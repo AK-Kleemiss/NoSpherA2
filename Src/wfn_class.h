@@ -46,6 +46,21 @@ inline std::ostream& operator<<(std::ostream& os, WfnOrigin origin) {
     }
 }
 class MO;
+enum e_origin {
+    NOT_YET_DEFINED = 0,
+    CRYSTAL = 1,
+    wfn = 2,
+    cub = 3,
+    ffn = 4,
+    fchk = 5,
+    wfx = 6,
+    xyz = 7,
+    molden = 8,
+    gbw = 9,
+    tonto = 10,
+    xtb = 11,
+    ptb = 12
+};
 
 /**
  * @class WFN
@@ -78,9 +93,7 @@ private:
     //Multiplicity of the wavefunction
     unsigned int multi;
     //Number of software/Filetype that was used to generate the wavefunction
-    // 0=NOT_YET_DEFINED/UNKNOWN; 1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK; 6=WFX; 7=XYZ; 8=Molden; 9=gbw
-	// enum class is typesafe, so it has to be defined as such. It can be switched to enum later if needed
-    int origin;
+    e_origin origin;
     //Store the total energy of the wavefunction
     double total_energy;
 	//Store the virial ratio of the wavefunction (if available)
@@ -159,6 +172,7 @@ private:
     bool distance_switch;
     bool has_ECPs;
     bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
+	bool is_unrestricted = false; // True if the wavefunction is unrestricted (different alpha and beta MOs)
     // precomputed factors and helper functions for ESP calc
 	static long long int pre[9][5][5][9];
     constexpr static void fill_pre();
@@ -176,7 +190,7 @@ public:
     /** Default constructor creates an empty wavefunction object. */
 	WFN();
     /** Construct empty WFN with an explicit origin/filetype code. @param given_origin origin code */
-    WFN(int given_origin);
+    WFN(e_origin given_origin);
     /** Construct by reading a file, auto-detecting filetype. @param filename path to wavefunction file @param debug enable verbose logging */
     WFN(const std::filesystem::path& filename, const bool& debug = false);
     /** Construct with forced charge / multiplicity while reading a file. */
@@ -220,6 +234,8 @@ public:
     const int& get_MO_op(const int &nr) const;
     /** Remove all fully unoccupied MOs (occ==0). */
     void delete_unoccupied_MOs();
+    /** Delet all Qs from the waveufnciton (charge = 119)*/
+    void delete_Qs();
     /** Const reference to MO object. */
     const MO &get_MO(const int &n) const;
     /** Count MOs having a specified operator id. */
@@ -250,12 +266,16 @@ public:
     bool read_xyz(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
     /** Read Molden format (.molden). */
     bool read_molden(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
+    /** Read tonto orbital_energies and molecular_orbitals binary file. */
+    bool read_tonto(const std::filesystem::path& filename, std::ostream& file, const bool debug = false, const std::filesystem::path& energies_filename = "", const std::filesystem::path& orbitals_filename = "");
     /** Read ORCA .gbw binary file. */
     bool read_gbw(const std::filesystem::path&filename, std::ostream &file, const bool debug = false, const bool has_ECPs = false);
     /** Read xTB / pTB binary orbital file. */
     bool read_ptb(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
     /** Write current wavefunction to .wfn file (optionally only occupied). */
     bool write_wfn(const std::filesystem::path&fileName, const bool &debug, const bool occupied) const;
+    /** Write current wavefunction to .47 file (optionally only occupied). */
+    bool write_nbo(const std::filesystem::path& fileName, const bool& debug);
     /** Write atomic geometry to .xyz file. */
     bool write_xyz(const std::filesystem::path& fileName);
     /** Set internal path field. */
@@ -264,6 +284,8 @@ public:
         path = given_path;
         return true;
     };
+    /** Get whether this is an unrestricted calculation */
+	bool get_is_unrestricted() const { return is_unrestricted; };
     /** Print primitive information to stdout. */
     void print_primitive(const int &nr) const;
     /** Assign total charge (overwrites existing). */
@@ -289,7 +311,7 @@ public:
     /** Number of (optionally only occupied) MOs. */
     const int get_nmo(const bool &only_occ) const;
     /** Origin/file type code. */
-    const int& get_origin() const { return origin; };
+    const e_origin& get_origin() const { return origin; };
     /** ECP mode (def2/xTB/pTB etc.). */
     const int& get_ECP_mode() const { return ECP_m; };
     /** Freeform comment header. */

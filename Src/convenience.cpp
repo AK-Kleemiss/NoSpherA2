@@ -8,69 +8,71 @@
 #include "wfn_class.h"
 #include "atoms.h"
 #include "JKFit.h"
+#include "fchk.h"
+
 #ifdef _WIN32
 #include <windows.h>
 #endif
 
 std::string help_message =
-    ("\n----------------------------------------------------------------------------\n"
-     "          These commands and arguments are known by NoSpherA2:\n"
-     "----------------------------------------------------------------------------\n\n"
-     ":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n"
-     "   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n"
-     "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (tested for OCC)\n"
-     "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename [requires -b and -d]\n"
-     "   -b              <FILENAME>               Read this basis set\n"
-     "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
-     "   -dmin           <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
-     "   -hkl_min_max    <6 Numbers>              Performs calculation on hkl range defined by the 6 numbers. (replaces dmin and hkl)\n"
-     "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
-     "                                            [1]: def2-ECP\n"
-     "                                            [2]: xTB\n"
-     "                                            [3]: pTB\n"
-     "   --help/-help/--h                         print this help\n"
-     "   -cpus           <NUMBER>                 Sets the number of available threads to use. Defaults to all available CPUs"
-     "   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n"
-     "   -v2                                      Even more stuff\n"
-     "   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n"
-     "   -charge         <NUMBER>                 Input charge of wavefunction (otherwise attempted to be read from the wfn)\n"
-     "   -method         <METHOD NAME>            Can be [RKS] or RHF to distinguish between DFT and HF\n"
-     "   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n"
-     "   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n"
-     "   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n"
-     "   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors. Use is discouraged!\n"
-     "   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n"
-     "   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n"
-     "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.\n"
-     "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
-     "   -TFVC                                    Use the Topological Fuzzy Voronoi Cells (TFVC) partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
-     "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
-     "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
-     "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
-     "                                            If there is more than a single twin law to be used, use the twin command multiple times.\n"
-     "   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n"
-     "   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n"
-     "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
-     "                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n"
-     "                                            without spaces.\n"
-     "   -salted         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n"
-     "   -ri_fit         <Aux Basis> <BETA>       Uses RI-Fitting to partition the electron density. If Aux Basis == 'auto' a optinal beta value can be given.\n"
-     "   -mtc_mult       <List of multiplicity>   Matching multiplicity for -cmtc and -mtc wavefucntions\n"
-     "   -mtc_charge     <List of charges>        Matching charges for -cmtc and -mtc wavefucntions\n"
-     "   -mtc_ECP        <List of ECP modes>      Matching ECP modes for -cmtc and -mtc wavefucntions\n"
-     "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
-     "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
-     "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
-     "   -cmtc            <List of .wfns + parts> Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
-     "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
-     "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
-     "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3 -mtc_charge 0 0 0 -mtc_mult 1 1 1 -mtc_ECP 0 0 0\n"
-     "      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n"
-     "      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc (also works for tscb files)\n"
-     "      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n"
-     "      convert tsc:  NoSpherA2.exe -tscb A.tscb\n"
-     "      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n"
-     "      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
+("\n----------------------------------------------------------------------------\n"
+    "          These commands and arguments are known by NoSpherA2:\n"
+    "----------------------------------------------------------------------------\n\n"
+    ":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n"
+    "   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n"
+    "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (tested for OCC)\n"
+    "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename [requires -b and -d]\n"
+    "   -b              <FILENAME>               Read this basis set\n"
+    "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
+    "   -dmin           <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
+    "   -hkl_min_max    <6 Numbers>              Performs calculation on hkl range defined by the 6 numbers. (replaces dmin and hkl)\n"
+    "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
+    "                                            [1]: def2-ECP\n"
+    "                                            [2]: xTB\n"
+    "                                            [3]: pTB\n"
+    "   --help/-help/--h                         print this help\n"
+    "   -cpus           <NUMBER>                 Sets the number of available threads to use. Defaults to all available CPUs"
+    "   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n"
+    "   -v2                                      Even more stuff\n"
+    "   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n"
+    "   -charge         <NUMBER>                 Input charge of wavefunction (otherwise attempted to be read from the wfn)\n"
+    "   -method         <METHOD NAME>            Can be [RKS] or RHF to distinguish between DFT and HF\n"
+    "   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n"
+    "   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n"
+    "   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n"
+    "   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors. Use is discouraged!\n"
+    "   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n"
+    "   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n"
+    "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.\n"
+    "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
+    "   -TFVC                                    Use the Topological Fuzzy Voronoi Cells (TFVC) partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
+    "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
+    "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
+    "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
+    "                                            If there is more than a single twin law to be used, use the twin command multiple times.\n"
+    "   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n"
+    "   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n"
+    "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
+    "                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n"
+    "                                            without spaces.\n"
+    "   -salted         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n"
+    "   -ri_fit         <Aux Basis> <BETA>       Uses RI-Fitting to partition the electron density. If Aux Basis == 'auto' a optinal beta value can be given.\n"
+    "   -mtc_mult       <List of multiplicity>   Matching multiplicity for -cmtc and -mtc wavefucntions\n"
+    "   -mtc_charge     <List of charges>        Matching charges for -cmtc and -mtc wavefucntions\n"
+    "   -mtc_ECP        <List of ECP modes>      Matching ECP modes for -cmtc and -mtc wavefucntions\n"
+    "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
+    "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
+    "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
+    "   -cmtc            <List of .wfns + parts> Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
+    "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
+    "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
+    "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3 -mtc_charge 0 0 0 -mtc_mult 1 1 1 -mtc_ECP 0 0 0\n"
+    "      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n"
+    "      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc (also works for tscb files)\n"
+    "      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n"
+    "      convert tsc:  NoSpherA2.exe -tscb A.tscb\n"
+    "      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n"
+    "      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
 std::string NoSpherA2_message(bool no_date)
 {
     std::string t = "    _   __     _____       __              ___   ___\n";
@@ -107,7 +109,7 @@ std::string NoSpherA2_message(bool no_date)
 
 std::string build_date = ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
 
-bool is_similar_rel(const double &first, const double &second, const double &tolerance)
+bool is_similar_rel(const double& first, const double& second, const double& tolerance)
 {
     double diff = abs(first - second);
     if (diff > abs((first + second + 0.01) * tolerance / 2))
@@ -116,7 +118,7 @@ bool is_similar_rel(const double &first, const double &second, const double &tol
         return true;
 };
 
-bool is_similar(const double &first, const double &second, const double &tolerance)
+bool is_similar(const double& first, const double& second, const double& tolerance)
 {
     double diff = abs(first - second);
     if (diff > pow(10, tolerance))
@@ -125,7 +127,7 @@ bool is_similar(const double &first, const double &second, const double &toleran
         return true;
 };
 
-bool is_similar_abs(const double &first, const double &second, const double &tolerance)
+bool is_similar_abs(const double& first, const double& second, const double& tolerance)
 {
     double diff = abs(first - second);
     if (diff > abs(tolerance))
@@ -159,7 +161,7 @@ double cosinus_annaeherung::calculate_error_at(double x) const
     return cos(x) - get(x);
 }
 */
-void copy_file(std::filesystem::path &from, std::filesystem::path &to)
+void copy_file(std::filesystem::path& from, std::filesystem::path& to)
 {
     std::ifstream source(from.c_str(), std::ios::binary);
     std::ofstream dest(to.c_str(), std::ios::binary);
@@ -170,15 +172,15 @@ void copy_file(std::filesystem::path &from, std::filesystem::path &to)
     dest.close();
 };
 
-std::array<double, 3> cross(const std::array<double, 3> &a, const std::array<double, 3> &b)
+std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b)
 {
     return {
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0]};
+        a[0] * b[1] - a[1] * b[0] };
 }
 
-double a_dot(const std::array<double, 3> &a, const std::array<double, 3> &b)
+double a_dot(const std::array<double, 3>& a, const std::array<double, 3>& b)
 {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 };
@@ -230,20 +232,20 @@ std::filesystem::path get_home_path(void)
 #endif
 }
 
-bool check_bohr(WFN &wave, bool debug)
+bool check_bohr(WFN& wave, bool debug)
 {
     double min_length = 300.0;
     for (int i = 0; i < wave.get_ncen(); i++)
     {
-        double atom1[3]{0, 0, 0};
+        double atom1[3]{ 0, 0, 0 };
         for (int x = 0; x < 3; x++)
             atom1[x] = wave.get_atom_coordinate(i, x);
         for (int j = i + 1; j < wave.get_ncen(); j++)
         {
-            double atom2[3]{0, 0, 0};
+            double atom2[3]{ 0, 0, 0 };
             for (int x = 0; x < 3; x++)
                 atom2[x] = wave.get_atom_coordinate(j, x);
-            double d[3]{0, 0, 0};
+            double d[3]{ 0, 0, 0 };
             d[0] = atom1[0] - atom2[0];
             d[1] = atom1[1] - atom2[1];
             d[2] = atom1[2] - atom2[2];
@@ -264,7 +266,7 @@ bool check_bohr(WFN &wave, bool debug)
     return (!(min_length < 2));
 };
 
-std::string go_get_string(std::ifstream &file, std::string search, bool rewind)
+std::string go_get_string(std::ifstream& file, std::string search, bool rewind)
 {
     if (rewind)
     {
@@ -280,7 +282,7 @@ std::string go_get_string(std::ifstream &file, std::string search, bool rewind)
         return line;
 }
 
-std::string shrink_string(std::string &input)
+std::string shrink_string(std::string& input)
 {
     while (input.find(" ") != -1)
     {
@@ -337,7 +339,7 @@ std::string shrink_string(std::string &input)
     return input;
 };
 
-std::string shrink_string_to_atom(std::string &input, const int &atom_number)
+std::string shrink_string_to_atom(std::string& input, const int& atom_number)
 {
     while (input.find(" ") != -1)
     {
@@ -401,12 +403,12 @@ std::string shrink_string_to_atom(std::string &input, const int &atom_number)
     return input;
 };
 
-bool read_block_from_fortran_binary(std::ifstream &file, void *Target)
+bool read_block_from_fortran_binary(std::ifstream& file, void* Target)
 {
     int size_begin = 0, size_end = 0;
-    file.read(reinterpret_cast<char *>(&size_begin), sizeof(int));
-    file.read(reinterpret_cast<char *>(Target), size_begin);
-    file.read(reinterpret_cast<char *>(&size_end), sizeof(int));
+    file.read(reinterpret_cast<char*>(&size_begin), sizeof(int));
+    file.read(reinterpret_cast<char*>(Target), size_begin);
+    file.read(reinterpret_cast<char*>(&size_end), sizeof(int));
     if (size_begin != size_end)
     {
         std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
@@ -414,6 +416,25 @@ bool read_block_from_fortran_binary(std::ifstream &file, void *Target)
     }
     return true;
 }
+template<typename T>
+bool read_block_from_fortran_binary(std::ifstream& file, std::vector<T>& Target)
+{
+    int size_begin = 0, size_end = 0;
+    file.read(reinterpret_cast<char*>(&size_begin), sizeof(int));
+    Target.resize(size_begin / sizeof(T));
+    file.read(reinterpret_cast<char*>(Target.data()), size_begin);
+    file.read(reinterpret_cast<char*>(&size_end), sizeof(int));
+    if (size_begin != size_end)
+    {
+        std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
+        return false;
+    }
+    return true;
+}
+template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<double>& Target);
+template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<int>& Target);
+template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<float>& Target);
+template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<char>& Target);
 
 primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
 {
@@ -429,79 +450,79 @@ primitive::primitive(const SimplePrimitive& other) : center(other.center), type(
         0.25);
 };
 
-void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
+void select_cubes(std::vector<std::vector<unsigned int>>& selection, std::vector<WFN>& wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
 {
     // asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
     // Returns values in selection[0][i] for iths selection of wavefunction and
     //  selection[1][i] for iths selection of cube
     using namespace std;
-   std::cout << "Which of the following cubes to use? Need to select " << nr_of_cubes << " file";
+    std::cout << "Which of the following cubes to use? Need to select " << nr_of_cubes << " file";
     if (nr_of_cubes > 1)
-       std::cout << "s in total." << endl;
+        std::cout << "s in total." << endl;
     else
-       std::cout << "." << endl;
-   std::cout << endl
-         << endl;
+        std::cout << "." << endl;
+    std::cout << endl
+        << endl;
     for (int w = 0; w < wavy.size(); w++)
     {
         stringstream stream;
-       std::cout << "_____________________________________________________________" << endl;
-       std::cout << "WFN ";
+        std::cout << "_____________________________________________________________" << endl;
+        std::cout << "WFN ";
         stream << setw(2) << w;
-       std::cout << stream.str() << ") " << wavy[w].get_path().stem() << endl;
+        std::cout << stream.str() << ") " << wavy[w].get_path().stem() << endl;
         stream.str("");
         for (int c = 0; c < wavy[w].get_cube_count(); c++)
         {
             if (c == 0)
-               std::cout << "        |" << endl
-                     << "Cube    |" << endl;
+                std::cout << "        |" << endl
+                << "Cube    |" << endl;
             else
-               std::cout << "        |" << endl;
+                std::cout << "        |" << endl;
             if (!wfnonly)
             {
-               std::cout << setw(2) << w;
-               std::cout << ".";
-               std::cout << setw(2) << c;
+                std::cout << setw(2) << w;
+                std::cout << ".";
+                std::cout << setw(2) << c;
             }
             else
-               std::cout << "     ";
-           std::cout << "   |_ " << wavy[w].get_cube_path(c).stem();
+                std::cout << "     ";
+            std::cout << "   |_ " << wavy[w].get_cube_path(c).stem();
             if (!exists(wavy[w].get_cube_path(c)))
-               std::cout << " (MEM ONLY)";
-           std::cout << endl;
+                std::cout << " (MEM ONLY)";
+            std::cout << endl;
         }
-       std::cout << "_____________________________________________________________" << endl
-             << endl
-             << endl;
+        std::cout << "_____________________________________________________________" << endl
+            << endl
+            << endl;
     }
     // bool happy = false;
     unsigned int selected_cubes = 0;
     do
     {
-       std::cout << "Select " << selected_cubes + 1 << ". ";
+        std::cout << "Select " << selected_cubes + 1 << ". ";
         if (wfnonly)
-           std::cout << "WFN ";
+            std::cout << "WFN ";
         else
-           std::cout << "cube ";
-       std::cout << "please: ";
+            std::cout << "cube ";
+        std::cout << "please: ";
         string input;
         cin >> input;
         if (!wfnonly)
         {
             if (input.find('.') == string::npos)
             {
-               std::cout << "no . found in input!" << endl;
+                std::cout << "no . found in input!" << endl;
                 continue;
             }
         }
         else
         {
             if (input.find('.') == string::npos)
-               std::cout << "Ignoring the .!" << endl;
+                std::cout << "Ignoring the .!" << endl;
             unsigned int nr_wave = fromString<unsigned int>(input);
             if (nr_wave < 0 || nr_wave >= wavy.size())
             {
-               std::cout << "Invalid choice!" << endl;
+                std::cout << "Invalid choice!" << endl;
                 continue;
             }
             selected_cubes++;
@@ -513,20 +534,20 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
         }
         if (debug)
         {
-           std::cout << "input: " << input << endl;
-           std::cout << "with . found at: " << input.find('.') << endl;
-           std::cout << "substr1: " << input.substr(0, input.find('.')) << endl;
-           std::cout << "substr2: " << input.substr(input.find('.') + 1) << endl;
+            std::cout << "input: " << input << endl;
+            std::cout << "with . found at: " << input.find('.') << endl;
+            std::cout << "substr1: " << input.substr(0, input.find('.')) << endl;
+            std::cout << "substr2: " << input.substr(input.find('.') + 1) << endl;
         }
         string wave(input.substr(0, input.find('.')));
         string cube(input.substr(input.find('.') + 1));
         unsigned int nr_wave = fromString<unsigned int>(wave);
         int nr_cube = fromString<int>(cube);
         if (debug)
-           std::cout << "Translated: " << nr_wave << " " << nr_cube << endl;
+            std::cout << "Translated: " << nr_wave << " " << nr_cube << endl;
         if (nr_wave < 0 || nr_wave >= wavy.size() || nr_cube < 0 || nr_cube >= wavy[nr_wave].get_cube_count())
         {
-           std::cout << "Invalid choice!" << endl;
+            std::cout << "Invalid choice!" << endl;
             continue;
         }
         selection[0][selected_cubes] = nr_wave;
@@ -535,13 +556,13 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
         if (selected_cubes == nr_of_cubes)
         {
             if (debug)
-               std::cout << "Going to return!" << endl;
+                std::cout << "Going to return!" << endl;
             return;
         }
     } while (true);
 };
 
-bool unsaved_files(std::vector<WFN> &wavy)
+bool unsaved_files(std::vector<WFN>& wavy)
 {
     for (int w = 0; w < wavy.size(); w++)
         for (int c = 0; c < wavy[w].get_cube_count(); c++)
@@ -551,9 +572,9 @@ bool unsaved_files(std::vector<WFN> &wavy)
 };
 
 void readxyzMinMax_fromWFN(
-    WFN &wavy,
-    double *CoordMinMax,
-    int *NbSteps,
+    WFN& wavy,
+    double* CoordMinMax,
+    int* NbSteps,
     double Radius,
     double Increments,
     bool no_bohr)
@@ -599,9 +620,9 @@ void readxyzMinMax_fromWFN(
 
 void readxyzMinMax_fromCIF(
     std::filesystem::path cif,
-    double *CoordMinMax,
-    int *NbSteps,
-    vec2 &cm,
+    double* CoordMinMax,
+    int* NbSteps,
+    vec2& cm,
     double Resolution)
 {
     using namespace std;
@@ -631,7 +652,7 @@ void readxyzMinMax_fromCIF(
             cm[i][j] /= NbSteps[j];
 }
 
-bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
+bool generate_sph2cart_mat(vec2& p, vec2& d, vec2& f, vec2& g)
 {
     //
     // From 3P: P0 P1 P2
@@ -759,7 +780,7 @@ bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
     g[14][4] = 3.0 / sqrt(7);
     return true;
 }
-bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
+bool generate_cart2sph_mat(vec2& d, vec2& f, vec2& g, vec2& h)
 {
     //
     // From 5D: D 0, D + 1, D - 1, D + 2, D - 2
@@ -943,7 +964,7 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     return true;
 }
 
-bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug)
 {
     using namespace std;
     vec2 Uij, Cijk, Dijkl;
@@ -953,7 +974,7 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
     string line;
     svec labels;
     int count_fields = 0;
-    int position_field[3] = {0, 0, 0};
+    int position_field[3] = { 0, 0, 0 };
     int label_field = 100;
     vec2 positions;
     positions.resize(wavy.get_ncen());
@@ -1010,9 +1031,9 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
                     {
                         if (debug)
                             log3 << "WFN position: " << wavy.get_atom_coordinate(i, 0) << " " << wavy.get_atom_coordinate(i, 1) << " " << wavy.get_atom_coordinate(i, 2) << endl
-                                 << "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.get_atom_charge(i) << endl;
+                            << "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.get_atom_charge(i) << endl;
                         wavy.set_atom_label(i, fields[label_field]);
-                        wavy.set_atom_frac_coords(i, {stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])});
+                        wavy.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
                         found_this_one = true;
                         break;
                     }
@@ -1028,7 +1049,7 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
     asym_cif_input.clear();
     asym_cif_input.seekg(0, asym_cif_input.beg);
     count_fields = 0;
-    int ADP_field[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    int ADP_field[15] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     label_field = 100;
     atoms_read = false;
     Uij.resize(wavy.get_ncen());
@@ -1254,12 +1275,12 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
     }
 
     for (int i = 0; i < wavy.get_ncen(); i++)
-        wavy.set_atom_ADPs(i, {Uij[i], Cijk[i], Dijkl[i]});
+        wavy.set_atom_ADPs(i, { Uij[i], Cijk[i], Dijkl[i] });
 
     return true;
 };
 
-void swap_sort(ivec order, cvec &v)
+void swap_sort(ivec order, cvec& v)
 {
     int i = 0;
     while (i < v.size() - 1)
@@ -1282,7 +1303,7 @@ void swap_sort(ivec order, cvec &v)
     }
 }
 
-void swap_sort_multi(ivec order, std::vector<ivec> &v)
+void swap_sort_multi(ivec order, std::vector<ivec>& v)
 {
     int i = 0;
     ivec temp;
@@ -1312,7 +1333,7 @@ void swap_sort_multi(ivec order, std::vector<ivec> &v)
     }
 }
 
-double get_lambda_1(double *a)
+double get_lambda_1(double* a)
 {
     vec bw, zw;
     // int run = 0;
@@ -1346,7 +1367,7 @@ double get_lambda_1(double *a)
             a[5],
             a[6],
             a[7],
-            a[8] - q};
+            a[8] - q };
         const double r = (B[0] * B[4] * B[8] + B[1] * B[5] * B[6] + B[3] * B[4] * B[7] - B[0] * B[5] * B[7] - B[1] * B[3] * B[8] - B[2] * B[4] * B[6]) / 2;
         double phi;
         if (r <= -1)
@@ -1370,7 +1391,7 @@ double get_lambda_1(double *a)
     }
 };
 
-const double gaussian_radial(const primitive &p, const double &r)
+const double gaussian_radial(const primitive& p, const double& r)
 {
     return pow(r, p.get_type()) * std::exp(-p.get_exp() * r * r) * p.normalization_constant();
 }
@@ -1521,7 +1542,7 @@ double bessel_first_kind(const int l, const double x)
     }
 }
 
-int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b)
+int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b)
 {
     wavy.set_basis_set_ptr((*b).get_data());
     int nr_coefs = 0;
@@ -1542,7 +1563,7 @@ int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b)
 }
 
 
-double get_decimal_precision_from_CIF_number(std::string &given_string)
+double get_decimal_precision_from_CIF_number(std::string& given_string)
 {
     int len = (int)given_string.length();
     int open_bracket = -1;
@@ -1601,14 +1622,14 @@ void options::digest_options()
     // Lets print what was the command line, for debugging
     if (debug)
     {
-       std::cout << " Recap of input:\nsize: " << arguments.size() << endl;
+        std::cout << " Recap of input:\nsize: " << arguments.size() << endl;
     }
     // This loop figures out command line options
     int argc = (int)arguments.size();
     for (int i = 0; i < arguments.size(); i++)
     {
         if (debug)
-           std::cout << arguments[i] << endl;
+            std::cout << arguments[i] << endl;
         string temp = arguments[i];
         if (temp.find("-") > 0)
             continue;
@@ -1621,7 +1642,7 @@ void options::digest_options()
             int n = 1;
             string store;
             if (debug)
-               std::cout << "Looking for Anions!" << endl;
+                std::cout << "Looking for Anions!" << endl;
             while (i + n < argc && string(arguments[i + n]).find("-") != 0)
             {
                 if (i + n - 1 > arguments.size())
@@ -1631,7 +1652,7 @@ void options::digest_options()
                 for (int r = 0; r < Z.size(); r++)
                 {
                     if (debug)
-                       std::cout << Z[r] << endl;
+                        std::cout << Z[r] << endl;
                     Anions.push_back(Z[r]);
                 }
                 n++;
@@ -1645,23 +1666,23 @@ void options::digest_options()
         }
         else if (temp == "-atom_dens")
         {
-           std::cout << NoSpherA2_message() << endl;
+            std::cout << NoSpherA2_message() << endl;
             wfn = arguments[i + 1];
-            err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist",std::cout);
+            err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
             ivec val_MOs;
             ivec val_MOs_beta;
             if (argc >= i + 3)
             {
                 val_MOs = split_string<int>(arguments[i + 2], ",");
-               std::cout << "Alpha MOs to keep: ";
+                std::cout << "Alpha MOs to keep: ";
                 for (int j = 0; j < val_MOs.size(); j++)
-                   std::cout << val_MOs[j] << " ";
-               std::cout << endl;
+                    std::cout << val_MOs[j] << " ";
+                std::cout << endl;
                 val_MOs_beta = split_string<int>(arguments[i + 3], ",");
-               std::cout << "Beta MOs to keep: ";
+                std::cout << "Beta MOs to keep: ";
                 for (int j = 0; j < val_MOs_beta.size(); j++)
-                   std::cout << val_MOs_beta[j] << " ";
-               std::cout << endl;
+                    std::cout << val_MOs_beta[j] << " ";
+                std::cout << endl;
             }
             spherically_averaged_density(*this, val_MOs, val_MOs_beta);
             exit(0);
@@ -1686,7 +1707,7 @@ void options::digest_options()
             int n = 1;
             string store;
             if (debug)
-               std::cout << "Looking for Cations!" << endl;
+                std::cout << "Looking for Cations!" << endl;
             while (i + n < argc && string(arguments[i + n]).find("-") != 0)
             {
                 if (i + n - 1 > arguments.size())
@@ -1696,7 +1717,7 @@ void options::digest_options()
                 for (int r = 0; r < Z.size(); r++)
                 {
                     if (debug)
-                       std::cout << Z[r] << endl;
+                        std::cout << Z[r] << endl;
                     Cations.push_back(Z[r]);
                 }
                 n++;
@@ -1709,13 +1730,13 @@ void options::digest_options()
         else if (temp == "-coef")
         {
             coef_file = arguments[i + 1];
-            err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist",std::cout);
+            err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist", std::cout);
             SALTED = true;
         }
         else if (temp == "-cif")
         {
             cif = arguments[i + 1];
-            err_checkf(std::filesystem::exists(cif), "CIF doesn't exist",std::cout);
+            err_checkf(std::filesystem::exists(cif), "CIF doesn't exist", std::cout);
         }
         else if (temp == "-cpus")
         {
@@ -1750,7 +1771,7 @@ void options::digest_options()
                 {
                     std::cout << "--Group: " << _temp << endl << "--";
                     for (int run = 0; run < groups[groups.size() - 1].size(); run++)
-                        std::cout  << groups[groups.size() - 1][run] << " ";
+                        std::cout << groups[groups.size() - 1][run] << " ";
                     std::cout << endl;
                 }
                 n++;
@@ -1795,6 +1816,22 @@ void options::digest_options()
             ivec a = split_string<int>(arguments[i + 3], ",");
             ivec b = split_string<int>(arguments[i + 4], ",");
             test_core_sfac_corrected(prec, threads, arguments[i + 2], a, b);
+            exit(0);
+        }
+        else if (temp == "-convert_to_47") {
+            err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
+            std::filesystem::path wfn = arguments[i + 1];
+            WFN wavy(e_origin::NOT_YET_DEFINED);
+            wavy.read_known_wavefunction_format(wfn, std::cout, debug);
+            wavy.write_nbo(wfn.replace_extension(".47"), debug);
+            exit(0);
+        }
+        else if (temp == "-convert_XCW")
+        {
+            err_checkf(argc >= i + 3, "Not enough arguments for -convert_XCW\nPlease provide at least stdout name and lambda step!", std::cout);
+            std::string stdo = arguments[i + 1];
+            std::string step = arguments[i + 2];
+            convert_tonto_XCW_lambda_steps(stdo, step, debug, *this);
             exit(0);
         }
         else if (temp == "-def" || temp == "-DEF")
@@ -1858,7 +1895,7 @@ void options::digest_options()
         else if (temp == "-ewal_sum")
         {
             // bool read, WFN& wave, std::ostream& file,
-            WFN *temp_w = new WFN(9);
+            WFN* temp_w = new WFN(e_origin::cub);
             cube residual(arguments[i + 1], true, *temp_w, std::cout);
             if (argc >= i + 3)
             {
@@ -1905,7 +1942,7 @@ void options::digest_options()
         else if (temp == "-hkl")
         {
             hkl = arguments[i + 1];
-            err_checkf(std::filesystem::exists(hkl), "hkl doesn't exist",std::cout);
+            err_checkf(std::filesystem::exists(hkl), "hkl doesn't exist", std::cout);
         }
         else if (temp == "-hkl_min_max")
         {
@@ -1915,7 +1952,7 @@ void options::digest_options()
             int k_max(stoi(arguments[i + 4]));
             int l_min(stoi(arguments[i + 5]));
             int l_max(stoi(arguments[i + 6]));
-            hkl_min_max = {{h_min, h_max}, {k_min, k_max}, {l_min, l_max}};
+            hkl_min_max = { {h_min, h_max}, {k_min, k_max}, {l_min, l_max} };
         }
         else if (temp == "-IAM")
             iam_switch = true;
@@ -1929,7 +1966,7 @@ void options::digest_options()
             double doubel_max_size = static_cast<double>(vec_max_size * sizeof(double)) * 1e-6;
             if (mem > doubel_max_size)
             {
-               std::cout << "Max memory set to " << mem << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << 50000 << " MB." << endl;
+                std::cout << "Max memory set to " << mem << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << 50000 << " MB." << endl;
                 mem = 50000.0;
             }
         }
@@ -2037,13 +2074,13 @@ void options::digest_options()
             pbc = stoi(arguments[i + 1]);
         else if (temp == "-polarizabilities")
         {
-            pol_wfns = {arguments[i + 1],
+            pol_wfns = { arguments[i + 1],
                         arguments[i + 2],
                         arguments[i + 3],
                         arguments[i + 4],
                         arguments[i + 5],
                         arguments[i + 6],
-                        arguments[i + 7]};
+                        arguments[i + 7] };
         }
         else if (temp == "-QCT" || temp == "-qct")
             qct = true;
@@ -2071,7 +2108,7 @@ void options::digest_options()
         {
             RI_FIT = true;
             partition_type = PartitionType::RI;
-            int next_basis_set = i+1;
+            int next_basis_set = i + 1;
             // Check if next argument is a valid basis set name or a new argument starting with "-"
             while (next_basis_set < argc && arguments[next_basis_set].find("-") != 0) {
                 if (arguments[next_basis_set] == "auto_aux") {
@@ -2141,7 +2178,7 @@ void options::digest_options()
             np_coeffs.fortran_order = false;
             np_coeffs.shape = { static_cast<unsigned long>(coefs.size()) };
             npy::write_npy("SALTED_COEFS.npy", np_coeffs);
-            }
+        }
         else if (temp == "-test_reading_SALTED_binary") {
             test_reading_SALTED_binary_file();
             exit(0);
@@ -2176,8 +2213,8 @@ void options::digest_options()
         {
             filesystem::path wfn1_name = arguments[i + 1];
             filesystem::path wfn2_name = arguments[i + 2];
-            WFN *wavy1 = new WFN(wfn1_name);
-            WFN *wavy2 = new WFN(wfn2_name);
+            WFN* wavy1 = new WFN(wfn1_name);
+            WFN* wavy2 = new WFN(wfn2_name);
             ofstream outputFile("fukui_averaged_density_wfn.dat");
             for (double r = 0.001; r < 10.0; r += 0.001)
             {
@@ -2195,7 +2232,7 @@ void options::digest_options()
         {
             string wfn_name = arguments[i + 1];
             std::cout << "Reading wavefunction: " << wfn_name << endl;
-            WFN *wavy = new WFN(wfn_name);
+            WFN* wavy = new WFN(wfn_name);
             std::cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy->set_has_ECPs(true);
@@ -2231,10 +2268,10 @@ void options::digest_options()
                 twin_law.back()[twl] = stod(arguments[i + 1 + twl]);
             if (debug)
             {
-               std::cout << "twin_law: ";
+                std::cout << "twin_law: ";
                 for (int twl = 0; twl < 9; twl++)
-                   std::cout << setw(7) << setprecision(2) << twin_law.back()[twl];
-               std::cout << endl;
+                    std::cout << setw(7) << setprecision(2) << twin_law.back()[twl];
+                std::cout << endl;
             }
             i += 9;
         }
@@ -2256,7 +2293,7 @@ void options::digest_options()
             else if (name.extension() == ".tsc")
                 blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
             else
-                err_checkf(false, "Wrong file ending!",std::cout);
+                err_checkf(false, "Wrong file ending!", std::cout);
             exit(0);
         }
         else if (temp == "-test_analytical")
@@ -2285,7 +2322,7 @@ void options::digest_options()
 
             WFN wavy(wfn);
 
-            WFN wavy_aux(0);
+            WFN wavy_aux(e_origin::NOT_YET_DEFINED);
             wavy_aux.set_atoms(wavy.get_atoms());
             wavy_aux.set_ncen(wavy.get_ncen());
             wavy_aux.delete_basis_set();
@@ -2319,7 +2356,7 @@ void options::digest_options()
         else if (temp == "-wfn")
         {
             wfn = arguments[i + 1];
-            err_checkf(std::filesystem::exists(wfn), "Wavefunction dos not exist!",std::cout);
+            err_checkf(std::filesystem::exists(wfn), "Wavefunction does not exist!", std::cout);
         }
         else if (temp == "-wfn_cif")
         {
@@ -2347,7 +2384,7 @@ void options::digest_options()
     }
 };
 
-void options::look_for_debug(int &argc, char **argv)
+void options::look_for_debug(int& argc, char** argv)
 {
     // This loop figures out command line options
     for (int i = 0; i < argc; i++)
@@ -2366,24 +2403,24 @@ void options::look_for_debug(int &argc, char **argv)
     }
 };
 
-bool is_nan(double &in)
+bool is_nan(double& in)
 {
     return in != in;
 };
-bool is_nan(float &in)
+bool is_nan(float& in)
 {
     return in != in;
 };
-bool is_nan(long double &in)
+bool is_nan(long double& in)
 {
     return in != in;
 };
-bool is_nan(cdouble &in)
+bool is_nan(cdouble& in)
 {
     return in != in;
 };
 
-bool ends_with(const std::string &str, const std::string &suffix)
+bool ends_with(const std::string& str, const std::string& suffix)
 {
     if (str.length() >= suffix.length())
     {
@@ -2434,7 +2471,7 @@ double double_from_string_with_esd(std::string in)
         return stod(in.substr(0, in.find('(')));
 }
 
-std::string trim(const std::string &s)
+std::string trim(const std::string& s)
 {
     if (s == "")
         return "";
@@ -2453,7 +2490,7 @@ std::string trim(const std::string &s)
     return std::string(start, end + 1);
 }
 
-int CountWords(const char *str)
+int CountWords(const char* str)
 {
     if (str == NULL)
         return -1;
@@ -2479,16 +2516,16 @@ int CountWords(const char *str)
     return numWords;
 };
 
-void print_duration(std::ostream &file, const std::string &description, const std::chrono::microseconds &duration, std::optional<std::chrono::microseconds> total_duration = std::nullopt)
+void print_duration(std::ostream& file, const std::string& description, const std::chrono::microseconds& duration, std::optional<std::chrono::microseconds> total_duration = std::nullopt)
 {
     auto mins = std::chrono::duration_cast<std::chrono::minutes>(duration);
     auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration) % 60;
     auto millisecs = std::chrono::duration_cast<std::chrono::milliseconds>(duration) % 1000;
 
     file << std::setw(35) << std::left << std::setfill(' ') << description << ": " << std::right
-         << std::setw(2) << std::setfill('0') << mins.count() << ":"
-         << std::setw(2) << std::setfill('0') << secs.count() << ":"
-         << std::setw(3) << std::setfill('0') << millisecs.count();
+        << std::setw(2) << std::setfill('0') << mins.count() << ":"
+        << std::setw(2) << std::setfill('0') << secs.count() << ":"
+        << std::setw(3) << std::setfill('0') << millisecs.count();
     if (total_duration.has_value())
     {
         double percentage = (double(duration.count()) / total_duration->count()) * 100.0;
@@ -2499,15 +2536,15 @@ void print_duration(std::ostream &file, const std::string &description, const st
     file << std::setfill(' ');
 }
 
-void write_timing_to_file(std::ostream &file,
-                          std::vector<_time_point> time_points,
-                          std::vector<std::string> descriptions)
+void write_timing_to_file(std::ostream& file,
+    std::vector<_time_point> time_points,
+    std::vector<std::string> descriptions)
 {
     using namespace std;
     // Check if either vector is empty
     if (time_points.empty() || descriptions.empty())
     {
-       std::cout << "Error: Empty vector passed to write_timing_to_file" << endl;
+        std::cout << "Error: Empty vector passed to write_timing_to_file" << endl;
         return;
     }
 
@@ -2524,7 +2561,7 @@ void write_timing_to_file(std::ostream &file,
     file << "---------------------------------------------------------------------------" << endl;
 }
 
-void remove_empty_elements(svec &input, const std::string &empty)
+void remove_empty_elements(svec& input, const std::string& empty)
 {
     for (int i = (int)input.size() - 1; i >= 0; i--)
         if (input[i] == empty || input[i] == "")
@@ -2559,7 +2596,7 @@ long long int get_sec(std::chrono::high_resolution_clock::time_point start, std:
     return sec.count();
 }
 
-const int shell2function(const int &type, const int &prim)
+const int shell2function(const int& type, const int& prim)
 {
     switch (type)
     {
@@ -2673,7 +2710,8 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
             command += "'";
         }
         command += " 2> /dev/null";
-    } else {
+    }
+    else {
         use_kdialog = (system("which kdialog > /dev/null 2>&1") == 0);
         if (use_kdialog) {
             command = "kdialog --getopenfilename \"";
@@ -2685,7 +2723,8 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
             }
             command += "'";
             command += " --title \"Select a file to load\" 2> /dev/null";
-        } else {
+        }
+        else {
             std::cout << "No suitable file dialog tool found (zenity/kdialog)." << std::endl;
             std::cout << "Please enter the full path to the file: " << std::flush;
             std::string input_path;
@@ -2704,7 +2743,8 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
             if (std::filesystem::exists(path)) {
                 if (debug) std::cout << "Selected file via manual input: " << path << std::endl;
                 return true;
-            } else {
+            }
+            else {
                 std::cerr << "Error: File not found at path: " << path << std::endl;
                 return false;
             }
@@ -2738,7 +2778,7 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
     }
 
     // Clean up the path string which might have a newline
-    file_str.erase(file_str.find_last_not_of(" \n\r\t")+1);
+    file_str.erase(file_str.find_last_not_of(" \n\r\t") + 1);
 
     if (file_str.empty()) {
         if (debug) std::cout << "File selection cancelled or returned empty path." << std::endl;
@@ -2856,10 +2896,10 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
     return true;
 };
 
-const int sht2nbas(const int &type)
+const int sht2nbas(const int& type)
 {
-    const int st2bas[9]{1, 3, 6, 10, 15, 21, 28, 36};
-    const int nst2bas[9]{17,15,13,11, 9, 7, 5, 4, 1};
+    const int st2bas[9]{ 1, 3, 6, 10, 15, 21, 28, 36 };
+    const int nst2bas[9]{ 17,15,13,11, 9, 7, 5, 4, 1 };
     if (type >= 0)
         return st2bas[type];
     else
@@ -2873,7 +2913,7 @@ char asciitolower(char in)
     return in;
 }
 
-int vec_sum(const bvec &in)
+int vec_sum(const bvec& in)
 {
     int sum = 0;
     for (bool val : in)
@@ -2883,7 +2923,7 @@ int vec_sum(const bvec &in)
     return sum;
 }
 
-int vec_sum(const ivec &in)
+int vec_sum(const ivec& in)
 {
     int sum = 0;
     for (int val : in)
@@ -2893,7 +2933,7 @@ int vec_sum(const ivec &in)
     return sum;
 }
 
-double vec_sum(const vec &in)
+double vec_sum(const vec& in)
 {
     double sum = 0.0;
     for (double val : in)
@@ -2903,7 +2943,7 @@ double vec_sum(const vec &in)
     return sum;
 }
 
-cdouble vec_sum(const cvec &in)
+cdouble vec_sum(const cvec& in)
 {
     cdouble res = 0.0;
     for (int i = 0; i < in.size(); i++)
@@ -2911,7 +2951,7 @@ cdouble vec_sum(const cvec &in)
     return res;
 }
 
-double vec_length(const vec &in)
+double vec_length(const vec& in)
 {
     double sum = 0.0;
     for (double val : in)
@@ -2921,7 +2961,7 @@ double vec_length(const vec &in)
     return sqrt(sum);
 }
 
-void error_check(const bool condition, const std::source_location loc, const std::string &error_message, std::ostream &log_file)
+void error_check(const bool condition, const std::source_location loc, const std::string& error_message, std::ostream& log_file)
 {
     if (!condition)
     {
@@ -2932,7 +2972,7 @@ void error_check(const bool condition, const std::source_location loc, const std
         exit(-1);
     }
 };
-void not_implemented(const std::source_location loc, const std::string &error_message, std::ostream &log_file)
+void not_implemented(const std::source_location loc, const std::string& error_message, std::ostream& log_file)
 {
     log_file << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << " not yet implemented!" << std::endl;
     log_file.flush();
@@ -2949,7 +2989,7 @@ void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
     for (int i = 0; i < 16; ++i)
     {
         w[i] = (block[i * 4] << 24) | (block[i * 4 + 1] << 16) |
-               (block[i * 4 + 2] << 8) | (block[i * 4 + 3]);
+            (block[i * 4 + 2] << 8) | (block[i * 4 + 3]);
     }
 
     for (int i = 16; i < 64; ++i)
@@ -2991,7 +3031,7 @@ void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
 }
 
 // SHA-256 update function
-void sha::sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t *data, size_t len, uint64_t &bitlen)
+void sha::sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t* data, size_t len, uint64_t& bitlen)
 {
     for (size_t i = 0; i < len; ++i)
     {
@@ -3062,17 +3102,17 @@ void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, u
 }
 
 // Function to calculate SHA-256 hash
-std::string sha::sha256(const std::string &input)
+std::string sha::sha256(const std::string& input)
 {
     uint32_t state[8] = {
         0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 };
 
-    uint8_t buffer[64] = {0};
+    uint8_t buffer[64] = { 0 };
     uint8_t hash[32];
     uint64_t bitlen = 0;
 
-    sha256_update(state, buffer, reinterpret_cast<const uint8_t *>(input.c_str()), input.length(), bitlen);
+    sha256_update(state, buffer, reinterpret_cast<const uint8_t*>(input.c_str()), input.length(), bitlen);
     sha256_final(state, buffer, bitlen, hash);
 
     std::stringstream ss;
@@ -3112,7 +3152,7 @@ ProgressBar::~ProgressBar()
 #endif
 }
 
-void ProgressBar::write_progress(std::ostream &os)
+void ProgressBar::write_progress(std::ostream& os)
 {
     // No need to write once progress is 100%
     if (progress_ > 100.0f)
@@ -3120,7 +3160,7 @@ void ProgressBar::write_progress(std::ostream &os)
 
     // Move cursor to the first position on the same line
     // Check if os is a file stream
-    if (dynamic_cast<std::filebuf *>(std::cout.rdbuf()))
+    if (dynamic_cast<std::filebuf*>(std::cout.rdbuf()))
     {
         os.seekp(linestart); // Is a file stream
     }
@@ -3176,3 +3216,87 @@ void ProgressBar::initialize_taskbar_progress()
     }
 }
 #endif
+
+void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt) {
+    double lambda = 0.0;
+    const double ls = stod(lambda_step);
+    std::string jobname, line;
+    std::filesystem::path stdout_file = str;
+    err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", std::cout);
+    std::ifstream rf(stdout_file.string().c_str(), std::ios::in);
+    rf.seekg(0);
+    while (rf.good() && line.find("Name ...") == std::string::npos) {
+        getline(rf, line);
+    }
+    jobname = split_string<std::string>(line, " ")[2];
+    std::cout << "Conervting XCW wavefunctions with lambda step " + std::to_string(ls) + " and jobname: " + jobname << std::endl;
+
+    //iterate over files in the same folder looking for .orbital_energies,restricted or .MO_energies,r and .molecular_orbitals,restricted or .MOs,r at the given lambda value
+    //example filename: NiP3.molecular_orbitals,lambda=0.000000,restricted
+    //make lambda value into a string with 6 decimal places
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(6) << lambda;
+    std::string formatted_lambda = ss.str();
+    std::filesystem::path energies_file = stdout_file.parent_path() / (jobname + ".orbital_energies,lambda=" + formatted_lambda + ",restricted");
+    if (!std::filesystem::exists(energies_file))
+        energies_file = stdout_file.parent_path() / (jobname + ".MO_energies,lambda=" + formatted_lambda + ",r");
+    if (!std::filesystem::exists(energies_file))
+        energies_file = stdout_file.parent_path() / (jobname + ".orbital_energies,lambda=" + formatted_lambda + ",alpha");
+    if (!std::filesystem::exists(energies_file))
+        energies_file = stdout_file.parent_path() / (jobname + ".MO_energies,lambda=" + formatted_lambda + ",a");
+
+    std::filesystem::path orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,lambda=" + formatted_lambda + ",restricted");
+    if (!std::filesystem::exists(orbitals_file))
+        orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,lambda=" + formatted_lambda + ",r");
+    if (!std::filesystem::exists(orbitals_file))
+        orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,lambda=" + formatted_lambda + ",alpha");
+    if (!std::filesystem::exists(orbitals_file))
+        orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,lambda=" + formatted_lambda + ",a");
+
+    while (std::filesystem::exists(energies_file) && std::filesystem::exists(orbitals_file)) {
+        const std::filesystem::path of = orbitals_file;
+        const std::filesystem::path ef = energies_file;
+
+        err_checkf(of.string() != "", "Orbitals file name is empty?!", std::cout);
+        err_checkf(ef.string() != "", "Energy file name is empty?!", std::cout);
+        err_checkf(std::filesystem::exists(of), "couldn't open or find " + of.string() + ", leaving", std::cout);
+        err_checkf(std::filesystem::exists(ef), "couldn't open or find " + ef.string() + ", leaving", std::cout);
+        std::cout << "lambda = " + std::to_string(lambda) + "..." << std::flush;
+
+        std::vector<WFN> wavy;
+        wavy.emplace_back(e_origin::tonto);
+        wavy.back().read_tonto(stdout_file, std::cout, debug, ef, of);
+        std::filesystem::path basename = stdout_file.parent_path() / (jobname + "_l_" + formatted_lambda);
+        wavy.back().write_wfn(basename.string() + ".wfn", debug, false);
+        free_fchk(std::cout, basename.string() + ".fchk", "", wavy.back(), debug, true);
+
+        if (opt.cif != "") {
+            svec ka;
+            int nr = 0;
+            opt.groups[0] = { 0 };
+            tsc_block<int, cdouble> result = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, std::cout, ka, nr);
+            result.write_tscb_file(opt.cif, basename.string() + ".tscb");
+        }
+
+        lambda += ls;
+        std::stringstream ss_l;
+        ss_l << std::fixed << std::setprecision(6) << lambda;
+        formatted_lambda = ss_l.str();
+        energies_file = stdout_file.parent_path() / (jobname + ".orbital_energies,lambda=" + formatted_lambda + ",restricted");
+        if (!std::filesystem::exists(energies_file))
+            energies_file = stdout_file.parent_path() / (jobname + ".MO_energies,lambda=" + formatted_lambda + ",r");
+        if (!std::filesystem::exists(energies_file))
+            energies_file = stdout_file.parent_path() / (jobname + ".orbital_energies,lambda=" + formatted_lambda + ",alpha");
+        if (!std::filesystem::exists(energies_file))
+            energies_file = stdout_file.parent_path() / (jobname + ".MO_energies,lambda=" + formatted_lambda + ",a");
+
+        orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,lambda=" + formatted_lambda + ",restricted");
+        if (!std::filesystem::exists(orbitals_file))
+            orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,lambda=" + formatted_lambda + ",r");
+        if (!std::filesystem::exists(orbitals_file))
+            orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,lambda=" + formatted_lambda + ",alpha");
+        if (!std::filesystem::exists(orbitals_file))
+            orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,lambda=" + formatted_lambda + ",a");
+        std::cout << " .. done!" << std::endl;
+    }
+};

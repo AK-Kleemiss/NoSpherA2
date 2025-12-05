@@ -261,12 +261,36 @@
       <Configuration>D_Mohr_Salt</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="D_OH_rad_tonto|ARM64">
+      <Configuration>D_OH_rad_tonto</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="D_OH_rad_tonto|x64">
+      <Configuration>D_OH_rad_tonto</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="D_OH_rad|ARM64">
+      <Configuration>D_OH_rad</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="D_OH_rad|x64">
+      <Configuration>D_OH_rad</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="D_OpenShell_gbw|ARM64">
       <Configuration>D_OpenShell_gbw</Configuration>
       <Platform>ARM64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="D_OpenShell_gbw|x64">
       <Configuration>D_OpenShell_gbw</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="D_OpShell_tonto|ARM64">
+      <Configuration>D_OpShell_tonto</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="D_OpShell_tonto|x64">
+      <Configuration>D_OpShell_tonto</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="D_polarizability|ARM64">
@@ -307,6 +331,14 @@
     </ProjectConfiguration>
     <ProjectConfiguration Include="D_QCT|x64">
       <Configuration>D_QCT</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="D_radical_tonto|ARM64">
+      <Configuration>D_radical_tonto</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="D_radical_tonto|x64">
+      <Configuration>D_radical_tonto</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="D_RI_Test|ARM64">
@@ -467,7 +499,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
-    <UseDynamicDebugging>true</UseDynamicDebugging>
+    <UseDynamicDebugging>false</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_QCT|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -4388,7 +4420,7 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level1</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>Disabled</Optimization>
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
@@ -6478,7 +6510,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <OpenMPSupport>true</OpenMPSupport>
+      <OpenMPSupport>false</OpenMPSupport>
       <FloatingPointModel>Fast</FloatingPointModel>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <FunctionLevelLinking>true</FunctionLevelLinking>

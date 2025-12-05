@@ -60,12 +60,12 @@ jobs:
 
     steps:
     - name: Harden Runner
-      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
       with:
         egress-policy: audit
 
     - name: Checkout
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       with:
         submodules: recursive
         fetch-depth: 1
@@ -94,18 +94,83 @@ jobs:
         name: ${{ matrix.artifact-name }}
         path: ${{ matrix.artifact-path }}
 
+  # Create macOS Universal Binary
+  build_mac_universal:
+    needs: build
+    runs-on: macos-latest
+    name: Build macOS Universal Binary
+
+    steps:
+    - name: Harden Runner
+      uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+      with:
+        egress-policy: audit
+
+    - name: Checkout
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      with:
+        submodules: recursive
+        fetch-depth: 1
+
+    - name: Download ARM64 Binary
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        name: executable_MacOS_ARM64
+        path: ./arm64/
+
+    - name: Download x86_64 Binary
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        name: executable_MacOS_x86_64
+        path: ./x86_64/
+
+    - name: Create Universal Binary with lipo
+      run: |
+        echo "Creating universal binary with lipo..."
+        mkdir -p universal
+        
+        # Make binaries executable
+        chmod +x ./arm64/NoSpherA2_arm64
+        chmod +x ./x86_64/NoSpherA2_x86_64
+        
+        # Verify architectures before combining
+        echo "ARM64 binary architecture:"
+        file ./arm64/NoSpherA2_arm64
+        lipo -info ./arm64/NoSpherA2_arm64
+        
+        echo "x86_64 binary architecture:"
+        file ./x86_64/NoSpherA2_x86_64
+        lipo -info ./x86_64/NoSpherA2_x86_64
+        
+        # Create universal binary
+        lipo -create -output ./universal/NoSpherA2_Mac ./arm64/NoSpherA2_arm64 ./x86_64/NoSpherA2_x86_64
+        
+        # Verify universal binary
+        echo "Universal binary architecture:"
+        file ./universal/NoSpherA2_Mac
+        lipo -info ./universal/NoSpherA2_Mac
+        
+        # Make executable
+        chmod +x ./universal/NoSpherA2_Mac
+
+    - name: Upload Universal Binary
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      with:
+        name: executable_MacOS_Universal
+        path: ./universal/NoSpherA2_Mac
+
   # Separate testing job
   test:
     needs: build
     runs-on: ubuntu-latest
     steps:
     - name: Harden Runner
-      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
       with:
         egress-policy: audit
 
     - name: Checkout
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       with:
         submodules: recursive
         fetch-depth: 1
@@ -140,7 +205,7 @@ jobs:
 
     steps:
     - name: Harden Runner
-      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
       with:
         egress-policy: audit
 
@@ -195,18 +260,18 @@ jobs:
 
     steps:
     - name: Harden Runner
-      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
       with:
         egress-policy: audit
 
     - name: Checkout repository
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       with:
         submodules: recursive
         fetch-depth: 1
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4.31.0
+      uses: github/codeql-action/init@fdbfb4d2750291e159f0156def62b853c2798ca2 # v4.31.5
       with:
         languages: ${{ matrix.language }}
         source-root: Src
@@ -256,13 +321,13 @@ jobs:
       run: cd Linux && make -j1
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4.31.0
+      uses: github/codeql-action/analyze@fdbfb4d2750291e159f0156def62b853c2798ca2 # v4.31.5
       with:
         output: 'codeql-results.sarif'
       continue-on-error: true
 
     - name: Upload analysis results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4.31.0
+      uses: github/codeql-action/upload-sarif@fdbfb4d2750291e159f0156def62b853c2798ca2 # v4.31.5
       with:
         sarif_file: ${{github.workspace}}/codeql-results.sarif
         category: codeql
@@ -279,12 +344,12 @@ jobs:
       security-events: write
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
         with:
           egress-policy: audit
 
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
             submodules: false
             fetch-depth: 1
@@ -301,7 +366,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload analysis results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4.31.0
+        uses: github/codeql-action/upload-sarif@fdbfb4d2750291e159f0156def62b853c2798ca2 # v4.31.5
         with:
           sarif_file: ${{github.workspace}}/flawfinder_results.sarif
           category: flawfinder

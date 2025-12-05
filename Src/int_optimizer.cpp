@@ -255,8 +255,7 @@ void CINTOpt_setij(NoSpherA2::CINTOpt* opt, int* ng,
                     // transpose pairdata
                     for (ip = 0; ip < iprim; ip++) {
                         for (jp = 0; jp < jprim; jp++, pdata++) {
-                            memcpy(pdata, pdata0 + jp * iprim + ip,
-                                sizeof(NoSpherA2::PairData));
+                            memcpy(pdata, pdata0 + jp * iprim + ip, sizeof(NoSpherA2::PairData));
                         }
                     }
                 }
