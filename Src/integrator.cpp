@@ -611,41 +611,56 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
     std::cout << "\n=======================Unrestrained==========================" << std::endl;
     for (int i = 0; i < wavy.get_ncen(); i++) {
         std::string label = wavy.get_atoms()[i].get_label();
-        std::string out = std::format("Atom {:<3}({:<3}) | Unrestrained: RRS = {:>10.6f}, DiffSum = {:>10.6f}, |DiffSum/2| = {:>10.6f}, Sum = {:>10.6f}, Partitioned Sum = {:>10.6f}",
-            label,
-            i,
-            diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::RRS],
-            diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM],
-            diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::ABS_SUM],
-            diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM_NO_DIFF],
-            partitioned_densities[i]
-        );
+        //std::string out = std::format("Atom {:<3}({:<3}) | Unrestrained: RRS = {:>10.6f}, DiffSum = {:>10.6f}, |DiffSum/2| = {:>10.6f}, Sum = {:>10.6f}, Partitioned Sum = {:>10.6f}",
+        //    label,
+        //    i,
+        //    diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::RRS],
+        //    diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM],
+        //    diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::ABS_SUM],
+        //    diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM_NO_DIFF],
+        //    partitioned_densities[i]
+        //);
+        std::string out = "Atom " + label + "(" + std::to_string(i) + ") | Unrestrained: RRS = " 
+            + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::RRS]) 
+            + ", DiffSum = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM]) 
+            + ", |DiffSum/2| = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::ABS_SUM]) 
+            + ", Sum = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM_NO_DIFF]);
         std::cout << out << std::endl;
     }
     std::cout << "\n=======================Enhanced==========================" << std::endl;
     for (int i = 0; i < wavy.get_ncen(); i++) {
         std::string label = wavy.get_atoms()[i].get_label();
-        std::string out = std::format("Atom {:<3}({:<3}) | Enhanced: RRS = {:>10.6f}, DiffSum = {:>10.6f}, |DiffSum/2| = {:>10.6f}, Sum = {:>10.6f}",
-            label,
-            i,
-            diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::RRS],
-            diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::SUM],
-            diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::ABS_SUM],
-            diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::SUM_NO_DIFF]
-        );
+        //std::string out = std::format("Atom {:<3}({:<3}) | Enhanced: RRS = {:>10.6f}, DiffSum = {:>10.6f}, |DiffSum/2| = {:>10.6f}, Sum = {:>10.6f}",
+        //    label,
+        //    i,
+        //    diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::RRS],
+        //    diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::SUM],
+        //    diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::ABS_SUM],
+        //    diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::SUM_NO_DIFF]
+        //);
+        std::string out = "Atom " + label + "(" + std::to_string(i) + ") | Enhanced: RRS = "
+            + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::RRS])
+            + ", DiffSum = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::SUM])
+            + ", |DiffSum/2| = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::ABS_SUM])
+            + ", Sum = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::SUM_NO_DIFF]);
         std::cout << out << std::endl;
     }
     std::cout << "\n=======================Hybrid==========================" << std::endl;
     for (int i = 0; i < wavy.get_ncen(); i++) {
         std::string label = wavy.get_atoms()[i].get_label();
-        std::string out = std::format("Atom {:<3}({:<3}) | Hybrid: RRS = {:>10.6f}, DiffSum = {:>10.6f}, |DiffSum/2| = {:>10.6f}, Sum = {:>10.6f}",
-            label,
-            i,
-            diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::RRS],
-            diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::SUM],
-            diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::ABS_SUM],
-            diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::SUM_NO_DIFF]
-        );
+        //std::string out = std::format("Atom {:<3}({:<3}) | Hybrid: RRS = {:>10.6f}, DiffSum = {:>10.6f}, |DiffSum/2| = {:>10.6f}, Sum = {:>10.6f}",
+        //    label,
+        //    i,
+        //    diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::RRS],
+        //    diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::SUM],
+        //    diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::ABS_SUM],
+        //    diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::SUM_NO_DIFF]
+        //);
+        std::string out = "Atom " + label + "(" + std::to_string(i) + ") | Hybrid: RRS = "
+            + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::RRS])
+            + ", DiffSum = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::SUM])
+            + ", |DiffSum/2| = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::ABS_SUM])
+            + ", Sum = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::SUM_NO_DIFF]);
         std::cout << out << std::endl;
     }
 

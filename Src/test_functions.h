@@ -1468,11 +1468,12 @@ void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>>& aux_basis,
        }
    );
 
-   std::string atom_specifier = std::format("{}{}_{}{}", wavy.get_atom_label(atom_idx_1), atom_idx_1, wavy.get_atom_label(atom_idx_2), atom_idx_2);
+   //std::string atom_specifier = std::format("{}{}_{}{}", wavy.get_atom_label(atom_idx_1), atom_idx_1, wavy.get_atom_label(atom_idx_2), atom_idx_2);
+   std::string atom_specifier = wavy.get_atom_label(atom_idx_1) + std::to_string(atom_idx_1) + "_" + wavy.get_atom_label(atom_idx_2) + std::to_string(atom_idx_2);
    vec2 grid_points = { atomic_grids_local[0][GridData::X], atomic_grids_local[0][GridData::Y], atomic_grids_local[0][GridData::Z] };
    grid_manager.writeSimpleGrid("WFN_density_" + atom_specifier + ".dat", grid_points, { {"WFN_density",atomic_grids_local[0][GridData::WFN_DENSITY]} });
-   grid_manager.writeSimpleGrid("Density_" + std::format("{}{}", wavy.get_atom_label(atom_idx_1), atom_idx_1) + ".dat", grid_points, data_atom1);
-   grid_manager.writeSimpleGrid("Density_" + std::format("{}{}", wavy.get_atom_label(atom_idx_2), atom_idx_2) + ".dat", grid_points, data_atom2);
+   grid_manager.writeSimpleGrid("Density_" + wavy.get_atom_label(atom_idx_1) + std::to_string(atom_idx_1) + ".dat", grid_points, data_atom1);
+   grid_manager.writeSimpleGrid("Density_" + wavy.get_atom_label(atom_idx_2) + std::to_string(atom_idx_2) + ".dat", grid_points, data_atom2);
 }
 
 void test_analytical_fourier(bool full)

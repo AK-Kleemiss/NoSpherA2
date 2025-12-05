@@ -2322,7 +2322,7 @@ void options::digest_options()
             }
 
             WFN wavy(wfn);
-            string out = std::format("Calculating 1D density between atoms {} ({}) and {} ({}) with {} gridpoints and {:.2f} Angstrom padding.", wavy.get_atom_label(atom_idx_1), atom_idx_1, wavy.get_atom_label(atom_idx_2), atom_idx_2, gridpoints, padding);
+            string out = "Calculating 1D density between atoms " + wavy.get_atom_label(atom_idx_1) + " (" + std::to_string(atom_idx_1) + ") and " + wavy.get_atom_label(atom_idx_2) + " (" + std::to_string(atom_idx_2) + ") with " + std::to_string(gridpoints) + " gridpoints and " + std::to_string(padding) + " Angstrom padding.";
             std::cout << out << std::endl;
             get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
             exit(0);
