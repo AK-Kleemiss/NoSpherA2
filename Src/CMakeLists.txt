@@ -59,7 +59,8 @@ if (MSVC)
 endif()
 target_compile_options(libnosphera2 PUBLIC
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Debug>>:-g -Og>
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Release>>:-O3>
+    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:RelWithDebInfo>>:-O2 -g>
+    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Release>>:-O2>
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-MMD -MP -fmessage-length=0>
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:${OPENMP_FLAG}>
     $<$<PLATFORM_ID:Darwin>:-DACCELERATE_NEW_LAPACK -Xpreprocessor -fopenmp -lomp>
@@ -73,8 +74,8 @@ if (MSVC)
 endif()
 # This is done so Makefile can keep working the way it does. I have no Idea how to make windows work if I change the location of mdspan
 #add_compile_definitions(libnosphera2 "-D__CMAKE_BUILD__")
-target_compile_definitions(libnosphera2 PRIVATE __CMAKE_BUILD__)
-
+target_compile_definitions(libnosphera2 PRIVATE __CMAKE_BUILD__  MKL_LP64 MKL_Direct_Call)
+target_include_directories(libnosphera2 PRIVATE ${MKL_INCLUDE})
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
         $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
@@ -88,7 +89,7 @@ target_link_options(libnosphera2 PRIVATE
     $<$<PLATFORM_ID:Darwin>:-framework Accelerate>
 )
 target_link_libraries(libnosphera2 PUBLIC
-    $<$<PLATFORM_ID:Linux>:MKL::MKL>
+    $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>
     occ::qm
     occ::main
     basis_set_helper

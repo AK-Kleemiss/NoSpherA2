@@ -66,6 +66,8 @@ if (NOT Darwin)
             SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
         )
     endif ()
+    set(MKL_THREADING intel_thread)
+    set(MKL_MPI intelmpi)
     find_package(MKL CONFIG REQUIRED
         HINTS "${_ONEAPI_MKL_ROOT}/lib/cmake"
         PATH_SUFFIXES "mkl"
