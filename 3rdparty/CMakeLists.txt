@@ -31,13 +31,6 @@ CPMAddPackage(
 )
 
 list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
-
-#if (MSVC AND CMAKE_GENERATOR MATCHES "Visual Studio")
-#    set(ENV{CARGO_PROFILE_RELEASE_CODEGEN_UNITS} "1")
-#    set(ENV{RUSTFLAGS} "-C linker=lld-link")
-#endif()
-
-#set(ENV{CMAKE_GENERATOR} "Ninja")
 CPMAddPackage(
     NAME featomic
     URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.4/featomic-cxx-0.6.4.tar.gz"
@@ -117,23 +110,12 @@ if (LINUX)
       message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
     endif ()
 elseif (WIN32)
-    include(${CMAKE_SOURCE_DIR}/cmake/micromamba.cmake)
-    set(_ONEAPI_MKL_ROOT "${CMAKE_BINARY_DIR}/environments/mambaenv/Library")
-    if (NOT EXISTS "${_ONEAPI_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
-        micromamba_environment(
-            NAME mambaenv
-            SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
-        )
-    endif ()
-#    list(APPEND CMAKE_PREFIX_PATH "${_ONEAPI_MKL_ROOT}/lib/cmake/tbb" "${_ONEAPI_MKL_ROOT}/lib/cmake")
-#    set(MKL_THREADING "tbb_thread")
-    find_package(MKL CONFIG REQUIRED
-        HINTS "${_ONEAPI_MKL_ROOT}/lib/cmake"
-        PATH_SUFFIXES "mkl"
-    )
-    message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
-    set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)
-    set(MKL_DLL_PATH "${_ONEAPI_MKL_ROOT}/bin" PARENT_SCOPE)
+#    execute_process(
+#        COMMAND ${NUGET_EXE} install intelmkl.static.win-x64 -Version 2025.3.0.453 -OutputDirectory ${CMAKE_SOURCE_DIR}/Lib/MKL -ExcludeVersion
+#        RESULT_VARIABLE NUGET_RESULT
+#    )
+#    set(MKL_ROOT "${CMAKE_BINARY_DIR}/vcpkg_installed/vcpkg/pkgs/intel-mkl_x64-windows")
+#    find_package(MKL CONFIG REQUIRED)
 endif ()
 if (Darwin)
     set(USE_SYSTEM_BLAS ON)
