@@ -99,7 +99,6 @@ else ()
         "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl"
         "USE_QCINT OFF"
         "ENABLE_HOST_OPT OFF"
-        "WITH_PYTHON_BINDINGS OFF"
         "USE_FORTRAN OFF"
         "BLA_STATIC ON"
     )
@@ -116,6 +115,7 @@ CPMAddPackage(
     GIT_TAG "main_with_libs"
     OPTIONS
         "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
+        "WITH_PYTHON_BINDINGS OFF"
         ${Darwin_FLAGS}
         ${WIN_FLAGS}
         ${LINUX_FLAGS}
