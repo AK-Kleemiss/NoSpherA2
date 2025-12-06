@@ -87,7 +87,9 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     target_compile_definitions(libnosphera2 PRIVATE __CMAKE_BUILD__  MKL_LP64 MKL_Direct_Call)
     target_include_directories(libnosphera2 PRIVATE ${MKL_INCLUDE})
 else()
-    # On Darwin with Accelerate, disable Eigen's BLAS declarations to avoid conflicts
+    # On Darwin with Accelerate, prevent Eigen from including its own blas.h
+    # which has conflicting declarations with Apple's Accelerate framework
+    target_compile_definitions(libnosphera2 PUBLIC BLAS_H)
 endif ()
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
