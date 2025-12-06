@@ -81,8 +81,8 @@ if (WIN32)
     set(WIN_FLAGS
         "GG_NO_PRAGMA ON"
         "CPACK_SYSTEM_NAME windows"
-        "CMAKE_CXX_FLAGS /O2 /fp:fast"
-        "CMAKE_C_FLAGS /O2 /fp:fast"
+#        "CMAKE_CXX_FLAGS /O2 /fp:fast"
+#        "CMAKE_C_FLAGS /O2 /fp:fast"
     )
 endif ()
 
