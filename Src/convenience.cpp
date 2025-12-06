@@ -2375,6 +2375,12 @@ void options::digest_options()
         {
             calc_partition_densities();
         }
+        else if (temp == "-occ")
+        {
+            occ = arguments[i + 1];
+            err_checkf(std::filesystem::exists(occ), "OCC input doesn't exist!",std::cout);
+
+        }
     }
 };
 

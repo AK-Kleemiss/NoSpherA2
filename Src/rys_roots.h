@@ -12,14 +12,14 @@ void CINTsr_rys_roots(int nroots, double x, double lower, double* u, double* w);
 //void CINTstg_roots(int nroots, double ta, double ua, double* rr, double* ww);
 //int CINTsr_rys_polyfits(int nroots, double x, double lower, double* u, double* w);
 
-int CINTrys_schmidt(int nroots, double x, double lower, double* roots, double* weights);
-int CINTlrys_schmidt(int nroots, double x, double lower, double* roots, double* weights);
+int NOS_CINTrys_schmidt(int nroots, double x, double lower, double* roots, double* weights);
+int NOS_CINTlrys_schmidt(int nroots, double x, double lower, double* roots, double* weights);
 int CINTrys_laguerre(int n, double x, double lower, double* roots, double* weights);
 int CINTlrys_laguerre(int n, double x, double lower, double* roots, double* weights);
 int CINTrys_jacobi(int n, double x, double lower, double* roots, double* weights);
 int CINTlrys_jacobi(int n, double x, double lower, double* roots, double* weights);
 
-#define CINTqrys_schmidt        CINTlrys_schmidt
+#define CINTqrys_schmidt        NOS_CINTlrys_schmidt
 #define CINTqrys_laguerre       CINTlrys_laguerre
 #define CINTqrys_jacobi         CINTlrys_jacobi
 

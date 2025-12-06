@@ -25,13 +25,11 @@ runs:
         restore-keys: |
           intelmkl-${{ inputs.platform }}-${{ runner.os }}-
 
-    - name: Cache Intel MKL NuGet Packages (Windows)
+    - name: Cache Intel MKL (Windows)
       if: inputs.platform == 'Windows'
       uses: actions/cache@v4.2.4
       with:
-        path: |
-          Windows/packages
-          ~/.nuget/packages
-        key: nuget-mkl-${{ inputs.platform }}-${{ hashFiles('Windows/**/*.vcxproj', 'Windows/**/*.sln') }}
+        path: Lib/MKL
+        key: intelmkl-${{ inputs.platform }}-${{ runner.os }}-2025.2.0
         restore-keys: |
-          nuget-mkl-${{ inputs.platform }}-
+          intelmkl-${{ inputs.platform }}-${{ runner.os }}-

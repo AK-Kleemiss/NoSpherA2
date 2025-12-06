@@ -595,6 +595,8 @@ struct options
     std::filesystem::path turbomole_path;
     std::filesystem::path basis_set_path;
     std::string cwd;
+    std::string occ;
+    std::filesystem::path occ_toml_path;
     bool debug = false;
     bool all_charges = false;
     bool rho = false;
