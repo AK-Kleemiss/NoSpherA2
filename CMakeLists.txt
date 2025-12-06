@@ -15,7 +15,6 @@ endif()
 
 if (WIN32)
     set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
-    # Use /arch:AVX for MSVC
     add_compile_options(/arch:AVX)
 endif()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)

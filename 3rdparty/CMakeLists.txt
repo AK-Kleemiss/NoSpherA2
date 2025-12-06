@@ -89,7 +89,8 @@ endif ()
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(Darwin_FLAGS
         "USE_SYSTEM_BLAS ON"
-        "ENABLE_HOST_OPT=ON"
+        "ENABLE_HOST_OPT OFF"
+        "USE_OPENMP OFF"
         "CMAKE_CXX_FLAGS -O3 -ffast-math -march=native"
         "CMAKE_C_FLAGS -O3 -ffast-math -march=native"
     )
