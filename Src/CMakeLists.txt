@@ -99,7 +99,7 @@ endif ()
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     find_package(BLAS REQUIRED)
     target_compile_definitions(libnosphera2 PUBLIC EIGEN_USE_BLAS)
-    target_link_libraries(occ_core
+    target_link_libraries(libnosphera2
       PUBLIC
       ${BLAS_LIBRARIES})
 endif ()
