@@ -44,6 +44,13 @@ jobs:
             artifact-name: executable_MacOS_x86_64
             artifact-path: Mac/NoSpherA2
 
+          - uses: actions/checkout@v4
+          - name: Setup tmate session
+            if: ${{ failure() }}
+            uses: mxschmitt/action-tmate@v3
+            with:
+              limit-access-to-actor: true
+
           - os: ubuntu-latest
             name: Linux
             build-script: | 
@@ -102,13 +109,6 @@ jobs:
       with:
         name: ${{ matrix.artifact-name }}
         path: ${{ matrix.artifact-path }}
-
-    - uses: actions/checkout@v4
-    - name: Setup tmate session
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: true
 
 
   # Create macOS Universal Binary

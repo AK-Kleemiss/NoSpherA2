@@ -97,7 +97,7 @@ target_link_options(libnosphera2 PRIVATE
 )
 target_link_libraries(libnosphera2 PUBLIC
     $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>
-    $<$<PLATFORM_ID:Darwin>:Homebrew::OpenMP>
+    $<$<PLATFORM_ID:Darwin>:OpenMP::OpenMP_C>
     occ::qm
     occ::main
     basis_set_helper
