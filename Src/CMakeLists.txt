@@ -54,11 +54,16 @@ target_precompile_headers(libnosphera2 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/pch.h
 )
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+# OpenMP configuration
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    # macOS: Use Homebrew libomp (works for both Intel and Apple Silicon)
+    find_package(HomebrewOpenMP REQUIRED)
+    set(OPENMP_FLAG "")  # Flags handled by imported target
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(OPENMP_FLAG "-fopenmp=libomp")
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(OPENMP_FLAG "-fopenmp")
-endif ()
+endif()
 if (MSVC)
     target_compile_options(libnosphera2 PRIVATE $<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
 endif()
@@ -67,8 +72,8 @@ target_compile_options(libnosphera2 PUBLIC
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:RelWithDebInfo>>:-O2 -g>
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Release>>:-O2>
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-MMD -MP -fmessage-length=0>
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:${OPENMP_FLAG}>
-    $<$<PLATFORM_ID:Darwin>:-DACCELERATE_NEW_LAPACK -Xpreprocessor -fopenmp -lomp>
+    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:${OPENMP_FLAG}>
+    $<$<PLATFORM_ID:Darwin>:-DACCELERATE_NEW_LAPACK>
 )
 if (MSVC)
     target_compile_options(libnosphera2 PUBLIC /openmp)
@@ -95,6 +100,7 @@ target_link_options(libnosphera2 PRIVATE
 )
 target_link_libraries(libnosphera2 PUBLIC
     $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>
+    $<$<PLATFORM_ID:Darwin>:Homebrew::OpenMP>
     occ::qm
     occ::main
     basis_set_helper
