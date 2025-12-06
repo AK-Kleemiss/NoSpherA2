@@ -93,12 +93,6 @@ jobs:
       with:
         platform: ${{ matrix.name }}
 
-    - uses: actions/checkout@v4
-    - name: Setup tmate session
-      if: ${{ matrix.name == 'Mac_Universal' }}
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: true
 
     - name: Build NoSpherA2
       run: ${{ matrix.build-script }}
@@ -108,6 +102,14 @@ jobs:
       with:
         name: ${{ matrix.artifact-name }}
         path: ${{ matrix.artifact-path }}
+
+    - uses: actions/checkout@v4
+    - name: Setup tmate session
+      if: ${{ failure() }}
+      uses: mxschmitt/action-tmate@v3
+      with:
+        limit-access-to-actor: true
+
 
   # Create macOS Universal Binary
   build_mac_universal:
