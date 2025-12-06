@@ -85,6 +85,13 @@ jobs:
       with:
         platform: ${{ matrix.name }}
 
+    - uses: actions/checkout@v4
+    - name: Setup tmate session
+      if: ${{ matrix.name == Mac_Universal }}
+      uses: mxschmitt/action-tmate@v3
+      with:
+        limit-access-to-actor: true
+
     - name: Build NoSpherA2
       run: ${{ matrix.build-script }}
 
