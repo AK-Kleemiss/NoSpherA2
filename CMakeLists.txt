@@ -33,6 +33,10 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     option(WITH_CLANG_TIDY "Enable clang tidy" OFF)
     if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
         set(MKL_INTERFACE "lp64" CACHE STRING "ilp64 uses double precision for indices in MKL, the other option is lp64." )
+        set(ONEAPI_DIRECTORY $ENV{MKLROOT} CACHE STRING
+            "Location of OneAPI. If empty and you didn't loaded modules or used a setvars.sh, OneAPI will be downloaded.")
+        set(FAKE_HOME_TEST "ON" CACHE STRING
+            "This is for testing the automatic install of MKL. It pretends the home directory is at /tmp/home.")
     endif ()
     set(CONDA_ENV "base" CACHE STRING "Conda env to be used.")
     set(CONDA_COMMAND "conda" CACHE STRING "CONDA command (used to download dependencies.)")
@@ -41,10 +45,6 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     if (NOT CONDA_ENV STREQUAL "base")
         option(USE_CUSTOM_ENV "Use a user provided environment for conda." ON)
     endif ()
-    set(ONEAPI_DIRECTORY $ENV{MKLROOT} CACHE STRING
-        "Location of OneAPI. If empty and you didn't loaded modules or used a setvars.sh, OneAPI will be downloaded.")
-    set(FAKE_HOME_TEST "ON" CACHE STRING
-        "This is for testing the automatic install of MKL. It pretends the home directory is at /tmp/home.")
 endif()
 if (MSVC AND NOT (${OCC_BUILD_TYPE} STREQUAL ${CMAKE_BUILD_TYPE}))
     message(FATAL_ERROR "Building OCC in a different mode than NoSpherA2 is not supported because MSVC containers have

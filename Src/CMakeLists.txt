@@ -44,8 +44,10 @@ add_library(libnosphera2 STATIC
 )
 add_dependencies(libnosphera2 generate_auxiliary_basis)
 
-if (MKL_INTERFACE STREQUAL "ilp64")
-    target_compile_definitions(libnosphera2 PUBLIC USE_64BITMKL)
+if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+    if (MKL_INTERFACE STREQUAL "ilp64")
+        target_compile_definitions(libnosphera2 PUBLIC USE_64BITMKL)
+    endif ()
 endif ()
 #target_link_libraries(libnosphera2 PRIVATE "-fsanitize=address")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
