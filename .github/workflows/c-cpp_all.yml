@@ -26,15 +26,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS universal binary build using CMake (builds both x86_64 and arm64 in one step)
-          - os: macos-latest
-            name: Mac_Universal
+          - os: macos-latest  # Apple Silicon (ARM64)
+            name: Mac_ARM64
+            build-script: | 
+              mkdir build && cd build 
+              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="arm64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp
+              cmake --build . --target NoSpherA2 -j
+            artifact-name: executable_MacOS_ARM64
+            artifact-path: Mac/NoSpherA2
+
+          - os: macos-13  # Intel x86_64
+            name: Mac_x86_64
             build-script: |
               mkdir build && cd build 
-              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DCMAKE_BUILD_TYPE=Release 
+              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp
               cmake --build . --target NoSpherA2 -j
-            artifact-name: executable_MacOS_Universal
-            artifact-path: build/Src/NoSpherA2
+            artifact-name: executable_MacOS_x86_64
+            artifact-path: Mac/NoSpherA2
 
           - os: ubuntu-latest
             name: Linux
@@ -100,6 +108,71 @@ jobs:
       with:
         name: ${{ matrix.artifact-name }}
         path: ${{ matrix.artifact-path }}
+
+  # Create macOS Universal Binary
+  build_mac_universal:
+    needs: build
+    runs-on: macos-latest
+    name: Build macOS Universal Binary
+
+    steps:
+    - name: Harden Runner
+      uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+      with:
+        egress-policy: audit
+
+    - name: Checkout
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      with:
+        submodules: recursive
+        fetch-depth: 1
+
+    - name: Download ARM64 Binary
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        name: executable_MacOS_ARM64
+        path: ./arm64/
+
+    - name: Download x86_64 Binary
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        name: executable_MacOS_x86_64
+        path: ./x86_64/
+
+    - name: Create Universal Binary with lipo
+      run: |
+        echo "Creating universal binary with lipo..."
+        mkdir -p universal
+        
+        # Make binaries executable
+        chmod +x ./arm64/NoSpherA2
+        chmod +x ./x86_64/NoSpherA2
+        
+        # Verify architectures before combining
+        echo "ARM64 binary architecture:"
+        file ./arm64/NoSpherA2
+        lipo -info ./arm64/NoSpherA2
+        
+        echo "x86_64 binary architecture:"
+        file ./x86_64/NoSpherA2
+        lipo -info ./x86_64/NoSpherA2
+        
+        # Create universal binary
+        lipo -create -output ./universal/NoSpherA2_Mac ./arm64/NoSpherA2 ./x86_64/NoSpherA2
+        
+        # Verify universal binary
+        echo "Universal binary architecture:"
+        file ./universal/NoSpherA2_Mac
+        lipo -info ./universal/NoSpherA2_Mac
+        
+        # Make executable
+        chmod +x ./universal/NoSpherA2_Mac
+
+    - name: Upload Universal Binary
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      with:
+        name: executable_MacOS_Universal
+        path: ./universal/NoSpherA2_Mac
 
   # Separate testing job
   test:

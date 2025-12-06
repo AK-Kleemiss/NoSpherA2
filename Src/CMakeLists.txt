@@ -54,11 +54,8 @@ target_precompile_headers(libnosphera2 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/pch.h
 )
 
-# OpenMP configuration
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    # macOS: Use Homebrew libomp (works for both Intel and Apple Silicon)
-    find_package(HomebrewOpenMP REQUIRED)
-    set(OPENMP_FLAG "")  # Flags handled by imported target
+    find_package(OpenMP REQUIRED)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(OPENMP_FLAG "-fopenmp=libomp")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
