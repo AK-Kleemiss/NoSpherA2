@@ -45,7 +45,10 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     set(FAKE_HOME_TEST "ON" CACHE STRING
         "This is for testing the automatic install of MKL. It pretends the home directory is at /tmp/home.")
 endif()
-
+if (MSVC AND NOT (${OCC_BUILD_TYPE} STREQUAL ${CMAKE_BUILD_TYPE}))
+    message(FATAL_ERROR "Building OCC in a different mode than NoSpherA2 is not supported because MSVC containers have
+            different sizes between Release and Debug builds.")
+endif ()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/NOSTEST.cmake")
