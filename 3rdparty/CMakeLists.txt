@@ -88,6 +88,7 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(MKL_FLAGS
         "BLA_VENDOR Intel10_64lp_seq"
         "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl"
+        "BLA_STATIC ON"
     )
 endif ()
 
@@ -101,10 +102,8 @@ CPMAddPackage(
         "WITH_PYTHON_BINDINGS OFF"
         "USE_FORTRAN OFF"
         "USE_SYSTEM_BLAS ${USE_SYSTEM_BLAS}"
-        "USE_SYSTEM_TBB OFF"
         "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
         ${MKL_FLAGS}
-        "BLA_STATIC ON"
         ${WIN_FLAGS}
 )
 file(COPY ${occ_SOURCE_DIR}/share/ DESTINATION ${CMAKE_BINARY_DIR}/occ_data)
