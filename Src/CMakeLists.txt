@@ -86,7 +86,6 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     target_include_directories(libnosphera2 PRIVATE ${MKL_INCLUDE})
 else()
     # On Darwin with Accelerate, disable Eigen's BLAS declarations to avoid conflicts
-    target_compile_definitions(libnosphera2 PUBLIC EIGEN_USE_BLAS=0)
 endif ()
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
