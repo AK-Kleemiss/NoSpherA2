@@ -87,7 +87,7 @@ jobs:
 
     - uses: actions/checkout@v4
     - name: Setup tmate session
-      if: ${{ matrix.name == Mac_Universal }}
+      if: ${{ matrix.name == 'Mac_Universal' }}
       uses: mxschmitt/action-tmate@v3
       with:
         limit-access-to-actor: true
