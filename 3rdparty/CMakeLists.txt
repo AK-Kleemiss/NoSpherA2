@@ -55,7 +55,7 @@ else ()
     set(HOME $ENV{HOME})
 endif ()
 
-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     set(MKL_LINK "static")
     set(MKL_INTERFACE lp64)
     include(${CMAKE_SOURCE_DIR}/cmake/micromamba.cmake)
