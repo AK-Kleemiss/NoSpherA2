@@ -21,8 +21,8 @@ int main()
     fmt::println("Conversion from OCC to NospherA2 took {}µs.", duration_occ2nos);
     fmt::println("Total, OCC and OCC2NOS took {}µs.", duration_occ2nos + duration_occ);
     fmt::println("---------------------------------------------");
-    auto wfn_from_occ = results.occ2NOS;
-    auto wfn_nos = results.file2NOS;
+    auto wfn_from_occ = results.occ2NOS.value();
+    auto wfn_nos = results.file2NOS.value();
 
     wfnequal(wfn_from_occ, wfn_nos);
     return 0;

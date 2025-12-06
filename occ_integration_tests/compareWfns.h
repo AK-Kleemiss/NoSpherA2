@@ -80,8 +80,8 @@ struct ConversionTimes
 struct BenchmarkResults
 {
     ConversionTimes times;
-    WFN file2NOS;
-    WFN occ2NOS;
+    std::optional<WFN> file2NOS;
+    std::optional<WFN> occ2NOS;
 };
 BenchmarkResults conversion_benchmark(std::string filepath, bool get_wfns = false);
 
