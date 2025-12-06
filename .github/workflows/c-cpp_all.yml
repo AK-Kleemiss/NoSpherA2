@@ -18,6 +18,7 @@ permissions:
 
 env:
     FEATOMIC_CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF"
+    SCCACHE_GHA_ENABLED: "true"
 
 jobs:
   # Build matrix for all platforms
@@ -30,7 +31,7 @@ jobs:
             name: Mac_ARM64
             build-script: | 
               mkdir build && cd build 
-              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="arm64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp
+              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="arm64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_MacOS_ARM64
             artifact-path: Mac/NoSpherA2
@@ -39,7 +40,7 @@ jobs:
             name: Mac_x86_64
             build-script: |
               mkdir build && cd build 
-              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp
+              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_MacOS_x86_64
             artifact-path: Mac/NoSpherA2
@@ -49,7 +50,7 @@ jobs:
             name: Linux
             build-script: | 
               mkdir build && cd build
-              cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
+              cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_Linux
             artifact-path: build/Src/NoSpherA2
@@ -59,7 +60,7 @@ jobs:
             build-script: |
               mkdir build
               cd build
-              cmake -G "Ninja" -DCMAKE_C_COMPILER=clang-cl.exe -DCMAKE_CXX_COMPILER=clang-cl.exe ..
+              cmake -G "Ninja" -DCMAKE_C_COMPILER=clang-cl.exe -DCMAKE_CXX_COMPILER=clang-cl.exe -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ..
               cmake --build . --config Release --target NoSpherA2 --parallel
             artifact-name: executable_Windows
             artifact-path: build/Src/Release/NoSpherA2.exe
@@ -78,6 +79,10 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 1
+
+    # This caches and store build objects. It should fix the problems where the cache was being used for testing dependency updates.
+    - name: Run sccache-cache
+      uses: mozilla-actions/sccache-action@bafd42bd91680affe190f697cac6ef3ad958ecba # v0.0.10
 
     - name: Setup Build Environment
       uses: ./.github/actions/setup-build-env

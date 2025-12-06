@@ -8,28 +8,20 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Cache Featomic (Other platforms)
-      uses: actions/cache@v4.2.4
-      with:
-        path: Lib/featomic_install
-        key: featomic-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('featomic/**') }}
-        restore-keys: |
-          featomic-${{ inputs.platform }}-${{ runner.os }}-
-
     - name: Cache Intel MKL (Linux)
       if: inputs.platform == 'Linux'
       uses: actions/cache@v4.2.4
       with:
-        path: Lib/MKL
-        key: intelmkl-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('Lib/MKL/**') }}
+        path: build/environments/mambaenv
+        key: mambaenv-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('environment.yml') }}
         restore-keys: |
-          intelmkl-${{ inputs.platform }}-${{ runner.os }}-
+          mambaenv-${{ inputs.platform }}-${{ runner.os }}-
 
     - name: Cache Intel MKL (Windows)
       if: inputs.platform == 'Windows'
       uses: actions/cache@v4.2.4
       with:
-        path: Lib/MKL
-        key: intelmkl-${{ inputs.platform }}-${{ runner.os }}-2025.2.0
+        path: build/environments/mambaenv
+        key: mambaenv-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('environment.yml') }}
         restore-keys: |
-          intelmkl-${{ inputs.platform }}-${{ runner.os }}-
+          mambaenv-${{ inputs.platform }}-${{ runner.os }}-
