@@ -83,11 +83,14 @@ if (MSVC)
 endif()
 # This is done so Makefile can keep working the way it does. I have no Idea how to make windows work if I change the location of mdspan
 #add_compile_definitions(libnosphera2 "-D__CMAKE_BUILD__")
-if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_compile_definitions(libnosphera2 PUBLIC EIGEN_USE_LAPACKE)
+    target_link_libraries(libnosphera2 PUBLIC
+        $<LINK_LIBRARY:FRAMEWORK,Accelerate>
+    )
+else ()
     target_compile_definitions(libnosphera2 PRIVATE __CMAKE_BUILD__  MKL_LP64 MKL_Direct_Call)
     target_include_directories(libnosphera2 PRIVATE ${MKL_INCLUDE})
-else()
-    # On Darwin with Accelerate, disable Eigen's BLAS declarations to avoid conflicts
 endif ()
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
@@ -107,7 +110,6 @@ endif ()
 target_link_options(libnosphera2 PRIVATE
     $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static>
     $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++ -static-libgcc -MMD -MP -fopenmp -ffast-math>
-    $<$<PLATFORM_ID:Darwin>:-framework Accelerate>
 )
 target_link_libraries(libnosphera2 PUBLIC
     $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>

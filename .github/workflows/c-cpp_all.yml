@@ -19,6 +19,7 @@ permissions:
 env:
     FEATOMIC_CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF"
     SCCACHE_GHA_ENABLED: "true"
+    RUSTC_WRAPPER: "sccache"
 
 jobs:
   # Build matrix for all platforms
@@ -44,7 +45,6 @@ jobs:
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_MacOS_x86_64
             artifact-path: Mac/NoSpherA2
-
 
           - os: ubuntu-latest
             name: Linux
@@ -310,38 +310,15 @@ jobs:
       id: cache-intelmkl-linux
       with:
         path: build/environments
-        key: intelmkl-linux-${{ runner.os }}-${{ hashFiles('build/environments/**') }}
+        key: mambaenv-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('environment.yml') }}
         restore-keys: |
-          intelmkl-linux-${{ runner.os }}-
-
-    - name: Build IntelMKL
-      if: steps.cache-intelmkl-linux.outputs.cache-hit != 'true'
-      run: |
-          mkdir build
-          cd build
-          cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
-
-    # Cache featomic
-    - name: Cache featomic Build
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-      id: cache-featomic-linux
-      with:
-        path: Lib/featomic_install
-        key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
-        restore-keys: |
-          featomic-linux-${{ runner.os }}-
-
-    - name: Build featomic
-      if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
-      run: |
-          cd featomic/featomic 
-          mkdir -p build
-          cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
-          make install
+          mambaenv-${{ inputs.platform }}-${{ runner.os }}-
 
     - name: Build project
-      run: cd Linux && make -j1
+      run: |
+          mkdir build && cd build
+          cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          cmake --build . --target NoSpherA2 -j
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4.31.0

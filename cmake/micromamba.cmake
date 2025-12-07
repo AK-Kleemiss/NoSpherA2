@@ -59,7 +59,6 @@ endfunction()
 #   ENV_NAME: Name of the environment
 #   OUTVAR: Name of the variable to store the result
 function(check_micromamba_environment ENV_NAME OUTVAR)
-    set(ENV_PATH ${CMAKE_BINARY_DIR}/environments/${ENV_NAME})
     if (EXISTS "${ENV_PATH}/conda-meta/history")
         set(${OUTVAR} TRUE PARENT_SCOPE)
     else ()
@@ -119,7 +118,6 @@ function(micromamba_environment)
         list(APPEND FILE_ARG ${F})
     endforeach ()
 
-    set(ENV_PATH ${CMAKE_BINARY_DIR}/environments/${ENV_NAME})
     if (NOT OVERWRITE_MICROMAMBA)
         ensure_micromamba(MICROMAMBA_BIN)
     else()
