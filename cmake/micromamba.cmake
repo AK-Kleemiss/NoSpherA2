@@ -165,6 +165,6 @@ function(micromamba_environment)
     if (DEFINED PARSED_ARGS_ENV_PATH)
         set(${PARSED_ARGS_ENV_PATH} ${ENV_PATH} PARENT_SCOPE)
     endif ()
-    set(CONDA_ENV_PATH ${ENV_PATH} PARENT_SCOPE)
+    set(MICROMAMBA_ENV_PATH ${ENV_PATH} PARENT_SCOPE)
 
 endfunction()

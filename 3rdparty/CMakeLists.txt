@@ -58,7 +58,7 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     set(MKL_LINK "static")
     set(MKL_INTERFACE lp64)
     include(${CMAKE_SOURCE_DIR}/cmake/micromamba.cmake)
-    set(_ONEAPI_MKL_ROOT "${CMAKE_BINARY_DIR}/environments/mambaenv/Library")
+    set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
     if (NOT EXISTS "${_ONEAPI_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
         micromamba_environment(
             NAME mambaenv
