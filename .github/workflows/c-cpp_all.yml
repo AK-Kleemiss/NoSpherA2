@@ -25,7 +25,6 @@ jobs:
   # Build matrix for all platforms
   build:
     strategy:
-      fail-fast: true
       matrix:
         include:
           - os: macos-latest  # Apple Silicon (ARM64)
