@@ -64,6 +64,12 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
             NAME mambaenv
             SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
         )
+        # Update the path after environment creation
+        if (WIN32)
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
+        else ()
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}")
+        endif ()
     endif ()
     set(MKL_THREADING intel_thread)
     set(MKL_MPI intelmpi)

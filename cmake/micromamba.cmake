@@ -95,6 +95,9 @@ function(micromamba_environment)
         set(ENV_NAME ${PARSED_ARGS_NAME})
     endif ()
 
+    # Define the environment path based on the environment name
+    set(ENV_PATH "${CMAKE_BINARY_DIR}/environments/${ENV_NAME}")
+
     set(VERBOSE_FLAG "--quiet")
     if (PARSED_ARGS_VERBOSE EQUAL 0)
         set(VERBOSE_FLAG "--quiet")
