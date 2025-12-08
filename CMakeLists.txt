@@ -15,7 +15,6 @@ endif()
 
 if (WIN32)
     set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
-    # Use /arch:AVX for MSVC
     add_compile_options(/arch:AVX)
 endif()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -32,7 +31,13 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     option(BUILD_OPENMP "Necessary if cross compiling from windows to Linux/Darwin" OFF)
     option(USE_VECTOR_INSTRUCTIONS "If you want to use vector instructions. Defaults to ON" ON)
     option(WITH_CLANG_TIDY "Enable clang tidy" OFF)
-    set(MKL_INTERFACE "lp64" CACHE STRING "ilp64 uses double precision for indices in MKL, the other option is lp64." )
+    if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+        set(MKL_INTERFACE "lp64" CACHE STRING "ilp64 uses double precision for indices in MKL, the other option is lp64." )
+        set(ONEAPI_DIRECTORY $ENV{MKLROOT} CACHE STRING
+            "Location of OneAPI. If empty and you didn't loaded modules or used a setvars.sh, OneAPI will be downloaded.")
+        set(FAKE_HOME_TEST "ON" CACHE STRING
+            "This is for testing the automatic install of MKL. It pretends the home directory is at /tmp/home.")
+    endif ()
     set(CONDA_ENV "base" CACHE STRING "Conda env to be used.")
     set(CONDA_COMMAND "conda" CACHE STRING "CONDA command (used to download dependencies.)")
     set(OCC_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING "Build type for OCC")
@@ -40,12 +45,12 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     if (NOT CONDA_ENV STREQUAL "base")
         option(USE_CUSTOM_ENV "Use a user provided environment for conda." ON)
     endif ()
-    set(ONEAPI_DIRECTORY $ENV{MKLROOT} CACHE STRING
-        "Location of OneAPI. If empty and you didn't loaded modules or used a setvars.sh, OneAPI will be downloaded.")
-    set(FAKE_HOME_TEST "ON" CACHE STRING
-        "This is for testing the automatic install of MKL. It pretends the home directory is at /tmp/home.")
+    set(ENV_PATH ${CMAKE_BINARY_DIR}/environments/${ENV_NAME} CACHE STRING "Set the environment path.")
 endif()
-
+if (MSVC AND NOT (${OCC_BUILD_TYPE} STREQUAL ${CMAKE_BUILD_TYPE}))
+    message(FATAL_ERROR "Building OCC in a different mode than NoSpherA2 is not supported because MSVC containers have
+            different sizes between Release and Debug builds.")
+endif ()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/NOSTEST.cmake")

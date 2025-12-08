@@ -44,8 +44,10 @@ add_library(libnosphera2 STATIC
 )
 add_dependencies(libnosphera2 generate_auxiliary_basis)
 
-if (MKL_INTERFACE STREQUAL "ilp64")
-    target_compile_definitions(libnosphera2 PUBLIC USE_64BITMKL)
+if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+    if (MKL_INTERFACE STREQUAL "ilp64")
+        target_compile_definitions(libnosphera2 PUBLIC USE_64BITMKL)
+    endif ()
 endif ()
 #target_link_libraries(libnosphera2 PRIVATE "-fsanitize=address")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -54,11 +56,8 @@ target_precompile_headers(libnosphera2 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/pch.h
 )
 
-# OpenMP configuration
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    # macOS: Use Homebrew libomp (works for both Intel and Apple Silicon)
-    find_package(HomebrewOpenMP REQUIRED)
-    set(OPENMP_FLAG "")  # Flags handled by imported target
+    find_package(OpenMP REQUIRED)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(OPENMP_FLAG "-fopenmp=libomp")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -84,8 +83,15 @@ if (MSVC)
 endif()
 # This is done so Makefile can keep working the way it does. I have no Idea how to make windows work if I change the location of mdspan
 #add_compile_definitions(libnosphera2 "-D__CMAKE_BUILD__")
-target_compile_definitions(libnosphera2 PRIVATE __CMAKE_BUILD__  MKL_LP64 MKL_Direct_Call)
-target_include_directories(libnosphera2 PRIVATE ${MKL_INCLUDE})
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_compile_definitions(libnosphera2 PUBLIC EIGEN_USE_LAPACKE)
+    target_link_libraries(libnosphera2 PUBLIC
+        $<LINK_LIBRARY:FRAMEWORK,Accelerate>
+    )
+else ()
+    target_compile_definitions(libnosphera2 PRIVATE __CMAKE_BUILD__  MKL_LP64 MKL_Direct_Call)
+    target_include_directories(libnosphera2 PRIVATE ${MKL_INCLUDE})
+endif ()
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
         $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
@@ -93,14 +99,21 @@ if (${USE_VECTOR_INSTRUCTIONS})
     )
 endif ()
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    find_package(BLAS REQUIRED)
+    target_compile_definitions(libnosphera2 PUBLIC EIGEN_USE_BLAS)
+    target_link_libraries(libnosphera2
+      PUBLIC
+      ${BLAS_LIBRARIES})
+endif ()
+
 target_link_options(libnosphera2 PRIVATE
     $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static>
     $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++ -static-libgcc -MMD -MP -fopenmp -ffast-math>
-    $<$<PLATFORM_ID:Darwin>:-framework Accelerate>
 )
 target_link_libraries(libnosphera2 PUBLIC
     $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>
-    $<$<PLATFORM_ID:Darwin>:Homebrew::OpenMP>
+    $<$<PLATFORM_ID:Darwin>:OpenMP::OpenMP_C>
     occ::qm
     occ::main
     basis_set_helper

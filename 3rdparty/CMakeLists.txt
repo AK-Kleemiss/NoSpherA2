@@ -48,18 +48,17 @@ else ()
     set(featomic_st_name "libfeatomic.a")
 endif ()
 
-set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
-if (${FAKE_HOME_TEST})
-    set(HOME "/tmp/home")
-else ()
-    set(HOME $ENV{HOME})
-endif ()
-
-set(MKL_LINK "static")
-set(MKL_INTERFACE lp64)
-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+    if (${FAKE_HOME_TEST})
+        set(HOME "/tmp/home")
+    else ()
+        set(HOME $ENV{HOME})
+    endif ()
+    set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
+    set(MKL_LINK "static")
+    set(MKL_INTERFACE lp64)
     include(${CMAKE_SOURCE_DIR}/cmake/micromamba.cmake)
-    set(_ONEAPI_MKL_ROOT "${CMAKE_BINARY_DIR}/environments/mambaenv/Library")
+    set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
     if (NOT EXISTS "${_ONEAPI_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
         micromamba_environment(
             NAME mambaenv
@@ -76,36 +75,51 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)
     set(MKL_DLL_PATH "${_ONEAPI_MKL_ROOT}/bin" PARENT_SCOPE)
 endif ()
-if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set(USE_SYSTEM_BLAS ON)
-else ()
-    set(USE_SYSTEM_BLAS OFF)
-endif ()
+
 if (WIN32)
-    set(WIN_FLAGS "GG_NO_PRAGMA ON;CPACK_SYSTEM_NAME windows")
-endif ()
-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set(MKL_FLAGS
-        "BLA_VENDOR Intel10_64lp_seq"
-        "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl"
+    set(WIN_FLAGS
+        "GG_NO_PRAGMA ON"
+        "CPACK_SYSTEM_NAME windows"
+#        "CMAKE_CXX_FLAGS /O2 /fp:fast"
+#        "CMAKE_C_FLAGS /O2 /fp:fast"
     )
 endif ()
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(Darwin_FLAGS
+        "EIGEN_USE_LAPACKE ON"
+        "ENABLE_HOST_OPT OFF"
+        "USE_OPENMP OFF"
+        "CMAKE_CXX_FLAGS -O3 -ffast-math -march=native"
+        "CMAKE_C_FLAGS -O3 -ffast-math -march=native"
+    )
+else ()
+    set(LINUX_WINDOWS_COMMON_FLAGS
+        "BLA_VENDOR Intel10_64lp_seq"
+        "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl"
+        "USE_QCINT OFF"
+        "ENABLE_HOST_OPT OFF"
+        "USE_FORTRAN OFF"
+        "BLA_STATIC ON"
+    )
+endif ()
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(LINUX_FLAGS
+        "CMAKE_CXX_FLAGS -O3 -ffast-math -march=native"
+        "CMAKE_C_FLAGS -O3 -ffast-math -march=native"
+    )
+endif ()
 CPMAddPackage(
     NAME occ
     GITHUB_REPOSITORY MilitaoLucas/occ
     GIT_TAG "main_with_libs"
     OPTIONS
-        "USE_QCINT OFF"
-        "ENABLE_HOST_OPT OFF"
-        "WITH_PYTHON_BINDINGS OFF"
-        "USE_FORTRAN OFF"
-        "USE_SYSTEM_BLAS ${USE_SYSTEM_BLAS}"
-        "USE_SYSTEM_TBB OFF"
         "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
-        ${MKL_FLAGS}
-        "BLA_STATIC ON"
+        "WITH_PYTHON_BINDINGS OFF"
+        ${Darwin_FLAGS}
         ${WIN_FLAGS}
+        ${LINUX_FLAGS}
+        ${LINUX_WINDOWS_COMMON_FLAGS}
 )
 file(COPY ${occ_SOURCE_DIR}/share/ DESTINATION ${CMAKE_BINARY_DIR}/occ_data)
 set(OCC_DATA_PATH "${CMAKE_BINARY_DIR}/occ_data" PARENT_SCOPE)
