@@ -103,12 +103,12 @@ jobs:
     - name: Build NoSpherA2
       run: ${{ matrix.build-script }}
 
-    - uses: actions/checkout@v4
-    - name: Setup tmate session
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: true
+#    - uses: actions/checkout@v4
+#    - name: Setup tmate session
+#      if: ${{ failure() }}
+#      uses: mxschmitt/action-tmate@v3
+#      with:
+#        limit-access-to-actor: true
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
