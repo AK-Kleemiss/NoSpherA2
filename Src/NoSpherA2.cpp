@@ -12,11 +12,13 @@
 #include <occ/io/occ_input.h>
 #include <occ/qm/wavefunction.h>
 #include "cif.h"
+#include "debug_utils.h"
 
 int QCT(options& opt, std::vector<WFN>& wavy);
 
 int main(int argc, char **argv)
 {
+    wait_for_debugger(); // This is for debugging during tests. It just returns if the env variable DEBUG_WAIT is not set.
     using namespace std;
     char cwd[1024];
 #ifdef _WIN32

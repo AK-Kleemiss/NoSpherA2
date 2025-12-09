@@ -1,6 +1,7 @@
 add_subdirectory(basis_set_helper)
 
-set(GENERATED_AUX_CPP "${CMAKE_CURRENT_BINARY_DIR}/auxiliary_basis.cpp")
+set(GENERATED_AUX_CPP "${CMAKE_CURRENT_BINARY_DIR}/auxiliary_basis.cpp"
+        debug_utils.h)
 set_source_files_properties(${GENERATED_AUX_CPP} PROPERTIES GENERATED TRUE)
 add_library(libnosphera2 STATIC
     "${GENERATED_AUX_CPP}"
