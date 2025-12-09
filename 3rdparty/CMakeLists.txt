@@ -77,6 +77,11 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
         HINTS "${_ONEAPI_MKL_ROOT}/lib/cmake"
         PATH_SUFFIXES "mkl"
     )
+    if (WIN32)
+        file(COPY "${_ONEAPI_MKL_ROOT}/bin/libiomp5md.dll" DESTINATION "${CMAKE_BINARY_DIR}")
+    else ()
+        file(COPY "${_ONEAPI_MKL_ROOT}/lib/libiomp5.so" DESTINATION "${CMAKE_BINARY_DIR}")
+    endif ()
     message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
     set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)
     set(MKL_DLL_PATH "${_ONEAPI_MKL_ROOT}/bin" PARENT_SCOPE)

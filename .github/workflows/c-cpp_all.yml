@@ -44,7 +44,7 @@ jobs:
               cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_MacOS_x86_64
-            artifact-path: Mac/NoSpherA2
+            artifact-path: build/Src/NoSpherA2
 
           - os: ubuntu-latest
             name: Linux
@@ -53,7 +53,9 @@ jobs:
               cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_Linux
-            artifact-path: build/Src/NoSpherA2
+            artifact-path: |
+              build/Src/NoSpherA2
+              build/libiomp5.so
 
           - os: windows-2022
             name: Windows
@@ -63,7 +65,9 @@ jobs:
               cmake -G "Ninja" -DCMAKE_C_COMPILER=clang-cl.exe -DCMAKE_CXX_COMPILER=clang-cl.exe -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ..
               cmake --build . --config Release --target NoSpherA2 --parallel
             artifact-name: executable_Windows
-            artifact-path: build/Src/Release/NoSpherA2.exe
+            artifact-path: |
+              build/Src/Release/NoSpherA2.exe
+              build/libiomp5md.dll
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.name }}
@@ -109,6 +113,22 @@ jobs:
 #      uses: mxschmitt/action-tmate@v3
 #      with:
 #        limit-access-to-actor: true
+
+    - name: Test ${{ matrix.name }}
+      shell: bash
+      working-directory: build
+      run: ctest -C Release --output-on-failure -j 2
+
+    - name: Upload Test Artifacts
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-logs-${{ matrix.name }}
+        path: |
+          build/tests/**/*.log
+          build/tests/**/*.diff
+          build/tests/**/*.good
+          build/Testing/Temporary/LastTest.log
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
@@ -181,44 +201,6 @@ jobs:
       with:
         name: executable_MacOS_Universal
         path: ./universal/NoSpherA2_Mac
-
-  # Separate testing job
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Harden Runner
-      uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
-      with:
-        egress-policy: audit
-
-    - name: Checkout
-      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-      with:
-        submodules: recursive
-        fetch-depth: 1
-
-    - name: Download Linux Executable
-      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-      with:
-        name: executable_Linux
-        path: ./
-
-    - name: Run Tests
-      run: |
-        # The artifact preserves directory structure, so we need to find the executable
-        find . -name "NoSpherA2" -type f -exec chmod +x {} \;
-        cp ./build/Src/NoSpherA2 ./NoSpherA2 || cp ./NoSpherA2 ./NoSpherA2 || true
-        chmod +x NoSpherA2
-        cd tests
-        export LD_LIBRARY_PATH=../:$LD_LIBRARY_PATH
-        make all -k
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
-      with:
-        name: differences in tests
-        path: tests/*.diff
 
   # Combine all artifacts
   combine_all:
