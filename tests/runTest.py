@@ -16,6 +16,7 @@ def main():
     args = parser.parse_args()
     os.chdir(args.dir)
     debugging = "TEST_DEBUG" in os.environ
+    print(debugging)
     args.args = [i.replace('\"', '') for i in args.args.split()] + ["-all_charges"]
     print(f"Running: {args.exe} {args.args}")
 

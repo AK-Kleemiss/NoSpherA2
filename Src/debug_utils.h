@@ -16,6 +16,7 @@
     #include <chrono>
 #endif
 
+volatile bool g_debug_attached = false;
 inline void wait_for_debugger() {
     if (!std::getenv("DEBUG_WAIT")) {
         return;
@@ -45,10 +46,10 @@ inline void wait_for_debugger() {
     std::cout << "Process ID: " << getpid() << std::endl;
     std::cout << "Action: " << std::endl;
     std::cout << "  1. Open your IDE (CLion/VS Code) and 'Attach to Process'" << std::endl;
+    std::cout << "  2. Run command 'expr attached = true'" << std::endl;
 
-    volatile bool attached = false;
 
-    while (!attached) {
+    while (!g_debug_attached) {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
