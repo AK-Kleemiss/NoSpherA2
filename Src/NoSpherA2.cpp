@@ -8,9 +8,7 @@
 #include "properties.h"
 #include "isosurface.h"
 #include "nos_math.h"
-#include <occ/main/occ_scf.h>
-#include <occ/io/occ_input.h>
-#include <occ/qm/wavefunction.h>
+
 #include "cif.h"
 #include "debug_utils.h"
 

@@ -7,7 +7,6 @@
 #include <string>
 #include <array>
 #include <filesystem>
-#include <occ/qm/wavefunction.h>
 #include "mo_class.h"
 
 namespace occ::qm

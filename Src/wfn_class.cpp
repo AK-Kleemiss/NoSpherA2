@@ -11,10 +11,7 @@
 #include <cmath>
 #include <cstdio>
 #include <numeric>
-#include <occ/qm/wavefunction.h>
 #include <ostream>
-#include <occ/gto/gto.h>
-#include <occ/io/conversion.h>
 #include <ranges>
 #include <vector>
 #include "libCintMain.h"
