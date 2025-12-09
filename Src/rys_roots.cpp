@@ -17,6 +17,8 @@
 
 #if defined(__APPLE__)
  // On macOS we are using Accelerate for BLAS/LAPACK
+#define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 0
+#define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 0
 #include <Accelerate/Accelerate.h>
 #else
  // Linux/Windows with oneMKL

@@ -84,7 +84,6 @@ endif()
 # This is done so Makefile can keep working the way it does. I have no Idea how to make windows work if I change the location of mdspan
 #add_compile_definitions(libnosphera2 "-D__CMAKE_BUILD__")
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    target_compile_definitions(libnosphera2 PUBLIC EIGEN_USE_LAPACKE)
     target_link_libraries(libnosphera2 PUBLIC
         $<LINK_LIBRARY:FRAMEWORK,Accelerate>
     )
@@ -99,21 +98,13 @@ if (${USE_VECTOR_INSTRUCTIONS})
     )
 endif ()
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    find_package(BLAS REQUIRED)
-    target_compile_definitions(libnosphera2 PUBLIC EIGEN_USE_BLAS)
-    target_link_libraries(libnosphera2
-      PUBLIC
-      ${BLAS_LIBRARIES})
-endif ()
-
 target_link_options(libnosphera2 PRIVATE
     $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static>
     $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++ -static-libgcc -MMD -MP -fopenmp -ffast-math>
 )
 target_link_libraries(libnosphera2 PUBLIC
     $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>
-    $<$<PLATFORM_ID:Darwin>:OpenMP::OpenMP_C>
+    $<$<PLATFORM_ID:Darwin>:OpenMP::OpenMP_C OpenMP::OpenMP_CXX>
     occ::qm
     occ::main
     basis_set_helper

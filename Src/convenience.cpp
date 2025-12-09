@@ -1,5 +1,8 @@
 #include "pch.h"
 #include "convenience.h"
+
+#include <omp.h>
+
 #include "cell.h"
 #include "tsc_block.h"
 #include "test_functions.h"
@@ -1741,7 +1744,11 @@ void options::digest_options()
         else if (temp == "-cpus")
         {
             threads = stoi(arguments[i + 1]);
+#ifdef __APPLE__
+            omp_set_num_threads(threads);
+#else
             MKL_Set_Num_Threads(threads);
+#endif
 #ifdef _OPENMP
             omp_set_num_threads(threads);
             omp_set_dynamic(0);
