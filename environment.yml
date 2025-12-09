@@ -9,4 +9,3 @@ dependencies:
    - mkl-static
    - cmake
    - intel-openmp
-   - tbb-devel
