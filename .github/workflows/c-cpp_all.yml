@@ -58,7 +58,7 @@ jobs:
           - os: windows-2022
             name: Windows
             build-script: |
-              mkdir -p build
+              cmake -E make_directory build
               cd build
               cmake -G "Ninja" -DCMAKE_C_COMPILER=clang-cl.exe -DCMAKE_CXX_COMPILER=clang-cl.exe -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ..
               cmake --build . --config Release --target NoSpherA2 --parallel

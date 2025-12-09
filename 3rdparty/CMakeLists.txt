@@ -96,8 +96,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         "USE_SYSTEM_BLAS OFF"
         "ENABLE_HOST_OPT OFF"
         "USE_OPENMP OFF"
-        "CMAKE_CXX_FLAGS -O3 -ffast-math -march=native"
-        "CMAKE_C_FLAGS -O3 -ffast-math -march=native"
+        "CMAKE_CXX_FLAGS -O2"
+        "CMAKE_C_FLAGS -O2"
     )
 else ()
     set(LINUX_WINDOWS_COMMON_FLAGS
@@ -118,7 +118,7 @@ endif ()
 CPMAddPackage(
     NAME occ
     GITHUB_REPOSITORY MilitaoLucas/occ
-    GIT_TAG "main_with_libs"
+    GIT_TAG "libs_rebase"
     OPTIONS
         "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
         "WITH_PYTHON_BINDINGS OFF"
