@@ -78,6 +78,17 @@ const double array_length(const array &in)
     }
     return sqrt(sum);
 }
+template <typename array>
+const double array_length(const array& in, const array& in2)
+{
+    double sum = 0.0;
+    auto it1 = in.begin(); 
+    auto it2 = in2.begin(); 
+    for (;it1 != in.end(); ++it1, ++it2) {
+		sum += (*it1 - *it2) * (*it1 - *it2);
+    }
+    return sqrt(sum);
+}
 
 // Function to compute cross product
 std::array<double, 3> cross(const std::array<double, 3> &a, const std::array<double, 3> &b);

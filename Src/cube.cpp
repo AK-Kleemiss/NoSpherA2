@@ -655,42 +655,34 @@ double cube::ewald_sum(const int kMax, const double conv) {
     for (int i = 0; i < 3; i++) {
         std::cout << std::setw(10) << reciprocalLattice[i][0] << std::setw(10) << reciprocalLattice[i][1] << std::setw(10) << reciprocalLattice[i][2] << std::endl;
     }
-    
-    
-    std::vector<std::array<double, 3>> ri(grid_points);
-    std::vector<std::vector<std::array<double, 3>>> rij(grid_points);
-    for (int i = 0; i < size[0]; i++) {
-        for (int j = 0; j < size[1]; j++) {
-            for (int k = 0; k < size[2]; k++) {
-                ri[i * size[1] * size[2] + j * size[2] + k] = get_pos(i, j, k);
-                rij[i * size[1] * size[2] + j * size[2] + k].resize(grid_points);
-                for (int l = 0; l < size[0]; l++) {
-                    for (int m = 0; m < size[1]; m++) {
-                        for (int n = 0; n < size[2]; n++) {
-                            std::array<double, 3> rj = get_pos(l, m, n);
-                            rij[i * size[1] * size[2] + j * size[2] + k][l * size[1] * size[2] + m * size[2] + n] = 
-                            { ri[i * size[1] * size[2] + j * size[2] + k][0] - rj[0], 
-                              ri[i * size[1] * size[2] + j * size[2] + k][1] - rj[1], 
-                              ri[i * size[1] * size[2] + j * size[2] + k][2] - rj[2]};
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+	ProgressBar *pb = new ProgressBar(grid_points, 60, "-", " ", "Real-space");
+	double v00 = vectors[0][0], v01 = vectors[0][1], v02 = vectors[0][2];
+	double v10 = vectors[1][0], v11 = vectors[1][1], v12 = vectors[1][2];
+	double v20 = vectors[2][0], v21 = vectors[2][1], v22 = vectors[2][2];
     // Real-space contribution
 #pragma omp parallel for reduction(+:realSpaceEnergy)
     for (int i = 0; i < size[0]; i++) {
         double length = 0, fac = 0, v1 = 0;
+        double l0 = -i*v00, l1 = -i*v10, l2 = -i*v20;
         for (int j = 0; j < size[1]; j++) {
+			l0 -= j * v01;
+			l1 -= j * v11;
+			l2 -= j * v21;
             for (int k = 0; k < size[2]; k++) {
+				l0 -= k * v02;
+				l1 -= k * v12;
+				l2 -= k * v22;
                 v1 = values[i][j][k];
-#pragma ivdep
                 for (int l = 0; l < size[0]; l++) {
+					l0 += l * v00;
+					l1 += l * v10;
+					l2 += l * v20;
                     for (int m = 0; m < size[1]; m++) {
+						l0 += m * v01;
+						l1 += m * v11;
+						l2 += m * v21;
                         for (int n = 0; n < size[2]; n++) {
-                            length = array_length(rij[i * size[1] * size[2] + j * size[2] + k][l * size[1] * size[2] + m * size[2] + n]);
+                            length = std::hypot(l0 + n * v02, l1 + n * v12, l2 + n * v22);
                             if (length > 6.0 || length == 0) continue;
                             fac = erfc(alpha * length) / length;
                             if (abs(fac) < 1E-10) continue;
@@ -698,9 +690,11 @@ double cube::ewald_sum(const int kMax, const double conv) {
                         }
                     }
                 }
+                pb->update();
             }
         }
     }
+    delete(pb);
     realSpaceEnergy *= dv * dv * 0.5;
     std::cout << "Real-space energy: " << realSpaceEnergy << std::endl;
     double result = 0.0;
@@ -711,6 +705,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     std::deque<double> history;
     for (int k_vec = 1; k_vec <= kMax; k_vec++) {
         double temp = 0;
+        pb = new ProgressBar(8 * k_vec * k_vec * k_vec, 60, "-", " ", "Reciprocal-space " + k_vec);
         for (int h = -k_vec; h <= k_vec; ++h) {
             for (int k = -k_vec; k <= k_vec; ++k) {
                 for (int l = -k_vec; l <= k_vec; ++l) {
@@ -741,10 +736,13 @@ double cube::ewald_sum(const int kMax, const double conv) {
                         for (int d2 = 0; d2 < size[1]; d2++) {
                             for (int d3 = 0; d3 < size[2]; d3++) {
                                 v1 = values[d1][d2][d3];
+                                const std::array<double, 3> ri = get_pos(d1, d2, d3);
                                 for (int d4 = 0; d4 < size[0]; d4++) {
                                     for (int d5 = 0; d5 < size[1]; d5++) {
                                         for (int d6 = 0; d6 < size[2]; d6++) {
-                                            kDotR = dot_(kvec, rij[d1 * size[1] * size[2] + d2 * size[2] + d3][d4 * size[1] * size[2] + d5 * size[2] + d6]);
+                                            std::array<double, 3> rj = get_pos(d4, d5, d6);
+											rj = { rj[0] - ri[0], rj[1] - ri[1], rj[2] - ri[2] };
+                                            kDotR = dot_(kvec, rj);
                                             temp += exp(-k2 / FOUR_alsq) / abs(k2) * v1 * values[d4][d5][d6] * cos(kDotR);
                                         }
                                     }
@@ -752,6 +750,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
                             }
                         }
                     }
+					pb->update();
                 }
             }
         }
@@ -759,6 +758,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
         if (has_converged(res_temp, result, conv, realSpaceEnergy, history, window_size)) {
             break;
         }
+        delete(pb);
     }
 
     reciprocalSpaceEnergy = result;
