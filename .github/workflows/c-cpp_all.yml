@@ -20,12 +20,13 @@ env:
     FEATOMIC_CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF"
     SCCACHE_GHA_ENABLED: "true"
     RUSTC_WRAPPER: "sccache"
+    OCC_DATA_PATH: "${{ github.workspace }}/build/occ_data"
 
 jobs:
   # Build matrix for all platforms
   build:
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - os: macos-latest  # Apple Silicon (ARM64)
@@ -33,28 +34,28 @@ jobs:
             build-script: | 
               mkdir -p build && cd build 
               cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="arm64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
-              cmake --build . --target NoSpherA2 -j
+              cmake --build . --target NoSpherA2 -j3
             artifact-name: executable_MacOS_ARM64
-            artifact-path: build/Src/NoSpherA2
+            artifact-path: build/NoSpherA2
 
           - os: macos-15-intel  # Intel x86_64
             name: Mac_x86_64
             build-script: |
               mkdir -p build && cd build 
               cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
-              cmake --build . --target NoSpherA2 -j
+              cmake --build . --target NoSpherA2 -j3
             artifact-name: executable_MacOS_x86_64
-            artifact-path: build/Src/NoSpherA2
+            artifact-path: build/NoSpherA2
 
           - os: ubuntu-latest
             name: Linux
             build-script: | 
               mkdir -p build && cd build
               cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
-              cmake --build . --target NoSpherA2 -j
+              cmake --build . --target NoSpherA2 -j4
             artifact-name: executable_Linux
             artifact-path: |
-              build/Src/NoSpherA2
+              build/NoSpherA2
               build/libiomp5.so
 
           - os: windows-2022
@@ -63,10 +64,10 @@ jobs:
               cmake -E make_directory build
               cd build
               cmake -G "Ninja" -DCMAKE_C_COMPILER=clang-cl.exe -DCMAKE_CXX_COMPILER=clang-cl.exe -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ..
-              cmake --build . --config Release --target NoSpherA2 --parallel
+              cmake --build . --config Release --target NoSpherA2 -j4
             artifact-name: executable_Windows
             artifact-path: |
-              build/Src/Release/NoSpherA2.exe
+              build/NoSpherA2.exe
               build/libiomp5md.dll
 
     runs-on: ${{ matrix.os }}
@@ -117,7 +118,7 @@ jobs:
     - name: Test ${{ matrix.name }}
       shell: bash
       working-directory: build
-      run: ctest -C Release --output-on-failure -j 2
+      run: ctest -C Release --output-on-failure -j 1
 
     - name: Upload Test Artifacts
       if: failure()

@@ -4,6 +4,8 @@ import subprocess
 import difflib
 import argparse
 import os
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 import shutil
 
 def main():
