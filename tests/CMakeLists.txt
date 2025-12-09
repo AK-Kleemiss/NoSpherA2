@@ -23,7 +23,10 @@ add_nos_test(openBLAS "-blastest -no-date" DIRECTORY "OpenBLAS")
 # properties is failing, but it seems like the output changed. It doesn't look too bad
 add_nos_test(properties "-wfn olex2/Wfn_job/sucrose.wfx -cif sucrose.cif -lap -eli -resolution 0.5 -no-date" DIRECTORY "sucrose_fchk_SF")
 add_nos_test(reading_SALTED "-test_reading_SALTED_binary" DIRECTORY "SALTED")
-add_nos_test(ri_fit "-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit combo_basis_fit -no-date" DIRECTORY "epoxide_gbw" GOOD_LOG "ri_fit.good")
+if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+    # ri_fit doesn't work in Darwin because of dgels.
+    add_nos_test(ri_fit "-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit combo_basis_fit -no-date" DIRECTORY "epoxide_gbw" GOOD_LOG "ri_fit.good")
+endif ()
 add_nos_test(rubredoxin_cmtc "-hkl 1yk4_h.hkl -acc 0 -cmtc residues/1.gbw residues/1.cif 0 residues/2.gbw residues/2.cif 0.1 residues/3.gbw residues/3.cif 0.2 residues/4.gbw residues/4.cif 0 -mtc_mult 1 1 1 1 -mtc_charge 0 0 0 0 -mtc_ECP 0 0 0 0 -no-date" DIRECTORY "rubredoxin_cmtc")
 add_nos_test(SALTED "-SALTED Model -cif test_cysteine.cif -wfn test_cysteine.xyz -dmin 0.73 -no-date" DIRECTORY "SALTED")
 add_nos_test(sucrose_IAM "-cif sucrose.cif -hkl sucrose.hkl -xyz sucrose.xyz -IAM -no-date" DIRECTORY "sucrose_IAM_SF")
