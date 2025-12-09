@@ -31,7 +31,7 @@ jobs:
           - os: macos-latest  # Apple Silicon (ARM64)
             name: Mac_ARM64
             build-script: | 
-              mkdir build && cd build 
+              mkdir -p build && cd build 
               cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="arm64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_MacOS_ARM64
@@ -40,7 +40,7 @@ jobs:
           - os: macos-15-intel  # Intel x86_64
             name: Mac_x86_64
             build-script: |
-              mkdir build && cd build 
+              mkdir -p build && cd build 
               cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_MacOS_x86_64
@@ -49,7 +49,7 @@ jobs:
           - os: ubuntu-latest
             name: Linux
             build-script: | 
-              mkdir build && cd build
+              mkdir -p build && cd build
               cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_Linux
@@ -58,7 +58,7 @@ jobs:
           - os: windows-2022
             name: Windows
             build-script: |
-              mkdir build
+              mkdir -p build
               cd build
               cmake -G "Ninja" -DCMAKE_C_COMPILER=clang-cl.exe -DCMAKE_CXX_COMPILER=clang-cl.exe -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ..
               cmake --build . --config Release --target NoSpherA2 --parallel
@@ -316,7 +316,7 @@ jobs:
 
     - name: Build project
       run: |
-          mkdir build && cd build
+          mkdir -p build && cd build
           cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           cmake --build . --target NoSpherA2 -j
 
