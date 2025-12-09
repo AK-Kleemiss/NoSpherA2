@@ -118,7 +118,12 @@ jobs:
     - name: Test ${{ matrix.name }}
       shell: bash
       working-directory: build
-      run: ctest -C Release --output-on-failure -j 1
+      run: |
+        if [ "${{ matrix.os }}" = "windows-2022" ]; then
+          ctest -C Release --output-on-failure -j 1
+        else
+          ctest --output-on-failure -j 1
+        fi
 
     - name: Upload Test Artifacts
       if: failure()
