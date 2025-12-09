@@ -101,8 +101,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         "USE_SYSTEM_BLAS OFF"
         "ENABLE_HOST_OPT OFF"
         "USE_OPENMP OFF"
-        "CMAKE_CXX_FLAGS -O2"
-        "CMAKE_C_FLAGS -O2"
+        "CMAKE_CXX_FLAGS -O1"
+        "CMAKE_C_FLAGS -O1"
     )
 else ()
     set(LINUX_WINDOWS_COMMON_FLAGS

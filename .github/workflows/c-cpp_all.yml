@@ -35,7 +35,7 @@ jobs:
               cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="arm64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_MacOS_ARM64
-            artifact-path: Mac/NoSpherA2
+            artifact-path: build/Src/NoSpherA2
 
           - os: macos-15-intel  # Intel x86_64
             name: Mac_x86_64
