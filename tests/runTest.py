@@ -18,9 +18,8 @@ def main():
     args = parser.parse_args()
     os.chdir(args.dir)
     debugging = "TEST_DEBUG" in os.environ
-    print(debugging)
-    print(f"Running: {args.exe} {args.args}")
     args.args = [i.replace('\"', '') for i in args.args.split()] + ["-all_charges"]
+    print(f"Running: {args.exe} {' '.join(args.args)}")
 
     try:
         subprocess.run(
