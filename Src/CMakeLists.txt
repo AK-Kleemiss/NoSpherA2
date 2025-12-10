@@ -105,7 +105,7 @@ if (${USE_VECTOR_INSTRUCTIONS})
 endif ()
 
 target_link_options(libnosphera2 PUBLIC
-    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static>
+#    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static>
     $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++ -static-libgcc -MMD -MP -fopenmp -ffast-math>
 )
 target_link_libraries(libnosphera2 PUBLIC
