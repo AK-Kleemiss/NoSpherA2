@@ -115,9 +115,9 @@ jobs:
       with:
         path: |
           ${{env.CPM_SOURCE_CACHE}}
-        key: ${{ matrix.name }}-NoSpherA2-build-${{ hashFiles('3rdparty/CMakeLists.txt') }}
+        key: ${{ matrix.name }}-NoSpherA2-cpm-${{ hashFiles('3rdparty/CMakeLists.txt') }}
         restore-keys: |
-          ${{ matrix.name }}-NoSpherA2-build-
+          ${{ matrix.name }}-NoSpherA2-cpm-
 
     - uses: ilammy/msvc-dev-cmd@v1
       with:
@@ -140,15 +140,15 @@ jobs:
           ctest --output-on-failure -j 1
         fi
 
-    - name: Setup tmate session
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: true
-
+#    - name: Setup tmate session
+#      if: ${{ failure() }}
+#      uses: mxschmitt/action-tmate@v3
+#      with:
+#        limit-access-to-actor: true
+#
     - name: Upload Test Artifacts
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
       with:
         name: test-logs-${{ matrix.name }}
         path: |
@@ -231,7 +231,7 @@ jobs:
 
   # Combine all artifacts
   combine_all:
-    needs: [build]
+    needs: [build, build_mac_universal]
     runs-on: ubuntu-latest
     name: Combine All Executables
 
