@@ -45,7 +45,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     if (NOT CONDA_ENV STREQUAL "base")
         option(USE_CUSTOM_ENV "Use a user provided environment for conda." ON)
     endif ()
-    set(ENV_PATH ${CMAKE_BINARY_DIR}/environments/mambaenv CACHE STRING "Set the environment path.")
+    set(MICROMAMBA_ENV_PATH ${CMAKE_BINARY_DIR}/environments/mambaenv CACHE STRING "Set the environment path.")
 endif()
 if (MSVC AND NOT (${OCC_BUILD_TYPE} STREQUAL ${CMAKE_BUILD_TYPE}))
     message(FATAL_ERROR "Building OCC in a different mode than NoSpherA2 is not supported because MSVC containers have

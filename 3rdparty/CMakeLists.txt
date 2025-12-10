@@ -2,6 +2,9 @@ include(ExternalProject)
 
 set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
 set(ENV{CMAKE_TRY_COMPILE_CONFIGURATION} Release)
+if (MSVC)
+    add_compile_options(/EHsc)
+endif ()
 if (NOT WIN32)
     CPMAddPackage(
         NAME Ccache.cmake
@@ -35,6 +38,7 @@ CPMAddPackage(
     NAME featomic
     URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.4/featomic-cxx-0.6.4.tar.gz"
     OPTIONS
+        "G Ninja"
         "CMAKE_BUILD_TYPE Release"
         "FEATOMIC_FETCH_METATENSOR ON"
         "BUILD_SHARED_LIBS OFF"
@@ -86,14 +90,15 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)
     set(MKL_DLL_PATH "${_ONEAPI_MKL_ROOT}/bin" PARENT_SCOPE)
     set(_ONEAPI_MKL_ROOT ${_ONEAPI_MKL_ROOT} PARENT_SCOPE)
-    list(APPEND CMAKE_PREFIX_PATH "${_ONEAPI_MKL_ROOT}")
+    list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
 endif ()
 
 if (WIN32)
     set(WIN_FLAGS
         "GG_NO_PRAGMA ON"
         "CPACK_SYSTEM_NAME windows"
-        "CMAKE_CXX_FLAGS \"-D__TBB_DYNAMIC_LOAD_ENABLED=0\""
+        "USE_SYSTEM_TBB OFF"
+        "CMAKE_CXX_FLAGS -D__TBB_DYNAMIC_LOAD_ENABLED=0"
 #        "CMAKE_CXX_FLAGS /O2 /fp:fast"
 #        "CMAKE_C_FLAGS /O2 /fp:fast"
     )
@@ -109,7 +114,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 else ()
     set(LINUX_WINDOWS_COMMON_FLAGS
         "BLA_VENDOR Intel10_64lp_seq"
-        "USE_SYSTEM_TBB ON"
+        "USE_SYSTEM_TBB OFF"
+        "TBB_PREFIX_PATH ${_ONEAPI_MKL_ROOT}"
         "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl"
         "USE_QCINT OFF"
         "ENABLE_HOST_OPT OFF"
@@ -126,7 +132,7 @@ endif ()
 CPMAddPackage(
     NAME occ
     GITHUB_REPOSITORY MilitaoLucas/occ
-    GIT_TAG "libs_rebase"
+    GIT_TAG "libs_rebase2"
     OPTIONS
         "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
         "ENABLE_HOST_OPT OFF"

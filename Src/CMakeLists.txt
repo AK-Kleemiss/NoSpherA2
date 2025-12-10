@@ -104,13 +104,13 @@ if (${USE_VECTOR_INSTRUCTIONS})
     )
 endif ()
 
-target_link_options(libnosphera2 PRIVATE
+target_link_options(libnosphera2 PUBLIC
     $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static>
     $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++ -static-libgcc -MMD -MP -fopenmp -ffast-math>
 )
 target_link_libraries(libnosphera2 PUBLIC
     $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>
-    $<$<PLATFORM_ID:Windows>:${_ONEAPI_MKL_ROOT}/lib/tbb12.lib>
+    $<$<PLATFORM_ID:Windows>:occ::tbb>
     $<$<PLATFORM_ID:Darwin>:OpenMP::OpenMP_C OpenMP::OpenMP_CXX>
     occ::qm
     occ::main
@@ -134,7 +134,7 @@ add_executable(NoSpherA2 "${CMAKE_CURRENT_SOURCE_DIR}/NoSpherA2.cpp")
 set_target_properties(NoSpherA2 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
-target_link_libraries(NoSpherA2 PRIVATE libnosphera2 $<$<PLATFORM_ID:Windows>:${_ONEAPI_MKL_ROOT}/lib/tbb12.lib>)
+target_link_libraries(NoSpherA2 PRIVATE libnosphera2 $<$<PLATFORM_ID:Windows>:occ::tbb>)
 target_include_directories(NoSpherA2 PRIVATE ${MKL_INCLUDE})
 if(WIN32)
     set_target_properties(libnosphera2 PROPERTIES
