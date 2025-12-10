@@ -2,7 +2,7 @@
 
 #include "convenience.h"
 #include "integration_params.h"
-
+#include "cint.h"
 
 //DEPRICATED::Function to compute electron repulsion integrals
 void computeEri3c(Int_Params& param1,
@@ -80,11 +80,12 @@ struct Overlap3C {
  * max_mem: Maximum available memory in MB
  */
 template <typename Kernel>
-void computeRho(Int_Params& param1,
-    Int_Params& param2,
+void computeRho(
+    const Int_Params& normal_basis,
+    const Int_Params& aux_basis,
     const dMatrix2& dm,
     vec& rho,
-    double max_mem);
+    double cutoff = 12.0);
 
 template <typename Kernel>
 void compute3C(Int_Params& param1,

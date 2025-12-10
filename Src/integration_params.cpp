@@ -1,10 +1,14 @@
 #include "integration_params.h"
-#include "JKFit.h"
+#include "cint.h"
+#include "constants.h"
 
 Int_Params::Int_Params()
 {
     wfn_origin = 0;
     ncen = 0;
+    atoms.clear();
+    atoms.shrink_to_fit();
+    basis_sets.clear();
 }
 
 Int_Params::Int_Params(const WFN &wavy)
@@ -14,6 +18,49 @@ Int_Params::Int_Params(const WFN &wavy)
     wfn_origin = wavy.get_origin();
     ncen = wavy.get_ncen();
     calc_integration_parameters();
+}
+
+Int_Params::Int_Params(const Int_Params &first, const Int_Params &second)
+{
+    // Combine two Int_Params objects
+    wfn_origin = 0;
+    atoms.clear();
+    atoms.shrink_to_fit();
+    basis_sets.clear();
+    
+    _atm.resize(first._atm.size() + second._atm.size(), 0);
+    _bas.resize(first._bas.size() + second._bas.size(), 0);
+    _env.resize(first._env.size() + second._env.size(), 0);
+    ncen = first.ncen + second.ncen;
+    nbas = first.nbas + second.nbas;
+
+    //// Copy all the data from the first object into the respective containers in the combined object
+    std::copy(first._atm.begin(), first._atm.end(), _atm.begin());
+    std::copy(first._bas.begin(), first._bas.end(), _bas.begin());
+    std::copy(first._env.begin(), first._env.end(), _env.begin());
+    //Also copy the _env data from the second object to the end of the _env data in the combined object
+    std::copy(second._env.begin(), second._env.end(), _env.begin() + first._env.size());
+
+    // Update the pointers in the second object to point to the correct place in the combined _env vector
+    const unsigned int off = first._env.size();
+    const int natm_off = first._atm.size() / 6;
+    ivec atm2 = second._atm;
+    ivec bas2 = second._bas;
+    for (int a = 0; a < natm_off; a++)
+    {
+        atm2[a * 6 + 1] += off;
+        atm2[a * 6 + 3] += off;
+    }
+    for (int b = 0; b < second.nbas; b++)
+    {
+        bas2[b * 8 + 0] += natm_off;
+        bas2[b * 8 + 5] += off;
+        bas2[b * 8 + 6] += off;
+    }
+    //// Copy the data from the second object into the combined objects
+    std::copy(atm2.begin(), atm2.end(), _atm.begin() + first._atm.size());
+    std::copy(bas2.begin(), bas2.end(), _bas.begin() + first._bas.size());
+    nao = first.nao + second.nao;
 }
 
 vec Int_Params::normalize_gto(vec coef, const vec& exp, const int l)
@@ -231,48 +278,6 @@ void Int_Params::calc_integration_parameters()
     populate_atm();
     populate_env();
     populate_bas();
-}
-
-Int_Params Int_Params::operator+(const Int_Params &other)
-{
-    // Combine two Int_Params objects
-    // Create a new Int_Params object and resize the arrays to fit the new size
-    Int_Params combined;
-    combined._atm.resize(_atm.size() + other._atm.size(), 0);
-    combined._bas.resize(_bas.size() + other._bas.size(), 0);
-    combined._env.resize(_env.size() + other._env.size(), 0);
-    combined.ncen = ncen + other.ncen;
-    combined.nbas = nbas + other.nbas;
-
-    // Copy all the data from the first object into the respective containers in the combined object
-    std::copy(_atm.begin(), _atm.end(), combined._atm.begin());
-    std::copy(_bas.begin(), _bas.end(), combined._bas.begin());
-    std::copy(_env.begin(), _env.end(), combined._env.begin());
-    // Also copy the _env data from the second object to the end of the _env data in the combined object
-    std::copy(other._env.begin(), other._env.end(), combined._env.begin() + _env.size());
-
-    // Update the pointers in the second object to point to the correct place in the combined _env vector
-    unsigned int off = _env.size();
-    int natm_off = _atm.size() / 6;
-    ivec atm2 = other._atm;
-    ivec bas2 = other._bas;
-    for (int a = 0; a < natm_off; a++)
-    {
-        atm2[a * 6 + 1] += off;
-        atm2[a * 6 + 3] += off;
-    }
-    for (int b = 0; b < other.nbas; b++)
-    {
-        bas2[b * 8 + 0] += natm_off;
-        bas2[b * 8 + 5] += off;
-        bas2[b * 8 + 6] += off;
-    }
-    // Copy the data from the second object into the combined objects
-    std::copy(atm2.begin(), atm2.end(), combined._atm.begin() + _atm.size());
-    std::copy(bas2.begin(), bas2.end(), combined._bas.begin() + _bas.size());
-    combined.nao = nao + other.nao;
-
-    return combined;
 }
 
 void Int_Params::print_data(std::string name) {

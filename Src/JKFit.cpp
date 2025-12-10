@@ -204,7 +204,7 @@ void BasisSet::gen_auto_aux(const WFN& orbital_wfn) {
                 a_max_by_l[shelltype] = std::max(a_max_by_l[shelltype], exps[i]);
             }
             prim_idx += shellsize;
-            coefs = Int_Params().normalize_gto(coefs, exps, shelltype);
+            coefs = Int_Params::normalize_gto(coefs, exps, shelltype);
 
             vec r_exp(shellsize, 0.0);
             for (int i = 0; i < shellsize; i++) {
