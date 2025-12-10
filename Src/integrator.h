@@ -2,15 +2,15 @@
 #include "convenience.h"
 
 // Enhanced density fitting with adaptive electron restraints
-vec density_fit_restrain(const WFN& wavy, const WFN& wavy_aux, const double cutoff, const char metric,
+vec density_fit_restrain(const WFN& wavy, const WFN& wavy_aux, const char metric,
                 double restraint_strength = 0.00005, bool adaptive_restraint = true,
                 const std::string& charge_scheme = "sanderson_estimate", bool analyze_quality = true);
 
 // Unrestrained density fitting (original approach)
-vec density_fit_unrestrained(const WFN& wavy, const WFN& wavy_aux, const double cutoff,
+vec density_fit_unrestrained(const WFN& wavy, const WFN& wavy_aux,
                              const char metric, bool analyze_quality = true);
 
-vec density_fit_hybrid(const WFN& wavy, const WFN& wavy_aux, const double cutoff,
+vec density_fit_hybrid(const WFN& wavy, const WFN& wavy_aux,
                       const char metric, double restraint_strength = 0.00005,
                       double tikhonov_lambda = 1e-6, const std::string& charge_scheme = "mulliken", bool analyze_quality = false);
 

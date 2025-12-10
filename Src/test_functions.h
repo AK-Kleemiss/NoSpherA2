@@ -1417,8 +1417,8 @@ void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>>& aux_basis,
 
 
     WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-    vec ri_coefs_u = density_fit_unrestrained(wavy, wavy_aux, 1000, 'C');
-    vec ri_coefs_tfvc = density_fit_hybrid(wavy, wavy_aux, 1000, 'C', 2.0E-4, 1E-6, "TFVC", true);
+    vec ri_coefs_u = density_fit_unrestrained(wavy, wavy_aux, 'C');
+    vec ri_coefs_tfvc = density_fit_hybrid(wavy, wavy_aux, 'C', 2.0E-4, 1E-6, "TFVC", true);
 
    vec2 dens_hirsh(2);
    vec2 dens_becke(2);

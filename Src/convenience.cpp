@@ -2076,7 +2076,7 @@ void options::digest_options()
         else if (temp == "-write_ri_coefs"){
             WFN wavy(wfn);
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-            vec ri_coefs = density_fit_unrestrained(wavy, wavy_aux, mem, 'C', debug);
+            vec ri_coefs = density_fit_unrestrained(wavy, wavy_aux,'C', debug);
             npy::npy_data<double> np_coeffs;
             np_coeffs.data = ri_coefs;
             np_coeffs.fortran_order = false;

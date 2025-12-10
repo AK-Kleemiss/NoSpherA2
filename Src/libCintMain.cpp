@@ -2,6 +2,7 @@
 
 
 #include "cint_funcs.h"
+#include "constants.h"
 
 extern "C" {
     extern CINTOptimizerFunction int3c2e_optimizer;
@@ -416,12 +417,27 @@ vec2 build_distance_list(const std::vector<atom>& atoms)
 #pragma omp parallel for schedule(dynamic) collapse(2)
     for (int i = 0; i < natoms; i++) {
         for (int j = i+1 ; j < natoms; j++) {
-            double dist = atoms[i].distance_to(atoms[j]);
+            const double dist = atoms[i].distance_to(atoms[j]);
             pair_list[i][j] = dist;
             pair_list[j][i] = dist;
         }
     }
     return pair_list;
+}
+
+vec build_largest_exp(const std::vector<atom>& atoms)
+{
+    //fill vector with largest number
+    vec res(atoms.size(), 2E100 );
+    const int natoms = atoms.size();
+#pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < natoms; i++) {
+        for (int s = 0; s < atoms[i].get_basis_set_size(); s++) {
+           const double exp = atoms[i].get_basis_set_exponent(s);
+           res[i] = std::min(res[i], exp);
+       }
+    }
+    return res;
 }
 
 //Ivec contains the ao indices for the given wave object
@@ -467,12 +483,8 @@ void computeRho(
     const Int_Params& normal_basis, 
     const Int_Params& aux_basis,
     const dMatrix2& dm,
-    vec& rho,
-    double cutoff)
+    vec& rho)
 {
-    cutoff = 11.5;
-    vec2 distance_list = build_distance_list(normal_basis.get_atoms());
-
     Int_Params combined(normal_basis,aux_basis);
 
     ivec bas = combined.get_bas();
@@ -495,17 +507,28 @@ void computeRho(
     ivec bas_orbital_indices = generate_bas_indices_per_atom(normal_basis);
     ivec bas_aux_indices = generate_bas_indices_per_atom(aux_basis);
 
+    double exp_cutoff = 0.5*constants::exp_cutoff;
+
+
+    vec2 distance_list = build_distance_list(normal_basis.get_atoms());
+    vec worst_exponents = build_largest_exp(normal_basis.get_atoms());
+    bvec2 screened(natoms, bvec(natoms, false));
     // Pre-compute maximum block size to avoid repeated allocations
     int max_block_ij = 0;
     for (int atom_i = 0; atom_i < natoms; atom_i++) {
         for (int atom_j = atom_i; atom_j < natoms; atom_j++) {
-            if (distance_list[atom_i][atom_j] > cutoff) continue;
+            if (-pow(distance_list[atom_i][atom_j], 2) * (worst_exponents[atom_i] + worst_exponents[atom_j]) < exp_cutoff) {
+                //std::cout << "Pre-screening: " << atom_i << " : " << atom_j << " Distance: " << distance_list[atom_i][atom_j] << " Criteria: " << -pow(distance_list[atom_i][atom_j], 2) * (worst_exponents[atom_i] + worst_exponents[atom_j]) << " < " << exp_cutoff << std::endl;
+                screened[atom_i][atom_j] = true;
+                continue;
+            }
             const int naoi = aoloc[bas_orbital_indices[atom_i + 1]] - aoloc[bas_orbital_indices[atom_i]];
             const int naoj = aoloc[bas_orbital_indices[atom_j + 1]] - aoloc[bas_orbital_indices[atom_j]];
             max_block_ij = std::max(max_block_ij, naoi * naoj);
         }
     }
-#pragma omp parallel for schedule(dynamic)
+//    int skipped = 0;
+//#pragma omp parallel for schedule(dynamic)
     for (int atm_idx = 0; atm_idx < natoms; atm_idx++) {
         double* rho_atom = rho.data() + aoloc[nQM + bas_aux_indices[atm_idx]] - aoloc[nQM];
         int shl_slice[6] = {
@@ -519,8 +542,8 @@ void computeRho(
         vec dm_slice(max_block_ij);
         for (int atom_i = 0; atom_i < natoms; atom_i++) {
             for (int atom_j = atom_i; atom_j < natoms; atom_j++) {
-                if (distance_list[atom_i][atom_j] > cutoff) { continue; }
-                
+                //if (screened[atom_i][atom_j]) skipped++;
+                if (screened[atom_i][atom_j]) continue;
                 // Hoist weight calculation before kernel call
                 const double weight = 2.0 - static_cast<double>(atom_i == atom_j);
                 
@@ -565,7 +588,7 @@ void computeRho(
                     block_ij,
                     dm_slice.data(),
                     1,
-                    1.0,             // <- accumulate, not overwrite
+                    1.0,
                     rho_atom,
                     1);
             }
@@ -575,17 +598,18 @@ void computeRho(
         delete opty;
         opty = nullptr;
     }
+//    std::cout << "Skipped " << skipped << " blocks due to distance cutoff." << std::endl;
 }
 template void computeRho<Coulomb3C>(
     const Int_Params& normal_basis,
     const Int_Params& aux_basis,
     const dMatrix2& dm,
-    vec& rho, double cutoff);
+    vec& rho);
 template void computeRho<Overlap3C>(
     const Int_Params& normal_basis,
     const Int_Params& aux_basis,
     const dMatrix2& dm,
-    vec& rho, double cutoff);
+    vec& rho);
 
 
 template <typename Kernel>

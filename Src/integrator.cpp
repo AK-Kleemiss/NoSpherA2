@@ -162,7 +162,7 @@ void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
 }
 
 // Basic unrestrained density fitting (original approach)
-vec density_fit_unrestrained(const WFN& wavy, const WFN& wavy_aux, const double cutoff,
+vec density_fit_unrestrained(const WFN& wavy, const WFN& wavy_aux,
     const char metric, bool analyze_quality)
 {
     vec eri2c;
@@ -184,11 +184,11 @@ vec density_fit_unrestrained(const WFN& wavy, const WFN& wavy_aux, const double 
     switch (metric) {
     case 'C':
         compute2C<Coulomb2C>(aux_basis, eri2c);
-        computeRho<Coulomb3C>(wavy, wavy_aux, dm, rho, cutoff);
+        computeRho<Coulomb3C>(wavy, wavy_aux, dm, rho);
         break;
     case 'O':
         compute2C<Overlap2C>(aux_basis, eri2c);
-        computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho, cutoff);
+        computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho);
         break;
     }
 
@@ -211,7 +211,7 @@ vec density_fit_unrestrained(const WFN& wavy, const WFN& wavy_aux, const double 
 
 
 
-vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_mem, const char metric,
+vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const char metric,
                  double restraint_strength, bool adaptive_restraint, 
                  const std::string& charge_scheme, bool analyze_quality)
 {
@@ -233,11 +233,11 @@ vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_
     switch (metric) {
         case 'C':
             compute2C<Coulomb2C>(aux_basis, eri2c);
-            computeRho<Coulomb3C>(normal_basis, aux_basis, dm, rho, max_mem);
+            computeRho<Coulomb3C>(normal_basis, aux_basis, dm, rho);
             break;
         case 'O':
             compute2C<Overlap2C>(aux_basis, eri2c);
-            computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho, max_mem);
+            computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho);
             break;
     }
 
@@ -266,7 +266,7 @@ vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_
 }
 
 // Hybrid approach combining thikonov regularization and electron restraints
-vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux, const double max_mem, 
+vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux, 
                       const char metric, double restraint_strength, 
                       double tikhonov_lambda, const std::string& charge_scheme, bool analyze_quality)
 {
@@ -285,11 +285,11 @@ vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux, const double max_me
     switch (metric) {
     case 'C':
         compute2C<Coulomb2C>(aux_basis, eri2c);
-        computeRho<Coulomb3C>(normal_basis, aux_basis, dm, rho, max_mem);
+        computeRho<Coulomb3C>(normal_basis, aux_basis, dm, rho);
         break;
     case 'O':
         compute2C<Overlap2C>(aux_basis, eri2c);
-        computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho, max_mem);
+        computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho);
         break;
     }
 
@@ -492,20 +492,19 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
     //#include "test_functions.h"
     std::cout << "\n=== Enhanced Density Fitting Demonstration ===" << std::endl;
 
-    double max_mem = 4000.0; // MB
     char metric = 'C'; // Coulomb metric
 
     _time_point start_time = get_time();
     // Method 0: Unrestrained (original approach)
     std::cout << "\n--- Method 0: Unrestrained (Baseline) ---" << std::endl;
-    vec coeff_unrestrained = density_fit_unrestrained(wavy, wavy_aux, max_mem, metric, true);
+    vec coeff_unrestrained = density_fit_unrestrained(wavy, wavy_aux, metric, true);
     std::cout << "Time for unrestrained fit: " 
         << std::chrono::duration<double>(get_time() - start_time).count() << " seconds." << std::endl;
     
     start_time = get_time();
     // Method 1: Enhanced restraints with adaptive weighting
     std::cout << "\n--- Method 1: Enhanced Adaptive Restraints ---" << std::endl;
-    vec coeff_enhanced = density_fit_restrain(wavy, wavy_aux, max_mem, metric,
+    vec coeff_enhanced = density_fit_restrain(wavy, wavy_aux, metric,
         2e-4,     // restraint strength
         true,      // adaptive weighting
         "Hirsh", // charge scheme
@@ -516,7 +515,7 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
     start_time = get_time();
     // Method 2: Hybrid approach
     std::cout << "\n--- Method 2: Hybrid Regularization ---" << std::endl;
-    vec coeff_hybrid = density_fit_hybrid(wavy, wavy_aux, max_mem, metric,
+    vec coeff_hybrid = density_fit_hybrid(wavy, wavy_aux, metric,
         2e-4,     // restraint strength
         1e-6,      // tikhonov lambda
         "Hirsh", true); // charge scheme

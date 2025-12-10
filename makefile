@@ -113,12 +113,29 @@ else
 	fi
 endif
 
+LibCint:
+ifeq ($(NAME),WINDOWS)
+	@if not exist Lib\LibCint\lib\cint.lib ( \
+		echo Building LibCint for $(NAME) &&\
+		@cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 .. && cmake --build . --config Release && cd ../.. && \
+		copy libcint\build\Release\cint.lib Lib\LibCint\lib \
+	) else ( \
+		echo Skipping LibCint build, Lib\LibCint\lib\cint.lib already exists \
+	)
+else
+	@if [ ! -f Lib\LibCint\lib\cint.a ]; then \
+		@cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 .. && cmake --build . --config Release && cd ../.. \
+	else \
+		echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
+	fi
+endif
+
 
 ifeq ($(NAME),WINDOWS)
-NoSpherA2: IntelMKL featomic
+NoSpherA2: IntelMKL featomic LibCint
 	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe . && copy Windows\x64\Release\libiomp5md.dll
 
-NoSpherA2_Debug: IntelMKL featomic
+NoSpherA2_Debug: IntelMKL featomic LibCint
 	@echo Building NoSpherA2_Debug for $(NAME)
 	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
 
@@ -127,12 +144,12 @@ clean:
 endif
 
 ifeq ($(NAME),LINUX)
-NoSpherA2: IntelMKL featomic
+NoSpherA2: IntelMKL featomic LibCint
 	@echo Start making Linux executable
 	@rm -f NoSpherA2
 	@cd Linux && rm -f NoSpherA2 && make all -j
 
-NoSpherA2_Debug: IntelMKL featomic
+NoSpherA2_Debug: IntelMKL featomic LibCint
 	@echo Building NoSpherA2_Debug for $(NAME)
 	@rm -f NoSpherA2_Debug
 	@cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
@@ -143,22 +160,22 @@ clean:
 endif
 
 ifeq ($(NAME),MAC)
-NoSpherA2: IntelMKL featomic_$(NATIVE_ARCH)
+NoSpherA2: IntelMKL featomic_$(NATIVE_ARCH) LibCint
 	@echo Start making Mac $(NATIVE_ARCH) executable
 	@rm -f NoSpherA2_$(NATIVE_ARCH)
 	@cd Mac && rm -f NoSpherA2_$(NATIVE_ARCH) && make NoSpherA2_$(NATIVE_ARCH) -j && cp NoSpherA2_$(NATIVE_ARCH) ../NoSpherA2
 
-NoSpherA2_arm64: IntelMKL featomic_arm64
+NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint
 	@echo Start making Mac arm64 executable
 	@rm -f NoSpherA2_arm64
 	@cd Mac && rm -f NoSpherA2_arm64 && make NoSpherA2_arm64 -j && cp NoSpherA2_arm64 ../NoSpherA2
 
-NoSpherA2_x86_64: IntelMKL featomic_x86_64
+NoSpherA2_x86_64: IntelMKL featomic_x86_64 LibCint
 	@echo Start making Mac x86_64 executable
 	@rm -f NoSpherA2_x86_64
 	@cd Mac && rm -f NoSpherA2_x86_64 && make NoSpherA2_x86_64 -j && cp NoSpherA2_x86_64 ../NoSpherA2_x86_64
 
-NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64
+NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint
 	@echo Start making Mac universal executable
 	@rm -f NoSpherA2
 	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j
@@ -173,4 +190,4 @@ tests: NoSpherA2
 	make -C tests all -k -B
 
 
-.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust
+.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust LibCint

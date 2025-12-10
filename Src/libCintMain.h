@@ -84,8 +84,7 @@ void computeRho(
     const Int_Params& normal_basis,
     const Int_Params& aux_basis,
     const dMatrix2& dm,
-    vec& rho,
-    double cutoff = 12.0);
+    vec& rho);
 
 template <typename Kernel>
 void compute3C(Int_Params& param1,

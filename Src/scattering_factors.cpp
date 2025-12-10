@@ -2720,12 +2720,11 @@ tsc_block_type calculate_scattering_factors(
         {
             file << "\nGenerating densities... " << endl;
             WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis);
-            double cutoff = 12.0 - 2 + opt.accuracy; //Assuming a default accuracy of 2.0, with a cutoff of 12.0 Ang. 
 
 
             //vec coefs = density_fit_hybrid(*wavy, wavy_aux, cutoff, 'C',
             //                                2.0e-4, 1e-6, "TFVC");
-            vec coefs = density_fit_unrestrained(*wavy, wavy_aux, cutoff, 'C', false);
+            vec coefs = density_fit_unrestrained(*wavy, wavy_aux, 'C', false);
             file << setw(12 * 4 + 2) << "... done!\n"
                  << flush;
             time_points.push_back(get_time());
