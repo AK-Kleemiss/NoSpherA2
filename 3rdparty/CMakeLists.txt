@@ -85,6 +85,7 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
     set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)
     set(MKL_DLL_PATH "${_ONEAPI_MKL_ROOT}/bin" PARENT_SCOPE)
+    list(APPEND CMAKE_PREFIX_PATH "${_ONEAPI_MKL_ROOT}")
 endif ()
 
 if (WIN32)
@@ -106,6 +107,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 else ()
     set(LINUX_WINDOWS_COMMON_FLAGS
         "BLA_VENDOR Intel10_64lp_seq"
+        "USE_SYSTEM_TBB ON"
         "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl"
         "USE_QCINT OFF"
         "ENABLE_HOST_OPT OFF"
