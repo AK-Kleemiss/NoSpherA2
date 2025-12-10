@@ -52,7 +52,11 @@ jobs:
             name: Linux
             build-script: | 
               mkdir -p build && cd build
-              cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+              cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release `
+                               -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+                               -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+                               -DBUILD_SHARED_LIBS=OFF `
+                               -DTBB_BUILD_SHARED=OFF
               cmake --build . --target NoSpherA2 -j4
             artifact-name: executable_Linux
             artifact-path: |
@@ -96,32 +100,16 @@ jobs:
         submodules: recursive
         fetch-depth: 1
 
-    # This caches and store build objects. It should fix the problems where the cache was being used for testing dependency updates.
-    - name: Run sccache-cache
-      uses: mozilla-actions/sccache-action@bafd42bd91680affe190f697cac6ef3ad958ecba # v0.0.10
-
     - name: Setup Build Environment
       uses: ./.github/actions/setup-build-env
       with:
         platform: ${{ matrix.name }}
 
-    - name: Cache Dependencies
+    - name: Cache action
       uses: ./.github/actions/cache-deps
       with:
         platform: ${{ matrix.name }}
 
-    - name: Cache CPM
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{env.CPM_SOURCE_CACHE}}
-        key: ${{ matrix.name }}-NoSpherA2-cpm-${{ hashFiles('3rdparty/CMakeLists.txt') }}
-        restore-keys: |
-          ${{ matrix.name }}-NoSpherA2-cpm-
-
-    - uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: amd64
     - name: Build Dependencies
       uses: ./.github/actions/build-deps
       with:
@@ -308,26 +296,25 @@ jobs:
         languages: ${{ matrix.language }}
         source-root: Src
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential
-
-    # Cache IntelMKL
-    - name: Cache IntelMKL Build
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-      id: cache-intelmkl-linux
+    - name: Cache action
+      uses: ./.github/actions/cache-deps
       with:
-        path: build/environments
-        key: mambaenv-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('environment.yml') }}
-        restore-keys: |
-          mambaenv-${{ inputs.platform }}-${{ runner.os }}-
+        platform: Linux
+
+    - name: Setup Build Environment
+      uses: ./.github/actions/setup-build-env
+      with:
+        platform: Linux
 
     - name: Build project
       run: |
-          mkdir -p build && cd build
-          cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
-          cmake --build . --target NoSpherA2 -j
+        mkdir -p build && cd build
+        cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release `
+                         -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+                         -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+                         -DBUILD_SHARED_LIBS=OFF `
+                         -DTBB_BUILD_SHARED=OFF
+        cmake --build . --target NoSpherA2 -j4
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@cf1bb45a277cb3c205638b2cd5c984db1c46a412 # v4.31.7
