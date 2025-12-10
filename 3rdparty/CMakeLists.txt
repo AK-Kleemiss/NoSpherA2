@@ -99,7 +99,6 @@ endif ()
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(Darwin_FLAGS
         "USE_SYSTEM_BLAS OFF"
-        "ENABLE_HOST_OPT OFF"
         "USE_OPENMP OFF"
         "CMAKE_CXX_FLAGS -O1"
         "CMAKE_C_FLAGS -O1"
@@ -126,6 +125,7 @@ CPMAddPackage(
     GIT_TAG "libs_rebase"
     OPTIONS
         "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
+        "ENABLE_HOST_OPT OFF"
         "WITH_PYTHON_BINDINGS OFF"
         ${Darwin_FLAGS}
         ${WIN_FLAGS}
