@@ -71,6 +71,7 @@ jobs:
               -DCMAKE_C_COMPILER_LAUNCHER=sccache `
               -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
               -DCMAKE_EXE_LINKER_FLAGS="runtimeobject.lib" `
+              -DCMAKE_SHARED_LINKER_FLAGS="runtimeobject.lib"
               cmake --build . --config Release --target NoSpherA2 -j4
             artifact-name: executable_Windows
             artifact-path: |
