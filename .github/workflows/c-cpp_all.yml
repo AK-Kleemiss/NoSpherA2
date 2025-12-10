@@ -109,15 +109,6 @@ jobs:
         restore-keys: |
           ${{ matrix.name }}-NoSpherA2-build-
 
-    - name: Cache BUILD
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{github.workspace}}/build # This is intentionally left extremely abrangent to avoid bugs related to caching.
-        key: ${{ matrix.name }}-NoSpherA2-build-${{ hashFiles('**/CMakeLists.txt') }}
-        restore-keys: |
-          ${{ matrix.name }}-NoSpherA2-build-
-
     - name: Build Dependencies
       uses: ./.github/actions/build-deps
       with:
