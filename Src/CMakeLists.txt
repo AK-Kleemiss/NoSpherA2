@@ -129,7 +129,7 @@ add_executable(NoSpherA2 "${CMAKE_CURRENT_SOURCE_DIR}/NoSpherA2.cpp")
 set_target_properties(NoSpherA2 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
-target_link_libraries(NoSpherA2 PRIVATE libnosphera2)
+target_link_libraries(NoSpherA2 PRIVATE libnosphera2 $<$<PLATFORM_ID:Windows>:${_ONEAPI_MKL_ROOT}/lib/tbb12.lib>)
 target_include_directories(NoSpherA2 PRIVATE ${MKL_INCLUDE})
 if(WIN32)
     set_target_properties(libnosphera2 PROPERTIES
@@ -139,9 +139,9 @@ if(WIN32)
             VS_DEBUGGER_ENVIRONMENT "PATH=${MKL_DLL_PATH};$ENV{PATH}"
     )
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(MKL_DLLS "${MKL_DLL_PATH}/libiomp5md.dll;${MKL_DLL_PATH}/tbb12_debug.dll")
+        set(MKL_DLLS "${MKL_DLL_PATH}/libiomp5md.dll")
     else()
-        set(MKL_DLLS "${MKL_DLL_PATH}/libiomp5md.dll;${MKL_DLL_PATH}/tbb12.dll")
+        set(MKL_DLLS "${MKL_DLL_PATH}/libiomp5md.dll")
     endif ()
     file(COPY ${MKL_DLLS} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()
