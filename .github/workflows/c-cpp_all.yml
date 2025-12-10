@@ -52,10 +52,10 @@ jobs:
             name: Linux
             build-script: | 
               mkdir -p build && cd build
-              cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release `
-                               -DCMAKE_C_COMPILER_LAUNCHER=sccache `
-                               -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
-                               -DBUILD_SHARED_LIBS=OFF `
+              cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release \
+                               -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+                               -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+                               -DBUILD_SHARED_LIBS=OFF \
                                -DTBB_BUILD_SHARED=OFF
               cmake --build . --target NoSpherA2 -j4
             artifact-name: executable_Linux
@@ -309,11 +309,12 @@ jobs:
     - name: Build project
       run: |
         mkdir -p build && cd build
-        cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release `
-                         -DCMAKE_C_COMPILER_LAUNCHER=sccache `
-                         -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
-                         -DBUILD_SHARED_LIBS=OFF `
+        cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release \
+                         -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+                         -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+                         -DBUILD_SHARED_LIBS=OFF \
                          -DTBB_BUILD_SHARED=OFF
+
         cmake --build . --target NoSpherA2 -j4
 
     - name: Perform CodeQL Analysis
