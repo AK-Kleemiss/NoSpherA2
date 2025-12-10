@@ -68,13 +68,18 @@ if (MSVC)
     target_compile_options(libnosphera2 PRIVATE $<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
 endif()
 target_compile_options(libnosphera2 PUBLIC
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Debug>>:-g -Og>
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:RelWithDebInfo>>:-O2 -g>
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Release>>:-O2>
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-MMD -MP -fmessage-length=0>
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:${OPENMP_FLAG}>
     $<$<PLATFORM_ID:Darwin>:-DACCELERATE_NEW_LAPACK>
 )
+if (NOT MSVC)
+    target_compile_options(libnosphera2 PUBLIC
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Debug>>:-g -Og>
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:RelWithDebInfo>>:-O2 -g>
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Release>>:-O2>
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-MMD -MP -fmessage-length=0>
+    )
+endif()
+
 if (MSVC)
     target_compile_options(libnosphera2 PUBLIC /openmp)
     target_compile_options(libnosphera2 PUBLIC
