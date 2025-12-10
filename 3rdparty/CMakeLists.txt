@@ -117,8 +117,8 @@ else ()
 endif ()
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(LINUX_FLAGS
-        "CMAKE_CXX_FLAGS -O3 -ffast-math -march=native"
-        "CMAKE_C_FLAGS -O3 -ffast-math -march=native"
+        "CMAKE_CXX_FLAGS -O3 -ffast-math"
+        "CMAKE_C_FLAGS -O3 -ffast-math"
     )
 endif ()
 CPMAddPackage(

@@ -21,6 +21,7 @@ env:
     SCCACHE_GHA_ENABLED: "true"
     RUSTC_WRAPPER: "sccache"
     OCC_DATA_PATH: "${{ github.workspace }}/build/occ_data"
+    CPM_SOURCE_CACHE: "${{ github.workspace }}/cache/cpm"
 
 jobs:
   # Build matrix for all platforms
@@ -99,11 +100,28 @@ jobs:
       with:
         platform: ${{ matrix.name }}
 
+    - name: Cache CPM
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{env.CPM_SOURCE_CACHE}}
+        key: ${{ matrix.name }}-NoSpherA2-build-${{ hashFiles('3rdparty/CMakeLists.txt') }}
+        restore-keys: |
+          ${{ matrix.name }}-NoSpherA2-build-
+
+    - name: Cache BUILD
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{github.workspace}}/build # This is intentionally left extremely abrangent to avoid bugs related to caching.
+        key: ${{ matrix.name }}-NoSpherA2-build-${{ hashFiles('**/CMakeLists.txt') }}
+        restore-keys: |
+          ${{ matrix.name }}-NoSpherA2-build-
+
     - name: Build Dependencies
       uses: ./.github/actions/build-deps
       with:
         platform: ${{ matrix.name }}
-
 
     - name: Build NoSpherA2
       run: ${{ matrix.build-script }}

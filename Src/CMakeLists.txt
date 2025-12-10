@@ -105,6 +105,7 @@ target_link_options(libnosphera2 PRIVATE
 )
 target_link_libraries(libnosphera2 PUBLIC
     $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>
+    $<$<PLATFORM_ID:Windows>:${_ONEAPI_MKL_ROOT}/lib/tbb12.lib>
     $<$<PLATFORM_ID:Darwin>:OpenMP::OpenMP_C OpenMP::OpenMP_CXX>
     occ::qm
     occ::main
