@@ -528,7 +528,7 @@ void computeRho(
         }
     }
 //    int skipped = 0;
-//#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
     for (int atm_idx = 0; atm_idx < natoms; atm_idx++) {
         double* rho_atom = rho.data() + aoloc[nQM + bas_aux_indices[atm_idx]] - aoloc[nQM];
         int shl_slice[6] = {
