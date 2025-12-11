@@ -597,6 +597,83 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
     return result;
 }
 
+/**
+ * Computes Final NAOs by symmetrically orthogonalizing the Pre-NAOs.
+ *
+ * @param C_PNAO    Global matrix of Pre-NAOs (N x N). Columns are orbitals.
+ * @param S_AO      Original Overlap Matrix in AO basis (N x N).
+ * @param n         Number of basis functions (N).
+ * @return          Matrix of final NAOs (N x N), Columns are orbitals.
+ */
+std::vector<double> orthogonalizePNAOs(const vec& C_PNAO,
+    const vec& S_AO,
+    int n) {
+
+    std::vector<double> S_PNAO(n * n);
+    std::vector<double> Temp(n * n); // Intermediate buffer
+    std::vector<double> C_NAO(n * n); // Result
+
+    // 1. Compute Overlap in PNAO basis: S_PNAO = C_PNAO^T * S_AO * C_PNAO
+
+    // Step A: Temp = S_AO * C_PNAO
+    // S_AO is symmetric.
+    cblas_dsymm(CblasRowMajor, CblasLeft, CblasUpper,
+        n, n,
+        1.0, S_AO.data(), n,
+        C_PNAO.data(), n,
+        0.0, Temp.data(), n);
+
+    // Step B: S_PNAO = C_PNAO^T * Temp
+    // C_PNAO is not symmetric, so we use dgemm.
+    // Transpose the first matrix (C_PNAO^T).
+    cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+        n, n, n,
+        1.0, C_PNAO.data(), n,
+        Temp.data(), n,
+        0.0, S_PNAO.data(), n);
+
+    // 2. Compute S_PNAO^(-1/2) using Eigendecomposition
+    // S_PNAO is symmetric (and positive definite).
+
+    std::vector<double> W(n); // Eigenvalues
+    // We can overwrite S_PNAO with eigenvectors to save memory, 
+    // but let's keep it clear. Copy S_PNAO to 'U' (Eigenvectors).
+    std::vector<double> U = S_PNAO;
+
+    // LAPACKE_dsyevd: Computes all eigenvalues and eigenvectors
+    err_checkf(LAPACKE_dsyevd(LAPACK_ROW_MAJOR, 'V', 'U', n, U.data(), n, W.data()) == 0, "Eigenvalue computation failed.", std::cout);
+
+    // Construct S^-1/2 = U * Lambda^(-1/2) * U^T
+    std::fill(S_PNAO.begin(), S_PNAO.end(), 0.0); // Reuse S_PNAO to store S^-1/2
+
+    for (int k = 0; k < n; ++k) {
+        double scale = 1.0 / std::sqrt(W[k]);
+        // Add contribution of k-th eigenvector: scale * (v_k * v_k^T)
+        // v_k is the k-th ROW of U.
+        const double* v_k = &U[k * n];
+
+        // This is a rank-1 update (dger), but we can just sum manually or loop
+        // Since we need the full matrix for the next multiplication
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                S_PNAO[i * n + j] += scale * v_k[i] * v_k[j];
+            }
+        }
+    }
+
+    // 3. Transform PNAOs to NAOs
+    // C_NAO = C_PNAO * S^(-1/2)
+    // C_PNAO (Columns are PNAOs) * S_inv_sqrt (transformation matrix)
+
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        n, n, n,
+        1.0, C_PNAO.data(), n,
+        S_PNAO.data(), n, // This is now S^-1/2
+        0.0, C_NAO.data(), n);
+
+    return C_NAO;
+}
+
 std::vector<NAOResult> computeAllAtomicNAOs(WFN& wavy) {
     const int N_atoms = wavy.get_ncen();
     const dMatrix2 DM = wavy.get_dm();
