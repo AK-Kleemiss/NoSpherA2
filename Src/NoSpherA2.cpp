@@ -9,6 +9,7 @@
 #include "isosurface.h"
 #include "nos_math.h"
 
+#include "../cmake-build-release-ninja/_deps/occ-src/include/occ/core/parallel.h"
 #include "cif.h"
 #include "debug_utils.h"
 
@@ -387,6 +388,8 @@ int main(int argc, char **argv)
             if (opt.occ.ends_with(".toml"))
             {
                 auto config = occ::io::read_occ_input_file(opt.occ);
+                occ::log::set_log_file("NoSpherA2_OCC.log");
+                occ::parallel::set_num_threads(config.runtime.threads);
                 auto wfn = occ::main::run_scf_external(config, true);
                 auto wfn_from_occ = WFN(wfn);
                 wavy.emplace_back(wfn_from_occ);
