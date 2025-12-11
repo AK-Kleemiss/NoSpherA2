@@ -15,7 +15,10 @@ MKL_THREADING ?= INTEL     # INTEL | SEQ  (INTEL = mkl_intel_thread + libiomp5)
 
 # Source & include roots
 SRC_DIR := ../Src
-INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include
+INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include ../Lib/LibCint/include
+
+#LibCint local libs
+LIBCINT		   := ../Lib/LibCint/lib/cint.a
 
 # Featomic local libs
 LIBRASCALINE   := ../Lib/featomic_install/lib/libfeatomic.a
@@ -111,14 +114,14 @@ auxiliary_basis.o_d: basis_set_converter
 # ---- Link ----
 NoSpherA2: ${OBJS}
 	@echo 'Building target: $@'
-	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) ${LIBS}
+	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ${LIBS}
 	cp NoSpherA2 ../
 	cp ../Lib/MKL/compiler/2025.2/lib/libiomp5.so ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d}
 	@echo 'Building target: $@'
-	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) ${LIBS}
+	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ${LIBS}
 	cp NoSpherA2_Debug ../
 	cp ../Lib/MKL/compiler/2025.2/lib/libiomp5.so ../
 	@echo 'Done building Debug version of NoSpherA2'

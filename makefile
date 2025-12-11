@@ -115,6 +115,7 @@ endif
 
 LibCint:
 ifeq ($(NAME),WINDOWS)
+	echo Building LibCint for $(NAME) &&	\
 	@if not exist Lib\LibCint\lib\cint.lib ( \
 		echo Building LibCint for $(NAME) &&\
 		@cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 .. && cmake --build . --config Release && cd ../.. && \
@@ -124,11 +125,13 @@ ifeq ($(NAME),WINDOWS)
 	)
 else
 	@if [ ! -f Lib\LibCint\lib\cint.a ]; then \
-		@cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 .. && cmake --build . --config Release && cd ../.. \
+			cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 .. && cmake --build . --config Release && cd ../.. && \
+			cp libcint/build/libcint.a Lib/LibCint/lib/cint.a; \
 	else \
-		echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
+			echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
 	fi
 endif
+
 
 
 ifeq ($(NAME),WINDOWS)
