@@ -407,38 +407,100 @@ inline void aligned_free_d(double* p)
 #endif
 }
 
-//This currently scales as O(N^2), if this becomes a bottleneck we can implement cell-lists or k-d trees
-vec2 build_distance_list(const std::vector<atom>& atoms)
-{
-    std::vector<std::pair<int, int>> pairs;
-    vec2 pair_list(atoms.size(), vec(atoms.size()));
+void calc_screend_functions_and_max_ij(
+    const std::vector<atom>& atoms,
+    const ivec& aoloc,
+    const ivec& bas_orbital_indices,
+    bvec2& screened,
+    int& max_ij
+) {
+    const int natoms = static_cast<int>(atoms.size());
+    if (natoms == 0) {
+        screened.clear();
+        max_ij = 0.0;
+        return;
+    }
 
-    const int natoms = atoms.size();
-#pragma omp parallel for collapse(2)
-    for (int i = 0; i < natoms; i++) {
-        for (int j = i+1 ; j < natoms; j++) {
-            const double dist = atoms[i].distance_to(atoms[j]);
-            pair_list[i][j] = dist;
-            pair_list[j][i] = dist;
+    // Initialize screened matrix (natoms x natoms) only once
+    screened.assign(natoms, bvec(natoms, false));
+    max_ij = 0.0;
+
+    // --- 1) Precompute worst exponents per atom (parallel) ---
+
+    std::vector<double> worst_exp(natoms);
+
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < natoms; ++i) {
+        const int nbas = atoms[i].get_basis_set_size();
+
+        // Use a local variable; std::numeric_limits<double>::infinity() is more "semantic"
+        double w = std::numeric_limits<double>::infinity();
+        for (int s = 0; s < nbas; ++s) {
+            const double e = atoms[i].get_basis_set_exponent(s);
+            if (e < w) w = e;
         }
+        worst_exp[i] = w;
     }
-    return pair_list;
+
+    const double exp_cutoff = 0.5 * constants::exp_cutoff;
+
+    // --- 2) Loop over atom pairs and do screening + max-block computation (parallel) ---
+
+    std::string output = "";    //Only used for debug output
+
+    int max_block_ij = 0;
+#pragma omp parallel
+    {
+        int local_max = 0;
+        std::string local_output = "";
+
+#pragma omp for schedule(dynamic) nowait
+        for (int atom_i = 0; atom_i < natoms; ++atom_i) {
+            for (int atom_j = atom_i; atom_j < natoms; ++atom_j) {
+                const double dist = atoms[atom_i].distance_to(atoms[atom_j]);
+                const double dist2 = dist * dist;
+
+                const double crit = -dist2 * (worst_exp[atom_i] + worst_exp[atom_j]);
+                if (crit < exp_cutoff) {
+                    //local_output += "Screening atom pair (" + std::to_string(atom_i) + ", " + std::to_string(atom_j) + ") with distance " + std::to_string(dist) + " and criterion " + std::to_string(crit) + " < " + std::to_string(exp_cutoff) + "\n";
+                    screened[atom_i][atom_j] = true;
+                    continue;
+                }
+
+                const int bi = bas_orbital_indices[atom_i];
+                const int bip1 = bas_orbital_indices[atom_i + 1];
+                const int bj = bas_orbital_indices[atom_j];
+                const int bjp1 = bas_orbital_indices[atom_j + 1];
+
+                const int naoi = aoloc[bip1] - aoloc[bi];
+                const int naoj = aoloc[bjp1] - aoloc[bj];
+
+                const int block_ij = naoi * naoj;
+                if (block_ij > local_max) {
+                    local_max = block_ij;
+                }
+            }
+        }
+        #pragma omp critical
+        {
+            if (local_max > max_block_ij) {
+                max_block_ij = local_max;
+            }
+            output += local_output;    //Only used for debug output
+        }
+
+    }
+    max_ij = max_block_ij;    //Only used for debug output
+
+    std::cout << output << std::flush;
+    int skipped = std::accumulate(screened.begin(), screened.end(), 0,
+        [](int sum, const bvec& row) {
+            return sum + std::count(row.begin(), row.end(), true);
+        });
+    std::cout << "Screened out " << skipped << " atom pairs due to overlap criteria." << std::endl;
 }
 
-vec build_largest_exp(const std::vector<atom>& atoms)
-{
-    //fill vector with largest number
-    vec res(atoms.size(), 2E100 );
-    const int natoms = atoms.size();
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < natoms; i++) {
-        for (int s = 0; s < atoms[i].get_basis_set_size(); s++) {
-           const double exp = atoms[i].get_basis_set_exponent(s);
-           res[i] = std::min(res[i], exp);
-       }
-    }
-    return res;
-}
+
 
 //Ivec contains the ao indices for the given wave object
 //The list contains (0, n_ao_atom1, last_item + n_ao_atom2, ...)
@@ -501,32 +563,28 @@ void computeRho(
 
     rho.resize(aoloc[nQM + nAux] - aoloc[nQM], 0.0);
 
-    CINTOpt* opty = nullptr;
-    Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
-
     ivec bas_orbital_indices = generate_bas_indices_per_atom(normal_basis);
     ivec bas_aux_indices = generate_bas_indices_per_atom(aux_basis);
 
-    double exp_cutoff = 0.5*constants::exp_cutoff;
 
-
-    vec2 distance_list = build_distance_list(normal_basis.get_atoms());
-    vec worst_exponents = build_largest_exp(normal_basis.get_atoms());
-    bvec2 screened(natoms, bvec(natoms, false));
-    // Pre-compute maximum block size to avoid repeated allocations
+    _time_point start_total = std::chrono::high_resolution_clock::now();
+    bvec2 screened;
     int max_block_ij = 0;
-    for (int atom_i = 0; atom_i < natoms; atom_i++) {
-        for (int atom_j = atom_i; atom_j < natoms; atom_j++) {
-            if (-pow(distance_list[atom_i][atom_j], 2) * (worst_exponents[atom_i] + worst_exponents[atom_j]) < exp_cutoff) {
-                //std::cout << "Pre-screening: " << atom_i << " : " << atom_j << " Distance: " << distance_list[atom_i][atom_j] << " Criteria: " << -pow(distance_list[atom_i][atom_j], 2) * (worst_exponents[atom_i] + worst_exponents[atom_j]) << " < " << exp_cutoff << std::endl;
-                screened[atom_i][atom_j] = true;
-                continue;
-            }
-            const int naoi = aoloc[bas_orbital_indices[atom_i + 1]] - aoloc[bas_orbital_indices[atom_i]];
-            const int naoj = aoloc[bas_orbital_indices[atom_j + 1]] - aoloc[bas_orbital_indices[atom_j]];
-            max_block_ij = std::max(max_block_ij, naoi * naoj);
-        }
-    }
+    calc_screend_functions_and_max_ij(
+        normal_basis.get_atoms(),
+        aoloc,
+        bas_orbital_indices,
+        screened,
+        max_block_ij
+    );
+    std::cout << "Time for screening calculation (mics): "
+        << std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::high_resolution_clock::now() - start_total
+        ).count() << std::endl;
+
+    CINTOpt* opty = nullptr;
+    Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
+
 //    int skipped = 0;
 #pragma omp parallel for schedule(dynamic)
     for (int atm_idx = 0; atm_idx < natoms; atm_idx++) {
@@ -541,18 +599,18 @@ void computeRho(
         vec res(max_block_ij * naok);
         vec dm_slice(max_block_ij);
         for (int atom_i = 0; atom_i < natoms; atom_i++) {
+            shl_slice[0] = bas_orbital_indices[atom_i];
+            shl_slice[1] = bas_orbital_indices[atom_i + 1];
+            const int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
             for (int atom_j = atom_i; atom_j < natoms; atom_j++) {
                 //if (screened[atom_i][atom_j]) skipped++;
                 if (screened[atom_i][atom_j]) continue;
                 // Hoist weight calculation before kernel call
                 const double weight = 2.0 - static_cast<double>(atom_i == atom_j);
                 
-                shl_slice[0] = bas_orbital_indices[atom_i];
-                shl_slice[1] = bas_orbital_indices[atom_i + 1];
                 shl_slice[2] = bas_orbital_indices[atom_j];
                 shl_slice[3] = bas_orbital_indices[atom_j + 1];
 
-                const int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
                 const int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
                 const int block_ij = naoi * naoj;
 
