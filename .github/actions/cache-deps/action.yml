@@ -8,8 +8,11 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Cache Intel MKL (Linux)
-      if: inputs.platform == 'Linux'
+    # This caches and store build objects. It should fix the problems where the cache was being used for testing dependency updates.
+    - name: Run sccache-cache
+      uses: mozilla-actions/sccache-action@bafd42bd91680affe190f697cac6ef3ad958ecba # v0.0.10
+
+    - name: Cache Intel MKL (${{ inputs.platform }})
       uses: actions/cache@v4.2.4
       with:
         path: build/environments/mambaenv
@@ -17,11 +20,11 @@ runs:
         restore-keys: |
           mambaenv-${{ inputs.platform }}-${{ runner.os }}-
 
-    - name: Cache Intel MKL (Windows)
-      if: inputs.platform == 'Windows'
-      uses: actions/cache@v4.2.4
+    - name: Cache CPM
+      uses: actions/cache@v4
       with:
-        path: build/environments/mambaenv
-        key: mambaenv-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('environment.yml') }}
+        path: |
+          ${{env.CPM_SOURCE_CACHE}}
+        key: ${{ matrix.name }}-NoSpherA2-cpm-${{ hashFiles('3rdparty/CMakeLists.txt') }}
         restore-keys: |
-          mambaenv-${{ inputs.platform }}-${{ runner.os }}-
+          ${{ matrix.name }}-NoSpherA2-cpm-

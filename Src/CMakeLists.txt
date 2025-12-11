@@ -68,13 +68,18 @@ if (MSVC)
     target_compile_options(libnosphera2 PRIVATE $<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
 endif()
 target_compile_options(libnosphera2 PUBLIC
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Debug>>:-g -Og>
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:RelWithDebInfo>>:-O2 -g>
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Release>>:-O2>
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-MMD -MP -fmessage-length=0>
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:${OPENMP_FLAG}>
     $<$<PLATFORM_ID:Darwin>:-DACCELERATE_NEW_LAPACK>
 )
+if (NOT MSVC)
+    target_compile_options(libnosphera2 PUBLIC
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Debug>>:-g -Og>
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:RelWithDebInfo>>:-O2 -g>
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Release>>:-O2>
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-MMD -MP -fmessage-length=0>
+    )
+endif()
+
 if (MSVC)
     target_compile_options(libnosphera2 PUBLIC /openmp)
     target_compile_options(libnosphera2 PUBLIC
@@ -99,12 +104,13 @@ if (${USE_VECTOR_INSTRUCTIONS})
     )
 endif ()
 
-target_link_options(libnosphera2 PRIVATE
-    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static>
+target_link_options(libnosphera2 PUBLIC
+#    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static>
     $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++ -static-libgcc -MMD -MP -fopenmp -ffast-math>
 )
 target_link_libraries(libnosphera2 PUBLIC
     $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>
+    $<$<PLATFORM_ID:Windows>:occ::tbb>
     $<$<PLATFORM_ID:Darwin>:OpenMP::OpenMP_C OpenMP::OpenMP_CXX>
     occ::qm
     occ::main
@@ -128,7 +134,7 @@ add_executable(NoSpherA2 "${CMAKE_CURRENT_SOURCE_DIR}/NoSpherA2.cpp")
 set_target_properties(NoSpherA2 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
-target_link_libraries(NoSpherA2 PRIVATE libnosphera2)
+target_link_libraries(NoSpherA2 PRIVATE libnosphera2 $<$<PLATFORM_ID:Windows>:occ::tbb>)
 target_include_directories(NoSpherA2 PRIVATE ${MKL_INCLUDE})
 if(WIN32)
     set_target_properties(libnosphera2 PROPERTIES
@@ -138,9 +144,9 @@ if(WIN32)
             VS_DEBUGGER_ENVIRONMENT "PATH=${MKL_DLL_PATH};$ENV{PATH}"
     )
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(MKL_DLLS "${MKL_DLL_PATH}/libiomp5md.dll;${MKL_DLL_PATH}/tbb12_debug.dll")
+        set(MKL_DLLS "${MKL_DLL_PATH}/libiomp5md.dll")
     else()
-        set(MKL_DLLS "${MKL_DLL_PATH}/libiomp5md.dll;${MKL_DLL_PATH}/tbb12.dll")
+        set(MKL_DLLS "${MKL_DLL_PATH}/libiomp5md.dll")
     endif ()
     file(COPY ${MKL_DLLS} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()

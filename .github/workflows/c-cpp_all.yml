@@ -21,6 +21,7 @@ env:
     SCCACHE_GHA_ENABLED: "true"
     RUSTC_WRAPPER: "sccache"
     OCC_DATA_PATH: "${{ github.workspace }}/build/occ_data"
+    CPM_SOURCE_CACHE: "${{ github.workspace }}/cache/cpm"
 
 jobs:
   # Build matrix for all platforms
@@ -51,7 +52,11 @@ jobs:
             name: Linux
             build-script: | 
               mkdir -p build && cd build
-              cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+              cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release \
+                               -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+                               -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+                               -DBUILD_SHARED_LIBS=OFF \
+                               -DTBB_BUILD_SHARED=OFF
               cmake --build . --target NoSpherA2 -j4
             artifact-name: executable_Linux
             artifact-path: |
@@ -63,7 +68,17 @@ jobs:
             build-script: |
               cmake -E make_directory build
               cd build
-              cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl.exe -DCMAKE_CXX_COMPILER=clang-cl.exe -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ..
+              cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release `
+              -DCMAKE_C_COMPILER=clang-cl.exe `
+              -DCMAKE_LINKER=lld-link `
+              -DCMAKE_CXX_COMPILER=clang-cl.exe `
+              -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+              -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+              -DCMAKE_EXE_LINKER_FLAGS="runtimeobject.lib" `
+              -DCMAKE_SHARED_LINKER_FLAGS="runtimeobject.lib" `
+              -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
+              -DBUILD_SHARED_LIBS=OFF `
+              -DTBB_BUILD_SHARED=OFF
               cmake --build . --config Release --target NoSpherA2 -j4
             artifact-name: executable_Windows
             artifact-path: |
@@ -85,16 +100,12 @@ jobs:
         submodules: recursive
         fetch-depth: 1
 
-    # This caches and store build objects. It should fix the problems where the cache was being used for testing dependency updates.
-    - name: Run sccache-cache
-      uses: mozilla-actions/sccache-action@bafd42bd91680affe190f697cac6ef3ad958ecba # v0.0.10
-
     - name: Setup Build Environment
       uses: ./.github/actions/setup-build-env
       with:
         platform: ${{ matrix.name }}
 
-    - name: Cache Dependencies
+    - name: Cache action
       uses: ./.github/actions/cache-deps
       with:
         platform: ${{ matrix.name }}
@@ -117,16 +128,15 @@ jobs:
           ctest --output-on-failure -j 1
         fi
 
-    - uses: actions/checkout@v4
-    - name: Setup tmate session
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: true
-
+#    - name: Setup tmate session
+#      if: ${{ failure() }}
+#      uses: mxschmitt/action-tmate@v3
+#      with:
+#        limit-access-to-actor: true
+#
     - name: Upload Test Artifacts
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
       with:
         name: test-logs-${{ matrix.name }}
         path: |
@@ -209,7 +219,7 @@ jobs:
 
   # Combine all artifacts
   combine_all:
-    needs: [build]
+    needs: [build, build_mac_universal]
     runs-on: ubuntu-latest
     name: Combine All Executables
 
@@ -286,26 +296,26 @@ jobs:
         languages: ${{ matrix.language }}
         source-root: Src
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential
-
-    # Cache IntelMKL
-    - name: Cache IntelMKL Build
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-      id: cache-intelmkl-linux
+    - name: Cache action
+      uses: ./.github/actions/cache-deps
       with:
-        path: build/environments
-        key: mambaenv-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('environment.yml') }}
-        restore-keys: |
-          mambaenv-${{ inputs.platform }}-${{ runner.os }}-
+        platform: Linux
+
+    - name: Setup Build Environment
+      uses: ./.github/actions/setup-build-env
+      with:
+        platform: Linux
 
     - name: Build project
       run: |
-          mkdir -p build && cd build
-          cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
-          cmake --build . --target NoSpherA2 -j
+        mkdir -p build && cd build
+        cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release \
+                         -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+                         -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+                         -DBUILD_SHARED_LIBS=OFF \
+                         -DTBB_BUILD_SHARED=OFF
+
+        cmake --build . --target NoSpherA2 -j4
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@cf1bb45a277cb3c205638b2cd5c984db1c46a412 # v4.31.7
