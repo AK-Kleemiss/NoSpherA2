@@ -566,8 +566,6 @@ void computeRho(
     ivec bas_orbital_indices = generate_bas_indices_per_atom(normal_basis);
     ivec bas_aux_indices = generate_bas_indices_per_atom(aux_basis);
 
-
-    _time_point start_total = std::chrono::high_resolution_clock::now();
     bvec2 screened;
     int max_block_ij = 0;
     calc_screend_functions_and_max_ij(
@@ -577,15 +575,10 @@ void computeRho(
         screened,
         max_block_ij
     );
-    std::cout << "Time for screening calculation (mics): "
-        << std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::high_resolution_clock::now() - start_total
-        ).count() << std::endl;
 
     CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
-//    int skipped = 0;
 #pragma omp parallel for schedule(dynamic)
     for (int atm_idx = 0; atm_idx < natoms; atm_idx++) {
         double* rho_atom = rho.data() + aoloc[nQM + bas_aux_indices[atm_idx]] - aoloc[nQM];
@@ -603,7 +596,6 @@ void computeRho(
             shl_slice[1] = bas_orbital_indices[atom_i + 1];
             const int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
             for (int atom_j = atom_i; atom_j < natoms; atom_j++) {
-                //if (screened[atom_i][atom_j]) skipped++;
                 if (screened[atom_i][atom_j]) continue;
                 // Hoist weight calculation before kernel call
                 const double weight = 2.0 - static_cast<double>(atom_i == atom_j);
@@ -656,7 +648,6 @@ void computeRho(
         delete opty;
         opty = nullptr;
     }
-//    std::cout << "Skipped " << skipped << " blocks due to distance cutoff." << std::endl;
 }
 template void computeRho<Coulomb3C>(
     const Int_Params& normal_basis,

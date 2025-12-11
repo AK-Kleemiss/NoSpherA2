@@ -632,7 +632,8 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
             + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::RRS]) 
             + ", DiffSum = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM]) 
             + ", |DiffSum/2| = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::ABS_SUM]) 
-            + ", Sum = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM_NO_DIFF]);
+            + ", Sum = " + std::to_string(diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM_NO_DIFF])
+            + ", Partitioned Sum = " + std::to_string(partitioned_densities[i]);
         std::cout << out << std::endl;
     }
     std::cout << "\n=======================Enhanced==========================" << std::endl;
