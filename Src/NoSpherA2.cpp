@@ -9,7 +9,6 @@
 #include "isosurface.h"
 #include "nos_math.h"
 
-#include "../cmake-build-release-ninja/_deps/occ-src/include/occ/core/parallel.h"
 #include "cif.h"
 #include "debug_utils.h"
 
