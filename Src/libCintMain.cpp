@@ -414,7 +414,7 @@ vec2 build_distance_list(const std::vector<atom>& atoms)
     vec2 pair_list(atoms.size(), vec(atoms.size()));
 
     const int natoms = atoms.size();
-#pragma omp parallel for schedule(dynamic) collapse(2)
+#pragma omp parallel for collapse(2)
     for (int i = 0; i < natoms; i++) {
         for (int j = i+1 ; j < natoms; j++) {
             const double dist = atoms[i].distance_to(atoms[j]);
