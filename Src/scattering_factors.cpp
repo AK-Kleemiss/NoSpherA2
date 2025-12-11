@@ -2721,7 +2721,6 @@ tsc_block_type calculate_scattering_factors(
             file << "\nGenerating densities... " << endl;
             WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis);
 
-
             //vec coefs = density_fit_hybrid(*wavy, wavy_aux, cutoff, 'C',
             //                                2.0e-4, 1e-6, "TFVC");
             vec coefs = density_fit_unrestrained(*wavy, wavy_aux, 'C', false);
@@ -2738,9 +2737,9 @@ tsc_block_type calculate_scattering_factors(
             {
                 int a = asym_atom_list[i];
                 file << setw(10) << labels[i]
-                     << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[i];
+                     << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[a];
                 if (opt.debug)
-                    file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+                    file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[a];
                 file << endl;
             }
         
