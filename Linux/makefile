@@ -4,7 +4,7 @@ RM := rm -f
 COMP   := g++
 C_COMP := gcc
 
-LIBS := -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lm -lc
+LIBS := -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lm -lc -lquadmath
 
 # oneAPI env (source setvars.sh before each compile/link)
 SETVARS ?= ../Lib/MKL/setvars.sh
