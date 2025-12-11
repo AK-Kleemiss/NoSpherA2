@@ -2569,13 +2569,9 @@ __________________________________
                     {
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            double temp_coef = 0;
                             for (int cart = 0; cart < 3; cart++)
                             {
-                                temp_coef = p_temp[cart][s];
-                                if (abs(temp_coef) < 1E-10)
-                                    temp_coef = 0;
-                                op == 0 ? push_back_MO_coef(MO_run, temp_coef) : push_back_MO_coef(MO_run + expected_coefs, temp_coef);
+                                op == 0 ? push_back_MO_coef(MO_run, p_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, p_temp[cart][s]);
                                 if (MO_run == 0 && op == 0)
                                 {
                                     push_back_exponent(prims[basis_run + s].get_exp());
@@ -2608,10 +2604,9 @@ __________________________________
                     {
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            for (int _i = 0; _i < 6; _i++)
-                                op == 0 ? push_back_MO_coef(MO_run, d_temp[_i][s]) : push_back_MO_coef(MO_run + expected_coefs, d_temp[_i][s]);
                             for (int cart = 0; cart < 6; cart++)
                             {
+                                op == 0 ? push_back_MO_coef(MO_run, d_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, d_temp[cart][s]);
                                 if (MO_run == 0 && op == 0)
                                 {
                                     push_back_exponent(prims[basis_run + s].get_exp());
