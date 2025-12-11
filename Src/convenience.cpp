@@ -2090,6 +2090,8 @@ void options::digest_options()
             resolution = stod(arguments[i + 1]);
         else if (temp == "-rdg")
             calc = rdg = true;
+        else if (temp == "-rgbi")
+            rgbi = true;
         else if (temp.find("-rkpts") < 1)
             read_k_pts = true;
         else if (temp == "-rho_cube")

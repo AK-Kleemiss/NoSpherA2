@@ -273,8 +273,8 @@ struct CINTEnvVars {
     union { double* rl; double* grids; };
 
     int (*f_g0_2e)(double*, double*, double*, double, CINTEnvVars*);
-    void (*f_g0_2d4d)(double *, Rys2eT*, CINTEnvVars*);
-    void (*f_gout)(double* , double* , int* , CINTEnvVars* , int );
+    void (*f_g0_2d4d)(double*, Rys2eT*, CINTEnvVars*);
+    void (*f_gout)(double*, double*, int*, CINTEnvVars*, int);
     CINTOpt* opt;
 
     /* values are assigned during calculation */
@@ -294,7 +294,7 @@ enum COORDINATE_TYPE {
 };
 
 template<COORDINATE_TYPE CT>
-ivec make_loc(ivec& bas, int nbas) {
+ivec make_loc(const ivec& bas, const int nbas) {
     ivec dims(nbas, 0);
     // Calculate (2*l + 1) * nctr for spherical harmonics
     for (size_t i = 0; i < nbas; i++)

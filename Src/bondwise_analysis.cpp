@@ -3,6 +3,9 @@
 #include "convenience.h"
 #include "bondwise_analysis.h"
 #include "properties.h"
+#include "libCintMain.h"
+#include "nos_math.h"
+#include "integration_params.h"
 
 int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector, double* incr, std::string& outname, bool rho, bool rdg, bool eli, bool lap) {
     options opt;
@@ -59,7 +62,7 @@ int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector
     std::cout << "  *.  Number of primitives      :     " << std::setw(5) << wavy.get_nex() << "                               *.\n";
     std::cout << "  *.  Number of MOs             :       " << std::setw(3) << wavy.get_nmo() << "                               *.\n";
 
-    cube dummy(0,0,0);
+    cube dummy(0, 0, 0);
     Calc_Prop(
         CubeRho,
         CubeRDG,
@@ -95,90 +98,90 @@ int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector
     return 0;
 };
 
-bond do_bonds(WFN &wavy, 
-    int mode_sel, 
-    bool mode_leng, 
-    bool mode_res, 
-    double res[], 
-    bool cub, 
-    double boxsize[], 
-    int atom1, 
-    int atom2, 
-    int atom3, 
-    const bool& debug, 
-    const bool& bohr, 
-    int runnumber, 
-    bool rho, 
-    bool rdg, 
+bond do_bonds(WFN& wavy,
+    int mode_sel,
+    bool mode_leng,
+    bool mode_res,
+    double res[],
+    bool cub,
+    double boxsize[],
+    int atom1,
+    int atom2,
+    int atom3,
+    const bool& debug,
+    const bool& bohr,
+    int runnumber,
+    bool rho,
+    bool rdg,
     bool eli,
-    bool lap){
-    bond results{"","","","",false,false,false};
+    bool lap) {
+    bond results{ "","","","",false,false,false };
     std::string line("");
     std::vector <std::string> label;
     label.resize(3);
-    double coords1[3],coords2[3],coords3[3];
-    int na=0;
-    double z[3],x[3],y[3],help[3],size[3],s2[3];
+    double coords1[3], coords2[3], coords3[3];
+    int na = 0;
+    double z[3], x[3], y[3], help[3], size[3], s2[3];
     int np[3];
     double ang2bohr;
-    if(bohr)ang2bohr=0.52917720859;
-    else ang2bohr=1.0;
+    if (bohr)ang2bohr = 0.52917720859;
+    else ang2bohr = 1.0;
     na = wavy.get_ncen();
-    if(atom1<=0 || atom2<=0 || atom3<=0 || mode_sel<=0 || mode_sel> 4 || atom1>na || atom2>na || atom3>na || atom1==atom2 || atom2==atom3 || atom1==atom3)
+    if (atom1 <= 0 || atom2 <= 0 || atom3 <= 0 || mode_sel <= 0 || mode_sel > 4 || atom1 > na || atom2 > na || atom3 > na || atom1 == atom2 || atom2 == atom3 || atom1 == atom3)
     {
         std::cout << "Invalid selections of atoms or mode_sel, please try again!\n";
         return(results);
     }
-    if(debug) std::cout << "No. of Atoms selected: " << atom1 << atom2 << atom2 << "\n";
+    if (debug) std::cout << "No. of Atoms selected: " << atom1 << atom2 << atom2 << "\n";
     for (int i = 0; i < 3; i++)
         coords1[i] = wavy.get_atom_coordinate(atom1 - 1, i);
     for (int i = 0; i < 3; i++)
         coords2[i] = wavy.get_atom_coordinate(atom2 - 1, i);
     for (int i = 0; i < 3; i++)
         coords3[i] = wavy.get_atom_coordinate(atom3 - 1, i);
-    label[0]=wavy.get_atom_label(atom1-1);
-    label[1]=wavy.get_atom_label(atom2-1);
-    label[2]=wavy.get_atom_label(atom3-1);
-    if(debug)
+    label[0] = wavy.get_atom_label(atom1 - 1);
+    label[1] = wavy.get_atom_label(atom2 - 1);
+    label[2] = wavy.get_atom_label(atom3 - 1);
+    if (debug)
     {
         std::cout << "The Atoms found corresponding to your selection are:\n";
-        std::cout << label[0]<< " " <<coords1[0]<< " " <<coords1[1] << " " << coords1[2] << "\n";
-        std::cout << label[1]<< " " <<coords2[0]<< " " <<coords2[1] << " " << coords2[2] << "\n";
-        std::cout << label[2]<< " " <<coords3[0]<< " " <<coords3[1] << " " << coords3[2] << "\n";
+        std::cout << label[0] << " " << coords1[0] << " " << coords1[1] << " " << coords1[2] << "\n";
+        std::cout << label[1] << " " << coords2[0] << " " << coords2[1] << " " << coords2[2] << "\n";
+        std::cout << label[2] << " " << coords3[0] << " " << coords3[1] << " " << coords3[2] << "\n";
     }
-    double znorm=sqrt((coords2[0]-coords1[0])*(coords2[0]-coords1[0])+(coords2[1]-coords1[1])*(coords2[1]-coords1[1])+(coords2[2]-coords1[2])*(coords2[2]-coords1[2]));
-    z[0]=(coords2[0]-coords1[0])/znorm;
-    z[1]=(coords2[1]-coords1[1])/znorm;
-    z[2]=(coords2[2]-coords1[2])/znorm;
-    help[0]=coords3[0]-coords2[0];
-    help[1]=coords3[1]-coords2[1];
-    help[2]=coords3[2]-coords2[2];
-    y[0]=z[1]*help[2]-z[2]*help[1];
-    y[1]=z[2]*help[0]-z[0]*help[2];
-    y[2]=z[0]*help[1]-z[1]*help[0];
-    double ynorm=sqrt(y[0]*y[0]+y[1]*y[1]+y[2]*y[2]);
-    y[0]=y[0]/ynorm;
-    y[1]=y[1]/ynorm;
-    y[2]=y[2]/ynorm;
-    x[0]=(z[1]*y[2]-z[2]*y[1]);
-    x[1]=(z[2]*y[0]-z[0]*y[2]);
-    x[2]=(z[0]*y[1]-z[1]*y[0]);
-    z[0]=-z[0];
-    z[1]=-z[1];
-    z[2]=-z[2];
+    double znorm = sqrt((coords2[0] - coords1[0]) * (coords2[0] - coords1[0]) + (coords2[1] - coords1[1]) * (coords2[1] - coords1[1]) + (coords2[2] - coords1[2]) * (coords2[2] - coords1[2]));
+    z[0] = (coords2[0] - coords1[0]) / znorm;
+    z[1] = (coords2[1] - coords1[1]) / znorm;
+    z[2] = (coords2[2] - coords1[2]) / znorm;
+    help[0] = coords3[0] - coords2[0];
+    help[1] = coords3[1] - coords2[1];
+    help[2] = coords3[2] - coords2[2];
+    y[0] = z[1] * help[2] - z[2] * help[1];
+    y[1] = z[2] * help[0] - z[0] * help[2];
+    y[2] = z[0] * help[1] - z[1] * help[0];
+    double ynorm = sqrt(y[0] * y[0] + y[1] * y[1] + y[2] * y[2]);
+    y[0] = y[0] / ynorm;
+    y[1] = y[1] / ynorm;
+    y[2] = y[2] / ynorm;
+    x[0] = (z[1] * y[2] - z[2] * y[1]);
+    x[1] = (z[2] * y[0] - z[0] * y[2]);
+    x[2] = (z[0] * y[1] - z[1] * y[0]);
+    z[0] = -z[0];
+    z[1] = -z[1];
+    z[2] = -z[2];
 
-    double hnorm=0.0;
-    double ringhelp[3]={};
-    if(mode_sel==2 || mode_sel==1) hnorm=znorm;
-    else if(mode_sel==3) hnorm=sqrt((coords3[0]-coords1[0])*(coords3[0]-coords1[0])+(coords3[1]-coords1[1])*(coords3[1]-coords1[1])+(coords3[2]-coords1[2])*(coords3[2]-coords1[2]));
-    else if(mode_sel==4)
+    double hnorm = 0.0;
+    double ringhelp[3] = {};
+    if (mode_sel == 2 || mode_sel == 1) hnorm = znorm;
+    else if (mode_sel == 3) hnorm = sqrt((coords3[0] - coords1[0]) * (coords3[0] - coords1[0]) + (coords3[1] - coords1[1]) * (coords3[1] - coords1[1]) + (coords3[2] - coords1[2]) * (coords3[2] - coords1[2]));
+    else if (mode_sel == 4)
     {
-        for(int r=0; r<3;r++) ringhelp[r]=(coords3[r]+coords1[r]+coords2[r])/3;
-        hnorm=(sqrt( (coords3[0]-ringhelp[0])*(coords3[0]-ringhelp[0])+(coords3[1]-ringhelp[1])*(coords3[1]-ringhelp[1])+(coords3[2]-ringhelp[2])*(coords3[2]-ringhelp[2]))
-                +sqrt( (coords1[0]-ringhelp[0])*(coords1[0]-ringhelp[0])+(coords1[1]-ringhelp[1])*(coords1[1]-ringhelp[1])+(coords1[2]-ringhelp[2])*(coords1[2]-ringhelp[2]))
-                +sqrt( (coords2[0]-ringhelp[0])*(coords2[0]-ringhelp[0])+(coords2[1]-ringhelp[1])*(coords2[1]-ringhelp[1])+(coords2[2]-ringhelp[2])*(coords2[2]-ringhelp[2])))/3;
+        for (int r = 0; r < 3; r++) ringhelp[r] = (coords3[r] + coords1[r] + coords2[r]) / 3;
+        hnorm = (sqrt((coords3[0] - ringhelp[0]) * (coords3[0] - ringhelp[0]) + (coords3[1] - ringhelp[1]) * (coords3[1] - ringhelp[1]) + (coords3[2] - ringhelp[2]) * (coords3[2] - ringhelp[2]))
+            + sqrt((coords1[0] - ringhelp[0]) * (coords1[0] - ringhelp[0]) + (coords1[1] - ringhelp[1]) * (coords1[1] - ringhelp[1]) + (coords1[2] - ringhelp[2]) * (coords1[2] - ringhelp[2]))
+            + sqrt((coords2[0] - ringhelp[0]) * (coords2[0] - ringhelp[0]) + (coords2[1] - ringhelp[1]) * (coords2[1] - ringhelp[1]) + (coords2[2] - ringhelp[2]) * (coords2[2] - ringhelp[2]))) / 3;
     }
-    if(debug)
+    if (debug)
     {
         std::cout << "Your three vectors are:\n";
         std::cout << "X= " << x[0] << " " << x[1] << " " << x[2] << "\n";
@@ -186,199 +189,199 @@ bond do_bonds(WFN &wavy,
         std::cout << "Z= " << z[0] << " " << z[1] << " " << z[2] << "\n";
         std::cout << "From here on mode_leng and cub are used\n";
     }
-    for(int r=0;r<3;r++)
+    for (int r = 0; r < 3; r++)
     {
-        if(res[r]<0)
+        if (res[r] < 0)
         {
             std::cout << "Wrong input in res! Try again!\n";
-                return(results);
-            }
-        if(boxsize[r]<0)
+            return(results);
+        }
+        if (boxsize[r] < 0)
         {
             std::cout << "Wrong input for box scaling! Try again!\n";
             return(results);
         }
-        else if(boxsize[r]>=50)
+        else if (boxsize[r] >= 50)
         {
             std::cout << "Come on, be realistic!\nTry Again!\n";
             return(results);
         }
     }
-    if(!mode_res)
+    if (!mode_res)
     {
-        if(debug) std::cout << "Determining resolution\n";
-        if(mode_leng)
+        if (debug) std::cout << "Determining resolution\n";
+        if (mode_leng)
         {
-            if(debug) std::cout << "mres=true; mleng=true\n";
-            switch(mode_sel)
+            if (debug) std::cout << "mres=true; mleng=true\n";
+            switch (mode_sel)
             {
-                case 1:
-                    size[0]=ceil(9*znorm/ang2bohr)/10;
-                    break;
-                case 2:
-                    size[0]=ceil(15*znorm/ang2bohr)/10;
-                    break;
-                case 3:
-                    size[0]=ceil(15*hnorm/ang2bohr)/10;
-                    break;
-                case 4:
-                    size[0]=ceil(30*hnorm/ang2bohr)/10;
-                    break;
+            case 1:
+                size[0] = ceil(9 * znorm / ang2bohr) / 10;
+                break;
+            case 2:
+                size[0] = ceil(15 * znorm / ang2bohr) / 10;
+                break;
+            case 3:
+                size[0] = ceil(15 * hnorm / ang2bohr) / 10;
+                break;
+            case 4:
+                size[0] = ceil(30 * hnorm / ang2bohr) / 10;
+                break;
             }
-            for(int r=0;r<3;r++)
+            for (int r = 0; r < 3; r++)
             {
-                if(boxsize[r]!=0) size[r]=boxsize[r]/ang2bohr;
-                else if(r>0||cub==true) size[r]=size[0];
-                s2[r]=size[r]/2;
+                if (boxsize[r] != 0) size[r] = boxsize[r] / ang2bohr;
+                else if (r > 0 || cub == true) size[r] = size[0];
+                s2[r] = size[r] / 2;
             }
         }
         else
         {
-            if(debug) std::cout << "mres=true; mleng=false\n";
-            for(int r=0;r<3;r++)
+            if (debug) std::cout << "mres=true; mleng=false\n";
+            for (int r = 0; r < 3; r++)
             {
-                if(cub&&r>0)
+                if (cub && r > 0)
                 {
-                    if(debug) std::cout << "I'm making things cubic!\n";
-                    s2[r]=s2[0];
+                    if (debug) std::cout << "I'm making things cubic!\n";
+                    s2[r] = s2[0];
                     continue;
                 }
-                switch(mode_sel)
+                switch (mode_sel)
                 {
+                case 1:
+                case 2:
+                    size[r] = znorm / ang2bohr;
+                    break;
+                case 3:
+                case 4:
+                    size[r] = hnorm / ang2bohr;
+                    break;
+                }
+                if (boxsize[r] != 0) size[r] = size[r] * boxsize[r];
+                else {
+                    switch (mode_sel)
+                    {
                     case 1:
+                        size[r] = ceil(9 * znorm / ang2bohr) / 10;
+                        break;
                     case 2:
-                        size[r]=znorm/ang2bohr;
+                        size[r] = ceil(15 * znorm / ang2bohr) / 10;
                         break;
                     case 3:
-                    case 4:
-                        size[r]=hnorm/ang2bohr;
+                        size[r] = ceil(15 * hnorm / ang2bohr) / 10;
                         break;
-                }
-                if(boxsize[r]!=0) size[r]=size[r]*boxsize[r];
-                else{
-                    switch(mode_sel)
-                    {
-                        case 1:
-                            size[r]=ceil(9*znorm/ang2bohr)/10;
-                            break;
-                        case 2:
-                            size[r]=ceil(15*znorm/ang2bohr)/10;
-                            break;
-                        case 3:
-                            size[r]=ceil(15*hnorm/ang2bohr)/10;
-                            break;
-                        case 4:
-                            size[r]=ceil(30*hnorm/ang2bohr)/10;
-                            break;
+                    case 4:
+                        size[r] = ceil(30 * hnorm / ang2bohr) / 10;
+                        break;
                     }
                 }
-                s2[r]=size[r]/2;
+                s2[r] = size[r] / 2;
             }
         }
-        for(int r=0;r<3;r++) np[r]=(int) round((2*s2[r])/res[r])+1;
+        for (int r = 0; r < 3; r++) np[r] = (int)round((2 * s2[r]) / res[r]) + 1;
     }
     else
     {
-        if(debug) std::cout << "Boxsize is used\n";
-        for (int r=0;r<3;r++)
+        if (debug) std::cout << "Boxsize is used\n";
+        for (int r = 0; r < 3; r++)
         {
-            if(cub) np[r]=(int) res[0];
-            else np[r]=(int) res[r];
+            if (cub) np[r] = (int)res[0];
+            else np[r] = (int)res[r];
         }
-        if(mode_leng)
+        if (mode_leng)
         {
-            if(debug) std::cout << "mode_leng=true; using boxsize\n";
-            switch(mode_sel)
+            if (debug) std::cout << "mode_leng=true; using boxsize\n";
+            switch (mode_sel)
             {
-                case 1:
-                    size[0]=ceil(9*znorm/ang2bohr)/10;
-                    break;
-                case 2:
-                    size[0]=ceil(15*znorm/ang2bohr)/10;
-                    break;
-                case 3:
-                    size[0]=ceil(15*hnorm/ang2bohr)/10;
-                    break;
-                case 4:
-                    size[0]=ceil(30*hnorm/ang2bohr)/10;
-                    break;
+            case 1:
+                size[0] = ceil(9 * znorm / ang2bohr) / 10;
+                break;
+            case 2:
+                size[0] = ceil(15 * znorm / ang2bohr) / 10;
+                break;
+            case 3:
+                size[0] = ceil(15 * hnorm / ang2bohr) / 10;
+                break;
+            case 4:
+                size[0] = ceil(30 * hnorm / ang2bohr) / 10;
+                break;
             }
-            for(int r=0;r<3;r++)
+            for (int r = 0; r < 3; r++)
             {
-                if(debug) std::cout << r+1 << ". Axis:";
-                if(boxsize[r]!=0) size[r]=boxsize[r];
-                else if(r>0||cub==true) size[r]=size[0];
-                s2[r]=size[r]/2;
+                if (debug) std::cout << r + 1 << ". Axis:";
+                if (boxsize[r] != 0) size[r] = boxsize[r];
+                else if (r > 0 || cub == true) size[r] = size[0];
+                s2[r] = size[r] / 2;
             }
         }
         else
         {
-            if(debug) std::cout << "Enter multiplicator for length (z,y,x)\n";
-            for(int r=0;r<3;r++)
+            if (debug) std::cout << "Enter multiplicator for length (z,y,x)\n";
+            for (int r = 0; r < 3; r++)
             {
-                if(cub==1&&r>0)
+                if (cub == 1 && r > 0)
                 {
-                    if(debug) std::cout << "I'm making things cubic!\n";
-                    s2[r]=s2[0];
-                    size[r]=size[0];
+                    if (debug) std::cout << "I'm making things cubic!\n";
+                    s2[r] = s2[0];
+                    size[r] = size[0];
                     continue;
                 }
-                if(debug) std::cout << r+1 << ". Axis:";
-                switch(mode_sel)
+                if (debug) std::cout << r + 1 << ". Axis:";
+                switch (mode_sel)
                 {
+                case 1:
+                case 2:
+                    size[r] = znorm / ang2bohr;
+                    break;
+                case 3:
+                case 4:
+                    size[r] = hnorm / ang2bohr;
+                    break;
+                }
+                if (boxsize[r] != 0) size[r] = size[r] * boxsize[r];
+                else {
+                    switch (mode_sel)
+                    {
                     case 1:
+                        size[r] = ceil(9 * znorm / ang2bohr) / 10;
+                        break;
                     case 2:
-                        size[r]=znorm/ang2bohr;
+                        size[r] = ceil(15 * znorm / ang2bohr) / 10;
                         break;
                     case 3:
-                    case 4:
-                        size[r]=hnorm/ang2bohr;
+                        size[r] = ceil(15 * hnorm / ang2bohr) / 10;
                         break;
-                }
-                if(boxsize[r]!=0) size[r]=size[r]*boxsize[r];
-                else{
-                    switch(mode_sel)
-                    {
-                        case 1:
-                            size[r]=ceil(9*znorm/ang2bohr)/10;
-                            break;
-                        case 2:
-                            size[r]=ceil(15*znorm/ang2bohr)/10;
-                            break;
-                        case 3:
-                            size[r]=ceil(15*hnorm/ang2bohr)/10;
-                            break;
-                        case 4:
-                            size[r]=ceil(30*hnorm/ang2bohr)/10;
-                            break;
+                    case 4:
+                        size[r] = ceil(30 * hnorm / ang2bohr) / 10;
+                        break;
                     }
                 }
-                s2[r]=size[r]/2;
+                s2[r] = size[r] / 2;
             }
         }
     }
-    double o[3]={};
-    if(debug) std::cout << "This is the origin:\n";
-    for(int d=0;d<3;d++)
+    double o[3] = {};
+    if (debug) std::cout << "This is the origin:\n";
+    for (int d = 0; d < 3; d++)
     {
-        switch(mode_sel)
+        switch (mode_sel)
         {
-            case 1:
-                o[d]=coords2[d]-(s2[0]*x[d]+s2[1]*y[d]+s2[2]*z[d])/ang2bohr;
-                break;
-            case 2:
-                o[d]=(coords1[d]-(coords1[d]-coords2[d])/2)-(s2[0]*x[d]+s2[1]*y[d]+s2[2]*z[d])/ang2bohr;
-                break;
-            case 3:
-                o[d]=(coords3[d]-(coords3[d]-coords1[d])/2)-(s2[0]*x[d]+s2[1]*y[d]+s2[2]*z[d])/ang2bohr;
-                break;
-            case 4:
-                o[d]=ringhelp[d]-(s2[0]*x[d]+s2[1]*y[d]+s2[2]*z[d])/ang2bohr;
-                break;
+        case 1:
+            o[d] = coords2[d] - (s2[0] * x[d] + s2[1] * y[d] + s2[2] * z[d]) / ang2bohr;
+            break;
+        case 2:
+            o[d] = (coords1[d] - (coords1[d] - coords2[d]) / 2) - (s2[0] * x[d] + s2[1] * y[d] + s2[2] * z[d]) / ang2bohr;
+            break;
+        case 3:
+            o[d] = (coords3[d] - (coords3[d] - coords1[d]) / 2) - (s2[0] * x[d] + s2[1] * y[d] + s2[2] * z[d]) / ang2bohr;
+            break;
+        case 4:
+            o[d] = ringhelp[d] - (s2[0] * x[d] + s2[1] * y[d] + s2[2] * z[d]) / ang2bohr;
+            break;
         }
-        if(debug) std::cout << o[d] << "\n";
+        if (debug) std::cout << o[d] << "\n";
     }
-    std::string outname={""};
+    std::string outname = { "" };
     outname += wavy.get_path().generic_string();
     outname += "_";
     outname += label[0];
@@ -393,22 +396,22 @@ bond do_bonds(WFN &wavy,
     outname += std::to_string(runnumber);
     double v[9];
     double incr[3];
-    for (int i=0; i<3; i++){
-        v[i]=x[i];
-        v[i+3]=y[i];
-        v[i+6]=z[i];
-        incr[i]=size[i]/np[i];
+    for (int i = 0; i < 3; i++) {
+        v[i] = x[i];
+        v[i + 3] = y[i];
+        v[i + 6] = z[i];
+        incr[i] = size[i] / np[i];
         //incr[i]=res[i];
     }
-    if(compute_dens(wavy, debug, np, o, v, incr, outname,rho,rdg,eli,lap)==0){
-        results.success=true;
-        results.filename=outname;
+    if (compute_dens(wavy, debug, np, o, v, incr, outname, rho, rdg, eli, lap) == 0) {
+        results.success = true;
+        results.filename = outname;
     }
     return(results);
 }
 
-int autobonds(bool debug, WFN &wavy, const std::filesystem::path& inputfile, const bool& bohr){
-    char inputFile[2048]="";
+int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, const bool& bohr) {
+    char inputFile[2048] = "";
     if (!exists(inputfile))
     {
         std::cout << "No input file specified! I am going to make an example for you in input.example!\n";
@@ -418,16 +421,16 @@ int autobonds(bool debug, WFN &wavy, const std::filesystem::path& inputfile, con
         return 0;
     }
     std::ifstream input(inputfile.c_str());
-    if(!input.good())
+    if (!input.good())
     {
         std::cout << inputFile << " does not exist or is not readable!\n";
         return 0;
     }
     input.seekg(0);
     std::string line("");
-    getline(input,line);
+    getline(input, line);
     std::string comment("!");
-    while(line.compare(0,1,comment)==0) getline(input,line);
+    while (line.compare(0, 1, comment) == 0) getline(input, line);
     int rho, rdg, eli, lap;
     if (line.length() < 10) return 0;
     else
@@ -438,15 +441,15 @@ int autobonds(bool debug, WFN &wavy, const std::filesystem::path& inputfile, con
             return 0; // Handle the error appropriately
         }
     }
-    int errorcount=0,runnumber=0;
-    do{
-        getline(input,line);
-        if(line.length()<10) continue;
+    int errorcount = 0, runnumber = 0;
+    do {
+        getline(input, line);
+        if (line.length() < 10) continue;
         runnumber++;
-        int sel=0, leng=0, cube=0, mres=0, a1=0, a2=0, a3=0;
-        double res[3],box[3];
-        bool bleng=false,bres=false,bcube=false;
-        if(line.length() > 1)
+        int sel = 0, leng = 0, cube = 0, mres = 0, a1 = 0, a2 = 0, a3 = 0;
+        double res[3], box[3];
+        bool bleng = false, bres = false, bcube = false;
+        if (line.length() > 1)
         {
             std::istringstream iss(line);
             if (!(iss >> sel >> leng >> mres >> res[0] >> res[1] >> res[2] >> cube >> box[0] >> box[1] >> box[2] >> a1 >> a2 >> a3)) {
@@ -454,28 +457,180 @@ int autobonds(bool debug, WFN &wavy, const std::filesystem::path& inputfile, con
                 continue; // Skip this line and move to the next
             }
         }
-        if(leng==1){ bleng=true; if(debug) std::cout << "leng=true\n";}
-        else { bleng=false; if(debug) std::cout << "leng=false\n";}
-        if(cube==1){ bcube=true; if(debug) std::cout << "cube=true\n";}
-        else { bcube=false; if(debug) std::cout << "cube=false\n";}
-        if(mres==1){ bres=true; if(debug) std::cout << "mres=true\n";}
-        else { bres=false; if(debug) std::cout << "mres=false\n";}
-        if (debug) std::cout << "running calculations for line " << runnumber<< " of the input file:\n\n";
-        bond work{"","","","",false,false,false};
-        work=do_bonds(wavy,sel,bleng,bres,res,bcube,box,a1,a2,a3,debug,bohr,runnumber,rho==1,rdg==1,eli==1,lap==1);
-        if(!work.success)
+        if (leng == 1) { bleng = true; if (debug) std::cout << "leng=true\n"; }
+        else { bleng = false; if (debug) std::cout << "leng=false\n"; }
+        if (cube == 1) { bcube = true; if (debug) std::cout << "cube=true\n"; }
+        else { bcube = false; if (debug) std::cout << "cube=false\n"; }
+        if (mres == 1) { bres = true; if (debug) std::cout << "mres=true\n"; }
+        else { bres = false; if (debug) std::cout << "mres=false\n"; }
+        if (debug) std::cout << "running calculations for line " << runnumber << " of the input file:\n\n";
+        bond work{ "","","","",false,false,false };
+        work = do_bonds(wavy, sel, bleng, bres, res, bcube, box, a1, a2, a3, debug, bohr, runnumber, rho == 1, rdg == 1, eli == 1, lap == 1);
+        if (!work.success)
         {
             std::cout << "!!!!!!!!!!!!problem somewhere during the calculations, see messages above!!!!!\n";
             errorcount++;
         }
         else {
-            if(rho==1) wavy.push_back_cube(work.filename + "_rho.cube", false, false);
-            if(rdg==1) wavy.push_back_cube(work.filename + "_rdg.cube", false, false);
-            if(eli==1) wavy.push_back_cube(work.filename + "_eli.cube", false, false);
-            if(lap==1) wavy.push_back_cube(work.filename + "_lap.cube", false, false);
-            if(rho==1&&rdg==1) wavy.push_back_cube(work.filename + "_signed_rho.cube", false, false);
+            if (rho == 1) wavy.push_back_cube(work.filename + "_rho.cube", false, false);
+            if (rdg == 1) wavy.push_back_cube(work.filename + "_rdg.cube", false, false);
+            if (eli == 1) wavy.push_back_cube(work.filename + "_eli.cube", false, false);
+            if (lap == 1) wavy.push_back_cube(work.filename + "_lap.cube", false, false);
+            if (rho == 1 && rdg == 1) wavy.push_back_cube(work.filename + "_signed_rho.cube", false, false);
         }
-    }while (!input.eof());
-    std::cout << "\n  *   Finished all calculations! " << runnumber-errorcount << " out of " << runnumber << " were successful!            *\n";
+    } while (!input.eof());
+    std::cout << "\n  *   Finished all calculations! " << runnumber - errorcount << " out of " << runnumber << " were successful!            *\n";
     return 1;
+}
+
+/**
+ * Calculates Atomic Natural Orbitals for a specific atom.
+ *
+ * @param D_full      Pointer to the full Density Matrix (N_basis x N_basis)
+ * @param S_full      Pointer to the full Overlap Matrix (N_basis x N_basis)
+ * @param full_stride The leading dimension of the full matrices (usually N_basis)
+ * @param atom_indices A vector containing the indices (0-based) of the basis functions for this atom
+ * @return NAOResult containing sorted occupancies and coefficients
+ */
+NAOResult calculateAtomicNAO(const dMatrix2& D_full,
+    const dMatrix2& S_full,
+    const std::vector<int>& atom_indices) {
+
+    err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
+    err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
+    err_checkf(D_full.extent(0) == S_full.extent(0), "Density and Overlap matrices must be of the same size.", std::cout);
+
+    int n = static_cast<int>(atom_indices.size());
+    const int full_stride = static_cast<int>(D_full.extent(0));
+
+
+    // 1. Memory Allocation for Submatrices
+    // Using flat std::vectors to ensure contiguous memory for MKL
+    vec D_sub(n * n);
+    vec S_sub(n * n);
+    vec Temp(n * n);  // To store D * S
+    vec Rho(n * n);   // To store S * D * S (The target density)
+    vec W(n);         // Eigenvalues
+
+    // 2. Gather: Copy elements from full matrices to submatrices
+    // We assume Row-Major storage for C++ convenience
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            const int global_i = atom_indices[i];
+            const int global_j = atom_indices[j];
+
+            // Access full matrix: row * stride + col
+            D_sub[i * n + j] = D_full(global_i, global_j);
+            S_sub[i * n + j] = S_full(global_i, global_j);
+        }
+    }
+
+    // 3. Compute Weighted Density: Rho = S_sub * D_sub * S_sub
+
+    // Step A: Temp = D_sub * S_sub
+    // D is symmetric. We use cblas_dsymm.
+    // Parameters: Layout, Side, Uplo, M, N, alpha, A, lda, B, ldb, beta, C, ldc
+    cblas_dsymm(CblasRowMajor, CblasLeft, CblasUpper,
+        n, n,
+        1.0,
+        D_sub.data(), n,
+        S_sub.data(), n,
+        0.0,
+        Temp.data(), n);
+
+    // Step B: Rho = S_sub * Temp
+    // General multiplication because Temp is not necessarily symmetric
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        n, n, n,
+        1.0,
+        S_sub.data(), n,
+        Temp.data(), n,
+        0.0,
+        Rho.data(), n);
+
+    // 4. Eigendecomposition: Rho * v = lambda * v
+    // LAPACKE_dsyevd replaces 'Rho' with eigenvectors and fills 'W' with eigenvalues.
+    // 'jobz' = 'V' (Compute vectors), 'uplo' = 'U' (Upper triangle)
+    err_checkf(LAPACKE_dsyevd(LAPACK_ROW_MAJOR, 'V', 'U', n, Rho.data(), n, W.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+
+    // 5. Post-Processing: Sort Descending
+    // LAPACK returns eigenvalues in ascending order. 
+    // We need to reverse W and the corresponding rows/cols of Rho (eigenvectors).
+
+    NAOResult result;
+    result.eigenvalues = W;
+    result.eigenvectors = Rho; // Rho now contains eigenvectors
+
+    // Create an index vector to sort descending
+    ivec idx(n);
+    std::iota(idx.begin(), idx.end(), 0);
+
+    std::sort(idx.begin(), idx.end(), [&](int i1, int i2) {
+        return result.eigenvalues[i1] > result.eigenvalues[i2];
+        });
+
+    // Reorder based on sorted indices
+    std::vector<double> sorted_evals(n);
+    std::vector<double> sorted_evecs(n * n);
+
+    for (int i = 0; i < n; ++i) {
+        int original_idx = idx[i];
+        sorted_evals[i] = result.eigenvalues[original_idx];
+
+        // Copy the eigenvector (column in ColMajor, row in RowMajor)
+        // LAPACK_ROW_MAJOR with 'V' stores eigenvectors in ROWS or COLS?
+        // Standard LAPACK stores eigenvectors in COLUMNS of Z.
+        // LAPACKE Row Major interface: Z[i*ldz + j] contains the j-th component of i-th eigenvector?
+        // NO: LAPACKE_dsyevd in Row Major stores the i-th eigenvector in the i-th ROW (if we view it as Z^T) or COLUMN?
+        // Verification: In Row Major layout, eigenvectors are stored as columns.
+        // Z(i, j) is the i-th component of the j-th eigenvector. 
+        // So we copy column 'original_idx' to column 'i'.
+
+        for (int row = 0; row < n; ++row) {
+            sorted_evecs[row * n + i] = result.eigenvectors[row * n + original_idx];
+        }
+    }
+
+    result.eigenvalues = sorted_evals;
+    result.eigenvectors = sorted_evecs;
+
+    return result;
+}
+
+std::vector<NAOResult> computeAllAtomicNAOs(WFN& wavy) {
+    const int N_atoms = wavy.get_ncen();
+    const dMatrix2 DM = wavy.get_dm();
+    const std::vector<atom> ats = wavy.get_atoms();
+    std::vector<NAOResult> all_results;
+    all_results.reserve(N_atoms);
+
+    Int_Params basis(wavy);
+    vec S_full;
+    compute2C<Overlap2C>(basis, S_full);
+    const int n_basis = basis.get_nao();
+    Shape2D shape(n_basis, n_basis);
+
+    const dMatrix2 overlap_full = reshape<dMatrix2>(S_full, shape);
+
+    int last_index = 0;
+
+    for (auto& a : ats) {
+        ivec indices;
+        indices.reserve(n_basis / N_atoms); // Rough estimate
+        int current_shell = -1;
+        int nr_indices = 0;
+        std::vector<basis_set_entry> basis_set = a.get_basis_set();
+        for (auto& bf : basis_set) {
+            if (bf.get_shell() != current_shell) {
+                current_shell++;
+                bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 5 : nr_indices = 7));
+                for (int i = 0; i < nr_indices; i++) {
+                    indices.push_back(last_index);
+                    last_index++;
+                }
+            }
+        }
+        all_results.emplace_back(calculateAtomicNAO(DM, overlap_full, indices));
+    }
+    return all_results;
 }

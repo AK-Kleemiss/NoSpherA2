@@ -8,9 +8,9 @@ class atom;
 class BasisSet;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI };
 
-inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
-void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file = std::cout);
-void not_implemented(const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file);
+inline std::streambuf* coutbuf = std::cout.rdbuf(); // save old buf
+void error_check(const bool condition, const std::source_location loc, const std::string& error_mesasge, std::ostream& log_file = std::cout);
+void not_implemented(const std::source_location loc, const std::string& error_mesasge, std::ostream& log_file);
 #define err_checkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
 #define err(error_message, file) error_check(false, std::source_location::current(), error_message, file)
 #define err_chkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
@@ -63,13 +63,13 @@ typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic
 typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> cMatrixRef4;
 typedef Kokkos::mdspan<const cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> ccMatrixRef4;
 
-int vec_sum(const bvec &in);
-int vec_sum(const ivec &in);
-double vec_sum(const vec &in);
-cdouble vec_sum(const cvec &in);
-double vec_length(const vec &in);
+int vec_sum(const bvec& in);
+int vec_sum(const ivec& in);
+double vec_sum(const vec& in);
+cdouble vec_sum(const cvec& in);
+double vec_length(const vec& in);
 template <typename array>
-const double array_length(const array &in)
+const double array_length(const array& in)
 {
     double sum = 0.0;
     for (double val : in)
@@ -82,19 +82,19 @@ template <typename array>
 const double array_length(const array& in, const array& in2)
 {
     double sum = 0.0;
-    auto it1 = in.begin(); 
-    auto it2 = in2.begin(); 
-    for (;it1 != in.end(); ++it1, ++it2) {
-		sum += (*it1 - *it2) * (*it1 - *it2);
+    auto it1 = in.begin();
+    auto it2 = in2.begin();
+    for (; it1 != in.end(); ++it1, ++it2) {
+        sum += (*it1 - *it2) * (*it1 - *it2);
     }
     return sqrt(sum);
 }
 
 // Function to compute cross product
-std::array<double, 3> cross(const std::array<double, 3> &a, const std::array<double, 3> &b);
+std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b);
 
 // Function to compute dot product
-double a_dot(const std::array<double, 3> &a, const std::array<double, 3> &b);
+double a_dot(const std::array<double, 3>& a, const std::array<double, 3>& b);
 
 constexpr const std::complex<double> c_one(0, 1.0);
 
@@ -104,7 +104,7 @@ extern std::string build_date;
 
 namespace sha
 {
-// Rotate right operation
+    // Rotate right operation
 #define ROTR(x, n) ((x >> n) | (x << (32 - n)))
 
 // Logical functions for SHA-256
@@ -118,21 +118,21 @@ namespace sha
     constexpr uint64_t custom_bswap_64(uint64_t x)
     {
         return ((x & 0xFF00000000000000ull) >> 56) |
-               ((x & 0x00FF000000000000ull) >> 40) |
-               ((x & 0x0000FF0000000000ull) >> 24) |
-               ((x & 0x000000FF00000000ull) >> 8) |
-               ((x & 0x00000000FF000000ull) << 8) |
-               ((x & 0x0000000000FF0000ull) << 24) |
-               ((x & 0x000000000000FF00ull) << 40) |
-               ((x & 0x00000000000000FFull) << 56);
+            ((x & 0x00FF000000000000ull) >> 40) |
+            ((x & 0x0000FF0000000000ull) >> 24) |
+            ((x & 0x000000FF00000000ull) >> 8) |
+            ((x & 0x00000000FF000000ull) << 8) |
+            ((x & 0x0000000000FF0000ull) << 24) |
+            ((x & 0x000000000000FF00ull) << 40) |
+            ((x & 0x00000000000000FFull) << 56);
     }
 
     constexpr uint32_t custom_bswap_32(uint32_t value)
     {
         return ((value & 0x000000FF) << 24) |
-               ((value & 0x0000FF00) << 8) |
-               ((value & 0x00FF0000) >> 8) |
-               ((value & 0xFF000000) >> 24);
+            ((value & 0x0000FF00) << 8) |
+            ((value & 0x00FF0000) >> 8) |
+            ((value & 0xFF000000) >> 24);
     }
 
     // Initial hash values
@@ -152,37 +152,37 @@ namespace sha
         0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
         0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
         0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
+        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2 };
 
     // SHA-256 processing function
     void sha256_transform(uint32_t state[8], const uint8_t block[64]);
 
     // SHA-256 update function
-    void sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t *data, size_t len, uint64_t &bitlen);
+    void sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t* data, size_t len, uint64_t& bitlen);
 
     // SHA-256 padding and final hash computation
     void sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, uint8_t hash[32]);
 
     // Function to calculate SHA-256 hash
-    std::string sha256(const std::string &input);
+    std::string sha256(const std::string& input);
 }
 
-bool is_similar_rel(const double &first, const double &second, const double &tolerance);
-bool is_similar(const double &first, const double &second, const double &tolerance);
-bool is_similar_abs(const double &first, const double &second, const double &tolerance);
+bool is_similar_rel(const double& first, const double& second, const double& tolerance);
+bool is_similar(const double& first, const double& second, const double& tolerance);
+bool is_similar_abs(const double& first, const double& second, const double& tolerance);
 std::filesystem::path get_home_path(void);
 char asciitolower(char in);
 
-bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g);
-bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h);
-std::string go_get_string(std::ifstream &file, std::string search, bool rewind = true);
+bool generate_sph2cart_mat(vec2& p, vec2& d, vec2& f, vec2& g);
+bool generate_cart2sph_mat(vec2& d, vec2& f, vec2& g, vec2& h);
+std::string go_get_string(std::ifstream& file, std::string search, bool rewind = true);
 
-const int sht2nbas(const int &type);
+const int sht2nbas(const int& type);
 
-const int shell2function(const int &type, const int &prim);
+const int shell2function(const int& type, const int& prim);
 
 template <class T>
-std::string toString(const T &t)
+std::string toString(const T& t)
 {
     std::ostringstream stream;
     stream << t;
@@ -190,7 +190,7 @@ std::string toString(const T &t)
 }
 
 template <class T>
-T fromString(const std::string &s)
+T fromString(const std::string& s)
 {
     std::istringstream stream(s);
     T t;
@@ -199,14 +199,14 @@ T fromString(const std::string &s)
 }
 
 template <typename T>
-void shrink_vector(std::vector<T> &g)
+void shrink_vector(std::vector<T>& g)
 {
     g.clear();
     std::vector<T>(g).swap(g);
 }
 
 template <class T>
-std::vector<T> split_string(const std::string &input, const std::string delimiter)
+std::vector<T> split_string(const std::string& input, const std::string delimiter)
 {
     std::string input_copy = input + delimiter; // Need to add one delimiter in the end to return all elements
     std::vector<T> result;
@@ -219,41 +219,41 @@ std::vector<T> split_string(const std::string &input, const std::string delimite
     return result;
 };
 
-void remove_empty_elements(svec &input, const std::string &empty = " ");
+void remove_empty_elements(svec& input, const std::string& empty = " ");
 std::chrono::high_resolution_clock::time_point get_time();
 long long int get_musec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 long long int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 long long int get_sec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 
-void write_timing_to_file(std::ostream &file, std::vector<_time_point> time_points, std::vector<std::string> descriptions);
+void write_timing_to_file(std::ostream& file, std::vector<_time_point> time_points, std::vector<std::string> descriptions);
 
-int CountWords(const char *str);
+int CountWords(const char* str);
 
-void copy_file(std::filesystem::path &from, std::filesystem::path &to);
-std::string shrink_string(std::string &input);
-std::string shrink_string_to_atom(std::string &input, const int &atom_number);
+void copy_file(std::filesystem::path& from, std::filesystem::path& to);
+std::string shrink_string(std::string& input);
+std::string shrink_string_to_atom(std::string& input, const int& atom_number);
 //------------------Functions to work with configuration files--------------------------
-bool check_bohr(WFN &wave, bool debug);
+bool check_bohr(WFN& wave, bool debug);
 
-bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std::string> filter, const std::string& current_path);
-bool save_file_dialog(std::filesystem::path &path, bool debug, const svec &endings, const std::string &filename_given = "", const std::string& current_path = "");
-void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes = 1, bool wfnonly = false, bool debug = false);
-bool unsaved_files(std::vector<WFN> &wavy);
+bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std::string> filter, const std::string& current_path);
+bool save_file_dialog(std::filesystem::path& path, bool debug, const svec& endings, const std::string& filename_given = "", const std::string& current_path = "");
+void select_cubes(std::vector<std::vector<unsigned int>>& selection, std::vector<WFN>& wavy, unsigned int nr_of_cubes = 1, bool wfnonly = false, bool debug = false);
+bool unsaved_files(std::vector<WFN>& wavy);
 
-std::string trim(const std::string &s);
+std::string trim(const std::string& s);
 
-inline void print_centered_text(const std::string &text, int &bar_width)
+inline void print_centered_text(const std::string& text, int& bar_width)
 {
     const int text_length = static_cast<int>(text.length());
     const int total_padding = bar_width - text_length;
     const int padding_left = total_padding / 2;
-    const int padding_right = (total_padding - padding_left)-1;
+    const int padding_right = (total_padding - padding_left) - 1;
 
     std::cout << "["
-              << std::setw(padding_left) << std::setfill(' ') << ""
-              << text
-              << std::setw(padding_right) << std::setfill(' ') << ""
-              << "]" << std::endl;
+        << std::setw(padding_left) << std::setfill(' ') << ""
+        << text
+        << std::setw(padding_right) << std::setfill(' ') << ""
+        << "]" << std::endl;
 }
 
 //-------------------------Progress_bar--------------------------------------------------
@@ -263,7 +263,7 @@ class ProgressBar
 public:
     ~ProgressBar();
 
-    ProgressBar(const unsigned long long &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
+    ProgressBar(const unsigned long long& worksize, const int& bar_width = 60, const std::string& fill = "#", const std::string& remainder = " ", const std::string& status_text = "")
         : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize / 100 : 1)
     {
         int bw = bar_width_ + 2;
@@ -280,7 +280,7 @@ public:
         progress_ = (float)workdone * workpart_;
     }
 
-    void update(std::ostream &os = std::cout)
+    void update(std::ostream& os = std::cout)
     {
 #pragma omp critical
         {
@@ -293,7 +293,7 @@ public:
         }
     }
 
-    void write_progress(std::ostream &os = std::cout);
+    void write_progress(std::ostream& os = std::cout);
 
 private:
     const unsigned long long worksize_;
@@ -307,44 +307,44 @@ private:
     float progress_;
     std::streampos linestart;
 #ifdef _WIN32
-    ITaskbarList3 *taskbarList_;
+    ITaskbarList3* taskbarList_;
 
     void initialize_taskbar_progress();
 #endif
 };
 
 void readxyzMinMax_fromWFN(
-    WFN &wavy,
-    double *CoordMinMax,
-    int *NbSteps,
+    WFN& wavy,
+    double* CoordMinMax,
+    int* NbSteps,
     double Radius,
     double Increments,
     bool no_bohr = false);
 
 void readxyzMinMax_fromCIF(
     std::filesystem::path cif,
-    double *CoordMinMax,
-    int *NbSteps,
-    vec2 &cm,
+    double* CoordMinMax,
+    int* NbSteps,
+    vec2& cm,
     double Resolution);
 
-bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
+bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug);
 
 double double_from_string_with_esd(std::string in);
 
-void swap_sort(ivec order, cvec &v);
+void swap_sort(ivec order, cvec& v);
 
-void swap_sort_multi(ivec order, std::vector<ivec> &v);
+void swap_sort_multi(ivec order, std::vector<ivec>& v);
 
 // Given a 3x3 matrix in a single array of double will find and sort eigenvalues and return biggest eigenvalue
-double get_lambda_1(double *a);
+double get_lambda_1(double* a);
 
-double get_decimal_precision_from_CIF_number(std::string &given_string);
+double get_decimal_precision_from_CIF_number(std::string& given_string);
 
 template <typename numtype = int>
 struct hashFunction
 {
-    size_t operator()(const std::vector<numtype> &myVector) const
+    size_t operator()(const std::vector<numtype>& myVector) const
     {
         std::hash<numtype> hasher;
         size_t answer = 0;
@@ -359,7 +359,7 @@ struct hashFunction
 template <typename numtype = int>
 struct hkl_equal
 {
-    bool operator()(const std::vector<numtype> &vec1, const std::vector<numtype> &vec2) const
+    bool operator()(const std::vector<numtype>& vec1, const std::vector<numtype>& vec2) const
     {
         const int size = vec1.size();
         if (size != vec2.size())
@@ -382,7 +382,7 @@ struct hkl_equal
 template <typename numtype = int>
 struct hkl_less
 {
-    bool operator()(const std::vector<numtype> &vec1, const std::vector<numtype> &vec2) const
+    bool operator()(const std::vector<numtype>& vec1, const std::vector<numtype>& vec2) const
     {
         if (vec1[0] < vec2[0])
         {
@@ -419,7 +419,7 @@ constexpr unsigned int doublefactorial(int n)
 }
 
 template <typename T>
-void removeElement(std::vector<T> &vec, const T &x)
+void removeElement(std::vector<T>& vec, const T& x)
 {
     // Use std::remove to shift elements and get the new end iterator
     auto new_end = std::remove(vec.begin(), vec.end(), x);
@@ -427,7 +427,7 @@ void removeElement(std::vector<T> &vec, const T &x)
     vec.erase(new_end, vec.end());
 }
 
-inline void Enter(){
+inline void Enter() {
     std::cout << "press ENTER to continue... " << std::flush;
     std::cin.ignore();
     std::cin.get();
@@ -443,17 +443,17 @@ inline void cls() {
     std::cout.flush();
 }
 
-inline bool yesno(){
-    bool end=false;
+inline bool yesno() {
+    bool end = false;
     while (!end) {
-        char dum ='?';
+        char dum = '?';
         std::cout << "(Y/N)?";
         std::cin >> dum;
-        if(dum == 'y'||dum == 'Y'){
+        if (dum == 'y' || dum == 'Y') {
             std::cout << "Okay..." << std::endl;
-             return true;
+            return true;
         }
-        else if(dum == 'N'||dum == 'n') return false;
+        else if (dum == 'N' || dum == 'n') return false;
         else std::cout << "Sorry, i did not understand that!" << std::endl;
     }
     return false;
@@ -491,12 +491,12 @@ public:
     primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {};
     primitive(int c, int t, double e, double coef);
     primitive(const SimplePrimitive& p);
-    bool operator==(const primitive &other) const
+    bool operator==(const primitive& other) const
     {
         return center == other.center &&
-               type == other.type &&
-               exp == other.exp &&
-               coefficient == other.coefficient;
+            type == other.type &&
+            exp == other.exp &&
+            coefficient == other.coefficient;
     };
     int get_center() const
     {
@@ -514,19 +514,19 @@ public:
     {
         return coefficient;
     };
-    void set_center(const int &c)
+    void set_center(const int& c)
     {
         center = c;
     };
-    void set_type(const int &t)
+    void set_type(const int& t)
     {
         type = t;
     };
-    void set_exp(const double &e)
+    void set_exp(const double& e)
     {
         exp = e;
     };
-    void set_coef(const double &c)
+    void set_coef(const double& c)
     {
         coefficient = c;
     };
@@ -549,18 +549,18 @@ typedef std::set<hkl_d>::const_iterator hkl_list_it_d;
 
 //---------------- Object for handling all input options -------------------------------
 struct options
-/**
- * @brief The `options` class represents a collection of options and settings for a program.
- *
- * It contains various member variables that store different configuration parameters.
- * These parameters control the behavior and functionality of the program.
- *
- * The `options` class also provides constructors and member functions to initialize and manipulate these parameters.
- *
- * @note This class is used to configure the behavior of a specific program and may have different member variables and functions depending on the program's requirements.
- */
+    /**
+     * @brief The `options` class represents a collection of options and settings for a program.
+     *
+     * It contains various member variables that store different configuration parameters.
+     * These parameters control the behavior and functionality of the program.
+     *
+     * The `options` class also provides constructors and member functions to initialize and manipulate these parameters.
+     *
+     * @note This class is used to configure the behavior of a specific program and may have different member variables and functions depending on the program's requirements.
+     */
 {
-    std::ostream &log_file;
+    std::ostream& log_file;
     double resolution = 0.1;
     double radius = 2.0;
     double d_sfac_scan = 0.0;
@@ -568,10 +568,10 @@ struct options
     double dmin = 99.0;
     double mem = 1000.0; // In MB
     double efield = 0.005;
-    double MinMax[6]{0, 0, 0, 0, 0, 0};
+    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
     ivec MOs;
     ivec2 groups;
-    ivec2 hkl_min_max{{-100, 100}, {-100, 100}, {-100, 100}};
+    ivec2 hkl_min_max{ {-100, 100}, {-100, 100}, {-100, 100} };
     vec2 twin_law;
     ivec2 combined_tsc_groups;
     pathvec combined_tsc_calc_files;
@@ -639,8 +639,9 @@ struct options
     bool RI_FIT = false;
     bool needs_Thakkar_fill = false;
     bool qct = false;
+    bool rgbi = false;
     int hirsh_number = 0;
-    int NbSteps[3]{0, 0, 0};
+    int NbSteps[3]{ 0, 0, 0 };
     int accuracy = 2;
     int threads = -1;
     int pbc = 0;
@@ -660,7 +661,7 @@ struct options
      * @param argv An array of C-style strings representing the command line arguments.
      *
      */
-    void look_for_debug(int &argc, char **argv);
+    void look_for_debug(int& argc, char** argv);
     /**
      * @brief Digests the options.
      *
@@ -674,7 +675,7 @@ struct options
     {
         groups.resize(1);
     };
-    options(int &argc, char **argv, std::ostream &log) : log_file(log)
+    options(int& argc, char** argv, std::ostream& log) : log_file(log)
     {
         groups.resize(1);
         look_for_debug(argc, argv);
@@ -683,7 +684,7 @@ struct options
 
 const double gaussian_radial(const primitive& p, const double& r);
 
-int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b);
+int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b);
 
 void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt);
 
@@ -691,13 +692,13 @@ double hypergeometric(double a, double b, double c, double x);
 
 cdouble hypergeometric(double a, double b, double c, cdouble x);
 
-bool ends_with(const std::string &str, const std::string &suffix);
+bool ends_with(const std::string& str, const std::string& suffix);
 
-bool is_nan(double &in);
-bool is_nan(float &in);
-bool is_nan(long double &in);
-bool is_nan(cdouble &in);
+bool is_nan(double& in);
+bool is_nan(float& in);
+bool is_nan(long double& in);
+bool is_nan(cdouble& in);
 
-bool read_block_from_fortran_binary(std::ifstream &file, void *Target);
+bool read_block_from_fortran_binary(std::ifstream& file, void* Target);
 template <typename T>
 bool read_block_from_fortran_binary(std::ifstream& file, std::vector<T>& Target);
