@@ -102,19 +102,7 @@
     <ClCompile Include="..\Src\integrator.cpp">
       <Filter>Quelldateien\libCint</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\cart2sph.cpp">
-      <Filter>Quelldateien\libCint</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\integration_params.cpp">
-      <Filter>Quelldateien\libCint</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\rys_roots.cpp">
-      <Filter>Quelldateien\libCint</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\int_optimizer.cpp">
-      <Filter>Quelldateien\libCint</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\int_g2e.cpp">
       <Filter>Quelldateien\libCint</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\libCintMain.cpp">
@@ -251,19 +239,7 @@
     <ClInclude Include="..\Src\integrator.h">
       <Filter>Headerdateien\libCint</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\cart2sph.h">
-      <Filter>Headerdateien\libCint</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\integration_params.h">
-      <Filter>Headerdateien\libCint</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\rys_roots.h">
-      <Filter>Headerdateien\libCint</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\int_optimizer.h">
-      <Filter>Headerdateien\libCint</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\int_g2e.h">
       <Filter>Headerdateien\libCint</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\libCintMain.h">
