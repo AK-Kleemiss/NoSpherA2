@@ -1185,12 +1185,12 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
                 MOs_to_delete[i + deleted] = true;
             }
     }
-   std::cout << "MOs deleted: " << deleted << endl;
-   std::cout << "MO map:" << endl;
+    std::cout << "MOs deleted: " << deleted << endl;
+    std::cout << "MO map:" << endl;
     for (int i = 0; i < MOs_to_delete.size(); i++)
        std::cout << i << " " << MOs_to_delete[i] << endl;
-   std::cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
-   std::cout << "\n\nEnergies / Occu after:" << endl;
+    std::cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
+    std::cout << "\n\nEnergies / Occu after:" << endl;
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
        std::cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
 
@@ -1213,7 +1213,7 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
     }
     delete (progress);
     _time_point end = get_time();
-   std::cout << "Time taken: " << round(get_sec(start, end) / 60) << " m " << get_sec(start, end) % 60 << " s " << get_msec(start, end) << " ms" << endl;
+    std::cout << "Time taken: " << round(get_sec(start, end) / 60) << " m " << get_sec(start, end) % 60 << " s " << get_msec(start, end) << " ms" << endl;
     ofstream dat_out(dat, ios::out);
     dat_out << scientific << setprecision(12) << setw(20);
     for (int i = 0; i < res[0].size(); i++)
@@ -1254,7 +1254,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
     wavy_full_Au.delete_unoccupied_MOs();
     WFN wavy_val_Au(ele + "_jorge.gbw");
     wavy_val_Au.delete_unoccupied_MOs();
-   std::cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
+    std::cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
     bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
     int deleted = 0;
     if (val_els_alpha.size() > 0)
@@ -1279,12 +1279,12 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
                 MOs_to_delete[i + deleted] = true;
             }
     }
-   std::cout << "MOs deleted: " << deleted << endl;
-   std::cout << "MO map:" << endl;
+    std::cout << "MOs deleted: " << deleted << endl;
+    std::cout << "MO map:" << endl;
     for (int i = 0; i < MOs_to_delete.size(); i++)
        std::cout << i << " " << MOs_to_delete[i] << endl;
-   std::cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
-   std::cout << "\n\nEnergies / Occu after:" << endl;
+    std::cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
+    std::cout << "\n\nEnergies / Occu after:" << endl;
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
        std::cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
 
@@ -1548,7 +1548,7 @@ void test_analytical_fourier(bool full)
         vec coefs(type * 2 + 1);
 
         // Initialize the Wavefunction
-        WFN wavy(0);
+        WFN wavy(e_origin::NOT_YET_DEFINED);
         wavy.push_back_MO(0, 1.0, -13);
         wavy.push_back_atom("H", 0, 0, 0, 1);
         wavy.push_back_atom_basis_set(0, c_exp, vals[0], type, 0);
@@ -1661,7 +1661,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
     }
 
     // Initialize the Wavefunction
-    WFN wavy(0);
+    WFN wavy(e_origin::NOT_YET_DEFINED);
     wavy.push_back_MO(0, 1.0, -13);
     wavy.push_back_atom("H", 0, 0, 0, 1);
     wavy.push_back_atom_basis_set(0, 1.0, 1.0, lambda, 0);

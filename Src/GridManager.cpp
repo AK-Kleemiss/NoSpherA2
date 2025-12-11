@@ -740,7 +740,6 @@ void PartitionResults::printChargeTable(const svec& labels, const WFN& wave, con
 }
 
 void GridManager::calculateSphericalDensities(const WFN& wave, const cell& unit_cell, const ivec& atom_list, vec2& single_spherical_density, vec2& combined_spherical_density) {
-    using namespace std;
     bvec fake_needs_grid(wave.get_ncen(), true);
     ivec complete_type_list = identifyAtomTypes(wave, fake_needs_grid);
 

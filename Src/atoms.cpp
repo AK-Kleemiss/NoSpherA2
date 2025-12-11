@@ -52,7 +52,7 @@ atom::atom(const std::string& l,
     const int& ECP_els) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(ECP_els), basis_set_id(0), frac_coords({ 0,0,0 }), is_asym(false)
 {};
 
-atom atom::operator= (const atom& rhs) {
+atom& atom::operator= (const atom& rhs) {
     label = rhs.label;
     ID = rhs.ID;
     nr = rhs.nr;

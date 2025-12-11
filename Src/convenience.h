@@ -673,6 +673,8 @@ struct options
 
 const double gaussian_radial(const primitive& p, const double& r);
 
+void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt);
+
 double hypergeometric(double a, double b, double c, double x);
 
 cdouble hypergeometric(double a, double b, double c, cdouble x);
@@ -685,3 +687,5 @@ bool is_nan(long double &in);
 bool is_nan(cdouble &in);
 
 bool read_block_from_fortran_binary(std::ifstream &file, void *Target);
+template <typename T>
+bool read_block_from_fortran_binary(std::ifstream& file, std::vector<T>& Target);

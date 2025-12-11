@@ -115,7 +115,7 @@ void Int_Params::collect_basis_data()
             exponents.push_back(basis[shell].get_exponent());
         }
         // Normalize the GTOs depending on the context
-        if (wfn_origin == 9 || wfn_origin == 6)
+        if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx)
         {
             for (int i = 0; i < coefficients.size(); i++)
             {
@@ -123,7 +123,7 @@ void Int_Params::collect_basis_data()
                 coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2*l+1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
             }
         }
-        else if (wfn_origin == 0)
+        else if (wfn_origin == e_origin::NOT_YET_DEFINED)
         {
             int coef_idx = 0;
             for (unsigned int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++)
@@ -147,11 +147,11 @@ void Int_Params::collect_basis_data()
         for (int func = 0; func < basis.size(); func++)
         {
             int new_l = 0;
-            if (wfn_origin == 0)      new_l = basis[func].get_type();
-            else if (wfn_origin == 9 || wfn_origin == 6) new_l = basis[func].get_type() -1;
+            if (wfn_origin == e_origin::NOT_YET_DEFINED)      new_l = basis[func].get_type();
+            else if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto) new_l = basis[func].get_type() - 1;
             else {
                 std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
-                new_l = basis[func].get_type() -1;
+                new_l = basis[func].get_type() - 1;
             }
 
             if (new_l > max_l) max_l = new_l;
@@ -165,8 +165,11 @@ void Int_Params::collect_basis_data()
             for (unsigned int shell_idx = 0; shell_idx < atoms[atom_idx].get_shellcount_size(); shell_idx++) {
                 int curr_funcs = (int)atoms[atom_idx].get_shellcount()[shell_idx];
 
-                if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == 9 || wfn_origin == 6))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) { //Sort functions regarding the angular momentum
-                    if (wfn_origin != 0 && wfn_origin != 9 && wfn_origin != 6) std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
+                if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) { //Sort functions regarding the angular momentum
+                    if (wfn_origin != e_origin::NOT_YET_DEFINED 
+                        && wfn_origin != e_origin::gbw 
+                        && wfn_origin != e_origin::wfx) 
+                        std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
                     n_funcs += curr_funcs;
                     continue;
                 }
@@ -302,24 +305,6 @@ void Int_Params::print_data(std::string name) {
         file << _env[e] << " ";
     }
     file.close();
-}
-
-
-ivec make_loc(ivec& bas, int nbas) {
-    ivec dims(nbas, 0);
-    // Calculate (2*l + 1) * nctr for spherical harmonics
-    for (size_t i = 0; i < nbas; i++)
-    {
-        dims[i] = (2 * bas(ANG_OF, i) + 1) * bas(NCTR_OF, i);
-    }
-
-    // Create the ao_loc array
-    ivec ao_loc(nbas + 1, 0);
-
-    // Compute the cumulative sum
-    std::partial_sum(dims.begin(), dims.end(), ao_loc.begin() + 1);
-
-    return ao_loc;
 }
 
 double CINTcommon_fac_sp(int l)

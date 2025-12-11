@@ -181,22 +181,22 @@ public:
       shrink_vector<numtype_index>(index[i]);
     }
   };
-  const cvec get_sf_for_scatterer(const unsigned int nr)
+  const cvec get_sf_for_scatterer(const size_t nr)
   {
     err_checkf(nr < scatterer.size(), "Wrong number in get SF", std::cout);
     return sf[nr];
   };
-  const cvec get_sf_for_scatterer(const unsigned int nr, std::ostream &log)
+  const cvec get_sf_for_scatterer(const size_t nr, std::ostream &log)
   {
     err_checkf(nr < scatterer.size(), "Wrong number in get SF", log);
     return sf[nr];
   };
-  const std::string get_scatterer(const unsigned int nr)
+  const std::string get_scatterer(const size_t nr)
   {
     err_checkf(nr < scatterer.size(), "Invalid nr of scatterer", std::cout);
     return scatterer[nr];
   };
-  const std::string get_scatterer(const unsigned int nr, std::ostream &log)
+  const std::string get_scatterer(const size_t nr, std::ostream &log)
   {
     err_checkf(nr < scatterer.size(), "Invalid nr of scatterer", log);
     return scatterer[nr];
@@ -215,37 +215,37 @@ public:
   }
   void set_AD(const bool value) { anomalous_dispersion = value; };
   bool get_AD() { return anomalous_dispersion; };
-  const ivec get_indices(const unsigned int nr)
+  const ivec get_indices(const size_t nr)
   {
     err_checkf(nr < index[0].size(), "Invalid nr of index", std::cout);
     return {index[0][nr], index[1][nr], index[2][nr]};
   };
-  const ivec get_indices(const unsigned int nr, std::ofstream &file)
+  const ivec get_indices(const size_t nr, std::ofstream &file)
   {
     err_checkf(nr < index[0].size(), "Invalid nr of index", file);
     return {index[0][nr], index[1][nr], index[2][nr]};
   };
-  const int get_index(const unsigned int dim, const unsigned int nr)
+  const int get_index(const unsigned int dim, const size_t nr)
   {
     err_checkf(dim < 3, "invalid dimension for index", std::cout);
     err_checkf(nr < index[dim].size(), "invalid nr for index", std::cout);
     return index[dim][nr];
   };
-  const int get_index(const unsigned int dim, const unsigned int nr, std::ofstream &file)
+  const int get_index(const unsigned int dim, const size_t nr, std::ofstream &file)
   {
     err_checkf(dim < 3, "invalid dimension for index", file);
     err_checkf(nr < index[dim].size(), "invalid nr for index", file);
     return index[dim][nr];
   };
-  const bool is_empty() { return (sf.size() > 0 && scatterer.size() > 0 && index.size() > 0); };
-  const int scatterer_size()
+  const bool is_empty() { return !(sf.size() > 0 && scatterer.size() > 0 && index.size() > 0); };
+  const size_t scatterer_size()
   {
     if (sf.size() == scatterer.size())
-      return (int)sf.size();
+      return sf.size();
     else
       return 0;
   };
-  const int reflection_size()
+  const size_t reflection_size()
   {
     if (sf.size() == 0 || index.size() == 0)
     {
@@ -268,17 +268,19 @@ public:
       *this = rhs;
       return;
     }
+    const size_t refls = rhs.reflection_size();
+    const size_t scats = rhs.scatterer_size();
     // Appends the scatterers of rhs to the current set assuming same size of reflections.
-    err_checkf(reflection_size() == rhs.reflection_size(), "Inconsistent number of reflections!", log);
+    err_checkf(reflection_size() == refls, "Inconsistent number of reflections!", log);
     err_checkf(rhs.reflection_size() > 0, "Nothing to append or inconsinstency in given block detected, then please don't do it!", log);
 #pragma omp parallel for
-    for (int i = 0; i < rhs.reflection_size(); i++)
+    for (int64_t i = 0; i < refls; i++)
       for (int dim = 0; dim < 3; dim++)
         err_checkf(index[dim][i] == rhs.get_index(dim, i), "Mismatch in indices in append!", log);
     int new_scatterers = 0;
-    bvec is_new(rhs.scatterer_size(), true);
+    bvec is_new(scats, true);
 //#pragma omp parallel for reduction(+ : new_scatterers)
-    for (int s = 0; s < (int)rhs.scatterer_size(); s++)
+    for (size_t s = 0; s < scats; s++)
     {
       for (int run = 0; run < scatterer_size(); run++)
         if (rhs.get_scatterer(s) == scatterer[run])
@@ -291,7 +293,7 @@ public:
     sf.resize(size_t(old_size + new_scatterers));
     scatterer.resize(size_t(old_size + new_scatterers));
 #pragma omp parallel for
-    for (int s = 0; s < rhs.scatterer_size(); s++)
+    for (int64_t s = 0; s < scats; s++)
     {
       if (is_new[s])
       {
@@ -322,16 +324,18 @@ public:
     // Appends the scatterers of rhs to the current set assuming same size of reflections.
     err_checkf(reflection_size() == rhs.reflection_size(), "Inconsistent number of reflections!", log);
     err_checkf(rhs.reflection_size() > 0, "Nothing to append or inconsinstency in given block detected, then please don't do it!", log);
+    const size_t refls = rhs.reflection_size();
+    const size_t scats = rhs.scatterer_size();
 #pragma omp parallel for
-    for (int i = 0; i < rhs.reflection_size(); i++)
+    for (int64_t i = 0; i < refls; i++)
       for (int dim = 0; dim < 3; dim++)
         err_checkf(index[dim][i] == rhs.get_index(dim, i), "Mismatch in indices in append!", log);
 
     std::unordered_set<std::string> existing_set(scatterer.begin(), scatterer.end());
-    bvec is_new(rhs.scatterer_size(), false);
+    bvec is_new(scats, false);
     std::atomic<int> new_scatterers(0);
 //#pragma omp parallel for
-    for (int s = 0; s < rhs.scatterer_size(); ++s)
+    for (size_t s = 0; s < scats; ++s)
     {
         const std::string& name = rhs.get_scatterer(s);
 
@@ -427,6 +431,33 @@ public:
     }
     tsc_file.close();
     err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
+  }
+  const std::string get_tsc_cif_block(const options& opt) const {
+    std::string result;
+    result += "_aspheric_ffs_partitioning.name     ";
+    if(opt.partition_type == PartitionType::Becke){ result += "'Becke'\n"; }
+    else if(opt.partition_type == PartitionType::TFVC){ result += "'TFVC'\n"; }
+    else if(opt.partition_type == PartitionType::Hirshfeld){ result += "'Hirshfeld'\n"; }
+    else if(opt.partition_type == PartitionType::RI){ result += "'RI-Fit'\n"; }
+    else { result += "'Unknown'\n"; }
+    result += "_aspheric_ffs_partitioning.software 'NoSpherA2'\n";
+    result += "_aspheric_ffs_partitioning.source   'partitioned molecular wavefunction calculation'";
+    result += "\n\nloop_\n_aspheric_ff.index_h\n_aspheric_ff.index_k\n_aspheric_ff.index_l\n_aspheric_ff.form_factor_real\n_aspheric_ff.form_factor_imag\n ";
+    for(size_t i=0; i<index[0].size(); i++) {
+      for(int dim=0; dim<3; dim++) {
+        result += std::to_string(index[dim][i]) + " ";
+      }
+      result += "'[";
+      for(size_t s=0; s<sf.size(); s++) {
+        result += std::to_string(real(sf[s][i])) + " ";
+      }
+      result += "]' '[";
+      for (size_t s = 0; s < sf.size(); s++) {
+          result += std::to_string(imag(sf[s][i])) + " ";
+      }
+      result += "]'\n ";
+    }
+    return result;
   }
   void write_tscb_file(std::filesystem::path cif_name = "test.cif", std::filesystem::path name = "experimental.tscb")
   {

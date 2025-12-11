@@ -752,7 +752,7 @@ double read_fchk_double(std::ifstream& in, const char* search, bool rewind)
     return std::stod(temp.substr(49, temp.length() - 49));
 };
 
-bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, bool &debug, bool force_overwrite)
+bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, const bool &debug, const bool force_overwrite)
 {
     using namespace std;
     int elcount = 0;
@@ -801,7 +801,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
     {
         file << "Origin: " << wave.get_origin() << endl;
     }
-    if (wave.get_origin() == 2 || wave.get_origin() == 4 || wave.get_origin() == 9 || wave.get_origin() == 8)
+    if (wave.get_origin() == e_origin::wfn || wave.get_origin() == e_origin::ffn || wave.get_origin() == e_origin::gbw || wave.get_origin() == e_origin::molden || wave.get_origin() == e_origin::tonto)
     {
         //-----------------------check ordering and order accordingly----------------------
         wave.sort_wfn(wave.check_order(debug), debug);
@@ -877,9 +877,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++)
                         {
                             aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-                            double term = constants::PI3 / pow(aiaj, 3);
-                            term = pow(term, 0.5);
-                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
+                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * pow(constants::PI3 / pow(aiaj, 3), 0.5);
                         }
                     }
                     if (factor == 0)
@@ -906,9 +904,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++)
                         {
                             aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-                            double term = constants::PI3 / (4 * pow(aiaj, 5));
-                            term = pow(term, 0.5);
-                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
+                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * pow(constants::PI3 / (4 * pow(aiaj, 5)), 0.5);
                         }
                     }
                     if (factor == 0)
@@ -936,9 +932,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++)
                         {
                             aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-                            double term = constants::PI3 / (16 * pow(aiaj, 7));
-                            term = pow(term, 0.5);
-                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
+                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * pow(constants::PI3 / (16 * pow(aiaj, 7)), 0.5);
                         }
                     }
                     if (factor == 0)
@@ -968,9 +962,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++)
                         {
                             aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-                            double term = constants::PI3 / (64 * pow((aiaj), 9));
-                            term = pow(term, 0.5);
-                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
+                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * pow(constants::PI3 / (64 * pow((aiaj), 9)), 0.5);
                         }
                     }
                     if (factor == 0)
@@ -1072,12 +1064,17 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                 case 4:
                     nao += 10;
                     break;
+                case 5: 
+                    nao += 15;
+					break;
                 }
             }
         }
         int nshell = 0;
         for (int m = 0; m < wave.get_nmo(); m++)
         {
+            if (wave.get_MO_op(m) != 0)
+                continue;
             int run_2 = 0;
             for (int a = 0; a < wave.get_ncen(); a++)
             {
@@ -1128,11 +1125,13 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
             if (nshell != run_2)
                 nshell = run_2;
         }
-        if (alpha_els != beta_els)
+        if (wave.get_is_unrestricted())
         {
-            for (int m = alpha_els; m < alpha_els + beta_els; m++)
+            for (int m = 0; m < wave.get_nmo(); m++)
             {
                 int run_2 = 0;
+                if (wave.get_MO_op(m) != 1)
+					continue;
                 for (int a = 0; a < wave.get_ncen(); a++)
                 {
                     for (int s = 0; s < wave.get_atom_shell_count(a); s++)
@@ -1216,7 +1215,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
         int naotr = nao * (nao + 1) / 2;
         vec kp;
         wave.resize_DM(naotr, 0.0);
-        if (alpha_els != beta_els)
+        if (wave.get_is_unrestricted())
             wave.resize_SDM(naotr, 0.0);
         if (debug)
         {
@@ -1231,36 +1230,18 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
             {
                 const int iuv = (iu * (iu + 1) / 2) + iv;
                 // if (debug) file << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu * (iu + 1) / 2 << endl;
-                double temp;
+                double temp, occ;
                 // if (debug) file << "Working on MO: ";
                 for (int m = 0; m < wave.get_nmo(); m++)
                 {
-                    // if (debug && m == 0) file << m << " " << flush;
-                    // else if (debug && m != wave.get_nmo() - 1) file << "." << flush;
-                    // else file << wave.get_nmo() - 1 << flush;
-                    if (alpha_els != beta_els)
-                    {
-                        if (m < alpha_els)
-                        {
-                            temp = wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
-                            err_checkf(wave.set_SDM(iuv, wave.get_SDM(iuv) + temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), file);
-                            err_checkf(wave.set_DM(iuv, wave.get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), file);
-                        }
-                        else
-                        {
-                            temp = wave.get_MO_occ(m) * CMO_beta[iu + ((m - alpha_els) * nao)] * CMO_beta[iv + ((m - alpha_els) * nao)];
-                            err_checkf(wave.set_SDM(iuv, wave.get_SDM(iuv) - temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), file);
-                            err_checkf(wave.set_DM(iuv, wave.get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), file);
-                        }
-                    }
+                    occ = wave.get_MO_occ(m);
+                    if (occ == 0.0)
+                        continue;
+                    if (wave.get_MO_op(m) == 0)
+                        temp = occ * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
                     else
-                    {
-                        if (wave.get_MO_occ(m) == 0.0)
-                            continue;
-                        temp = wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
-                        err_checkf(wave.set_DM(iuv, wave.get_DM(iuv) + temp), "Something went wrong while writing the DM!", file);
-                    }
-                    // else if (debug) file << "DM after: " << wave.get_DM(iuv) << endl;
+                        temp = occ * CMO_beta[iu + ((m % nao) * nao)] * CMO_beta[iv + ((m % nao) * nao)];
+                    err_checkf(wave.set_DM(iuv, wave.get_DM(iuv) + temp), "Something went wrong while writing the DM!", file);
                 }
                 // if (debug) file << endl;
             }
@@ -1284,7 +1265,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
             file << wave.get_DM_size() << " Elements in DM" << endl;
             dm.flush();
             dm.close();
-            if (alpha_els != beta_els)
+            if (wave.get_is_unrestricted())
             {
                 ofstream sdm("sdm.debug", ofstream::out);
                 file << "SDM is in sdm.debug" << endl;
@@ -1518,7 +1499,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                 fchk << "\n";
         }
 
-        if (alpha_els != beta_els)
+        if (wave.get_is_unrestricted())
         {
             fchk << "Beta Orbital Energies                      R   N=" << setw(12) << nao << "\n";
             runs = 0;
@@ -1547,7 +1528,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                 fchk << "\n";
         }
 
-        if (alpha_els != beta_els)
+        if (wave.get_is_unrestricted())
         {
             fchk << "Beta MO coefficients                       R   N=" << setw(12) << nao * nao << "\n";
             runs = 0;
@@ -1572,7 +1553,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
             if ((runs % 5 == 0 && runs != 0) || i == wave.get_DM_size() - 1)
                 fchk << "\n";
         }
-        if (alpha_els != beta_els)
+        if (wave.get_is_unrestricted())
         {
             fchk << "Spin SCF Density                           R   N=" << setw(12) << wave.get_SDM_size() << "\n";
             runs = 0;
@@ -1588,6 +1569,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
         fchk.close();
         file << " ...done!" << endl;
     }
+	else err_checkf(false, "Unsupported wavefunction type: " + wave.get_origin(), file);
     if (debug)
         file << "Finished writing fchk!" << endl;
     return true;
