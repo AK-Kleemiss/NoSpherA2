@@ -113,7 +113,33 @@ else
 	fi
 endif
 
-
+ifeq ($(NAME),WINDOWS)
+OCC:
+	@if not exist $(MAKEFILE_DIR)\Lib\occ_install\lib\libocc_core.lib ( \
+		echo Building OCC for $(NAME) && \
+		New-Item -Path $(MAKEFILE_DIR)\occ -ItemType Directory -Force
+		cd $(MAKEFILE_DIR)/occ && \
+		(if exist build rd /s /q build) && \
+		mkdir build && \
+		cd build && \
+		echo Starting build && \
+		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" .. && \
+		cmake -G "Ninja" -DBLA_VENDOR="Intel10_64lp_seq"
+						 -DUSE_SYSTEM_TBB="OFF" -DBLAS_ROOT="Lib/mambaenv/lib/cmake/mkl"
+						 -DUSE_QCINT="OFF" -DENABLE_HOST_OPT="OFF" -DUSE_FORTRAN="OFF"
+						 -DBLA_STATIC="ON" -DWITH_PYTHON_BINDINGS="OFF" -DCMAKE_INSTALL_PREFIX="../Lib/occ_install"
+						 -DGG_NO_PRAGMA="ON" -DCMAKE_CXX_FLAGS="-D__TBB_DYNAMIC_LOAD_ENABLED=0"
+						 -DCMAKE_C_COMPILER=clang-cl.exe
+						 -DCMAKE_LINKER=lld-link
+						 -DCMAKE_CXX_COMPILER=clang-cl.exe .. && \
+		ninja -j0 && \
+		ninja install \
+	) else ( \
+		echo occ already built \
+	)
+	  fi
+	fi
+endif
 ifeq ($(NAME),WINDOWS)
 NoSpherA2: IntelMKL featomic
 	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe . && copy Windows\x64\Release\libiomp5md.dll

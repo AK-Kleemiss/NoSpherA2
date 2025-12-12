@@ -62,13 +62,26 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     set(MKL_LINK "static")
     set(MKL_INTERFACE lp64)
     include(${CMAKE_SOURCE_DIR}/cmake/micromamba.cmake)
+    file(SHA1 ${CMAKE_SOURCE_DIR}/environment.yml _ENV_HASH)
+    set(_SAVED_ENV_HASH "")
+    if (EXISTS ${CMAKE_BINARY_DIR}/env.sha1)
+        file(READ ${CMAKE_BINARY_DIR}/env.sha1 _SAVED_ENV_HASH OPTIONAL)
+    endif ()
     set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
-    if (NOT EXISTS "${_ONEAPI_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
+    if (NOT ${_SAVED_ENV_HASH} STREQUAL ${_ENV_HASH})
         micromamba_environment(
             NAME mambaenv
             SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
         )
+        file(SHA1 ${CMAKE_SOURCE_DIR}/environment.yml _ENV_HASH)
+        file(WRITE ${CMAKE_BINARY_DIR}/env.sha1 ${_ENV_HASH})
         # Update the path after environment creation
+        if (WIN32)
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
+        else ()
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}")
+        endif ()
+    else()
         if (WIN32)
             set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
         else ()
@@ -97,7 +110,6 @@ if (WIN32)
     set(WIN_FLAGS
         "GG_NO_PRAGMA ON"
         "CPACK_SYSTEM_NAME windows"
-        "USE_SYSTEM_TBB OFF"
         "CMAKE_CXX_FLAGS -D__TBB_DYNAMIC_LOAD_ENABLED=0"
 #        "CMAKE_CXX_FLAGS /O2 /fp:fast"
 #        "CMAKE_C_FLAGS /O2 /fp:fast"
@@ -135,8 +147,8 @@ CPMAddPackage(
     GIT_TAG "libs_rebase2"
     OPTIONS
         "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
-        "ENABLE_HOST_OPT OFF"
         "WITH_PYTHON_BINDINGS OFF"
+        "CMAKE_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX}/occ_install"
         ${Darwin_FLAGS}
         ${WIN_FLAGS}
         ${LINUX_FLAGS}

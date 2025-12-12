@@ -20,7 +20,7 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
 set(DEBUG_DIR ${CMAKE_SOURCE_DIR}/build_debug)
-set(CMAKE_INSTALL_PREFIX $ENV{HOME})
+set(CMAKE_INSTALL_PREFIX $ENV{HOME} CACHE PATH "Install path prefix, prepended onto install directories.")
 message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
