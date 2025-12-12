@@ -1,7 +1,8 @@
 #include "int_g2e.h"
 #include "rys_roots.h"
 
-void CINTcart_comp(int* nx, int* ny, int* nz, const int lmax)
+using namespace NoSpherA2;
+void NOS_CINTcart_comp(int* nx, int* ny, int* nz, const int lmax)
 {
     int inc = 0;
     int lx, ly, lz;
@@ -17,7 +18,7 @@ void CINTcart_comp(int* nx, int* ny, int* nz, const int lmax)
     }
 }
 
-void CINTg3c1e_index_xyz(int* idx, const CINTEnvVars* envs)
+void CINTg3c1e_index_xyz(int* idx, const NoSpherA2::CINTEnvVars* envs)
 {
     const int i_l = envs->i_l;
     const int j_l = envs->j_l;
@@ -35,9 +36,9 @@ void CINTg3c1e_index_xyz(int* idx, const CINTEnvVars* envs)
     int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
     int k_nx[CART_MAX], k_ny[CART_MAX], k_nz[CART_MAX];
 
-    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
-    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
-    CINTcart_comp(k_nx, k_ny, k_nz, k_l);
+    NOS_CINTcart_comp(i_nx, i_ny, i_nz, i_l);
+    NOS_CINTcart_comp(j_nx, j_ny, j_nz, j_l);
+    NOS_CINTcart_comp(k_nx, k_ny, k_nz, k_l);
 
     ofx = 0;
     ofy = envs->g_size;
@@ -61,7 +62,7 @@ void CINTg3c1e_index_xyz(int* idx, const CINTEnvVars* envs)
     }
 }
 
-void CINTg2e_index_xyz(int* idx, const CINTEnvVars* envs)
+void CINTg2e_index_xyz(int* idx, const NoSpherA2::CINTEnvVars* envs)
 {
     const int i_l = envs->i_l;
     const int j_l = envs->j_l;
@@ -84,10 +85,10 @@ void CINTg2e_index_xyz(int* idx, const CINTEnvVars* envs)
     int k_nx[CART_MAX], k_ny[CART_MAX], k_nz[CART_MAX];
     int l_nx[CART_MAX], l_ny[CART_MAX], l_nz[CART_MAX];
 
-    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
-    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
-    CINTcart_comp(k_nx, k_ny, k_nz, k_l);
-    CINTcart_comp(l_nx, l_ny, l_nz, l_l);
+    NOS_CINTcart_comp(i_nx, i_ny, i_nz, i_l);
+    NOS_CINTcart_comp(j_nx, j_ny, j_nz, j_l);
+    NOS_CINTcart_comp(k_nx, k_ny, k_nz, k_l);
+    NOS_CINTcart_comp(l_nx, l_ny, l_nz, l_l);
 
     ofx = 0;
     ofy = envs->g_size;
@@ -155,7 +156,7 @@ void CINTg2e_index_xyz(int* idx, const CINTEnvVars* envs)
     } // j
 }
 
-void CINTg1e_index_xyz(int* idx, const CINTEnvVars* envs)
+void CINTg1e_index_xyz(int* idx, const NoSpherA2::CINTEnvVars* envs)
 {
     const int i_l = envs->i_l;
     const int j_l = envs->j_l;
@@ -170,8 +171,8 @@ void CINTg1e_index_xyz(int* idx, const CINTEnvVars* envs)
     int i_nx[CART_MAX], i_ny[CART_MAX], i_nz[CART_MAX];
     int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
 
-    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
-    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
+    NOS_CINTcart_comp(i_nx, i_ny, i_nz, i_l);
+    NOS_CINTcart_comp(j_nx, j_ny, j_nz, j_l);
 
     ofx = 0;
     ofy = envs->g_size;
@@ -190,7 +191,7 @@ void CINTg1e_index_xyz(int* idx, const CINTEnvVars* envs)
     }
 }
 
-int CINTg1e_ovlp(double* g, CINTEnvVars* envs)
+int CINTg1e_ovlp(double* g, NoSpherA2::CINTEnvVars* envs)
 {
     double* gx = g;
     double* gy = g + envs->g_size;
@@ -198,7 +199,7 @@ int CINTg1e_ovlp(double* g, CINTEnvVars* envs)
     double aij = envs->ai[0] + envs->aj[0];
 
     gx[0] = 1;
-    gy[0] = 1; 
+    gy[0] = 1;
     gz[0] = envs->fac[0] * constants::sqr_pi * constants::PI / (aij * sqrt(aij));
 
     int nmax = envs->li_ceil + envs->lj_ceil;
@@ -253,7 +254,7 @@ int CINTg1e_ovlp(double* g, CINTEnvVars* envs)
 }
 
 void CINTg3c1e_ovlp(double* g, double ai, double aj, double ak,
-    const CINTEnvVars* envs)
+    const NoSpherA2::CINTEnvVars* envs)
 {
     const int li = envs->li_ceil;
     const int lj = envs->lj_ceil;
@@ -323,7 +324,7 @@ void CINTg3c1e_ovlp(double* g, double ai, double aj, double ak,
 /*
  * g[i,k,l,j] = < ik | lj > = ( i j | k l )
  */
-int CINTg0_2e(double* g, double* rij, double* rkl, double cutoff, CINTEnvVars* envs)
+int CINTg0_2e(double* g, double* rij, double* rkl, double cutoff, NoSpherA2::CINTEnvVars* envs)
 {
     int irys;
     int nroots = envs->nrys_roots;
@@ -404,7 +405,7 @@ int CINTg0_2e(double* g, double* rij, double* rkl, double cutoff, CINTEnvVars* e
     double rklrx = rkl[0] - envs->rx_in_rklrx[0];
     double rklry = rkl[1] - envs->rx_in_rklrx[1];
     double rklrz = rkl[2] - envs->rx_in_rklrx[2];
-    Rys2eT bc;
+    NoSpherA2::Rys2eT bc;
     double* b00 = bc.b00;
     double* b10 = bc.b10;
     double* b01 = bc.b01;
@@ -448,7 +449,7 @@ int CINTg0_2e(double* g, double* rij, double* rkl, double cutoff, CINTEnvVars* e
 /*
  * g(nroots,0:nmax,0:mmax)
  */
-void CINTg0_2e_2d(double* g, Rys2eT* bc, CINTEnvVars* envs)
+void CINTg0_2e_2d(double* g, NoSpherA2::Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     const int nroots = envs->nrys_roots;
     const int nmax = envs->li_ceil + envs->lj_ceil;
@@ -602,7 +603,7 @@ void CINTg0_2e_2d(double* g, Rys2eT* bc, CINTEnvVars* envs)
  * g0[i,k,l,j] = < ik | lj > = ( i j | k l )
  */
  /* 2d is based on l,j */
-void CINTg0_lj2d_4d(double* g, CINTEnvVars* envs)
+void CINTg0_lj2d_4d(double* g, NoSpherA2::CINTEnvVars* envs)
 {
     const int li = envs->li_ceil;
     const int lk = envs->lk_ceil;
@@ -677,14 +678,14 @@ void CINTg0_lj2d_4d(double* g, CINTEnvVars* envs)
 }
 
 
-void CINTg0_2e_lj2d4d(double* g, Rys2eT* bc, CINTEnvVars* envs)
+void CINTg0_2e_lj2d4d(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     CINTg0_2e_2d(g, bc, envs);
     CINTg0_lj2d_4d(g, envs);
 }
 
 /* 2d is based on i,l */
-void CINTg0_il2d_4d(double* g, CINTEnvVars* envs)
+void CINTg0_il2d_4d(double* g, NoSpherA2::CINTEnvVars* envs)
 {
     int lk = envs->lk_ceil;
     int lj = envs->lj_ceil;
@@ -755,19 +756,19 @@ void CINTg0_il2d_4d(double* g, CINTEnvVars* envs)
 }
 
 
-void CINTg0_2e_il2d4d(double* g, Rys2eT* bc, CINTEnvVars* envs)
+void CINTg0_2e_il2d4d(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     CINTg0_2e_2d(g, bc, envs);
     CINTg0_il2d_4d(g, envs);
 }
 
-static inline void _g0_2d4d_0000(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0000(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     g[0] = 1;
     g[1] = 1;
     //g[2] = w[0];
 }
-static inline void _g0_2d4d_0001(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0001(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -779,7 +780,7 @@ static inline void _g0_2d4d_0001(double* g, Rys2eT* bc, CINTEnvVars* envs)
     //g[4] = w[0];
     g[5] = cpz[0] * g[4];
 }
-static inline void _g0_2d4d_0002(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0002(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -804,7 +805,7 @@ static inline void _g0_2d4d_0002(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[16] = cpz[0] * g[14] + b01[0] * g[12];
     g[17] = cpz[1] * g[15] + b01[1] * g[13];
 }
-static inline void _g0_2d4d_0003(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0003(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -835,7 +836,7 @@ static inline void _g0_2d4d_0003(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[22] = cpz[0] * g[20] + 2 * b01[0] * g[18];
     g[23] = cpz[1] * g[21] + 2 * b01[1] * g[19];
 }
-static inline void _g0_2d4d_0010(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0010(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -847,7 +848,7 @@ static inline void _g0_2d4d_0010(double* g, Rys2eT* bc, CINTEnvVars* envs)
     //g[4] = w[0];
     g[5] = cpz[0] * g[4];
 }
-static inline void _g0_2d4d_0011(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0011(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -881,7 +882,7 @@ static inline void _g0_2d4d_0011(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[26] = g[24] * (zkzl + cpz[0]);
     g[27] = g[25] * (zkzl + cpz[1]);
 }
-static inline void _g0_2d4d_0012(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0012(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -927,7 +928,7 @@ static inline void _g0_2d4d_0012(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = g[32] * (zkzl + cpz[0]);
     g[35] = g[33] * (zkzl + cpz[1]);
 }
-static inline void _g0_2d4d_0020(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0020(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -952,7 +953,7 @@ static inline void _g0_2d4d_0020(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[16] = cpz[0] * g[14] + b01[0] * g[12];
     g[17] = cpz[1] * g[15] + b01[1] * g[13];
 }
-static inline void _g0_2d4d_0021(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0021(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -998,7 +999,7 @@ static inline void _g0_2d4d_0021(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[44] = g[36] * (zkzl + cpz[0]) + 2 * b01[0] * g[34];
     g[45] = g[37] * (zkzl + cpz[1]) + 2 * b01[1] * g[35];
 }
-static inline void _g0_2d4d_0030(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0030(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -1029,7 +1030,7 @@ static inline void _g0_2d4d_0030(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[22] = cpz[0] * g[20] + 2 * b01[0] * g[18];
     g[23] = cpz[1] * g[21] + 2 * b01[1] * g[19];
 }
-static inline void _g0_2d4d_0100(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0100(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1041,7 +1042,7 @@ static inline void _g0_2d4d_0100(double* g, Rys2eT* bc, CINTEnvVars* envs)
     //g[4] = w[0];
     g[5] = c0z[0] * g[4];
 }
-static inline void _g0_2d4d_0101(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0101(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1075,7 +1076,7 @@ static inline void _g0_2d4d_0101(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[22] = cpz[0] * g[20] + b00[0] * g[16];
     g[23] = cpz[1] * g[21] + b00[1] * g[17];
 }
-static inline void _g0_2d4d_0102(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0102(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1122,7 +1123,7 @@ static inline void _g0_2d4d_0102(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = cpz[0] * g[32] + b01[0] * g[30] + b00[0] * g[26];
     g[35] = cpz[1] * g[33] + b01[1] * g[31] + b00[1] * g[27];
 }
-static inline void _g0_2d4d_0110(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0110(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1156,7 +1157,7 @@ static inline void _g0_2d4d_0110(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[22] = cpz[0] * g[20] + b00[0] * g[16];
     g[23] = cpz[1] * g[21] + b00[1] * g[17];
 }
-static inline void _g0_2d4d_0111(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0111(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1218,7 +1219,7 @@ static inline void _g0_2d4d_0111(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[62] = g[60] * (zkzl + cpz[0]) + b00[0] * g[48];
     g[63] = g[61] * (zkzl + cpz[1]) + b00[1] * g[49];
 }
-static inline void _g0_2d4d_0120(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0120(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1265,7 +1266,7 @@ static inline void _g0_2d4d_0120(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = cpz[0] * g[32] + b01[0] * g[30] + b00[0] * g[26];
     g[35] = cpz[1] * g[33] + b01[1] * g[31] + b00[1] * g[27];
 }
-static inline void _g0_2d4d_0200(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0200(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1290,7 +1291,7 @@ static inline void _g0_2d4d_0200(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[16] = c0z[0] * g[14] + b10[0] * g[12];
     g[17] = c0z[1] * g[15] + b10[1] * g[13];
 }
-static inline void _g0_2d4d_0201(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0201(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1337,7 +1338,7 @@ static inline void _g0_2d4d_0201(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = c0z[0] * g[30] + b10[0] * g[26] + b00[0] * g[28];
     g[35] = c0z[1] * g[31] + b10[1] * g[27] + b00[1] * g[29];
 }
-static inline void _g0_2d4d_0210(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0210(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1384,7 +1385,7 @@ static inline void _g0_2d4d_0210(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = c0z[0] * g[30] + b10[0] * g[26] + b00[0] * g[28];
     g[35] = c0z[1] * g[31] + b10[1] * g[27] + b00[1] * g[29];
 }
-static inline void _g0_2d4d_0300(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_0300(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1415,7 +1416,7 @@ static inline void _g0_2d4d_0300(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[22] = c0z[0] * g[20] + 2 * b10[0] * g[18];
     g[23] = c0z[1] * g[21] + 2 * b10[1] * g[19];
 }
-static inline void _g0_2d4d_1000(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_1000(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1427,7 +1428,7 @@ static inline void _g0_2d4d_1000(double* g, Rys2eT* bc, CINTEnvVars* envs)
     //g[4] = w[0];
     g[5] = c0z[0] * g[4];
 }
-static inline void _g0_2d4d_1001(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_1001(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1461,7 +1462,7 @@ static inline void _g0_2d4d_1001(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[22] = cpz[0] * g[18] + b00[0] * g[16];
     g[23] = cpz[1] * g[19] + b00[1] * g[17];
 }
-static inline void _g0_2d4d_1002(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_1002(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1508,7 +1509,7 @@ static inline void _g0_2d4d_1002(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = cpz[0] * g[30] + b01[0] * g[26] + b00[0] * g[28];
     g[35] = cpz[1] * g[31] + b01[1] * g[27] + b00[1] * g[29];
 }
-static inline void _g0_2d4d_1010(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_1010(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1542,7 +1543,7 @@ static inline void _g0_2d4d_1010(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[22] = cpz[0] * g[18] + b00[0] * g[16];
     g[23] = cpz[1] * g[19] + b00[1] * g[17];
 }
-static inline void _g0_2d4d_1011(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_1011(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1604,7 +1605,7 @@ static inline void _g0_2d4d_1011(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[54] = g[50] * (zkzl + cpz[0]) + b00[0] * g[48];
     g[55] = g[51] * (zkzl + cpz[1]) + b00[1] * g[49];
 }
-static inline void _g0_2d4d_1020(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_1020(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1651,7 +1652,7 @@ static inline void _g0_2d4d_1020(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = cpz[0] * g[30] + b01[0] * g[26] + b00[0] * g[28];
     g[35] = cpz[1] * g[31] + b01[1] * g[27] + b00[1] * g[29];
 }
-static inline void _g0_2d4d_1100(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_1100(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1685,7 +1686,7 @@ static inline void _g0_2d4d_1100(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[26] = g[24] * (zizj + c0z[0]);
     g[27] = g[25] * (zizj + c0z[1]);
 }
-static inline void _g0_2d4d_1101(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_1101(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1747,7 +1748,7 @@ static inline void _g0_2d4d_1101(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[54] = zizj * g[52] + cpz[0] * g[56] + b00[0] * g[48];
     g[55] = zizj * g[53] + cpz[1] * g[57] + b00[1] * g[49];
 }
-static inline void _g0_2d4d_1110(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_1110(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1809,7 +1810,7 @@ static inline void _g0_2d4d_1110(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[54] = zizj * g[52] + cpz[0] * g[56] + b00[0] * g[48];
     g[55] = zizj * g[53] + cpz[1] * g[57] + b00[1] * g[49];
 }
-static inline void _g0_2d4d_1200(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_1200(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1855,7 +1856,7 @@ static inline void _g0_2d4d_1200(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = g[32] * (zizj + c0z[0]);
     g[35] = g[33] * (zizj + c0z[1]);
 }
-static inline void _g0_2d4d_2000(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_2000(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1880,7 +1881,7 @@ static inline void _g0_2d4d_2000(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[16] = c0z[0] * g[14] + b10[0] * g[12];
     g[17] = c0z[1] * g[15] + b10[1] * g[13];
 }
-static inline void _g0_2d4d_2001(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_2001(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1927,7 +1928,7 @@ static inline void _g0_2d4d_2001(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = c0z[0] * g[32] + b10[0] * g[30] + b00[0] * g[26];
     g[35] = c0z[1] * g[33] + b10[1] * g[31] + b00[1] * g[27];
 }
-static inline void _g0_2d4d_2010(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_2010(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -1974,7 +1975,7 @@ static inline void _g0_2d4d_2010(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = c0z[0] * g[32] + b10[0] * g[30] + b00[0] * g[26];
     g[35] = c0z[1] * g[33] + b10[1] * g[31] + b00[1] * g[27];
 }
-static inline void _g0_2d4d_2100(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_2100(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -2020,7 +2021,7 @@ static inline void _g0_2d4d_2100(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[40] = g[32] * (zizj + c0z[0]);
     g[41] = g[33] * (zizj + c0z[1]);
 }
-static inline void _g0_2d4d_3000(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _g0_2d4d_3000(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -2052,7 +2053,7 @@ static inline void _g0_2d4d_3000(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[23] = c0z[1] * g[21] + 2 * b10[1] * g[19];
 }
 
-void CINTg0_2e_2d4d_unrolled(double* g, Rys2eT* bc, CINTEnvVars* envs)
+void CINTg0_2e_2d4d_unrolled(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     int type_ijkl = ((envs->li_ceil << 6) | (envs->lj_ceil << 4) |
         (envs->lk_ceil << 2) | (envs->ll_ceil));
@@ -2097,7 +2098,7 @@ void CINTg0_2e_2d4d_unrolled(double* g, Rys2eT* bc, CINTEnvVars* envs)
 }
 
 
-static inline void _srg0_2d4d_0000(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0000(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     g[0] = 1;
     g[1] = 1;
@@ -2106,7 +2107,7 @@ static inline void _srg0_2d4d_0000(double* g, Rys2eT* bc, CINTEnvVars* envs)
     //g[4] = w[0];
     //g[5] = w[0];
 }
-static inline void _srg0_2d4d_0001(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0001(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -2124,7 +2125,7 @@ static inline void _srg0_2d4d_0001(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[10] = cpz[0] * g[8];
     g[11] = cpz[1] * g[9];
 }
-static inline void _srg0_2d4d_0002(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0002(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -2167,7 +2168,7 @@ static inline void _srg0_2d4d_0002(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = cpz[2] * g[30] + b01[2] * g[26];
     g[35] = cpz[3] * g[31] + b01[3] * g[27];
 }
-static inline void _srg0_2d4d_0003(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0003(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -2222,7 +2223,7 @@ static inline void _srg0_2d4d_0003(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[46] = cpz[2] * g[42] + 2 * b01[2] * g[38];
     g[47] = cpz[3] * g[43] + 2 * b01[3] * g[39];
 }
-static inline void _srg0_2d4d_0010(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0010(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -2240,7 +2241,7 @@ static inline void _srg0_2d4d_0010(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[10] = cpz[0] * g[8];
     g[11] = cpz[1] * g[9];
 }
-static inline void _srg0_2d4d_0011(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0011(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -2298,7 +2299,7 @@ static inline void _srg0_2d4d_0011(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[54] = g[50] * (zkzl + cpz[2]);
     g[55] = g[51] * (zkzl + cpz[3]);
 }
-static inline void _srg0_2d4d_0012(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0012(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -2380,7 +2381,7 @@ static inline void _srg0_2d4d_0012(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[70] = g[66] * (zkzl + cpz[2]);
     g[71] = g[67] * (zkzl + cpz[3]);
 }
-static inline void _srg0_2d4d_0020(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0020(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -2423,7 +2424,7 @@ static inline void _srg0_2d4d_0020(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = cpz[2] * g[30] + b01[2] * g[26];
     g[35] = cpz[3] * g[31] + b01[3] * g[27];
 }
-static inline void _srg0_2d4d_0021(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0021(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -2505,7 +2506,7 @@ static inline void _srg0_2d4d_0021(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[90] = g[74] * (zkzl + cpz[2]) + 2 * b01[2] * g[70];
     g[91] = g[75] * (zkzl + cpz[3]) + 2 * b01[3] * g[71];
 }
-static inline void _srg0_2d4d_0030(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0030(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -2560,7 +2561,7 @@ static inline void _srg0_2d4d_0030(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[46] = cpz[2] * g[42] + 2 * b01[2] * g[38];
     g[47] = cpz[3] * g[43] + 2 * b01[3] * g[39];
 }
-static inline void _srg0_2d4d_0100(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0100(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -2578,7 +2579,7 @@ static inline void _srg0_2d4d_0100(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[10] = c0z[0] * g[8];
     g[11] = c0z[1] * g[9];
 }
-static inline void _srg0_2d4d_0101(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0101(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -2636,7 +2637,7 @@ static inline void _srg0_2d4d_0101(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[46] = cpz[2] * g[42] + b00[2] * g[34];
     g[47] = cpz[3] * g[43] + b00[3] * g[35];
 }
-static inline void _srg0_2d4d_0102(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0102(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -2719,7 +2720,7 @@ static inline void _srg0_2d4d_0102(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[70] = cpz[2] * g[66] + b01[2] * g[62] + b00[2] * g[54];
     g[71] = cpz[3] * g[67] + b01[3] * g[63] + b00[3] * g[55];
 }
-static inline void _srg0_2d4d_0110(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0110(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -2777,7 +2778,7 @@ static inline void _srg0_2d4d_0110(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[46] = cpz[2] * g[42] + b00[2] * g[34];
     g[47] = cpz[3] * g[43] + b00[3] * g[35];
 }
-static inline void _srg0_2d4d_0111(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0111(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -2887,7 +2888,7 @@ static inline void _srg0_2d4d_0111(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[126] = g[122] * (zkzl + cpz[2]) + b00[2] * g[98];
     g[127] = g[123] * (zkzl + cpz[3]) + b00[3] * g[99];
 }
-static inline void _srg0_2d4d_0120(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0120(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -2970,7 +2971,7 @@ static inline void _srg0_2d4d_0120(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[70] = cpz[2] * g[66] + b01[2] * g[62] + b00[2] * g[54];
     g[71] = cpz[3] * g[67] + b01[3] * g[63] + b00[3] * g[55];
 }
-static inline void _srg0_2d4d_0200(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0200(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3013,7 +3014,7 @@ static inline void _srg0_2d4d_0200(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = c0z[2] * g[30] + b10[2] * g[26];
     g[35] = c0z[3] * g[31] + b10[3] * g[27];
 }
-static inline void _srg0_2d4d_0201(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0201(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3096,7 +3097,7 @@ static inline void _srg0_2d4d_0201(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[70] = c0z[2] * g[62] + b10[2] * g[54] + b00[2] * g[58];
     g[71] = c0z[3] * g[63] + b10[3] * g[55] + b00[3] * g[59];
 }
-static inline void _srg0_2d4d_0210(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0210(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3179,7 +3180,7 @@ static inline void _srg0_2d4d_0210(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[70] = c0z[2] * g[62] + b10[2] * g[54] + b00[2] * g[58];
     g[71] = c0z[3] * g[63] + b10[3] * g[55] + b00[3] * g[59];
 }
-static inline void _srg0_2d4d_0300(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_0300(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3234,7 +3235,7 @@ static inline void _srg0_2d4d_0300(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[46] = c0z[2] * g[42] + 2 * b10[2] * g[38];
     g[47] = c0z[3] * g[43] + 2 * b10[3] * g[39];
 }
-static inline void _srg0_2d4d_1000(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_1000(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3252,7 +3253,7 @@ static inline void _srg0_2d4d_1000(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[10] = c0z[0] * g[8];
     g[11] = c0z[1] * g[9];
 }
-static inline void _srg0_2d4d_1001(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_1001(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3310,7 +3311,7 @@ static inline void _srg0_2d4d_1001(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[46] = cpz[2] * g[38] + b00[2] * g[34];
     g[47] = cpz[3] * g[39] + b00[3] * g[35];
 }
-static inline void _srg0_2d4d_1002(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_1002(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3393,7 +3394,7 @@ static inline void _srg0_2d4d_1002(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[70] = cpz[2] * g[62] + b01[2] * g[54] + b00[2] * g[58];
     g[71] = cpz[3] * g[63] + b01[3] * g[55] + b00[3] * g[59];
 }
-static inline void _srg0_2d4d_1010(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_1010(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3451,7 +3452,7 @@ static inline void _srg0_2d4d_1010(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[46] = cpz[2] * g[38] + b00[2] * g[34];
     g[47] = cpz[3] * g[39] + b00[3] * g[35];
 }
-static inline void _srg0_2d4d_1011(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_1011(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3561,7 +3562,7 @@ static inline void _srg0_2d4d_1011(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[110] = g[102] * (zkzl + cpz[2]) + b00[2] * g[98];
     g[111] = g[103] * (zkzl + cpz[3]) + b00[3] * g[99];
 }
-static inline void _srg0_2d4d_1020(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_1020(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3644,7 +3645,7 @@ static inline void _srg0_2d4d_1020(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[70] = cpz[2] * g[62] + b01[2] * g[54] + b00[2] * g[58];
     g[71] = cpz[3] * g[63] + b01[3] * g[55] + b00[3] * g[59];
 }
-static inline void _srg0_2d4d_1100(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_1100(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3702,7 +3703,7 @@ static inline void _srg0_2d4d_1100(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[54] = g[50] * (zizj + c0z[2]);
     g[55] = g[51] * (zizj + c0z[3]);
 }
-static inline void _srg0_2d4d_1101(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_1101(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3812,7 +3813,7 @@ static inline void _srg0_2d4d_1101(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[110] = zizj * g[106] + cpz[2] * g[114] + b00[2] * g[98];
     g[111] = zizj * g[107] + cpz[3] * g[115] + b00[3] * g[99];
 }
-static inline void _srg0_2d4d_1110(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_1110(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -3922,7 +3923,7 @@ static inline void _srg0_2d4d_1110(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[110] = zizj * g[106] + cpz[2] * g[114] + b00[2] * g[98];
     g[111] = zizj * g[107] + cpz[3] * g[115] + b00[3] * g[99];
 }
-static inline void _srg0_2d4d_1200(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_1200(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -4004,7 +4005,7 @@ static inline void _srg0_2d4d_1200(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[70] = g[66] * (zizj + c0z[2]);
     g[71] = g[67] * (zizj + c0z[3]);
 }
-static inline void _srg0_2d4d_2000(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_2000(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -4047,7 +4048,7 @@ static inline void _srg0_2d4d_2000(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[34] = c0z[2] * g[30] + b10[2] * g[26];
     g[35] = c0z[3] * g[31] + b10[3] * g[27];
 }
-static inline void _srg0_2d4d_2001(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_2001(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -4130,7 +4131,7 @@ static inline void _srg0_2d4d_2001(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[70] = c0z[2] * g[66] + b10[2] * g[62] + b00[2] * g[54];
     g[71] = c0z[3] * g[67] + b10[3] * g[63] + b00[3] * g[55];
 }
-static inline void _srg0_2d4d_2010(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_2010(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -4213,7 +4214,7 @@ static inline void _srg0_2d4d_2010(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[70] = c0z[2] * g[66] + b10[2] * g[62] + b00[2] * g[54];
     g[71] = c0z[3] * g[67] + b10[3] * g[63] + b00[3] * g[55];
 }
-static inline void _srg0_2d4d_2100(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_2100(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -4295,7 +4296,7 @@ static inline void _srg0_2d4d_2100(double* g, Rys2eT* bc, CINTEnvVars* envs)
     g[82] = g[66] * (zizj + c0z[2]);
     g[83] = g[67] * (zizj + c0z[3]);
 }
-static inline void _srg0_2d4d_3000(double* g, Rys2eT* bc, CINTEnvVars* envs)
+static inline void _srg0_2d4d_3000(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     double* c0x = bc->c00x;
     double* c0y = bc->c00y;
@@ -4352,7 +4353,7 @@ static inline void _srg0_2d4d_3000(double* g, Rys2eT* bc, CINTEnvVars* envs)
 }
 
 
-void CINTsrg0_2e_2d4d_unrolled(double* g, Rys2eT* bc, CINTEnvVars* envs)
+void CINTsrg0_2e_2d4d_unrolled(double* g, Rys2eT* bc, NoSpherA2::CINTEnvVars* envs)
 {
     int type_ijkl = ((envs->li_ceil << 6) | (envs->lj_ceil << 4) |
         (envs->lk_ceil << 2) | (envs->ll_ceil));
@@ -4399,7 +4400,7 @@ void CINTsrg0_2e_2d4d_unrolled(double* g, Rys2eT* bc, CINTEnvVars* envs)
 
 
 
-void CINTinit_int2c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
+void CINTinit_int2c2e_EnvVars(NoSpherA2::CINTEnvVars* envs, int* ng, int* shls,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
     envs->natm = natm;
@@ -4429,7 +4430,7 @@ void CINTinit_int2c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
     envs->rk = env + atm(PTR_COORD, bas(ATOM_OF, k_sh));
 
 
-    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->k_l);
+    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * NOS_CINTcommon_fac_sp(envs->i_l) * NOS_CINTcommon_fac_sp(envs->k_l);
     if (env[PTR_EXPCUTOFF] == 0) {
         envs->expcutoff = EXPCUTOFF;
     }
@@ -4504,7 +4505,7 @@ void CINTinit_int2c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
  * Note the 3c2e functions takes i,j,k parameters. But we initialize
  * ll_ceil, to reuse g2e_g02d function.
  */
-void CINTinit_int3c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
+void CINTinit_int3c2e_EnvVars(NoSpherA2::CINTEnvVars* envs, int* ng, int* shls,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
     envs->natm = natm;
@@ -4536,7 +4537,7 @@ void CINTinit_int3c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
     envs->rk = env + atm(PTR_COORD, bas(ATOM_OF, k_sh));
 
 
-    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->j_l) * CINTcommon_fac_sp(envs->k_l);
+    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * NOS_CINTcommon_fac_sp(envs->i_l) * NOS_CINTcommon_fac_sp(envs->j_l) * NOS_CINTcommon_fac_sp(envs->k_l);
     if (env[PTR_EXPCUTOFF] == 0) {
         envs->expcutoff = EXPCUTOFF;
     }
@@ -4622,7 +4623,7 @@ void CINTinit_int3c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
 }
 
 
-void CINTinit_int3c1e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
+void CINTinit_int3c1e_EnvVars(NoSpherA2::CINTEnvVars* envs, int* ng, int* shls,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
     envs->natm = natm;
@@ -4665,8 +4666,8 @@ void CINTinit_int3c1e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
     envs->nrys_roots = (envs->li_ceil + envs->lj_ceil + envs->lk_ceil) / 2 + 1;
 
     envs->common_factor = constants::PI * constants::sqr_pi
-        * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->j_l)
-        * CINTcommon_fac_sp(envs->k_l);
+        * NOS_CINTcommon_fac_sp(envs->i_l) * NOS_CINTcommon_fac_sp(envs->j_l)
+        * NOS_CINTcommon_fac_sp(envs->k_l);
     if (env[PTR_EXPCUTOFF] == 0) {
         envs->expcutoff = EXPCUTOFF;
     }
@@ -4690,7 +4691,7 @@ void CINTinit_int3c1e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
 }
 
 
-void CINTinit_int1e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
+void CINTinit_int1e_EnvVars(NoSpherA2::CINTEnvVars* envs, int* ng, int* shls,
     int* atm, int natm,
     int* bas, int nbas, double* env)
 {
@@ -4768,7 +4769,7 @@ void CINTinit_int1e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
 
 
 void make_g1e_gout(double* gout, double* g, int* idx,
-    CINTEnvVars* envs, int empty, int int1e_type)
+    NoSpherA2::CINTEnvVars* envs, int empty, int int1e_type)
 {
     int ia;
     switch (int1e_type) {

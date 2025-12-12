@@ -1,0 +1,11 @@
+name: mambaenv
+channels:
+   - https://software.repos.intel.com/python/conda
+   - conda-forge
+dependencies:
+   - python
+   - pkgconfig
+   - mkl-devel
+   - mkl-static
+   - cmake
+   - intel-openmp

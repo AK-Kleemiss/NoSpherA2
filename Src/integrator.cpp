@@ -8,7 +8,9 @@
 
 #if defined(__APPLE__)
 // On macOS we are using Accelerate for BLAS/LAPACK
+#define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 0
 #include <Accelerate/Accelerate.h>
+
 #else
 // Linux/Windows with oneMKL
 #include <mkl.h>
@@ -66,86 +68,86 @@ vec reorder_p(vec coefs_in, WFN aux_basis)
 
 
 // Enhanced electron restraint with adaptive weighting for s-orbitals only
-// Only s-orbitals are restrained as other orbitals don't contribute to 
+// Only s-orbitals are restrained as other orbitals don't contribute to
 // spherically averaged electron density used in electron counting
-void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux, 
-                          double base_restraint_coef, 
+void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
+                          double base_restraint_coef,
                           bool adaptive_weighting,
                           const vec& expected_charges)
 {
     double radial;
     basis_set_entry bf;
-    
+
     size_t original_size = rho.size();
     size_t n_atoms = wavy_aux.get_ncen();
-    
+
     // Adaptive restraint coefficient based on system size and basis set quality
     double restraint_coef = base_restraint_coef;
     if (adaptive_weighting) {
         // Scale restraint based on auxiliary basis size - larger basis needs less restraint
         double basis_scaling = std::max(0.1, 1.0 - std::log10(original_size) * 0.1);
         restraint_coef *= basis_scaling;
-        
+
         // Scale based on number of atoms - more atoms need stronger restraint per atom
         double atom_scaling = std::min(2.0, 1.0 + std::sqrt(n_atoms) * 0.1);
         restraint_coef *= atom_scaling;
     }
-    
-    std::cout << "Setting adaptive restraint coefficient to: " << std::fixed 
+
+    std::cout << "Setting adaptive restraint coefficient to: " << std::fixed
               << std::showpoint << std::setprecision(6) << restraint_coef << std::endl;
 
     // Resize matrices for restraint equations
     size_t new_size = original_size * original_size + n_atoms * original_size;
     eri2c.resize(new_size);
-    
+
     // Create matrix view for restraint block
     dMatrixRef2 eri2c_restraint(eri2c.data() + original_size * original_size, n_atoms, original_size);
-    
+
     rho.resize(original_size + n_atoms);
 
     // Calculate electron integration matrix for all basis functions
     vec electron_integrals(original_size, 0.0);
     int coef_idx = 0;
-    
+
     for (int atm_idx = 0; atm_idx < n_atoms; atm_idx++) {
         atom current_atom = wavy_aux.get_atoms()[atm_idx];
-        
+
         // Determine expected electron count for this atom
         double expected_electrons = current_atom.get_charge(); // Default to nuclear charge
         if (!expected_charges.empty() && atm_idx < expected_charges.size()) {
             expected_electrons = expected_charges[atm_idx];
         }
-        
+
         // Set target electron count with adaptive weighting
         double atom_weight = restraint_coef;
         if (adaptive_weighting) {
             // Heavier atoms (higher Z) get stronger restraint
             atom_weight *= std::min(2.0, 1.0 + current_atom.get_charge() * 0.02);
         }
-        
+
         rho[original_size + atm_idx] = expected_electrons * atom_weight;
-        
+
         // Reset coefficient index for this atom
         int type = -1, prim = 0;
-        
+
         for (unsigned int shell = 0; shell < current_atom.get_shellcount().size(); shell++) {
             type = current_atom.get_basis_set_entry(prim).get_type();
-            
+
             // Only apply restraints to s-orbitals (type == 0)
             // Other orbitals don't contribute to spherically averaged electron density
             if (type == 0) { // s-orbital only
                 radial = 0.0;
-                
+
                 // Sum over primitives in this s-shell
                 for (unsigned int e = 0; e < current_atom.get_shellcount()[shell]; e++) {
                     bf = current_atom.get_basis_set_entry(prim + e);
                     primitive p(0, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
-                    
+
                     // Electron-nucleus attraction integral for s-orbital: <χ|1|χ>
-                    radial += constants::PI / (2.0 * std::pow(p.get_exp(), 1.5)) 
+                    radial += constants::PI / (2.0 * std::pow(p.get_exp(), 1.5))
                             * p.normalization_constant() * p.get_coef();
                 }
-                
+
                 // Store the electron integral for this s-orbital
                 eri2c_restraint(atm_idx, coef_idx) = radial * atom_weight;
                 coef_idx++;
@@ -153,17 +155,17 @@ void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
                 // Skip non-s orbitals but still increment indices appropriately
                 coef_idx += (2 * type + 1);
             }
-            
+
             prim += current_atom.get_shellcount()[shell];
         }
     }
-    
+
     std::cout << "Added electron restraints for " << n_atoms << " atoms." << std::endl;
 }
 
 
 vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_mem, const char metric,
-                 double restraint_strength, bool adaptive_restraint, 
+                 double restraint_strength, bool adaptive_restraint,
                  const std::string& charge_scheme, bool analyze_quality)
 {
     vec eri2c;
@@ -195,12 +197,12 @@ vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_
     // Calculate expected charges based on chosen scheme
     std::cout << "Using charge scheme: " << charge_scheme << std::endl;
     vec expected_populations = calculate_expected_populations(wavy, wavy_aux, charge_scheme);
-    
+
     // Apply enhanced electron restraints
-    add_electron_restraint(eri2c, rho, wavy_aux, restraint_strength, 
+    add_electron_restraint(eri2c, rho, wavy_aux, restraint_strength,
                           adaptive_restraint, expected_populations);
-    
-    // Solve the regularized 
+
+    // Solve the regularized
     std::cout << "Solving regularized linear system..." << std::endl;
     solve_linear_system(eri2c, rho.size(), aux_basis.get_nao(), rho);
 
@@ -217,8 +219,8 @@ vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_
 }
 
 // Hybrid approach combining thikonov regularization and electron restraints
-vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux, const double max_mem, 
-                      const char metric, double restraint_strength, 
+vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux, const double max_mem,
+                      const char metric, double restraint_strength,
                       double tikhonov_lambda, const std::string& charge_scheme, bool analyze_quality)
 {
     vec eri2c;
@@ -253,12 +255,12 @@ vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux, const double max_me
     // Then add electron restraints
     vec expected_populations = calculate_expected_populations(wavy, wavy_aux, charge_scheme);
     add_electron_restraint(eri2c, rho, wavy_aux, restraint_strength, true, expected_populations);
-    
+
     std::cout << "Solving hybrid regularized system..." << std::endl;
     solve_linear_system(eri2c, rho.size(), n, rho);
 
     rho = reorder_p(rho, wavy_aux);
-    
+
     // Analyze the quality of the fit if requested
     if (analyze_quality) {
         analyze_density_fit_quality(rho, wavy_aux, expected_populations);
@@ -272,7 +274,7 @@ vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux, const double max_me
 vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const std::string& scheme)
 {
     vec expected_populations(wavy_aux.get_ncen());
-    
+
     if (scheme == "nuclear") {
         // Simple nuclear populations
         for (int i = 0; i < wavy_aux.get_ncen(); i++) {
@@ -354,7 +356,7 @@ vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const s
         // Setup grids for the molecule
         bvec needs_grid = GridManager::determineAtomsNeedingGrids(temp, asym_atom_list);
         grid_manager.setupGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
-        
+
 
         // Calculate partitioned charges
         auto results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
@@ -364,7 +366,7 @@ vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const s
         }
     }
     else {
-        std::cerr << "Warning: Unknown charge scheme '" << scheme 
+        std::cerr << "Warning: Unknown charge scheme '" << scheme
             << "'. Defaulting to nuclear charges." << std::endl;
         expected_populations = calculate_expected_populations(wavy, wavy_aux, "nuclear");
     }
@@ -373,37 +375,37 @@ vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const s
 }
 
 // Analyze the quality of density fitting and detect problematic charges
-void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, 
+void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux,
                                 const vec& expected_charges)
 {
     std::cout << "\n=== Density Fitting Quality Analysis ===" << std::endl;
-    
+
     vec atomic_populations(wavy_aux.get_ncen(), 0.0);
     int coef_idx = 0;
-    
+
     // Calculate atomic populations from coefficients using only s-orbitals
     for (int atm_idx = 0; atm_idx < wavy_aux.get_ncen(); atm_idx++) {
         atom current_atom = wavy_aux.get_atoms()[atm_idx];
-        
+
         int type = -1, prim = 0;
         for (unsigned int shell = 0; shell < current_atom.get_shellcount().size(); shell++) {
             type = current_atom.get_basis_set_entry(prim).get_type();
-            
+
             // Only calculate population from s-orbitals (type == 0)
             if (type == 0) { // s-orbital
                 double radial_integral = 0.0;
                 basis_set_entry bf;
-                
+
                 // Calculate the radial integration for s-orbital
                 for (unsigned int e = 0; e < current_atom.get_shellcount()[shell]; e++) {
                     bf = current_atom.get_basis_set_entry(prim + e);
                     primitive p(0, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
-                    
+
                     // Radial integral for s-orbital: <χ|1|χ>
-                    radial_integral += constants::PI / (2.0 * std::pow(p.get_exp(), 1.5)) 
+                    radial_integral += constants::PI / (2.0 * std::pow(p.get_exp(), 1.5))
                                      * p.normalization_constant() * p.get_coef();
                 }
-                
+
                 // Multiply radial part with the coefficient to get electron population contribution
                 atomic_populations[atm_idx] += coefficients[coef_idx] * radial_integral;
                 coef_idx++;
@@ -411,18 +413,18 @@ void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux,
                 // Skip non-s orbitals but still increment coefficient index
                 coef_idx += (2 * type + 1);
             }
-            
+
             prim += current_atom.get_shellcount()[shell];
         }
-        
+
         double n_electrons = current_atom.get_charge();
         double computed_charge = n_electrons - atomic_populations[atm_idx];
         double expected_charge = 0.0;
-        
+
         if (!expected_charges.empty() && atm_idx < expected_charges.size()) {
             expected_charge = n_electrons - expected_charges[atm_idx];
         }
-        
+
         std::cout << "Atom " << atm_idx + 1 << std::fixed << std::setprecision(3) << " (Z=" << n_electrons << "): "
                   << "Population = " << atomic_populations[atm_idx]
                   << ", Charge = " << computed_charge
@@ -531,37 +533,37 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
         diff.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_diff_Method" + std::to_string(a - 1) + ".cube");
         diff.write_file(true, false);
     }
-    
+
 
     // Compare results
     std::cout << "\n=== Method Comparison ===" << std::endl;
-    std::cout << "Unrestrained        - Max coeff: " << std::fixed << std::setprecision(6) 
-              << *std::max_element(coeff_unrestrained.begin(), coeff_unrestrained.end()) 
+    std::cout << "Unrestrained        - Max coeff: " << std::fixed << std::setprecision(6)
+              << *std::max_element(coeff_unrestrained.begin(), coeff_unrestrained.end())
               << ", Min coeff: " << *std::min_element(coeff_unrestrained.begin(), coeff_unrestrained.end()) << std::endl;
-    std::cout << "Enhanced restraints - Max coeff: " << std::fixed << std::setprecision(6) 
-              << *std::max_element(coeff_enhanced.begin(), coeff_enhanced.end()) 
+    std::cout << "Enhanced restraints - Max coeff: " << std::fixed << std::setprecision(6)
+              << *std::max_element(coeff_enhanced.begin(), coeff_enhanced.end())
               << ", Min coeff: " << *std::min_element(coeff_enhanced.begin(), coeff_enhanced.end()) << std::endl;
-    std::cout << "Hybrid approach     - Max coeff: " << std::fixed << std::setprecision(6) 
-              << *std::max_element(coeff_hybrid.begin(), coeff_hybrid.end()) 
+    std::cout << "Hybrid approach     - Max coeff: " << std::fixed << std::setprecision(6)
+              << *std::max_element(coeff_hybrid.begin(), coeff_hybrid.end())
               << ", Min coeff: " << *std::min_element(coeff_hybrid.begin(), coeff_hybrid.end()) << std::endl;
-    
+
     // Calculate RMS differences from unrestrained baseline
     double rms_unrestrained_vs_enhanced = 0.0;
     double rms_unrestrained_vs_hybrid = 0.0;
     double rms_enhanced_vs_hybrid = 0.0;
-    
+
     size_t n_coeff = std::min({coeff_unrestrained.size(), coeff_enhanced.size(), coeff_hybrid.size()});
-    
+
     for (size_t i = 0; i < n_coeff; i++) {
         double diff1 = coeff_unrestrained[i] - coeff_enhanced[i];
         double diff2 = coeff_unrestrained[i] - coeff_hybrid[i];
         double diff3 = coeff_enhanced[i] - coeff_hybrid[i];
-        
+
         rms_unrestrained_vs_enhanced += diff1 * diff1;
         rms_unrestrained_vs_hybrid += diff2 * diff2;
         rms_enhanced_vs_hybrid += diff3 * diff3;
     }
-    
+
     rms_unrestrained_vs_enhanced = std::sqrt(rms_unrestrained_vs_enhanced / n_coeff);
     rms_unrestrained_vs_hybrid = std::sqrt(rms_unrestrained_vs_hybrid / n_coeff);
     rms_enhanced_vs_hybrid = std::sqrt(rms_enhanced_vs_hybrid / n_coeff);
@@ -581,17 +583,17 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
     avg_unrestrained /= n_coeff;
     avg_enhanced /= n_coeff;
     avg_hybrid /= n_coeff;
-    
+
     std::cout << "\n=== Average Coefficient Magnitudes ===" << std::endl;
     std::cout << "Unrestrained: " << std::fixed << std::setprecision(6) << avg_unrestrained << std::endl;
     std::cout << "Enhanced:     " << std::fixed << std::setprecision(6) << avg_enhanced << std::endl;
     std::cout << "Hybrid:       " << std::fixed << std::setprecision(6) << avg_hybrid << std::endl;
-    
+
     std::cout << "=================================================\n" << std::endl;
 }
 
 // Basic unrestrained density fitting (original approach)
-vec density_fit_unrestrained(const WFN &wavy, const WFN& wavy_aux, const double max_mem, 
+vec density_fit_unrestrained(const WFN &wavy, const WFN& wavy_aux, const double max_mem,
                              const char metric, bool analyze_quality)
 {
     vec eri2c;

@@ -1,5 +1,6 @@
 ifeq ($(OS), Windows_NT)
   NAME := WINDOWS
+  SHELL := cmd.exe
 else
   UNAME_S := $(shell uname -s)
   ifeq ($(UNAME_S), Linux)
@@ -113,12 +114,62 @@ else
 	fi
 endif
 
-
 ifeq ($(NAME),WINDOWS)
-NoSpherA2: IntelMKL featomic
+
+MAMBA_PATH := $(MAKEFILE_DIR)/Lib/mambaenv
+occ:
+	@if not exist Lib\occ_install\bin\occ.exe ( \
+	echo Building OCC for $(NAME) && \
+	echo Starting build && \
+	echo "$(MAMBA_PATH)" && \
+	set "CMAKE_GENERATOR=Ninja" && \
+	cmake -S . -B occ_build .. -GNinja \
+	-DCMAKE_BUILD_TYPE="Release" \
+	-DCMAKE_C_COMPILER="clang-cl.exe" \
+	-DCMAKE_LINKER="lld-link" \
+	-DCMAKE_CXX_COMPILER="clang-cl.exe" \
+	-DCMAKE_EXE_LINKER_FLAGS="runtimeobject.lib" \
+	-DCMAKE_SHARED_LINKER_FLAGS="runtimeobject.lib" \
+	-DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" \
+	-DBUILD_SHARED_LIBS="OFF" \
+	-DMICROMAMBA_ENV_PATH="$(MAMBA_PATH)" \
+	-DTBB_BUILD_SHARED="OFF" && \
+	cd occ_build && \
+	cmake --build . --config Release --target occ -- -j 0 && \
+	cmake -P _deps/occ-build/cmake_install.cmake && \
+	) else ( \
+		echo occ already built; \
+	)
+
+occ_debug:
+	@if not exist Lib\occ_install\bin\occ.exe ( \
+	echo Building OCC for $(NAME) && \
+	(if exist occ_build rd /s /q occ_build) && \
+	mkdir occ_build && \
+	cd occ_build && \
+	echo Starting build && \
+	cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_C_COMPILER=clang-cl.exe \
+	-DCMAKE_LINKER=lld-link \
+	-DCMAKE_CXX_COMPILER=clang-cl.exe \
+	-DCMAKE_EXE_LINKER_FLAGS="runtimeobject.lib" \
+	-DCMAKE_SHARED_LINKER_FLAGS="runtimeobject.lib" \
+	-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded \
+	-DBUILD_SHARED_LIBS=OFF \
+	-DMICROMAMBA_ENV_PATH="Lib/mambaenv" \
+	-DTBB_BUILD_SHARED=OFF && \
+	cd occ_build && \
+	cmake --build . --config Release --target occ -- -j 0 && \
+	cmake -P _deps/occ-build/cmake_install.cmake && \
+	) else ( \
+		echo occ already built; \
+	)
+endif
+ifeq ($(NAME),WINDOWS)
+NoSpherA2: IntelMKL featomic occ
 	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe . && copy Windows\x64\Release\libiomp5md.dll
 
-NoSpherA2_Debug: IntelMKL featomic
+NoSpherA2_Debug: IntelMKL featomic occ_debug
 	@echo Building NoSpherA2_Debug for $(NAME)
 	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
 
@@ -173,4 +224,4 @@ tests: NoSpherA2
 	make -C tests all -k -B
 
 
-.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust
+.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust occ occ_debug
