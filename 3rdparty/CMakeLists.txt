@@ -62,13 +62,14 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     set(MKL_LINK "static")
     set(MKL_INTERFACE lp64)
     include(${CMAKE_SOURCE_DIR}/cmake/micromamba.cmake)
-    file(SHA1 ${CMAKE_SOURCE_DIR}/environment.yml _ENV_HASH)
+    file(SHA1  ${CMAKE_SOURCE_DIR}/environment.yml _ENV_HASH)
     set(_SAVED_ENV_HASH "")
     if (EXISTS ${CMAKE_BINARY_DIR}/env.sha1)
         file(READ ${CMAKE_BINARY_DIR}/env.sha1 _SAVED_ENV_HASH OPTIONAL)
     endif ()
     set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
-    if (NOT ${_SAVED_ENV_HASH} STREQUAL ${_ENV_HASH})
+    if (NOT "${_SAVED_ENV_HASH}" STREQUAL "${_ENV_HASH}")
+        set(ENV_PATH "${MICROMAMBA_ENV_PATH}")
         micromamba_environment(
             NAME mambaenv
             SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml

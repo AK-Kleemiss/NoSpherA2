@@ -126,7 +126,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
     unsigned int n_cart;
     unsigned int sum_ncart;
     int atom;
-    volatile int l;
+    int l;
     for (int i=0; i<shells.size(); i++)
     {
         const auto& shell = shells[i];
@@ -156,9 +156,9 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
     // This could also be calculated in the loop above and I tried it, but I noticed when looking at the data that
     // a vector was inserted into coefficients for each MO. I think that probably that would result in more work for the
     // CPU due to cache misses, but I didn't benchmark it.
-    volatile unsigned int chunk_size;
-    volatile unsigned int n_sph;
-    volatile unsigned int n_prim;
+    unsigned int chunk_size;
+    unsigned int n_sph;
+    unsigned int n_prim;
     double occ;
     double* coeffs_ptr;
     unsigned int basis_offset;
@@ -197,12 +197,9 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
             const VectorXd& contraction_coeffs = scalar*(2*exp_arr).pow(p)*CC;
             const auto& MOc = mo_go.C.block(basis_offset, n, n_sph, 1);
             Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);
-
-            MatrixXd temp = A * MOc;
             // Map<const VectorXd> contraction(contraction_coeffs.data(), n_prim);
             // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
-            MatrixXd temp2 = contraction_coeffs*temp.transpose();
-            dest_block = temp2;
+            dest_block = contraction_coeffs*(A * MOc).transpose();
 
             write_cursor += chunk_size;
             basis_offset += n_sph;

@@ -47,7 +47,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     endif ()
     set(MICROMAMBA_ENV_PATH ${CMAKE_BINARY_DIR}/environments/mambaenv CACHE STRING "Set the environment path.")
 endif()
-if (MSVC AND NOT (${OCC_BUILD_TYPE} STREQUAL ${CMAKE_BUILD_TYPE}))
+if (MSVC AND NOT ("${OCC_BUILD_TYPE}" STREQUAL "${CMAKE_BUILD_TYPE}"))
     message(FATAL_ERROR "Building OCC in a different mode than NoSpherA2 is not supported because MSVC containers have
             different sizes between Release and Debug builds.")
 endif ()

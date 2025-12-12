@@ -1,5 +1,6 @@
 ifeq ($(OS), Windows_NT)
   NAME := WINDOWS
+  SHELL := cmd.exe
 else
   UNAME_S := $(shell uname -s)
   ifeq ($(UNAME_S), Linux)
@@ -114,37 +115,61 @@ else
 endif
 
 ifeq ($(NAME),WINDOWS)
-OCC:
-	@if not exist $(MAKEFILE_DIR)\Lib\occ_install\lib\libocc_core.lib ( \
-		echo Building OCC for $(NAME) && \
-		New-Item -Path $(MAKEFILE_DIR)\occ -ItemType Directory -Force
-		cd $(MAKEFILE_DIR)/occ && \
-		(if exist build rd /s /q build) && \
-		mkdir build && \
-		cd build && \
-		echo Starting build && \
-		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" .. && \
-		cmake -G "Ninja" -DBLA_VENDOR="Intel10_64lp_seq"
-						 -DUSE_SYSTEM_TBB="OFF" -DBLAS_ROOT="Lib/mambaenv/lib/cmake/mkl"
-						 -DUSE_QCINT="OFF" -DENABLE_HOST_OPT="OFF" -DUSE_FORTRAN="OFF"
-						 -DBLA_STATIC="ON" -DWITH_PYTHON_BINDINGS="OFF" -DCMAKE_INSTALL_PREFIX="../Lib/occ_install"
-						 -DGG_NO_PRAGMA="ON" -DCMAKE_CXX_FLAGS="-D__TBB_DYNAMIC_LOAD_ENABLED=0"
-						 -DCMAKE_C_COMPILER=clang-cl.exe
-						 -DCMAKE_LINKER=lld-link
-						 -DCMAKE_CXX_COMPILER=clang-cl.exe .. && \
-		ninja -j0 && \
-		ninja install \
+
+MAMBA_PATH := $(MAKEFILE_DIR)/Lib/mambaenv
+occ:
+	@if not exist Lib\occ_install\bin\occ.exe ( \
+	echo Building OCC for $(NAME) && \
+	echo Starting build && \
+	echo "$(MAMBA_PATH)" && \
+	set "CMAKE_GENERATOR=Ninja" && \
+	cmake -S . -B occ_build .. -GNinja \
+	-DCMAKE_BUILD_TYPE="Release" \
+	-DCMAKE_C_COMPILER="clang-cl.exe" \
+	-DCMAKE_LINKER="lld-link" \
+	-DCMAKE_CXX_COMPILER="clang-cl.exe" \
+	-DCMAKE_EXE_LINKER_FLAGS="runtimeobject.lib" \
+	-DCMAKE_SHARED_LINKER_FLAGS="runtimeobject.lib" \
+	-DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" \
+	-DBUILD_SHARED_LIBS="OFF" \
+	-DMICROMAMBA_ENV_PATH="$(MAMBA_PATH)" \
+	-DTBB_BUILD_SHARED="OFF" && \
+	cd occ_build && \
+	cmake --build . --config Release --target occ -- -j 0 && \
+	cmake -P _deps/occ-build/cmake_install.cmake && \
 	) else ( \
-		echo occ already built \
+		echo occ already built; \
 	)
-	  fi
-	fi
+
+occ_debug:
+	@if not exist Lib\occ_install\bin\occ.exe ( \
+	echo Building OCC for $(NAME) && \
+	(if exist occ_build rd /s /q occ_build) && \
+	mkdir occ_build && \
+	cd occ_build && \
+	echo Starting build && \
+	cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_C_COMPILER=clang-cl.exe \
+	-DCMAKE_LINKER=lld-link \
+	-DCMAKE_CXX_COMPILER=clang-cl.exe \
+	-DCMAKE_EXE_LINKER_FLAGS="runtimeobject.lib" \
+	-DCMAKE_SHARED_LINKER_FLAGS="runtimeobject.lib" \
+	-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded \
+	-DBUILD_SHARED_LIBS=OFF \
+	-DMICROMAMBA_ENV_PATH="Lib/mambaenv" \
+	-DTBB_BUILD_SHARED=OFF && \
+	cd occ_build && \
+	cmake --build . --config Release --target occ -- -j 0 && \
+	cmake -P _deps/occ-build/cmake_install.cmake && \
+	) else ( \
+		echo occ already built; \
+	)
 endif
 ifeq ($(NAME),WINDOWS)
-NoSpherA2: IntelMKL featomic
+NoSpherA2: IntelMKL featomic occ
 	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe . && copy Windows\x64\Release\libiomp5md.dll
 
-NoSpherA2_Debug: IntelMKL featomic
+NoSpherA2_Debug: IntelMKL featomic occ_debug
 	@echo Building NoSpherA2_Debug for $(NAME)
 	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
 
@@ -199,4 +224,4 @@ tests: NoSpherA2
 	make -C tests all -k -B
 
 
-.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust
+.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust occ occ_debug
