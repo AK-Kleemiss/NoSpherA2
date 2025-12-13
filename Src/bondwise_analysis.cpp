@@ -505,7 +505,7 @@ vec change_basis(const vec& in, const vec& transformation, int size) {
 
     //Then we do res = temp * t
     cblas_dgemm(CblasRowMajor,
-        CblasTrans,
+        CblasNoTrans,
         CblasNoTrans,
         size, size, size,
         1.0,

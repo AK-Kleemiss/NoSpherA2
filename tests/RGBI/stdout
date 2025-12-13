@@ -19,7 +19,7 @@ _______________________________________________________________
 _______________________________________________________________
 
 
-Timer started at 13/12/2025 14:08:14.
+Timer started at 13/12/2025 21:20:58.
 
 
 
@@ -126,17 +126,17 @@ Gaussian basis sets
 Basis name ................ def2-SVP
 
 No. of basis sets ......... 2
-No. of shells ............. 12
-No. of shell pairs ........ 78
-No. of basis functions .... 25
-No. of primitives ......... 39
+No. of shells ............. 11
+No. of shell pairs ........ 66
+No. of basis functions .... 19
+No. of primitives ......... 33
 
 
 Basis set O:def2-SVP
 
-No. of shells ............. 6
-No. of basis functions .... 15
-No. of primitives ......... 25
+No. of shells ............. 5
+No. of basis functions .... 9
+No. of primitives ......... 19
 _________________________________
 
  -L-   Fn   Exponent  Contraction
@@ -154,7 +154,6 @@ _________________________________
               3.8636       0.3333
               1.0481       0.7415
   p     7     0.2764       1.0000
-  d    10     1.2000       1.0000
 _________________________________
 
 
@@ -187,7 +186,7 @@ Basis set linear dependence analysis
   linear_dependence_tolerance are projected out of the AO basis
   leading to, in this case, some exact-zero MO eigenvalues.
 
-Min. overlap matrix eigenvalue .... 0.3897E-01
+Min. overlap matrix eigenvalue .... 0.4814E-01
 Linear dependence tolerance ....... 0.1000E-04
 Linear dependence shift ........... 0.1000E+13
 No. of small eigenvalues .......... 0
@@ -199,9 +198,9 @@ _________________________
       max. value
 _________________________
 
-  1      -1.0000        3
-  2       0.0000       13
-  3       1.0000        9
+  1      -1.0000        1
+  2       0.0000       12
+  3       1.0000        6
 _________________________
 
 
@@ -231,7 +230,7 @@ Linear dependence options:
 
 Linear dependence tolerance ....... 0.1000E-04
 Linear dependence shift ........... 0.1000E+13
-Min. overlap matrix eigenvalue .... 0.3897E-01
+Min. overlap matrix eigenvalue .... 0.4814E-01
 No. of small S eigenvalues ........ 0
 No. of neg.  S eigenvalues ........ 0
 
@@ -257,14 +256,14 @@ Replace the vector which is ....... worst
 Initial guess energies
 ======================
 
-Total energy (E_e+V_NN)   E .......  -75.9215
-Total electronic energy   E_e .....  -84.8020
+Total energy (E_e+V_NN)   E .......  -75.9122
+Total electronic energy   E_e .....  -84.7927
 Nuclear repulsion energy  V_NN ....    8.8805
-Electron repulsion energy V_ee ....   38.6054
-Nuclear attraction energy V_eN .... -199.6612
-Total potential energy    V ....... -152.1753
-Kinetic energy            T .......   76.2538
-Virial ratio             -V/T .....    1.9956
+Electron repulsion energy V_ee ....   38.6100
+Nuclear attraction energy V_eN .... -199.9117
+Total potential energy    V ....... -152.4212
+Kinetic energy            T .......   76.5090
+Virial ratio             -V/T .....    1.9922
 
 ==============
 SCF iterations
@@ -275,17 +274,16 @@ ____________________________________
             E/au         E  Gradient
 ____________________________________
 
-     0  -75.9215  -75.9215    0.4918   *Damping on
+     0  -75.9122  -75.9122    0.4492   *Damping on
                                        *Levelshift on
-     1  -75.9539   -0.0325    0.1606
-     2  -75.9575   -0.0035    0.0620   *DIIS starts saving now
-     3  -75.9580   -0.0005    0.0230   *Damping was off
+     1  -75.9446   -0.0324    0.1546
+     2  -75.9482   -0.0036    0.0590   *DIIS starts saving now
+     3  -75.9487   -0.0005    0.0210   *Damping was off
                                        *Levelshift was off
                                        *DIIS extrapolates now
-     4  -75.9581   -0.0001    0.0016
-     5  -75.9581    0.0000    0.0003   *Difference has converged
-     6  -75.9581    0.0000    0.0000
-     7  -75.9581    0.0000    0.0000
+     4  -75.9488   -0.0001    0.0016
+     5  -75.9488    0.0000    0.0003   *Difference has converged
+     6  -75.9488    0.0000    0.0000
 ____________________________________
 
 * * * SCF has converged * * *
@@ -295,11 +293,11 @@ ____________________________________
 SCF results
 ===========
 
-Total energy (E_e+V_NN)   E .......  -75.9581
-Total electronic energy   E_e .....  -84.8386
+Total energy (E_e+V_NN)   E .......  -75.9488
+Total electronic energy   E_e .....  -84.8293
 Nuclear repulsion energy  V_NN ....    8.8805
-Electron repulsion energy V_ee ....   37.6195
-Nuclear attraction energy V_eN .... -197.8767
-Total potential energy    V ....... -151.3767
-Kinetic energy            T .......   75.4186
-Virial ratio             -V/T .....    2.0072
+Electron repulsion energy V_ee ....   37.6150
+Nuclear attraction energy V_eN .... -198.1001
+Total potential energy    V ....... -151.6047
+Kinetic energy            T .......   75.6558
+Virial ratio             -V/T .....    2.0039
