@@ -2569,13 +2569,11 @@ __________________________________
                     {
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            double temp_coef = 0;
                             for (int cart = 0; cart < 3; cart++)
                             {
-                                temp_coef = p_temp[cart][s];
-                                if (abs(temp_coef) < 1E-10)
-                                    temp_coef = 0;
-                                op == 0 ? push_back_MO_coef(MO_run, temp_coef) : push_back_MO_coef(MO_run + expected_coefs, temp_coef);
+                                if (abs(p_temp[cart][s]) < 1E-10)
+                                    p_temp[cart][s] = 0;
+                                op == 0 ? push_back_MO_coef(MO_run, p_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, p_temp[cart][s]);
                                 if (MO_run == 0 && op == 0)
                                 {
                                     push_back_exponent(prims[basis_run + s].get_exp());

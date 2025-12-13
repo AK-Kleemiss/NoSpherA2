@@ -81,7 +81,7 @@ void Int_Params::collect_basis_data()
             exponents.push_back(basis[shell].get_exponent());
         }
         // Normalize the GTOs depending on the context
-        if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx)
+        if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto)
         {
             for (int i = 0; i < coefficients.size(); i++)
             {
@@ -146,8 +146,6 @@ void Int_Params::collect_basis_data()
                 shelltype.push_back(l);
                 pos_in_new_coeffs += curr_funcs;
                 n_funcs += curr_funcs;
-
-
             }
         }
         //Populate basis_sets dictionary  (Element:[coefficients, exponents, starting point in _env vector, shellcount])
