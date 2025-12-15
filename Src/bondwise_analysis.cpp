@@ -519,6 +519,21 @@ vec change_basis(const vec& in, const vec& transformation, int size) {
     return result;
 }
 
+bool isSymmetricViaEigenvalues(const vec& A, int n, double tol = 1e-12) {
+    vec A_copy = A;  // dgeev destroys input
+    vec wr(n), wi(n);
+
+    LAPACKE_dgeev(LAPACK_ROW_MAJOR, 'N', 'N', n, A_copy.data(), n,
+        wr.data(), wi.data(), nullptr, n, nullptr, n);
+
+    for (int i = 0; i < n; ++i) {
+        if (std::abs(wi[i]) > tol) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /**
  * Calculates Atomic Natural Orbitals for a specific atom.
  *
@@ -542,8 +557,8 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
 
     // 1. Memory Allocation for Submatrices
     // Using flat std::vectors to ensure contiguous memory for MKL
-    vec D_sub(n * n); // called P in tonto
-    vec S_sub(n * n); // called S in tonto
+    vec D_sub(n * n, 0.0); // called P in tonto
+    vec S_sub(n * n, 0.0); // called S in tonto
     vec V(n * n);
     vec Temp(n * n, 0.0);  // To store S^0.5
     vec Temp2(n * n, 0.0);  // To store S^-0.5
@@ -552,19 +567,35 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
 
     // 2. Gather: Copy elements from full matrices to submatrices
     // We assume Row-Major storage for C++ convenience
+    double d = 0;
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
             const int global_i = atom_indices[i];
             const int global_j = atom_indices[j];
 
             // Access full matrix: row * stride + col
-            D_sub[i * n + j] = D_full(global_i, global_j);
-            S_sub[i * n + j] = S_full(global_i, global_j);
+            //d = D_full(global_i, global_j);
+            //if (abs(d) > 1E-5)
+                D_sub[i * n + j] = D_full(global_i, global_j);
+            //d = S_full(global_i, global_j);
+            //if (abs(d) > 1E-5)
+                S_sub[i * n + j] = S_full(global_i, global_j);
         }
     }
+#ifdef NSA2DEBUG
+    err_checkf(isSymmetricViaEigenvalues(D_sub, n), "Denisty matrix not symmetric!", std::cout);
+    err_checkf(isSymmetricViaEigenvalues(S_sub, n), "Overlap matrix not symmetric!", std::cout);
+#endif
+
     V = S_sub;
     // make V = Sqrt(S)
-    err_checkf(LAPACKE_dsyevd(LAPACK_ROW_MAJOR, 'V', 'U', n, V.data(), n, W.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+    err_checkf(LAPACKE_dsyev(
+        LAPACK_ROW_MAJOR, 
+        'V', 'U', 
+        n, 
+        V.data(), 
+        n, 
+        W.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
 
     for (int i = 0; i < n; i++) {
         if (abs(W[i]) < 1E-20)
@@ -578,10 +609,13 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
             for (int k = 0; k < n; k++)
                 Temp[i * n + j] += V[i * n + k] * W[k] * V[j * n + k];
 
-    auto X = change_basis(D_sub, Temp, n);
+    const vec X = change_basis(D_sub, Temp, n);
     vec occu(n, 0);
     vec P = X;
-    err_checkf(LAPACKE_dsyevd(LAPACK_ROW_MAJOR, 'V', 'U', n, P.data(), n, occu.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+#ifdef NSA2DEBUG
+    err_checkf(isSymmetricViaEigenvalues(P, n), "Transformed matrix not symmetric!", std::cout);
+#endif
+    err_checkf(LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', n, P.data(), n, occu.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
 
     for (int i = 0; i < n; i++) {
         if (abs(W[i]) < 1E-20)
@@ -627,15 +661,6 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
     for (int i = 0; i < n; ++i) {
         int original_idx = idx[i];
         sorted_evals[i] = result.eigenvalues[original_idx];
-
-        // Copy the eigenvector (column in ColMajor, row in RowMajor)
-        // LAPACK_ROW_MAJOR with 'V' stores eigenvectors in ROWS or COLS?
-        // Standard LAPACK stores eigenvectors in COLUMNS of Z.
-        // LAPACKE Row Major interface: Z[i*ldz + j] contains the j-th component of i-th eigenvector?
-        // NO: LAPACKE_dsyevd in Row Major stores the i-th eigenvector in the i-th ROW (if we view it as Z^T) or COLUMN?
-        // Verification: In Row Major layout, eigenvectors are stored as columns.
-        // Z(i, j) is the i-th component of the j-th eigenvector. 
-        // So we copy column 'original_idx' to column 'i'.
 
         for (int row = 0; row < n; ++row) {
             sorted_evecs[row * n + i] = result.eigenvectors[row * n + original_idx];
