@@ -90,7 +90,7 @@ jobs:
       run: ${{ matrix.build-script }}
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: ${{ matrix.artifact-name }}
         path: ${{ matrix.artifact-path }}
@@ -155,7 +155,7 @@ jobs:
         chmod +x ./universal/NoSpherA2_Mac
 
     - name: Upload Universal Binary
-      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: executable_MacOS_Universal
         path: ./universal/NoSpherA2_Mac
@@ -189,7 +189,7 @@ jobs:
         make all -k
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: differences in tests
         path: tests/*.diff
@@ -222,7 +222,7 @@ jobs:
         name: executable_Windows
 
     - name: Archive all executables
-      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: executables
         path: |
