@@ -7,6 +7,14 @@
 #include "nos_math.h"
 #include "integration_params.h"
 
+// Structure to hold the result
+struct NAOResult {
+    vec eigenvalues;  // Occupancies
+    vec eigenvectors; // Coefficients
+    int atom_index = -1;
+    ivec matrix_elements;
+};
+
 int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector, double* incr, std::string& outname, bool rho, bool rdg, bool eli, bool lap) {
     options opt;
 
@@ -491,31 +499,23 @@ vec change_basis(const vec& in, const vec& transformation, int size) {
     vec temp(size * size);
     // first we do temp = t^T * i
     cblas_dgemm(CblasRowMajor,
-        CblasTrans,
-        CblasNoTrans,
+        CblasTrans, CblasNoTrans,
         size, size, size,
         1.0,
-        transformation.data(),
-        size,
-        in.data(),
-        size,
+        transformation.data(), size,
+        in.data(), size,
         0.0,
-        temp.data(),
-        size);
+        temp.data(), size);
 
     //Then we do res = temp * t
     cblas_dgemm(CblasRowMajor,
-        CblasNoTrans,
-        CblasNoTrans,
+        CblasNoTrans, CblasNoTrans,
         size, size, size,
         1.0,
-        temp.data(),
-        size,
-        transformation.data(),
-        size,
+        temp.data(), size,
+        transformation.data(), size,
         0.0,
-        result.data(),
-        size);
+        result.data(), size);
     return result;
 }
 
@@ -552,49 +552,54 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
     err_checkf(D_full.extent(0) == S_full.extent(0), "Density and Overlap matrices must be of the same size.", std::cout);
 
     const int n = static_cast<int>(atom_indices.size());
-    const int full_stride = static_cast<int>(D_full.extent(0));
-
 
     // 1. Memory Allocation for Submatrices
     // Using flat std::vectors to ensure contiguous memory for MKL
     vec D_sub(n * n, 0.0); // called P in tonto
     vec S_sub(n * n, 0.0); // called S in tonto
-    vec V(n * n);
+    vec V(n * n);          // Workhorse
     vec Temp(n * n, 0.0);  // To store S^0.5
-    vec Temp2(n * n, 0.0);  // To store S^-0.5
-    vec Rho(n * n);   // To store S * D * S (The target density)
+    vec Temp2(n * n, 0.0); // To store S^-0.5
+    vec Rho(n * n);   // To store  target density
     vec W(n);         // Eigenvalues
 
     // 2. Gather: Copy elements from full matrices to submatrices
-    // We assume Row-Major storage for C++ convenience
-    double d = 0;
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
             const int global_i = atom_indices[i];
             const int global_j = atom_indices[j];
-
-            // Access full matrix: row * stride + col
-            //d = D_full(global_i, global_j);
-            //if (abs(d) > 1E-5)
-                D_sub[i * n + j] = D_full(global_i, global_j);
-            //d = S_full(global_i, global_j);
-            //if (abs(d) > 1E-5)
-                S_sub[i * n + j] = S_full(global_i, global_j);
+            D_sub[i * n + j] = D_full(global_i, global_j);
+            S_sub[i * n + j] = S_full(global_i, global_j);
         }
     }
 #ifdef NSA2DEBUG
     err_checkf(isSymmetricViaEigenvalues(D_sub, n), "Denisty matrix not symmetric!", std::cout);
     err_checkf(isSymmetricViaEigenvalues(S_sub, n), "Overlap matrix not symmetric!", std::cout);
+    std::cout << "Overlap submatrix S:\n";
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << S_sub[i * n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "Density submatrix D:\n";
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << D_sub[i * n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+
 #endif
 
     V = S_sub;
     // make V = Sqrt(S)
     err_checkf(LAPACKE_dsyev(
-        LAPACK_ROW_MAJOR, 
-        'V', 'U', 
-        n, 
-        V.data(), 
-        n, 
+        LAPACK_ROW_MAJOR,
+        'V', 'U',
+        n,
+        V.data(),
+        n,
         W.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
 
     for (int i = 0; i < n; i++) {
@@ -609,13 +614,45 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
             for (int k = 0; k < n; k++)
                 Temp[i * n + j] += V[i * n + k] * W[k] * V[j * n + k];
 
+#ifdef NSA2DEBUG
+    std::cout << "projection matrix V:\n";
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Temp[i * n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+#endif
+
     const vec X = change_basis(D_sub, Temp, n);
+#ifdef NSA2DEBUG
+    std::cout << "projected density X:\n";
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << X[i * n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+#endif
     vec occu(n, 0);
     vec P = X;
 #ifdef NSA2DEBUG
     err_checkf(isSymmetricViaEigenvalues(P, n), "Transformed matrix not symmetric!", std::cout);
 #endif
     err_checkf(LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', n, P.data(), n, occu.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+
+#ifdef NSA2DEBUG
+    std::cout << "Eigenvalues of projected density P:\n";
+    for (int i = 0; i < n; ++i) {
+        std::cout << std::setw(14) << std::setprecision(8) << std::fixed << occu[i] << " ";
+    }
+    std::cout << std::endl << "Projected density P:\n";
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << P[i * n + j] << " ";
+        std::cout << std::endl;
+    }
+#endif
 
     for (int i = 0; i < n; i++) {
         if (abs(W[i]) < 1E-20)
@@ -629,22 +666,37 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
             for (int k = 0; k < n; k++)
                 Temp2[i * n + j] += V[i * n + k] * W[k] * V[j * n + k];
 
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "Back projection S^-0.5:\n";
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Temp2[i * n + j] << " ";
+        std::cout << std::endl;
+    }
+#endif
+
     cblas_dgemm(CblasRowMajor,
-        CblasNoTrans,
-        CblasNoTrans,
+        CblasNoTrans, CblasNoTrans,
         n, n, n,
         1.0,
-        Temp2.data(),
-        n,
-        P.data(),
-        n,
+        Temp2.data(), n,
+        P.data(), n,
         0.0,
-        Rho.data(),
-        n);
+        Rho.data(), n);
+
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "resulting NAO:\n";
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Rho[i * n + j] << " ";
+        std::cout << std::endl;
+    }
+#endif
 
     NAOResult result;
     result.eigenvalues = W;
     result.eigenvectors = Rho; // Rho now contains eigenvectors
+    result.matrix_elements = atom_indices;
 
     // Create an index vector to sort descending
     ivec idx(n);
@@ -655,15 +707,18 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
         });
 
     // Reorder based on sorted indices
-    std::vector<double> sorted_evals(n);
-    std::vector<double> sorted_evecs(n * n);
+    vec sorted_evals;
+    vec sorted_evecs;
+    sorted_evecs.reserve(n * n);
 
     for (int i = 0; i < n; ++i) {
         int original_idx = idx[i];
-        sorted_evals[i] = result.eigenvalues[original_idx];
+        if (result.eigenvalues[original_idx] < 0.075)
+            continue;
+        sorted_evals.emplace_back(result.eigenvalues[original_idx]);
 
         for (int row = 0; row < n; ++row) {
-            sorted_evecs[row * n + i] = result.eigenvectors[row * n + original_idx];
+            sorted_evecs.emplace_back(result.eigenvectors[row * n + original_idx]);
         }
     }
 
@@ -693,7 +748,8 @@ std::vector<double> orthogonalizePNAOs(const vec& C_PNAO,
 
     // Step A: Temp = S_AO * C_PNAO
     // S_AO is symmetric.
-    cblas_dsymm(CblasRowMajor, CblasLeft, CblasUpper,
+    cblas_dsymm(CblasRowMajor,
+        CblasLeft, CblasUpper,
         n, n,
         1.0, S_AO.data(), n,
         C_PNAO.data(), n,
@@ -702,7 +758,8 @@ std::vector<double> orthogonalizePNAOs(const vec& C_PNAO,
     // Step B: S_PNAO = C_PNAO^T * Temp
     // C_PNAO is not symmetric, so we use dgemm.
     // Transpose the first matrix (C_PNAO^T).
-    cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+    cblas_dgemm(CblasRowMajor,
+        CblasTrans, CblasNoTrans,
         n, n, n,
         1.0, C_PNAO.data(), n,
         Temp.data(), n,
@@ -741,13 +798,153 @@ std::vector<double> orthogonalizePNAOs(const vec& C_PNAO,
     // C_NAO = C_PNAO * S^(-1/2)
     // C_PNAO (Columns are PNAOs) * S_inv_sqrt (transformation matrix)
 
-    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+    cblas_dgemm(CblasRowMajor,
+        CblasNoTrans, CblasNoTrans,
         n, n, n,
         1.0, C_PNAO.data(), n,
         S_PNAO.data(), n, // This is now S^-1/2
-        0.0, C_NAO.data(), n);
+        0.0,
+        C_NAO.data(), n);
 
     return C_NAO;
+}
+
+void LAPACKE_pseudo_inverse_of(vec& A, int m, int n, double cutoff = 1E-5) {
+    int k = std::min(m, n);
+
+    // 1. Allocate memory for SVD results
+    vec S(k);                 // Singular values
+    vec U(m * k);             // Left singular vectors (m x k)
+    vec Vt(k * n);            // Right singular vectors transposed (k x n)
+    vec superb(k - 1);        // Workspace for dgesvd
+
+    // Make a copy of A because dgesvd destroys the input matrix
+    vec A_copy = A;
+
+    // 2. Compute SVD: A = U * S * Vt
+    // use 'S' for jobu/jobvt to compute the "thin" SVD (only the first k columns/rows)
+    lapack_int info = LAPACKE_dgesvd(
+        LAPACK_ROW_MAJOR,
+        'S', 'S',
+        m, n,
+        A_copy.data(), n,
+        S.data(),
+        U.data(), k,
+        Vt.data(), n,
+        superb.data()
+    );
+
+    err_checkf(info == 0, "LAPACKE_dgesvd failed with info unequal 0!", std::cout);
+
+    // 3. Invert Singular Values (Sigma^+)
+    // Filter out small singular values
+    for (int i = 0; i < k; ++i) {
+        if (S[i] > cutoff) {
+            S[i] = 1.0 / S[i];
+        }
+        else {
+            S[i] = 0.0;
+        }
+    }
+
+    // 4. Compute A^+ = V * S^+ * U^T
+    vec W(k * m);
+    for (int i = 0; i < k; ++i) {
+        for (int j = 0; j < m; ++j) {
+            W[i * m + j] = S[i] * U[j * k + i]; // U is row-major (m x k)
+        }
+    }
+
+    // Resize A to hold the result (n x m)
+    if (A.size() != n * m) {
+        A.resize(n * m);
+    }
+
+    // Perform Matrix Multiplication: C = alpha * A * B + beta * C
+
+    cblas_dgemm(
+        CblasRowMajor,
+        CblasTrans, CblasNoTrans,
+        n, m, k,
+        1.0,
+        Vt.data(), n,  // A matrix (Vt), lda=n
+        W.data(), m,   // B matrix (W),  ldb=m
+        0.0,
+        A.data(), m    // C matrix (Result), ldc=m
+    );
+}
+
+vec projection_matrix(const vec& NAOs, const vec& overlap, const int& size_overlap, const int& size_NAOs) {
+    //TODO: Make subspace overlap amtrix
+    vec S_Sub;
+
+    //TODO: Check sizes of all matrizes and change values to lapacke calls and prints
+
+    auto X = change_basis(overlap, NAOs, size_overlap);
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "new Basis:\n";
+    for (int i = 0; i < size_overlap; i++) {
+        for (int j = 0; j < size_NAOs; j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << X[i * size_overlap + j] << " ";
+        std::cout << std::endl;
+    }
+#endif
+
+    auto Y = X;
+    LAPACKE_pseudo_inverse_of(Y, size_NAOs, size_NAOs);
+
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "Back projection S^-0.5:\n";
+    for (int i = 0; i < size_overlap; i++) {
+        for (int j = 0; j < size_NAOs; j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Y[i * size_overlap + j] << " ";
+        std::cout << std::endl;
+    }
+#endif
+
+    vec res(size_NAOs * size_overlap);
+
+    cblas_dgemm(CblasRowMajor,
+        CblasNoTrans, CblasNoTrans,
+        size_overlap, size_overlap, size_overlap,
+        1.0,
+        NAOs.data(), size_NAOs,
+        Y.data(), size_NAOs,
+        0.0,
+        X.data(), size_NAOs);
+
+    cblas_dgemm(CblasRowMajor,
+        CblasNoTrans, CblasTrans,
+        size_overlap, size_overlap, size_overlap,
+        1.0,
+        X.data(), size_NAOs,
+        NAOs.data(), size_NAOs,
+        0.0,
+        res.data(), //This is P in the code
+        size_NAOs);
+
+    return res;
+}
+
+double trace_product(const vec& a, const vec& b, int size1, int size2) {
+    double res = 0;
+    for (int i = 0; i < size1; ++i) {
+        for (int j = 0; j < size2; ++j) {
+            res += a[i * size2 + j] * b[j * size1 + i];
+        }
+    }
+    return res;
+}
+
+
+double expectation(const vec& dens_mat, const vec& S_sub, const vec& rho, int size) {
+    auto W = change_basis(dens_mat, S_sub, size);
+    return trace_product(W, rho, static_cast<int>(std::sqrt(dens_mat.size())), static_cast<int>(std::sqrt(S_sub.size())));
+}
+
+double Roby_population_analysis(const vec& NAOs, const vec& density_matrix, const vec& overlap_mat, int size) {
+    auto P = projection_matrix(NAOs, density_matrix, static_cast<int>(std::sqrt(density_matrix.size())), static_cast<int>(std::sqrt(NAOs.size())));
+    return expectation(P, overlap_mat, density_matrix, size);
 }
 
 std::vector<NAOResult> computeAllAtomicNAOs(WFN& wavy) {
@@ -768,10 +965,9 @@ std::vector<NAOResult> computeAllAtomicNAOs(WFN& wavy) {
     const dMatrix2 overlap_full = reshape<dMatrix2>(S_full, shape);
 
     int last_index = 0;
-
+    ivec2 indices(wavy.get_ncen());
     for (auto& a : ats) {
-        ivec indices;
-        indices.reserve(DM.extent(0) / N_atoms); // Rough estimate
+        indices[a.get_nr() - 1].reserve(DM.extent(0) / N_atoms); // Rough estimate
         int current_shell = -1;
         int nr_indices = 0;
         std::vector<basis_set_entry> basis_set = a.get_basis_set();
@@ -783,14 +979,28 @@ std::vector<NAOResult> computeAllAtomicNAOs(WFN& wavy) {
                 else
                     bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 6 : nr_indices = 10));
                 for (int i = 0; i < nr_indices; i++) {
-                    indices.push_back(last_index);
+                    indices[a.get_nr() - 1].push_back(last_index);
                     last_index++;
                 }
             }
         }
-        auto pNAO = calculateAtomicNAO(DM, overlap_full, indices);
-        pNAO.eigenvectors = orthogonalizePNAOs(pNAO.eigenvectors, S_full, static_cast<int>(indices.size()));
+        NAOResult pNAO = calculateAtomicNAO(DM, overlap_full, indices[a.get_nr() - 1]);
+        pNAO.atom_index = a.get_nr() - 1;
+        //pNAO.eigenvectors = orthogonalizePNAOs(pNAO.eigenvectors, S_full, static_cast<int>(indices[a.get_nr()].size()));
         all_results.emplace_back(pNAO);
     }
     return all_results;
+}
+
+void RGBI_Analysis(WFN& wavy) {
+    auto all_NAOs = computeAllAtomicNAOs(wavy);
+    for (size_t atom_idx = 0; atom_idx < all_NAOs.size(); atom_idx++) {
+        const auto& nao_result = all_NAOs[atom_idx];
+        std::cout << "Atom " << atom_idx + 1 << " NAO Occupancies:\n";
+        for (size_t i = 0; i < nao_result.eigenvalues.size(); i++) {
+            std::cout << "  NAO " << i + 1 << ": " << std::setprecision(6) << nao_result.eigenvalues[i] << "\n";
+        }
+        std::cout << std::endl;
+    }
+
 }

@@ -14,14 +14,8 @@ struct bond {
     bool esp;
 };
 
-// Structure to hold the result
-struct NAOResult {
-    vec eigenvalues;  // Occupancies
-    vec eigenvectors; // Coefficients (Row-major or Col-major depending on choice)
-};
-
 bond do_bonds(WFN& wavy, int mode_general, int mode_sel, bool mode_leng, bool mode_res, double res[], bool cub, double boxsize[], int atom1, int atom2, int atom3, const bool& debug, const bool& bohr, int runnumber, bool rho, bool rdg, bool eli, bool lap);
 int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, const bool& bohr);
-std::vector<NAOResult> computeAllAtomicNAOs(WFN& wavy);
+void RGBI_Analysis(WFN& wavy);
 
 #include "wfn_class.h"
