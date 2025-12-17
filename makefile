@@ -131,15 +131,17 @@ $(OCC_EXE):
 	-DCMAKE_C_COMPILER="clang-cl.exe" \
 	-DCMAKE_LINKER="lld-link" \
 	-DCMAKE_CXX_COMPILER="clang-cl.exe" \
+	-DCMAKE_CXX_FLAGS="/utf-8" \
 	-DCMAKE_EXE_LINKER_FLAGS="runtimeobject.lib" \
 	-DCMAKE_SHARED_LINKER_FLAGS="runtimeobject.lib" \
 	-DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" \
 	-DBUILD_SHARED_LIBS="OFF" \
+	-DCMAKE_INSTALL_PREFIX="Lib" \
 	-DMICROMAMBA_ENV_PATH="$(MAMBA_PATH)" \
 	-DTBB_BUILD_SHARED="OFF" && \
 	cd occ_build && \
-	cmake --build . --config Release --target occ -- -j 0 && \
-	cmake -P _deps/occ-build/cmake_install.cmake
+	cmake --build . --config Release --target occ -- -j10 && \
+	cmake -DCMAKE_INSTALL_PREFIX="..\Lib\occ_install" -P _deps/occ-build/cmake_install.cmake
 
 
 occ_debug:

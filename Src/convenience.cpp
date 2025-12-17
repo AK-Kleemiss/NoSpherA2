@@ -15,6 +15,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <commdlg.h>
+#include <cderr.h>
 #endif
 
 std::string help_message =
