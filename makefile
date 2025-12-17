@@ -117,11 +117,14 @@ endif
 ifeq ($(NAME),WINDOWS)
 
 MAMBA_PATH := $(MAKEFILE_DIR)/Lib/mambaenv
-occ:
-	@if not exist Lib\occ_install\bin\occ.exe ( \
-	echo Building OCC for $(NAME) && \
-	echo Starting build && \
-	echo "$(MAMBA_PATH)" && \
+OCC_EXE := Lib\occ_install\bin\occ.exe
+
+occ: $(OCC_EXE)
+
+$(OCC_EXE):
+	@echo Building OCC for $(NAME) 
+	@echo Starting build
+	@echo "$(MAMBA_PATH)"
 	set "CMAKE_GENERATOR=Ninja" && \
 	cmake -S . -B occ_build .. -GNinja \
 	-DCMAKE_BUILD_TYPE="Release" \
@@ -136,10 +139,8 @@ occ:
 	-DTBB_BUILD_SHARED="OFF" && \
 	cd occ_build && \
 	cmake --build . --config Release --target occ -- -j 0 && \
-	cmake -P _deps/occ-build/cmake_install.cmake && \
-	) else ( \
-		echo occ already built; \
-	)
+	cmake -P _deps/occ-build/cmake_install.cmake
+
 
 occ_debug:
 	@if not exist Lib\occ_install\bin\occ.exe ( \

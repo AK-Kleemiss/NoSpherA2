@@ -96,7 +96,7 @@ function(micromamba_environment)
     endif ()
 
     # Define the environment path based on the environment name
-    set(ENV_PATH "${CMAKE_BINARY_DIR}/environments/${ENV_NAME}")
+    set(ENV_PATH "${CMAKE_BINARY_DIR}/environments/${ENV_NAME}" CACHE STRING "Env path")
 
     set(VERBOSE_FLAG "--quiet")
     if (PARSED_ARGS_VERBOSE EQUAL 0)
