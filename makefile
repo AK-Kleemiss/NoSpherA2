@@ -165,7 +165,7 @@ $(OCC_EXE): micromamba
 	-DBUILD_SHARED_LIBS="OFF" \
 	-DWITH_PYTHON_BINDINGS="OFF" \
 	-DCMAKE_INSTALL_PREFIX="Lib\occ_install" && \
-	cmake --build occ_build --config Release --target occ -- -j10 && \
+	cmake --build occ_build --config Release --target occ -- -j 0 && \
 	cmake --install occ_build
 
 
