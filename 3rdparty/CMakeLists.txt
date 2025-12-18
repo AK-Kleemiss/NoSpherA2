@@ -126,7 +126,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     )
 else ()
     set(LINUX_WINDOWS_COMMON_FLAGS
-        "BLA_VENDOR Intel10_64lp_seq"
+        "BLA_VENDOR Intel10_64lp"
         "USE_SYSTEM_TBB OFF"
         "TBB_PREFIX_PATH ${_ONEAPI_MKL_ROOT}"
         "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl"
