@@ -123,11 +123,6 @@ target_link_libraries(libnosphera2 PUBLIC
     $<$<CXX_COMPILER_ID:MSVC>:ntdll>
     $<$<CXX_COMPILER_ID:MSVC>:ws2_32>
 )
-set(CMAKE_VS_NUGET_PACKAGE_RESTORE ON)
-set_property(TARGET libnosphera2
-    PROPERTY VS_PACKAGE_REFERENCES
-        "intelmkl.static.win-x64_2025.3.0.453;inteltbb.redist.win_2022.2.0.503;inteltbb.devel.win_2022.2.0.503;intelopenmp.redist.win_2025.2.1.1000;intelopenmp.devel.win_2025.2.1.1000"
-)
 set_target_properties(libnosphera2 PROPERTIES PREFIX "")
 target_include_directories(libnosphera2 PUBLIC ${MKL_INCLUDE})
 add_executable(NoSpherA2 "${CMAKE_CURRENT_SOURCE_DIR}/NoSpherA2.cpp")

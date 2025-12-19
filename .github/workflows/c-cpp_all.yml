@@ -34,7 +34,7 @@ jobs:
             name: Mac_ARM64
             build-script: | 
               mkdir -p build && cd build 
-              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="arm64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="arm64" -DIS_ACTIONS=ON -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j3
             artifact-name: executable_MacOS_ARM64
             artifact-path: build/NoSpherA2
@@ -43,7 +43,7 @@ jobs:
             name: Mac_x86_64
             build-script: |
               mkdir -p build && cd build 
-              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64" -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64" -DIS_ACTIONS=ON -DCMAKE_BUILD_TYPE=Release -DOpenMP_ROOT=$(brew --prefix)/opt/libomp -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
               cmake --build . --target NoSpherA2 -j3
             artifact-name: executable_MacOS_x86_64
             artifact-path: build/NoSpherA2
@@ -56,7 +56,8 @@ jobs:
                                -DCMAKE_C_COMPILER_LAUNCHER=sccache \
                                -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
                                -DBUILD_SHARED_LIBS=OFF \
-                               -DTBB_BUILD_SHARED=OFF
+                               -DTBB_BUILD_SHARED=OFF \
+                               -DIS_ACTIONS=ON
               cmake --build . --target NoSpherA2 -j4
             artifact-name: executable_Linux
             artifact-path: |
@@ -78,7 +79,8 @@ jobs:
               -DCMAKE_SHARED_LINKER_FLAGS="runtimeobject.lib" `
               -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
               -DBUILD_SHARED_LIBS=OFF `
-              -DTBB_BUILD_SHARED=OFF
+              -DTBB_BUILD_SHARED=OFF `
+              -DIS_ACTIONS=ON
               cmake --build . --config Release --target NoSpherA2 -j4
             artifact-name: executable_Windows
             artifact-path: |

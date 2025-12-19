@@ -5,19 +5,21 @@
 CPMDeclarePackage(Ccache.cmake
   NAME Ccache.cmake
   VERSION 1.2.5
+  GIT_TAG "639f153a960f04407618a68d4dc68c9e6c3cd10d"
   GITHUB_REPOSITORY TheLartians/Ccache.cmake
 )
 # mdspan (unversioned)
- CPMDeclarePackage(mdspan
+CPMDeclarePackage(mdspan
   NAME mdspan
-  GIT_TAG "546d4dd63697c6a331554adb6fe650e09b690812"
+  GIT_TAG "546d4dd63697c6a331554adb6fe650e09b690812" # latest when it was pinned
   GITHUB_REPOSITORY kokkos/mdspan
 )
 # featomic
 CPMDeclarePackage(featomic
   NAME featomic
   GITHUB_REPOSITORY "metatensor/featomic"
-  GIT_TAG "featomic-v0.6.4"
+  GIT_TAG "95fb774c16a0da7a32f76dfd53df4fb1dcb765db"
+  VERSION 0.6.4
   SOURCE_SUBDIR "featomic"
   OPTIONS
     "G Ninja"
