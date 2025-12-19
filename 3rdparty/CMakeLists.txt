@@ -6,11 +6,7 @@ if (MSVC)
     add_compile_options(/EHsc)
 endif ()
 if (NOT WIN32)
-    CPMAddPackage(
-        NAME Ccache.cmake
-        GITHUB_REPOSITORY TheLartians/Ccache.cmake
-        VERSION 1.2.5
-    )
+    CPMAddPackage("gh:TheLartians/Ccache.cmake")
 endif ()
 if (BUILD_RELEASE_OCC)
     set(OCC_BUILD_MODE "Release")
@@ -36,7 +32,7 @@ CPMAddPackage(
 list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
 CPMAddPackage(
     NAME featomic
-    URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.4/featomic-cxx-0.6.4.tar.gz"
+    GITHUB_REPOSITORY "metatensor/featomic"
     OPTIONS
         "G Ninja"
         "CMAKE_BUILD_TYPE Release"
@@ -44,7 +40,6 @@ CPMAddPackage(
         "BUILD_SHARED_LIBS OFF"
         "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
         "FEATOMIC_USE_STATIC_METATENSOR ON"
-#        "CMAKE_TRY_COMPILE_CONFIGURATION Release"
 )
 if (WIN32)
     set(featomic_st_name "featomic.lib")

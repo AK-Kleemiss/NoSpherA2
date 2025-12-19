@@ -53,6 +53,7 @@ if (MSVC AND NOT ("${OCC_BUILD_TYPE}" STREQUAL "${CMAKE_BUILD_TYPE}"))
 endif ()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake")
+CPMUsePackageLock(package-lock.cmake)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/NOSTEST.cmake")
 add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
 
