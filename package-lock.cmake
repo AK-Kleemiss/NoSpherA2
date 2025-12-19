@@ -17,7 +17,8 @@ CPMDeclarePackage(Ccache.cmake
 CPMDeclarePackage(featomic
   NAME featomic
   GITHUB_REPOSITORY "metatensor/featomic"
-  GIT_TAG "tag/featomic-v0.6.4"
+  GIT_TAG "featomic-v0.6.4"
+  SOURCE_SUBDIR "featomic"
   OPTIONS
     "G Ninja"
     "CMAKE_BUILD_TYPE Release"

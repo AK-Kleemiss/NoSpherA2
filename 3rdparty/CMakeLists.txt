@@ -33,6 +33,7 @@ list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
 CPMAddPackage(
     NAME featomic
     GITHUB_REPOSITORY "metatensor/featomic"
+    SOURCE_SUBDIR "featomic"
     OPTIONS
         "G Ninja"
         "CMAKE_BUILD_TYPE Release"
