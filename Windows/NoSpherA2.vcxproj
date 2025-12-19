@@ -2600,12 +2600,12 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\occ_install\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6973,7 +6973,7 @@
       <OpenMPSupport>true</OpenMPSupport>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /MT </AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6986,7 +6986,7 @@
       <IntelJCCErratum>true</IntelJCCErratum>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\occ_install\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -6994,7 +6994,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies);..\Lib\occ_install\lib\cint.lib;..\Lib\occ_install\lib\fmt.lib;..\Lib\occ_install\lib\gau2grid_static.lib;..\Lib\occ_install\lib\libecpint_static.lib;..\Lib\occ_install\lib\occ_cg.lib;..\Lib\occ_install\lib\occ_core.lib;..\Lib\occ_install\lib\occ_crystal.lib;..\Lib\occ_install\lib\occ_descriptors.lib;..\Lib\occ_install\lib\occ_dft.lib;..\Lib\occ_install\lib\occ_disp.lib;..\Lib\occ_install\lib\occ_dma.lib;..\Lib\occ_install\lib\occ_driver.lib;..\Lib\occ_install\lib\occ_elastic_fit.lib;..\Lib\occ_install\lib\occ_geometry.lib;..\Lib\occ_install\lib\occ_gto.lib;..\Lib\occ_install\lib\occ_interaction.lib;..\Lib\occ_install\lib\occ_io.lib;..\Lib\occ_install\lib\occ_isosurface.lib;..\Lib\occ_install\lib\occ_main.lib;..\Lib\occ_install\lib\occ_opt.lib;..\Lib\occ_install\lib\occ_qm.lib;..\Lib\occ_install\lib\occ_sht.lib;..\Lib\occ_install\lib\occ_slater.lib;..\Lib\occ_install\lib\occ_solvent.lib;..\Lib\occ_install\lib\occ_xdm.lib;..\Lib\occ_install\lib\occ_xtb.lib;..\Lib\occ_install\lib\scn.lib;..\Lib\occ_install\lib\spdlog.lib;..\Lib\occ_install\lib\xc.lib;..\Lib\occ_install\lib\dftd4.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>

@@ -1393,7 +1393,11 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
 
 void test_openblas()
 {
+#ifdef __APPLE__
+    omp_set_num_threads(4);
+#else
     MKL_Set_Num_Threads(4);
+#endif
 #ifdef _OPENMP
     omp_set_num_threads(4);
 #endif
@@ -1439,7 +1443,7 @@ void test_analytical_fourier(bool full)
     {
         grid[i].resize(griddy.get_num_grid_points(), 0.0);
     }
-    
+
     vec2 empty(1, vec(1, 0.0));
     griddy.get_grid(1, 0, pos, pos, pos, &charge, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data(), grid[5].data(), grid[6].data(), WFN(), empty);
 
@@ -1726,7 +1730,7 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     std::cout << "DFT: " << std::fixed << std::setprecision(4) << vec_sum(elecs_DFT) << std::endl;
     std::cout << "RI:  " << std::fixed << std::setprecision(4) << vec_sum(elecs_RI) << std::endl;
     std::cout << "Analytic:  " << std::fixed << std::setprecision(4) << vec_sum(analytic_RI) << std::endl;
-   
+
 }
 
 void test_reading_SALTED_binary_file() {

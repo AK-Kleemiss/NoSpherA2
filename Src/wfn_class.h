@@ -7,6 +7,12 @@
 #include <string>
 #include <array>
 #include <filesystem>
+#include "mo_class.h"
+
+namespace occ::qm
+{
+	struct Wavefunction;
+}
 
 class MO;
 enum e_origin {
@@ -100,17 +106,17 @@ private:
 	// Vector of atoms/centers in the wavefunction
     std::vector<atom> atoms;
 
-	// remove a center from the centers vector 
+	// remove a center from the centers vector
 	// CAREFUL: also need to remove all primitives associated with that center, as well as the associated coefficients in each MO and reduce nex accordingly
 	// @param g_nr the index of the center to be removed
     // @return true if successful
     bool erase_center(const int &g_nr);
-    // remove a type from the type vector 
+    // remove a type from the type vector
     // CAREFUL: also need to remove all primitives associated with that center, as well as the associated coefficients in each MO and reduce nex accordingly
     // @param g_nr the index of the type to be removed
     // @return true if successful
     bool erase_type(const int &nr);
-    // remove an exponent from the exponents vector 
+    // remove an exponent from the exponents vector
     // CAREFUL: also need to remove all primitives associated with that center, as well as the associated coefficients in each MO and reduce nex accordingly
     // @param g_nr the index of the exponent to be removed
 	// @return true if successful
@@ -118,6 +124,15 @@ private:
     bool push_back_center(const int &cent);
     bool push_back_type(const int &type);
     bool push_back_exponent(const double &e);
+	void insert_into_exponents(std::ranges::input_range auto&& v) {
+        exponents.insert(exponents.end(), std::ranges::begin(v), std::ranges::end(v));
+    }
+    void insert_into_centers(std::ranges::input_range auto&& v) {
+        centers.insert(centers.end(), std::ranges::begin(v), std::ranges::end(v));
+    }
+	void insert_into_types(std::ranges::input_range auto&& v) {
+        types.insert(types.end(), std::ranges::begin(v), std::ranges::end(v));
+    }
     void assign_MO_coefs(const int &nr, vec &values);
     void push_back_MO_coef(const int& nr, const double& value);
     bool modified;
@@ -127,10 +142,10 @@ private:
     bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
 	bool is_unrestricted = false; // True if the wavefunction is unrestricted (different alpha and beta MOs)
     // precomputed factors and helper functions for ESP calc
-    long long int pre[9][5][5][9];
-    void fill_pre();
-    long long int Afac_pre[9][5][9];
-    void fill_Afac_pre();
+	static long long int pre[9][5][5][9];
+    constexpr static void fill_pre();
+    static long long int Afac_pre[9][5][9];
+    constexpr static void fill_Afac_pre();
     const double fj(int &j, int &l, int &m, double &aa, double &bb) const;
     const double Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp) const;
     const double compute_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
@@ -149,7 +164,11 @@ public:
     /** Construct with forced charge / multiplicity while reading a file. */
     WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug = false);
     ///@}
-
+	/** Construct from an OCC Wavefunction Struct. If from_file=true, it will use OCC to read any wfn format supported by it*/
+    WFN(occ::qm::Wavefunction& occ_WF, bool from_file=false);
+	// virtual ~WFN() {};
+    //-------------------- OCC additional things--------------------------------------------
+    // friend class WfnAdapter;
     //--------------------MO handling--------------------------------------------
     /** Set a MO primitive coefficient. @return true if successful */
     bool set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value);
@@ -193,6 +212,8 @@ public:
     const void clear_MOs();
 	/** Get maximum absolute MO coefficient (for cutoff checks). */
     const double get_maximum_MO_coefficient(bool occu = true) const;
+
+	const std::vector<MO> &get_MOs_vec() const { return MOs; };
 
     //--------------------in and output----------------------------------------
     /** Change stored basis set name label. */
@@ -550,6 +571,9 @@ public:
     const int *get_ptr_centers() { return &centers[0]; };
     /** Raw pointer to primitive exponents. */
     const double *get_ptr_exponents() { return &exponents[0]; };
+	const ivec& get_types() { return types; };
+	const vec& get_exponents() { return exponents; };
+	const ivec& get_centers() { return centers; };
 };
 
 #include "mo_class.h"

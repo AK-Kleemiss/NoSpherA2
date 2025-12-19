@@ -1,34 +1,29 @@
-function(add_nos_test test_name test_args)
-    # Parse keyworded args: ARGS (single value), COMPARE_NAME (single value)
-    cmake_parse_arguments(PARSE_ARGV 2 TEST "" "COMPARE_NAME;COMPARE_GOOD;DIRECTORY" "")
-    if(NOT TEST_COMPARE_NAME)
-        set(TEST_COMPARE_NAME "NoSpherA2.log")
-    endif()
+function(add_nos_test TEST_NAME ARGS)
+    cmake_parse_arguments(PARSE_ARGV 2 TEST "" "DIRECTORY;GOOD_LOG;ACTUAL_LOG" "")
+    if (NOT TEST_ACTUAL_LOG)
+        set(TEST_ACTUAL_LOG "NoSpherA2.log")
+    endif ()
     if (NOT TEST_DIRECTORY)
-        set(TEST_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${test_name}")
-        set(TEST_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/${test_name})
+        set(TEST_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${TEST_NAME})
+        set(TEST_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME})
     else ()
-        set(TEST_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_DIRECTORY}")
+        set(TEST_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${TEST_DIRECTORY})
         set(TEST_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/${TEST_DIRECTORY})
     endif ()
-    if (NOT TEST_COMPARE_GOOD)
-        set(TEST_COMPARE_GOOD "${test_name}.good")
-    endif ()
-    file(COPY ${TEST_SRC_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
+    file(COPY ${TEST_SRC_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    if (NOT TEST_GOOD_LOG)
+        set(TEST_GOOD_LOG "${TEST_BIN_DIR}/${TEST_NAME}.good")
+    endif ()
     add_test(
-        NAME ${test_name}
+        NAME ${TEST_NAME}
+        COMMAND ${Python3_EXECUTABLE}
+                "${CMAKE_SOURCE_DIR}/tests/runTest.py"
+                --exe $<TARGET_FILE:NoSpherA2>
+                --actual "${TEST_ACTUAL_LOG}"
+                --good "${TEST_GOOD_LOG}"
+                --args="${ARGS}"
+                --dir ${TEST_BIN_DIR}
         WORKING_DIRECTORY ${TEST_BIN_DIR}
-#        COMMAND bash -c "$<TARGET_FILE:NoSpherA2> ${test_args} && diff -q -i -b ${TEST_COMPARE_NAME} ${TEST_COMPARE_GOOD}"
-        COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/runTest.py
-                "${TEST_COMPARE_NAME}" "${TEST_COMPARE_GOOD}" "$<TARGET_FILE:NoSpherA2> ${test_args}"
-    )
-    string(REPLACE " " ";" my_list "${test_args}")
-    add_custom_target(
-        debug_test_${test_name}
-#        COMMAND $<TARGET_FILE:NoSpherA2> ${my_list}
-        COMMAND $<TARGET_FILE:NoSpherA2>
-        WORKING_DIRECTORY ${TEST_BIN_DIR}
-        DEPENDS NoSpherA2
     )
 endfunction()

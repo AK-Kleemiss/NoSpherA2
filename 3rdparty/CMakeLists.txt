@@ -1,11 +1,27 @@
 include(ExternalProject)
+
 set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
 set(ENV{CMAKE_TRY_COMPILE_CONFIGURATION} Release)
-CPMAddPackage(
-    NAME Ccache.cmake
-    GITHUB_REPOSITORY TheLartians/Ccache.cmake
-    VERSION 1.2.5
-)
+if (MSVC)
+    add_compile_options(/EHsc)
+endif ()
+if (NOT WIN32 AND NOT IS_ACTIONS)
+    CPMAddPackage("gh:TheLartians/Ccache.cmake")
+endif ()
+if (BUILD_RELEASE_OCC)
+    set(OCC_BUILD_MODE "Release")
+else ()
+    set(OCC_BUILD_MODE ${CMAKE_BUILD_TYPE})
+endif ()
+
+# Fix libcint quadmath Fortran bindings issue in debug builds with GCC
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TARGET cint)
+    target_link_libraries(cint gfortran)
+endif()
+
+include(CMakePrintHelpers)
+include(${CMAKE_SOURCE_DIR}/cmake/get_all_properties.cmake)
+print_target_properties(occ)
 
 CPMAddPackage(
     NAME mdspan
@@ -16,13 +32,15 @@ CPMAddPackage(
 list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
 CPMAddPackage(
     NAME featomic
-    URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.2/featomic-cxx-0.6.2.tar.gz"
+    GITHUB_REPOSITORY "metatensor/featomic"
+    SOURCE_SUBDIR "featomic"
     OPTIONS
+        "G Ninja"
         "CMAKE_BUILD_TYPE Release"
         "FEATOMIC_FETCH_METATENSOR ON"
         "BUILD_SHARED_LIBS OFF"
         "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
-        "CMAKE_TRY_COMPILE_CONFIGURATION Release"
+        "FEATOMIC_USE_STATIC_METATENSOR ON"
 )
 if (WIN32)
     set(featomic_st_name "featomic.lib")
@@ -30,68 +48,108 @@ else ()
     set(featomic_st_name "libfeatomic.a")
 endif ()
 
-set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
-message(WARNING "HERE: ${ONEAPI_DIRECTORY}")
-message(WARNING "HERE: ${CMAKE_CURRENT_BINARY_DIR}")
-if (${FAKE_HOME_TEST})
-    set(HOME "/tmp/home")
-else ()
-    set(HOME $ENV{HOME})
-endif ()
-
-if (UNIX)
+if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+    set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
     set(MKL_LINK "static")
-    if (NOT EXISTS ${ONEAPI_DIRECTORY})
-        set(_MKL_ROOT "${MKL_INSTALL_DIR}/mkl/latest")
-        set(_MKL_CONFIG "${_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
-
-        if(NOT EXISTS "${_MKL_CONFIG}")
-            file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/Lib/MKL")
-            set(_MKL_SH "${CMAKE_SOURCE_DIR}/Lib/intel-mkl-installer.sh")
-            if (NOT EXISTS ${_MKL_SH})
-                file(DOWNLOAD
-                  "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh"
-                  "${_MKL_SH}"
-                  EXPECTED_HASH SHA256=7bfdde1379a9cd3c2784af4352931a0527a5c483c9da71e851a3f06e055af7c7
-                  SHOW_PROGRESS
-                  STATUS _DL_STATUS
-                )
-                list(GET _DL_STATUS 0 _DL_CODE)
-                if(NOT _DL_CODE EQUAL 0)
-                  message(FATAL_ERROR "Failed to download oneMKL: ${_DL_STATUS}")
-                endif()
-            endif ()
-            set(OLD_HOME $ENV{HOME})
-            set(ENV{HOME} "/tmp/home")
-            message(STATUS "INSTALLING MKL IN: ${MKL_INSTALL_DIR}")
-            file(MAKE_DIRECTORY $ENV{HOME})
-            execute_process(COMMAND chmod +x ${_MKL_SH})
-            execute_process(
-                COMMAND ${_MKL_SH} -a --silent --eula accept --install-dir "${MKL_INSTALL_DIR}"
-
-              RESULT_VARIABLE _MKL_RC
-            )
-            FILE(REMOVE $ENV{HOME})
-            set(ENV{HOME} ${OLD_HOME})
-            if(NOT _MKL_RC EQUAL 0)
-              message(FATAL_ERROR "oneMKL installer failed with code ${_MKL_RC}")
-            endif()
-        endif()
-        list(APPEND CMAKE_PREFIX_PATH "${_MKL_ROOT}")
-        find_package(MKL CONFIG REQUIRED
-            HINTS "${_MKL_ROOT}"
-            PATH_SUFFIXES "lib/cmake/mkl"
-        )
-        message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
-
-    else ()
-        set(_ONEAPI_MKL_ROOT "${ONEAPI_DIRECTORY}/mkl/latest")
-        find_package(MKL CONFIG REQUIRED
-            HINTS "${_ONEAPI_MKL_ROOT}" "${ONEAPI_DIRECTORY}"
-            PATH_SUFFIXES "lib/cmake/mkl"
-        )
-      message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
+    set(MKL_INTERFACE lp64)
+    include(${CMAKE_SOURCE_DIR}/cmake/micromamba.cmake)
+    file(SHA1  ${CMAKE_SOURCE_DIR}/environment.yml _ENV_HASH)
+    set(_SAVED_ENV_HASH "")
+    if (EXISTS ${CMAKE_BINARY_DIR}/env.sha1)
+        file(READ ${CMAKE_BINARY_DIR}/env.sha1 _SAVED_ENV_HASH OPTIONAL)
     endif ()
-else ()
-    find_package(MKL CONFIG REQUIRED)
+    set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
+    if (NOT "${_SAVED_ENV_HASH}" STREQUAL "${_ENV_HASH}")
+        set(ENV_PATH "${MICROMAMBA_ENV_PATH}")
+        micromamba_environment(
+            NAME mambaenv
+            SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
+        )
+        file(SHA1 ${CMAKE_SOURCE_DIR}/environment.yml _ENV_HASH)
+        file(WRITE ${CMAKE_BINARY_DIR}/env.sha1 ${_ENV_HASH})
+        # Update the path after environment creation
+        if (WIN32)
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
+        else ()
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}")
+        endif ()
+    else()
+        if (WIN32)
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
+        else ()
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}")
+        endif ()
+    endif ()
+    set(MKL_THREADING intel_thread)
+    set(MKL_MPI intelmpi)
+    find_package(MKL CONFIG REQUIRED
+        HINTS "${_ONEAPI_MKL_ROOT}/lib/cmake"
+        PATH_SUFFIXES "mkl"
+    )
+    if (WIN32)
+        file(COPY "${_ONEAPI_MKL_ROOT}/bin/libiomp5md.dll" DESTINATION "${CMAKE_BINARY_DIR}")
+    else ()
+        file(COPY "${_ONEAPI_MKL_ROOT}/lib/libiomp5.so" DESTINATION "${CMAKE_BINARY_DIR}")
+    endif ()
+    message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
+    set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)
+    set(MKL_DLL_PATH "${_ONEAPI_MKL_ROOT}/bin" PARENT_SCOPE)
+    set(_ONEAPI_MKL_ROOT ${_ONEAPI_MKL_ROOT} PARENT_SCOPE)
+    list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
 endif ()
+
+if (WIN32)
+    set(WIN_FLAGS
+        "GG_NO_PRAGMA ON"
+        "CPACK_SYSTEM_NAME windows"
+        "CMAKE_CXX_FLAGS -D__TBB_DYNAMIC_LOAD_ENABLED=0"
+#        "CMAKE_CXX_FLAGS /O2 /fp:fast"
+#        "CMAKE_C_FLAGS /O2 /fp:fast"
+    )
+endif ()
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(Darwin_FLAGS
+        "USE_SYSTEM_BLAS OFF"
+        "USE_OPENMP OFF"
+        "CMAKE_CXX_FLAGS -O2"
+        "CMAKE_C_FLAGS -O2"
+    )
+else ()
+    set(LINUX_WINDOWS_COMMON_FLAGS
+        "BLA_VENDOR Intel10_64lp"
+        "USE_SYSTEM_TBB OFF"
+        "TBB_PREFIX_PATH ${_ONEAPI_MKL_ROOT}"
+        "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl"
+        "USE_QCINT OFF"
+        "ENABLE_HOST_OPT OFF"
+        "USE_FORTRAN OFF"
+        "BLA_STATIC ON"
+    )
+endif ()
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(LINUX_FLAGS
+        "CMAKE_CXX_FLAGS -O3 -ffast-math"
+        "CMAKE_C_FLAGS -O3 -ffast-math"
+    )
+endif ()
+CPMAddPackage(
+    NAME occ
+    GITHUB_REPOSITORY MilitaoLucas/occ
+    GIT_TAG "libs_rebase2"
+    OPTIONS
+        "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
+        "WITH_PYTHON_BINDINGS OFF"
+        "CMAKE_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX}/occ_install"
+        ${Darwin_FLAGS}
+        ${WIN_FLAGS}
+        ${LINUX_FLAGS}
+        ${LINUX_WINDOWS_COMMON_FLAGS}
+)
+file(COPY ${occ_SOURCE_DIR}/share/ DESTINATION ${CMAKE_BINARY_DIR}/occ_data)
+set(OCC_DATA_PATH "${CMAKE_BINARY_DIR}/occ_data" PARENT_SCOPE)
+
+# Fix libcint quadmath Fortran bindings issue in debug builds with GCC
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TARGET cint)
+    target_link_libraries(cint)
+endif()

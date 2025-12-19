@@ -1729,7 +1729,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries);..\Lib\occ_install\lib\occ_main.lib;..\Lib\occ_install\lib\occ_qm.lib;..\Lib\occ_install\ltbb12.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">

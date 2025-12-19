@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Rys quadrature
 
  Code is edited based on
@@ -17,6 +17,8 @@
 
 #if defined(__APPLE__)
  // On macOS we are using Accelerate for BLAS/LAPACK
+#define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 0
+#define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 0
 #include <Accelerate/Accelerate.h>
 #else
  // Linux/Windows with oneMKL
@@ -166,7 +168,7 @@ double TURNOVER_POINT[] = {
  * F (t)  =   |    u    e      du,
  *  m        _/  0
  *
- * where m replaces ν for more convenient typesetting.
+ * where m replaces ? for more convenient typesetting.
  *
  * If t is less than SML16 or equals 0, then
  *
@@ -181,7 +183,7 @@ double TURNOVER_POINT[] = {
  *            0
  *                    1
  *                    -
- *           1 /  π  \2       _
+ *           1 /  p  \2       _
  * F (t)  =  - | --- |  erf( /t ).
  *  0        2 \  t  /
  *
@@ -6184,10 +6186,10 @@ void CINTrys_roots(int nroots, double x, double *u, double *w)
         break;
     case 6:
     case 7:
-        err = segment_solve(nroots, x, 0., u, w, 11, CINTrys_jacobi, CINTrys_schmidt);
+        err = segment_solve(nroots, x, 0., u, w, 11, CINTrys_jacobi, NOS_CINTrys_schmidt);
         break;
     case 8:
-        err = segment_solve(nroots, x, 0., u, w, 11, CINTrys_jacobi, CINTlrys_schmidt);
+        err = segment_solve(nroots, x, 0., u, w, 11, CINTrys_jacobi, NOS_CINTlrys_schmidt);
         break;
     case 9:
         err = segment_solve(nroots, x, 0., u, w, 10, CINTlrys_jacobi, CINTlrys_laguerre);
@@ -6251,12 +6253,12 @@ void CINTsr_rys_roots(int nroots, double x, double lower, double *u, double *w)
     switch (nroots)
     {
     case 1:
-        err = CINTrys_schmidt(nroots, x, lower, u, w);
+        err = NOS_CINTrys_schmidt(nroots, x, lower, u, w);
         break;
     case 2:
         if (lower < 0.99)
         {
-            err = CINTrys_schmidt(nroots, x, lower, u, w);
+            err = NOS_CINTrys_schmidt(nroots, x, lower, u, w);
         }
         else
         {
@@ -6277,7 +6279,7 @@ void CINTsr_rys_roots(int nroots, double x, double lower, double *u, double *w)
 #endif
         if (lower < 0.93)
         {
-            err = CINTrys_schmidt(nroots, x, lower, u, w);
+            err = NOS_CINTrys_schmidt(nroots, x, lower, u, w);
         }
         else if (lower < 0.97)
         {
@@ -6302,7 +6304,7 @@ void CINTsr_rys_roots(int nroots, double x, double lower, double *u, double *w)
 #endif
         if (lower < 0.8)
         {
-            err = CINTrys_schmidt(nroots, x, lower, u, w);
+            err = NOS_CINTrys_schmidt(nroots, x, lower, u, w);
         }
         else if (lower < 0.9)
         {
@@ -6327,7 +6329,7 @@ void CINTsr_rys_roots(int nroots, double x, double lower, double *u, double *w)
 #endif
         if (lower < 0.4)
         {
-            err = segment_solve(nroots, x, lower, u, w, 50, CINTrys_schmidt, CINTlrys_laguerre);
+            err = segment_solve(nroots, x, lower, u, w, 50, NOS_CINTrys_schmidt, CINTlrys_laguerre);
         }
         else if (lower < 0.8)
         {
@@ -6341,7 +6343,7 @@ void CINTsr_rys_roots(int nroots, double x, double lower, double *u, double *w)
     case 6:
         if (lower < 0.25)
         {
-            err = segment_solve(nroots, x, lower, u, w, 60, CINTrys_schmidt, CINTlrys_laguerre);
+            err = segment_solve(nroots, x, lower, u, w, 60, NOS_CINTrys_schmidt, CINTlrys_laguerre);
         }
         else if (lower < 0.8)
         {
@@ -10050,7 +10052,7 @@ static int _rdk_rys_roots(int nroots, double *fmt_ints,
     return 0;
 }
 
-int CINTrys_schmidt(int nroots, double x, double lower, double *roots, double *weights)
+int NOS_CINTrys_schmidt(int nroots, double x, double lower, double *roots, double *weights)
 {
     double fmt_ints[MXRYSROOTS * 2];
     if (lower == 0)
@@ -10155,7 +10157,7 @@ int R_lsmit(long double *cs, long double *fmt_ints, int n)
     return 0;
 }
 
-int CINTlrys_schmidt(int nroots, double x, double lower, double *roots, double *weights)
+int NOS_CINTlrys_schmidt(int nroots, double x, double lower, double *roots, double *weights)
 {
     int i, k, j, order, error;
     int nroots1 = nroots + 1;

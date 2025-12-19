@@ -4,3 +4,7 @@
 [submodule "featomic"]
 	path = featomic
 	url = https://github.com/metatensor/featomic
+[submodule "libs/occ"]
+	path = libs/occ
+	url = https://github.com/MilitaoLucas/occ.git
+	branch = sharedLibs
