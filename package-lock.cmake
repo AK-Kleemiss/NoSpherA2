@@ -141,7 +141,7 @@ CPMDeclarePackage(libcint
   NAME libcint
   VERSION 6.1.2
   GIT_TAG master
-  GITHUB_REPOSITORY peterspackman/libcint
+  GITHUB_REPOSITORY MilitaoLucas/libcint
   OPTIONS
     "WITH_FORTRAN OFF"
     "WITH_CINT2_INTERFACE OFF"
