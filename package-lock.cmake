@@ -137,11 +137,16 @@ CPMDeclarePackage(dftd4_cpp
 #  GITHUB_REPOSITORY yixuan/LBFGSpp
 #)
 # libcint
+if(MSVC)
+  set(LIBCINT_REPO "MilitaoLucas/libcint")
+else()
+  set(LIBCINT_REPO "peterspackman/libcint")
+endif ()
 CPMDeclarePackage(libcint
   NAME libcint
   VERSION 6.1.2
   GIT_TAG master
-  GITHUB_REPOSITORY MilitaoLucas/libcint
+  GITHUB_REPOSITORY ${LIBCINT_REPO}
   OPTIONS
     "WITH_FORTRAN OFF"
     "WITH_CINT2_INTERFACE OFF"
