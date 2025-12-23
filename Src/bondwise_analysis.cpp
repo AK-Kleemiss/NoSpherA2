@@ -7,13 +7,22 @@
 #include "nos_math.h"
 #include "integration_params.h"
 
-// Structure to hold the result
+// Structure to hold the NAOs
 struct NAOResult {
     vec eigenvalues;  // Occupancies
     vec eigenvectors; // Coefficients
     int atom_index = -1;
     ivec matrix_elements;
 };
+
+//structrue to contain multiple NAO atom sets and the overlap and density matrices
+struct Roby_information {
+    std::vector<NAOResult> NAOs;
+    dMatrix2 overlap_matrix;
+    dMatrix2 density_matrix;
+    dMatrix2 total_NAOs;
+};
+
 
 int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector, double* incr, std::string& outname, bool rho, bool rdg, bool eli, bool lap) {
     options opt;
@@ -694,7 +703,7 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
 #endif
 
     NAOResult result;
-    result.eigenvalues = W;
+    result.eigenvalues = occu;
     result.eigenvectors = Rho; // Rho now contains eigenvectors
     result.matrix_elements = atom_indices;
 
@@ -947,12 +956,13 @@ double Roby_population_analysis(const vec& NAOs, const vec& density_matrix, cons
     return expectation(P, overlap_mat, density_matrix, size);
 }
 
-std::vector<NAOResult> computeAllAtomicNAOs(WFN& wavy) {
+Roby_information computeAllAtomicNAOs(WFN& wavy) {
     const int N_atoms = wavy.get_ncen();
-    const dMatrix2 DM = wavy.get_dm();
     const std::vector<atom> ats = wavy.get_atoms();
-    std::vector<NAOResult> all_results;
-    all_results.reserve(N_atoms);
+    Roby_information all_results;
+    all_results.NAOs.reserve(N_atoms);
+
+    all_results.density_matrix = wavy.get_dm();
 
     Int_Params basis(wavy);
     vec S_full;
@@ -960,14 +970,14 @@ std::vector<NAOResult> computeAllAtomicNAOs(WFN& wavy) {
         compute2c_Overlap_Cart(basis, S_full);
     else
         compute2C<Overlap2C>(basis, S_full);
-    Shape2D shape(DM.extent(0), DM.extent(1));
+    Shape2D shape(all_results.density_matrix.extent(0), all_results.density_matrix.extent(1));
 
-    const dMatrix2 overlap_full = reshape<dMatrix2>(S_full, shape);
+    all_results.overlap_matrix = reshape<dMatrix2>(S_full, shape);
 
     int last_index = 0;
     ivec2 indices(wavy.get_ncen());
     for (auto& a : ats) {
-        indices[a.get_nr() - 1].reserve(DM.extent(0) / N_atoms); // Rough estimate
+        indices[a.get_nr() - 1].reserve(all_results.density_matrix.extent(0) / N_atoms); // Rough estimate
         int current_shell = -1;
         int nr_indices = 0;
         std::vector<basis_set_entry> basis_set = a.get_basis_set();
@@ -984,23 +994,58 @@ std::vector<NAOResult> computeAllAtomicNAOs(WFN& wavy) {
                 }
             }
         }
-        NAOResult pNAO = calculateAtomicNAO(DM, overlap_full, indices[a.get_nr() - 1]);
-        pNAO.atom_index = a.get_nr() - 1;
+
         //pNAO.eigenvectors = orthogonalizePNAOs(pNAO.eigenvectors, S_full, static_cast<int>(indices[a.get_nr()].size()));
-        all_results.emplace_back(pNAO);
+        all_results.NAOs.emplace_back(calculateAtomicNAO(all_results.density_matrix, all_results.overlap_matrix, indices[a.get_nr() - 1]));
+        all_results.NAOs.back().atom_index = a.get_nr() - 1;
+
     }
     return all_results;
 }
 
 void RGBI_Analysis(WFN& wavy) {
     auto all_NAOs = computeAllAtomicNAOs(wavy);
-    for (size_t atom_idx = 0; atom_idx < all_NAOs.size(); atom_idx++) {
-        const auto& nao_result = all_NAOs[atom_idx];
+    Shape2D NAOs_size;
+    std::vector<Shape2D> matrix_elements_per_atom(all_NAOs.NAOs.size(), { 0,0 });
+    for (size_t atom_idx = 0; atom_idx < all_NAOs.NAOs.size(); atom_idx++) {
+#ifdef NSA2DEBUG
         std::cout << "Atom " << atom_idx + 1 << " NAO Occupancies:\n";
-        for (size_t i = 0; i < nao_result.eigenvalues.size(); i++) {
-            std::cout << "  NAO " << i + 1 << ": " << std::setprecision(6) << nao_result.eigenvalues[i] << "\n";
+#endif
+        for (size_t i = 0; i < all_NAOs.NAOs[atom_idx].eigenvalues.size(); i++) {
+#ifdef NSA2DEBUG
+            std::cout << "  NAO " << i + 1 << ": " << std::setprecision(6) << all_NAOs.NAOs[atom_idx].eigenvalues[i] << "\n";
+#endif
+            matrix_elements_per_atom[atom_idx].cols++;
+            NAOs_size.cols++;
         }
+        const int rows = all_NAOs.NAOs[atom_idx].eigenvectors.size() / matrix_elements_per_atom[atom_idx].cols;
+        NAOs_size.rows += rows;
+        matrix_elements_per_atom[atom_idx].rows = rows;
         std::cout << std::endl;
     }
-
+    //Create a square matrix of size matrix_size x matrix_size and fill with subblocks of the evecs
+    vec NAO_matrix(NAOs_size.cols * NAOs_size.rows, 0.0);
+    Shape2D offset(0, 0);
+    for (int a = 0; a < all_NAOs.NAOs.size(); a++) {
+        for (int i = 0; i < matrix_elements_per_atom[a].cols; i++) {
+            for (int j = 0; j < matrix_elements_per_atom[a].rows; j++) {
+                const int index_NAO = (offset.cols + i) * NAOs_size.rows + (offset.rows + j);
+                const int index_eigenvector = i * matrix_elements_per_atom[a].rows + j;
+                NAO_matrix[index_NAO] = all_NAOs.NAOs[a].eigenvectors[index_eigenvector];
+            }
+        }
+        offset.cols += matrix_elements_per_atom[a].cols;
+        offset.rows += matrix_elements_per_atom[a].rows;
+    }
+    Shape2D temp(7, 19);
+    all_NAOs.total_NAOs = reshape<dMatrix2>(NAO_matrix, temp);
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "Global NAO Matrix:\n";
+    for(int i = 0; i < NAOs_size.rows; i++) {
+        for (int j = 0; j < NAOs_size.cols; j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << all_NAOs.total_NAOs(j, i) << " ";
+        std::cout << std::endl;
+    }
+#endif
+    double null = 0;
 }
