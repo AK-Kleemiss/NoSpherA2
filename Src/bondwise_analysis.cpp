@@ -484,6 +484,28 @@ int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, con
     return 1;
 }
 
+std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN& wavy) {
+    std::vector<std::pair<int, int>> bonds;
+    for (int i = 0; i < wavy.get_ncen(); i++)
+    {
+        for (int j = i + 1; j < wavy.get_ncen(); j++)
+        {
+            double distance = std::hypot(wavy.get_atom_coordinate(i, 0) - wavy.get_atom_coordinate(j, 0),
+                wavy.get_atom_coordinate(i, 1) - wavy.get_atom_coordinate(j, 1),
+                wavy.get_atom_coordinate(i, 2) - wavy.get_atom_coordinate(j, 2));
+            double svdW = constants::ang2bohr(constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)]);
+            if (distance < 1.35 * svdW)
+            {
+#ifdef NSA2DEBUG
+                std::cout << "Bond between " << i << " (" << wavy.get_atom_charge(i) << ") and " << j << " (" << wavy.get_atom_charge(j) << ") with distance " << distance << " and svdW " << svdW << std::endl;
+#endif // NSA2DEBUG
+                bonds.push_back(std::make_pair(i, j));
+            }
+        }
+    }
+    return bonds;
+}
+
 //Assuming square matrices
 vec change_basis_sq(const vec& in, const vec& transformation, int size) {
 
@@ -569,6 +591,35 @@ void get_submatrix(const dMatrix2& full,
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
             std::cout << std::setw(14) << std::setprecision(8) << std::fixed << sub[i * n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+#endif
+}
+
+void get_submatrix(const dMatrix2& full,
+    vec& sub,
+    const std::vector<int>& val_indices,
+    const std::vector<int>& vec_indices) {
+    const int n1 = static_cast<int>(val_indices.size());
+    const int n2 = static_cast<int>(vec_indices.size());
+    err_checkf(n2 > 0, "Val indices list is empty.", std::cout);
+    err_checkf(n2 > 0, "Vec indices list is empty.", std::cout);
+    err_checkf(sub.size() == n1 * n2, "Submatrix has incorrect size.", std::cout);
+
+
+    for (int i = 0; i < n1; ++i) {
+        for (int j = 0; j < n2; ++j) {
+            const int global_i = val_indices[i];
+            const int global_j = vec_indices[j];
+            sub[i * n2 + j] = full(global_i, global_j);
+        }
+    }
+#ifdef NSA2DEBUG
+    std::cout << "Submatrix:\n";
+    for (int i = 0; i < n1; ++i) {
+        for (int j = 0; j < n2; ++j) {
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << sub[i * n2 + j] << " ";
         }
         std::cout << std::endl;
     }
@@ -920,24 +971,34 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, double cutoff = 1E-5) {
     return dot<dMatrix2>(reshape<dMatrix2>(Vt, Shape2D(k, n)), reshape<dMatrix2>(W, Shape2D(k, m)), true, false);
 }
 
-double Roby_information::projection_matrix_and_expectation(const ivec& indices) {
+double Roby_information::projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals, const ivec& eigvecs) {
     const int n = indices.size();
-    vec D_Sub(n * n, 0.0);
+    //vec D_Sub(n * n, 0.0);
     vec S_Sub(n * n, 0.0);
-    get_submatrices(overlap_matrix, density_matrix, S_Sub, D_Sub, indices);
+    get_submatrix(overlap_matrix, S_Sub, indices);
     dMatrix2 S = reshape<dMatrix2>(S_Sub, Shape2D(n, n));
-    dMatrix2 D = reshape<dMatrix2>(S_Sub, Shape2D(n, n));
+    int atom = -1;
+    //dMatrix2 D = reshape<dMatrix2>(D_Sub, Shape2D(n, n));
 
     dMatrix2 NAOs;
     if (n == total_NAOs.extent(1))
         NAOs = total_NAOs;
     else {
-        //TODO: assign subspace NAOs from NAOResults
+        //TODO: assign subspace NAOs from NAOResults for a given atom
         for (auto NAO : this->NAOs) {
             // if matrix_elemnts of this NAO are identical to indices, resahpe NAO.eigenvectors to the correct shape
             if (NAO.matrix_elements == indices)
                 NAOs = reshape<dMatrix2>(NAO.eigenvectors, Shape2D(NAO.eigenvalues.size(), n));
+            atom = NAO.atom_index;
         }
+    }
+    //For atom groups we can use submatrices of total_NAOs
+    if (NAOs.size() == 0) {
+        const int n1 = eigvals.size();
+        const int n2 = eigvecs.size();
+        vec NAO_sub(n1 * n2);
+        get_submatrix(total_NAOs, NAO_sub, eigvals, eigvecs);
+        NAOs = reshape<dMatrix2>(NAO_sub, Shape2D(n1, n2));
     }
 
     auto X = change_basis_general(S, transpose(NAOs));
@@ -961,7 +1022,11 @@ double Roby_information::projection_matrix_and_expectation(const ivec& indices) 
     }
 #endif
 
+    //making the projection matrix
     X = change_basis_general(Y, transpose(NAOs), false);
+
+    if (atom >= 0)
+        projection_matrices.push_back(X);
 
 #ifdef NSA2DEBUG
     std::cout << std::endl << "Backtransformed X:\n";
@@ -972,20 +1037,28 @@ double Roby_information::projection_matrix_and_expectation(const ivec& indices) 
     }
 #endif
 
-    //return X; X is now projection matrix
-    // n = n_bf
+    dMatrix2 S_rect = get_rectangle(overlap_matrix, indices);
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "S_rect:\n";
+    for (int i = 0; i < S_rect.extent(0); i++) {
+        for (int j = 0; j < S_rect.extent(1); j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << S_rect(i, j) << " ";
+        std::cout << std::endl;
+    }
+#endif
 
-    auto W = change_basis_general(X, S);
+    //overlap projection
+    auto W = change_basis_general(X, S_rect);
 #ifdef NSA2DEBUG
     std::cout << std::endl << "Overlap transformed W:\n";
-    for (int i = 0; i < W.extent(0); i++) {
-        for (int j = 0; j < W.extent(1); j++)
+    for (int i = 0; i < W.extent(1); i++) {
+        for (int j = 0; j < W.extent(0); j++)
             std::cout << std::setw(14) << std::setprecision(8) << std::fixed << W(i, j) << " ";
         std::cout << std::endl;
     }
 #endif
 
-    const double expect = trace_product<double>(W, D);
+    const double expect = trace_product<double>(W, density_matrix);
     return expect;
 }
 
@@ -1048,6 +1121,7 @@ void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
 }
 
 Roby_information::Roby_information(WFN& wavy) {
+    auto bonds = get_bonded_atom_pairs(wavy);
     computeAllAtomicNAOs(wavy);
     Shape2D NAOs_size;
     for (size_t atom_idx = 0; atom_idx < NAOs.size(); atom_idx++) {
@@ -1101,7 +1175,130 @@ Roby_information::Roby_information(WFN& wavy) {
         atom_pops[NAO.atom_index] = Roby_population_analysis(NAO.matrix_elements);
 #ifdef NSA2DEBUG
         std::cout << std::endl << "Expectation value: " << atom_pops[NAO.atom_index] << "\n";
-#endif    
+#endif
+    }
+
+    dMatrix2 atom_pair_populations(NAOs.size(), NAOs.size());
+
+    //now perform bond analysis for all bonded atoms
+    for (auto bond : bonds) {
+        ivec bond_indices;
+        //gather basis function indices for both atoms
+        for (auto idx : NAOs[bond.first].matrix_elements)
+            bond_indices.push_back(idx);
+        for (auto idx : NAOs[bond.second].matrix_elements)
+            bond_indices.push_back(idx);
+        //just in case: sort bond indices, easy since each atom's indices are already assumed sorted and each basis function belongs to only one atom once
+        std::sort(bond_indices.begin(), bond_indices.end());
+
+        //now determine the bond atom NAO indices
+        int start_vec = 0, start_val = 0;
+        ivec bond_eigenvecs, bond_eigenvals;
+        for (auto NAO : NAOs) {
+            if (NAO.atom_index == bond.first || NAO.atom_index == bond.second) {
+                const int n1 = NAO.eigenvalues.size();
+                const int n2 = NAO.eigenvectors.size() / n1;
+                for (int i = 0; i < n1; i++) {
+                    bond_eigenvals.push_back(start_val + i);
+                }
+                for (int i = 0; i < n2; i++) {
+                    bond_eigenvecs.push_back(start_vec + i);
+                }
+            }
+            start_vec += NAO.matrix_elements.size();
+            start_val += NAO.eigenvalues.size();
+        }
+
+        //calcualte population using data from both atoms
+        const double bond_population = projection_matrix_and_expectation(bond_indices, bond_eigenvals, bond_eigenvecs);
+        atom_pair_populations(bond.first, bond.second) = bond_population;
+        atom_pair_populations(bond.second, bond.first) = bond_population;
+        std::cout << "Bond population between atom " << bond.first + 1 << " and atom " << bond.second + 1 << ": " << bond_population << std::endl;
+        const int size_ion1 = projection_matrices[bond.first].extent(0) + projection_matrices[bond.second].extent(0),
+            size_ion2 = projection_matrices[bond.first].extent(1) + projection_matrices[bond.second].extent(1),
+            size1_1 = projection_matrices[bond.first].extent(0),
+            size1_2 = projection_matrices[bond.first].extent(1),
+            size2_1 = projection_matrices[bond.second].extent(0),
+            size2_2 = projection_matrices[bond.second].extent(1);
+        dMatrix2 Ionic_Operator(size_ion1, size_ion2);
+        for (int i = 0; i < size1_1; i++) {
+            for (int j = 0; j < size2_2; j++) {
+                Ionic_Operator(i, j) = projection_matrices[bond.first](i, j);
+            }
+        }
+        for (int i = 0; i < size2_1; i++) {
+            for (int j = 0; j < size2_2; j++) {
+                Ionic_Operator(i + size1_1, j + size1_2) = -projection_matrices[bond.second](i, j);
+            }
+        }
+#ifdef NSA2DEBUG
+        std::cout << std::endl << "Ionic Operator:\n";
+        for (int i = 0; i < size_ion1; i++) {
+            for (int j = 0; j < size_ion2; j++)
+                std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Ionic_Operator(i, j) << " ";
+            std::cout << std::endl;
+        }
+#endif
+        // get matching suboverlap matrix
+        const int n = bond_indices.size();
+        vec S_Sub(n * n, 0.0);
+        get_submatrix(overlap_matrix, S_Sub, bond_indices);
+        //dMatrix2 S = reshape<dMatrix2>(S_Sub, Shape2D(n, n));
+
+        auto V = S_Sub;
+        vec W(n);
+        // make V = Sqrt(S)
+        err_checkf(LAPACKE_dsyev(
+            LAPACK_ROW_MAJOR,
+            'V', 'U',
+            n,
+            V.data(),
+            n,
+            W.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+
+        for (int i = 0; i < n; i++) {
+            if (abs(W[i]) < 1E-5)
+                W[i] = 0;
+            else
+                W[i] = std::sqrt(abs(W[i]));
+        }
+        vec Temp(n * n, 0.0);
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                for (int k = 0; k < n; k++)
+                    Temp[i * n + j] += V[i * n + k] * W[k] * V[j * n + k];
+
+        auto A = reshape<dMatrix2>(Temp, Shape2D(n, n));
+
+        auto SI = LAPACKE_invert(A);
+
+        auto X = change_basis_general(Ionic_Operator, A, false);
+        // solve symmetric eigenproblem of X
+        vec ionic_eigenvals(X.extent(0));
+        err_checkf(LAPACKE_dsyev(
+            LAPACK_ROW_MAJOR,
+            'V', 'U',
+            X.extent(0),
+            X.data(),
+            X.extent(1),
+            ionic_eigenvals.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+#ifdef NSA2DEBUG
+        std::cout << "Ionic eigenvalues between atom " << bond.first + 1 << " and atom " << bond.second + 1 << ":\n";
+        for (size_t i = 0; i < ionic_eigenvals.size(); i++) {
+            std::cout << "  Eigenvalue " << i + 1 << ": " << std::setprecision(6) << ionic_eigenvals[i] << "\n";
+        }
+        std::cout << std::endl;
+#endif
+        auto EVC = dot<dMatrix2>(SI, X);
+#ifdef NSA2DEBUG
+        std::cout << std::endl << "theta_I:\n";
+        for (int i = 0; i < EVC.extent(0); i++) {
+            for (int j = 0; j < EVC.extent(1); j++)
+                std::cout << std::setw(14) << std::setprecision(8) << std::fixed << EVC(i, j) << " ";
+            std::cout << std::endl;
+        }
+#endif
+        //TODO: Sort out the small eigenvalues of theta and start buildup of ionic orbitals approx line 1227
     }
 
     double null = 0;

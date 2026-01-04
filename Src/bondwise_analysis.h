@@ -27,19 +27,28 @@ private:
         vec sub_OM;
     };
 
+    struct bond_indices {
+        double covalent;
+        double ionic;
+        double total;
+        double percent_covalent_Pyth;
+        double percent_covalent_Arakai;
+    };
+
     std::vector<NAOResult> NAOs;
     dMatrix2 overlap_matrix;
     dMatrix2 density_matrix;
     dMatrix2 total_NAOs;
+    std::vector<dMatrix2> projection_matrices;
     NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full, const std::vector<int>& atom_indices);
-    double projection_matrix_and_expectation(const ivec& indices);
+    double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {});
     void computeAllAtomicNAOs(WFN& wavy);
 public:
     Roby_information() = default;
     ~Roby_information() = default;
     Roby_information(const Roby_information&) = default;
     Roby_information(WFN& wavy);
-    
+
     double Roby_population_analysis(ivec atoms);
 
 

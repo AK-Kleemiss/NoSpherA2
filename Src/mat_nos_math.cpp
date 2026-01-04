@@ -354,17 +354,19 @@ T trace_product(const T2& a, const T2& b, const bool transp) {
     const int cols_b = b.extent(1);
     err_checkf(cols_a == rows_b, "Incompatible sizes in trace product", std::cout);
     err_checkf(rows_a == cols_b, "Incompatible sizes in trace product", std::cout);
+    err_checkf(cols_a == cols_b, "Incompatible matrix sizes in trace product!", std::cout);
     T res = 0;
     if (!transp) {
-        for (int i = 0; i < cols_a; ++i) {
-            for (int j = 0; j < rows_a; ++j) {
-                res += a(i, j) * b(j, i);
+        for (int i = 0; i < cols_a; i++) {
+            double* ina = (double*)a.data() + (i * rows_a);
+            for (int j = 0; j < rows_a; j++) {
+                res += *(ina + j) * b.data()[j * cols_a + i];
             }
         }
     }
     else {
-        for (int i = 0; i < rows_a; ++i) {
-            for (int j = 0; j < cols_a; ++j) {
+        for (int i = 0; i < rows_a; i++) {
+            for (int j = 0; j < cols_a; j++) {
                 res += a(i, j) * b(i, j);
             }
         }
@@ -374,3 +376,22 @@ T trace_product(const T2& a, const T2& b, const bool transp) {
 template int trace_product(const iMatrix2& a, const iMatrix2& b, const bool transp);
 template double trace_product(const dMatrix2& a, const dMatrix2& b, const bool transp);
 template cdouble trace_product(const cMatrix2& a, const cMatrix2& b, const bool transp);
+
+template <typename T>
+T get_rectangle(const T& a, const ivec& rows) {
+    //IMPORTANT: rows will be filled up as rows dictated, hence a shuffle is possible
+    //const int rows_a = a.extent(0);
+    const int cols_a = a.extent(1);
+    size_t runny = 0;
+    T res(rows.size(), cols_a);
+    for (auto row : rows) {
+        for (int j = 0; j < cols_a; j++) {
+            res(runny, j) = a(row, j);
+        }
+        runny++;
+    }
+    return res;
+}
+template iMatrix2 get_rectangle(const iMatrix2& a, const ivec& rows);
+template dMatrix2 get_rectangle(const dMatrix2& a, const ivec& rows);
+template cMatrix2 get_rectangle(const cMatrix2& a, const ivec& rows);

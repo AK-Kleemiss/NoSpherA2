@@ -133,6 +133,9 @@ T dot_BLAS(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugat
 template <typename T, typename T2>
 T trace_product(const T2& a, const T2& b, const bool transp = false);
 
+template <typename T>
+T get_rectangle(const T& a, const ivec& rows);
+
 // Self written matrix multiplication with flat vectors
 template <typename T>
 std::vector<T> dot(const std::vector<T>& mat, const std::vector<T>& vec, bool transp = false);
