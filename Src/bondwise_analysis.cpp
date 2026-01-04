@@ -7,22 +7,6 @@
 #include "nos_math.h"
 #include "integration_params.h"
 
-// Structure to hold the NAOs
-struct NAOResult {
-    vec eigenvalues;  // Occupancies
-    vec eigenvectors; // Coefficients
-    int atom_index = -1;
-    ivec matrix_elements;
-};
-
-//structrue to contain multiple NAO atom sets and the overlap and density matrices
-struct Roby_information {
-    std::vector<NAOResult> NAOs;
-    dMatrix2 overlap_matrix;
-    dMatrix2 density_matrix;
-    dMatrix2 total_NAOs;
-};
-
 
 int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector, double* incr, std::string& outname, bool rho, bool rdg, bool eli, bool lap) {
     options opt;
@@ -501,7 +485,7 @@ int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, con
 }
 
 //Assuming square matrices
-vec change_basis(const vec& in, const vec& transformation, int size) {
+vec change_basis_sq(const vec& in, const vec& transformation, int size) {
 
     // new = transform^T * in * tranform
     vec result(size * size);
@@ -528,6 +512,27 @@ vec change_basis(const vec& in, const vec& transformation, int size) {
     return result;
 }
 
+//For non-square transformation matrices
+dMatrix2 change_basis_general(const dMatrix2& in, const dMatrix2& transformation, bool forward = true) {
+    //int a, b, c, d;
+    //c = transformation.extent(1); //cols of t
+    //d = transformation.extent(0); //rows of t
+    //a = in.extent(1); //cols of in
+    //b = in.extent(0); //rows of in
+    //err_checkf(a == b, "Input matrix must be square.", std::cout);
+    //err_checkf(c == b, "Incompatible matrix dimensions for basis change.", std::cout);
+    if (!forward) {
+        dMatrix2 temp = dot<dMatrix2>(transformation, in, false, false); // temp = t * in
+        dMatrix2 result = dot<dMatrix2>(temp, transformation, false, true); // res = temp * t^T
+        return result;
+    }
+    else {
+        dMatrix2 temp = dot<dMatrix2>(transformation, in, true, false); // temp = t^T * in
+        dMatrix2 result = dot<dMatrix2>(temp, transformation, false, false); // res = temp * t
+        return result;
+    }
+}
+
 bool isSymmetricViaEigenvalues(const vec& A, int n, double tol = 1e-12) {
     vec A_copy = A;  // dgeev destroys input
     vec wr(n), wi(n);
@@ -543,36 +548,47 @@ bool isSymmetricViaEigenvalues(const vec& A, int n, double tol = 1e-12) {
     return true;
 }
 
-/**
- * Calculates Atomic Natural Orbitals for a specific atom.
- *
- * @param D_full      Pointer to the full Density Matrix (N_basis x N_basis)
- * @param S_full      Pointer to the full Overlap Matrix (N_basis x N_basis)
- * @param full_stride The leading dimension of the full matrices (usually N_basis)
- * @param atom_indices A vector containing the indices (0-based) of the basis functions for this atom
- * @return NAOResult containing sorted occupancies and coefficients
- */
-NAOResult calculateAtomicNAO(const dMatrix2& D_full,
-    const dMatrix2& S_full,
+void get_submatrix(const dMatrix2& full,
+    vec& sub,
     const std::vector<int>& atom_indices) {
+    err_checkf(atom_indices.size() > 0, "Atom indices list is empty.", std::cout);
+    const int n = static_cast<int>(atom_indices.size());
+    err_checkf(full.extent(0) == full.extent(1), "Matrix must be square.", std::cout);
+    err_checkf(sub.size() == n * n, "Submatrix has incorrect size.", std::cout);
 
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            const int global_i = atom_indices[i];
+            const int global_j = atom_indices[j];
+            sub[i * n + j] = full(global_i, global_j);
+        }
+    }
+#ifdef NSA2DEBUG
+    std::cout << "Submatrix:\n";
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << sub[i * n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+#endif
+}
+
+void get_submatrices(const dMatrix2& D_full,
+    const dMatrix2& S_full,
+    vec& D_sub,
+    vec& S_sub,
+    const std::vector<int>& atom_indices) {
+    err_checkf(atom_indices.size() > 0, "Atom indices list is empty.", std::cout);
+    const int n = static_cast<int>(atom_indices.size());
     err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
     err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
     err_checkf(D_full.extent(0) == S_full.extent(0), "Density and Overlap matrices must be of the same size.", std::cout);
+    err_checkf(D_sub.size() == n * n, "Density submatrix has incorrect size.", std::cout);
+    err_checkf(S_sub.size() == n * n, "Overlap submatrix has incorrect size.", std::cout);
 
-    const int n = static_cast<int>(atom_indices.size());
 
-    // 1. Memory Allocation for Submatrices
-    // Using flat std::vectors to ensure contiguous memory for MKL
-    vec D_sub(n * n, 0.0); // called P in tonto
-    vec S_sub(n * n, 0.0); // called S in tonto
-    vec V(n * n);          // Workhorse
-    vec Temp(n * n, 0.0);  // To store S^0.5
-    vec Temp2(n * n, 0.0); // To store S^-0.5
-    vec Rho(n * n);   // To store  target density
-    vec W(n);         // Eigenvalues
-
-    // 2. Gather: Copy elements from full matrices to submatrices
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
             const int global_i = atom_indices[i];
@@ -598,8 +614,39 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
         }
         std::cout << std::endl;
     }
-
 #endif
+}
+
+/**
+ * Calculates Atomic Natural Orbitals for a specific atom.
+ *
+ * @param D_full      Pointer to the full Density Matrix (N_basis x N_basis)
+ * @param S_full      Pointer to the full Overlap Matrix (N_basis x N_basis)
+ * @param full_stride The leading dimension of the full matrices (usually N_basis)
+ * @param atom_indices A vector containing the indices (0-based) of the basis functions for this atom
+ * @return NAOResult containing sorted occupancies and coefficients
+ */
+Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2& D_full,
+    const dMatrix2& S_full,
+    const std::vector<int>& atom_indices) {
+
+    err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
+    err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
+    err_checkf(D_full.extent(0) == S_full.extent(0), "Density and Overlap matrices must be of the same size.", std::cout);
+
+    const int n = static_cast<int>(atom_indices.size());
+
+    // 1. Memory Allocation for Submatrices
+    // Using flat std::vectors to ensure contiguous memory for MKL
+    vec D_sub(n * n, 0.0); // called P in tonto
+    vec S_sub(n * n, 0.0); // called S in tonto
+    get_submatrices(D_full, S_full, D_sub, S_sub, atom_indices);
+
+    vec V(n * n);          // Workhorse
+    vec Temp(n * n, 0.0);  // To store S^0.5
+    vec Temp2(n * n, 0.0); // To store S^-0.5
+    vec Rho(n * n);   // To store  target density
+    vec W(n);         // Eigenvalues
 
     V = S_sub;
     // make V = Sqrt(S)
@@ -633,7 +680,7 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
     }
 #endif
 
-    const vec X = change_basis(D_sub, Temp, n);
+    const vec X = change_basis_sq(D_sub, Temp, n);
 #ifdef NSA2DEBUG
     std::cout << "projected density X:\n";
     for (int i = 0; i < n; ++i) {
@@ -706,6 +753,8 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
     result.eigenvalues = occu;
     result.eigenvectors = Rho; // Rho now contains eigenvectors
     result.matrix_elements = atom_indices;
+    result.sub_DM = D_sub;
+    result.sub_OM = S_sub;
 
     // Create an index vector to sort descending
     ivec idx(n);
@@ -818,7 +867,9 @@ std::vector<double> orthogonalizePNAOs(const vec& C_PNAO,
     return C_NAO;
 }
 
-void LAPACKE_pseudo_inverse_of(vec& A, int m, int n, double cutoff = 1E-5) {
+dMatrix2 LAPACKE_invert(const dMatrix2& A, double cutoff = 1E-5) {
+    const int m = static_cast<int>(A.extent(0)); // rows
+    const int n = static_cast<int>(A.extent(1)); // cols
     int k = std::min(m, n);
 
     // 1. Allocate memory for SVD results
@@ -828,7 +879,7 @@ void LAPACKE_pseudo_inverse_of(vec& A, int m, int n, double cutoff = 1E-5) {
     vec superb(k - 1);        // Workspace for dgesvd
 
     // Make a copy of A because dgesvd destroys the input matrix
-    vec A_copy = A;
+    vec A_copy = A.container();
 
     // 2. Compute SVD: A = U * S * Vt
     // use 'S' for jobu/jobvt to compute the "thin" SVD (only the first k columns/rows)
@@ -857,112 +908,108 @@ void LAPACKE_pseudo_inverse_of(vec& A, int m, int n, double cutoff = 1E-5) {
     }
 
     // 4. Compute A^+ = V * S^+ * U^T
-    vec W(k * m);
+    vec W(k * m, 0.0);
     for (int i = 0; i < k; ++i) {
+        if (S[i] == 0.0) continue;
         for (int j = 0; j < m; ++j) {
             W[i * m + j] = S[i] * U[j * k + i]; // U is row-major (m x k)
         }
     }
 
-    // Resize A to hold the result (n x m)
-    if (A.size() != n * m) {
-        A.resize(n * m);
-    }
-
     // Perform Matrix Multiplication: C = alpha * A * B + beta * C
-
-    cblas_dgemm(
-        CblasRowMajor,
-        CblasTrans, CblasNoTrans,
-        n, m, k,
-        1.0,
-        Vt.data(), n,  // A matrix (Vt), lda=n
-        W.data(), m,   // B matrix (W),  ldb=m
-        0.0,
-        A.data(), m    // C matrix (Result), ldc=m
-    );
+    return dot<dMatrix2>(reshape<dMatrix2>(Vt, Shape2D(k, n)), reshape<dMatrix2>(W, Shape2D(k, m)), true, false);
 }
 
-vec projection_matrix(const vec& NAOs, const vec& overlap, const int& size_overlap, const int& size_NAOs) {
-    //TODO: Make subspace overlap amtrix
-    vec S_Sub;
+double Roby_information::projection_matrix_and_expectation(const ivec& indices) {
+    const int n = indices.size();
+    vec D_Sub(n * n, 0.0);
+    vec S_Sub(n * n, 0.0);
+    get_submatrices(overlap_matrix, density_matrix, S_Sub, D_Sub, indices);
+    dMatrix2 S = reshape<dMatrix2>(S_Sub, Shape2D(n, n));
+    dMatrix2 D = reshape<dMatrix2>(S_Sub, Shape2D(n, n));
 
-    //TODO: Check sizes of all matrizes and change values to lapacke calls and prints
-
-    auto X = change_basis(overlap, NAOs, size_overlap);
-#ifdef NSA2DEBUG
-    std::cout << std::endl << "new Basis:\n";
-    for (int i = 0; i < size_overlap; i++) {
-        for (int j = 0; j < size_NAOs; j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << X[i * size_overlap + j] << " ";
-        std::cout << std::endl;
-    }
-#endif
-
-    auto Y = X;
-    LAPACKE_pseudo_inverse_of(Y, size_NAOs, size_NAOs);
-
-#ifdef NSA2DEBUG
-    std::cout << std::endl << "Back projection S^-0.5:\n";
-    for (int i = 0; i < size_overlap; i++) {
-        for (int j = 0; j < size_NAOs; j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Y[i * size_overlap + j] << " ";
-        std::cout << std::endl;
-    }
-#endif
-
-    vec res(size_NAOs * size_overlap);
-
-    cblas_dgemm(CblasRowMajor,
-        CblasNoTrans, CblasNoTrans,
-        size_overlap, size_overlap, size_overlap,
-        1.0,
-        NAOs.data(), size_NAOs,
-        Y.data(), size_NAOs,
-        0.0,
-        X.data(), size_NAOs);
-
-    cblas_dgemm(CblasRowMajor,
-        CblasNoTrans, CblasTrans,
-        size_overlap, size_overlap, size_overlap,
-        1.0,
-        X.data(), size_NAOs,
-        NAOs.data(), size_NAOs,
-        0.0,
-        res.data(), //This is P in the code
-        size_NAOs);
-
-    return res;
-}
-
-double trace_product(const vec& a, const vec& b, int size1, int size2) {
-    double res = 0;
-    for (int i = 0; i < size1; ++i) {
-        for (int j = 0; j < size2; ++j) {
-            res += a[i * size2 + j] * b[j * size1 + i];
+    dMatrix2 NAOs;
+    if (n == total_NAOs.extent(1))
+        NAOs = total_NAOs;
+    else {
+        //TODO: assign subspace NAOs from NAOResults
+        for (auto NAO : this->NAOs) {
+            // if matrix_elemnts of this NAO are identical to indices, resahpe NAO.eigenvectors to the correct shape
+            if (NAO.matrix_elements == indices)
+                NAOs = reshape<dMatrix2>(NAO.eigenvectors, Shape2D(NAO.eigenvalues.size(), n));
         }
     }
-    return res;
+
+    auto X = change_basis_general(S, transpose(NAOs));
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "new Basis:\n";
+    for (int i = 0; i < X.extent(0); i++) {
+        for (int j = 0; j < X.extent(1); j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << X(i, j) << " ";
+        std::cout << std::endl;
+    }
+#endif
+
+    auto Y = LAPACKE_invert(X);
+
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "Pseudo inverse of Y:\n";
+    for (int i = 0; i < Y.extent(0); i++) {
+        for (int j = 0; j < Y.extent(1); j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Y(i, j) << " ";
+        std::cout << std::endl;
+    }
+#endif
+
+    X = change_basis_general(Y, transpose(NAOs), false);
+
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "Backtransformed X:\n";
+    for (int i = 0; i < X.extent(0); i++) {
+        for (int j = 0; j < X.extent(1); j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << X(i, j) << " ";
+        std::cout << std::endl;
+    }
+#endif
+
+    //return X; X is now projection matrix
+    // n = n_bf
+
+    auto W = change_basis_general(X, S);
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "Overlap transformed W:\n";
+    for (int i = 0; i < W.extent(0); i++) {
+        for (int j = 0; j < W.extent(1); j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << W(i, j) << " ";
+        std::cout << std::endl;
+    }
+#endif
+
+    const double expect = trace_product<double>(W, D);
+    return expect;
 }
 
-
-double expectation(const vec& dens_mat, const vec& S_sub, const vec& rho, int size) {
-    auto W = change_basis(dens_mat, S_sub, size);
-    return trace_product(W, rho, static_cast<int>(std::sqrt(dens_mat.size())), static_cast<int>(std::sqrt(S_sub.size())));
+double Roby_information::Roby_population_analysis(const ivec atoms) {
+    ivec bf_indices;
+    if (atoms.size() == 0) {
+        for (NAOResult& NAO : NAOs) {
+            for (auto index : NAO.matrix_elements)
+                bf_indices.push_back(index);
+        }
+    }
+    else {
+        bf_indices = atoms;
+    }
+    double P = projection_matrix_and_expectation(bf_indices);
+    return P;
 }
 
-double Roby_population_analysis(const vec& NAOs, const vec& density_matrix, const vec& overlap_mat, int size) {
-    auto P = projection_matrix(NAOs, density_matrix, static_cast<int>(std::sqrt(density_matrix.size())), static_cast<int>(std::sqrt(NAOs.size())));
-    return expectation(P, overlap_mat, density_matrix, size);
-}
-
-Roby_information computeAllAtomicNAOs(WFN& wavy) {
+void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
     const int N_atoms = wavy.get_ncen();
     const std::vector<atom> ats = wavy.get_atoms();
-    Roby_information all_results;
-    all_results.NAOs.reserve(N_atoms);
+    NAOs.reserve(N_atoms);
 
-    all_results.density_matrix = wavy.get_dm();
+    density_matrix = wavy.get_dm();
 
     Int_Params basis(wavy);
     vec S_full;
@@ -970,14 +1017,13 @@ Roby_information computeAllAtomicNAOs(WFN& wavy) {
         compute2c_Overlap_Cart(basis, S_full);
     else
         compute2C<Overlap2C>(basis, S_full);
-    Shape2D shape(all_results.density_matrix.extent(0), all_results.density_matrix.extent(1));
 
-    all_results.overlap_matrix = reshape<dMatrix2>(S_full, shape);
+    overlap_matrix = reshape<dMatrix2>(S_full, Shape2D(density_matrix.extent(0), density_matrix.extent(1)));
 
     int last_index = 0;
     ivec2 indices(wavy.get_ncen());
     for (auto& a : ats) {
-        indices[a.get_nr() - 1].reserve(all_results.density_matrix.extent(0) / N_atoms); // Rough estimate
+        indices[a.get_nr() - 1].reserve(density_matrix.extent(0) / N_atoms); // Rough estimate
         int current_shell = -1;
         int nr_indices = 0;
         std::vector<basis_set_entry> basis_set = a.get_basis_set();
@@ -996,56 +1042,67 @@ Roby_information computeAllAtomicNAOs(WFN& wavy) {
         }
 
         //pNAO.eigenvectors = orthogonalizePNAOs(pNAO.eigenvectors, S_full, static_cast<int>(indices[a.get_nr()].size()));
-        all_results.NAOs.emplace_back(calculateAtomicNAO(all_results.density_matrix, all_results.overlap_matrix, indices[a.get_nr() - 1]));
-        all_results.NAOs.back().atom_index = a.get_nr() - 1;
-
+        NAOs.emplace_back(calculateAtomicNAO(density_matrix, overlap_matrix, indices[a.get_nr() - 1]));
+        NAOs.back().atom_index = a.get_nr() - 1;
     }
-    return all_results;
 }
 
-void RGBI_Analysis(WFN& wavy) {
-    auto all_NAOs = computeAllAtomicNAOs(wavy);
+Roby_information::Roby_information(WFN& wavy) {
+    computeAllAtomicNAOs(wavy);
     Shape2D NAOs_size;
-    std::vector<Shape2D> matrix_elements_per_atom(all_NAOs.NAOs.size(), { 0,0 });
-    for (size_t atom_idx = 0; atom_idx < all_NAOs.NAOs.size(); atom_idx++) {
+    for (size_t atom_idx = 0; atom_idx < NAOs.size(); atom_idx++) {
 #ifdef NSA2DEBUG
         std::cout << "Atom " << atom_idx + 1 << " NAO Occupancies:\n";
 #endif
-        for (size_t i = 0; i < all_NAOs.NAOs[atom_idx].eigenvalues.size(); i++) {
+        for (size_t i = 0; i < NAOs[atom_idx].eigenvalues.size(); i++) {
 #ifdef NSA2DEBUG
-            std::cout << "  NAO " << i + 1 << ": " << std::setprecision(6) << all_NAOs.NAOs[atom_idx].eigenvalues[i] << "\n";
+            std::cout << "  NAO " << i + 1 << ": " << std::setprecision(6) << NAOs[atom_idx].eigenvalues[i] << "\n";
 #endif
-            matrix_elements_per_atom[atom_idx].cols++;
-            NAOs_size.cols++;
+            NAOs_size.rows++;
         }
-        const int rows = all_NAOs.NAOs[atom_idx].eigenvectors.size() / matrix_elements_per_atom[atom_idx].cols;
-        NAOs_size.rows += rows;
-        matrix_elements_per_atom[atom_idx].rows = rows;
+        const int cols = NAOs[atom_idx].eigenvectors.size() / NAOs[atom_idx].eigenvalues.size();
+        NAOs_size.cols += cols;
         std::cout << std::endl;
     }
-    //Create a square matrix of size matrix_size x matrix_size and fill with subblocks of the evecs
+    //Create a matrix of size n_NAOs x n_bf and fill with subblocks of the evecs
     vec NAO_matrix(NAOs_size.cols * NAOs_size.rows, 0.0);
-    Shape2D offset(0, 0);
-    for (int a = 0; a < all_NAOs.NAOs.size(); a++) {
-        for (int i = 0; i < matrix_elements_per_atom[a].cols; i++) {
-            for (int j = 0; j < matrix_elements_per_atom[a].rows; j++) {
-                const int index_NAO = (offset.cols + i) * NAOs_size.rows + (offset.rows + j);
-                const int index_eigenvector = i * matrix_elements_per_atom[a].rows + j;
-                NAO_matrix[index_NAO] = all_NAOs.NAOs[a].eigenvectors[index_eigenvector];
+    total_NAOs = reshape<dMatrix2>(NAO_matrix, Shape2D(NAOs_size.rows, NAOs_size.cols));
+    Shape2D temp = { 0,0 };
+    for (auto NAO : NAOs) {
+        const int ME = NAO.matrix_elements.size();
+        const int NEV = NAO.eigenvalues.size();
+        for (int i = 0; i < NEV; i++) {
+            const int row = temp.rows + i;
+            for (int j = 0; j < ME; j++) {
+                const int index_eigenvector = i * ME + j;
+                const int col = temp.cols + j;
+                total_NAOs(row, col) = NAO.eigenvectors[index_eigenvector];
             }
         }
-        offset.cols += matrix_elements_per_atom[a].cols;
-        offset.rows += matrix_elements_per_atom[a].rows;
+        temp.rows += NAO.eigenvalues.size();
+        temp.cols += NAO.matrix_elements.size();
     }
-    Shape2D temp(7, 19);
-    all_NAOs.total_NAOs = reshape<dMatrix2>(NAO_matrix, temp);
 #ifdef NSA2DEBUG
     std::cout << std::endl << "Global NAO Matrix:\n";
-    for(int i = 0; i < NAOs_size.rows; i++) {
+    for (int i = 0; i < NAOs_size.rows; i++) {
         for (int j = 0; j < NAOs_size.cols; j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << all_NAOs.total_NAOs(j, i) << " ";
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << total_NAOs(i, j) << " ";
         std::cout << std::endl;
     }
 #endif
+    // total_NAOs has n_NAOs rows (each row is an individual NAO in the basis set)
+    // and n_bfs columns, where each value corresponds to a basis function from here on
+    double all_atom_population = Roby_population_analysis({});
+#ifdef NSA2DEBUG
+    std::cout << std::endl << "Expectation value: " << all_atom_population << "\n";
+#endif
+    vec atom_pops(NAOs.size(), 0.0);
+    for (auto NAO : NAOs) {
+        atom_pops[NAO.atom_index] = Roby_population_analysis(NAO.matrix_elements);
+#ifdef NSA2DEBUG
+        std::cout << std::endl << "Expectation value: " << atom_pops[NAO.atom_index] << "\n";
+#endif    
+    }
+
     double null = 0;
 }

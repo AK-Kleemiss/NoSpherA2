@@ -14,8 +14,38 @@ struct bond {
     bool esp;
 };
 
+//structrue to contain multiple NAO atom sets and the overlap and density matrices
+class Roby_information {
+private:
+    // Structure to hold the NAOs
+    struct NAOResult {
+        vec eigenvalues;  // Occupancies
+        vec eigenvectors; // Coefficients
+        int atom_index = -1;
+        ivec matrix_elements;
+        vec sub_DM;
+        vec sub_OM;
+    };
+
+    std::vector<NAOResult> NAOs;
+    dMatrix2 overlap_matrix;
+    dMatrix2 density_matrix;
+    dMatrix2 total_NAOs;
+    NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full, const std::vector<int>& atom_indices);
+    double projection_matrix_and_expectation(const ivec& indices);
+    void computeAllAtomicNAOs(WFN& wavy);
+public:
+    Roby_information() = default;
+    ~Roby_information() = default;
+    Roby_information(const Roby_information&) = default;
+    Roby_information(WFN& wavy);
+    
+    double Roby_population_analysis(ivec atoms);
+
+
+};
+
 bond do_bonds(WFN& wavy, int mode_general, int mode_sel, bool mode_leng, bool mode_res, double res[], bool cub, double boxsize[], int atom1, int atom2, int atom3, const bool& debug, const bool& bohr, int runnumber, bool rho, bool rdg, bool eli, bool lap);
 int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, const bool& bohr);
-void RGBI_Analysis(WFN& wavy);
 
 #include "wfn_class.h"

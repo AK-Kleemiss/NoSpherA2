@@ -392,8 +392,7 @@ int main(int argc, char** argv)
         log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
         if (opt.rgbi) {
-            RGBI_Analysis(wavy[0]);
-
+            Roby_information Roby(wavy[0]);
         }
 
         // this one is for generation of an fchk file
