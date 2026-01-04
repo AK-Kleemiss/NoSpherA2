@@ -13,6 +13,8 @@ struct NAOResult {
     vec eigenvectors; // Coefficients
     int atom_index = -1;
     ivec matrix_elements;
+    vec sub_DM;
+    vec sub_OM;
 };
 
 //structrue to contain multiple NAO atom sets and the overlap and density matrices
@@ -706,6 +708,8 @@ NAOResult calculateAtomicNAO(const dMatrix2& D_full,
     result.eigenvalues = occu;
     result.eigenvectors = Rho; // Rho now contains eigenvectors
     result.matrix_elements = atom_indices;
+    result.sub_DM = D_sub;
+    result.sub_OM = S_sub;
 
     // Create an index vector to sort descending
     ivec idx(n);
@@ -883,76 +887,74 @@ void LAPACKE_pseudo_inverse_of(vec& A, int m, int n, double cutoff = 1E-5) {
     );
 }
 
-vec projection_matrix(const vec& NAOs, const vec& overlap, const int& size_overlap, const int& size_NAOs) {
-    //TODO: Make subspace overlap amtrix
-    vec S_Sub;
-
+vec projection_matrix(const vec& NAOs, const vec& overlap, const int& size_overlap, const Shape2D size_NAOs) {
     //TODO: Check sizes of all matrizes and change values to lapacke calls and prints
 
     auto X = change_basis(overlap, NAOs, size_overlap);
 #ifdef NSA2DEBUG
     std::cout << std::endl << "new Basis:\n";
     for (int i = 0; i < size_overlap; i++) {
-        for (int j = 0; j < size_NAOs; j++)
+        for (int j = 0; j < size_NAOs.cols; j++)
             std::cout << std::setw(14) << std::setprecision(8) << std::fixed << X[i * size_overlap + j] << " ";
         std::cout << std::endl;
     }
 #endif
 
     auto Y = X;
-    LAPACKE_pseudo_inverse_of(Y, size_NAOs, size_NAOs);
+    LAPACKE_pseudo_inverse_of(Y, size_NAOs.cols, size_NAOs.rows);
 
 #ifdef NSA2DEBUG
     std::cout << std::endl << "Back projection S^-0.5:\n";
     for (int i = 0; i < size_overlap; i++) {
-        for (int j = 0; j < size_NAOs; j++)
+        for (int j = 0; j < size_NAOs.cols; j++)
             std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Y[i * size_overlap + j] << " ";
         std::cout << std::endl;
     }
 #endif
 
-    vec res(size_NAOs * size_overlap);
+    vec res(size_NAOs.cols * size_overlap);
 
     cblas_dgemm(CblasRowMajor,
         CblasNoTrans, CblasNoTrans,
         size_overlap, size_overlap, size_overlap,
         1.0,
-        NAOs.data(), size_NAOs,
-        Y.data(), size_NAOs,
+        NAOs.data(), size_NAOs.cols,
+        Y.data(), size_NAOs.rows,
         0.0,
-        X.data(), size_NAOs);
+        X.data(), size_NAOs.cols);
 
     cblas_dgemm(CblasRowMajor,
         CblasNoTrans, CblasTrans,
         size_overlap, size_overlap, size_overlap,
         1.0,
-        X.data(), size_NAOs,
-        NAOs.data(), size_NAOs,
+        X.data(), size_NAOs.cols,
+        NAOs.data(), size_NAOs.rows,
         0.0,
         res.data(), //This is P in the code
-        size_NAOs);
+        size_NAOs.cols);
 
     return res;
 }
 
-double trace_product(const vec& a, const vec& b, int size1, int size2) {
+double trace_product(const vec& a, const vec& b, const Shape2D size) {
     double res = 0;
-    for (int i = 0; i < size1; ++i) {
-        for (int j = 0; j < size2; ++j) {
-            res += a[i * size2 + j] * b[j * size1 + i];
+    for (int i = 0; i < size.cols; ++i) {
+        for (int j = 0; j < size.rows; ++j) {
+            res += a[i * size.cols + j] * b[j * size.cols + i];
         }
     }
     return res;
 }
 
 
-double expectation(const vec& dens_mat, const vec& S_sub, const vec& rho, int size) {
-    auto W = change_basis(dens_mat, S_sub, size);
-    return trace_product(W, rho, static_cast<int>(std::sqrt(dens_mat.size())), static_cast<int>(std::sqrt(S_sub.size())));
+double expectation(const vec& dens_mat, const vec& S_sub, const vec& rho, const Shape2D size) {
+    err_checkf(size.rows == size.cols, "Density matrix must be square!", std::cout);
+    auto W = change_basis(dens_mat, S_sub, size.rows);
+    return trace_product(W, rho, size);
 }
 
-double Roby_population_analysis(const vec& NAOs, const vec& density_matrix, const vec& overlap_mat, int size) {
-    auto P = projection_matrix(NAOs, density_matrix, static_cast<int>(std::sqrt(density_matrix.size())), static_cast<int>(std::sqrt(NAOs.size())));
+double Roby_population_analysis(const vec& NAOs, const vec& density_matrix, const vec& overlap_mat, const Shape2D size) {
+    auto P = projection_matrix(NAOs, density_matrix, static_cast<int>(std::sqrt(density_matrix.size())), size);
     return expectation(P, overlap_mat, density_matrix, size);
 }
 
@@ -1037,15 +1039,17 @@ void RGBI_Analysis(WFN& wavy) {
         offset.cols += matrix_elements_per_atom[a].cols;
         offset.rows += matrix_elements_per_atom[a].rows;
     }
-    Shape2D temp(7, 19);
+    Shape2D temp(NAOs_size.rows, NAOs_size.cols);
     all_NAOs.total_NAOs = reshape<dMatrix2>(NAO_matrix, temp);
 #ifdef NSA2DEBUG
     std::cout << std::endl << "Global NAO Matrix:\n";
-    for(int i = 0; i < NAOs_size.rows; i++) {
+    for (int i = 0; i < NAOs_size.rows; i++) {
         for (int j = 0; j < NAOs_size.cols; j++)
             std::cout << std::setw(14) << std::setprecision(8) << std::fixed << all_NAOs.total_NAOs(j, i) << " ";
         std::cout << std::endl;
     }
 #endif
+
+    auto all_atom_group = Roby_population_analysis(all_NAOs.total_NAOs.container(), all_NAOs.density_matrix.container(), all_NAOs.overlap_matrix.container(), NAOs_size);
     double null = 0;
 }
