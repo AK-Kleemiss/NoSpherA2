@@ -7,6 +7,17 @@
 #include "nos_math.h"
 #include "integration_params.h"
 
+#ifdef NSA2DEBUG
+void print_dmatrix2(const dMatrix2& EVC2, const std::string name) {
+    std::cout << std::endl << name << ":\n";
+    for (int i = 0; i < EVC2.extent(0); i++) {
+        for (int j = 0; j < EVC2.extent(1); j++)
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << EVC2(i, j) << " ";
+        std::cout << std::endl;
+    }
+}
+#endif
+
 
 int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector, double* incr, std::string& outname, bool rho, bool rdg, bool eli, bool lap) {
     options opt;
@@ -480,11 +491,11 @@ std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN& wavy) {
     {
         for (int j = i + 1; j < wavy.get_ncen(); j++)
         {
-            double distance = std::hypot(wavy.get_atom_coordinate(i, 0) - wavy.get_atom_coordinate(j, 0),
+            const double distance = std::hypot(wavy.get_atom_coordinate(i, 0) - wavy.get_atom_coordinate(j, 0),
                 wavy.get_atom_coordinate(i, 1) - wavy.get_atom_coordinate(j, 1),
                 wavy.get_atom_coordinate(i, 2) - wavy.get_atom_coordinate(j, 2));
-            double svdW = constants::ang2bohr(constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)]);
-            if (distance < 1.35 * svdW)
+            const double svdW = constants::ang2bohr(constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)]);
+            if (distance < 1.5 * svdW)
             {
 #ifdef NSA2DEBUG
                 std::cout << "Bond between " << i << " (" << wavy.get_atom_charge(i) << ") and " << j << " (" << wavy.get_atom_charge(j) << ") with distance " << distance << " and svdW " << svdW << std::endl;
@@ -602,24 +613,12 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
                 Temp[i * n + j] += V[i * n + k] * W[k] * V[j * n + k];
 
 #ifdef NSA2DEBUG
-    std::cout << "projection matrix V:\n";
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Temp[i * n + j] << " ";
-        }
-        std::cout << std::endl;
-    }
+    print_dmatrix2(reshape<dMatrix2>(Temp, Shape2D(n, n)), "projection matrix V");
 #endif
 
     const vec X = change_basis_sq(D_sub, Temp, n);
 #ifdef NSA2DEBUG
-    std::cout << "projected density X:\n";
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << X[i * n + j] << " ";
-        }
-        std::cout << std::endl;
-    }
+    print_dmatrix2(reshape<dMatrix2>(X, Shape2D(n, n)), "projected density X");
 #endif
     vec occu(n, 0);
     vec P = X;
@@ -633,12 +632,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
     for (int i = 0; i < n; ++i) {
         std::cout << std::setw(14) << std::setprecision(8) << std::fixed << occu[i] << " ";
     }
-    std::cout << std::endl << "Projected density P:\n";
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << P[i * n + j] << " ";
-        std::cout << std::endl;
-    }
+    print_dmatrix2(reshape<dMatrix2>(P, Shape2D(n, n)), "Projected density P");
 #endif
 
     for (int i = 0; i < n; i++) {
@@ -654,12 +648,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
                 Temp2[i * n + j] += V[i * n + k] * W[k] * V[j * n + k];
 
 #ifdef NSA2DEBUG
-    std::cout << std::endl << "Back projection S^-0.5:\n";
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Temp2[i * n + j] << " ";
-        std::cout << std::endl;
-    }
+    print_dmatrix2(reshape<dMatrix2>(Temp2, Shape2D(n, n)), "Back projection S^-0.5");
 #endif
 
     cblas_dgemm(CblasRowMajor,
@@ -672,12 +661,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
         Rho.data(), n);
 
 #ifdef NSA2DEBUG
-    std::cout << std::endl << "resulting NAO:\n";
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Rho[i * n + j] << " ";
-        std::cout << std::endl;
-    }
+    print_dmatrix2(reshape<dMatrix2>(Rho, Shape2D(n, n)), "resulting NAO");
 #endif
 
     NAOResult result;
@@ -798,7 +782,7 @@ std::vector<double> orthogonalizePNAOs(const vec& C_PNAO,
     return C_NAO;
 }
 
-double Roby_information::projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals, const ivec& eigvecs) {
+double Roby_information::projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals, const ivec& eigvecs, dMatrix2* given_NAO) {
     const int n = indices.size();
     //vec D_Sub(n * n, 0.0);
     vec S_Sub(n * n, 0.0);
@@ -824,65 +808,45 @@ double Roby_information::projection_matrix_and_expectation(const ivec& indices, 
         const int n1 = eigvals.size();
         const int n2 = eigvecs.size();
         vec NAO_sub(n1 * n2);
-        get_submatrix(total_NAOs, NAO_sub, eigvals, eigvecs);
+        if (given_NAO == nullptr)
+            given_NAO = &total_NAOs;
+        get_submatrix(*given_NAO, NAO_sub, eigvals, eigvecs);
         NAOs = reshape<dMatrix2>(NAO_sub, Shape2D(n1, n2));
     }
+#ifdef NSA2DEBUG
+    print_dmatrix2(NAOs, "W in projection matrix making");
+#endif
 
     auto X = change_basis_general(S, transpose(NAOs));
 #ifdef NSA2DEBUG
-    std::cout << std::endl << "new Basis:\n";
-    for (int i = 0; i < X.extent(0); i++) {
-        for (int j = 0; j < X.extent(1); j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << X(i, j) << " ";
-        std::cout << std::endl;
-    }
+    print_dmatrix2(X, "new Basis");
 #endif
 
     auto Y = LAPACKE_invert(X);
-
 #ifdef NSA2DEBUG
-    std::cout << std::endl << "Pseudo inverse of Y:\n";
-    for (int i = 0; i < Y.extent(0); i++) {
-        for (int j = 0; j < Y.extent(1); j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Y(i, j) << " ";
-        std::cout << std::endl;
-    }
+    print_dmatrix2(Y, "Pseudo inverse of Y");
 #endif
 
     //making the projection matrix
     X = change_basis_general(Y, transpose(NAOs), false);
-
-    if (atom >= 0)
-        projection_matrices.push_back(X);
-
 #ifdef NSA2DEBUG
-    std::cout << std::endl << "Backtransformed X:\n";
-    for (int i = 0; i < X.extent(0); i++) {
-        for (int j = 0; j < X.extent(1); j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << X(i, j) << " ";
-        std::cout << std::endl;
-    }
+    print_dmatrix2(X, "Backtransformed X");
 #endif
+
+    if (atom >= 0) {
+        projection_matrices.push_back(X);
+        overlap_matrices.push_back(S);
+    }
 
     dMatrix2 S_rect = get_rectangle(overlap_matrix, indices);
 #ifdef NSA2DEBUG
-    std::cout << std::endl << "S_rect:\n";
-    for (int i = 0; i < S_rect.extent(0); i++) {
-        for (int j = 0; j < S_rect.extent(1); j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << S_rect(i, j) << " ";
-        std::cout << std::endl;
-    }
+    print_dmatrix2(S_rect, "S_rect:");
 #endif
 
     //overlap projection
     auto W = change_basis_general(X, S_rect);
 #ifdef NSA2DEBUG
-    std::cout << std::endl << "Overlap transformed W:\n";
-    for (int i = 0; i < W.extent(1); i++) {
-        for (int j = 0; j < W.extent(0); j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << W(i, j) << " ";
-        std::cout << std::endl;
-    }
+    print_dmatrix2(W, "Overlap transformed W");
 #endif
 
     const double expect = trace_product<double>(W, density_matrix);
@@ -951,46 +915,72 @@ ivec Roby_information::find_eigenvalue_pairs(const vec& eigvals, const double to
     const int n = eigvals.size();
     ivec pairs(n, -1);
     for (int i = 0; i < n; i++) {
-		if (pairs[i] >= 0) 
+        if (pairs[i] >= 0)
             continue; // already paired
         for (int j = 0; j < n; j++) {
-			if (pairs[j] >= 0) 
+            if (pairs[j] >= 0)
                 continue; // already paired
-            if (abs(abs(eigvals[j])-1.0) < tolerance) 
+            if (abs(abs(eigvals[j]) - 1.0) < tolerance)
                 continue; // skip values close ot +/- one, as they reside only on one atom
             if (abs(eigvals[i] + eigvals[j]) < tolerance) {
                 pairs[i] = j;
                 pairs[j] = i;
                 break;
-			}
+            }
         }
-        if (pairs[i] == -1) 
+        if (pairs[i] == -1)
             pairs[i] = i;
     }
     return pairs;
 }
 
-void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& EVC, const vec& eigvals, const ivec& pairs, const int index_a, const int index_b) {
+void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(
+    dMatrix2& EVC,
+    const vec& eigvals,
+    const ivec& pairs,
+    const int index_a,
+    const int index_b,
+    const ivec& pair_matrix_indices)
+{
     double fp, fm, fa, fb, s, c, s2;
-    const int n_ab = EVC.extent(1);
+    const int n_ab = EVC.extent(0);
     const int n_eigvals = eigvals.size();
     const int n_a = projection_matrices[index_a].extent(0);
     const int n_b = projection_matrices[index_b].extent(0);
     err_checkf(n_ab == n_a + n_b, "Inconsitent size in projection matrices?!", std::cout);
-    err_checkf(n_eigvals == EVC.extent(0), "Inconsitency between EVC and eigvals", std::cout);
-    
+    err_checkf(n_eigvals == EVC.extent(1), "Inconsitency between EVC and eigvals", std::cout);
+
     dMatrix1 A(n_a), B(n_b);
     dMatrix1 EVC_column(n_ab);
     dMatrix2 PAS(n_a, n_ab), PBS(n_b, n_ab);
 
-    //TODO: Make PAS und PBS using "right overlap transofrm"
+    vec Sub_overlap(n_a * n_ab);
+    get_submatrix(overlap_matrix, Sub_overlap, NAOs[index_a].matrix_elements, pair_matrix_indices);
+    dMatrix2 Sa = reshape<dMatrix2>(Sub_overlap, Shape2D(n_a, n_ab));
+    PAS = dot<dMatrix2>(projection_matrices[index_a], Sa, false, false);
+    Sub_overlap.clear(); Sub_overlap.resize(n_b * n_ab);
+    get_submatrix(overlap_matrix, Sub_overlap, NAOs[index_b].matrix_elements, pair_matrix_indices);
+    dMatrix2 Sb = reshape<dMatrix2>(Sub_overlap, Shape2D(n_b, n_ab));
+    PBS = dot<dMatrix2>(projection_matrices[index_b], Sb, false, false);
+#ifdef NSA2DEBUG
+    print_dmatrix2(PAS, "PAS");
+    print_dmatrix2(PBS, "PBS");
+#endif // NSA2DEBUG
+
 
     for (int i = 0; i < n_eigvals; i++) {
         if (pairs[i] < 0) continue;
         if (pairs[i] == i) continue;
         if (eigvals[i] < eigvals[pairs[i]]) continue;
+#ifdef NSA2DEBUG
+        std::cout << "Doing i=" << i << std::endl;
+#endif
         for (int a = 0; a < n_ab; a++)
-            EVC_column(a) = EVC(i, a);
+            EVC_column(a) = EVC(a, i);
+
+#ifdef NSA2DEBUG
+        print_dmatrix2(reshape<dMatrix2>(EVC_column, Shape2D(n_ab, 1)), "slice used");
+#endif
 
         s = eigvals[i];
         s2 = s * s;
@@ -1013,6 +1003,12 @@ void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& 
                 B(b) /= fb;
         }
 
+#ifdef NSA2DEBUG
+        std::cout << "fa: " << fa << std::endl << "fb: " << fb << std::endl;
+        print_dmatrix2(reshape<dMatrix2>(A, Shape2D(n_a, 1)), "A");
+        print_dmatrix2(reshape<dMatrix2>(B, Shape2D(n_b, 1)), "B");
+#endif
+
         //build antibonding state in pairs[i]
         fa = 0.5 * (fm - fp);
         fb = 0.5 * (fm + fp);
@@ -1021,9 +1017,45 @@ void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& 
             EVC(a, pairs[i]) = fa * A(a);
         }
         for (int b = n_a; b < n_ab; b++) {
-            EVC(b, pairs[i]) = fb * B(b);
+            EVC(b, pairs[i]) = fb * B(b - n_a);
         }
     }
+}
+
+std::map<char, dMatrix2> Roby_information::make_covalent_from_ionic(
+    const dMatrix2& theta_I,
+    const vec& eigvals,
+    const ivec& pairs) {
+    std::map<char, dMatrix2> res; // A = angle, V = eigen_value, T = Theta_vector
+    const int size = eigvals.size();
+    res.emplace('A', dMatrix2(size, 1));
+    res.emplace('V', dMatrix2(size, 1));
+    res.emplace('T', dMatrix2(theta_I.extent(0), theta_I.extent(1)));
+
+    for (int i = 0; i < size; i++) {
+        res['A'](i, 0) = 90.0;
+        res['V'](i, 0) = 0.0;
+    }
+
+    for (int val = 0; val < size; val++) {
+        if (pairs[val] < 0) continue;
+        if (pairs[val] == val) continue;
+        const double s = eigvals[val];
+        if (s < eigvals[pairs[val]]) continue;
+
+        for (int i = 0; i < theta_I.extent(0); i++) {
+            res['T'](i, val) = constants::INV_SQRT2 * (theta_I(i, val) + theta_I(i, pairs[val]));
+            res['T'](i, pairs[val]) = constants::INV_SQRT2 * (theta_I(i, val) - theta_I(i, pairs[val]));
+        }
+
+        const double c = sqrt(1.0 - s * s);
+        res['V'](val, 0) = c;
+        res['V'](pairs[val], 0) = -c;
+
+        res['A'](val, 0) = atan2(s, c) * constants::INV_PI_180;
+    }
+
+    return res;
 }
 
 Roby_information::Roby_information(WFN& wavy) {
@@ -1042,7 +1074,9 @@ Roby_information::Roby_information(WFN& wavy) {
         }
         const int cols = NAOs[atom_idx].eigenvectors.size() / NAOs[atom_idx].eigenvalues.size();
         NAOs_size.cols += cols;
+#ifdef NSA2DEBUG
         std::cout << std::endl;
+#endif
     }
     //Create a matrix of size n_NAOs x n_bf and fill with subblocks of the evecs
     vec NAO_matrix(NAOs_size.cols * NAOs_size.rows, 0.0);
@@ -1063,34 +1097,23 @@ Roby_information::Roby_information(WFN& wavy) {
         temp.cols += NAO.matrix_elements.size();
     }
 #ifdef NSA2DEBUG
-    std::cout << std::endl << "Global NAO Matrix:\n";
-    for (int i = 0; i < NAOs_size.rows; i++) {
-        for (int j = 0; j < NAOs_size.cols; j++)
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << total_NAOs(i, j) << " ";
-        std::cout << std::endl;
-    }
+    print_dmatrix2(total_NAOs, "Global NAO Matrix");
 #endif
     // total_NAOs has n_NAOs rows (each row is an individual NAO in the basis set)
     // and n_bfs columns, where each value corresponds to a basis function from here on
     double all_atom_population = Roby_population_analysis({});
-#ifdef NSA2DEBUG
-    std::cout << std::endl << "Expectation value: " << all_atom_population << "\n";
-#endif
+    std::cout << std::endl << "Total Population: " << all_atom_population << "\n\n";
     vec atom_pops(NAOs.size(), 0.0);
     for (auto NAO : NAOs) {
         atom_pops[NAO.atom_index] = Roby_population_analysis(NAO.matrix_elements);
-#ifdef NSA2DEBUG
-        std::cout << std::endl << "Expectation value: " << atom_pops[NAO.atom_index] << "\n";
-#endif
+        std::cout << "\tAtom " << NAO.atom_index << ": " << atom_pops[NAO.atom_index] << std::endl;
     }
 
     dMatrix2 atom_pair_populations(NAOs.size(), NAOs.size());
 
     //now perform bond analysis for all bonded atoms
     for (auto bond : bonds) {
-#ifdef NSA2DEBUG
-        std::cout << std::endl << "---------------------------- Atom Pair: "  << bond.first<< " " << bond.second << " ----------------------\n";
-#endif
+        std::cout << std::endl << "---------------------------- Atom Pair: " << bond.first << " " << bond.second << " ----------------------\n";
         ivec bond_indices, bond_eigenvecs, bond_eigenvals;
         //gather basis function indices for both atoms
         for (auto idx : NAOs[bond.first].matrix_elements)
@@ -1140,12 +1163,7 @@ Roby_information::Roby_information(WFN& wavy) {
             }
         }
 #ifdef NSA2DEBUG
-        std::cout << std::endl << "Ionic Operator:\n";
-        for (int i = 0; i < size_ion1; i++) {
-            for (int j = 0; j < size_ion2; j++)
-                std::cout << std::setw(14) << std::setprecision(8) << std::fixed << Ionic_Operator(i, j) << " ";
-            std::cout << std::endl;
-        }
+        print_dmatrix2(Ionic_Operator, "Ionic Operator");
 #endif
         // get matching suboverlap matrix
         const int n = bond_indices.size();
@@ -1178,33 +1196,18 @@ Roby_information::Roby_information(WFN& wavy) {
 
         auto A = reshape<dMatrix2>(Temp, Shape2D(n, n));
 #ifdef NSA2DEBUG
-        std::cout << std::endl << "Overlap Sqrt SH:\n";
-        for (int i = 0; i < A.extent(0); i++) {
-            for (int j = 0; j < A.extent(1); j++)
-                std::cout << std::setw(14) << std::setprecision(8) << std::fixed << A(i, j) << " ";
-            std::cout << std::endl;
-        }
+        print_dmatrix2(A, "Overlap Sqrt SH");
 #endif
 
         auto SI = LAPACKE_invert(A);
 
 #ifdef NSA2DEBUG
-        std::cout << std::endl << "Overlap Pseudo Inverse:\n";
-        for (int i = 0; i < SI.extent(0); i++) {
-            for (int j = 0; j < SI.extent(1); j++)
-                std::cout << std::setw(14) << std::setprecision(8) << std::fixed << SI(i, j) << " ";
-            std::cout << std::endl;
-        }
+        print_dmatrix2(SI, "Overlap Pseudo Inverse");
 #endif
 
-        auto X = change_basis_general(Ionic_Operator, transpose(A),  true);
+        auto X = change_basis_general(Ionic_Operator, transpose(A), true);
 #ifdef NSA2DEBUG
-        std::cout << std::endl << "Overlap Eigenproblem:\n";
-        for (int i = 0; i < X.extent(0); i++) {
-            for (int j = 0; j < X.extent(1); j++)
-                std::cout << std::setw(14) << std::setprecision(8) << std::fixed << X(i, j) << " ";
-            std::cout << std::endl;
-        }
+        print_dmatrix2(X, "Overlap Eigenproblem");
 #endif
 
         // solve symmetric eigenproblem of X
@@ -1226,18 +1229,13 @@ Roby_information::Roby_information(WFN& wavy) {
 
         auto EVC = dot<dMatrix2>(SI, X);
 #ifdef NSA2DEBUG
-        std::cout << std::endl << "theta_I:\n";
-        for (int i = 0; i < EVC.extent(0); i++) {
-            for (int j = 0; j < EVC.extent(1); j++)
-                std::cout << std::setw(14) << std::setprecision(8) << std::fixed << EVC(i, j) << " ";
-            std::cout << std::endl;
-        }
+        print_dmatrix2(EVC, "theta_I");
 #endif
 
-		ivec non_zero_indices;
-		for (int i = 0; i < ionic_eigenvals.size(); i++) {
+        ivec non_zero_indices;
+        for (int i = 0; i < ionic_eigenvals.size(); i++) {
             if (abs(ionic_eigenvals[i]) > 1E-5)
-				non_zero_indices.push_back(i);
+                non_zero_indices.push_back(i);
         }
         const int n0 = non_zero_indices.size();
 #ifdef NSA2DEBUG
@@ -1249,31 +1247,96 @@ Roby_information::Roby_information(WFN& wavy) {
 #endif
 
         vec pruned_eigvals;
-        for (int nzv = 0; nzv < n0; nzv++) 
+        for (int nzv = 0; nzv < n0; nzv++)
             pruned_eigvals.push_back(ionic_eigenvals[non_zero_indices[nzv]]);
         EVC = transpose(EVC);
-        auto EVC2 = get_rectangle(EVC, non_zero_indices);
+        auto EVC2 = transpose(get_rectangle(EVC, non_zero_indices));
+#ifdef NSA2DEBUG
+        print_dmatrix2(EVC2, "theta_I after pruning:");
+#endif
         EVC.container().clear();
 
         auto pairs = find_eigenvalue_pairs(pruned_eigvals);
 #ifdef NSA2DEBUG
         std::cout << "Pairs:\n";
         for (size_t i = 0; i < n0; i++) {
-            std::cout << std::setw(3) << i << ": " << std::setw(10) << std::setprecision(6) << pairs[i] << "\n";
+            std::cout << std::setw(3) << i << ": " << std::setw(5) << std::setprecision(6) << pairs[i] << "\n";
         }
         std::cout << std::endl;
 #endif
-        
-        transform_Ionic_eigenvectors_to_Ionic_orbitals(EVC2, pruned_eigvals, pairs, bond.first, bond.second);
+
+        transform_Ionic_eigenvectors_to_Ionic_orbitals(EVC2, pruned_eigvals, pairs, bond.first, bond.second, bond_indices);
 #ifdef NSA2DEBUG
-        std::cout << std::endl << "theta_I after Ionic:\n";
-        for (int i = 0; i < EVC2.extent(0); i++) {
-            for (int j = 0; j < EVC2.extent(1); j++)
-                std::cout << std::setw(14) << std::setprecision(8) << std::fixed << EVC2(i, j) << " ";
-            std::cout << std::endl;
-        }
+        print_dmatrix2(EVC2, "theta_I after Ionic");
 #endif
+        //EVC2 is theta_Ionic, now make theta_Covalent
+        auto covalent_info = make_covalent_from_ionic(EVC2, pruned_eigvals, pairs);
+#ifdef NSA2DEBUG
+        print_dmatrix2(covalent_info['A'], "theta_Angles");
+        print_dmatrix2(covalent_info['V'], "eigen_C");
+        print_dmatrix2(covalent_info['T'], "theta_C");
+#endif
+        vec covalent_popul(n0), ionic_popul(n0);
+        ivec vals;
+        for (int i = 0; i < EVC2.extent(0); i++)
+            vals.emplace_back(i);
+        for (int i = 0; i < n0; i++) {
+            //make covalent populations
+            auto temp = transpose(covalent_info['T']);
+            covalent_popul[i] = projection_matrix_and_expectation(bond_indices, { i }, vals, &(temp));
+            temp = transpose(EVC2);
+            ionic_popul[i] = projection_matrix_and_expectation(bond_indices, { i }, vals, &(temp));
+        }
+        std::cout << "Covalent populations:\n";
+        for (int i = 0; i < n0; i++)
+            std::cout << "\t" << i << ":\t" << covalent_popul[i] << std::endl;
+        std::cout << "Ionic populations:\n";
+        for (int i = 0; i < n0; i++)
+            std::cout << "\t" << i << ":\t" << ionic_popul[i] << std::endl;
+
+        const double zero_angle_cutoff = 1E-2 * constants::INV_PI_180;
+
+        vec cov_index(n0, 0.0), ion_index(n0, 0.0);
+        double b_ab = 0;
+        bond_index_result results(0, 0, 0, 0, 0, {});
+        for (int i = 0; i < n0; i++) {
+            if (covalent_info['A'](i, 0) < zero_angle_cutoff || covalent_info['A'](i, 0) > 90 - zero_angle_cutoff)
+                continue; // skip lone pairs
+
+            if (pruned_eigvals[i] < pruned_eigvals[pairs[i]])
+                continue; // skip antibonding
+
+            if (pairs[i] != i) {
+                cov_index[i] = 0.5 * (covalent_popul[i] - covalent_popul[pairs[i]]);
+                ion_index[i] = 0.5 * (ionic_popul[i] - ionic_popul[pairs[i]]);
+                results.covalent += cov_index[i];
+                results.ionic += ion_index[i];
+            }
+            else if (pruned_eigvals[i] > 0.0)
+                ion_index[i] = 0.5 * ionic_popul[i];
+            else if (pruned_eigvals[i] < 0.0)
+                ion_index[i] = -0.5 * ionic_popul[i];
+        }
+
+        b_ab = results.covalent * results.covalent + results.ionic * results.ionic;
+        results.percent_covalent_Pyth = 100 * (results.covalent * results.covalent / b_ab);
+        b_ab = sqrt(b_ab);
+        results.percent_covalent_Arakai = 200 * abs(asin(results.covalent / b_ab)) / constants::PI;
+        results.atom_indices = bond;
+        results.total = b_ab;
+        RGBI.push_back(results);
     }
+    std::cout << "\n\nAtoms" << std::setw(9) << "Covalent" << std::setw(8) << "Ionic" << std::setw(8) << "Total" << std::setw(8) << "Pyth" << std::setw(8) << "Arakai" << std::endl;
+    std::cout << "---------------------------------------------------------------------\n";
+    for (auto res : RGBI) {
+        std::cout << res.atom_indices.first << "-" << res.atom_indices.second << "  \t"
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.covalent << "\t"
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.ionic << "\t"
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.total << "\t"
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.percent_covalent_Pyth << "\t"
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.percent_covalent_Arakai << std::endl;
+    }
+    std::cout << "---------------------------------------------------------------------\n";
 
     double null = 0;
 }

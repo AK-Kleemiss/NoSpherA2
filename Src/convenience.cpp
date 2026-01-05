@@ -2961,16 +2961,16 @@ void error_check(const bool condition, const std::source_location loc, const std
 {
     if (!condition)
     {
-        log_file << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << std::endl;
+        log_file << "Error in " << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << std::endl;
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
-        std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << std::endl;
+        std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " line: " << loc.line() << " " << error_message << std::endl;
         exit(-1);
     }
 };
 void not_implemented(const std::source_location loc, const std::string& error_message, std::ostream& log_file)
 {
-    log_file << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << " not yet implemented!" << std::endl;
+    log_file << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << " not yet implemented!" << std::endl;
     log_file.flush();
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << " not yet implemented!" << std::endl;

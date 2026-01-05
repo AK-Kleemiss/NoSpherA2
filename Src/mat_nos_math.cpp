@@ -11,7 +11,7 @@
 #endif
 
 template <typename mat_t, typename vec_t, typename Shape_t>
-mat_t reshape(vec_t& vec_in, const Shape_t size)
+mat_t reshape(const vec_t& vec_in, const Shape_t size)
 {
     using ext_t = typename mat_t::extents_type;
     using ele_t = typename mat_t::element_type;
@@ -54,51 +54,51 @@ mat_t reshape(vec_t& vec_in, const Shape_t size)
     mat_t res_0;
     return res_0;
 }
-template dMatrix2 reshape(dMatrix1& vec_in, const Shape2D size);
-template cMatrix2 reshape(cMatrix1& vec_in, const Shape2D size);
-template iMatrix2 reshape(iMatrix1& vec_in, const Shape2D size);
-template dMatrix2 reshape(dMatrix2& vec_in, const Shape2D size);
-template cMatrix2 reshape(cMatrix2& vec_in, const Shape2D size);
-template iMatrix2 reshape(iMatrix2& vec_in, const Shape2D size);
-template dMatrix2 reshape(dMatrix3& vec_in, const Shape2D size);
-template cMatrix2 reshape(cMatrix3& vec_in, const Shape2D size);
-template iMatrix2 reshape(iMatrix3& vec_in, const Shape2D size);
-template dMatrix2 reshape(dMatrix4& vec_in, const Shape2D size);
-template cMatrix2 reshape(cMatrix4& vec_in, const Shape2D size);
-template iMatrix2 reshape(iMatrix4& vec_in, const Shape2D size);
-template dMatrix3 reshape(dMatrix1& vec_in, const Shape3D size);
-template cMatrix3 reshape(cMatrix1& vec_in, const Shape3D size);
-template iMatrix3 reshape(iMatrix1& vec_in, const Shape3D size);
-template dMatrix3 reshape(dMatrix2& vec_in, const Shape3D size);
-template cMatrix3 reshape(cMatrix2& vec_in, const Shape3D size);
-template iMatrix3 reshape(iMatrix2& vec_in, const Shape3D size);
-template dMatrix3 reshape(dMatrix3& vec_in, const Shape3D size);
-template cMatrix3 reshape(cMatrix3& vec_in, const Shape3D size);
-template iMatrix3 reshape(iMatrix3& vec_in, const Shape3D size);
-template dMatrix3 reshape(dMatrix4& vec_in, const Shape3D size);
-template cMatrix3 reshape(cMatrix4& vec_in, const Shape3D size);
-template iMatrix3 reshape(iMatrix4& vec_in, const Shape3D size);
-template dMatrix4 reshape(dMatrix1& vec_in, const Shape4D size);
-template cMatrix4 reshape(cMatrix1& vec_in, const Shape4D size);
-template iMatrix4 reshape(iMatrix1& vec_in, const Shape4D size);
-template dMatrix4 reshape(dMatrix2& vec_in, const Shape4D size);
-template cMatrix4 reshape(cMatrix2& vec_in, const Shape4D size);
-template iMatrix4 reshape(iMatrix2& vec_in, const Shape4D size);
-template dMatrix4 reshape(dMatrix3& vec_in, const Shape4D size);
-template cMatrix4 reshape(cMatrix3& vec_in, const Shape4D size);
-template iMatrix4 reshape(iMatrix3& vec_in, const Shape4D size);
-template dMatrix4 reshape(dMatrix4& vec_in, const Shape4D size);
-template cMatrix4 reshape(cMatrix4& vec_in, const Shape4D size);
-template iMatrix4 reshape(iMatrix4& vec_in, const Shape4D size);
-template dMatrix2 reshape(vec& vec_in, const Shape2D size);
-template cMatrix2 reshape(cvec& vec_in, const Shape2D size);
-template iMatrix2 reshape(ivec& vec_in, const Shape2D size);
-template dMatrix3 reshape(vec& vec_in, const Shape3D size);
-template cMatrix3 reshape(cvec& vec_in, const Shape3D size);
-template iMatrix3 reshape(ivec& vec_in, const Shape3D size);
-template dMatrix4 reshape(vec& vec_in, const Shape4D size);
-template cMatrix4 reshape(cvec& vec_in, const Shape4D size);
-template iMatrix4 reshape(ivec& vec_in, const Shape4D size);
+template dMatrix2 reshape(const dMatrix1& vec_in, const Shape2D size);
+template cMatrix2 reshape(const cMatrix1& vec_in, const Shape2D size);
+template iMatrix2 reshape(const iMatrix1& vec_in, const Shape2D size);
+template dMatrix2 reshape(const dMatrix2& vec_in, const Shape2D size);
+template cMatrix2 reshape(const cMatrix2& vec_in, const Shape2D size);
+template iMatrix2 reshape(const iMatrix2& vec_in, const Shape2D size);
+template dMatrix2 reshape(const dMatrix3& vec_in, const Shape2D size);
+template cMatrix2 reshape(const cMatrix3& vec_in, const Shape2D size);
+template iMatrix2 reshape(const iMatrix3& vec_in, const Shape2D size);
+template dMatrix2 reshape(const dMatrix4& vec_in, const Shape2D size);
+template cMatrix2 reshape(const cMatrix4& vec_in, const Shape2D size);
+template iMatrix2 reshape(const iMatrix4& vec_in, const Shape2D size);
+template dMatrix3 reshape(const dMatrix1& vec_in, const Shape3D size);
+template cMatrix3 reshape(const cMatrix1& vec_in, const Shape3D size);
+template iMatrix3 reshape(const iMatrix1& vec_in, const Shape3D size);
+template dMatrix3 reshape(const dMatrix2& vec_in, const Shape3D size);
+template cMatrix3 reshape(const cMatrix2& vec_in, const Shape3D size);
+template iMatrix3 reshape(const iMatrix2& vec_in, const Shape3D size);
+template dMatrix3 reshape(const dMatrix3& vec_in, const Shape3D size);
+template cMatrix3 reshape(const cMatrix3& vec_in, const Shape3D size);
+template iMatrix3 reshape(const iMatrix3& vec_in, const Shape3D size);
+template dMatrix3 reshape(const dMatrix4& vec_in, const Shape3D size);
+template cMatrix3 reshape(const cMatrix4& vec_in, const Shape3D size);
+template iMatrix3 reshape(const iMatrix4& vec_in, const Shape3D size);
+template dMatrix4 reshape(const dMatrix1& vec_in, const Shape4D size);
+template cMatrix4 reshape(const cMatrix1& vec_in, const Shape4D size);
+template iMatrix4 reshape(const iMatrix1& vec_in, const Shape4D size);
+template dMatrix4 reshape(const dMatrix2& vec_in, const Shape4D size);
+template cMatrix4 reshape(const cMatrix2& vec_in, const Shape4D size);
+template iMatrix4 reshape(const iMatrix2& vec_in, const Shape4D size);
+template dMatrix4 reshape(const dMatrix3& vec_in, const Shape4D size);
+template cMatrix4 reshape(const cMatrix3& vec_in, const Shape4D size);
+template iMatrix4 reshape(const iMatrix3& vec_in, const Shape4D size);
+template dMatrix4 reshape(const dMatrix4& vec_in, const Shape4D size);
+template cMatrix4 reshape(const cMatrix4& vec_in, const Shape4D size);
+template iMatrix4 reshape(const iMatrix4& vec_in, const Shape4D size);
+template dMatrix2 reshape(const vec& vec_in, const Shape2D size);
+template cMatrix2 reshape(const cvec& vec_in, const Shape2D size);
+template iMatrix2 reshape(const ivec& vec_in, const Shape2D size);
+template dMatrix3 reshape(const vec& vec_in, const Shape3D size);
+template cMatrix3 reshape(const cvec& vec_in, const Shape3D size);
+template iMatrix3 reshape(const ivec& vec_in, const Shape3D size);
+template dMatrix4 reshape(const vec& vec_in, const Shape4D size);
+template cMatrix4 reshape(const cvec& vec_in, const Shape4D size);
+template iMatrix4 reshape(const ivec& vec_in, const Shape4D size);
 
 // Flatten Matrix ND
 template <typename T1, typename T2>
@@ -412,18 +412,9 @@ void get_submatrix(const T2& full,
             sub[i * n + j] = full(global_i, global_j);
         }
     }
-#ifdef NSA2DEBUG
-    std::cout << "Submatrix:\n";
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << sub[i * n + j] << " ";
-        }
-        std::cout << std::endl;
-    }
-#endif
 }
 template void get_submatrix(const iMatrix2& full, ivec& sub, const ivec& indices);
-template void get_submatrix(const dMatrix2& full, vec& sub , const ivec& indices);
+template void get_submatrix(const dMatrix2& full, vec& sub, const ivec& indices);
 template void get_submatrix(const cMatrix2& full, cvec& sub, const ivec& indices);
 
 template <typename T, typename T2>
@@ -444,45 +435,36 @@ void get_submatrix(const T2& full,
             sub[i * n2 + j] = full(global_i, global_j);
         }
     }
-#ifdef NSA2DEBUG
-    std::cout << "Submatrix:\n";
-    for (int i = 0; i < n1; ++i) {
-        for (int j = 0; j < n2; ++j) {
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << sub[i * n2 + j] << " ";
-        }
-        std::cout << std::endl;
-    }
-#endif
 }
 template void get_submatrix(const iMatrix2& full, ivec& sub, const ivec& val_indices, const ivec& vec_indices);
-template void get_submatrix(const dMatrix2& full,  vec& sub, const ivec& val_indices, const ivec& vec_indices);
+template void get_submatrix(const dMatrix2& full, vec& sub, const ivec& val_indices, const ivec& vec_indices);
 template void get_submatrix(const cMatrix2& full, cvec& sub, const ivec& val_indices, const ivec& vec_indices);
 
 template<typename T>
 bool isSymmetricViaEigenvalues(const T& A, int n, double tol) {
     T A_copy = A;  // d/zgeev destroys input
     T wr(n), wi(n);
-	using Datatype = typename T::value_type;
+    using Datatype = typename T::value_type;
     if constexpr (std::is_same_v<Datatype, double>)
     {
-        LAPACKE_dgeev(LAPACK_ROW_MAJOR, 'N', 'N', 
-            n, A_copy.data(), 
-            n, wr.data(), 
-            wi.data(), nullptr, n, 
+        LAPACKE_dgeev(LAPACK_ROW_MAJOR, 'N', 'N',
+            n, A_copy.data(),
+            n, wr.data(),
+            wi.data(), nullptr, n,
             nullptr, n);
     }
     else if constexpr (std::is_same_v<Datatype, cdouble>)
     {
-     // int matrix_layout, char jobvl, char jobvr,
-     //     lapack_int n, lapack_complex_double* a,
-     //     lapack_int lda, lapack_complex_double* w,
-     //     lapack_complex_double* vl, lapack_int ldvl,
-     //     lapack_complex_double* vr, lapack_int ldvr
-     // //ISSUE WITH MKL COMPLEX TYPES I AM CURRENTL Y NOT INTERESTED IN SOLVING!
-        //LAPACKE_zgeev(LAPACK_ROW_MAJOR, 'N', 'N', 
-        //    n, reinterpret_cast<const cdouble*>(A_copy.data()), 
-        //    n, reinterpret_cast<const cdouble*>(wr.data()), 
-        //    reinterpret_cast<const cdouble*>(wi.data()), n, nullptr, n);
+        // int matrix_layout, char jobvl, char jobvr,
+        //     lapack_int n, lapack_complex_double* a,
+        //     lapack_int lda, lapack_complex_double* w,
+        //     lapack_complex_double* vl, lapack_int ldvl,
+        //     lapack_complex_double* vr, lapack_int ldvr
+        // //ISSUE WITH MKL COMPLEX TYPES I AM CURRENTL Y NOT INTERESTED IN SOLVING!
+           //LAPACKE_zgeev(LAPACK_ROW_MAJOR, 'N', 'N', 
+           //    n, reinterpret_cast<const cdouble*>(A_copy.data()), 
+           //    n, reinterpret_cast<const cdouble*>(wr.data()), 
+           //    reinterpret_cast<const cdouble*>(wi.data()), n, nullptr, n);
         return false;
     }
 
@@ -493,6 +475,7 @@ bool isSymmetricViaEigenvalues(const T& A, int n, double tol) {
     }
     return true;
 }
+template bool isSymmetricViaEigenvalues(const vec& A, int n, double tol);
 
 template <typename T, typename T2>
 void get_submatrices(const T2& D_full,
@@ -517,26 +500,8 @@ void get_submatrices(const T2& D_full,
             S_sub[i * n + j] = S_full(global_i, global_j);
         }
     }
-#ifdef NSA2DEBUG
-    err_checkf(isSymmetricViaEigenvalues<T>(D_sub, n), "Denisty matrix not symmetric!", std::cout);
-    err_checkf(isSymmetricViaEigenvalues<T>(S_sub, n), "Overlap matrix not symmetric!", std::cout);
-    std::cout << "Overlap submatrix S:\n";
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << S_sub[i * n + j] << " ";
-        }
-        std::cout << std::endl;
-    }
-    std::cout << "Density submatrix D:\n";
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << D_sub[i * n + j] << " ";
-        }
-        std::cout << std::endl;
-    }
-#endif
 }
-template void get_submatrices(const dMatrix2& D_full, const dMatrix2& S_full,  vec& D_sub,  vec& S_sub, const ivec& indices);
+template void get_submatrices(const dMatrix2& D_full, const dMatrix2& S_full, vec& D_sub, vec& S_sub, const ivec& indices);
 //template void get_submatrices(const cMatrix2& D_full, const cMatrix2& S_full, cvec& D_sub, cvec& S_sub, const ivec& indices);
 
 //calculates the Moore-Penrose pseudo-inverse of a matrix A using SVD
