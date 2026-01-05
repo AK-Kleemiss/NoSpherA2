@@ -1326,17 +1326,17 @@ Roby_information::Roby_information(WFN& wavy) {
         results.total = b_ab;
         RGBI.push_back(results);
     }
-    std::cout << "\n\nAtoms" << std::setw(9) << "Covalent" << std::setw(8) << "Ionic" << std::setw(8) << "Total" << std::setw(8) << "Pyth" << std::setw(8) << "Arakai" << std::endl;
-    std::cout << "---------------------------------------------------------------------\n";
+    std::cout << "\n\nAtoms" << std::setw(9) << "Cov." << std::setw(8) << "Ion." << std::setw(8) << "Tot." << std::setw(8) << "Pyth." << std::setw(8) << "Arak." << std::endl;
+    std::cout << "---------------------------------------------\n";
     for (auto res : RGBI) {
-        std::cout << res.atom_indices.first << "-" << res.atom_indices.second << "  \t"
-            << std::fixed << std::setprecision(3) << std::setw(8) << res.covalent << "\t"
-            << std::fixed << std::setprecision(3) << std::setw(8) << res.ionic << "\t"
-            << std::fixed << std::setprecision(3) << std::setw(8) << res.total << "\t"
-            << std::fixed << std::setprecision(3) << std::setw(8) << res.percent_covalent_Pyth << "\t"
+        std::cout << res.atom_indices.first << "-" << res.atom_indices.second << "  "
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.covalent
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.ionic
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.total
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.percent_covalent_Pyth
             << std::fixed << std::setprecision(3) << std::setw(8) << res.percent_covalent_Arakai << std::endl;
     }
-    std::cout << "---------------------------------------------------------------------\n";
+    std::cout << "---------------------------------------------\n";
 
     double null = 0;
 }
