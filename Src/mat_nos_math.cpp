@@ -395,3 +395,200 @@ T get_rectangle(const T& a, const ivec& rows) {
 template iMatrix2 get_rectangle(const iMatrix2& a, const ivec& rows);
 template dMatrix2 get_rectangle(const dMatrix2& a, const ivec& rows);
 template cMatrix2 get_rectangle(const cMatrix2& a, const ivec& rows);
+
+template <typename T, typename T2>
+void get_submatrix(const T2& full,
+    T& sub,
+    const ivec& indices) {
+    err_checkf(indices.size() > 0, "Atom indices list is empty.", std::cout);
+    const int n = static_cast<int>(indices.size());
+    err_checkf(full.extent(0) == full.extent(1), "Matrix must be square.", std::cout);
+    err_checkf(sub.size() == n * n, "Submatrix has incorrect size.", std::cout);
+
+    for (int i = 0; i < n; ++i) {
+        const int global_i = indices[i];
+        for (int j = 0; j < n; ++j) {
+            const int global_j = indices[j];
+            sub[i * n + j] = full(global_i, global_j);
+        }
+    }
+#ifdef NSA2DEBUG
+    std::cout << "Submatrix:\n";
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << sub[i * n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+#endif
+}
+template void get_submatrix(const iMatrix2& full, ivec& sub, const ivec& indices);
+template void get_submatrix(const dMatrix2& full, vec& sub , const ivec& indices);
+template void get_submatrix(const cMatrix2& full, cvec& sub, const ivec& indices);
+
+template <typename T, typename T2>
+void get_submatrix(const T2& full,
+    T& sub,
+    const ivec& val_indices,
+    const ivec& vec_indices) {
+    const int n1 = static_cast<int>(val_indices.size());
+    const int n2 = static_cast<int>(vec_indices.size());
+    err_checkf(n2 > 0, "Val indices list is empty.", std::cout);
+    err_checkf(n2 > 0, "Vec indices list is empty.", std::cout);
+    err_checkf(sub.size() == n1 * n2, "Submatrix has incorrect size.", std::cout);
+
+    for (int i = 0; i < n1; ++i) {
+        const int global_i = val_indices[i];
+        for (int j = 0; j < n2; ++j) {
+            const int global_j = vec_indices[j];
+            sub[i * n2 + j] = full(global_i, global_j);
+        }
+    }
+#ifdef NSA2DEBUG
+    std::cout << "Submatrix:\n";
+    for (int i = 0; i < n1; ++i) {
+        for (int j = 0; j < n2; ++j) {
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << sub[i * n2 + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+#endif
+}
+template void get_submatrix(const iMatrix2& full, ivec& sub, const ivec& val_indices, const ivec& vec_indices);
+template void get_submatrix(const dMatrix2& full,  vec& sub, const ivec& val_indices, const ivec& vec_indices);
+template void get_submatrix(const cMatrix2& full, cvec& sub, const ivec& val_indices, const ivec& vec_indices);
+
+template<typename T>
+bool isSymmetricViaEigenvalues(const T& A, int n, double tol) {
+    T A_copy = A;  // d/zgeev destroys input
+    T wr(n), wi(n);
+	using Datatype = typename T::value_type;
+    if constexpr (std::is_same_v<Datatype, double>)
+    {
+        LAPACKE_dgeev(LAPACK_ROW_MAJOR, 'N', 'N', 
+            n, A_copy.data(), 
+            n, wr.data(), 
+            wi.data(), nullptr, n, 
+            nullptr, n);
+    }
+    else if constexpr (std::is_same_v<Datatype, cdouble>)
+    {
+     // int matrix_layout, char jobvl, char jobvr,
+     //     lapack_int n, lapack_complex_double* a,
+     //     lapack_int lda, lapack_complex_double* w,
+     //     lapack_complex_double* vl, lapack_int ldvl,
+     //     lapack_complex_double* vr, lapack_int ldvr
+     // //ISSUE WITH MKL COMPLEX TYPES I AM CURRENTL Y NOT INTERESTED IN SOLVING!
+        //LAPACKE_zgeev(LAPACK_ROW_MAJOR, 'N', 'N', 
+        //    n, reinterpret_cast<const cdouble*>(A_copy.data()), 
+        //    n, reinterpret_cast<const cdouble*>(wr.data()), 
+        //    reinterpret_cast<const cdouble*>(wi.data()), n, nullptr, n);
+        return false;
+    }
+
+    for (int i = 0; i < n; ++i) {
+        if (std::abs(wi[i]) > tol) {
+            return false;
+        }
+    }
+    return true;
+}
+
+template <typename T, typename T2>
+void get_submatrices(const T2& D_full,
+    const T2& S_full,
+    T& D_sub,
+    T& S_sub,
+    const ivec& indices) {
+    err_checkf(indices.size() > 0, "Atom indices list is empty.", std::cout);
+    const int n = static_cast<int>(indices.size());
+    err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
+    err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
+    err_checkf(D_full.extent(0) == S_full.extent(0), "Density and Overlap matrices must be of the same size.", std::cout);
+    err_checkf(D_sub.size() == n * n, "Density submatrix has incorrect size.", std::cout);
+    err_checkf(S_sub.size() == n * n, "Overlap submatrix has incorrect size.", std::cout);
+
+
+    for (int i = 0; i < n; ++i) {
+        const int global_i = indices[i];
+        for (int j = 0; j < n; ++j) {
+            const int global_j = indices[j];
+            D_sub[i * n + j] = D_full(global_i, global_j);
+            S_sub[i * n + j] = S_full(global_i, global_j);
+        }
+    }
+#ifdef NSA2DEBUG
+    err_checkf(isSymmetricViaEigenvalues<T>(D_sub, n), "Denisty matrix not symmetric!", std::cout);
+    err_checkf(isSymmetricViaEigenvalues<T>(S_sub, n), "Overlap matrix not symmetric!", std::cout);
+    std::cout << "Overlap submatrix S:\n";
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << S_sub[i * n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "Density submatrix D:\n";
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << std::setw(14) << std::setprecision(8) << std::fixed << D_sub[i * n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+#endif
+}
+template void get_submatrices(const dMatrix2& D_full, const dMatrix2& S_full,  vec& D_sub,  vec& S_sub, const ivec& indices);
+//template void get_submatrices(const cMatrix2& D_full, const cMatrix2& S_full, cvec& D_sub, cvec& S_sub, const ivec& indices);
+
+//calculates the Moore-Penrose pseudo-inverse of a matrix A using SVD
+dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
+    const int m = static_cast<int>(A.extent(0)); // rows
+    const int n = static_cast<int>(A.extent(1)); // cols
+    int k = std::min(m, n);
+
+    // 1. Allocate memory for SVD results
+    vec S(k);                 // Singular values
+    vec U(m * k);             // Left singular vectors (m x k)
+    vec Vt(k * n);            // Right singular vectors transposed (k x n)
+    vec superb(k - 1);        // Workspace for dgesvd
+
+    // Make a copy of A because dgesvd destroys the input matrix
+    vec A_copy = A.container();
+
+    // 2. Compute SVD: A = U * S * Vt
+    // use 'S' for jobu/jobvt to compute the "thin" SVD (only the first k columns/rows)
+    lapack_int info = LAPACKE_dgesvd(
+        LAPACK_ROW_MAJOR,
+        'S', 'S',
+        m, n,
+        A_copy.data(), n,
+        S.data(),
+        U.data(), k,
+        Vt.data(), n,
+        superb.data()
+    );
+
+    err_checkf(info == 0, "LAPACKE_dgesvd failed with info unequal 0!", std::cout);
+
+    // 3. Invert Singular Values (Sigma^+)
+    // Filter out small singular values
+    for (int i = 0; i < k; ++i) {
+        if (S[i] > cutoff) {
+            S[i] = 1.0 / S[i];
+        }
+        else {
+            S[i] = 0.0;
+        }
+    }
+
+    // 4. Compute A^+ = V * S^+ * U^T
+    vec W(k * m, 0.0);
+    for (int i = 0; i < k; ++i) {
+        if (S[i] == 0.0) continue;
+        for (int j = 0; j < m; ++j) {
+            W[i * m + j] = S[i] * U[j * k + i]; // U is row-major (m x k)
+        }
+    }
+
+    // Perform Matrix Multiplication: C = alpha * A * B + beta * C
+    return dot<dMatrix2>(reshape<dMatrix2>(Vt, Shape2D(k, n)), reshape<dMatrix2>(W, Shape2D(k, m)), true, false);
+}

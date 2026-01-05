@@ -97,14 +97,13 @@ template <typename T>
 T self_dot(const T& mat1, const T& mat2, bool transp1 = false, bool transp2 = false);
 
 
-
-
 // 2D x 1D MATRIX MULTIPLICATION
 // Wrapper for BLAS dot product
 template <typename T>
 std::vector<T> dot(const std::vector<std::vector<T>>& mat,
     const std::vector<T>& vec,
     bool transp = false);
+
 template <typename T, typename T2>
 T dot(const T2& mat,
     const T& vec,
@@ -135,6 +134,21 @@ T trace_product(const T2& a, const T2& b, const bool transp = false);
 
 template <typename T>
 T get_rectangle(const T& a, const ivec& rows);
+
+template<typename T>
+bool isSymmetricViaEigenvalues(const T& A, int n, double tol = 1E-15);
+
+template <typename T, typename T2>
+void get_submatrix(const T2& full, T& sub, const ivec& indices);
+
+template <typename T, typename T2>
+void get_submatrix(const T2& full, T& sub, const ivec& val_indices, const ivec& vec_indices);
+
+template <typename T, typename T2>
+void get_submatrices(const T2& D_full, const T2& S_full, T& D_sub, T& S_sub, const ivec& indices);
+
+//calculates the Moore-Penrose pseudo-inverse of a matrix A using SVD
+dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5);
 
 // Self written matrix multiplication with flat vectors
 template <typename T>

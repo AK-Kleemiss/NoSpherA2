@@ -43,6 +43,8 @@ private:
     NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full, const std::vector<int>& atom_indices);
     double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {});
     void computeAllAtomicNAOs(WFN& wavy);
+    ivec find_eigenvalue_pairs(const vec& eigvals, const double tolerance = 1E-4);
+    void transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& EVC, const vec& eigvals, const ivec& pairs, const int index_a, const int index_b);
 public:
     Roby_information() = default;
     ~Roby_information() = default;
