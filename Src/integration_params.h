@@ -302,9 +302,8 @@ ivec make_loc(const ivec& bas, const int nbas) {
         if constexpr (CT == COORDINATE_TYPE::CART) {
             int l = bas(ANG_OF, i);
             dims[i] = ((l + 1) * (l + 2)) / 2 * bas(NCTR_OF, i); // Number of cartesian functions for given l
-            continue;
         }
-        else if constexpr (CT == COORDINATE_TYPE::SPH) {
+        if constexpr (CT == COORDINATE_TYPE::SPH) {
             dims[i] = (2 * bas(ANG_OF, i) + 1) * bas(NCTR_OF, i);
         }
     }
@@ -317,8 +316,8 @@ ivec make_loc(const ivec& bas, const int nbas) {
 
     return ao_loc;
 }
-template ivec make_loc<COORDINATE_TYPE::CART>(ivec& bas, int nbas);
-template ivec make_loc<COORDINATE_TYPE::SPH>(ivec& bas, int nbas);
+template ivec make_loc<COORDINATE_TYPE::CART>(const ivec& bas, int nbas);
+template ivec make_loc<COORDINATE_TYPE::SPH>(const ivec& bas, int nbas);
 
 
 /*
