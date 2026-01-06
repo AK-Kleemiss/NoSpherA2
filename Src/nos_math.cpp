@@ -807,6 +807,6 @@ NNLSResult nnls(dMatrix2& A,
 //    return NNLSResult{ x, res, 0 };
 //}
 
-// Remeaining functions which were separated for readibility
+// Remaining functions which were separated for readability
 #include "mat_nos_math.cpp"
 #include "vec_nos_math.cpp"

@@ -22,6 +22,9 @@ ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_ba
   SRCS += $(SRC_DIR)/auxiliary_basis.cpp
 endif
 
+#remove mat_nos_math.cpp and vec_nos_math.cpp from SRCS
+SRCS := $(filter-out $(SRC_DIR)/mat_nos_math.cpp $(SRC_DIR)/vec_nos_math.cpp, $(SRCS))
+
 # Per-arch objects
 OBJS_arm64  := $(patsubst $(SRC_DIR)/%.cpp, build/arm64/%.o,  $(SRCS))
 OBJS_x86_64 := $(patsubst $(SRC_DIR)/%.cpp, build/x86_64/%.o, $(SRCS))
