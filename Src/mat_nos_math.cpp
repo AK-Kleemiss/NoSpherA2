@@ -355,23 +355,75 @@ T trace_product(const T2& a, const T2& b, const bool transp) {
     err_checkf(cols_a == rows_b, "Incompatible sizes in trace product", std::cout);
     err_checkf(rows_a == cols_b, "Incompatible sizes in trace product", std::cout);
     err_checkf(cols_a == cols_b, "Incompatible matrix sizes in trace product!", std::cout);
-    T res = 0;
-    if (!transp) {
-        for (int i = 0; i < cols_a; i++) {
-            double* ina = (double*)a.data() + (i * rows_a);
-            for (int j = 0; j < rows_a; j++) {
-                res += *(ina + j) * b.data()[j * cols_a + i];
+    using Datatype = typename T2::value_type;
+    if constexpr (std::is_same_v<Datatype, double>)
+    {
+        double res = 0;
+        double* b_data = (double*)b.data();
+        double* a_data = (double*)a.data();
+        if (!transp) {
+#pragma omp parallel for reduction(+:res) schedule(static)
+            for (int i = 0; i < cols_a; i++) {
+                double* ina = a_data + (i * rows_a);
+                for (int j = 0; j < rows_a; j++) {
+                    res += *(ina + j) * b_data[j * cols_a + i];
+                }
             }
         }
-    }
-    else {
-        for (int i = 0; i < rows_a; i++) {
-            for (int j = 0; j < cols_a; j++) {
-                res += a(i, j) * b(i, j);
+        else {
+#pragma omp parallel for reduction(+:res) schedule(static)
+            for (int i = 0; i < rows_a; i++) {
+                for (int j = 0; j < cols_a; j++) {
+                    res += a(i, j) * b(i, j);
+                }
             }
         }
+        return res;
     }
-    return res;
+    else if constexpr (std::is_same_v<Datatype, cdouble>)
+    {
+        cdouble res = cdouble(0.0, 0.0);
+        if (!transp) {
+            for (int i = 0; i < cols_a; i++) {
+                cdouble* ina = (cdouble*)a.data() + (i * rows_a);
+                for (int j = 0; j < rows_a; j++) {
+                    res += *(ina + j) * b.data()[j * cols_a + i];
+                }
+            }
+        }
+        else {
+            for (int i = 0; i < rows_a; i++) {
+                for (int j = 0; j < cols_a; j++) {
+                    res += a(i, j) * b(i, j);
+                }
+            }
+        }
+        return res;
+    }
+    else if constexpr (std::is_same_v<Datatype, int>)
+    {
+        int res = 0;
+        int* b_data = (int*)b.data();
+        int* a_data = (int*)a.data();
+        if (!transp) {
+#pragma omp parallel for reduction(+:res) schedule(static)
+            for (int i = 0; i < cols_a; i++) {
+                int* ina = a_data + (i * rows_a);
+                for (int j = 0; j < rows_a; j++) {
+                    res += *(ina + j) * b_data[j * cols_a + i];
+                }
+            }
+        }
+        else {
+#pragma omp parallel for reduction(+:res) schedule(static)
+            for (int i = 0; i < rows_a; i++) {
+                for (int j = 0; j < cols_a; j++) {
+                    res += a(i, j) * b(i, j);
+                }
+            }
+        }
+        return res;
+    }
 }
 template int trace_product(const iMatrix2& a, const iMatrix2& b, const bool transp);
 template double trace_product(const dMatrix2& a, const dMatrix2& b, const bool transp);
@@ -590,7 +642,7 @@ void swap_rows_cols_symm(T& mat, const int i, const int j) {
     else
     {
         err_not_impl_f("Unsupported data type for swapping rows/cols symmetrically", std::cout);
-	}
+    }
 }
 template void swap_rows_cols_symm(dMatrix2& mat, const int row1, const int row2);
 template void swap_rows_cols_symm(cMatrix2& mat, const int row1, const int row2);

@@ -33,7 +33,11 @@ private:
         double total;
         double percent_covalent_Pyth;
         double percent_covalent_Arakai;
+        double pair_population;
+        double population_first;
+        double population_second;
         std::pair<int, int> atom_indices;
+        std::pair<int, int> atom_element_nr;
     };
 
     std::vector<NAOResult> NAOs;

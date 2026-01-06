@@ -1076,7 +1076,9 @@ std::map<char, dMatrix2> Roby_information::make_covalent_from_ionic(
 
 Roby_information::Roby_information(WFN& wavy) {
     auto bonds = get_bonded_atom_pairs(wavy);
+    std::cout << "Calculating NAOs for all atoms...                 " << std::flush;
     computeAllAtomicNAOs(wavy);
+    std::cout << " ...done!" << std::endl;
     Shape2D NAOs_size;
     for (size_t atom_idx = 0; atom_idx < NAOs.size(); atom_idx++) {
 #ifdef NSA2DEBUG
@@ -1117,19 +1119,33 @@ Roby_information::Roby_information(WFN& wavy) {
 #endif
     // total_NAOs has n_NAOs rows (each row is an individual NAO in the basis set)
     // and n_bfs columns, where each value corresponds to a basis function from here on
-    double all_atom_population = Roby_population_analysis({});
+    std::cout << "Calculating Population for all atoms...           " << std::flush;
+    const double all_atom_population = Roby_population_analysis({});
+    std::cout << " ...done." << std::endl;
     std::cout << std::endl << "Total Population: " << all_atom_population << "\n\n";
     vec atom_pops(NAOs.size(), 0.0);
+#ifndef NSA2DEBUG
+    ProgressBar* pb = new ProgressBar(NAOs.size(), 40, "-", " ", "Calculating Atomic Populations");
+#endif
     for (auto NAO : NAOs) {
         atom_pops[NAO.atom_index] = Roby_population_analysis(NAO.matrix_elements);
-        std::cout << "\tAtom " << NAO.atom_index << ": " << atom_pops[NAO.atom_index] << std::endl;
+#ifndef NSA2DEBUG
+        pb->update();
+#endif
+    }
+#ifndef NSA2DEBUG
+    delete pb;
+#endif
+    for (int i = 0; i < atom_pops.size(); i++) {
+        std::cout << "Population of atom " << i << ": " << atom_pops[i] << std::endl;
     }
 
-    dMatrix2 atom_pair_populations(NAOs.size(), NAOs.size());
-
+#ifndef NSA2DEBUG
+    pb = new ProgressBar(bonds.size(), 40, "-", " ", "Calculating Bond Populations");
+#endif
     //now perform bond analysis for all bonded atoms
     for (auto bond : bonds) {
-        std::cout << std::endl << "---------------------------- Atom Pair: " << bond.first << " " << bond.second << " ----------------------\n";
+        //std::cout << std::endl << "---------------------------- Atom Pair: " << bond.first << " " << bond.second << " ----------------------\n";
         ivec bond_indices, bond_eigenvecs, bond_eigenvals;
         //gather basis function indices for both atoms
         for (auto idx : NAOs[bond.first].matrix_elements)
@@ -1158,8 +1174,8 @@ Roby_information::Roby_information(WFN& wavy) {
 
         //calcualte population using data from both atoms
         const double bond_population = projection_matrix_and_expectation(bond_indices, bond_eigenvals, bond_eigenvecs);
-        atom_pair_populations(bond.first, bond.second) = bond_population;
-        atom_pair_populations(bond.second, bond.first) = bond_population;
+        //atom_pair_populations(bond.first, bond.second) = bond_population;
+        //atom_pair_populations(bond.second, bond.first) = bond_population;
         std::cout << "Bond population between atom " << bond.first + 1 << " and atom " << bond.second + 1 << ": " << bond_population << std::endl;
         const int size_ion1 = projection_matrices[bond.first].extent(0) + projection_matrices[bond.second].extent(0),
             size_ion2 = projection_matrices[bond.first].extent(1) + projection_matrices[bond.second].extent(1),
@@ -1303,18 +1319,20 @@ Roby_information::Roby_information(WFN& wavy) {
             temp = transpose(EVC2);
             ionic_popul[i] = projection_matrix_and_expectation(bond_indices, { i }, vals, &(temp));
         }
+#ifdef NSA2DEBUG
         std::cout << "Covalent populations:\n";
         for (int i = 0; i < n0; i++)
             std::cout << "\t" << i << ":\t" << covalent_popul[i] << std::endl;
         std::cout << "Ionic populations:\n";
         for (int i = 0; i < n0; i++)
             std::cout << "\t" << i << ":\t" << ionic_popul[i] << std::endl;
+#endif
 
         const double zero_angle_cutoff = 1E-2 * constants::INV_PI_180;
 
         vec cov_index(n0, 0.0), ion_index(n0, 0.0);
         double b_ab = 0;
-        bond_index_result results(0, 0, 0, 0, 0, {});
+        bond_index_result results(0, 0, 0, 0, 0, 0, 0, 0, {});
         for (int i = 0; i < n0; i++) {
             if (covalent_info['A'](i, 0) < zero_angle_cutoff || covalent_info['A'](i, 0) > 90 - zero_angle_cutoff)
                 continue; // skip lone pairs
@@ -1338,21 +1356,77 @@ Roby_information::Roby_information(WFN& wavy) {
         results.percent_covalent_Pyth = 100 * (results.covalent * results.covalent / b_ab);
         b_ab = sqrt(b_ab);
         results.percent_covalent_Arakai = 200 * abs(asin(results.covalent / b_ab)) / constants::PI;
-        results.atom_indices = bond;
-        results.total = b_ab;
+
+        int el_a = wavy.get_atom_charge(bond.first);
+        int el_b = wavy.get_atom_charge(bond.second);
+        if (el_a > el_b) {
+            results.atom_indices = bond;
+            results.atom_element_nr = std::make_pair(el_a, el_b);
+            results.total = b_ab;
+            results.pair_population = bond_population;
+            results.population_first = atom_pops[bond.first];
+            results.population_second = atom_pops[bond.second];
+        }
+        else {
+            results.atom_indices = std::make_pair(bond.second, bond.first);
+            results.atom_element_nr = std::make_pair(el_b, el_a);
+            results.total = b_ab;
+            results.pair_population = bond_population;
+            results.population_first = atom_pops[bond.second];
+            results.population_second = atom_pops[bond.first];
+            results.ionic = -results.ionic;
+        }
         RGBI.push_back(results);
+#ifndef NSA2DEBUG
+        pb->update();
+#endif
     }
-    std::cout << "\n\nAtoms" << std::setw(8) << "Cov." << std::setw(8) << "Ion." << std::setw(8) << "Tot." << std::setw(8) << "Pyth." << std::setw(8) << "Arak." << std::endl;
-    std::cout << "---------------------------------------------\n";
+#ifndef NSA2DEBUG
+    delete pb;
+#endif
+    const double number_of_electrons = wavy.get_nr_electrons();
+
+    std::cout << "\nRoby-Gould Bond Indices (RGBI) Analysis\n----------------------------------------------\n";
+    std::cout << "Number of electrons in system:         " << number_of_electrons << "\n";
+    std::cout << "Number of electrons in Roby Analysis:  " << all_atom_population << "\n";
+    std::cout << "Percentage of electrons accounted for: " << std::setprecision(4) << (100.0 * all_atom_population / number_of_electrons) << " %\n";
+    std::cout << "----------------------------------------------\n";
+
+    std::cout << "\n\nAtom Nr        Els  "
+        << std::setw(8) << "n_A"
+        << std::setw(8) << "n_B"
+        << std::setw(8) << "n_AB"
+        << std::setw(8) << "s_AB"
+        << std::setw(8) << "Cov."
+        << std::setw(8) << "Ion."
+        << std::setw(8) << "Tot."
+        << std::setw(8) << "Pyth."
+        << std::setw(8) << "Arak."
+        << std::endl;
+    std::cout << "--------------------------------------------------------------------------------------------\n";
+
+    //Sort results by Element of the heavier atom of the bonds and then within each group by the heavier of the second atom
+    std::sort(RGBI.begin(), RGBI.end(), [](const bond_index_result& a, const bond_index_result& b) {
+        if (a.atom_element_nr.first != b.atom_element_nr.first) {
+            return a.atom_element_nr.first > b.atom_element_nr.first;
+        }
+        return a.atom_element_nr.second > b.atom_element_nr.second;
+        });
+
     for (auto res : RGBI) {
-        std::cout << res.atom_indices.first << "-" << res.atom_indices.second << "  "
+        std::cout << std::setw(4) << res.atom_indices.first << " -" << std::setw(4) << res.atom_indices.second << "  "
+            << std::setw(3) << constants::atnr2letter(res.atom_element_nr.first) << " -" << std::setw(3) << constants::atnr2letter(res.atom_element_nr.second)
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.population_first
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.population_second
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.pair_population
+            << std::fixed << std::setprecision(3) << std::setw(8) << res.population_first + res.population_second - res.pair_population
             << std::fixed << std::setprecision(3) << std::setw(8) << res.covalent
             << std::fixed << std::setprecision(3) << std::setw(8) << res.ionic
             << std::fixed << std::setprecision(3) << std::setw(8) << res.total
             << std::fixed << std::setprecision(3) << std::setw(8) << res.percent_covalent_Pyth
             << std::fixed << std::setprecision(3) << std::setw(8) << res.percent_covalent_Arakai << std::endl;
     }
-    std::cout << "---------------------------------------------\n";
+    std::cout << "--------------------------------------------------------------------------------------------\n";
 
     double null = 0;
 }
