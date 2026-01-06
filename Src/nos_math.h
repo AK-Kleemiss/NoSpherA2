@@ -150,6 +150,9 @@ void get_submatrices(const T2& D_full, const T2& S_full, T& D_sub, T& S_sub, con
 //calculates the Moore-Penrose pseudo-inverse of a matrix A using SVD
 dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5);
 
+template <typename T>
+void swap_rows_cols_symm(T& mat, const int i, const int j);
+
 // Self written matrix multiplication with flat vectors
 template <typename T>
 std::vector<T> dot(const std::vector<T>& mat, const std::vector<T>& vec, bool transp = false);

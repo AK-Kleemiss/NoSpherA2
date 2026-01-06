@@ -81,12 +81,22 @@ void Int_Params::collect_basis_data()
             exponents.push_back(basis[shell].get_exponent());
         }
         // Normalize the GTOs depending on the context
-        if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto)
+        if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx)
         {
             for (int i = 0; i < coefficients.size(); i++)
             {
                 int l = basis[i].get_type() - 1;
                 coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
+            }
+        }
+		else if (wfn_origin == e_origin::tonto)
+        {
+            for (int i = 0; i < coefficients.size(); i++)
+            {
+                int l = basis[i].get_type() - 1;
+                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from Tonto to libcint  ... something something, cartesian harmonics...
+                if (l == 2) // D functions need an extra normalization factor
+					coefficients[i] *= std::sqrt(10./4.0/constants::PI); // ... something something, cartesian harmonics...^2
             }
         }
         else if (wfn_origin == e_origin::NOT_YET_DEFINED)

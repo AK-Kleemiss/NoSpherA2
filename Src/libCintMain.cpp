@@ -2081,6 +2081,13 @@ void compute2c_Overlap_Cart(Int_Params& params, vec& overlap_2c)
     overlap_2c.resize((size_t)naoi * naoj, 0.0);
     GTOint2c(int1e_ovlp_cart, res.data(), 1, 0, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
 
+#ifndef __APPLE__
+    // res is in fortran order, write the result in regular ordering
+    mkl_domatcopy('R', 'T', naoi, naoj, 1.0,
+        res.data(), (MKL_INT)naoj,
+        overlap_2c.data(), (MKL_INT)naoi);
+#else
+
     // res is in fortran order, write the result in regular ordering
     for (int i = 0; i < naoi; i++)
     {
@@ -2089,6 +2096,7 @@ void compute2c_Overlap_Cart(Int_Params& params, vec& overlap_2c)
             overlap_2c[j * (size_t)naoi + i] = res[i * (size_t)naoj + j];
         }
     }
+#endif
 }
 
 // Function to calculate the number of 3-center 2-electron integrals to compute at once based on the available memory

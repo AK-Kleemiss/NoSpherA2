@@ -884,6 +884,12 @@ void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
 
     overlap_matrix = reshape<dMatrix2>(S_full, Shape2D(density_matrix.extent(0), density_matrix.extent(1)));
 
+#ifdef NSA2DEBUG
+    print_dmatrix2(overlap_matrix, "Overlap matrix");
+#endif
+
+    //err_checkf()
+
     int last_index = 0;
     ivec2 indices(wavy.get_ncen());
     for (auto& a : ats) {
@@ -896,8 +902,15 @@ void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
                 current_shell++;
                 if (wavy.get_origin() != e_origin::tonto)
                     bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 5 : nr_indices = 7));
-                else
+                else {
                     bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 6 : nr_indices = 10));
+                    if (bf.get_type() == 3) {
+                        //2 - 4; 3 - 6; 5 - 6
+                        swap_rows_cols_symm(overlap_matrix, last_index + 1, last_index + 3);
+                        swap_rows_cols_symm(overlap_matrix, last_index + 2, last_index + 5);
+                        swap_rows_cols_symm(overlap_matrix, last_index + 4, last_index + 5);
+                    }
+                }
                 for (int i = 0; i < nr_indices; i++) {
                     indices[a.get_nr() - 1].push_back(last_index);
                     last_index++;
@@ -909,6 +922,9 @@ void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
         NAOs.emplace_back(calculateAtomicNAO(density_matrix, overlap_matrix, indices[a.get_nr() - 1]));
         NAOs.back().atom_index = a.get_nr() - 1;
     }
+#ifdef NSA2DEBUG
+    print_dmatrix2(overlap_matrix, "Overlap matrix repaired");
+#endif
 }
 
 ivec Roby_information::find_eigenvalue_pairs(const vec& eigvals, const double tolerance) {
@@ -1326,7 +1342,7 @@ Roby_information::Roby_information(WFN& wavy) {
         results.total = b_ab;
         RGBI.push_back(results);
     }
-    std::cout << "\n\nAtoms" << std::setw(9) << "Cov." << std::setw(8) << "Ion." << std::setw(8) << "Tot." << std::setw(8) << "Pyth." << std::setw(8) << "Arak." << std::endl;
+    std::cout << "\n\nAtoms" << std::setw(8) << "Cov." << std::setw(8) << "Ion." << std::setw(8) << "Tot." << std::setw(8) << "Pyth." << std::setw(8) << "Arak." << std::endl;
     std::cout << "---------------------------------------------\n";
     for (auto res : RGBI) {
         std::cout << res.atom_indices.first << "-" << res.atom_indices.second << "  "

@@ -557,3 +557,40 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
     // Perform Matrix Multiplication: C = alpha * A * B + beta * C
     return dot<dMatrix2>(reshape<dMatrix2>(Vt, Shape2D(k, n)), reshape<dMatrix2>(W, Shape2D(k, m)), true, false);
 }
+
+//Swippedy swappdy column/rows in a symmteric matrix
+template <typename T>
+void swap_rows_cols_symm(T& mat, const int i, const int j) {
+    err_checkf(mat.extent(0) == mat.extent(1), "Matrix must be square to swap rows/cols symmetrically!", std::cout);
+    const int n = static_cast<int>(mat.extent(0));
+    using Datatype = typename T::value_type;
+    if constexpr (std::is_same_v<Datatype, double>)
+    {
+        // swap rows i and j
+        cblas_dswap(n,               // number of elements in a row
+            mat.data() + i * n, 1,       // row i, contiguous
+            mat.data() + j * n, 1);      // row j, contiguous
+
+        // swap columns i and j
+        cblas_dswap(n,               // number of elements in a column
+            mat.data() + i, n,      // column i, stride = lda
+            mat.data() + j, n);     // column j, stride = lda
+    }
+    else if constexpr (std::is_same_v<Datatype, cdouble>)
+    {
+        // swap rows i and j
+        cblas_zswap(n,                                       // number of elements in a row
+            reinterpret_cast<cdouble*>(mat.data() + i * n), 1,       // row i, contiguous
+            reinterpret_cast<cdouble*>(mat.data() + j * n), 1);      // row j, contiguous
+        // swap columns i and j
+        cblas_zswap(n,                                       // number of elements in a column
+            reinterpret_cast<cdouble*>(mat.data() + i), n,      // column i, stride = lda
+            reinterpret_cast<cdouble*>(mat.data() + j), n);     // column j, stride = lda
+    }
+    else
+    {
+        err_not_impl_f("Unsupported data type for swapping rows/cols symmetrically", std::cout);
+	}
+}
+template void swap_rows_cols_symm(dMatrix2& mat, const int row1, const int row2);
+template void swap_rows_cols_symm(cMatrix2& mat, const int row1, const int row2);
