@@ -560,6 +560,7 @@ bool WFN::read_wfn(const std::filesystem::path& fileName, const bool& debug, std
         return false;
     }
     origin = e_origin::wfn;
+    d_f_switch = true;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName);
     if (rf.good())
@@ -1006,6 +1007,7 @@ bool WFN::read_xyz(const std::filesystem::path& filename, std::ostream& file, co
 bool WFN::read_wfx(const std::filesystem::path& fileName, const bool& debug, std::ostream& file)
 {
     origin = e_origin::wfx;
+	d_f_switch = true;
     using namespace std;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName.c_str());
@@ -1767,6 +1769,7 @@ bool WFN::read_molden(const std::filesystem::path& filename, std::ostream& file,
     }
     else if (!d5 && !f7 && !g9)
     {
+		d_f_switch = true;
         int run = 0;
         string sym;
         bool spin; // alpha = false, beta = true
@@ -2049,7 +2052,7 @@ bool WFN::read_molden(const std::filesystem::path& filename, std::ostream& file,
     {
         err_not_impl_f("PLEASE DONT MIX CARTESIAN AND SPERHICAL HARMINICS; THAT IS ANNOYING!", std::cout);
     }
-    //Make the matrix symmetric
+	//Make the matrix square for later use
     while (coefficients[0].size() < coefficients[0][0].size()) {
         coefficients[0].push_back(vec(coefficients[0][0].size(), 0.0));
         occ.push_back(0);
@@ -2071,6 +2074,7 @@ bool WFN::read_molden(const std::filesystem::path& filename, std::ostream& file,
 bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, const bool debug, const std::filesystem::path& energies_filename, const std::filesystem::path& orbitals_filename)
 {
     using namespace std;
+    d_f_switch = true;
     err_checkf(std::filesystem::exists(filename), "couldn't open or find " + filename.string() + ", leaving", file);
     std::filesystem::path energies_file, orbitals_file, stdout_file;
     ifstream rf;

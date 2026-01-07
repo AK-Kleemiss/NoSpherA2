@@ -12684,7 +12684,6 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SF|ARM64'">stdclatest</LanguageStandard_C>
     </ClCompile>
     <ClCompile Include="..\Src\libCintMain.cpp" />
-    <ClCompile Include="..\Src\mat_nos_math.cpp" />
     <ClCompile Include="..\Src\nos_math.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Publish|ARM64'">Use</PrecompiledHeader>

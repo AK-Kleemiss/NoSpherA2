@@ -495,7 +495,7 @@ std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN& wavy) {
                 wavy.get_atom_coordinate(i, 1) - wavy.get_atom_coordinate(j, 1),
                 wavy.get_atom_coordinate(i, 2) - wavy.get_atom_coordinate(j, 2));
             const double svdW = constants::ang2bohr(constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)]);
-            if (distance < 1.5 * svdW)
+            if (distance < 1.25 * svdW)
             {
 #ifdef NSA2DEBUG
                 std::cout << "Bond between " << i << " (" << wavy.get_atom_charge(i) << ") and " << j << " (" << wavy.get_atom_charge(j) << ") with distance " << distance << " and svdW " << svdW << std::endl;
@@ -877,7 +877,7 @@ void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
 
     Int_Params basis(wavy);
     vec S_full;
-    if (wavy.get_origin() == e_origin::tonto)
+    if (wavy.get_d_f_switch())
         compute2c_Overlap_Cart(basis, S_full);
     else
         compute2C<Overlap2C>(basis, S_full);

@@ -137,6 +137,9 @@
     <ClCompile Include="..\Src\cif.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\GridManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="NoSpherA2_DLL.rc">
