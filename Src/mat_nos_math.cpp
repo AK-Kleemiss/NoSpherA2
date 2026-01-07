@@ -459,9 +459,10 @@ void get_submatrix(const T2& full,
 
     for (int i = 0; i < n; ++i) {
         const int global_i = indices[i];
+        const int in = i * n;
         for (int j = 0; j < n; ++j) {
             const int global_j = indices[j];
-            sub[i * n + j] = full(global_i, global_j);
+            sub[in + j] = full(global_i, global_j);
         }
     }
 }
@@ -482,9 +483,10 @@ void get_submatrix(const T2& full,
 
     for (int i = 0; i < n1; ++i) {
         const int global_i = val_indices[i];
+        const int in = i * n2;
         for (int j = 0; j < n2; ++j) {
             const int global_j = vec_indices[j];
-            sub[i * n2 + j] = full(global_i, global_j);
+            sub[in + j] = full(global_i, global_j);
         }
     }
 }
@@ -499,11 +501,27 @@ bool isSymmetricViaEigenvalues(const T& A, int n, double tol) {
     using Datatype = typename T::value_type;
     if constexpr (std::is_same_v<Datatype, double>)
     {
+#ifdef __APPLE__
+        // Use Accelerate framework on macOS for eigenvalue computation
+        __CLPK_integer info = 0;
+        LAPACK_DoubleComplex* a_data = reinterpret_cast<LAPACK_DoubleComplex*>(A_copy.data());
+        double* wr_data = reinterpret_cast<double*>(wr.data());
+        double* wi_data = reinterpret_cast<double*>(wi.data());
+        __CLPK_integer n_clpk = static_cast<__CLPK_integer>(n);
+        __CLPK_integer lda = static_cast<__CLPK_integer>(n);
+        __CLPK_integer ldvl = static_cast<__CLPK_integer>(n);
+        __CLPK_integer ldvr = static_cast<__CLPK_integer>(n);
+        // Since we don't need left/right eigenvectors, we can pass nullptr
+        dgeev_((char*)"N", (char*)"N", &n_clpk, a_data, &lda,
+            wr_data, wi_data, nullptr, &ldvl, nullptr, &ldvr,
+            nullptr, &info);
+#else
         LAPACKE_dgeev(LAPACK_ROW_MAJOR, 'N', 'N',
             n, A_copy.data(),
             n, wr.data(),
             wi.data(), nullptr, n,
             nullptr, n);
+#endif
     }
     else if constexpr (std::is_same_v<Datatype, cdouble>)
     {
@@ -543,13 +561,13 @@ void get_submatrices(const T2& D_full,
     err_checkf(D_sub.size() == n * n, "Density submatrix has incorrect size.", std::cout);
     err_checkf(S_sub.size() == n * n, "Overlap submatrix has incorrect size.", std::cout);
 
-
     for (int i = 0; i < n; ++i) {
         const int global_i = indices[i];
+        const int in = i * n;
         for (int j = 0; j < n; ++j) {
             const int global_j = indices[j];
-            D_sub[i * n + j] = D_full(global_i, global_j);
-            S_sub[i * n + j] = S_full(global_i, global_j);
+            D_sub[in + j] = D_full(global_i, global_j);
+            S_sub[in + j] = S_full(global_i, global_j);
         }
     }
 }
@@ -560,7 +578,7 @@ template void get_submatrices(const dMatrix2& D_full, const dMatrix2& S_full, ve
 dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
     const int m = static_cast<int>(A.extent(0)); // rows
     const int n = static_cast<int>(A.extent(1)); // cols
-    int k = std::min(m, n);
+    const int k = std::min(m, n);
 
     // 1. Allocate memory for SVD results
     vec S(k);                 // Singular values
@@ -570,10 +588,34 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
 
     // Make a copy of A because dgesvd destroys the input matrix
     vec A_copy = A.container();
-
     // 2. Compute SVD: A = U * S * Vt
     // use 'S' for jobu/jobvt to compute the "thin" SVD (only the first k columns/rows)
-    lapack_int info = LAPACKE_dgesvd(
+#ifdef __APPLE__
+    // Use Accelerate framework on macOS for SVD computation
+    __CLPK_integer info = 0;
+    __CLPK_integer lwork = -1;
+    double work_query = 0.0;
+
+    // Query optimal work size
+    dgesvd_((char*)"S", (char*)"S", (__CLPK_integer*)&m, (__CLPK_integer*)&n,
+        A_copy.data(), (__CLPK_integer*)&n,
+        S.data(),
+        U.data(), (__CLPK_integer*)&k,
+        Vt.data(), (__CLPK_integer*)&n,
+        &work_query, (__CLPK_integer*)&lwork, (__CLPK_integer*)&info);
+
+    lwork = static_cast<__CLPK_integer>(work_query);
+    vec work(lwork);
+
+    // Perform SVD: A = U * S * Vt
+    dgesvd_((char*)"S", (char*)"S", (__CLPK_integer*)&m, (__CLPK_integer*)&n,
+        A_copy.data(), (__CLPK_integer*)&n,
+        S.data(),
+        U.data(), (__CLPK_integer*)&k,
+        Vt.data(), (__CLPK_integer*)&n,
+        work.data(), (__CLPK_integer*)&lwork, (__CLPK_integer*)&info);
+#else
+    err_checkf(LAPACKE_dgesvd(
         LAPACK_ROW_MAJOR,
         'S', 'S',
         m, n,
@@ -581,33 +623,85 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
         S.data(),
         U.data(), k,
         Vt.data(), n,
-        superb.data()
-    );
-
-    err_checkf(info == 0, "LAPACKE_dgesvd failed with info unequal 0!", std::cout);
+        superb.data()) == 0,
+        "LAPACKE_dgesvd failed with info unequal 0!", std::cout);
+#endif
 
     // 3. Invert Singular Values (Sigma^+)
     // Filter out small singular values
-    for (int i = 0; i < k; ++i) {
-        if (S[i] > cutoff) {
-            S[i] = 1.0 / S[i];
-        }
-        else {
-            S[i] = 0.0;
-        }
-    }
+    for (int i = 0; i < k; ++i)
+        S[i] = S[i] < cutoff ? 0.0 : 1.0 / S[i];
 
     // 4. Compute A^+ = V * S^+ * U^T
-    vec W(k * m, 0.0);
+    A_copy = vec(k * m, 0.0); // Reuse A_copy as W to save memory
     for (int i = 0; i < k; ++i) {
-        if (S[i] == 0.0) continue;
+        const int im = i * m;
+        if (S[i] == 0.0)
+            continue;
+#pragma omp simd
         for (int j = 0; j < m; ++j) {
-            W[i * m + j] = S[i] * U[j * k + i]; // U is row-major (m x k)
+            A_copy[im + j] = S[i] * U[j * k + i]; // U is row-major (m x k)
         }
     }
 
     // Perform Matrix Multiplication: C = alpha * A * B + beta * C
-    return dot<dMatrix2>(reshape<dMatrix2>(Vt, Shape2D(k, n)), reshape<dMatrix2>(W, Shape2D(k, m)), true, false);
+    return dot<dMatrix2>(reshape<dMatrix2>(Vt, Shape2D(k, n)), reshape<dMatrix2>(A_copy, Shape2D(k, m)), true, false);
+}
+
+void make_Eigenvalues(vec& A, vec& W) {
+    const int n = static_cast<int>(W.size());
+#ifdef __APPLE__
+    // Use Accelerate framework on macOS for eigenvalue computation
+    __CLPK_integer info = 0;
+    __CLPK_integer lwork = -1;
+    double work_query = 0.0;
+    // Query optimal work size
+    dsyev_((char*)"V", (char*)"U", (__CLPK_integer*)&n,
+        A.data(), (__CLPK_integer*)&n,
+        W.data(),
+        &work_query, (__CLPK_integer*)&lwork, (__CLPK_integer*)&info);
+    lwork = static_cast<__CLPK_integer>(work_query);
+    vec work(lwork);
+    // Perform eigenvalue decomposition
+    dsyev_((char*)"V", (char*)"U", (__CLPK_integer*)&n,
+        A.data(), (__CLPK_integer*)&n,
+        W.data(),
+        work.data(), (__CLPK_integer*)&lwork, (__CLPK_integer*)&info);
+    err_checkf(info == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+#else
+    err_checkf(LAPACKE_dsyev(
+        LAPACK_ROW_MAJOR,
+        'V', 'U',
+        n,
+        A.data(),
+        n,
+        W.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+#endif
+}
+
+vec mat_sqrt(vec& A, vec& W, const double cutoff) {
+    const int n = static_cast<int>(W.size());
+    vec Temp(n * n, 0.0);
+
+    make_Eigenvalues(A, W);
+
+    for (int i = 0; i < n; ++i)
+        W[i] = abs(W[i]) < cutoff ? 0.0 : std::sqrt(abs(W[i]));
+
+    double* T;
+    int in, jn;
+    for (int i = 0; i < n; i++) {
+        in = i * n;
+        for (int j = 0; j < n; j++) {
+            jn = j * n;
+            T = &Temp[in + j];
+#pragma omp simd
+            for (int k = 0; k < n; k++)
+                *T += A[in + k] * W[k] * A[jn + k];
+        }
+    }
+
+    return Temp;
 }
 
 //Swippedy swappdy column/rows in a symmteric matrix

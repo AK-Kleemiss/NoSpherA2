@@ -585,32 +585,12 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
     get_submatrices(D_full, S_full, D_sub, S_sub, atom_indices);
 
     vec V(n * n);          // Workhorse
-    vec Temp(n * n, 0.0);  // To store S^0.5
-    vec Temp2(n * n, 0.0); // To store S^-0.5
-    vec Rho(n * n);   // To store  target density
-    vec W(n);         // Eigenvalues
+    vec Rho(n * n);        // To store target density
 
     V = S_sub;
+    vec W(n);
     // make V = Sqrt(S)
-    err_checkf(LAPACKE_dsyev(
-        LAPACK_ROW_MAJOR,
-        'V', 'U',
-        n,
-        V.data(),
-        n,
-        W.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
-
-    for (int i = 0; i < n; i++) {
-        if (abs(W[i]) < 1E-20)
-            W[i] = 0;
-        else
-            W[i] = std::sqrt(abs(W[i]));
-    }
-
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            for (int k = 0; k < n; k++)
-                Temp[i * n + j] += V[i * n + k] * W[k] * V[j * n + k];
+    const vec Temp = mat_sqrt(V, W);
 
 #ifdef NSA2DEBUG
     print_dmatrix2(reshape<dMatrix2>(Temp, Shape2D(n, n)), "projection matrix V");
@@ -620,32 +600,37 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
 #ifdef NSA2DEBUG
     print_dmatrix2(reshape<dMatrix2>(X, Shape2D(n, n)), "projected density X");
 #endif
+
     vec occu(n, 0);
     vec P = X;
 #ifdef NSA2DEBUG
     err_checkf(isSymmetricViaEigenvalues<vec>(P, n), "Transformed matrix not symmetric!", std::cout);
 #endif
-    err_checkf(LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', n, P.data(), n, occu.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
-
+    make_Eigenvalues(P, occu);
 #ifdef NSA2DEBUG
     std::cout << "Eigenvalues of projected density P:\n";
     for (int i = 0; i < n; ++i) {
-        std::cout << std::setw(14) << std::setprecision(8) << std::fixed << occu[i] << " ";
+        std::cout << std::setw(14) << std::setprecision(8) << std::fixed << W[i] << " ";
     }
-    print_dmatrix2(reshape<dMatrix2>(P, Shape2D(n, n)), "Projected density P");
+    print_dmatrix2(reshape<dMatrix2>(A, Shape2D(n, n)), "Projected density P");
 #endif
 
-    for (int i = 0; i < n; i++) {
-        if (abs(W[i]) < 1E-20)
-            W[i] = 0;
-        else
-            W[i] = 1.0 / W[i];
-    }
+    for (int i = 0; i < n; ++i)
+        W[i] = abs(W[i]) < 1E-10 ? 0.0 : 1.0 / W[i];
 
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
+    vec Temp2(n * n, 0.0);
+    double* T;
+    int in, jn;
+    for (int i = 0; i < n; i++) {
+        in = i * n;
+        for (int j = 0; j < n; j++) {
+            jn = j * n;
+            T = &Temp2[in + j];
+#pragma simd
             for (int k = 0; k < n; k++)
-                Temp2[i * n + j] += V[i * n + k] * W[k] * V[j * n + k];
+                *T += V[in + k] * W[k] * V[jn + k];
+        }
+    }
 
 #ifdef NSA2DEBUG
     print_dmatrix2(reshape<dMatrix2>(Temp2, Shape2D(n, n)), "Back projection S^-0.5");
@@ -709,78 +694,81 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
  * @param n         Number of basis functions (N).
  * @return          Matrix of final NAOs (N x N), Columns are orbitals.
  */
-std::vector<double> orthogonalizePNAOs(const vec& C_PNAO,
-    const vec& S_AO,
-    int n) {
 
-    vec S_PNAO(n * n);
-    vec Temp(n * n); // Intermediate buffer
-    vec C_NAO(n * n); // Result
+ /* CURRENTLY NOT IN USE
+ std::vector<double> orthogonalizePNAOs(const vec& C_PNAO,
+     const vec& S_AO,
+     int n) {
 
-    // 1. Compute Overlap in PNAO basis: S_PNAO = C_PNAO^T * S_AO * C_PNAO
+     vec S_PNAO(n * n);
+     vec Temp(n * n); // Intermediate buffer
+     vec C_NAO(n * n); // Result
 
-    // Step A: Temp = S_AO * C_PNAO
-    // S_AO is symmetric.
-    cblas_dsymm(CblasRowMajor,
-        CblasLeft, CblasUpper,
-        n, n,
-        1.0, S_AO.data(), n,
-        C_PNAO.data(), n,
-        0.0, Temp.data(), n);
+     // 1. Compute Overlap in PNAO basis: S_PNAO = C_PNAO^T * S_AO * C_PNAO
 
-    // Step B: S_PNAO = C_PNAO^T * Temp
-    // C_PNAO is not symmetric, so we use dgemm.
-    // Transpose the first matrix (C_PNAO^T).
-    cblas_dgemm(CblasRowMajor,
-        CblasTrans, CblasNoTrans,
-        n, n, n,
-        1.0, C_PNAO.data(), n,
-        Temp.data(), n,
-        0.0, S_PNAO.data(), n);
+     // Step A: Temp = S_AO * C_PNAO
+     // S_AO is symmetric.
+     cblas_dsymm(CblasRowMajor,
+         CblasLeft, CblasUpper,
+         n, n,
+         1.0, S_AO.data(), n,
+         C_PNAO.data(), n,
+         0.0, Temp.data(), n);
 
-    // 2. Compute S_PNAO^(-1/2) using Eigendecomposition
-    // S_PNAO is symmetric (and positive definite).
+     // Step B: S_PNAO = C_PNAO^T * Temp
+     // C_PNAO is not symmetric, so we use dgemm.
+     // Transpose the first matrix (C_PNAO^T).
+     cblas_dgemm(CblasRowMajor,
+         CblasTrans, CblasNoTrans,
+         n, n, n,
+         1.0, C_PNAO.data(), n,
+         Temp.data(), n,
+         0.0, S_PNAO.data(), n);
 
-    vec W(n); // Eigenvalues
-    // We can overwrite S_PNAO with eigenvectors to save memory, 
-    // but let's keep it clear. Copy S_PNAO to 'U' (Eigenvectors).
-    vec U = S_PNAO;
+     // 2. Compute S_PNAO^(-1/2) using Eigendecomposition
+     // S_PNAO is symmetric (and positive definite).
 
-    // LAPACKE_dsyevd: Computes all eigenvalues and eigenvectors
-    err_checkf(LAPACKE_dsyevd(LAPACK_ROW_MAJOR, 'V', 'U', n, U.data(), n, W.data()) == 0, "Eigenvalue computation failed.", std::cout);
+     vec W(n); // Eigenvalues
+     // We can overwrite S_PNAO with eigenvectors to save memory,
+     // but let's keep it clear. Copy S_PNAO to 'U' (Eigenvectors).
+     vec U = S_PNAO;
 
-    // Construct S^-1/2 = U * Lambda^(-1/2) * U^T
-    std::fill(S_PNAO.begin(), S_PNAO.end(), 0.0); // Reuse S_PNAO to store S^-1/2
+     // LAPACKE_dsyevd: Computes all eigenvalues and eigenvectors
+     err_checkf(LAPACKE_dsyevd(LAPACK_ROW_MAJOR, 'V', 'U', n, U.data(), n, W.data()) == 0, "Eigenvalue computation failed.", std::cout);
 
-    for (int k = 0; k < n; ++k) {
-        double scale = 1.0 / std::sqrt(W[k]);
-        // Add contribution of k-th eigenvector: scale * (v_k * v_k^T)
-        // v_k is the k-th ROW of U.
-        const double* v_k = &U[k * n];
+     // Construct S^-1/2 = U * Lambda^(-1/2) * U^T
+     std::fill(S_PNAO.begin(), S_PNAO.end(), 0.0); // Reuse S_PNAO to store S^-1/2
 
-        // This is a rank-1 update (dger), but we can just sum manually or loop
-        // Since we need the full matrix for the next multiplication
-        for (int i = 0; i < n; ++i) {
-            for (int j = 0; j < n; ++j) {
-                S_PNAO[i * n + j] += scale * v_k[i] * v_k[j];
-            }
-        }
-    }
+     for (int k = 0; k < n; ++k) {
+         double scale = 1.0 / std::sqrt(W[k]);
+         // Add contribution of k-th eigenvector: scale * (v_k * v_k^T)
+         // v_k is the k-th ROW of U.
+         const double* v_k = &U[k * n];
 
-    // 3. Transform PNAOs to NAOs
-    // C_NAO = C_PNAO * S^(-1/2)
-    // C_PNAO (Columns are PNAOs) * S_inv_sqrt (transformation matrix)
+         // This is a rank-1 update (dger), but we can just sum manually or loop
+         // Since we need the full matrix for the next multiplication
+         for (int i = 0; i < n; ++i) {
+             for (int j = 0; j < n; ++j) {
+                 S_PNAO[i * n + j] += scale * v_k[i] * v_k[j];
+             }
+         }
+     }
 
-    cblas_dgemm(CblasRowMajor,
-        CblasNoTrans, CblasNoTrans,
-        n, n, n,
-        1.0, C_PNAO.data(), n,
-        S_PNAO.data(), n, // This is now S^-1/2
-        0.0,
-        C_NAO.data(), n);
+     // 3. Transform PNAOs to NAOs
+     // C_NAO = C_PNAO * S^(-1/2)
+     // C_PNAO (Columns are PNAOs) * S_inv_sqrt (transformation matrix)
 
-    return C_NAO;
-}
+     cblas_dgemm(CblasRowMajor,
+         CblasNoTrans, CblasNoTrans,
+         n, n, n,
+         1.0, C_PNAO.data(), n,
+         S_PNAO.data(), n, // This is now S^-1/2
+         0.0,
+         C_NAO.data(), n);
+
+     return C_NAO;
+ }
+ */
 
 double Roby_information::projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals, const ivec& eigvecs, dMatrix2* given_NAO) {
     const int n = indices.size();
@@ -1203,35 +1191,17 @@ Roby_information::Roby_information(WFN& wavy) {
         get_submatrix(overlap_matrix, S_Sub, bond_indices);
         //dMatrix2 S = reshape<dMatrix2>(S_Sub, Shape2D(n, n));
 
-        auto V = S_Sub;
+        vec V = S_Sub;
         vec W(n);
         // make V = Sqrt(S)
-        err_checkf(LAPACKE_dsyev(
-            LAPACK_ROW_MAJOR,
-            'V', 'U',
-            n,
-            V.data(),
-            n,
-            W.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+        const vec Temp = mat_sqrt(V, W);
 
-        for (int i = 0; i < n; i++) {
-            if (abs(W[i]) < 1E-5)
-                W[i] = 0;
-            else
-                W[i] = std::sqrt(abs(W[i]));
-        }
-        vec Temp(n * n, 0.0);
-        for (int i = 0; i < n; i++)
-            for (int j = 0; j < n; j++)
-                for (int k = 0; k < n; k++)
-                    Temp[i * n + j] += V[i * n + k] * W[k] * V[j * n + k];
-
-        auto A = reshape<dMatrix2>(Temp, Shape2D(n, n));
+        dMatrix2 A = reshape<dMatrix2>(Temp, Shape2D(n, n));
 #ifdef NSA2DEBUG
         print_dmatrix2(A, "Overlap Sqrt SH");
 #endif
 
-        auto SI = LAPACKE_invert(A);
+        dMatrix2 SI = LAPACKE_invert(A);
 
 #ifdef NSA2DEBUG
         print_dmatrix2(SI, "Overlap Pseudo Inverse");
@@ -1244,13 +1214,8 @@ Roby_information::Roby_information(WFN& wavy) {
 
         // solve symmetric eigenproblem of X
         vec ionic_eigenvals(X.extent(0));
-        err_checkf(LAPACKE_dsyev(
-            LAPACK_ROW_MAJOR,
-            'V', 'U',
-            X.extent(0),
-            X.data(),
-            X.extent(1),
-            ionic_eigenvals.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+        make_Eigenvalues(X.container(), ionic_eigenvals);
+
 #ifdef NSA2DEBUG
         std::cout << "Ionic eigenvalues between atom " << bond.first + 1 << " and atom " << bond.second + 1 << ":\n";
         for (size_t i = 0; i < ionic_eigenvals.size(); i++) {

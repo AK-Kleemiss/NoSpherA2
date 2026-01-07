@@ -13,7 +13,7 @@
 
 
 template <typename T>
-T conj(const T &val)
+T conj(const T& val)
 {
     if constexpr (std::is_same_v<T, cdouble> || std::is_same_v<T, std::complex<int>>)
     {
@@ -27,7 +27,7 @@ T conj(const T &val)
 
 // Reorder 3D Vectors following a given order
 template <typename T>
-std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector<std::vector<T>>> &original)
+std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector<std::vector<T>>>& original)
 {
     if (original.empty() || original[0].empty() || original[0][0].empty())
     {
@@ -54,10 +54,10 @@ std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector
 
     return transposed;
 }
-template vec3 reorder3D(const vec3 &original);
+template vec3 reorder3D(const vec3& original);
 
 // Element-wise exponentiation of a matrix
-vec2 elementWiseExponentiation(const vec2 &matrix, double exponent)
+vec2 elementWiseExponentiation(const vec2& matrix, double exponent)
 {
     vec2 result = matrix; // Copy the original matrix to preserve its dimensions
 
@@ -71,24 +71,24 @@ vec2 elementWiseExponentiation(const vec2 &matrix, double exponent)
 
     return result;
 }
-dMatrix2 elementWiseExponentiation(dMatrix2 &matrix, double exponent)
+dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent)
 {
     vec result(matrix.size(), 0.0);
-    dMatrix2 result_m = reshape<dMatrix2>(result, Shape2D({matrix.extent(0), matrix.extent(1)}));
+    dMatrix2 result_m = reshape<dMatrix2>(result, Shape2D({ matrix.extent(0), matrix.extent(1) }));
 
 #ifdef __APPLE__
     std::transform(matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val)
-                   { return std::pow(val, exponent); });
+        { return std::pow(val, exponent); });
 #else
     std::transform(std::execution::par, matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val)
-                   { return std::pow(val, exponent); });
+        { return std::pow(val, exponent); });
 #endif
 
     return result_m;
 }
 
 template <typename T>
-void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &A, const std::vector<std::vector<T>> &B)
+void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& A, const std::vector<std::vector<T>>& B)
 {
     std::cout << "Matrices have size " << A.extent(0) << "x" << A.extent(1) << std::endl;
     for (int i = 0; i < A.extent(0); i++)
@@ -108,7 +108,7 @@ void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<uns
 }
 
 template <typename T>
-void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent>> &A, const std::vector<T> &B)
+void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent>>& A, const std::vector<T>& B)
 {
     std::cout << "Matrices have size " << A.extent(0) << std::endl;
     for (int i = 0; i < A.extent(0); i++)
@@ -125,7 +125,7 @@ void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<uns
 }
 
 template <typename T>
-void compare_matrices(const std::vector<std::vector<T>> &A, const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &B)
+void compare_matrices(const std::vector<std::vector<T>>& A, const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& B)
 {
     std::cout << "Matrices have size " << B.extent(0) << "x" << B.extent(1) << std::endl;
     for (int i = 0; i < A.extent(0); i++)
@@ -145,7 +145,7 @@ void compare_matrices(const std::vector<std::vector<T>> &A, const Kokkos::Experi
 }
 
 template <typename T>
-void compare_matrices(const std::vector<std::vector<T>> &A, const std::vector<std::vector<T>> &B)
+void compare_matrices(const std::vector<std::vector<T>>& A, const std::vector<std::vector<T>>& B)
 {
     for (int i = 0; i < A.extent(0); i++)
     {
@@ -158,7 +158,7 @@ void compare_matrices(const std::vector<std::vector<T>> &A, const std::vector<st
 
 void _test_openblas()
 {
-    ivec dims = {10, 10};
+    ivec dims = { 10, 10 };
     // Init Mat A with some values as a 3x3 matrix
     vec2 A(dims[0], vec(dims[1]));
     vec2 B(dims[0], vec(dims[1]));
@@ -323,14 +323,18 @@ void solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigne
             A_col_major[j * m + i] = A[i * n + j]; // Transpose
         }
     }
-    char trans = 'T'; // We need to solve A^T x = b
-    int iwork = -1;
-    double* work = NULL;
-    //TODO: Implement workspace query and allocation for dgels
-    std::cout << "Warning: LAPACK dgels not implemented on macOS/Accelerate. Exiting." << std::endl;
-    exit(1);
-    //dgels_(&trans, &n, &m, &nrhs, A_col_major.data(), &lda, b.data(), &ldb, work, &iwork, &info);
-
+    char trans = 'N'; // Column-major layout already stored in A_col_major
+    int m_work = m;
+    int n_work = n;
+    int nrhs_work = nrhs;
+    int lda_cm = m;
+    int ldb_cm = m;
+    int lwork = -1;
+    double work_query = 0.0;
+    dgels_(&trans, &m_work, &n_work, &nrhs_work, A_col_major.data(), &lda_cm, b.data(), &ldb_cm, &work_query, &lwork, &info);
+    lwork = static_cast<int>(work_query);
+    std::vector<double> work(lwork);
+    dgels_(&trans, &m_work, &n_work, &nrhs_work, A_col_major.data(), &lda_cm, b.data(), &ldb_cm, work.data(), &lwork, &info);
 #else
     info = LAPACKE_dgels(LAPACK_COL_MAJOR, 'T', n, m, nrhs, A.data(), lda, b.data(), ldb);
 #endif
@@ -417,12 +421,12 @@ NNLSResult nnls(dMatrix2& A,
         }
         int tmpint = m - nrow;
 
-        #if defined(__APPLE__)
+#if defined(__APPLE__)
         lapack_int incx = 1;
         dlarfg_(&tmpint, &work[nrow], &work[nrow + 1], &incx, &tau);
-        #else
+#else
         LAPACKE_dlarfg(tmpint, &work[nrow], &work[nrow + 1], 1, &tau);
-        #endif
+#endif
         beta = work[nrow];
         work[nrow] = 1.0;
         unorm = 0.0;
@@ -437,14 +441,14 @@ NNLSResult nnls(dMatrix2& A,
             // ztest which is the new prospective value for x[j].
             std::copy(b.data(), b.data() + m, zz.begin());
 
-            #if defined(__APPLE__)
+#if defined(__APPLE__)
             char side = 'L';
             lapack_int one = 1;
             vec work_temp(tmpint, 0.0);
             dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
-            #else
+#else
             LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
-            #endif
+#endif
 
             if (zz[nrow] / beta <= 0.0) {
                 // reject column j as a candidate to be moved from set z to set p.
@@ -460,7 +464,7 @@ NNLSResult nnls(dMatrix2& A,
         }
         // column j accepted
         A(nrow, j) = beta;
-        std::copy(zz.begin(),zz.end(), b.data());
+        std::copy(zz.begin(), zz.end(), b.data());
         inds[iz] = inds[iz1];
         inds[iz1] = j;
         iz1 += 1;
@@ -472,14 +476,14 @@ NNLSResult nnls(dMatrix2& A,
                 for (int _j = nrow; _j < m; ++_j) {
                     zz[_j] = A(_j, col);
                 }
-                #if defined(__APPLE__)
+#if defined(__APPLE__)
                 char side = 'L';
                 lapack_int one = 1;
                 vec work_temp(tmpint, 0.0);
                 dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
-                #else
+#else
                 LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
-                #endif
+#endif
                 for (int _j = nrow; _j < m; ++_j) {
                     A(_j, col) = zz[_j];
                 }
@@ -541,11 +545,11 @@ NNLSResult nnls(dMatrix2& A,
                     for (int j = jj; j < nsetp; ++j) {
                         int ii = inds[j];
                         inds[j - 1] = ii;
-                        #if defined(__APPLE__)
+#if defined(__APPLE__)
                         dlartg_(&A(j - 1, ii), &A(j, ii), &cc, &ss, &A(j - 1, ii));
-                        #else
+#else
                         LAPACKE_dlartgp(A(j - 1, ii), A(j, ii), &cc, &ss, &A(j - 1, ii));
-                        #endif
+#endif
                         A(j, ii) = 0.0;
                         for (int col = 0; col < n; ++col) {
                             if (col != ii) {
