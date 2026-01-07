@@ -240,10 +240,8 @@ public:
   const bool is_empty() { return !(sf.size() > 0 && scatterer.size() > 0 && index.size() > 0); };
   const size_t scatterer_size()
   {
-    if (sf.size() == scatterer.size())
+      err_chkf(sf.size() == scatterer.size(), "Inconsistent size in scatterer_size()", std::cout);
       return sf.size();
-    else
-      return 0;
   };
   const size_t reflection_size()
   {

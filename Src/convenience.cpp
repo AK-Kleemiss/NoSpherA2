@@ -2096,7 +2096,7 @@ void options::digest_options()
                     if (next_basis_set + 1 < argc && arguments[next_basis_set + 1].find("-") != 0) {
                         beta = std::stod(arguments[next_basis_set + 1]);
                     }
-                    aux_basis.push_back(std::make_shared<BasisSet>(beta));
+                    aux_basis.push_back(std::make_shared<BasisSet>());
                     break;
                 }
                 err_chkf(BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set]), 
@@ -2106,7 +2106,7 @@ void options::digest_options()
             }
             if (aux_basis.size() == 0) {
                 cout << "No basis set specified. Falling back to automatic generation using beta = 2.0!" << endl;
-                aux_basis.push_back(std::make_shared<BasisSet>(2.0));
+                aux_basis.push_back(std::make_shared<BasisSet>());
             }
         }
         else if (temp == "-write_ri_coefs"){

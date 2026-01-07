@@ -1721,8 +1721,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 {
     using namespace std;
-    //double beta = 2.0;
-    //std::shared_ptr<BasisSet> aux_basis_set = std::make_shared<BasisSet>(wavy, beta);
+    //std::shared_ptr<BasisSet> aux_basis_set = std::make_shared<BasisSet>(wavy);
     std::vector<std::shared_ptr<BasisSet>> aux_basis_set{ BasisSetLibrary().get_basis_set("def2-universal-jkfit") };
 
     WFN wavy_aux = generate_aux_wfn(wavy, aux_basis_set);

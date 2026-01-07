@@ -1,18 +1,10 @@
 #include "pch.h"
 #include "integrator.h"
-#include "integration_params.h"
-#include "JKFit.h"
 #include "libCintMain.h"
+#include "JKFit.h"
 #include "nos_math.h"
 #include "GridManager.h"
 
-#if defined(__APPLE__)
-// On macOS we are using Accelerate for BLAS/LAPACK
-#include <Accelerate/Accelerate.h>
-#else
-// Linux/Windows with oneMKL
-#include <mkl.h>
-#endif
 
 vec einsum_ijk_ij_p(const dMatrix3 &v1, const dMatrix2 &v2)
 {
@@ -183,12 +175,12 @@ vec density_fit_unrestrained(const WFN& wavy, const WFN& wavy_aux,
     // Compute integrals
     switch (metric) {
     case 'C':
-        compute2C<Coulomb2C>(aux_basis, eri2c);
-        computeRho<Coulomb3C>(wavy, wavy_aux, dm, rho);
+        compute2C<Coulomb2C_SPH>(aux_basis, eri2c);
+        computeRho<Coulomb3C_SPH>(wavy, wavy_aux, dm, rho);
         break;
     case 'O':
-        compute2C<Overlap2C>(aux_basis, eri2c);
-        computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho);
+        compute2C<Overlap2C_SPH>(aux_basis, eri2c);
+        computeRho<Overlap3C_SPH>(normal_basis, aux_basis, dm, rho);
         break;
     }
 
@@ -232,12 +224,12 @@ vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const char metric
 
     switch (metric) {
         case 'C':
-            compute2C<Coulomb2C>(aux_basis, eri2c);
-            computeRho<Coulomb3C>(normal_basis, aux_basis, dm, rho);
+            compute2C<Coulomb2C_SPH>(aux_basis, eri2c);
+            computeRho<Coulomb3C_SPH>(normal_basis, aux_basis, dm, rho);
             break;
         case 'O':
-            compute2C<Overlap2C>(aux_basis, eri2c);
-            computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho);
+            compute2C<Overlap2C_SPH>(aux_basis, eri2c);
+            computeRho<Overlap3C_SPH>(normal_basis, aux_basis, dm, rho);
             break;
     }
 
@@ -284,12 +276,12 @@ vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux,
     // Compute integrals
     switch (metric) {
     case 'C':
-        compute2C<Coulomb2C>(aux_basis, eri2c);
-        computeRho<Coulomb3C>(normal_basis, aux_basis, dm, rho);
+        compute2C<Coulomb2C_SPH>(aux_basis, eri2c);
+        computeRho<Coulomb3C_SPH>(normal_basis, aux_basis, dm, rho);
         break;
     case 'O':
-        compute2C<Overlap2C>(aux_basis, eri2c);
-        computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho);
+        compute2C<Overlap2C_SPH>(aux_basis, eri2c);
+        computeRho<Overlap3C_SPH>(normal_basis, aux_basis, dm, rho);
         break;
     }
 
@@ -345,7 +337,7 @@ vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const s
         dMatrix2 dm = wavy.get_dm();
         vec eri2c;
         Int_Params normal_basis(wavy);
-        compute2C<Overlap2C>(normal_basis, eri2c);
+        compute2C<Overlap2C_SPH>(normal_basis, eri2c);
         dMatrixRef2 eri2c_ref(eri2c.data(), normal_basis.get_nao(), normal_basis.get_nao());
         const size_t nao = dm.extent(1);
 
@@ -521,10 +513,6 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
         "Hirsh", true); // charge scheme
     std::cout << "Time for hybrid fit: " 
         << std::chrono::duration<double>(get_time() - start_time).count() << " seconds." << std::endl;
-    const double radius = 3.0;
-    const double increment = 0.1;
-
-    //std::vector<vec> all_coeffs = { coeff_unrestrained , coeff_enhanced, coeff_hybrid};
 
     GridConfiguration config;
     config.accuracy = 2;
@@ -673,6 +661,10 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
         std::cout << out << std::endl;
     }
 
+    const double radius = 3.0;
+    const double increment = 0.1;
+
+    //std::vector<vec> all_coeffs = { coeff_unrestrained , coeff_enhanced, coeff_hybrid};
     //WFN dummy = wavy;
     //WFN dummy_aux = wavy_aux;
     //double MinMax[6]{ 0, 0, 0, 0, 0, 0 };

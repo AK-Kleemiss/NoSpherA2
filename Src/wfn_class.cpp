@@ -5,11 +5,9 @@
 #include "cube.h"
 #include "constants.h"
 #include "fchk.h"
-#include "integrator.h"
 #include "basis_set.h"
 #include "nos_math.h"
 #include "libCintMain.h"
-#include "integration_params.h"
 
 void WFN::fill_pre()
 {
@@ -4261,7 +4259,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
     vec OVLP_matrix = {};
 	Int_Params int_params(*this);
 
-	compute2c_Overlap_Cart(int_params, OVLP_matrix);
+    compute2C<Overlap2C_CRT>(int_params, OVLP_matrix);
 	//We have the overlap matrix, now write it to file
 
     ofstream rf(fileName, ios::out);

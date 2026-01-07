@@ -1,24 +1,6 @@
-﻿#include "libCintMain.h"
-
-
-#include "cint_funcs.h"
-#include "constants.h"
-
-extern "C" {
-    extern CINTOptimizerFunction int3c2e_optimizer;
-    extern CINTIntegralFunction int3c2e_sph;
-
-    extern CINTOptimizerFunction int2c2e_optimizer;
-    extern CINTIntegralFunction int2c2e_sph;
-
-    extern CINTOptimizerFunction int1e_ovlp_optimizer;
-    extern CINTIntegralFunction int1e_ovlp_sph;
-
-    extern CINTOptimizerFunction int3c1e_optimizer;
-    extern CINTIntegralFunction int3c1e_sph;
-}
-
-#include "nos_math.h"
+﻿#include "constants.h"
+#include "libCintMain.h"
+#include "libCintKernels.h"
 //
 #if defined(__APPLE__)
 // On macOS we are using Accelerate for BLAS/LAPACK
@@ -28,186 +10,8 @@ extern "C" {
 #include <mkl.h>
 #endif
 
-#define BLKSIZE 8
-/*
- * out[naoi,naoj,naok,comp] in F-order
- */
-void GTOnr3c_fill_s1(
-    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*),
-    double* out, double* buf, int comp, int jobid, int* shls_slice, int* ao_loc, CINTOpt* cintopt,
-    int* atm, int natm, int* bas, int nbas, double* env)
-{
-    const int ish0 = shls_slice[0];
-    const int ish1 = shls_slice[1];
-    const int jsh0 = shls_slice[2];
-    const int jsh1 = shls_slice[3];
-    const int ksh0 = shls_slice[4];
-    const int ksh1 = shls_slice[5];
-    const int nksh = ksh1 - ksh0;
-
-    const int ksh = jobid % nksh + ksh0;
-    const int jstart = jobid / nksh * BLKSIZE + jsh0;
-    const int jend = std::min(jstart + BLKSIZE, jsh1);
-    if (jstart >= jend)
-    {
-        return;
-    }
-
-    const size_t naoi = ao_loc[ish1] - ao_loc[ish0];
-    const size_t naoj = ao_loc[jsh1] - ao_loc[jsh0];
-    const size_t naok = ao_loc[ksh1] - ao_loc[ksh0];
-    int dims[] = { (int)naoi, (int)naoj, (int)naok };
-
-    const int k0 = ao_loc[ksh] - ao_loc[ksh0];
-    out += naoi * naoj * k0;
-
-    int ish, jsh, i0, j0;
-    int shls[3] = { 0, 0, ksh };
-
-    for (jsh = jstart; jsh < jend; jsh++)
-    {
-        for (ish = ish0; ish < ish1; ish++)
-        {
-            shls[0] = ish;
-            shls[1] = jsh;
-            i0 = ao_loc[ish] - ao_loc[ish0];
-            j0 = ao_loc[jsh] - ao_loc[jsh0];
-            (*intor)(out + j0 * naoi + i0, dims, shls, atm, natm, bas, nbas, env,
-                cintopt, buf);
-        }
-    }
-}
-
-
-
-int GTOmax_shell_dim(const int *ao_loc, const int *shls_slice, int ncenter)
-{
-    int i;
-    int i0 = shls_slice[0];
-    int i1 = shls_slice[1];
-    int di = 0;
-    for (i = 1; i < ncenter; i++)
-    {
-        i0 = std::min(i0, shls_slice[i * 2]);
-        i1 = std::max(i1, shls_slice[i * 2 + 1]);
-    }
-    for (i = i0; i < i1; i++)
-    {
-        di = std::max(di, ao_loc[i + 1] - ao_loc[i]);
-    }
-    return di;
-}
-
-size_t GTOmax_cache_size(
-    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *),
-    int *shls_slice, int ncenter,
-    int *atm, int natm, int *bas, int nbas, double *env)
-{
-    int i;
-    int i0 = shls_slice[0];
-    int i1 = shls_slice[1];
-    for (i = 1; i < ncenter; i++)
-    {
-        i0 = std::min(i0, shls_slice[i * 2]);
-        i1 = std::max(i1, shls_slice[i * 2 + 1]);
-    }
-    int (*f)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *) = (int (*)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *))intor;
-    int cache_size = 0;
-    int n;
-    int shls[4];
-    for (i = i0; i < i1; i++)
-    {
-        shls[0] = i;
-        shls[1] = i;
-        shls[2] = i;
-        shls[3] = i;
-        n = (*f)(NULL, NULL, shls, atm, natm, bas, nbas, env, NULL, NULL);
-        cache_size = std::max(cache_size, n);
-    }
-    return cache_size;
-}
-
-
-void GTOnr3c_drv(
-    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *),
-    void (*fill)(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *), double *, double *, int, int, int *, int *, CINTOpt *, int *, int, int *, int, double *),
-    double *eri, int comp, int *shls_slice, int *ao_loc, CINTOpt *cintopt,
-    int *atm, int natm, int *bas, int nbas, double *env)
-{
-    const int ish0 = shls_slice[0];
-    const int ish1 = shls_slice[1];
-    const int jsh0 = shls_slice[2];
-    const int jsh1 = shls_slice[3];
-    const int ksh0 = shls_slice[4];
-    const int ksh1 = shls_slice[5];
-    const int nish = ish1 - ish0;
-    const int njsh = jsh1 - jsh0;
-    const int nksh = ksh1 - ksh0;
-    const int di = GTOmax_shell_dim(ao_loc, shls_slice, 3);
-    const int cache_size = GTOmax_cache_size(intor, shls_slice, 3,
-                                             atm, natm, bas, nbas, env);
-    const int njobs = (std::max(nish, njsh) / BLKSIZE + 1) * nksh;
-
-#pragma omp parallel
-    {
-        int jobid;
-        double *buf = (double *)malloc(sizeof(double) * (di * di * di * comp + cache_size));
-#pragma omp for nowait schedule(dynamic)
-        for (jobid = 0; jobid < njobs; jobid++)
-        {
-            (*fill)(intor, eri, buf, comp, jobid, shls_slice, ao_loc,
-                    cintopt, atm, natm, bas, nbas, env);
-        }
-        free(buf);
-    }
-}
-
-
-/*
- * mat(naoi,naoj,comp) in F-order
- */
-void GTOint2c(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *), double *mat, int comp, int hermi,
-              int *shls_slice, int *ao_loc, CINTOpt *opt,
-              int *atm, int natm, int *bas, int nbas, double *env)
-{
-    const int ish0 = shls_slice[0];
-    const int ish1 = shls_slice[1];
-    const int jsh0 = shls_slice[2];
-    const int jsh1 = shls_slice[3];
-    const int nish = ish1 - ish0;
-    const int njsh = jsh1 - jsh0;
-    const size_t naoi = ao_loc[ish1] - ao_loc[ish0];
-    const size_t naoj = ao_loc[jsh1] - ao_loc[jsh0];
-    const int cache_size = GTOmax_cache_size(intor, shls_slice, 2,
-                                             atm, natm, bas, nbas, env);
-#pragma omp parallel
-    {
-        int dims[] = {(int)naoi, (int)naoj};
-        int ish, jsh, ij, i0, j0;
-        int shls[2];
-        double *cache = (double *)malloc(sizeof(double) * cache_size);
-#pragma omp for schedule(dynamic, 4)
-        for (ij = 0; ij < nish * njsh; ij++)
-        {
-            ish = ij / njsh;
-            jsh = ij % njsh;
-
-            ish += ish0;
-            jsh += jsh0;
-            shls[0] = ish;
-            shls[1] = jsh;
-            i0 = ao_loc[ish] - ao_loc[ish0];
-            j0 = ao_loc[jsh] - ao_loc[jsh0];
-            (*intor)(mat + j0 * naoi + i0, dims, shls,
-                     atm, natm, bas, nbas, env, opt, cache);
-        }
-        free(cache);
-    }
-}
-
-
-
 // Function to compute three-center two-electron integrals (eri3c)
+template <typename Kernel>
 void computeEri3c(Int_Params &param1,
                   Int_Params &param2,
                   vec &eri3c)
@@ -238,19 +42,26 @@ void computeEri3c(Int_Params &param1,
     assert(shl_slice[3] <= nbas);
     assert(shl_slice[5] <= nbas);
 
-    ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = Kernel::gen_loc(bas, nbas);
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
     int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
 
-    CINTOpt *opty = nullptr;
-    int3c2e_optimizer(&opty, atm.data(), nat, bas.data(), nbas, env.data());
+    CINTOpt* opty = nullptr;
+    Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // Compute integrals
     vec res((size_t)naoi * (size_t)naoj * (size_t)naok, 0.0);
     eri3c.resize((size_t)naoi * (size_t)naoj * (size_t)naok, 0.0);
 
-    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, res.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
+    Kernel::drv(res.data(),
+        1,
+        shl_slice.data(),
+        aoloc.data(),
+        opty,
+        atm.data(), nat,
+        bas.data(), nbas,
+        env.data());
 
     // FOR TESTING PURPOSES!!!!
     // GTOnr3c_drv(int3c2e_sph, res.data(), 1, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
@@ -269,26 +80,9 @@ void computeEri3c(Int_Params &param1,
         }
     }
 }
-
-
-// --- Traits for kernels ------------------------------------------------------
-void Coulomb2C::optimizer(CINTOpt*& opt,
-    int* atm, int nat, int* bas, int nbas, double* env) {
-    int2c2e_optimizer(&opt, atm, nat, bas, nbas, env);
-}
-void Coulomb2C::drv(double* out, int comp, int* shl_slice, int* aoloc,
-    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
-    GTOint2c(int2c2e_sph, out, comp, 0, shl_slice, aoloc, opt, atm, nat, bas, nbas, env);
-}
-
-void Overlap2C::optimizer(CINTOpt*& opt,
-    const int*, int, const int*, int, const double*) {
-    opt = nullptr; // no optimizer needed for overlap
-}
-void Overlap2C::drv(double* out, int comp, int* shl_slice, int* aoloc,
-    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
-    GTOint2c(int1e_ovlp_sph, out, comp, 0, shl_slice, aoloc, opt, atm, nat, bas, nbas, env);
-}
+template void computeEri3c<Coulomb3C_SPH>(Int_Params &param1,
+                                        Int_Params &param2,
+                                        vec& eri3c);
 
 template <typename Kernel>
 void compute2C(Int_Params& params, vec& ret) {
@@ -300,7 +94,7 @@ void compute2C(Int_Params& params, vec& ret) {
     int nat = params.get_natoms();
 
     ivec shl_slice = { 0, nbas, 0, nbas };
-    ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = Kernel::gen_loc(bas, nbas);
 
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
@@ -322,90 +116,10 @@ void compute2C(Int_Params& params, vec& ret) {
         }
     }
 }
-template void compute2C<Coulomb2C>(Int_Params& params, vec& ret);
-template void compute2C<Overlap2C>(Int_Params& params, vec& ret);
+template void compute2C<Coulomb2C_SPH>(Int_Params& params, vec& ret);
+template void compute2C<Overlap2C_SPH>(Int_Params& params, vec& ret);
+template void compute2C<Overlap2C_CRT>(Int_Params& params, vec& ret);
 
-// Function to calculate the number of 3-center 2-electron integrals to compute at once based on the available memory
-// naoi = number of basis functions in the first shell
-// naoj = number of basis functions in the second shell
-// aoloc = Running total of functions to computed based on the order of the basis functions
-// nQM = number of basis functions in the QM basis
-// nAux = number of basis functions in the auxiliary basis
-// max_RAM = maximum available memory in MB
-// Returns the number of functions to compute at once
-ivec calc_3c_steps(const unsigned long long int naoi, const unsigned long long int naoj, const ivec aoloc, const int nQM, const int nAux, const double max_mem)
-{
-    ivec steps = {nQM};
-
-    // First check if the maximum memory is enough to compute all integrals at once
-    // Calculate minimum memory needed for all integrals
-    unsigned long long int naok_end = (size_t)(aoloc[(size_t)nQM + nAux]) - aoloc[nQM];
-    double min_mem = static_cast<double>(sizeof(double) * naoi * naoj * naok_end) * 1e-6 + 200; // Small buffer of 200MB for other memory usage
-    if (min_mem < max_mem)
-    {
-        steps.push_back(nQM + nAux);
-        return steps;
-    }
-
-    // Calculate maximum number of basis functions for every iteration to stay under the memory limit
-    int current_step = 0;
-    unsigned long long int naok_max = static_cast<unsigned long long int>(max_mem / ((static_cast<double>(sizeof(double) * naoi * naoj)) * 1e-6));
-    for (int bas_i = 1; bas_i <= nAux; bas_i++)
-    {
-        unsigned long long int naok = aoloc[nQM + bas_i] - aoloc[steps[current_step]];
-        if (naok > naok_max)
-        {
-            steps.push_back(nQM + bas_i - 1);
-            current_step += 1;
-        }
-    }
-    steps.push_back(nQM + nAux);
-    return steps;
-}
-
-// --- Traits for kernels ------------------------------------------------------
-void Coulomb3C::optimizer(CINTOpt*& opt,
-    int* atm, int nat, int* bas, int nbas, double* env) {
-    int3c2e_optimizer(&opt, atm, nat, bas, nbas, env);
-}
-void Coulomb3C::drv(double* out, int comp, int* shl_slice, int* aoloc,
-    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
-    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, out, comp, shl_slice, aoloc, opt, atm, nat, bas, nbas, env);
-}
-
-void Overlap3C::optimizer(CINTOpt*& opt,
-    const int*, int, const int*, int, const double*) {
-    opt = nullptr;
-}
-void Overlap3C::drv(double* out, int comp, int* shl_slice, int* aoloc,
-    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
-    (void)opt;
-    GTOnr3c_drv(int3c1e_sph, GTOnr3c_fill_s1, out, comp, shl_slice, aoloc, nullptr, atm, nat, bas, nbas, env);
-}
-
-inline double* aligned_alloc_d(size_t n)
-{
-    void* p = nullptr;
-
-#if defined(__APPLE__)
-    // POSIX (Linux, macOS)
-    if (posix_memalign(&p, 64, n * sizeof(double)) != 0)
-        throw std::bad_alloc();
-#else
-    p = MKL_malloc(n * sizeof(double), 64);
-    if (!p) throw std::bad_alloc();
-#endif
-    return reinterpret_cast<double*>(p);
-}
-
-inline void aligned_free_d(double* p)
-{
-#if defined(__APPLE__)
-    free(p);
-#else
-    MKL_free(p);
-#endif
-}
 
 void calc_screend_functions_and_max_ij(
     const std::vector<atom>& atoms,
@@ -500,8 +214,6 @@ void calc_screend_functions_and_max_ij(
     std::cout << "Screened out " << skipped << " atom pairs due to overlap criteria." << std::endl;
 }
 
-
-
 //Ivec contains the ao indices for the given wave object
 //The list contains (0, n_ao_atom1, last_item + n_ao_atom2, ...)
 //So that ao indices for atom i are in [ao_indices_per_atom[i-1], ao_indices_per_atom[i])
@@ -521,7 +233,6 @@ ivec generate_bas_indices_per_atom(const Int_Params& params)
 
     return std::move(bas_indices_location);
 }
-
 
 void get_matrix_slice(const dMatrix2& dm, std::pair<int, int> row_range, std::pair<int, int> col_range, vec& dm_slice, const double weight)
 {
@@ -559,7 +270,8 @@ void computeRho(
     const int nat = combined.get_natoms();
     const int nbas = combined.get_nbas();
 
-    ivec aoloc = make_loc(bas, nbas);
+    //ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = Kernel::gen_loc(bas, nbas);
 
     rho.resize(aoloc[nQM + nAux] - aoloc[nQM], 0.0);
 
@@ -649,12 +361,12 @@ void computeRho(
         opty = nullptr;
     }
 }
-template void computeRho<Coulomb3C>(
+template void computeRho<Coulomb3C_SPH>(
     const Int_Params& normal_basis,
     const Int_Params& aux_basis,
     const dMatrix2& dm,
     vec& rho);
-template void computeRho<Overlap3C>(
+template void computeRho<Overlap3C_SPH>(
     const Int_Params& normal_basis,
     const Int_Params& aux_basis,
     const dMatrix2& dm,
@@ -673,7 +385,8 @@ void compute3C(Int_Params& param1,
     vec env = combined.get_env();
     int nat = combined.get_natoms();
     int nbas = combined.get_nbas();
-    ivec aoloc = make_loc(bas, nbas);
+    //ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = Kernel::gen_loc(bas, nbas);
     unsigned long long int naoi = aoloc[nQM] - aoloc[0];
     unsigned long long int naoj = aoloc[nQM] - aoloc[0];
     unsigned long long int naok = aoloc[nQM + nAux] - aoloc[nQM];
@@ -683,9 +396,9 @@ void compute3C(Int_Params& param1,
     ivec shl_slice = { 0, nQM, 0, nQM, nQM, nQM + nAux };
     Kernel::drv(eri3c.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 }
-template void compute3C<Coulomb3C>(Int_Params& param1,
+template void compute3C<Coulomb3C_SPH>(Int_Params& param1,
     Int_Params& param2,
     vec& eri3c);
-template void compute3C<Overlap3C>(Int_Params& param1,
+template void compute3C<Overlap3C_SPH>(Int_Params& param1,
     Int_Params& param2,
     vec& eri3c);

@@ -141,6 +141,9 @@
     <ClCompile Include="..\Src\GridManager.cpp">
       <Filter>Quelldateien\Grids</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\libCintKernels.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/atoms.h">
@@ -265,6 +268,9 @@
     </ClInclude>
     <ClInclude Include="..\Src\GridManager.h">
       <Filter>Headerdateien\Grids</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\libCintKernels.h">
+      <Filter>Headerdateien\libCint</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

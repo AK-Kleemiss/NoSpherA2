@@ -1,29 +1,15 @@
 #pragma once
 
 #include "convenience.h"
+
+//Include both, as they are both required when calling the functions declared here
 #include "integration_params.h"
-#include "cint.h"
+#include "libCintKernels.h"
 
 //DEPRICATED::Function to compute electron repulsion integrals
 void computeEri3c(Int_Params& param1,
     Int_Params& param2,
     vec& eri3c);
-
-struct Coulomb2C {
-    static constexpr bool NeedsOpt = true;
-    static void optimizer(CINTOpt*& opt,
-        int* atm, int nat, int* bas, int nbas, double* env);
-    static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
-};
-
-struct Overlap2C {
-    static constexpr bool NeedsOpt = false;
-    static void optimizer(CINTOpt*& opt,
-        const int*, int, const int*, int, const double*);
-    static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
-};
 
 /**
  * @brief Computes 2-center integrals using the specified kernel type.
@@ -42,27 +28,6 @@ struct Overlap2C {
  */
 template <typename Kernel>
 void compute2C(Int_Params& params, vec& ret);
-
-
-struct Coulomb3C {
-    static constexpr bool NeedsOpt = true;
-
-    static void optimizer(CINTOpt*& opt,
-        int* atm, int nat, int* bas, int nbas, double* env);
-
-    static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
-};
-
-struct Overlap3C {
-    static constexpr bool NeedsOpt = false;
-
-    static void optimizer(CINTOpt*& opt,
-        const int*, int, const int*, int, const double*);
-
-        static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-            CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
-};
 
 /*
 * Function to compute fitting coefficients for the density matrix using the desired metric indicated by the Kernel template parameter

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <map>
 #include <vector>
+#include <array>
 
 namespace constants
 {
