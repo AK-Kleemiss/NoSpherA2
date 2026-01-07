@@ -503,18 +503,42 @@ bool isSymmetricViaEigenvalues(const T& A, int n, double tol) {
     {
 #ifdef __APPLE__
         // Use Accelerate framework on macOS for eigenvalue computation
-        __CLPK_integer info = 0;
-        LAPACK_DoubleComplex* a_data = reinterpret_cast<LAPACK_DoubleComplex*>(A_copy.data());
-        double* wr_data = reinterpret_cast<double*>(wr.data());
-        double* wi_data = reinterpret_cast<double*>(wi.data());
-        __CLPK_integer n_clpk = static_cast<__CLPK_integer>(n);
-        __CLPK_integer lda = static_cast<__CLPK_integer>(n);
-        __CLPK_integer ldvl = static_cast<__CLPK_integer>(n);
-        __CLPK_integer ldvr = static_cast<__CLPK_integer>(n);
-        // Since we don't need left/right eigenvectors, we can pass nullptr
-        dgeev_((char*)"N", (char*)"N", &n_clpk, a_data, &lda,
-            wr_data, wi_data, nullptr, &ldvl, nullptr, &ldvr,
-            nullptr, &info);
+        __LAPACK_int info = 0;
+        __LAPACK_int n_clpk = static_cast<__LAPACK_int>(n);
+        __LAPACK_int lda = static_cast<__LAPACK_int>(n);
+        // When jobvl/jobvr = 'N', ldvl/ldvr can be 1
+        __LAPACK_int ldvl  = 1;
+        __LAPACK_int ldvr  = 1;
+
+        // Workspace query
+        __LAPACK_int lwork = -1;
+        double work_query = 0.0;
+
+        // dgeev_ signature requires a work buffer and lwork
+        dgeev_("N", "N",
+               &n_clpk,
+               reinterpret_cast<double*>(A_copy.data()), &lda,
+               reinterpret_cast<double*>(wr.data()),
+               reinterpret_cast<double*>(wi.data()),
+               nullptr, &ldvl,
+               nullptr, &ldvr,
+               &work_query, &lwork,
+               &info);
+
+        lwork = static_cast<__LAPACK_int>(work_query);
+        std::vector<double> work(static_cast<size_t>(lwork));
+
+        dgeev_("N", "N",
+               &n_clpk,
+               reinterpret_cast<double*>(A_copy.data()), &lda,
+               reinterpret_cast<double*>(wr.data()),
+               reinterpret_cast<double*>(wi.data()),
+               nullptr, &ldvl,
+               nullptr, &ldvr,
+               work.data(), &lwork,
+               &info);
+
+        err_checkf(info == 0, "LAPACK dgeev failed.", std::cout);
 #else
         LAPACKE_dgeev(LAPACK_ROW_MAJOR, 'N', 'N',
             n, A_copy.data(),
@@ -592,28 +616,28 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
     // use 'S' for jobu/jobvt to compute the "thin" SVD (only the first k columns/rows)
 #ifdef __APPLE__
     // Use Accelerate framework on macOS for SVD computation
-    __CLPK_integer info = 0;
-    __CLPK_integer lwork = -1;
+    __LAPACK_int info = 0;
+    __LAPACK_int lwork = -1;
     double work_query = 0.0;
 
     // Query optimal work size
-    dgesvd_((char*)"S", (char*)"S", (__CLPK_integer*)&m, (__CLPK_integer*)&n,
-        A_copy.data(), (__CLPK_integer*)&n,
+    dgesvd_((char*)"S", (char*)"S", (__LAPACK_int*)&m, (__LAPACK_int*)&n,
+        A_copy.data(), (__LAPACK_int*)&n,
         S.data(),
-        U.data(), (__CLPK_integer*)&k,
-        Vt.data(), (__CLPK_integer*)&n,
-        &work_query, (__CLPK_integer*)&lwork, (__CLPK_integer*)&info);
+        U.data(), (__LAPACK_int*)&k,
+        Vt.data(), (__LAPACK_int*)&n,
+        &work_query, (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
 
-    lwork = static_cast<__CLPK_integer>(work_query);
+    lwork = static_cast<__LAPACK_int>(work_query);
     vec work(lwork);
 
     // Perform SVD: A = U * S * Vt
-    dgesvd_((char*)"S", (char*)"S", (__CLPK_integer*)&m, (__CLPK_integer*)&n,
-        A_copy.data(), (__CLPK_integer*)&n,
+    dgesvd_((char*)"S", (char*)"S", (__LAPACK_int*)&m, (__LAPACK_int*)&n,
+        A_copy.data(), (__LAPACK_int*)&n,
         S.data(),
-        U.data(), (__CLPK_integer*)&k,
-        Vt.data(), (__CLPK_integer*)&n,
-        work.data(), (__CLPK_integer*)&lwork, (__CLPK_integer*)&info);
+        U.data(), (__LAPACK_int*)&k,
+        Vt.data(), (__LAPACK_int*)&n,
+        work.data(), (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
 #else
     err_checkf(LAPACKE_dgesvd(
         LAPACK_ROW_MAJOR,
@@ -652,21 +676,21 @@ void make_Eigenvalues(vec& A, vec& W) {
     const int n = static_cast<int>(W.size());
 #ifdef __APPLE__
     // Use Accelerate framework on macOS for eigenvalue computation
-    __CLPK_integer info = 0;
-    __CLPK_integer lwork = -1;
+    __LAPACK_int info = 0;
+    __LAPACK_int lwork = -1;
     double work_query = 0.0;
     // Query optimal work size
-    dsyev_((char*)"V", (char*)"U", (__CLPK_integer*)&n,
-        A.data(), (__CLPK_integer*)&n,
+    dsyev_((char*)"V", (char*)"U", (__LAPACK_int*)&n,
+        A.data(), (__LAPACK_int*)&n,
         W.data(),
-        &work_query, (__CLPK_integer*)&lwork, (__CLPK_integer*)&info);
-    lwork = static_cast<__CLPK_integer>(work_query);
+        &work_query, (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
+    lwork = static_cast<__LAPACK_int>(work_query);
     vec work(lwork);
     // Perform eigenvalue decomposition
-    dsyev_((char*)"V", (char*)"U", (__CLPK_integer*)&n,
-        A.data(), (__CLPK_integer*)&n,
+    dsyev_((char*)"V", (char*)"U", (__LAPACK_int*)&n,
+        A.data(), (__LAPACK_int*)&n,
         W.data(),
-        work.data(), (__CLPK_integer*)&lwork, (__CLPK_integer*)&info);
+        work.data(), (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
     err_checkf(info == 0, "The algorithm failed to compute eigenvalues.", std::cout);
 #else
     err_checkf(LAPACKE_dsyev(

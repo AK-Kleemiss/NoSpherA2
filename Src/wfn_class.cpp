@@ -6607,18 +6607,18 @@ const double WFN::compute_dens(
     vec2& d,
     vec& phi) const
 {
-    if (d_f_switch)
-    {
-        err_checkf(d.size() >= 5, "d is too small!", std::cout);
-        err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
-    }
-    else
-    {
+    //if (d_f_switch)
+    //{
+    //    err_checkf(d.size() >= 5, "d is too small!", std::cout);
+    //    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    //    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
+    //}
+    //else
+    //{
         err_checkf(d.size() >= 16, "d is too small!", std::cout);
         err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
         return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
-    }
+    //}
 };
 
 const double WFN::compute_dens(
@@ -6629,21 +6629,21 @@ const double WFN::compute_dens(
     vec2 d;
     vec phi(nmo, 0.0);
 
-    if (d_f_switch)
-    {
-        d.resize(5);
-        for (int i = 0; i < 5; i++)
-            d[i].resize(ncen, 0.0);
-        err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
-    }
-    else
-    {
+    //if (d_f_switch)
+    //{
+    //    d.resize(5);
+    //    for (int i = 0; i < 5; i++)
+    //        d[i].resize(ncen, 0.0);
+    //    err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
+    //    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
+    //}
+    //else
+    //{
         d.resize(16);
         for (int i = 0; i < 16; i++)
             d[i].resize(ncen, 0.0);
         return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
-    }
+    //}
 };
 
 const double WFN::compute_spin_dens(
@@ -6653,19 +6653,19 @@ const double WFN::compute_spin_dens(
     vec2& d,
     vec& phi) const
 {
-    if (d_f_switch)
-    {
-        err_checkf(d.size() >= 5, "d is too small!", std::cout);
-        err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
-    }
-    else
-    {
+    //if (d_f_switch)
+    //{
+    //    err_checkf(d.size() >= 5, "d is too small!", std::cout);
+    //    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    //    err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
+    //    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
+    //}
+    //else
+    //{
         err_checkf(d.size() >= 4, "d is too small!", std::cout);
         err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
         return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
-    }
+    //}
 };
 
 const double WFN::compute_spin_dens(
@@ -6676,21 +6676,21 @@ const double WFN::compute_spin_dens(
     vec2 d;
     vec phi(nmo, 0.0);
 
-    if (d_f_switch)
-    {
-        d.resize(5);
-        for (int i = 0; i < 5; i++)
-            d[i].resize(ncen, 0.0);
-        err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
-    }
-    else
-    {
+    //if (d_f_switch)
+    //{
+    //    d.resize(5);
+    //    for (int i = 0; i < 5; i++)
+    //        d[i].resize(ncen, 0.0);
+    //    err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
+    //    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
+    //}
+    //else
+    //{
         d.resize(16);
         for (int i = 0; i < 16; i++)
             d[i].resize(ncen, 0.0);
         return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
-    }
+    //}
 };
 
 const double WFN::compute_dens_cartesian(
