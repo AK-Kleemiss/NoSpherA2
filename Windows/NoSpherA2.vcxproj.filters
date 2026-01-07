@@ -141,12 +141,6 @@
     <ClCompile Include="..\Src\cif.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\mat_nos_math.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\vec_nos_math.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="../Src/AtomGrid.cpp">
       <Filter>Quelldateien\Grids</Filter>
     </ClCompile>

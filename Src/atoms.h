@@ -3,7 +3,7 @@
 
 //-----------------Definition of atoms and basis sets--------------------
 
-class basis_set_entry{
+class basis_set_entry {
 private:
     double coefficient;
     double exponent;
@@ -16,14 +16,14 @@ public:
     basis_set_entry();
     basis_set_entry(double g_coefficient, double g_exponent, unsigned int g_type, unsigned int g_shell);
     // Getter functions
-    
+
     const double& get_coefficient() const { return coefficient; };
     const double& get_exponent() const { return exponent; };
     const unsigned int& get_type() const { return type; };
     const unsigned int& get_shell() const { return shell; };
     const primitive& get_primitive() const { return p; };
     // Setter functions
-     
+
     void set_coefficient(const double& value) { coefficient = value; };
     void set_exponent(const double& value) { exponent = value; };
     void set_type(const unsigned int& value) { type = value; };
@@ -46,7 +46,7 @@ private:
     std::string ID;
     int nr, charge, ECP_electrons;
     double x, y, z;
-    std::array<double,3> frac_coords;
+    std::array<double, 3> frac_coords;
     std::vector<basis_set_entry> basis_set;
     int basis_set_id;
     std::vector<unsigned int> shellcount;
@@ -58,15 +58,15 @@ private:
     bool is_asym = false;
 public:
     atom();
-    atom(const std::string &l, const std::string& id, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
+    atom(const std::string& l, const std::string& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch);
     atom(const std::string& l, const std::string& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
-    atom& operator=(const atom &rhs);
+    atom& operator=(const atom& rhs);
     void print_values() const;
-    bool push_back_basis_set(const double &coefficient, const double &exponent, const int &type, const int &shell);
+    bool push_back_basis_set(const double& coefficient, const double& exponent, const int& type, const int& shell);
     void print_values_long() const;
     bool get_basis_set_loaded() const;
     bool is_anharm() const;
-    void assign_ADPs(vec &second, vec &third, vec &fourth);
+    void assign_ADPs(vec& second, vec& third, vec& fourth);
     void assign_ADPs(vec& second);
     void assign_ADPs(double& Uiso);
     void assign_ID(const std::string& id);
@@ -81,7 +81,7 @@ public:
     void set_charge(const int& ch) { charge = ch; };
     void set_ECP_electrons(const int& ECP_els) { ECP_electrons = ECP_els; };
     void set_coordinate(const unsigned int& axis, const double& value);
-    std::array<double, 3> get_coords() const { return {x,y,z}; };
+    std::array<double, 3> get_coords() const { return { x,y,z }; };
     void set_frac_coords(const std::array<double, 3>& frac);
     std::string get_label() const { return label; };
     int get_nr() const { return nr; };
@@ -97,6 +97,7 @@ public:
     void set_basis_set_type(const int& _nr, const int& value) { basis_set[_nr].set_type(value); };
     void set_basis_set_shell(const int& _nr, const int& value) { basis_set[_nr].set_shell(value); };
     std::vector<basis_set_entry> get_basis_set() const { return basis_set; };
+    const basis_set_entry* get_basis_set_ptr() const { return &(basis_set[0]); };
     void erase_basis_set(const unsigned int& _nr) { basis_set.erase(basis_set.begin() + _nr); };
     int get_basis_set_type(const int& _nr) const { return basis_set[_nr].get_type(); };
     int get_basis_set_shell(const int& _nr) const { return basis_set[_nr].get_shell(); };

@@ -7,7 +7,7 @@ Int_Params::Int_Params()
     ncen = 0;
 }
 
-Int_Params::Int_Params(const WFN &wavy)
+Int_Params::Int_Params(const WFN& wavy)
 {
     // Constructor, copying the atoms and basis set from the WFN object
     atoms = wavy.get_atoms();
@@ -86,7 +86,17 @@ void Int_Params::collect_basis_data()
             for (int i = 0; i < coefficients.size(); i++)
             {
                 int l = basis[i].get_type() - 1;
-                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2*l+1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
+                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
+            }
+        }
+		else if (wfn_origin == e_origin::tonto)
+        {
+            for (int i = 0; i < coefficients.size(); i++)
+            {
+                int l = basis[i].get_type() - 1;
+                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from Tonto to libcint  ... something something, cartesian harmonics...
+                if (l == 2) // D functions need an extra normalization factor
+					coefficients[i] *= std::sqrt(10./4.0/constants::PI); // ... something something, cartesian harmonics...^2
             }
         }
         else if (wfn_origin == e_origin::NOT_YET_DEFINED)
@@ -131,10 +141,11 @@ void Int_Params::collect_basis_data()
             for (unsigned int shell_idx = 0; shell_idx < atoms[atom_idx].get_shellcount_size(); shell_idx++) {
                 int curr_funcs = (int)atoms[atom_idx].get_shellcount()[shell_idx];
 
-                if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) { //Sort functions regarding the angular momentum
-                    if (wfn_origin != e_origin::NOT_YET_DEFINED 
-                        && wfn_origin != e_origin::gbw 
-                        && wfn_origin != e_origin::wfx) 
+                if (((basis[n_funcs].get_type() - 1 != l) && (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto)) || ((basis[n_funcs].get_type() != l) && (wfn_origin == e_origin::NOT_YET_DEFINED))) { //Sort functions regarding the angular momentum
+                    if (wfn_origin != e_origin::NOT_YET_DEFINED
+                        && wfn_origin != e_origin::gbw
+                        && wfn_origin != e_origin::wfx
+                        && wfn_origin != e_origin::tonto)
                         std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
                     n_funcs += curr_funcs;
                     continue;
@@ -146,12 +157,10 @@ void Int_Params::collect_basis_data()
                 shelltype.push_back(l);
                 pos_in_new_coeffs += curr_funcs;
                 n_funcs += curr_funcs;
-
-
             }
         }
         //Populate basis_sets dictionary  (Element:[coefficients, exponents, starting point in _env vector, shellcount])
-        basis_sets.insert({ atoms[atom_idx].get_charge(), LibCintBasis{coefficients_new, exponents_new, 0, shellcount_new, shelltype}});
+        basis_sets.insert({ atoms[atom_idx].get_charge(), LibCintBasis{coefficients_new, exponents_new, 0, shellcount_new, shelltype} });
     }
 }
 
@@ -209,7 +218,7 @@ void Int_Params::populate_env()
             }
             func_count += n_funcs;
         }
-        bas_ptr += func_count*2;
+        bas_ptr += func_count * 2;
     }
 }
 
@@ -249,7 +258,7 @@ void Int_Params::calc_integration_parameters()
     populate_bas();
 }
 
-Int_Params Int_Params::operator+(const Int_Params &other)
+Int_Params Int_Params::operator+(const Int_Params& other)
 {
     // Combine two Int_Params objects
     // Create a new Int_Params object and resize the arrays to fit the new size
@@ -295,7 +304,7 @@ void Int_Params::print_data(std::string name) {
     std::cout << "Printing data for " << name << std::endl;
     std::ofstream file(name + ".txt");
     file << "ATM:" << std::endl;
-    for (int a = 0; a < _atm.size()/6; a++) {
+    for (int a = 0; a < _atm.size() / 6; a++) {
         for (int i = 0; i < 6; i++) {
             file << _atm[a * 6 + i] << " ";
         }

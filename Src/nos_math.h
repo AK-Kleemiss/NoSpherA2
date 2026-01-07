@@ -1,4 +1,4 @@
- #pragma once
+#pragma once
 #include "convenience.h"
 
 struct Shape2D
@@ -7,8 +7,8 @@ struct Shape2D
     unsigned long long cols;
     Shape2D() : rows(0), cols(0) {}
     Shape2D(unsigned long long rows, unsigned long long cols) : rows(rows), cols(cols) {
-      err_checkf(rows >= 0, "cannot have negative size!", std::cout);
-      err_checkf(cols >= 0, "cannot have negative cols!", std::cout);
+        err_checkf(rows >= 0, "cannot have negative size!", std::cout);
+        err_checkf(cols >= 0, "cannot have negative cols!", std::cout);
     }
 };
 
@@ -19,9 +19,9 @@ struct Shape3D
     unsigned long long cols;
     Shape3D() : depth(0), rows(0), cols(0) {}
     Shape3D(unsigned long long depth, unsigned long long rows, unsigned long long cols) : depth(depth), rows(rows), cols(cols) {
-      err_checkf(depth >= 0, "cannot have negative size!", std::cout);
-      err_checkf(rows >= 0, "cannot have negative size!", std::cout);
-      err_checkf(cols >= 0, "cannot have negative size!", std::cout);
+        err_checkf(depth >= 0, "cannot have negative size!", std::cout);
+        err_checkf(rows >= 0, "cannot have negative size!", std::cout);
+        err_checkf(cols >= 0, "cannot have negative size!", std::cout);
     }
 };
 
@@ -32,7 +32,7 @@ struct Shape4D
     unsigned long long cols;
     unsigned long long time;
     Shape4D() : depth(0), rows(0), cols(0), time(0) {}
-    Shape4D(unsigned long long depth, unsigned long long rows, unsigned long long cols, unsigned long long time) : depth(depth), rows(rows), cols(cols), time(time){
+    Shape4D(unsigned long long depth, unsigned long long rows, unsigned long long cols, unsigned long long time) : depth(depth), rows(rows), cols(cols), time(time) {
         err_checkf(depth >= 0, "cannot have negative size!", std::cout);
         err_checkf(rows >= 0, "cannot have negative size!", std::cout);
         err_checkf(cols >= 0, "cannot have negative size!", std::cout);
@@ -41,16 +41,16 @@ struct Shape4D
 };
 
 template <typename mat_t, typename vec_t, typename Shape_t>
-mat_t reshape(vec_t& flatVec, const Shape_t size);
+mat_t reshape(const vec_t& flatVec, const Shape_t size);
 
 // TRANSPOSES
 // 3D MATRIX
 template <typename T>
-std::vector<std::vector<std::vector<T>>> transpose(const std::vector<std::vector<std::vector<T>>> &originalVec);
+std::vector<std::vector<std::vector<T>>> transpose(const std::vector<std::vector<std::vector<T>>>& originalVec);
 
 // 2D MATRIX
 template <class T>
-std::vector<std::vector<T>> transpose(const std::vector<std::vector<T>> &mat);
+std::vector<std::vector<T>> transpose(const std::vector<std::vector<T>>& mat);
 template <typename T>
 Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> transpose(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat);
 
@@ -65,7 +65,7 @@ std::vector<std::vector<T>> transpose(const std::vector<T>& vector);
 
 // Reorder 3D std::vectors following a given order
 template <typename T>
-std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector<std::vector<T>>> &original);
+std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector<std::vector<T>>>& original);
 
 // FLATTEN Operation
 //  Flatten vector 2D
@@ -73,7 +73,7 @@ template <typename T>
 std::vector<T> flatten(const std::vector<std::vector<T>>& vec2D);
 // Flatten vector 3D
 template <typename T>
-std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>> &vec3D);
+std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>>& vec3D);
 
 template <typename T1, typename T2>
 T1 flatten(const T2& vecND);
@@ -97,14 +97,13 @@ template <typename T>
 T self_dot(const T& mat1, const T& mat2, bool transp1 = false, bool transp2 = false);
 
 
-
-
 // 2D x 1D MATRIX MULTIPLICATION
 // Wrapper for BLAS dot product
 template <typename T>
-std::vector<T> dot(const std::vector<std::vector<T>>& mat, 
-                    const std::vector<T>& vec,
-                    bool transp = false);
+std::vector<T> dot(const std::vector<std::vector<T>>& mat,
+    const std::vector<T>& vec,
+    bool transp = false);
+
 template <typename T, typename T2>
 T dot(const T2& mat,
     const T& vec,
@@ -129,15 +128,43 @@ T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate = f
 template <typename T>
 T dot_BLAS(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate = false);
 
+//Trace product used for Roby analysis
+template <typename T, typename T2>
+T trace_product(const T2& a, const T2& b, const bool transp = false);
+
+template <typename T>
+T get_rectangle(const T& a, const ivec& rows);
+
+template<typename T>
+bool isSymmetricViaEigenvalues(const T& A, int n, double tol = 1E-15);
+
+template <typename T, typename T2>
+void get_submatrix(const T2& full, T& sub, const ivec& indices);
+
+template <typename T, typename T2>
+void get_submatrix(const T2& full, T& sub, const ivec& val_indices, const ivec& vec_indices);
+
+template <typename T, typename T2>
+void get_submatrices(const T2& D_full, const T2& S_full, T& D_sub, T& S_sub, const ivec& indices);
+
+//calculates the Moore-Penrose pseudo-inverse of a matrix A using SVD
+dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5);
+
+void make_Eigenvalues(vec& A, vec& W);
+vec mat_sqrt(vec& A, vec& W, const double cutoff = 1E-5);
+
+template <typename T>
+void swap_rows_cols_symm(T& mat, const int i, const int j);
+
 // Self written matrix multiplication with flat vectors
 template <typename T>
-std::vector<T> dot(const std::vector<T> &mat, const std::vector<T> &vec, bool transp = false);
+std::vector<T> dot(const std::vector<T>& mat, const std::vector<T>& vec, bool transp = false);
 
 template <typename T>
 Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> diag_dot(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat, const std::vector<T>& _vec, bool transp1 = false);
 
 // Element-wise exponentiation of a matrix
-vec2 elementWiseExponentiation(const vec2 &matrix, double exponent);
+vec2 elementWiseExponentiation(const vec2& matrix, double exponent);
 dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent);
 
 void _test_openblas();

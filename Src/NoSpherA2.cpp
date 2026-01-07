@@ -7,12 +7,12 @@
 #include "scattering_factors.h"
 #include "properties.h"
 #include "isosurface.h"
-#include "nos_math.h"
 #include "cif.h"
+#include "bondwise_analysis.h"
 
 int QCT(options& opt, std::vector<WFN>& wavy);
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     using namespace std;
     char cwd[1024];
@@ -77,7 +77,7 @@ int main(int argc, char **argv)
         cube Hirshfeld_grid2(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[1].get_ncen(), true);
         Hirshfeld_grid.give_parent_wfn(wavy[0]);
         Hirshfeld_grid2.give_parent_wfn(wavy[1]);
-        double len[3]{0, 0, 0};
+        double len[3]{ 0, 0, 0 };
         for (int i = 0; i < 3; i++)
         {
             len[i] = (opt.MinMax[3 + i] - opt.MinMax[i]) / opt.NbSteps[i];
@@ -101,9 +101,9 @@ int main(int argc, char **argv)
         Hirshfeld_weight.give_parent_wfn(wavy[0]);
         std::array<std::array<int, 3>, 3> Colourcode;
 
-        Colourcode[0] = {255, 0, 0};
-        Colourcode[1] = {255, 255, 255};
-        Colourcode[2] = {0, 0, 255};
+        Colourcode[0] = { 255, 0, 0 };
+        Colourcode[1] = { 255, 255, 255 };
+        Colourcode[2] = { 0, 0, 255 };
 
         std::vector<Triangle> triangles_i = marchingCubes(Hirshfeld_weight, 0.5);
         std::cout << "Found " << triangles_i.size() << " triangles!" << endl;
@@ -169,7 +169,7 @@ int main(int argc, char **argv)
         cube Rho2(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), true);
         Rho1.give_parent_wfn(wavy[0]);
         Rho2.give_parent_wfn(wavy[1]);
-        double len[3]{0, 0, 0};
+        double len[3]{ 0, 0, 0 };
         for (int i = 0; i < 3; i++)
         {
             len[i] = (opt.MinMax[3 + i] - opt.MinMax[i]) / opt.NbSteps[i];
@@ -275,13 +275,13 @@ int main(int argc, char **argv)
                 if (wavy[i].get_origin() == 7)
                     opt.iam_switch = true;
                 result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
-                                  opt,
-                                  wavy,
-                                  log_file,
-                                  known_scatterer,
-                                  i,
-                                  &known_kpts),
-                              log_file);
+                    opt,
+                    wavy,
+                    log_file,
+                    known_scatterer,
+                    i,
+                    &known_kpts),
+                    log_file);
             }
             else if (opt.SALTED)
             {
@@ -292,7 +292,7 @@ int main(int argc, char **argv)
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
 
-                if (!temp_pred->basis_set_loaded()){
+                if (!temp_pred->basis_set_loaded()) {
                     string df_basis_name = temp_pred->get_dfbasis_name();
                     std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
                     load_basis_into_WFN(temp_pred->wavy, aux_basis);
@@ -301,13 +301,13 @@ int main(int argc, char **argv)
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
                 result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
-                                  opt,
-                                  *temp_pred,
-                                  log_file,
-                                  known_scatterer,
-                                  i,
-                                  &known_kpts),
-                              log_file);
+                    opt,
+                    *temp_pred,
+                    log_file,
+                    known_scatterer,
+                    i,
+                    &known_kpts),
+                    log_file);
             }
         }
 
@@ -332,7 +332,7 @@ int main(int argc, char **argv)
             else
                 log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 3600) << " h " << (get_sec(start, end_write) % 3600) / 60 << " m\n";
             log_file << endl;
-            if(opt.write_CIF)
+            if (opt.write_CIF)
                 write_wfn_CIF(wavy, "test.wfn_cif", result, opt);
         }
         log_file.flush();
@@ -391,6 +391,10 @@ int main(int argc, char **argv)
         }
         log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
+        if (opt.rgbi) {
+            Roby_information Roby(wavy[0]);
+        }
+
         // this one is for generation of an fchk file
         if (opt.fchk != "")
         {
@@ -435,22 +439,22 @@ int main(int argc, char **argv)
                 if (wavy[0].get_origin() == 7)
                     opt.iam_switch = true;
                 res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
-                        opt,
-                        wavy,
-                        log_file,
-                        empty,
-                        0);
+                    opt,
+                    wavy,
+                    log_file,
+                    empty,
+                    0);
             }
             else
             {
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-               
-                SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[0], opt);
+
+                SALTEDPredictor* temp_pred = new SALTEDPredictor(wavy[0], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
-                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name); 
+                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
                 load_basis_into_WFN(temp_pred->wavy, aux_basis);
 
                 if (opt.debug)
@@ -461,7 +465,7 @@ int main(int argc, char **argv)
                     log_file,
                     empty,
                     0);
-                
+
                 delete temp_pred;
             }
             log_file << "Writing tsc file... " << flush;
@@ -506,7 +510,7 @@ int main(int argc, char **argv)
     if (!opt.no_date)
         std::cout << build_date;
     std::cout << "Did not understand the task to perform!\n"
-              << help_message << endl;
+        << help_message << endl;
     log_file.flush();
     return 0;
 }

@@ -64,6 +64,9 @@ ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_ba
   SRCS += $(SRC_DIR)/auxiliary_basis.cpp
 endif
 
+#remove mat_nos_math.cpp and vec_nos_math.cpp from SRCS
+SRCS := $(filter-out $(SRC_DIR)/mat_nos_math.cpp $(SRC_DIR)/vec_nos_math.cpp, $(SRCS))
+
 # Convert sources to object names (extract basename without path/extension)
 OBJ_NAMES := $(basename $(notdir $(SRCS)))
 OBJS   := $(OBJ_NAMES:=.o)

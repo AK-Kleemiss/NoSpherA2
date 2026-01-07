@@ -273,8 +273,8 @@ struct CINTEnvVars {
     union { double* rl; double* grids; };
 
     int (*f_g0_2e)(double*, double*, double*, double, CINTEnvVars*);
-    void (*f_g0_2d4d)(double *, Rys2eT*, CINTEnvVars*);
-    void (*f_gout)(double* , double* , int* , CINTEnvVars* , int );
+    void (*f_g0_2d4d)(double*, Rys2eT*, CINTEnvVars*);
+    void (*f_gout)(double*, double*, int*, CINTEnvVars*, int);
     CINTOpt* opt;
 
     /* values are assigned during calculation */
@@ -294,7 +294,7 @@ enum COORDINATE_TYPE {
 };
 
 template<COORDINATE_TYPE CT>
-ivec make_loc(ivec& bas, int nbas) {
+ivec make_loc(const ivec& bas, const int nbas) {
     ivec dims(nbas, 0);
     // Calculate (2*l + 1) * nctr for spherical harmonics
     for (size_t i = 0; i < nbas; i++)
@@ -302,9 +302,8 @@ ivec make_loc(ivec& bas, int nbas) {
         if constexpr (CT == COORDINATE_TYPE::CART) {
             int l = bas(ANG_OF, i);
             dims[i] = ((l + 1) * (l + 2)) / 2 * bas(NCTR_OF, i); // Number of cartesian functions for given l
-            continue;
         }
-        else if constexpr (CT == COORDINATE_TYPE::SPH) {
+        if constexpr (CT == COORDINATE_TYPE::SPH) {
             dims[i] = (2 * bas(ANG_OF, i) + 1) * bas(NCTR_OF, i);
         }
     }
@@ -317,8 +316,8 @@ ivec make_loc(ivec& bas, int nbas) {
 
     return ao_loc;
 }
-template ivec make_loc<COORDINATE_TYPE::CART>(ivec& bas, int nbas);
-template ivec make_loc<COORDINATE_TYPE::SPH>(ivec& bas, int nbas);
+template ivec make_loc<COORDINATE_TYPE::CART>(const ivec& bas, int nbas);
+template ivec make_loc<COORDINATE_TYPE::SPH>(const ivec& bas, int nbas);
 
 
 /*

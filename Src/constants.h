@@ -8,7 +8,7 @@
 
 namespace constants
 {
-    static double exp_cutoff=-23.5;
+    static double exp_cutoff = -23.5;
     static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
     double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
     {
@@ -52,7 +52,7 @@ namespace constants
         for (int i = 0; i < exponent; ++i) result *= base;
         return result;
     }
-    
+
     // Constants for later use
     constexpr double SQRT2 = sqrt(2.0);
     constexpr double SQRT3 = sqrt(3.0);
@@ -75,6 +75,7 @@ namespace constants
     constexpr double PI2 = PI * PI;
     constexpr double PI3 = PI2 * PI;
     constexpr double PI_180 = PI / 180.0;
+    constexpr double INV_PI_180 = 1.0 / PI_180;
     const double TG32 = tgamma(3.0 / 2.0);
     constexpr double ED_fact = 0.023934;
     constexpr int max_LT = 33;
@@ -85,7 +86,7 @@ namespace constants
                                        146, 170, 194, 230, 266, 302, 350, 434,
                                        590, 770, 974, 1202, 1454, 1730, 2030, 2354,
                                        2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
-    constexpr long long int double_ft[25]{ 1, 1, 2, 3, 8, 15, 48, 105, 384, 945, 3840, 10395, 46080, 135135, 645120, 2027025, 10321920, 34459425, 185794560, 654729075, 3715891200, 13749310575, 81749606400, 316234143225, 1961990553600};
+    constexpr long long int double_ft[25]{ 1, 1, 2, 3, 8, 15, 48, 105, 384, 945, 3840, 10395, 46080, 135135, 645120, 2027025, 10321920, 34459425, 185794560, 654729075, 3715891200, 13749310575, 81749606400, 316234143225, 1961990553600 };
     constexpr double alpha_coef = 0.1616204596739954813316614;
     constexpr double c_13 = 1.0 / 3.0;
     constexpr double c_43 = 4.0 / 3.0;
@@ -163,7 +164,7 @@ namespace constants
     constexpr double c_3003_2048p = sqrt(3003.0 / (2048.0 * PI));
 
     constexpr int pow_2[] = { 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576 };
-    
+
     constexpr size_t sod = sizeof(double);
     constexpr size_t soi = sizeof(int);
     constexpr size_t soc = sizeof(char);
@@ -185,7 +186,7 @@ namespace constants
     // ORCA: 0,1,-1,2,-2,3,-3...
     // PySCF: -3,-2,-1,0,1,2,3...
     //MAP Layout: {l {m,new_index}}
-    constexpr size_t orca_2_pySCF(const unsigned int& l,const int& m) {
+    constexpr size_t orca_2_pySCF(const unsigned int& l, const int& m) {
         if (l == 0) {
             //std::map<int, std::map<int, int>> orca_2_pySCF{ {0, {{0,0}}},
             if (m == 0) return 0;
@@ -411,7 +412,7 @@ namespace constants
         # 33 GXXYZ
         # 34 GXYYZ
         # 35 GXYZZ
-        should become 
+        should become
         g (401-415) xxxx, xxxy, xxxz, xxyy, xxyz, xxzz, xyyy, xyyz, xyzz, xzzz, yyyy,  yyyz, yyzz, yzzz, zzzz
         */
         else if (type == 21) return 401;
@@ -429,7 +430,7 @@ namespace constants
         else if (type == 33) return 405;
         else if (type == 34) return 408;
         else if (type == 35) return 409;
-		else return 0; //error
+        else return 0; //error
     };
 
     //constexpr long long int ft[21]{ 1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600, 6227020800, 87178291200, 1307674368000, 20922789888000, 355687428096000, 6402373705728000, 121645100408832000, 2432902008176640000 };
@@ -570,18 +571,18 @@ namespace constants
                                      28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 46, 46, 46, 46, 46, 46,
                                      46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 60, 60, 60, 60, 60, 60, 60, 60, 60, 78, 78, 78, 78, 78, 78 };
 
-    constexpr std::complex<double> i_pows[] = { 
-        std::complex<double>(1.0, 0.0), 
-        std::complex<double>(0.0, 1.0), 
-        std::complex<double>(-1.0, 0.0), 
+    constexpr std::complex<double> i_pows[] = {
+        std::complex<double>(1.0, 0.0),
+        std::complex<double>(0.0, 1.0),
+        std::complex<double>(-1.0, 0.0),
         std::complex<double>(0.0, -1.0),
-        std::complex<double>(1.0, 0.0), 
-        std::complex<double>(0.0, 1.0), 
-        std::complex<double>(-1.0, 0.0), 
+        std::complex<double>(1.0, 0.0),
+        std::complex<double>(0.0, 1.0),
+        std::complex<double>(-1.0, 0.0),
         std::complex<double>(0.0, -1.0),
-        std::complex<double>(1.0, 0.0), 
-        std::complex<double>(0.0, 1.0), 
-        std::complex<double>(-1.0, 0.0), 
+        std::complex<double>(1.0, 0.0),
+        std::complex<double>(0.0, 1.0),
+        std::complex<double>(-1.0, 0.0),
         std::complex<double>(0.0, -1.0) };
 
     constexpr std::complex<double> FOUR_PI_i_pows[] = {
@@ -840,7 +841,7 @@ namespace constants
     }
     constexpr SphericalNormsArray spherical_norms = generate_spherical_norms();
 
-    
+
 
     double associated_legendre_polynomial(const int& l, const int& m, const double& x);
     std::vector<double> cartesian_to_spherical(const double& x, const double& y, const double& z);
