@@ -11,32 +11,32 @@ void computeEri3c(Int_Params& param1,
 
 struct Coulomb2C {
     static constexpr bool NeedsOpt = true;
-    static void optimizer(CINTOpt*& opt,
+    static void optimizer(NoSpherA2::CINTOpt*& opt,
         int* atm, int nat, int* bas, int nbas, double* env);
     static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
+        NoSpherA2::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
 };
 
 struct Overlap2C {
     static constexpr bool NeedsOpt = false;
-    static void optimizer(CINTOpt*& opt,
+    static void optimizer(NoSpherA2::CINTOpt*& opt,
         const int*, int, const int*, int, const double*);
     static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
+        NoSpherA2::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
 };
 
 /**
  * @brief Computes 2-center integrals using the specified kernel type.
- * 
+ *
  * This function calculates 2-center integrals (overlap or Coulomb) based on the
  * integration parameters provided. The specific integral type is determined by
  * the kernel implementation used internally.
- * 
- * @param params Integration parameters containing basis set information, 
+ *
+ * @param params Integration parameters containing basis set information,
  *               atomic coordinates, and computational settings
  * @param ret Output vector to store the computed 2-center integral values
- * 
- * @note The function automatically handles optimization setup and memory 
+ *
+ * @note The function automatically handles optimization setup and memory
  *       management based on the kernel requirements (NeedsOpt flag)
  * @see Coulomb2C, Overlap2C for supported 2-center integral types
  */
@@ -47,21 +47,21 @@ void compute2C(Int_Params& params, vec& ret);
 struct Coulomb3C {
     static constexpr bool NeedsOpt = true;
 
-    static void optimizer(CINTOpt*& opt,
+    static void optimizer(NoSpherA2::CINTOpt*& opt,
         int* atm, int nat, int* bas, int nbas, double* env);
 
     static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
+        NoSpherA2::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
 };
 
 struct Overlap3C {
     static constexpr bool NeedsOpt = false;
 
-    static void optimizer(CINTOpt*& opt,
+    static void optimizer(NoSpherA2::CINTOpt*& opt,
         const int*, int, const int*, int, const double*);
 
         static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-            CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
+            NoSpherA2::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
 };
 
 // Function to compute Overlap integrals

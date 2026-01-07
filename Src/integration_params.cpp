@@ -1,5 +1,6 @@
 #include "integration_params.h"
 #include "JKFit.h"
+#include "wfn_class.h"
 
 Int_Params::Int_Params()
 {
@@ -132,9 +133,9 @@ void Int_Params::collect_basis_data()
                 int curr_funcs = (int)atoms[atom_idx].get_shellcount()[shell_idx];
 
                 if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) { //Sort functions regarding the angular momentum
-                    if (wfn_origin != e_origin::NOT_YET_DEFINED 
-                        && wfn_origin != e_origin::gbw 
-                        && wfn_origin != e_origin::wfx) 
+                    if (wfn_origin != e_origin::NOT_YET_DEFINED
+                        && wfn_origin != e_origin::gbw
+                        && wfn_origin != e_origin::wfx)
                         std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
                     n_funcs += curr_funcs;
                     continue;
@@ -315,7 +316,7 @@ void Int_Params::print_data(std::string name) {
     file.close();
 }
 
-double CINTcommon_fac_sp(int l)
+double NOS_CINTcommon_fac_sp(int l)
 {
     switch (l)
     {

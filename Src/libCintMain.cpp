@@ -9,6 +9,7 @@
 
 #if defined(__APPLE__)
 // On macOS we are using Accelerate for BLAS/LAPACK
+#define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 0
 #include <Accelerate/Accelerate.h>
 #else
 // Linux/Windows with oneMKL
@@ -27,7 +28,7 @@
     double *env = envs->env;                                                                    \
     int i_sh = shls[0];                                                                         \
     int j_sh = shls[1];                                                                         \
-    CINTOpt *opt = envs->opt;                                                                   \
+    NoSpherA2::CINTOpt *opt = envs->opt;                                                                   \
     if (opt->pairdata != NULL &&                                                                \
         opt->pairdata[i_sh * opt->nbas + j_sh] == NOVALUE)                                      \
     {                                                                                           \
@@ -48,7 +49,7 @@
     double *ck = env + bas(PTR_COEFF, k_sh);                                                    \
     double expcutoff = envs->expcutoff;                                                         \
     double rr_ij = SQUARE(envs->rirj);                                                          \
-    PairData *pdata_base, *pdata_ij;                                                            \
+    NoSpherA2::PairData *pdata_base, *pdata_ij;                                                            \
     if (opt->pairdata != NULL)                                                                  \
     {                                                                                           \
         pdata_base = opt->pairdata[i_sh * opt->nbas + j_sh];                                    \
@@ -81,7 +82,7 @@
     int *non0ctrk, *non0idxk;                                                                   \
     MALLOC_INSTACK_INT(non0ctrk, k_prim + k_prim * k_ctr);                                      \
     non0idxk = non0ctrk + k_prim;                                                               \
-    CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);                           \
+    NOS_CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);                           \
     double expij, cutoff;                                                                       \
     double *rij;                                                                                \
     double *rkl = envs->rkl;                                                                    \
@@ -175,7 +176,7 @@
         CINTdplus_transpose(gctr, a, nf *nc, n_comp); \
     }                                                 \
     *empty = 0;
-
+namespace NoSpherA2 {
 void CINTprim_to_ctr_0(double *gc, double *gp, double *coeff, size_t nf,
                        int nprim, int nctr, int non0ctr, int *sortedidx)
 {
@@ -193,7 +194,7 @@ void CINTprim_to_ctr_0(double *gc, double *gp, double *coeff, size_t nf,
     }
 }
 
-void CINTprim_to_ctr_1(double *gc, double *gp, double *coeff, size_t nf,
+static void CINTprim_to_ctr_1(double *gc, double *gp, double *coeff, size_t nf,
                        int nprim, int nctr, int non0ctr, int *sortedidx)
 {
     int i, j;
@@ -210,11 +211,11 @@ void CINTprim_to_ctr_1(double *gc, double *gp, double *coeff, size_t nf,
         }
     }
 }
-
+}
 /*
  * a[m,n] -> a_t[n,m]
  */
-void CINTdmat_transpose(double *a_t, double *a, int m, int n)
+static void CINTdmat_transpose(double *a_t, double *a, int m, int n)
 {
     int i, j, k;
 
@@ -262,7 +263,7 @@ void CINTdmat_transpose(double *a_t, double *a, int m, int n)
 /*
  * a_t[n,m] += a[m,n]
  */
-void CINTdplus_transpose(double *a_t, double *a, int m, int n)
+static void CINTdplus_transpose(double *a_t, double *a, int m, int n)
 {
     int i, j, k;
 
@@ -326,7 +327,7 @@ int GTOmax_shell_dim(const int *ao_loc, const int *shls_slice, int ncenter)
 }
 
 size_t GTOmax_cache_size(
-    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *),
+    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, NoSpherA2::CINTOpt *, double *),
     int *shls_slice, int ncenter,
     int *atm, int natm, int *bas, int nbas, double *env)
 {
@@ -338,7 +339,7 @@ size_t GTOmax_cache_size(
         i0 = std::min(i0, shls_slice[i * 2]);
         i1 = std::max(i1, shls_slice[i * 2 + 1]);
     }
-    int (*f)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *) = (int (*)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *))intor;
+    int (*f)(double *, int *, int *, int *, int, int *, int, double *, NoSpherA2::CINTOpt *, double *) = (int (*)(double *, int *, int *, int *, int, int *, int, double *, NoSpherA2::CINTOpt *, double *))intor;
     int cache_size = 0;
     int n;
     int shls[4];
@@ -355,8 +356,8 @@ size_t GTOmax_cache_size(
 }
 
 void GTOnr3c_drv(
-    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *),
-    double *out, int comp, int *shls_slice, int *ao_loc, CINTOpt *cintopt,
+    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, NoSpherA2::CINTOpt *, double *),
+    double *out, int comp, int *shls_slice, int *ao_loc, NoSpherA2::CINTOpt *cintopt,
     int *atm, int natm, int *bas, int nbas, double *env)
 {
     const int ish0 = shls_slice[0];
@@ -407,9 +408,9 @@ void GTOnr3c_drv(
 }
 
 void GTOnr3c_drv(
-    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *),
-    void (*fill)(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *), double *, double *, int, int, int *, int *, CINTOpt *, int *, int, int *, int, double *),
-    double *eri, int comp, int *shls_slice, int *ao_loc, CINTOpt *cintopt,
+    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, NoSpherA2::CINTOpt *, double *),
+    void (*fill)(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, NoSpherA2::CINTOpt *, double *), double *, double *, int, int, int *, int *, NoSpherA2::CINTOpt *, int *, int, int *, int, double *),
+    double *eri, int comp, int *shls_slice, int *ao_loc, NoSpherA2::CINTOpt *cintopt,
     int *atm, int natm, int *bas, int nbas, double *env)
 {
     const int ish0 = shls_slice[0];
@@ -444,8 +445,8 @@ void GTOnr3c_drv(
  * out[naoi,naoj,naok,comp] in F-order
  */
 void GTOnr3c_fill_s1(
-    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *),
-    double *out, double *buf, int comp, int jobid, int *shls_slice, int *ao_loc, CINTOpt *cintopt,
+    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, NoSpherA2::CINTOpt *, double *),
+    double *out, double *buf, int comp, int jobid, int *shls_slice, int *ao_loc, NoSpherA2::CINTOpt *cintopt,
     int *atm, int natm, int *bas, int nbas, double *env)
 {
     const int ish0 = shls_slice[0];
@@ -492,7 +493,7 @@ void GTOnr3c_fill_s1(
 void CINTgout2e(double* gout,
     double* g,
     int* idx,
-    CINTEnvVars* envs,
+    NoSpherA2::CINTEnvVars* envs,
     int gout_empty)
 {
     const int nf = envs->nf;
@@ -537,7 +538,7 @@ void CINTgout2e(double* gout,
     }
 }
 
-int CINT2c2e_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
+int CINT2c2e_loop(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int *empty)
 {
     int *shls = envs->shls;
     int *bas = envs->bas;
@@ -570,11 +571,11 @@ int CINT2c2e_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
     non0idxk = non0idxi + i_prim * i_ctr;
     if (i_ctr > 1)
     {
-        CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+        NOS_CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
     }
     if (k_ctr > 1)
     {
-        CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+        NOS_CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
     }
 
     int *idx = envs->opt->index_xyz_array[envs->i_l * LMAX1 + envs->k_l];
@@ -638,7 +639,7 @@ int CINT2c2e_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
     return !*empty;
 }
 
-int CINT2c2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
+int CINT2c2e_loop_nopt(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int *empty)
 {
     int *shls = envs->shls;
     int *bas = envs->bas;
@@ -691,11 +692,11 @@ int CINT2c2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empt
     non0idxk = non0idxi + i_prim * i_ctr;
     if (i_ctr > 1)
     {
-        CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+        NOS_CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
     }
     if (k_ctr > 1)
     {
-        CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+        NOS_CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
     }
 
     for (kp = 0; kp < k_prim; kp++)
@@ -743,7 +744,7 @@ int CINT2c2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empt
     return !*empty;
 }
 
-int int1e_cache_size(CINTEnvVars *envs)
+int int1e_cache_size(NoSpherA2::CINTEnvVars *envs)
 {
     int *shls = envs->shls;
     int *bas = envs->bas;
@@ -762,8 +763,8 @@ int int1e_cache_size(CINTEnvVars *envs)
     return cache_size;
 }
 
-int CINT2c2e_drv(double *out, int *dims, CINTEnvVars *envs, CINTOpt *opt,
-                 double *cache, void (*f_c2s)(double *, double *, int *, CINTEnvVars *, double *))
+int CINT2c2e_drv(double *out, int *dims, NoSpherA2::CINTEnvVars *envs, NoSpherA2::CINTOpt *opt,
+                 double *cache, void (*f_c2s)(double *, double *, int *, NoSpherA2::CINTEnvVars *, double *))
 {
     int *x_ctr = envs->x_ctr;
     int nc = envs->nf * x_ctr[0] * x_ctr[1];
@@ -834,10 +835,10 @@ int CINT2c2e_drv(double *out, int *dims, CINTEnvVars *envs, CINTOpt *opt,
 }
 
 int int2c2e_sph(double *out, int *dims, int *shls, int *atm, int natm,
-                int *bas, int nbas, double *env, CINTOpt *opt, double *cache)
+                int *bas, int nbas, double *env, NoSpherA2::CINTOpt *opt, double *cache)
 {
     int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
-    CINTEnvVars envs;
+    NoSpherA2::CINTEnvVars envs;
     CINTinit_int2c2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
     envs.f_gout = &CINTgout2e;
     return CINT2c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_1e);
@@ -846,8 +847,8 @@ int int2c2e_sph(double *out, int *dims, int *shls, int *atm, int natm,
 /*
  * mat(naoi,naoj,comp) in F-order
  */
-void GTOint2c(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *), double *mat, int comp, int hermi,
-              int *shls_slice, int *ao_loc, CINTOpt *opt,
+void GTOint2c(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, NoSpherA2::CINTOpt *, double *), double *mat, int comp, int hermi,
+              int *shls_slice, int *ao_loc, NoSpherA2::CINTOpt *opt,
               int *atm, int natm, int *bas, int nbas, double *env)
 {
     const int ish0 = shls_slice[0];
@@ -885,7 +886,7 @@ void GTOint2c(int (*intor)(double *, int *, int *, int *, int, int *, int, doubl
     }
 }
 
-int CINT3c2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
+int CINT3c2e_loop_nopt(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int *empty)
 {
     int *shls = envs->shls;
     int *bas = envs->bas;
@@ -911,12 +912,12 @@ int CINT3c2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empt
     double expcutoff = envs->expcutoff;
     double rr_ij = SQUARE(envs->rirj);
     double *log_maxci, *log_maxcj;
-    PairData *pdata_base, *pdata_ij;
+    NoSpherA2::PairData *pdata_base, *pdata_ij;
     MALLOC_INSTACK(log_maxci, i_prim + j_prim);
     MALLOC_INSTACK_PAIRDATA(pdata_base, i_prim * j_prim);
     log_maxcj = log_maxci + i_prim;
-    CINTOpt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
-    CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
+    NOS_CINTOpt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
+    NOS_CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
     if (CINTset_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
                          log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
                          i_prim, j_prim, rr_ij, expcutoff, env))
@@ -971,9 +972,9 @@ int CINT3c2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empt
     non0idxi = non0ctrk + k_prim;
     non0idxj = non0idxi + i_prim * i_ctr;
     non0idxk = non0idxj + j_prim * j_ctr;
-    CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
-    CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
-    CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
 
     int nc = i_ctr * j_ctr * k_ctr;
     // (irys,i,j,k,l,coord,0:1); +1 for nabla-r12
@@ -1063,7 +1064,7 @@ int CINT3c2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empt
     return !*empty;
 }
 
-int CINT3c2e_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
+int CINT3c2e_loop(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int *empty)
 {
     COMMON_ENVS_AND_DECLARE
     ADJUST_CUTOFF;
@@ -1149,7 +1150,7 @@ int CINT3c2e_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
 }
 
 // i_ctr = n; j_ctr = k_ctr = 1;
-int CINT3c2e_n11_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
+int CINT3c2e_n11_loop(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int *empty)
 {
     COMMON_ENVS_AND_DECLARE;
     ADJUST_CUTOFF;
@@ -1198,7 +1199,7 @@ int CINT3c2e_n11_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty
 }
 
 // j_ctr = n; i_ctr = k_ctr = 1;
-int CINT3c2e_1n1_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
+int CINT3c2e_1n1_loop(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int *empty)
 {
     COMMON_ENVS_AND_DECLARE;
     ADJUST_CUTOFF;
@@ -1252,7 +1253,7 @@ int CINT3c2e_1n1_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty
 }
 
 // i_ctr = j_ctr = k_ctr = 1;
-int CINT3c2e_111_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
+int CINT3c2e_111_loop(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int *empty)
 {
     COMMON_ENVS_AND_DECLARE;
     ADJUST_CUTOFF;
@@ -1306,7 +1307,7 @@ int CINT3c2e_111_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty
     return !*empty;
 }
 
-static int (*CINTf_3c2e_loop[8])(double *, CINTEnvVars *, double *, int *) = {
+static int (*CINTf_3c2e_loop[8])(double *, NoSpherA2::CINTEnvVars *, double *, int *) = {
     CINT3c2e_loop,
     CINT3c2e_loop,
     CINT3c2e_loop,
@@ -1317,8 +1318,8 @@ static int (*CINTf_3c2e_loop[8])(double *, CINTEnvVars *, double *, int *) = {
     CINT3c2e_111_loop,
 };
 
-int CINT3c2e_drv(double *out, const int *dims, CINTEnvVars *envs, CINTOpt *opt,
-                 double *cache, void (*f_e1_c2s)(double *, double *, const int *, CINTEnvVars *, double *), int is_ssc)
+int CINT3c2e_drv(double *out, const int *dims, NoSpherA2::CINTEnvVars *envs, NoSpherA2::CINTOpt *opt,
+                 double *cache, void (*f_e1_c2s)(double *, double *, const int *, NoSpherA2::CINTEnvVars *, double *), int is_ssc)
 {
     int *x_ctr = envs->x_ctr;
     size_t nc = (size_t)envs->nf * (size_t)x_ctr[0] * (size_t)x_ctr[1] * (size_t)x_ctr[2];
@@ -1407,10 +1408,10 @@ int CINT3c2e_drv(double *out, const int *dims, CINTEnvVars *envs, CINTOpt *opt,
 }
 
 int int3c2e_sph(double *out, int *dims, int *shls, int *atm, int natm,
-                int *bas, int nbas, double *env, CINTOpt *opt, double *cache)
+                int *bas, int nbas, double *env, NoSpherA2::CINTOpt *opt, double *cache)
 {
     int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
-    CINTEnvVars envs;
+    NoSpherA2::CINTEnvVars envs;
     CINTinit_int3c2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
     envs.f_gout = &CINTgout2e;
     return CINT3c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_3c2e1, 0);
@@ -1452,7 +1453,7 @@ void computeEri3c(Int_Params &param1,
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
     int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
 
-    CINTOpt *opty = nullptr;
+    NoSpherA2::CINTOpt *opty = nullptr;
     int3c2e_optimizer(&opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // Compute integrals
@@ -1479,7 +1480,7 @@ void computeEri3c(Int_Params &param1,
     }
 }
 
-int CINT3c1e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
+int CINT3c1e_loop_nopt(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int *empty)
 {
     int *shls = envs->shls;
     int *bas = envs->bas;
@@ -1524,9 +1525,9 @@ int CINT3c1e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empt
     non0idxi = non0ctrk + k_prim;
     non0idxj = non0idxi + i_prim * i_ctr;
     non0idxk = non0idxj + j_prim * j_ctr;
-    CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
-    CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
-    CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
 
     int nc = i_ctr * j_ctr * k_ctr;
     size_t leng = (size_t)envs->g_size * 3 * (size_t)((1 << envs->gbits) + 1);
@@ -1630,8 +1631,8 @@ int CINT3c1e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empt
     return !*empty;
 }
 
-int CINT3c1e_drv(double *out, int *dims, CINTEnvVars *envs, CINTOpt *opt,
-                 double *cache, void (*f_e1_c2s)(double *, double *, const int *, CINTEnvVars *, double *), int int_type, int is_ssc)
+int CINT3c1e_drv(double *out, int *dims, NoSpherA2::CINTEnvVars *envs, NoSpherA2::CINTOpt *opt,
+                 double *cache, void (*f_e1_c2s)(double *, double *, const int *, NoSpherA2::CINTEnvVars *, double *), int int_type, int is_ssc)
 {
     int *x_ctr = envs->x_ctr;
     int nc = envs->nf * x_ctr[0] * x_ctr[1] * x_ctr[2];
@@ -1738,7 +1739,7 @@ int CINT3c1e_drv(double *out, int *dims, CINTEnvVars *envs, CINTOpt *opt,
     return !empty;
 }
 
-void CINTgout1e(double *gout, double *g, int *idx, CINTEnvVars *envs, int empty)
+void CINTgout1e(double *gout, double *g, int *idx, NoSpherA2::CINTEnvVars *envs, int empty)
 {
     int nf = envs->nf;
     int n, ix, iy, iz;
@@ -1765,10 +1766,10 @@ void CINTgout1e(double *gout, double *g, int *idx, CINTEnvVars *envs, int empty)
 }
 
 int int3c1e_sph(double *out, int *dims, int *shls, int *atm, int natm,
-                int *bas, int nbas, double *env, CINTOpt *opt, double *cache)
+                int *bas, int nbas, double *env, NoSpherA2::CINTOpt *opt, double *cache)
 {
     int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
-    CINTEnvVars envs;
+    NoSpherA2::CINTEnvVars envs;
     CINTinit_int3c1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
     envs.f_gout = &CINTgout1e;
     return CINT3c1e_drv(out, dims, &envs, opt, cache, &c2s_sph_3c1e, 0, 0); // Second to last indice controls the type of integral (e.g. Overlap)
@@ -1777,7 +1778,7 @@ int int3c1e_sph(double *out, int *dims, int *shls, int *atm, int natm,
 /*
  * 1e GTO integral basic loop for < i|j>, no 1/r
  */
-int CINT1e_loop(double *gctr, CINTEnvVars *envs, double *cache, int int1e_type)
+int CINT1e_loop(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int int1e_type)
 {
     int *shls = envs->shls;
     int *bas = envs->bas;
@@ -1796,12 +1797,12 @@ int CINT1e_loop(double *gctr, CINTEnvVars *envs, double *cache, int int1e_type)
 
     double expcutoff = envs->expcutoff;
     double *log_maxci, *log_maxcj;
-    PairData *pdata_base, *pdata_ij;
+    NoSpherA2::PairData *pdata_base, *pdata_ij;
     MALLOC_INSTACK(log_maxci, i_prim + j_prim);
     MALLOC_INSTACK_PAIRDATA(pdata_base, i_prim * j_prim);
     log_maxcj = log_maxci + i_prim;
-    CINTOpt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
-    CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
+    NOS_CINTOpt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
+    NOS_CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
     if (CINTset_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
                          log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
                          i_prim, j_prim, SQUARE(envs->rirj), expcutoff, env))
@@ -1826,8 +1827,8 @@ int CINT1e_loop(double *gctr, CINTEnvVars *envs, double *cache, int int1e_type)
     non0ctrj = non0ctri + i_prim;
     non0idxi = non0ctrj + j_prim;
     non0idxj = non0idxi + i_prim * i_ctr;
-    CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
-    CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
 
     const int nc = i_ctr * j_ctr;
     // (irys,i,j,k,l,coord,0:1); +1 for nabla-r12
@@ -1868,7 +1869,7 @@ int CINT1e_loop(double *gctr, CINTEnvVars *envs, double *cache, int int1e_type)
         gout = g1;
     }
 
-    double common_factor = envs->common_factor * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->j_l);
+    double common_factor = envs->common_factor * NOS_CINTcommon_fac_sp(envs->i_l) * NOS_CINTcommon_fac_sp(envs->j_l);
 
     pdata_ij = pdata_base;
     for (jp = 0; jp < j_prim; jp++)
@@ -1923,8 +1924,8 @@ int CINT1e_loop(double *gctr, CINTEnvVars *envs, double *cache, int int1e_type)
 /*
  * 1e integrals <i|O|j> without 1/r
  */
-int CINT1e_drv(double *out, int *dims, CINTEnvVars *envs,
-               double *cache, void (*f_c2s)(double *, double *, int *, CINTEnvVars *, double *), int int1e_type)
+int CINT1e_drv(double *out, int *dims, NoSpherA2::CINTEnvVars *envs,
+               double *cache, void (*f_c2s)(double *, double *, int *, NoSpherA2::CINTEnvVars *, double *), int int1e_type)
 {
     if (out == NULL)
     {
@@ -1987,10 +1988,10 @@ int CINT1e_drv(double *out, int *dims, CINTEnvVars *envs,
 }
 
 int int1e_ovlp_sph(double *out, int *dims, int *shls, int *atm, int natm,
-                   int *bas, int nbas, double *env, CINTOpt *opt, double *cache)
+                   int *bas, int nbas, double *env, NoSpherA2::CINTOpt *opt, double *cache)
 {
     int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
-    CINTEnvVars envs;
+    NoSpherA2::CINTEnvVars envs;
     CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
     envs.f_gout = &CINTgout1e;
     return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
@@ -1998,21 +1999,21 @@ int int1e_ovlp_sph(double *out, int *dims, int *shls, int *atm, int natm,
 
 
 // --- Traits for kernels ------------------------------------------------------
-void Coulomb2C::optimizer(CINTOpt*& opt,
+void Coulomb2C::optimizer(NoSpherA2::CINTOpt*& opt,
     int* atm, int nat, int* bas, int nbas, double* env) {
     int2c2e_optimizer(&opt, atm, nat, bas, nbas, env);
 }
 void Coulomb2C::drv(double* out, int comp, int* shl_slice, int* aoloc,
-    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
+    NoSpherA2::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
     GTOint2c(int2c2e_sph, out, comp, 0, shl_slice, aoloc, opt, atm, nat, bas, nbas, env);
 }
 
-void Overlap2C::optimizer(CINTOpt*& opt,
+void Overlap2C::optimizer(NoSpherA2::CINTOpt*& opt,
     const int*, int, const int*, int, const double*) {
     opt = nullptr; // no optimizer needed for overlap
 }
 void Overlap2C::drv(double* out, int comp, int* shl_slice, int* aoloc,
-    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
+    NoSpherA2::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
     GTOint2c(int1e_ovlp_sph, out, comp, 0, shl_slice, aoloc, opt, atm, nat, bas, nbas, env);
 }
 
@@ -2031,7 +2032,7 @@ void compute2C(Int_Params& params, vec& ret) {
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
 
-    CINTOpt* opty = nullptr;
+    NoSpherA2::CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // Compute integrals
@@ -2130,21 +2131,21 @@ ivec calc_3c_steps(const unsigned long long int naoi, const unsigned long long i
 }
 
 // --- Traits for kernels ------------------------------------------------------
-void Coulomb3C::optimizer(CINTOpt*& opt,
+void Coulomb3C::optimizer(NoSpherA2::CINTOpt*& opt,
     int* atm, int nat, int* bas, int nbas, double* env) {
     int3c2e_optimizer(&opt, atm, nat, bas, nbas, env);
 }
 void Coulomb3C::drv(double* out, int comp, int* shl_slice, int* aoloc,
-    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
+    NoSpherA2::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
     GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, out, comp, shl_slice, aoloc, opt, atm, nat, bas, nbas, env);
 }
 
-void Overlap3C::optimizer(CINTOpt*& opt,
+void Overlap3C::optimizer(NoSpherA2::CINTOpt*& opt,
     const int*, int, const int*, int, const double*) {
     opt = nullptr;
 }
 void Overlap3C::drv(double* out, int comp, int* shl_slice, int* aoloc,
-    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
+    NoSpherA2::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
     (void)opt;
     GTOnr3c_drv(int3c1e_sph, GTOnr3c_fill_s1, out, comp, shl_slice, aoloc, nullptr, atm, nat, bas, nbas, env);
 }
@@ -2215,7 +2216,7 @@ void computeRho(Int_Params &param1,
 
     std::unique_ptr<double, decltype(&aligned_free_d)> res(aligned_alloc_d(tot_size* naok_max), aligned_free_d);
 
-    CINTOpt *opty = nullptr;
+    NoSpherA2::CINTOpt *opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     ProgressBar pb(steps.size() - 1, 60, "#", " ", "Computing Rho: ");
@@ -2236,7 +2237,7 @@ void computeRho(Int_Params &param1,
         int idx_curr_rho = aoloc[steps[step_idx - 1]] - aoloc[nQM];
         // einsum('ijk,ij->k', res, dm, out=rho)
         // This is 100% pure magic, thanks ChatGPT
-        cblas_dgemv(CblasRowMajor, 
+        cblas_dgemv(CblasRowMajor,
                     CblasNoTrans,
                     naok,
                     tot_size,

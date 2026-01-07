@@ -1,3 +1,4 @@
+#include "cube.h"
 #include "pch.h"
 #include "convenience.h"
 #include "fchk.h"
@@ -263,7 +264,7 @@ sel menu(
                 run = true;
                 for (int i = 0; i < 3; i++) {
                     if (temp[i] > 0 && temp[i] < 1) {
-                        if (run)    
+                        if (run)
                             res.Increments[i] = temp[i];
                         else {
                             cout << "invalid selection in dimension " << i << endl;
@@ -956,7 +957,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
         }
         std::cout << "R) Read in a new file" << endl;
         if(wavy.size() > 0){
-            std::cout << "M) Modify an already loaded wavefunction"<<endl 
+            std::cout << "M) Modify an already loaded wavefunction"<<endl
                 << "S) Save the active wavefunction";
             if (wavy[activewave].get_cube_count() > 0)
                 std::cout << "or cube(s)" << endl;
@@ -1098,7 +1099,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                         wavy[selection[0][0]].push_back_cube(*wavy[selection[0][0]].get_cube_ptr(selection[1][0]) + *wavy[selection[0][1]].get_cube_ptr(selection[1][1]));
                                         if(wavy[selection[0][0]].get_cube_ptr(wavy[selection[0][0]].get_cube_count() - 1)->get_size(0) != 0)
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                     }
                                         break;
@@ -1106,7 +1107,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                         wavy[selection[0][0]].push_back_cube(*wavy[selection[0][0]].get_cube_ptr(selection[1][0]) - *wavy[selection[0][1]].get_cube_ptr(selection[1][1]));
                                         if(wavy[selection[0][0]].get_cube_ptr(wavy[selection[0][0]].get_cube_count() - 1)->get_size(0) != 0)
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                     }
                                         break;
@@ -1114,7 +1115,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                         wavy[selection[0][0]].push_back_cube(*wavy[selection[0][0]].get_cube_ptr(selection[1][0]) * *wavy[selection[0][1]].get_cube_ptr(selection[1][1]));
                                         if(wavy[selection[0][0]].get_cube_ptr(wavy[selection[0][0]].get_cube_count() - 1)->get_size(0) != 0)
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                     }
                                         break;
@@ -1122,7 +1123,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                         wavy[selection[0][0]].push_back_cube(*wavy[selection[0][0]].get_cube_ptr(selection[1][0]) / *wavy[selection[0][1]].get_cube_ptr(selection[1][1]));
                                         if(wavy[selection[0][0]].get_cube_ptr(wavy[selection[0][0]].get_cube_count() - 1)->get_size(0) != 0)
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                     }
                                         break;
@@ -1148,26 +1149,26 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                             }
                                         if (wavy[selection[0][0]].apply_cube_mask(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                         }
                                         break;
                                     case 7:
                                         for(int i=0; i<2; i++)
                                             if(wavy[selection[0][i]].get_cube_loaded(selection[1][i])==false){
-                                                if (opt.debug) 
+                                                if (opt.debug)
                                                     std::cout << "Loading full file now!" << endl;
                                                 wavy[selection[0][i]].read_cube(selection[1][i],true,false,expert);
                                             }
                                         if(wavy[selection[0][0]].apply_cube_negative_mask(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                         break;
                                     case 8:{
                                         for(int i=0; i<2; i++)
                                             if(wavy[selection[0][i]].get_cube_loaded(selection[1][i])==false){
-                                                if (opt.debug) 
+                                                if (opt.debug)
                                                     std::cout << "Loading full file now!" << endl;
                                                 wavy[selection[0][i]].read_cube(selection[1][i],true,false,expert);
                                             }
@@ -1176,7 +1177,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                         std::cin >> thresh;
                                         if (wavy[selection[0][0]].apply_cube_thresh(selection[1][0],*wavy[selection[0][1]].get_cube_ptr(selection[1][1]), thresh))
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                         break;
                                     }
@@ -1191,7 +1192,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                             std::cout << "Operation succesfull!" << endl;
                                             std::cout << "Jaccord similarity: " << result << " Jaccord distance: " << 1-result << endl;
                                         }
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                     }
                                     break;
@@ -1203,7 +1204,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                             }
                                         if(wavy[selection[0][0]].cube_add(selection[1][0],*wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                         break;
                                     case 12:
@@ -1214,7 +1215,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                             }
                                         if (wavy[selection[0][0]].cube_subtract(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                         break;
                                     case 13:
@@ -1225,7 +1226,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                             }
                                         if (wavy[selection[0][0]].cube_multiply(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                         break;
                                     case 14:
@@ -1236,7 +1237,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                             }
                                         if (wavy[selection[0][0]].cube_divide(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
                                             std::cout << "Operation succesfull!" << endl;
-                                        else 
+                                        else
                                             std::cout << "Sorry, something went wrong!" << endl;
                                         break;
                                     case 0:
@@ -1297,7 +1298,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                         }
                     }
                     break;
-                }        
+                }
             case 'r':
             case 'R':{
                 if(expert){
@@ -1501,7 +1502,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                             i--;
                                             continue;
                                         }
-                                    }   
+                                    }
                                     std::cout << "Let me recapitulate: Center " << temp_cen << " type: " << temp_type << " exp: " << temp_exp
                                         << " and the MO coefficients:\n";
                                     for(int i=0; i<wavy[activewave].get_nmo(); i++){
@@ -1524,7 +1525,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                     if(x < -99.999 || x > 99.999){
                                         std::cout << "Sorry, number too large\n";
                                         continue;
-                                    }   
+                                    }
                                     std::cout << "y: ";
                                     std::cin >> y;
                                     if(y < -99.999 || y > 99.999){
@@ -1568,7 +1569,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                             case 'c':
                                 std::cout << "Which one do you want to change? (0=return to menu)";
                                 std::cin >> msel;
-                                if(msel>wavy[activewave].get_nex()||msel<0){ 
+                                if(msel>wavy[activewave].get_nex()||msel<0){
                                     std::cout << "Wrong input, start again!\n";
                                     break;
                                 }
@@ -1579,7 +1580,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                             case 'e':
                                 std::cout << "What is the nr. of the exponent you want to change? (0=return to menu)" << endl;
                                 std::cin >> msel;
-                                if(msel>wavy[activewave].get_nex()||msel<0){ 
+                                if(msel>wavy[activewave].get_nex()||msel<0){
                                     std::cout << "Wrong input, start again!\n";
                                     break;
                                 }
@@ -1590,7 +1591,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                             case 't':
                                 std::cout << "What is the nr. of the type you want to change? (0=return to menu)" << endl;
                                 std::cin >> msel;
-                                if(msel>wavy[activewave].get_nex()||msel<0){ 
+                                if(msel>wavy[activewave].get_nex()||msel<0){
                                     std::cout << "Wrong input, start again!\n";
                                     break;
                                 }
@@ -2038,7 +2039,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                 cls();
                 std::cout << "Sorry, i didn't get that, could you try it again?\n";
                 break;
-        }            
+        }
     }
     cls();
     return 0;

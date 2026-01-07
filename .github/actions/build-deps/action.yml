@@ -32,63 +32,9 @@ runs:
         & "$env:USERPROFILE\.cargo\bin\cargo.exe" --version
         & "$env:USERPROFILE\.cargo\bin\rustc.exe" --version
 
-    - name: Build featomic (Unix)
-      if: inputs.platform != 'Windows'
-      shell: bash
-      run: |
-        source ~/.cargo/env
-        export PATH="$HOME/.cargo/bin:$PATH"
-    
-        if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
-          echo "Building featomic for ${{ inputs.platform }}"
-          cd featomic/featomic
-          mkdir -p build
-          cd build
-          cmake ${{ env.FEATOMIC_CMAKE_FLAGS }} -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install ..
-          make install
-        else
-          echo 'Skipping featomic build, already exists'
-        fi
-
-    - name: Build Intel MKL (Linux)
-      if: inputs.platform == 'Linux'
-      shell: bash
-      run: |
-        if [ ! -f Lib/MKL/mkl/2025.2/lib/libmkl_core.a ]; then
-          wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh
-          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=${{ github.workspace }}/Lib/MKL --eula accept
-        else
-          echo 'Skipping IntelMKL build, already exists'
-        fi
-
-    - name: Set LD_LIBRARY_PATH for Intel OpenMP (Linux)
-      if: inputs.platform == 'Linux'
-      shell: bash
-      run: echo "LD_LIBRARY_PATH=${{ github.workspace }}/Lib/MKL/compiler/2025.2/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-
     - name: Build dependencies (Windows)
       if: inputs.platform == 'Windows'
       shell: powershell
       run: |
         # Ensure cargo is in PATH
         $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-        
-        # Build featomic
-        if (-not (Test-Path "Lib\featomic_install\lib\metatensor.lib")) {
-          Write-Host "Building featomic for Windows"
-          cd featomic\featomic
-          $buildDir = "build"
-          if (-not (Test-Path $buildDir)) {
-            mkdir $buildDir
-          }
-          cd $buildDir
-          cmake -G "Visual Studio 17 2022" ${{ env.FEATOMIC_CMAKE_FLAGS }} -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
-          msbuild -nologo .\featomic.sln -p:Configuration=Release
-          msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
-        } else {
-          Write-Host "Skipping featomic build, already exists"
-        }
-        
-        cd ${{ github.workspace }}
-        # Get Intel MKL
-        MSBuild .\Windows\NoSpherA2.sln /t:Restore /p:RestorePackagesPath=Windows/packages /p:RestoreTimeout=300000

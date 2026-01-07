@@ -3,6 +3,7 @@
 #include "convenience.h"
 #include "basis_set.h"
 #include "constants.h"
+#include "wfn_class.h"
 //----------------------------FCHK Preparation and Gaussian--------------------------------------
 /*
 KEPT AS AN EXAMPLE HOW TO CALL G09 FROM WITHIN C++
@@ -1064,7 +1065,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                 case 4:
                     nao += 10;
                     break;
-                case 5: 
+                case 5:
                     nao += 15;
 					break;
                 }
