@@ -1,11 +1,6 @@
 #pragma once
 
-#include <limits>
-#include <complex>
-#include <cmath>
-#include <map>
-#include <vector>
-#include <array>
+#include "pch.h"
 
 namespace constants
 {
