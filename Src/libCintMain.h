@@ -6,11 +6,6 @@
 #include "integration_params.h"
 #include "libCintKernels.h"
 
-//DEPRICATED::Function to compute electron repulsion integrals
-void computeEri3c(Int_Params& param1,
-    Int_Params& param2,
-    vec& eri3c);
-
 /**
  * @brief Computes 2-center integrals using the specified kernel type.
  * 
@@ -42,7 +37,6 @@ void compute2C(Int_Params& params, vec& ret);
  * param2: Int_Params object for the auxiliary basis
  * dm: Density matrix
  * rho: Resulting density matrix
- * max_mem: Maximum available memory in MB
  */
 template <typename Kernel>
 void computeRho(
@@ -50,6 +44,13 @@ void computeRho(
     const Int_Params& aux_basis,
     const dMatrix2& dm,
     vec& rho);
+
+
+//DEPRICATED::Function to compute electron repulsion integrals
+template <typename Kernel>
+void computeEri3c(Int_Params& param1,
+    Int_Params& param2,
+    vec& eri3c);
 
 template <typename Kernel>
 void compute3C(Int_Params& param1,
