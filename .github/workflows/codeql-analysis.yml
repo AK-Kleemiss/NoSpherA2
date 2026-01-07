@@ -32,37 +32,27 @@ jobs:
         submodules: recursive
         fetch-depth: 1
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gfortran clang build-essential
-
-    # Cache featomic
-    - name: Cache featomic Build
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-      id: cache-featomic-linux
+    - name: Setup Build Environment
+      uses: ./.github/actions/setup-build-env
       with:
-        path: Lib/featomic_install  # Adjust if featomic installs elsewhere
-        key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
-        restore-keys: |
-          featomic-linux-${{ runner.os }}-
-  
-    - name: Build featomic
-      if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
-      run: |
-          cd featomic/featomic 
-          mkdir -p build
-          cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
-          make install
+        platform: Linux
 
+    - name: Cache Dependencies
+      uses: ./.github/actions/cache-deps
+      with:
+        platform: Linux
+
+    - name: Build Dependencies
+      uses: ./.github/actions/build-deps
+      with:
+        platform: Linux
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@cf1bb45a277cb3c205638b2cd5c984db1c46a412 # v4.31.7
       with:
         languages: ${{ matrix.language }}
         source-root: ./Src
-        
+
     - name: make_Linux
       run: make
       continue-on-error: true
