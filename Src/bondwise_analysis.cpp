@@ -22,15 +22,15 @@ void print_dmatrix2(const dMatrix2& EVC2, const std::string name) {
 int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector, double* incr, std::string& outname, bool rho, bool rdg, bool eli, bool lap) {
     options opt;
 
-    cube CubeRho(np[0], np[1], np[2], wavy.get_ncen(), rho),
-        CubeRDG(np[0], np[1], np[2], wavy.get_ncen(), rdg),
-        CubeEli(np[0], np[1], np[2], wavy.get_ncen(), eli),
-        CubeLap(np[0], np[1], np[2], wavy.get_ncen(), lap);
+    cube CubeRho({ np[0], np[1], np[2] }, wavy.get_ncen(), rho),
+        CubeRDG({ np[0], np[1], np[2] }, wavy.get_ncen(), rdg),
+        CubeEli({ np[0], np[1], np[2] }, wavy.get_ncen(), eli),
+        CubeLap({ np[0], np[1], np[2] }, wavy.get_ncen(), lap);
 
     std::string Oname = outname;
     std::vector<int> ntyp;
     for (int i = 0; i < 3; i++) {
-        opt.NbSteps[i] = np[i];
+        opt.properties.NbSteps[i] = np[i];
         if (debug) {
             std::cout << "gvector before: ";
             for (int j = 0; j < 3; j++) std::cout << gvector[j + 3 * i] << " ";
@@ -69,12 +69,12 @@ int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector
     std::cout << "  *.  gridBox Min               : " << std::setw(11) << std::setprecision(6) << origin[0] << std::setw(12) << origin[1] << origin[2] << "     *.\n";
     std::cout << "  *.  gridBox Max               : " << std::setw(11) << std::setprecision(6) << (origin[0] + gvector[0] * np[0] + gvector[3] * np[1] + gvector[6] * np[2]) << std::setw(12) << (origin[1] + gvector[1] * np[0] + gvector[4] * np[1] + gvector[7] * np[2]) << (origin[2] + gvector[2] * np[0] + gvector[5] * np[1] + gvector[8] * np[2]) << "     *.\n";
     std::cout << "  *.  Increments(bohr)          : " << std::setw(11) << std::setprecision(6) << sqrt(pow(gvector[0], 2) + pow(gvector[1], 2) + pow(gvector[2], 2)) << std::setw(12) << sqrt(pow(gvector[3], 2) + pow(gvector[4], 2) + pow(gvector[5], 2)) << std::setw(12) << sqrt(pow(gvector[6], 2) + pow(gvector[7], 2) + pow(gvector[8], 2)) << "     *.\n";
-    std::cout << "  *.  NbSteps                   : " << std::setw(11) << opt.NbSteps[0] << std::setw(12) << opt.NbSteps[1] << std::setw(12) << opt.NbSteps[2] << "     *.\n";
+    std::cout << "  *.  NbSteps                   : " << std::setw(11) << opt.properties.NbSteps[0] << std::setw(12) << opt.properties.NbSteps[1] << std::setw(12) << opt.properties.NbSteps[2] << "     *.\n";
     std::cout << "  *.                                                                      *.\n";
     std::cout << "  *.  Number of primitives      :     " << std::setw(5) << wavy.get_nex() << "                               *.\n";
     std::cout << "  *.  Number of MOs             :       " << std::setw(3) << wavy.get_nmo() << "                               *.\n";
 
-    cube dummy(0, 0, 0);
+    cube dummy({ 0, 0, 0 });
     Calc_Prop(
         CubeRho,
         CubeRDG,
@@ -583,11 +583,9 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
     vec D_sub(n * n, 0.0); // called P in tonto
     vec S_sub(n * n, 0.0); // called S in tonto
     get_submatrices(D_full, S_full, D_sub, S_sub, atom_indices);
-
-    vec V(n * n);          // Workhorse
     vec Rho(n * n);        // To store target density
 
-    V = S_sub;
+    vec V = S_sub;
     vec W(n);
     // make V = Sqrt(S)
     const vec Temp = mat_sqrt(V, W);
@@ -612,7 +610,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
     for (int i = 0; i < n; ++i) {
         std::cout << std::setw(14) << std::setprecision(8) << std::fixed << W[i] << " ";
     }
-    print_dmatrix2(reshape<dMatrix2>(A, Shape2D(n, n)), "Projected density P");
+    print_dmatrix2(reshape<dMatrix2>(P, Shape2D(n, n)), "Projected density P");
 #endif
 
     for (int i = 0; i < n; ++i)
@@ -631,6 +629,9 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
                 *T += V[in + k] * W[k] * V[jn + k];
         }
     }
+
+    V.clear();
+    W.clear();
 
 #ifdef NSA2DEBUG
     print_dmatrix2(reshape<dMatrix2>(Temp2, Shape2D(n, n)), "Back projection S^-0.5");

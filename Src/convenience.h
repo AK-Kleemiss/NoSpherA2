@@ -63,6 +63,34 @@ typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic
 typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> cMatrixRef4;
 typedef Kokkos::mdspan<const cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> ccMatrixRef4;
 
+struct properties_options
+{
+    bool rho = false;
+    bool eli = false;
+    bool esp = false;
+    bool elf = false;
+    bool lap = false;
+    bool rdg = false;
+    bool hdef = false;
+    bool def = false;
+    bool hirsh = false;
+    bool s_rho = false;
+    bool all_mos = false;
+    double resolution = 0.1;
+    double radius = 2.0;
+    double integral_accuracy = -1;
+    std::array<int, 3> NbSteps = { 0, 0, 0 };
+    std::array<double, 6> MinMax = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    ivec MO_numbers;
+    int hirsh_number = 0;
+    bool calc() const {
+        return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || MO_numbers.size() > 0;
+    }
+    size_t n_grid_points() const {
+        return unsigned long long(NbSteps[0]) * NbSteps[1] * NbSteps[2];
+    }
+};
+
 int vec_sum(const bvec& in);
 int vec_sum(const ivec& in);
 double vec_sum(const vec& in);
@@ -315,18 +343,13 @@ private:
 
 void readxyzMinMax_fromWFN(
     WFN& wavy,
-    double* CoordMinMax,
-    int* NbSteps,
-    double Radius,
-    double Increments,
+    properties_options& opts,
     bool no_bohr = false);
 
 void readxyzMinMax_fromCIF(
     std::filesystem::path cif,
-    double* CoordMinMax,
-    int* NbSteps,
-    vec2& cm,
-    double Resolution);
+    properties_options& opts,
+    vec2& cm);
 
 bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug);
 
@@ -561,15 +584,11 @@ struct options
      */
 {
     std::ostream& log_file;
-    double resolution = 0.1;
-    double radius = 2.0;
     double d_sfac_scan = 0.0;
     double sfac_diffuse = 0.0;
     double dmin = 99.0;
     double mem = 1000.0; // In MB
     double efield = 0.005;
-    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-    ivec MOs;
     ivec2 groups;
     ivec2 hkl_min_max{ {-100, 100}, {-100, 100}, {-100, 100} };
     vec2 twin_law;
@@ -600,26 +619,15 @@ struct options
     std::filesystem::path coef_file;
     std::filesystem::path hirshfeld_surface;
     std::filesystem::path hirshfeld_surface2;
-    std::string fract_name;
+    std::filesystem::path fract_name;
     std::filesystem::path wavename;
     std::filesystem::path gaussian_path;
     std::filesystem::path turbomole_path;
     std::filesystem::path basis_set_path;
-    std::string cwd;
+    std::filesystem::path cwd;
+    properties_options properties;
     bool debug = false;
     bool all_charges = false;
-    bool rho = false;
-    bool calc = false;
-    bool eli = false;
-    bool esp = false;
-    bool elf = false;
-    bool lap = false;
-    bool rdg = false;
-    bool hdef = false;
-    bool def = false;
-    bool fract = false;
-    bool hirsh = false;
-    bool s_rho = false;
     bool SALTED = false;
     bool Olex2_1_3_switch = false;
     bool iam_switch = false;
@@ -632,7 +640,6 @@ struct options
     bool gbw2wfn = false;
     bool old_tsc = false;
     bool write_CIF = false;
-    bool all_mos = false;
     bool test = false;
     bool electron_diffraction = false;
     bool ECP = false;
@@ -640,8 +647,7 @@ struct options
     bool needs_Thakkar_fill = false;
     bool qct = false;
     bool rgbi = false;
-    int hirsh_number = 0;
-    int NbSteps[3]{ 0, 0, 0 };
+    bool fract = false;
     int accuracy = 2;
     int threads = -1;
     int pbc = 0;

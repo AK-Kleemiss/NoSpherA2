@@ -1007,7 +1007,7 @@ bool WFN::read_xyz(const std::filesystem::path& filename, std::ostream& file, co
 bool WFN::read_wfx(const std::filesystem::path& fileName, const bool& debug, std::ostream& file)
 {
     origin = e_origin::wfx;
-	d_f_switch = true;
+    d_f_switch = true;
     using namespace std;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName.c_str());
@@ -1769,7 +1769,7 @@ bool WFN::read_molden(const std::filesystem::path& filename, std::ostream& file,
     }
     else if (!d5 && !f7 && !g9)
     {
-		d_f_switch = true;
+        d_f_switch = true;
         int run = 0;
         string sym;
         bool spin; // alpha = false, beta = true
@@ -2052,7 +2052,7 @@ bool WFN::read_molden(const std::filesystem::path& filename, std::ostream& file,
     {
         err_not_impl_f("PLEASE DONT MIX CARTESIAN AND SPERHICAL HARMINICS; THAT IS ANNOYING!", std::cout);
     }
-	//Make the matrix square for later use
+    //Make the matrix square for later use
     while (coefficients[0].size() < coefficients[0][0].size()) {
         coefficients[0].push_back(vec(coefficients[0][0].size(), 0.0));
         occ.push_back(0);
@@ -6615,9 +6615,9 @@ const double WFN::compute_dens(
     //}
     //else
     //{
-        err_checkf(d.size() >= 16, "d is too small!", std::cout);
-        err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+    err_checkf(d.size() >= 16, "d is too small!", std::cout);
+    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
     //}
 };
 
@@ -6639,10 +6639,10 @@ const double WFN::compute_dens(
     //}
     //else
     //{
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize(ncen, 0.0);
-        return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+    d.resize(16);
+    for (int i = 0; i < 16; i++)
+        d[i].resize(ncen, 0.0);
+    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
     //}
 };
 
@@ -6662,9 +6662,9 @@ const double WFN::compute_spin_dens(
     //}
     //else
     //{
-        err_checkf(d.size() >= 4, "d is too small!", std::cout);
-        err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+    err_checkf(d.size() >= 4, "d is too small!", std::cout);
+    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
     //}
 };
 
@@ -6686,10 +6686,10 @@ const double WFN::compute_spin_dens(
     //}
     //else
     //{
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize(ncen, 0.0);
-        return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+    d.resize(16);
+    for (int i = 0; i < 16; i++)
+        d[i].resize(ncen, 0.0);
+    return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
     //}
 };
 
@@ -8722,19 +8722,20 @@ void WFN::calc_rho_cube(cube& cube_data) const
 
 void WFN::write_rho_cube(const double& radius, const double& increment) const {
     using namespace std;
-    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-    int steps[3]{ 0, 0, 0 };
+    properties_options opts;
+    opts.radius = radius;
+    opts.resolution = increment;
     WFN dummy = (*this);
-    readxyzMinMax_fromWFN(dummy, MinMax, steps, radius, increment, true);
-    cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
+    readxyzMinMax_fromWFN(dummy, opts, true);
+    cube CubeRho(opts.NbSteps, dummy.get_ncen(), true);
     dummy.delete_unoccupied_MOs();
     CubeRho.give_parent_wfn(dummy);
     std::cout << "Starting work..." << endl;
 
     for (int i = 0; i < 3; i++)
     {
-        CubeRho.set_origin(i, MinMax[i]);
-        CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+        CubeRho.set_origin(i, opts.MinMax[i]);
+        CubeRho.set_vector(i, i, (opts.MinMax[i + 3] - opts.MinMax[i]) / opts.NbSteps[i]);
     }
     CubeRho.set_comment1("Calculated density using NoSpherA2");
     CubeRho.set_comment2("from " + dummy.get_path().string());

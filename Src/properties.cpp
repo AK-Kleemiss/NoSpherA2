@@ -7,10 +7,10 @@
 #include "constants.h"
 
 void Calc_Spherical_Dens(
-    cube &CubeSpher,
-    WFN &wavy,
+    cube& CubeSpher,
+    WFN& wavy,
     double radius,
-    std::ostream &file,
+    std::ostream& file,
     bool wrap)
 {
     using namespace std;
@@ -20,7 +20,7 @@ void Calc_Spherical_Dens(
     vector<Thakkar> atoms;
     for (int a = 0; a < 92; a++) {
         atoms.emplace_back(a);
-        atoms[a].make_interpolator(1.005*1.005*1.005, 1E-7);
+        atoms[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
     }
 
     const int low_i = wrap ? -CubeSpher.get_size(0) : 0;
@@ -38,9 +38,9 @@ void Calc_Spherical_Dens(
             for (int k = low_k; k < high_k; k++)
             {
 
-                const double PosGrid[3]{i * CubeSpher.get_vector(0, 0) + j * CubeSpher.get_vector(0, 1) + k * CubeSpher.get_vector(0, 2) + CubeSpher.get_origin(0),
+                const double PosGrid[3]{ i * CubeSpher.get_vector(0, 0) + j * CubeSpher.get_vector(0, 1) + k * CubeSpher.get_vector(0, 2) + CubeSpher.get_origin(0),
                                         i * CubeSpher.get_vector(1, 0) + j * CubeSpher.get_vector(1, 1) + k * CubeSpher.get_vector(1, 2) + CubeSpher.get_origin(1),
-                                        i * CubeSpher.get_vector(2, 0) + j * CubeSpher.get_vector(2, 1) + k * CubeSpher.get_vector(2, 2) + CubeSpher.get_origin(2)};
+                                        i * CubeSpher.get_vector(2, 0) + j * CubeSpher.get_vector(2, 1) + k * CubeSpher.get_vector(2, 2) + CubeSpher.get_origin(2) };
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
@@ -96,16 +96,16 @@ void Calc_Spherical_Dens(
 };
 
 void Calc_Static_Def(
-    cube &CubeDEF,
-    cube &CubeRho,
-    WFN &wavy,
+    cube& CubeDEF,
+    cube& CubeRho,
+    WFN& wavy,
     double radius,
-    std::ostream &file,
+    std::ostream& file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
+    ProgressBar* progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
 
     vector<Thakkar> atoms;
     atoms.reserve(wavy.get_ncen());
@@ -126,13 +126,13 @@ void Calc_Static_Def(
             for (int k = low_k; k < high_k; k++)
             {
 
-                const double PosGrid[3]{i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0),
+                const double PosGrid[3]{ i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0),
                                         i * CubeDEF.get_vector(1, 0) + j * CubeDEF.get_vector(1, 1) + k * CubeDEF.get_vector(1, 2) + CubeDEF.get_origin(1),
-                                        i * CubeDEF.get_vector(2, 0) + j * CubeDEF.get_vector(2, 1) + k * CubeDEF.get_vector(2, 2) + CubeDEF.get_origin(2)};
+                                        i * CubeDEF.get_vector(2, 0) + j * CubeDEF.get_vector(2, 1) + k * CubeDEF.get_vector(2, 2) + CubeDEF.get_origin(2) };
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a, 2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -141,7 +141,7 @@ void Calc_Static_Def(
                 double dist;
                 for (int a = 0; a < wavy.get_ncen(); a++)
                 {
-                    dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2));
+                    dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a, 2), 2));
                     dens_all += atoms[a].get_radial_density(dist);
                 }
 
@@ -184,17 +184,17 @@ void Calc_Static_Def(
 };
 
 void Calc_Static_Def(
-    cube &CubeDEF,
-    cube &CubeRho,
-    cube &CubeSpher,
-    WFN &wavy,
+    cube& CubeDEF,
+    cube& CubeRho,
+    cube& CubeSpher,
+    WFN& wavy,
     double radius,
-    std::ostream &file,
+    std::ostream& file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
+    ProgressBar* progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
 
     const int low_i = wrap ? -CubeDEF.get_size(0) : 0;
     const int high_i = wrap ? 2 * CubeDEF.get_size(0) : CubeDEF.get_size(0);
@@ -210,13 +210,13 @@ void Calc_Static_Def(
             for (int k = low_k; k < high_k; k++)
             {
 
-                const double PosGrid[3]{i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0),
+                const double PosGrid[3]{ i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0),
                                         i * CubeDEF.get_vector(1, 0) + j * CubeDEF.get_vector(1, 1) + k * CubeDEF.get_vector(1, 2) + CubeDEF.get_origin(1),
-                                        i * CubeDEF.get_vector(2, 0) + j * CubeDEF.get_vector(2, 1) + k * CubeDEF.get_vector(2, 2) + CubeDEF.get_origin(2)};
+                                        i * CubeDEF.get_vector(2, 0) + j * CubeDEF.get_vector(2, 1) + k * CubeDEF.get_vector(2, 2) + CubeDEF.get_origin(2) };
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a, 2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -262,17 +262,17 @@ void Calc_Static_Def(
 };
 
 void Calc_Hirshfeld(
-    cube &CubeHDEF,
-    cube &CubeRho,
-    WFN &wavy,
+    cube& CubeHDEF,
+    cube& CubeRho,
+    WFN& wavy,
     double radius,
     int ignore_atom,
-    std::ostream &file,
+    std::ostream& file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
+    ProgressBar* progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
 
     vector<Thakkar> atoms;
     atoms.reserve(wavy.get_ncen());
@@ -307,7 +307,7 @@ void Calc_Hirshfeld(
                 double temp;
                 for (int a = 0; a < wavy.get_ncen(); a++)
                 {
-                    dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2));
+                    dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a, 2), 2));
                     temp = atoms[a].get_radial_density(dist);
                     if (ignore_atom == a)
                         dens_choice = temp;
@@ -353,18 +353,18 @@ void Calc_Hirshfeld(
 };
 
 void Calc_Hirshfeld(
-    cube &CubeHDEF,
-    cube &CubeRho,
-    cube &CubeSpherical,
-    WFN &wavy,
+    cube& CubeHDEF,
+    cube& CubeRho,
+    cube& CubeSpherical,
+    WFN& wavy,
     double radius,
     int ignore_atom,
-    std::ostream &file,
+    std::ostream& file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
+    ProgressBar* progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
 
     const int low_i = wrap ? -CubeHDEF.get_size(0) : 0;
@@ -384,7 +384,7 @@ void Calc_Hirshfeld(
                 std::array<double, 3> PosGrid = CubeRho.get_pos(i, j, k);
 
                 bool skip = true;
-                double dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(ignore_atom,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(ignore_atom, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(ignore_atom, 2), 2));
+                double dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(ignore_atom, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(ignore_atom, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(ignore_atom, 2), 2));
                 if (dist < constants::ang2bohr(radius))
                     skip = false;
                 if (skip)
@@ -428,18 +428,18 @@ void Calc_Hirshfeld(
 };
 
 void Calc_Hirshfeld_atom(
-    cube &CubeHirsh,
-    cube &CubeRho,
-    cube &CubeSpherical,
-    WFN &wavy,
+    cube& CubeHirsh,
+    cube& CubeRho,
+    cube& CubeSpherical,
+    WFN& wavy,
     double radius,
     int ignore_atom,
-    std::ostream &file,
+    std::ostream& file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeHirsh.get_size(0), 50, "=", " ", "Calculating Values");
+    ProgressBar* progress = new ProgressBar(CubeHirsh.get_size(0), 50, "=", " ", "Calculating Values");
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
 
     const int low_i = wrap ? -CubeHirsh.get_size(0) : 0;
@@ -503,15 +503,15 @@ void Calc_Hirshfeld_atom(
 };
 
 void Calc_Rho(
-    cube &CubeRho,
-    WFN &wavy,
+    cube& CubeRho,
+    WFN& wavy,
     double radius,
-    std::ostream &file,
+    std::ostream& file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Values");
+    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Values");
 
     const int low_i = wrap ? -CubeRho.get_size(0) : 0;
     const int high_i = wrap ? 2 * CubeRho.get_size(0) : CubeRho.get_size(0);
@@ -532,7 +532,7 @@ void Calc_Rho(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a, 2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -577,14 +577,14 @@ void Calc_Rho(
 };
 
 void Calc_Rho_spherical_harmonics(
-    cube &CubeRho,
-    WFN &wavy,
-    std::ostream &file)
+    cube& CubeRho,
+    WFN& wavy,
+    std::ostream& file)
 {
     using namespace std;
     _time_point start = get_time();
 
-    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
+    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
 
 #pragma omp parallel shared(CubeRho)
     {
@@ -618,15 +618,15 @@ void Calc_Rho_spherical_harmonics(
 };
 
 void Calc_MO_spherical_harmonics(
-    cube &CubeMO,
-    WFN &wavy,
+    cube& CubeMO,
+    WFN& wavy,
     int MO,
-    std::ostream &file,
+    std::ostream& file,
     bool nodate)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = NULL;
+    ProgressBar* progress = NULL;
     if (!nodate)
         progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating Values");
 
@@ -658,14 +658,14 @@ void Calc_MO_spherical_harmonics(
 };
 
 void Calc_S_Rho(
-    cube &Cube_S_Rho,
-    WFN &wavy,
-    std::ostream &file,
-    bool &nodate)
+    cube& Cube_S_Rho,
+    WFN& wavy,
+    std::ostream& file,
+    bool& nodate)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = NULL;
+    ProgressBar* progress = NULL;
     if (!nodate)
         progress = new ProgressBar(Cube_S_Rho.get_size(0), 50, "=", " ", "Calculating Values");
 
@@ -701,21 +701,21 @@ void Calc_S_Rho(
 };
 
 void Calc_Prop(
-    cube &CubeRho,
-    cube &CubeRDG,
-    cube &CubeElf,
-    cube &CubeEli,
-    cube &CubeLap,
-    cube &CubeESP,
-    WFN &wavy,
+    cube& CubeRho,
+    cube& CubeRDG,
+    cube& CubeElf,
+    cube& CubeEli,
+    cube& CubeLap,
+    cube& CubeESP,
+    WFN& wavy,
     double radius,
-    std::ostream &file,
+    std::ostream& file,
     bool test,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = NULL;
+    ProgressBar* progress = NULL;
     if (!test)
         progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Values");
 
@@ -739,11 +739,11 @@ void Calc_Prop(
                     Elf = 0,
                     Eli = 0,
                     Lap = 0,
-                    Hess[9]{0, 0, 0, 0, 0, 0, 0, 0, 0};
+                    Hess[9]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a, 2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -870,11 +870,11 @@ void Calc_Prop(
 };
 
 void Calc_ESP(
-    cube &CubeESP,
-    WFN &wavy,
+    cube& CubeESP,
+    WFN& wavy,
     double radius,
     bool no_date,
-    std::ostream &file,
+    std::ostream& file,
     bool wrap)
 {
     using namespace std;
@@ -892,11 +892,11 @@ void Calc_ESP(
                 d2[i][j] = 0;
                 continue;
             }
-            d2[i][j] = pow(wavy.get_atom_coordinate(i,0) - wavy.get_atom_coordinate(j,0), 2) + pow(wavy.get_atom_coordinate(i,1) - wavy.get_atom_coordinate(j,1), 2) + pow(wavy.get_atom_coordinate(i,2) - wavy.get_atom_coordinate(j,2), 2);
+            d2[i][j] = pow(wavy.get_atom_coordinate(i, 0) - wavy.get_atom_coordinate(j, 0), 2) + pow(wavy.get_atom_coordinate(i, 1) - wavy.get_atom_coordinate(j, 1), 2) + pow(wavy.get_atom_coordinate(i, 2) - wavy.get_atom_coordinate(j, 2), 2);
         }
     }
 
-    ProgressBar *progress = NULL;
+    ProgressBar* progress = NULL;
     if (!no_date)
         progress = new ProgressBar(CubeESP.get_size(0), 50, "=", " ", "Calculating ESP");
 
@@ -919,7 +919,7 @@ void Calc_ESP(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a, 2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -967,18 +967,18 @@ void Calc_ESP(
 };
 
 void Calc_MO(
-    cube &CubeMO,
+    cube& CubeMO,
     int mo,
-    WFN &wavy,
+    WFN& wavy,
     double radius,
-    std::ostream &file,
+    std::ostream& file,
     bool wrap)
 {
     using namespace std;
     err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
     _time_point start = get_time();
 
-    ProgressBar *progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating MO");
+    ProgressBar* progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating MO");
 
     const int low_i = wrap ? -CubeMO.get_size(0) : 0;
     const int high_i = wrap ? 2 * CubeMO.get_size(0) : CubeMO.get_size(0);
@@ -999,7 +999,7 @@ void Calc_MO(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a, 2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -1045,7 +1045,7 @@ void Calc_MO(
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
-void properties_calculation(options &opt)
+void properties_calculation(options& opt)
 {
     using namespace std;
     ofstream log2("NoSpherA2_cube.log", ios::out);
@@ -1061,11 +1061,11 @@ void properties_calculation(options &opt)
     WFN wavy(opt.wfn);
     if (opt.debug)
         log2 << "Starting calculation of properties" << endl;
-    if (opt.all_mos)
+    if (opt.properties.all_mos)
         for (int mo = 0; mo < wavy.get_nmo(); mo++)
-            opt.MOs.push_back(mo);
+            opt.properties.MO_numbers.push_back(mo);
     if (opt.debug)
-        log2 << "Size of MOs: " << opt.MOs.size() << endl;
+        log2 << "Size of MOs: " << opt.properties.MO_numbers.size() << endl;
 
     vec2 cell_matrix;
     cell_matrix.resize(3);
@@ -1073,27 +1073,27 @@ void properties_calculation(options &opt)
         cell_matrix[i].resize(3, 0.0);
     if (opt.debug)
     {
-        log2 << "cif|resolution|res(bohr)|radius|rad(bohr): " << opt.cif << "|" << opt.resolution << "|" << constants::ang2bohr(opt.resolution) << "|" << opt.radius << "|" << constants::ang2bohr(opt.radius) << endl;
+        log2 << "cif|resolution|res(bohr)|radius|rad(bohr): " << opt.cif << "|" << opt.properties.resolution << "|" << constants::ang2bohr(opt.properties.resolution) << "|" << opt.properties.radius << "|" << constants::ang2bohr(opt.properties.radius) << endl;
         for (int a = 0; a < wavy.get_ncen(); a++)
-            log2 << "Atom " << a << " at " << wavy.get_atom_coordinate(a,0) << " " << wavy.get_atom_coordinate(a,1) << " " << wavy.get_atom_coordinate(a,2) << endl;
+            log2 << "Atom " << a << " at " << wavy.get_atom_coordinate(a, 0) << " " << wavy.get_atom_coordinate(a, 1) << " " << wavy.get_atom_coordinate(a, 2) << endl;
     }
     if (opt.cif != "")
-        readxyzMinMax_fromCIF(opt.cif, opt.MinMax, opt.NbSteps, cell_matrix, opt.resolution);
+        readxyzMinMax_fromCIF(opt.cif, opt.properties, cell_matrix);
     else
     {
-        readxyzMinMax_fromWFN(wavy, opt.MinMax, opt.NbSteps, opt.radius, opt.resolution, true);
+        readxyzMinMax_fromWFN(wavy, opt.properties, true);
         for (int i = 0; i < 3; i++)
-            cell_matrix[i][i] = constants::ang2bohr(opt.resolution);
+            cell_matrix[i][i] = constants::ang2bohr(opt.properties.resolution);
     }
     if (opt.debug)
     {
         log2 << "MinMax: ";
         for (int i = 0; i < 6; i++)
-            log2 << setw(14) << scientific << opt.MinMax[i];
+            log2 << setw(14) << scientific << opt.properties.MinMax[i];
         log2 << endl;
         log2 << "Steps: ";
         for (int i = 0; i < 3; i++)
-            log2 << setw(14) << scientific << opt.NbSteps[i];
+            log2 << setw(14) << scientific << opt.properties.NbSteps[i];
         log2 << endl;
         log2 << "Cell Matrix:" << endl;
         for (int i = 0; i < 3; i++)
@@ -1103,17 +1103,17 @@ void properties_calculation(options &opt)
             log2 << endl;
         }
     }
-    cube Rho(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), true);
-    cube RDG(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.rdg);
-    cube Elf(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.elf);
-    cube Eli(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.eli);
-    cube Lap(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.lap);
-    cube ESP(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.esp);
-    cube MO(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), true);
-    cube HDEF(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.hdef);
-    cube DEF(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.def);
-    cube Hirsh(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.hirsh);
-    cube S_Rho(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.hirsh);
+    cube Rho(opt.properties.NbSteps, wavy.get_ncen(), true);
+    cube RDG(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.rdg);
+    cube Elf(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.elf);
+    cube Eli(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.eli);
+    cube Lap(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.lap);
+    cube ESP(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.esp);
+    cube MO(opt.properties.NbSteps, wavy.get_ncen(), true);
+    cube HDEF(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef);
+    cube DEF(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.def);
+    cube Hirsh(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hirsh);
+    cube S_Rho(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hirsh);
 
     Rho.give_parent_wfn(wavy);
     RDG.give_parent_wfn(wavy);
@@ -1129,17 +1129,17 @@ void properties_calculation(options &opt)
 
     for (int i = 0; i < 3; i++)
     {
-        Rho.set_origin(i, opt.MinMax[i]);
-        RDG.set_origin(i, opt.MinMax[i]);
-        Elf.set_origin(i, opt.MinMax[i]);
-        Eli.set_origin(i, opt.MinMax[i]);
-        Lap.set_origin(i, opt.MinMax[i]);
-        ESP.set_origin(i, opt.MinMax[i]);
-        MO.set_origin(i, opt.MinMax[i]);
-        HDEF.set_origin(i, opt.MinMax[i]);
-        DEF.set_origin(i, opt.MinMax[i]);
-        Hirsh.set_origin(i, opt.MinMax[i]);
-        S_Rho.set_origin(i, opt.MinMax[i]);
+        Rho.set_origin(i, opt.properties.MinMax[i]);
+        RDG.set_origin(i, opt.properties.MinMax[i]);
+        Elf.set_origin(i, opt.properties.MinMax[i]);
+        Eli.set_origin(i, opt.properties.MinMax[i]);
+        Lap.set_origin(i, opt.properties.MinMax[i]);
+        ESP.set_origin(i, opt.properties.MinMax[i]);
+        MO.set_origin(i, opt.properties.MinMax[i]);
+        HDEF.set_origin(i, opt.properties.MinMax[i]);
+        DEF.set_origin(i, opt.properties.MinMax[i]);
+        Hirsh.set_origin(i, opt.properties.MinMax[i]);
+        S_Rho.set_origin(i, opt.properties.MinMax[i]);
         for (int j = 0; j < 3; j++)
         {
             Rho.set_vector(i, j, cell_matrix[i][j]);
@@ -1189,148 +1189,146 @@ void properties_calculation(options &opt)
     Hirsh.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_hirsh.cube");
     S_Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_s_rho.cube");
 
-    if (opt.debug)
-    {
-        log2 << "Status: " << opt.hdef << opt.def << opt.hirsh << opt.lap << opt.eli << opt.elf << opt.rdg << opt.esp << endl;
-        log2 << "Everything is set up; starting calculation..." << endl;
-    }
-    else
-    {
-        log2 << "\nCalculating:" << endl;
-        if (opt.hdef || opt.def || opt.hirsh)
-            log2 << "Rho, ";
-        if (opt.hdef || opt.hirsh)
-            log2 << "Spherical Rho, ";
-        if (opt.def)
-            log2 << "Static deformation density, ";
-        if (opt.hdef)
-            log2 << "Hirshfeld deformation density, ";
-        if (opt.hirsh)
-            log2 << "Hirshfeld density, ";
-        if (opt.lap)
-            log2 << "Laplacian, ";
-        if (opt.eli)
-            log2 << "ELI, ";
-        if (opt.elf)
-            log2 << "ELF, ";
-        if (opt.rdg)
-            log2 << "RDG, ";
-        if (opt.esp)
-            log2 << "ESP, ";
-        if (opt.MOs.size() != 0)
-            log2 << "MOs, ";
-        if (opt.s_rho)
-            log2 << "Spin density, ";
-        log2 << endl;
-    }
+    log2 << "\nCalculating:" << endl;
+    if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
+        log2 << "Rho, ";
+    if (opt.properties.hdef || opt.properties.hirsh)
+        log2 << "Spherical Rho, ";
+    if (opt.properties.def)
+        log2 << "Static deformation density, ";
+    if (opt.properties.hdef)
+        log2 << "Hirshfeld deformation density, ";
+    if (opt.properties.hirsh)
+        log2 << "Hirshfeld density, ";
+    if (opt.properties.lap)
+        log2 << "Laplacian, ";
+    if (opt.properties.eli)
+        log2 << "ELI, ";
+    if (opt.properties.elf)
+        log2 << "ELF, ";
+    if (opt.properties.rdg)
+        log2 << "RDG, ";
+    if (opt.properties.esp)
+        log2 << "ESP, ";
+    if (opt.properties.MO_numbers.size() != 0)
+        log2 << "MOs, ";
+    if (opt.properties.s_rho)
+        log2 << "Spin density, ";
+    log2 << endl;
 
-    log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
+    log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
-    if (opt.MOs.size() != 0)
-        for (int i = 0; i < opt.MOs.size(); i++)
+    if (opt.properties.MO_numbers.size() != 0)
+        for (int i = 0; i < opt.properties.MO_numbers.size(); i++)
         {
-            log2 << "Calcualting MO: " << opt.MOs[i] << endl;
+            log2 << "Calcualting MO: " << opt.properties.MO_numbers[i] << endl;
             MO.set_zero();
-            MO.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_MO_" + to_string(opt.MOs[i]) + ".cube");
-            Calc_MO(MO, opt.MOs[i], wavy, opt.radius, log2, opt.cif != "");
+            MO.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_MO_" + to_string(opt.properties.MO_numbers[i]) + ".cube");
+            Calc_MO(MO, opt.properties.MO_numbers[i], wavy, opt.properties.radius, log2, opt.cif != "");
             MO.write_file(true);
         }
 
     wavy.delete_unoccupied_MOs();
     wavy.delete_Qs();
 
-    if (opt.hdef || opt.def || opt.hirsh)
+    if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
     {
         log2 << "Calcualting Rho...";
-        Calc_Rho(Rho, wavy, opt.radius, log2, opt.cif != "");
+        Calc_Rho(Rho, wavy, opt.properties.radius, log2, opt.cif != "");
         log2 << " ...done!" << endl;
-        cube temp(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.hdef || opt.hirsh);
+        cube temp(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef || opt.properties.hirsh);
         for (int i = 0; i < 3; i++)
         {
-            temp.set_origin(i, opt.MinMax[i]);
+            temp.set_origin(i, opt.properties.MinMax[i]);
             for (int j = 0; j < 3; j++)
                 temp.set_vector(i, j, cell_matrix[i][j]);
         }
-        if (opt.hdef || opt.hirsh)
+        if (opt.properties.hdef || opt.properties.hirsh)
         {
             log2 << "Calcualting spherical Rho...";
-            Calc_Spherical_Dens(temp, wavy, opt.radius, log2, opt.cif != "");
+            Calc_Spherical_Dens(temp, wavy, opt.properties.radius, log2, opt.cif != "");
             log2 << " ...done!" << endl;
         }
 
-        if (opt.def)
+        if (opt.properties.def)
         {
             log2 << "Calculating static deformation density...";
-            if (opt.hdef)
-                Calc_Static_Def(DEF, Rho, temp, wavy, opt.radius, log2, opt.cif != "");
+            if (opt.properties.hdef)
+                Calc_Static_Def(DEF, Rho, temp, wavy, opt.properties.radius, log2, opt.cif != "");
             else
-                Calc_Static_Def(DEF, Rho, wavy, opt.radius, log2, opt.cif != "");
+                Calc_Static_Def(DEF, Rho, wavy, opt.properties.radius, log2, opt.cif != "");
             log2 << " ...done!" << endl;
         }
 
-        if (opt.hdef)
+        if (opt.properties.hdef)
         {
             for (int a = 0; a < wavy.get_ncen(); a++)
             {
                 log2 << "Calcualting Hirshfeld deformation density for atom: " << a << endl;
                 HDEF.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_HDEF_" + to_string(a) + ".cube");
-                Calc_Hirshfeld(HDEF, Rho, temp, wavy, opt.radius, a, log2, opt.cif != "");
+                Calc_Hirshfeld(HDEF, Rho, temp, wavy, opt.properties.radius, a, log2, opt.cif != "");
                 HDEF.write_file(true);
                 HDEF.set_zero();
             }
         }
 
-        if (opt.hirsh)
+        if (opt.properties.hirsh)
         {
-            log2 << "Calcualting Hirshfeld density for atom: " << opt.hirsh_number << endl;
-            Calc_Hirshfeld_atom(Hirsh, Rho, temp, wavy, opt.radius, opt.hirsh_number, log2, opt.cif != "");
+            log2 << "Calcualting Hirshfeld density for atom: " << opt.properties.hirsh_number << endl;
+            Calc_Hirshfeld_atom(Hirsh, Rho, temp, wavy, opt.properties.radius, opt.properties.hirsh_number, log2, opt.cif != "");
             log2 << "..done!" << endl;
         }
     }
 
-    if (opt.lap || opt.eli || opt.elf || opt.rdg || opt.esp)
-        Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy, opt.radius, log2, opt.no_date, opt.cif != "");
+    if (opt.properties.lap || opt.properties.eli || opt.properties.elf || opt.properties.rdg || opt.properties.esp)
+        Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy, opt.properties.radius, log2, opt.no_date, opt.cif != "");
 
-    if (opt.s_rho)
+    if (opt.properties.s_rho)
         Calc_S_Rho(S_Rho, wavy, log2, opt.no_date);
 
+    if (opt.properties.integral_accuracy != -1) {
+        log2 << "Refining grid files to integral accuracy of " << opt.properties.integral_accuracy << " ..." << flush;
+        if (opt.properties.lap)
+            Lap.adaptive_refine([&wavy](const std::array<double, 3>& pos) { return wavy.computeLap(pos); }, opt.properties.integral_accuracy);
+    }
+
     log2 << "Writing cubes to Disk..." << flush;
-    if (opt.rdg)
+    if (opt.properties.rdg)
     {
         Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_signed_rho.cube");
         Rho.write_file(true);
         Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
         Rho.write_file(true, true);
     }
-    else if (opt.lap || opt.eli || opt.elf || opt.esp)
+    else if (opt.properties.lap || opt.properties.eli || opt.properties.elf || opt.properties.esp)
         Rho.write_file(true);
-    if (opt.rdg)
+    if (opt.properties.rdg)
         RDG.write_file(true);
-    if (opt.lap)
+    if (opt.properties.lap)
         Lap.write_file(true);
-    if (opt.elf)
+    if (opt.properties.elf)
         Elf.write_file(true);
-    if (opt.eli)
+    if (opt.properties.eli)
         Eli.write_file(true);
-    if (opt.s_rho)
+    if (opt.properties.s_rho)
         S_Rho.write_file(true);
-    if (opt.def)
+    if (opt.properties.def)
     {
         DEF.write_file(true);
         Rho.write_file(true);
     }
-    if (opt.hirsh)
+    if (opt.properties.hirsh)
         Hirsh.write_file(true);
 
     log2 << " done!" << endl;
 
-    if (opt.esp)
+    if (opt.properties.esp)
     {
         log2 << "Calculating ESP..." << flush;
         WFN temp = wavy;
         temp.delete_unoccupied_MOs();
         temp.delete_Qs();
-        Calc_ESP(ESP, temp, opt.radius, opt.no_date, log2);
+        Calc_ESP(ESP, temp, opt.properties.radius, opt.no_date, log2);
         log2 << "Writing cube to Disk..." << flush;
         ESP.write_file(true);
         log2 << "  done!" << endl;
@@ -1341,14 +1339,14 @@ void properties_calculation(options &opt)
     std::cout << "Properties calculation done!" << std::endl;
 }
 
-void do_combine_mo(options &opt)
+void do_combine_mo(options& opt)
 {
     using namespace std;
     WFN wavy1(e_origin::wfn);
     WFN wavy2(e_origin::wfn);
     WFN wavy3(e_origin::wfn);
-    wavy1.read_wfn(opt.combine_mo[0], false,std::cout);
-    wavy2.read_wfn(opt.combine_mo[1], false,std::cout);
+    wavy1.read_wfn(opt.combine_mo[0], false, std::cout);
+    wavy2.read_wfn(opt.combine_mo[1], false, std::cout);
     for (int i = 0; i < wavy1.get_ncen(); i++)
     {
         wavy3.push_back_atom(wavy1.get_atom(i));
@@ -1357,49 +1355,46 @@ void do_combine_mo(options &opt)
     {
         wavy3.push_back_atom(wavy2.get_atom(i));
     }
-   std::cout << "In total we have " << wavy3.get_ncen() << " atoms" << endl;
+    std::cout << "In total we have " << wavy3.get_ncen() << " atoms" << endl;
 
-    double MinMax1[6];
-    int steps1[3];
-    readxyzMinMax_fromWFN(wavy1, MinMax1, steps1, opt.radius, opt.resolution, true);
-    double MinMax2[6];
-    int steps2[3];
-    readxyzMinMax_fromWFN(wavy2, MinMax2, steps2, opt.radius, opt.resolution, true);
+    readxyzMinMax_fromWFN(wavy1, opt.properties, true);
+    properties_options prop2 = opt.properties;
+    readxyzMinMax_fromWFN(wavy2, prop2, true);
 
-   std::cout << "Read input\nCalculating for MOs ";
+    std::cout << "Read input\nCalculating for MOs ";
     for (int v1 = 0; v1 < opt.cmo1.size(); v1++)
     {
-       std::cout << opt.cmo1[v1] << " ";
+        std::cout << opt.cmo1[v1] << " ";
     }
-   std::cout << "of fragment 1 and MOs ";
+    std::cout << "of fragment 1 and MOs ";
     for (int v1 = 0; v1 < opt.cmo2.size(); v1++)
     {
-       std::cout << opt.cmo2[v1] << " ";
+        std::cout << opt.cmo2[v1] << " ";
     }
-   std::cout << "of fragment 2" << endl;
-    double MinMax[6]{100, 100, 100, -100, -100, -100};
-    int steps[3]{0, 0, 0};
+    std::cout << "of fragment 2" << endl;
+    std::array<double, 6> MinMax = { 100, 100, 100, -100, -100, -100 };
+    std::array<int, 3> steps = { 0, 0, 0 };
     for (int i = 0; i < 3; i++)
     {
-        if (MinMax1[i] < MinMax[i])
-            MinMax[i] = MinMax1[i];
-        if (MinMax1[i + 3] > MinMax[i + 3])
-            MinMax[i + 3] = MinMax1[i + 3];
+        if (opt.properties.MinMax[i] < MinMax[i])
+            MinMax[i] = opt.properties.MinMax[i];
+        if (opt.properties.MinMax[i + 3] > MinMax[i + 3])
+            MinMax[i + 3] = opt.properties.MinMax[i + 3];
     }
     for (int i = 0; i < 3; i++)
     {
-        if (MinMax2[i] < MinMax[i])
-            MinMax[i] = MinMax2[i];
-        if (MinMax2[i + 3] > MinMax[i + 3])
-            MinMax[i + 3] = MinMax2[i + 3];
+        if (prop2.MinMax[i] < MinMax[i])
+            MinMax[i] = prop2.MinMax[i];
+        if (prop2.MinMax[i + 3] > MinMax[i + 3])
+            MinMax[i + 3] = prop2.MinMax[i + 3];
         steps[i] = (int)ceil(constants::bohr2ang(MinMax[i + 3] - MinMax[i]) / 0.1);
     }
     int counter = 0;
-    cube total(steps[0], steps[1], steps[2], 0, true);
-    cube MO1(steps[0], steps[1], steps[2], 0, true);
+    cube total(steps, 0, true);
+    cube MO1(steps, 0, true);
     MO1.give_parent_wfn(wavy3);
     MO1.set_na(wavy3.get_ncen());
-    cube MO2(steps[0], steps[1], steps[2], 0, true);
+    cube MO2(steps, 0, true);
     svec fns;
     for (int i = 0; i < 3; i++)
     {
@@ -1454,12 +1449,12 @@ void do_combine_mo(options &opt)
 }
 
 static void Calc_Hirshfeld_atom_2(
-    cube &CubeHirsh,
-    cube &CubeRho,
-    cube &CubeSpherical,
-    WFN &wavy,
+    cube& CubeHirsh,
+    cube& CubeRho,
+    cube& CubeSpherical,
+    WFN& wavy,
     int _atom,
-    std::ostream &file)
+    std::ostream& file)
 {
     (void)file;
     using namespace std;
@@ -1472,9 +1467,9 @@ static void Calc_Hirshfeld_atom_2(
             for (int k = 0; k < CubeHirsh.get_size(2); k++)
             {
 
-                const double PosGrid[3]{i * CubeHirsh.get_vector(0, 0) + j * CubeHirsh.get_vector(0, 1) + k * CubeHirsh.get_vector(0, 2) + CubeHirsh.get_origin(0),
+                const double PosGrid[3]{ i * CubeHirsh.get_vector(0, 0) + j * CubeHirsh.get_vector(0, 1) + k * CubeHirsh.get_vector(0, 2) + CubeHirsh.get_origin(0),
                                         i * CubeHirsh.get_vector(1, 0) + j * CubeHirsh.get_vector(1, 1) + k * CubeHirsh.get_vector(1, 2) + CubeHirsh.get_origin(1),
-                                        i * CubeHirsh.get_vector(2, 0) + j * CubeHirsh.get_vector(2, 1) + k * CubeHirsh.get_vector(2, 2) + CubeHirsh.get_origin(2)};
+                                        i * CubeHirsh.get_vector(2, 0) + j * CubeHirsh.get_vector(2, 1) + k * CubeHirsh.get_vector(2, 2) + CubeHirsh.get_origin(2) };
 
                 // bool skip = true;
                 double dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(_atom, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(_atom, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(_atom, 2), 2));
@@ -1496,13 +1491,13 @@ enum class dipole_types
     Unknown
 };
 
-dipole_types stringTodipole_types(const std::string &str)
+dipole_types stringTodipole_types(const std::string& str)
 {
     static const std::unordered_map<std::string, dipole_types> stringToEnumMap = {
         {"atom", dipole_types::atom},
         {"geometry", dipole_types::geometry},
         {"hirshfeld", dipole_types::hirshfeld},
-        {"vdW", dipole_types::vdW}};
+        {"vdW", dipole_types::vdW} };
 
     auto it = stringToEnumMap.find(str);
     if (it != stringToEnumMap.end())
@@ -1515,14 +1510,14 @@ dipole_types stringTodipole_types(const std::string &str)
     }
 }
 
-vec calc_dipole_for_atom(WFN &wavy, const int &i, cube &Hirshfeld_atom, vec &charges, std::string type = "atom")
+vec calc_dipole_for_atom(WFN& wavy, const int& i, cube& Hirshfeld_atom, vec& charges, std::string type = "atom")
 {
     double mu_x = 0, mu_y = 0, mu_z = 0;
     double scratch = 0;
     const double ax = wavy.get_atom_coordinate(i, 0), ay = wavy.get_atom_coordinate(i, 1), az = wavy.get_atom_coordinate(i, 2), dv = Hirshfeld_atom.get_dv();
     // const int c = wavy.get_atom_charge(i);
     double charge = 0;
-    vec origin{0, 0, 0};
+    vec origin{ 0, 0, 0 };
     vec bound_atoms;
     for (int j = 0; j < wavy.get_ncen(); j++)
     {
@@ -1535,17 +1530,17 @@ vec calc_dipole_for_atom(WFN &wavy, const int &i, cube &Hirshfeld_atom, vec &cha
             bound_atoms.push_back(j);
         }
     }
-    const double v[9] = {Hirshfeld_atom.get_vector(0, 0), Hirshfeld_atom.get_vector(0, 1), Hirshfeld_atom.get_vector(0, 2),
+    const double v[9] = { Hirshfeld_atom.get_vector(0, 0), Hirshfeld_atom.get_vector(0, 1), Hirshfeld_atom.get_vector(0, 2),
                          Hirshfeld_atom.get_vector(1, 0), Hirshfeld_atom.get_vector(1, 1), Hirshfeld_atom.get_vector(1, 2),
-                         Hirshfeld_atom.get_vector(2, 0), Hirshfeld_atom.get_vector(2, 1), Hirshfeld_atom.get_vector(2, 2)};
+                         Hirshfeld_atom.get_vector(2, 0), Hirshfeld_atom.get_vector(2, 1), Hirshfeld_atom.get_vector(2, 2) };
     switch (stringTodipole_types(type))
     {
     case dipole_types::atom:
-        origin = {ax, ay, az};
+        origin = { ax, ay, az };
         break;
     case dipole_types::geometry:
         err_not_impl_f("geometry position not yet implemented", std::cout);
-        origin = {0, 0, 0};
+        origin = { 0, 0, 0 };
         break;
     case dipole_types::hirshfeld:
         err_not_impl_f("hirshfeld centers not yet implemented", std::cout);
@@ -1567,7 +1562,7 @@ vec calc_dipole_for_atom(WFN &wavy, const int &i, cube &Hirshfeld_atom, vec &cha
                 const double PosGrid[3]{
                     x * v[0] + y * v[1] + z * v[2] + Hirshfeld_atom.get_origin(0),
                     x * v[3] + y * v[4] + z * v[5] + Hirshfeld_atom.get_origin(1),
-                    x * v[6] + y * v[7] + z * v[8] + Hirshfeld_atom.get_origin(2)};
+                    x * v[6] + y * v[7] + z * v[8] + Hirshfeld_atom.get_origin(2) };
                 scratch = Hirshfeld_atom.get_value(x, y, z) * dv;
                 charge += scratch;
                 mu_x += (PosGrid[0] - origin[0]) * scratch;
@@ -1576,10 +1571,10 @@ vec calc_dipole_for_atom(WFN &wavy, const int &i, cube &Hirshfeld_atom, vec &cha
             }
         }
     }
-    return {mu_x, mu_y, mu_z, charge};
+    return { mu_x, mu_y, mu_z, charge };
 }
 
-void dipole_moments(options &opt, std::ostream &log2)
+void dipole_moments(options& opt, std::ostream& log2)
 {
     using namespace std;
     log2 << NoSpherA2_message(opt.no_date);
@@ -1591,33 +1586,33 @@ void dipole_moments(options &opt, std::ostream &log2)
         log2 << "Starting calculation of dipole moment" << endl;
 
     if (opt.debug)
-        log2 << opt.cif << " " << opt.resolution << " " << opt.radius << endl;
-    readxyzMinMax_fromWFN(wavy, opt.MinMax, opt.NbSteps, opt.radius, opt.resolution, true);
+        log2 << opt.cif << " " << opt.properties.resolution << " " << opt.properties.radius << endl;
+    readxyzMinMax_fromWFN(wavy, opt.properties, true);
     if (opt.debug)
     {
-        log2 << "Resolution: " << opt.resolution << endl;
+        log2 << "Resolution: " << opt.properties.resolution << endl;
         log2 << "MinMax:" << endl;
         for (int i = 0; i < 6; i++)
-            log2 << setw(14) << scientific << opt.MinMax[i];
+            log2 << setw(14) << scientific << opt.properties.MinMax[i];
         log2 << endl;
         log2 << "Steps:" << endl;
         for (int i = 0; i < 3; i++)
-            log2 << setw(14) << scientific << opt.NbSteps[i];
+            log2 << setw(14) << scientific << opt.properties.NbSteps[i];
         log2 << endl;
     }
-    cube Rho(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), true);
-    cube SPHER(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), true);
+    cube Rho(opt.properties.NbSteps, wavy.get_ncen(), true);
+    cube SPHER(opt.properties.NbSteps, wavy.get_ncen(), true);
 
     Rho.give_parent_wfn(wavy);
     SPHER.give_parent_wfn(wavy);
-    vec stepsizes{(opt.MinMax[3] - opt.MinMax[0]) / opt.NbSteps[0],
-                  (opt.MinMax[4] - opt.MinMax[1]) / opt.NbSteps[1],
-                  (opt.MinMax[5] - opt.MinMax[2]) / opt.NbSteps[2]};
+    vec stepsizes{ (opt.properties.MinMax[3] - opt.properties.MinMax[0]) / opt.properties.NbSteps[0],
+                  (opt.properties.MinMax[4] - opt.properties.MinMax[1]) / opt.properties.NbSteps[1],
+                  (opt.properties.MinMax[5] - opt.properties.MinMax[2]) / opt.properties.NbSteps[2] };
 
     for (int i = 0; i < 3; i++)
     {
-        Rho.set_origin(i, opt.MinMax[i]);
-        SPHER.set_origin(i, opt.MinMax[i]);
+        Rho.set_origin(i, opt.properties.MinMax[i]);
+        SPHER.set_origin(i, opt.properties.MinMax[i]);
         Rho.set_vector(i, i, stepsizes[i]);
         SPHER.set_vector(i, i, stepsizes[i]);
     }
@@ -1632,12 +1627,12 @@ void dipole_moments(options &opt, std::ostream &log2)
     vector<cube> Hirsh(wavy.get_ncen(), Rho);
     vec charges(wavy.get_ncen(), 0);
 
-    log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
+    log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
     log2 << "Calcualting Rho...";
-    Calc_Rho(Rho, wavy,  opt.radius, log2, false);
+    Calc_Rho(Rho, wavy, opt.properties.radius, log2, false);
     log2 << " ...done!\nCalcualting spherical Rho...";
-    Calc_Spherical_Dens(SPHER, wavy, opt.radius, log2);
+    Calc_Spherical_Dens(SPHER, wavy, opt.properties.radius, log2);
     log2 << " ...done!" << endl;
     vec2 dipole_moments;
     dipole_moments.reserve(wavy.get_ncen());
@@ -1654,7 +1649,7 @@ void dipole_moments(options &opt, std::ostream &log2)
     for (int i = 0; i < wavy.get_ncen(); i++)
         dipole_moments.emplace_back(calc_dipole_for_atom(wavy, i, Hirsh[i], charges));
     log2 << " atom   |  dipole moment x,        y,         z" << endl
-         << "======================================" << endl;
+        << "======================================" << endl;
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
         log2 << setw(3) << i << " (" << constants::atnr2letter(wavy.get_atom_charge(i)) << ") | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
@@ -1662,21 +1657,21 @@ void dipole_moments(options &opt, std::ostream &log2)
     std::cout << "\n\nProperties calculation done!" << std::endl;
 }
 
-vec2 dipole_moments(WFN &wavy, cube &SPHER, double *MinMax, int *NbSteps, int threads, double radius, std::ostream &log2, bool debug)
+vec2 dipole_moments(WFN& wavy, cube& SPHER, const properties_options& opts, int threads, std::ostream& log2, bool debug)
 {
     using namespace std;
     if (debug)
         log2 << "Starting calculation of dipole moment" << endl;
-    cube Rho(NbSteps[0], NbSteps[1], NbSteps[2], wavy.get_ncen(), true);
+    cube Rho(opts.NbSteps, wavy.get_ncen(), true);
 
     Rho.give_parent_wfn(wavy);
-    vec stepsizes{(MinMax[3] - MinMax[0]) / NbSteps[0],
-                  (MinMax[4] - MinMax[1]) / NbSteps[1],
-                  (MinMax[5] - MinMax[2]) / NbSteps[2]};
+    vec stepsizes{ (opts.MinMax[3] - opts.MinMax[0]) / opts.NbSteps[0],
+                  (opts.MinMax[4] - opts.MinMax[1]) / opts.NbSteps[1],
+                  (opts.MinMax[5] - opts.MinMax[2]) / opts.NbSteps[2] };
 
     for (int i = 0; i < 3; i++)
     {
-        Rho.set_origin(i, MinMax[i]);
+        Rho.set_origin(i, opts.MinMax[i]);
         Rho.set_vector(i, i, stepsizes[i]);
     }
     if (debug)
@@ -1687,12 +1682,12 @@ vec2 dipole_moments(WFN &wavy, cube &SPHER, double *MinMax, int *NbSteps, int th
     vector<cube> Hirsh(wavy.get_ncen(), Rho);
     vec charges(wavy.get_ncen(), 0);
 
-    log2 << "Calculating for " << fixed << setprecision(0) << NbSteps[0] * NbSteps[1] * NbSteps[2] << " Gridpoints." << endl;
+    log2 << "Calculating for " << fixed << setprecision(0) << opts.n_grid_points() << " Gridpoints." << endl;
 
     log2 << "Calcualting Rho...";
-    Calc_Rho(Rho, wavy, radius, log2, false);
+    Calc_Rho(Rho, wavy, opts.radius, log2, false);
     log2 << " ...done!\nCalcualting spherical Rho...";
-    Calc_Spherical_Dens(SPHER, wavy, radius, log2);
+    Calc_Spherical_Dens(SPHER, wavy, opts.radius, log2);
     log2 << " ...done!" << endl;
     vec2 dipole_moments;
     for (int i = 0; i < wavy.get_ncen(); i++)
@@ -1709,7 +1704,7 @@ vec2 dipole_moments(WFN &wavy, cube &SPHER, double *MinMax, int *NbSteps, int th
         dipole_moments.push_back(calc_dipole_for_atom(wavy, i, Hirsh[i], charges));
     log2 << "...done!" << endl;
     log2 << " atom   |    charge    | dipole moment x,        y,         z" << endl
-         << "===================================================" << endl;
+        << "===================================================" << endl;
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
         log2 << setw(3) << i << " (" << constants::atnr2letter(wavy.get_atom_charge(i)) << ") |" << scientific << setprecision(6) << setw(13) << dipole_moments[i][3] - wavy.get_atom_charge(i) << " | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
@@ -1717,7 +1712,7 @@ vec2 dipole_moments(WFN &wavy, cube &SPHER, double *MinMax, int *NbSteps, int th
     return dipole_moments;
 }
 
-void polarizabilities(options &opt, std::ostream &log2)
+void polarizabilities(options& opt, std::ostream& log2)
 {
     using namespace std;
     std::vector<WFN> wavy;
@@ -1733,30 +1728,30 @@ void polarizabilities(options &opt, std::ostream &log2)
         log2 << "Starting calculation of Polarizabilities" << endl;
 
     if (opt.debug)
-        log2 << opt.resolution << " " << opt.radius << endl;
-    readxyzMinMax_fromWFN(wavy[0], opt.MinMax, opt.NbSteps, opt.radius, opt.resolution, true);
+        log2 << opt.properties.resolution << " " << opt.properties.radius << endl;
+    readxyzMinMax_fromWFN(wavy[0], opt.properties, true);
     if (opt.debug)
     {
-        log2 << "Resolution: " << opt.resolution << endl;
+        log2 << "Resolution: " << opt.properties.resolution << endl;
         log2 << "MinMax:" << endl;
         for (int i = 0; i < 6; i++)
-            log2 << setw(14) << scientific << opt.MinMax[i];
+            log2 << setw(14) << scientific << opt.properties.MinMax[i];
         log2 << endl;
         log2 << "Steps:" << endl;
         for (int i = 0; i < 3; i++)
-            log2 << setw(14) << scientific << opt.NbSteps[i];
+            log2 << setw(14) << scientific << opt.properties.NbSteps[i];
         log2 << endl;
     }
-    cube SPHER(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), true);
+    cube SPHER(opt.properties.NbSteps, wavy[0].get_ncen(), true);
 
     SPHER.give_parent_wfn(wavy[0]);
-    vec stepsizes{(opt.MinMax[3] - opt.MinMax[0]) / opt.NbSteps[0],
-                  (opt.MinMax[4] - opt.MinMax[1]) / opt.NbSteps[1],
-                  (opt.MinMax[5] - opt.MinMax[2]) / opt.NbSteps[2]};
+    vec stepsizes{ (opt.properties.MinMax[3] - opt.properties.MinMax[0]) / opt.properties.NbSteps[0],
+                  (opt.properties.MinMax[4] - opt.properties.MinMax[1]) / opt.properties.NbSteps[1],
+                  (opt.properties.MinMax[5] - opt.properties.MinMax[2]) / opt.properties.NbSteps[2] };
 
     for (int i = 0; i < 3; i++)
     {
-        SPHER.set_origin(i, opt.MinMax[i]);
+        SPHER.set_origin(i, opt.properties.MinMax[i]);
         SPHER.set_vector(i, i, stepsizes[i]);
     }
     if (opt.debug)
@@ -1765,29 +1760,29 @@ void polarizabilities(options &opt, std::ostream &log2)
     SPHER.set_comment2("from" + wavy[0].get_path().string());
     SPHER.set_path((wavy[0].get_path().parent_path() / wavy[0].get_path().stem()).string() + "_spher.cube");
 
-    log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
+    log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.n_grid_points() << " Gridpoints." << endl;
 
     log2 << "Calcualting spherical Rho...";
-    Calc_Spherical_Dens(SPHER, wavy[0], opt.radius, log2, false);
+    Calc_Spherical_Dens(SPHER, wavy[0], opt.properties.radius, log2, false);
     log2 << " ...done!" << endl;
     vec3 dipoles(7); // 0, +x, -x, +y, -y, +z, -z
     for (int i = 0; i < 7; i++)
     {
-        dipoles[i] = dipole_moments(wavy[i], SPHER, opt.MinMax, opt.NbSteps, opt.threads, opt.radius, log2, opt.debug);
+        dipoles[i] = dipole_moments(wavy[i], SPHER, opt.properties, opt.threads, log2, opt.debug);
     }
     vec3 polarizabilities(wavy[0].get_ncen());
     for (int i = 0; i < wavy[0].get_ncen(); i++)
     {
-        polarizabilities[i] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-        vec dx = {(dipoles[1][i][0] - dipoles[2][i][0]),
+        polarizabilities[i] = { {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
+        vec dx = { (dipoles[1][i][0] - dipoles[2][i][0]),
                   (dipoles[3][i][0] - dipoles[4][i][0]),
-                  (dipoles[5][i][0] - dipoles[6][i][0])};
-        vec dy = {(dipoles[1][i][1] - dipoles[2][i][1]),
+                  (dipoles[5][i][0] - dipoles[6][i][0]) };
+        vec dy = { (dipoles[1][i][1] - dipoles[2][i][1]),
                   (dipoles[3][i][1] - dipoles[4][i][1]),
-                  (dipoles[5][i][1] - dipoles[6][i][1])};
-        vec dz = {(dipoles[1][i][2] - dipoles[2][i][2]),
+                  (dipoles[5][i][1] - dipoles[6][i][1]) };
+        vec dz = { (dipoles[1][i][2] - dipoles[2][i][2]),
                   (dipoles[3][i][2] - dipoles[4][i][2]),
-                  (dipoles[5][i][2] - dipoles[6][i][2])};
+                  (dipoles[5][i][2] - dipoles[6][i][2]) };
         polarizabilities[i][0][0] = dx[0] / 2 / opt.efield;
         polarizabilities[i][0][1] = dx[1] / 2 / opt.efield;
         polarizabilities[i][0][2] = dx[2] / 2 / opt.efield;
@@ -1800,20 +1795,20 @@ void polarizabilities(options &opt, std::ostream &log2)
     }
     // print the results per atom
     log2 << "Polarizabilities:\n atom   |    charge    |       xx,            xy,            xz,            yx,            yy,            yz,            zx,            zy,            zz" << endl
-         << "========|==============|=======================================================================================================================================" << endl;
+        << "========|==============|=======================================================================================================================================" << endl;
     for (int i = 0; i < wavy[0].get_ncen(); i++)
     {
         log2 << setw(3) << i << " (" << constants::atnr2letter(wavy[0].get_atom_charge(i)) << ") |"
-             << scientific << setprecision(6) << setw(13) << dipoles[0][i][3] - wavy[0].get_atom_charge(i) << " |"
-             << setw(14) << polarizabilities[i][0][0] << ","
-             << setw(14) << polarizabilities[i][0][1] << ","
-             << setw(14) << polarizabilities[i][0][2] << ","
-             << setw(14) << polarizabilities[i][1][0] << ","
-             << setw(14) << polarizabilities[i][1][1] << ","
-             << setw(14) << polarizabilities[i][1][2] << ","
-             << setw(14) << polarizabilities[i][2][0] << ","
-             << setw(14) << polarizabilities[i][2][1] << ","
-             << setw(14) << polarizabilities[i][2][2] << endl;
+            << scientific << setprecision(6) << setw(13) << dipoles[0][i][3] - wavy[0].get_atom_charge(i) << " |"
+            << setw(14) << polarizabilities[i][0][0] << ","
+            << setw(14) << polarizabilities[i][0][1] << ","
+            << setw(14) << polarizabilities[i][0][2] << ","
+            << setw(14) << polarizabilities[i][1][0] << ","
+            << setw(14) << polarizabilities[i][1][1] << ","
+            << setw(14) << polarizabilities[i][1][2] << ","
+            << setw(14) << polarizabilities[i][2][0] << ","
+            << setw(14) << polarizabilities[i][2][1] << ","
+            << setw(14) << polarizabilities[i][2][2] << endl;
     }
     std::cout << "\n\nProperties calculation done!" << std::endl;
 }

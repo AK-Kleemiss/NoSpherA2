@@ -65,27 +65,27 @@ int main(int argc, char** argv)
     // Perform Hirshfeld surface based on input and quit
     if (opt.hirshfeld_surface != "")
     {
-        if (opt.radius < 2.5)
+        if (opt.properties.radius < 2.5)
         {
             std::cout << "Resetting Radius to at least 2.5!" << endl;
-            opt.radius = 2.5;
+            opt.properties.radius = 2.5;
         }
         wavy.emplace_back(opt.hirshfeld_surface, opt.debug);
         wavy.emplace_back(opt.hirshfeld_surface2, opt.debug);
-        readxyzMinMax_fromWFN(wavy[0], opt.MinMax, opt.NbSteps, opt.radius, opt.resolution);
-        cube Hirshfeld_grid(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), true);
-        cube Hirshfeld_grid2(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[1].get_ncen(), true);
+        readxyzMinMax_fromWFN(wavy[0], opt.properties);
+        cube Hirshfeld_grid(opt.properties.NbSteps, wavy[0].get_ncen(), true);
+        cube Hirshfeld_grid2(opt.properties.NbSteps, wavy[1].get_ncen(), true);
         Hirshfeld_grid.give_parent_wfn(wavy[0]);
         Hirshfeld_grid2.give_parent_wfn(wavy[1]);
         double len[3]{ 0, 0, 0 };
         for (int i = 0; i < 3; i++)
         {
-            len[i] = (opt.MinMax[3 + i] - opt.MinMax[i]) / opt.NbSteps[i];
+            len[i] = (opt.properties.MinMax[3 + i] - opt.properties.MinMax[i]) / opt.properties.NbSteps[i];
         }
         for (int i = 0; i < 3; i++)
         {
-            Hirshfeld_grid.set_origin(i, opt.MinMax[i]);
-            Hirshfeld_grid2.set_origin(i, opt.MinMax[i]);
+            Hirshfeld_grid.set_origin(i, opt.properties.MinMax[i]);
+            Hirshfeld_grid2.set_origin(i, opt.properties.MinMax[i]);
             Hirshfeld_grid.set_vector(i, i, len[i]);
             Hirshfeld_grid2.set_vector(i, i, len[i]);
         }
@@ -93,8 +93,8 @@ int main(int argc, char** argv)
         Hirshfeld_grid.set_comment2("from " + wavy[0].get_path().string());
         Hirshfeld_grid2.set_comment1("Calculated density using NoSpherA2");
         Hirshfeld_grid2.set_comment2("from " + wavy[1].get_path().string());
-        Calc_Spherical_Dens(Hirshfeld_grid, wavy[0], opt.radius, log_file, false);
-        Calc_Spherical_Dens(Hirshfeld_grid2, wavy[1], opt.radius, log_file, false);
+        Calc_Spherical_Dens(Hirshfeld_grid, wavy[0], opt.properties.radius, log_file, false);
+        Calc_Spherical_Dens(Hirshfeld_grid2, wavy[1], opt.properties.radius, log_file, false);
         cube Total_Dens = Hirshfeld_grid + Hirshfeld_grid2;
         Total_Dens.give_parent_wfn(wavy[0]);
         cube Hirshfeld_weight = Hirshfeld_grid / Total_Dens;
@@ -164,20 +164,20 @@ int main(int argc, char** argv)
             std::cout << opt.wfn << opt.wfn2 << endl;
         wavy[0].delete_unoccupied_MOs();
         wavy[1].delete_unoccupied_MOs();
-        readxyzMinMax_fromWFN(wavy[0], opt.MinMax, opt.NbSteps, opt.radius, opt.resolution);
-        cube Rho1(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), true);
-        cube Rho2(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), true);
+        readxyzMinMax_fromWFN(wavy[0], opt.properties);
+        cube Rho1(opt.properties.NbSteps, wavy[0].get_ncen(), true);
+        cube Rho2(opt.properties.NbSteps, wavy[0].get_ncen(), true);
         Rho1.give_parent_wfn(wavy[0]);
         Rho2.give_parent_wfn(wavy[1]);
         double len[3]{ 0, 0, 0 };
         for (int i = 0; i < 3; i++)
         {
-            len[i] = (opt.MinMax[3 + i] - opt.MinMax[i]) / opt.NbSteps[i];
+            len[i] = (opt.properties.MinMax[3 + i] - opt.properties.MinMax[i]) / opt.properties.NbSteps[i];
         }
         for (int i = 0; i < 3; i++)
         {
-            Rho1.set_origin(i, opt.MinMax[i]);
-            Rho2.set_origin(i, opt.MinMax[i]);
+            Rho1.set_origin(i, opt.properties.MinMax[i]);
+            Rho2.set_origin(i, opt.properties.MinMax[i]);
             Rho1.set_vector(i, i, len[i]);
             Rho2.set_vector(i, i, len[i]);
         }
@@ -187,8 +187,8 @@ int main(int argc, char** argv)
         Rho2.set_comment2("from " + wavy[1].get_path().string());
         Rho1.set_path(std::filesystem::path(wavy[0].get_path().stem().string() + "_rho.cube"));
         Rho2.set_path(std::filesystem::path(wavy[1].get_path().stem().string() + "_rho.cube"));
-        Calc_Rho(Rho1, wavy[0], opt.radius, log_file, false);
-        Calc_Rho(Rho2, wavy[1], opt.radius, log_file, false);
+        Calc_Rho(Rho1, wavy[0], opt.properties.radius, log_file, false);
+        Calc_Rho(Rho2, wavy[1], opt.properties.radius, log_file, false);
         cube Rho_diff = Rho1 - Rho2;
 #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < Rho1.get_size(0); i++)
@@ -201,7 +201,7 @@ int main(int argc, char** argv)
         }
         for (int i = 0; i < 3; i++)
         {
-            Rho_diff.set_origin(i, opt.MinMax[i]);
+            Rho_diff.set_origin(i, opt.properties.MinMax[i]);
             Rho_diff.set_vector(i, i, len[i]);
         }
         Rho_diff.give_parent_wfn(wavy[0]);
@@ -375,7 +375,7 @@ int main(int argc, char** argv)
         return 0;
     }
     // This one has conversion to fchk and calculation of one single tsc file
-    if (opt.wfn != "" && !opt.calc && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
+    if (opt.wfn != "" && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
     {
         log_file << "Reading: " << setw(44) << opt.wfn << flush;
         wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
@@ -485,7 +485,7 @@ int main(int argc, char** argv)
         return 0;
     }
     // Contains all calculations of properties and cubes
-    if (opt.calc)
+    if (opt.properties.calc())
     {
         properties_calculation(opt);
         log_file.flush();

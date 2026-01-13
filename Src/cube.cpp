@@ -10,34 +10,33 @@ cube::cube()
     parent_wavefunction = new WFN(e_origin::cub);
     size = { 0, 0, 0 };
     origin = { 0.0, 0.0, 0.0 };
-    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
+    calc_dv();
 };
 
-cube::cube(int x, int y, int z, int g_na, bool grow_values)
+cube::cube(const std::array<int, 3> xyz, int g_na, bool grow_values)
 {
-    size[0] = x;
-    size[1] = y;
-    size[2] = z;
+    size = xyz;
+
     origin = { 0.0, 0.0, 0.0 };
     loaded = grow_values;
     if (grow_values)
     {
-        values.resize(x);
+        values.resize(xyz[0]);
 #pragma omp parallel for
-        for (int i = 0; i < x; i++)
+        for (int i = 0; i < xyz[0]; i++)
         {
-            values[i].resize(y);
-            for (int j = 0; j < y; j++)
-                values[i][j].resize(z, 0.0);
+            values[i].resize(xyz[1]);
+            for (int j = 0; j < xyz[1]; j++)
+                values[i][j].resize(xyz[2], 0.0);
         }
     }
     na = g_na;
     parent_wavefunction = new WFN(e_origin::cub);
     vectors = { { { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 } } };
-    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
+    calc_dv();
 };
 
-cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ostream &file, const bool expert, const bool header)
+cube::cube(const std::filesystem::path& filepath, bool read, WFN& wave, std::ostream& file, const bool expert, const bool header)
 {
     err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
     parent_wavefunction = &wave;
@@ -45,18 +44,18 @@ cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ost
     path = filepath;
     err_checkf(read_file(read, header, expert), "Sorry, something went wrong while reading!", file);
     loaded = read;
-    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
+    calc_dv();
 };
 
-cube::cube(const int g_na, const ivec &g_size, const vec &g_origin, const vec2 &g_vectors, const vec3 &g_values)
+cube::cube(const int g_na, const ivec& g_size, const vec& g_origin, const vec2& g_vectors, const vec3& g_values)
 {
     using namespace std;
     na = g_na;
     parent_wavefunction = new WFN(e_origin::cub);
-   std::cout << "Assigned Nr of Atoms" << endl;
+    std::cout << "Assigned Nr of Atoms" << endl;
     for (int i = 0; i < 3; i++)
     {
-       std::cout << i << ". dimension" << endl;
+        std::cout << i << ". dimension" << endl;
         size[i] = g_size[i];
         origin[i] = g_origin[i];
         for (int j = 0; j < 3; j++)
@@ -75,10 +74,10 @@ cube::cube(const int g_na, const ivec &g_size, const vec &g_origin, const vec2 &
         }
     }
     loaded = true;
-    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
+    calc_dv();
 };
 
-cube::cube(const cube &given)
+cube::cube(const cube& given)
 {
     na = given.get_na();
     path = given.path;
@@ -163,7 +162,7 @@ bool cube::read_values(std::ifstream& file) {
                     }
                 else
                 {
-                   std::cout << "This should not happen! Read a value outside of range!"
+                    std::cout << "This should not happen! Read a value outside of range!"
                         << " Run_x: " << run_x
                         << " Run_y: " << run_y
                         << " rest2: " << rest2
@@ -185,10 +184,10 @@ bool cube::read_values(std::ifstream& file) {
     }
     if (run_x != size[0] || run_y != size[1] || run_z != size[2])
     {
-       std::cout << "This file ended before i read all expected values!" << endl;
+        std::cout << "This file ended before i read all expected values!" << endl;
         if (file.eof())
-           std::cout << "ENCOUNTERED EOF!" << endl;
-       std::cout << "x,y,reads1,z: " << run_x << " " << run_y << " " << reads1 << "," << run_z << endl;
+            std::cout << "ENCOUNTERED EOF!" << endl;
+        std::cout << "x,y,reads1,z: " << run_x << " " << run_y << " " << reads1 << "," << run_z << endl;
         return (false);
     }
     file.close();
@@ -214,6 +213,8 @@ bool cube::read_file(bool full, bool header, bool expert)
             iss = std::istringstream(line);
             iss >> size[i] >> vectors[i][0] >> vectors[i][1] >> vectors[i][2];
         }
+
+        calc_dv();
 
         int atnr;
         double atp[3] = { 0, 0, 0 };
@@ -296,7 +297,7 @@ bool cube::write_file(bool force, bool absolute)
     return (true);
 };
 
-bool cube::write_file(const std::filesystem::path &given_path, bool debug)
+bool cube::write_file(const std::filesystem::path& given_path, bool debug)
 {
     using namespace std;
     stringstream stream;
@@ -304,7 +305,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
     ofstream of(given_path, ios::out);
     of << comment1 << "\n";
     of << comment2 << "\n";
-    of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << "\n";
+    of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(5) << setprecision(6) << origin[2] << "\n";
     for (int i = 0; i < 3; i++)
     {
         of << setw(5) << size[i];
@@ -320,7 +321,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
         of << "\n";
     }
     if (debug)
-       std::cout << "Finished atoms!" << endl;
+        std::cout << "Finished atoms!" << endl;
     if (get_loaded())
         for (int run_x = 0; run_x < size[0]; run_x++)
             for (int run_y = 0; run_y < size[1]; run_y++)
@@ -334,7 +335,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
                         of << "\n";
                 }
                 if (debug)
-                   std::cout << "Write Z-line!" << endl;
+                    std::cout << "Write Z-line!" << endl;
                 if (temp_write % 6 != 0)
                     of << "\n";
             }
@@ -357,14 +358,14 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
     return (true);
 };
 
-bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
+bool cube::write_xdgraph(const std::filesystem::path& given_path, bool debug)
 {
     using namespace std;
     stringstream stream;
     ofstream of(given_path, ios::out);
     of << "2DGRDFIL  0" << endl
-       << "cuQCT    FOU" << endl
-       << endl;
+        << "cuQCT    FOU" << endl
+        << endl;
     of << "! Gridpoints, Origin, Physical Dimensions" << endl;
     for (int i = 0; i < 3; i++)
         of << setw(14) << size[i];
@@ -384,10 +385,10 @@ bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
         of << " ATOM" << endl;
     }
     if (debug)
-       std::cout << "Finished atoms!" << endl;
+        std::cout << "Finished atoms!" << endl;
     of << "! Connections" << endl
-       << "         0" << endl
-       << "! Values" << endl;
+        << "         0" << endl
+        << "! Values" << endl;
     if (!get_loaded())
         read_file(true, false, false);
     for (int run_x = 0; run_x < size[0]; run_x++)
@@ -402,7 +403,7 @@ bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
                     of << endl;
             }
             if (debug)
-               std::cout << "Write Y-line!" << endl;
+                std::cout << "Write Y-line!" << endl;
             if (temp_write % 6 != 0)
                 of << endl;
         }
@@ -416,18 +417,18 @@ bool cube::fractal_dimension(const double stepsize) const
 {
     double min = 100, max = -100;
     for (const auto& inner_vec : values) {
-      for (const auto& innerest_vec : inner_vec) {
-        auto local_min_it = std::min_element(innerest_vec.begin(), innerest_vec.end());
-        auto local_max_it = std::max_element(innerest_vec.begin(), innerest_vec.end());
+        for (const auto& innerest_vec : inner_vec) {
+            auto local_min_it = std::min_element(innerest_vec.begin(), innerest_vec.end());
+            auto local_max_it = std::max_element(innerest_vec.begin(), innerest_vec.end());
 
-        if (*local_min_it < min) {
-          min = *local_min_it;
-        }
+            if (*local_min_it < min) {
+                min = *local_min_it;
+            }
 
-        if (*local_max_it > max) {
-          max = *local_max_it;
+            if (*local_max_it > max) {
+                max = *local_max_it;
+            }
         }
-      }
     }
     const double map_min = min, map_max = max;
     vec e = double_sum();
@@ -443,46 +444,46 @@ bool cube::fractal_dimension(const double stepsize) const
     double lv1, lv2;
 #pragma omp parallel private(lv1,lv2)
     {
-      long long int x, y, z;
+        long long int x, y, z;
 #pragma omp for
-      for (long long int i = 0; i < (size_t)size[0] * size[1] * ((size_t)size[2] - 1); i++)
-      {
-        x = i / ((size_t)size[1] * ((size_t)size[2] - 1));
-        y = (i / ((size_t)size[2] - 1)) % size[1];
-        z = i % ((size_t)size[2] - 1);
-        lv1 = values[x][y][z];
-        lv2 = values[x][y][z + 1];
-        for (int _i = 0; _i < steps; _i++)
-          if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
+        for (long long int i = 0; i < (size_t)size[0] * size[1] * ((size_t)size[2] - 1); i++)
+        {
+            x = i / ((size_t)size[1] * ((size_t)size[2] - 1));
+            y = (i / ((size_t)size[2] - 1)) % size[1];
+            z = i % ((size_t)size[2] - 1);
+            lv1 = values[x][y][z];
+            lv2 = values[x][y][z + 1];
+            for (int _i = 0; _i < steps; _i++)
+                if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
-            bins[_i]++;
-      }
+                    bins[_i]++;
+        }
 #pragma omp for
-      for (long long int i = 0; i < (size_t)size[0] * size[2] * ((size_t)size[1] - 1); i++)
-      {
-        z = i / ((size_t)size[0] * (size[1] - 1));
-        x = (i / ((size_t)size[1] - 1)) % size[0];
-        y = i % ((size_t)size[1] - 1);
-        lv1 = values[x][y][z];
-        lv2 = values[x][y + 1][z];
-        for (int _i = 0; _i < steps; _i++)
-          if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
+        for (long long int i = 0; i < (size_t)size[0] * size[2] * ((size_t)size[1] - 1); i++)
+        {
+            z = i / ((size_t)size[0] * (size[1] - 1));
+            x = (i / ((size_t)size[1] - 1)) % size[0];
+            y = i % ((size_t)size[1] - 1);
+            lv1 = values[x][y][z];
+            lv2 = values[x][y + 1][z];
+            for (int _i = 0; _i < steps; _i++)
+                if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
-            bins[_i]++;
-      }
+                    bins[_i]++;
+        }
 #pragma omp for
-      for (long long int i = 0; i < (size_t)size[1] * size[2] * ((size_t)size[0] - 1); i++)
-      {
-        y = i / (((size_t)size[0] - 1) * size[2]);
-        z = (i / ((size_t)size[0] - 1)) % size[2];
-        x = i % ((size_t)size[0] - 1);
-        lv1 = values[x][y][z];
-        lv2 = values[x + 1][y][z];
-        for (int _i = 0; _i < steps; _i++)
-          if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
+        for (long long int i = 0; i < (size_t)size[1] * size[2] * ((size_t)size[0] - 1); i++)
+        {
+            y = i / (((size_t)size[0] - 1) * size[2]);
+            z = (i / ((size_t)size[0] - 1)) % size[2];
+            x = i % ((size_t)size[0] - 1);
+            lv1 = values[x][y][z];
+            lv2 = values[x + 1][y][z];
+            for (int _i = 0; _i < steps; _i++)
+                if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
-            bins[_i]++;
-      }
+                    bins[_i]++;
+        }
     }
     const double epsilon = log(1 / (pow(comparisons, -constants::c_13)));
     for (int i = 0; i < steps; i++)
@@ -539,7 +540,7 @@ double cube::get_interpolated_value(double x, double y, double z) const
     double c1 = c01 * (1 - y1) + c11 * y1;
     return (c0 * (1 - z1) + c1 * z1);
 };
-    
+
 double cube::get_value(int x, int y, int z) const
 {
     if (x < size[0] && y < size[1] && z < size[2] && x >= 0 && y >= 0 && z >= 0)
@@ -617,7 +618,7 @@ bool has_converged(const double& current_value, double& previous_value, const do
 
 double cube::ewald_sum(const int kMax, const double conv) {
     calc_dv();
-    const std::array<double, 3> lengths{ array_length(vectors[0])*size[0], array_length(vectors[1])*size[1], array_length(vectors[2])*size[2]};
+    const std::array<double, 3> lengths{ array_length(vectors[0]) * size[0], array_length(vectors[1]) * size[1], array_length(vectors[2]) * size[2] };
     const double shortest_length = std::min({ lengths[0], lengths[1], lengths[2] });
     const double alpha = 2.0 * constants::sqr_pi / shortest_length;
     std::cout << "shortest length: " << shortest_length << " alpha: " << alpha << std::endl;
@@ -655,32 +656,32 @@ double cube::ewald_sum(const int kMax, const double conv) {
     for (int i = 0; i < 3; i++) {
         std::cout << std::setw(10) << reciprocalLattice[i][0] << std::setw(10) << reciprocalLattice[i][1] << std::setw(10) << reciprocalLattice[i][2] << std::endl;
     }
-	ProgressBar *pb = new ProgressBar(grid_points, 60, "-", " ", "Real-space");
-	double v00 = vectors[0][0], v01 = vectors[0][1], v02 = vectors[0][2];
-	double v10 = vectors[1][0], v11 = vectors[1][1], v12 = vectors[1][2];
-	double v20 = vectors[2][0], v21 = vectors[2][1], v22 = vectors[2][2];
+    ProgressBar* pb = new ProgressBar(grid_points, 60, "-", " ", "Real-space");
+    double v00 = vectors[0][0], v01 = vectors[0][1], v02 = vectors[0][2];
+    double v10 = vectors[1][0], v11 = vectors[1][1], v12 = vectors[1][2];
+    double v20 = vectors[2][0], v21 = vectors[2][1], v22 = vectors[2][2];
     // Real-space contribution
 #pragma omp parallel for reduction(+:realSpaceEnergy)
     for (int i = 0; i < size[0]; i++) {
         double length = 0, fac = 0, v1 = 0;
-        double l0 = -i*v00, l1 = -i*v10, l2 = -i*v20;
+        double l0 = -i * v00, l1 = -i * v10, l2 = -i * v20;
         for (int j = 0; j < size[1]; j++) {
-			l0 -= j * v01;
-			l1 -= j * v11;
-			l2 -= j * v21;
+            l0 -= j * v01;
+            l1 -= j * v11;
+            l2 -= j * v21;
             for (int k = 0; k < size[2]; k++) {
-				l0 -= k * v02;
-				l1 -= k * v12;
-				l2 -= k * v22;
+                l0 -= k * v02;
+                l1 -= k * v12;
+                l2 -= k * v22;
                 v1 = values[i][j][k];
                 for (int l = 0; l < size[0]; l++) {
-					l0 += l * v00;
-					l1 += l * v10;
-					l2 += l * v20;
+                    l0 += l * v00;
+                    l1 += l * v10;
+                    l2 += l * v20;
                     for (int m = 0; m < size[1]; m++) {
-						l0 += m * v01;
-						l1 += m * v11;
-						l2 += m * v21;
+                        l0 += m * v01;
+                        l1 += m * v11;
+                        l2 += m * v21;
                         for (int n = 0; n < size[2]; n++) {
                             length = std::hypot(l0 + n * v02, l1 + n * v12, l2 + n * v22);
                             if (length > 6.0 || length == 0) continue;
@@ -741,7 +742,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
                                     for (int d5 = 0; d5 < size[1]; d5++) {
                                         for (int d6 = 0; d6 < size[2]; d6++) {
                                             std::array<double, 3> rj = get_pos(d4, d5, d6);
-											rj = { rj[0] - ri[0], rj[1] - ri[1], rj[2] - ri[2] };
+                                            rj = { rj[0] - ri[0], rj[1] - ri[1], rj[2] - ri[2] };
                                             kDotR = dot_(kvec, rj);
                                             temp += exp(-k2 / FOUR_alsq) / abs(k2) * v1 * values[d4][d5][d6] * cos(kDotR);
                                         }
@@ -750,7 +751,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
                             }
                         }
                     }
-					pb->update();
+                    pb->update();
                 }
             }
         }
@@ -784,7 +785,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     return totalEnergy;
 }
 
-void cube::operator=(const cube &right)
+void cube::operator=(const cube& right)
 {
     for (int i = 0; i < 3; i++)
         size[i] = right.get_size(i);
@@ -804,6 +805,7 @@ void cube::operator=(const cube &right)
         for (int j = 0; j < 3; j++)
             vectors[i][j] = right.get_vector(i, j);
     }
+    calc_dv();
     if (right.get_loaded())
     {
 #pragma omp parallel for
@@ -818,7 +820,7 @@ void cube::operator=(const cube &right)
     parent_wavefunction = right.parent_wavefunction;
 };
 
-cube cube::operator+(const cube &right) const
+cube cube::operator+(const cube& right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "+" + right.get_path().stem().string() + ".cube");
@@ -834,7 +836,7 @@ cube cube::operator+(const cube &right) const
     return (res_cube);
 };
 
-cube cube::operator-(const cube &right) const
+cube cube::operator-(const cube& right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "-" + right.get_path().stem().string() + ".cube");
@@ -842,15 +844,15 @@ cube cube::operator-(const cube &right) const
         if (size[i] != right.get_size(i))
             return (cube());
 #pragma omp parallel for
-        for (int x = 0; x < size[0]; x++)
-            for (int y = 0; y < size[1]; y++)
-                for (int z = 0; z < size[2]; z++)
-                    res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) - right.get_value(x, y, z));
- 
+    for (int x = 0; x < size[0]; x++)
+        for (int y = 0; y < size[1]; y++)
+            for (int z = 0; z < size[2]; z++)
+                res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) - right.get_value(x, y, z));
+
     return (res_cube);
 };
 
-cube cube::operator*(const cube &right) const
+cube cube::operator*(const cube& right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "*" + right.get_path().stem().string() + ".cube");
@@ -862,11 +864,11 @@ cube cube::operator*(const cube &right) const
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
                 res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
-    
+
     return (res_cube);
 };
 
-cube cube::operator/(const cube &right) const
+cube cube::operator/(const cube& right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "_" + right.get_path().stem().string() + ".cube");
@@ -883,11 +885,11 @@ cube cube::operator/(const cube &right) const
                 else
                     res_cube.set_value(x, y, z, 0);
             }
- 
+
     return (res_cube);
 };
 
-bool cube::operator+=(const cube &right)
+bool cube::operator+=(const cube& right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -900,7 +902,7 @@ bool cube::operator+=(const cube &right)
     return (true);
 };
 
-bool cube::operator-=(const cube &right)
+bool cube::operator-=(const cube& right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -913,7 +915,7 @@ bool cube::operator-=(const cube &right)
     return (true);
 };
 
-bool cube::operator*=(const cube &right)
+bool cube::operator*=(const cube& right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -926,7 +928,7 @@ bool cube::operator*=(const cube &right)
     return (true);
 };
 
-bool cube::operator/=(const cube &right)
+bool cube::operator/=(const cube& right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -939,7 +941,7 @@ bool cube::operator/=(const cube &right)
     return (true);
 };
 
-bool cube::mask(const cube &right)
+bool cube::mask(const cube& right)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -965,7 +967,7 @@ bool cube::thresh(const double& thresh)
     return (true);
 }
 
-bool cube::thresh(const cube &right, const double& thresh)
+bool cube::thresh(const cube& right, const double& thresh)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -978,7 +980,7 @@ bool cube::thresh(const cube &right, const double& thresh)
     return (true);
 };
 
-bool cube::negative_mask(const cube &right)
+bool cube::negative_mask(const cube& right)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -1080,20 +1082,8 @@ bool cube::set_vector(int i, int j, double value)
 
 double cube::get_origin(unsigned int i) const
 {
-    switch (i)
-    {
-    case 0:
-        return (origin[0]);
-        break;
-    case 1:
-        return (origin[1]);
-        break;
-    case 2:
-        return (origin[2]);
-        break;
-    default:
-        return (-1);
-    }
+    err_checkf(i >= 0 && i < 3, "Invalid origin dimension!", std::cout);
+    return origin[i];
 };
 
 bool cube::set_origin(unsigned int i, double value)
@@ -1108,26 +1098,26 @@ bool cube::set_origin(unsigned int i, double value)
 std::filesystem::path cube::super_cube()
 {
     using namespace std;
-    int m[3]{0, 0, 0};
-   std::cout << "How many times in X-direction? ";
+    int m[3]{ 0, 0, 0 };
+    std::cout << "How many times in X-direction? ";
     cin >> m[0];
     while (m[0] <= 0 || m[0] > 20)
     {
-       std::cout << "This is unreasonable, try again! (between 1-20): ";
+        std::cout << "This is unreasonable, try again! (between 1-20): ";
         cin >> m[0];
     }
-   std::cout << "Y-direction? ";
+    std::cout << "Y-direction? ";
     cin >> m[1];
     while (m[1] <= 0 || m[1] > 20)
     {
-       std::cout << "This is unreasonable, try again! (between 1-20): ";
+        std::cout << "This is unreasonable, try again! (between 1-20): ";
         cin >> m[1];
     }
-   std::cout << "Z-direction? ";
+    std::cout << "Z-direction? ";
     cin >> m[2];
     while (m[2] <= 0 || m[2] > 20)
     {
-       std::cout << "This is unreasonable, try again! (between 1-20): ";
+        std::cout << "This is unreasonable, try again! (between 1-20): ";
         cin >> m[2];
     }
     std::filesystem::path new_path(path);
@@ -1201,7 +1191,7 @@ cube cube::super_cube(int x, int y, int z)
                 }
 
     new_path.replace_extension(".cube_super");
-    cube out = cube(m[0] * size[0], m[1] * size[1], m[2] * size[2], m[0] * m[1] * m[2] * parent_wavefunction->get_ncen(), true);
+    cube out = cube({ m[0] * size[0], m[1] * size[1], m[2] * size[2] }, m[0] * m[1] * m[2] * parent_wavefunction->get_ncen(), true);
     out.set_path(new_path);
     out.parent_wavefunction = &super_wfn;
     out.set_comment1(comment1 + " SUPER CUBE");
@@ -1252,3 +1242,217 @@ double cube::jaccard(const cube& right) const {
             }
     return (top / bot); //RETURN Real Space R-value between this cube and the given one
 };
+
+void cube::adaptive_refine(std::function<const double(const std::array<double, 3>)> const func, double target_error, int max_depth) {
+    using namespace std;
+    double current_integral = sum();
+    cout << "Initial Integral: " << current_integral << endl;
+
+    // Initialize refinement map (true = needs checking/refining, false = converged/smooth)
+    // Initially, everything needs checking.
+    // Dimensions match the current 'values' grid.
+    vector<vector<vector<bool>>> refinement_map(size[0], vector<vector<bool>>(size[1], vector<bool>(size[2], true)));
+
+    for (int depth = 0; depth < max_depth; ++depth) {
+        // Create new dimensions
+        int new_size[3] = { size[0] * 2, size[1] * 2, size[2] * 2 };
+
+        // Create new values grid
+        vector<vector<vector<double>>> new_values(new_size[0]);
+        // Create new refinement map for the next iteration
+        vector<vector<vector<bool>>> new_refinement_map(new_size[0]);
+
+#pragma omp parallel for
+        for (int i = 0; i < new_size[0]; ++i) {
+            new_values[i].resize(new_size[1]);
+            new_refinement_map[i].resize(new_size[1]);
+            for (int j = 0; j < new_size[1]; ++j) {
+                new_values[i][j].resize(new_size[2]);
+                new_refinement_map[i][j].resize(new_size[2], false); // Default to false, set to true if we find we need it
+            }
+        }
+
+        // New step vectors (half the size)
+        array<array<double, 3>, 3> new_vectors;
+        for (int d = 0; d < 3; ++d) {
+            for (int k = 0; k < 3; ++k) {
+                new_vectors[d][k] = vectors[d][k] / 2.0;
+            }
+        }
+
+        // Populate new grid
+        // Strategy: 
+        // 1. Copy existing points (even indices)
+        // 2. Evaluate or Interpolate new points based on local gradient AND previous refinement map
+
+        long long count_computed = 0;
+        long long count_interpolated = 0;
+
+#pragma omp parallel for reduction(+:count_computed, count_interpolated)
+        for (int i = 0; i < new_size[0]; ++i) {
+            for (int j = 0; j < new_size[1]; ++j) {
+                for (int k = 0; k < new_size[2]; ++k) {
+                    // Check if this corresponds to an exact old point
+                    if (i % 2 == 0 && j % 2 == 0 && k % 2 == 0) {
+                        new_values[i][j][k] = values[i / 2][j / 2][k / 2];
+                        // If the old parent needed refinement, the child might too (we'll check neighbors later or assume inheritance)
+                        // If we are at an exact old point, we just copy. 
+                        // The interesting part is filling the holes and deciding if those holes need computation.
+                        continue;
+                    }
+
+                    // Calculate position
+                    array<double, 3> pos = { 0.0, 0.0, 0.0 };
+                    for (int d = 0; d < 3; ++d) {
+                        pos[d] = origin[d] +
+                            i * new_vectors[0][d] +
+                            j * new_vectors[1][d] +
+                            k * new_vectors[2][d];
+                    }
+
+                    // Map to continuous old coordinates
+                    double old_i = i / 2.0;
+                    double old_j = j / 2.0;
+                    double old_k = k / 2.0;
+
+                    int i0 = (int)std::floor(old_i);
+                    int j0 = (int)std::floor(old_j);
+                    int k0 = (int)std::floor(old_k);
+
+                    bool need_recompute = true;
+                    bool parent_needs_refinement = false;
+
+                    // Ensure we have enough points to check neighbors
+                    if (size[0] >= 2 && size[1] >= 2 && size[2] >= 2) {
+                        // Clamp to boundary
+                        i0 = std::clamp(i0, 0, size[0] - 2);
+                        j0 = std::clamp(j0, 0, size[1] - 2);
+                        k0 = std::clamp(k0, 0, size[2] - 2);
+
+                        // Check if any of the surrounding 8 points in the old grid were marked as "needs_refinement"
+                        for (int di = 0; di <= 1; ++di)
+                            for (int dj = 0; dj <= 1; ++dj)
+                                for (int dk = 0; dk <= 1; ++dk) {
+                                    if (refinement_map[i0 + di][j0 + dj][k0 + dk]) {
+                                        parent_needs_refinement = true;
+                                    }
+                                }
+
+                        // If parent region was already converged/smooth, we skip expensive checks and compute
+                        if (!parent_needs_refinement) {
+                            need_recompute = false;
+                        }
+                        else {
+                            // Check variation in the 2x2x2 block of the old grid
+                            double min_v = 1E100, max_v = -1E100;
+                            double avg_v = 0.0;
+
+                            for (int di = 0; di <= 1; ++di)
+                                for (int dj = 0; dj <= 1; ++dj)
+                                    for (int dk = 0; dk <= 1; ++dk) {
+                                        double v = values[i0 + di][j0 + dj][k0 + dk];
+                                        if (v < min_v) min_v = v;
+                                        if (v > max_v) max_v = v;
+                                        avg_v += abs(v);
+                                    }
+                            avg_v /= 8.0;
+
+                            // Decision threshold
+                            double local_var = max_v - min_v;
+                            if (local_var <= target_error * (avg_v + 1e-10))
+                                need_recompute = false;
+                        }
+                    }
+
+                    if (need_recompute) {
+                        new_values[i][j][k] = func(pos);
+                        count_computed++;
+                        // If we computed this point, we mark it as active for the next level
+                        new_refinement_map[i][j][k] = true;
+                    }
+                    else {
+                        // Linear Interpolation (Trilinear) from old values
+                        // We can use get_interpolated_value but we need to coordinate systems match.
+                        // Actually easier to just implement trilinear here since we have indices
+
+                        double di = old_i - i0;
+                        double dj = old_j - j0;
+                        double dk = old_k - k0;
+
+                        double c00 = values[i0][j0][k0] * (1 - di) + values[i0 + 1][j0][k0] * di;
+                        double c10 = values[i0][j0 + 1][k0] * (1 - di) + values[i0 + 1][j0 + 1][k0] * di;
+                        double c01 = values[i0][j0][k0 + 1] * (1 - di) + values[i0 + 1][j0][k0 + 1] * di;
+                        double c11 = values[i0][j0 + 1][k0 + 1] * (1 - di) + values[i0 + 1][j0 + 1][k0 + 1] * di;
+
+                        double c0 = c00 * (1 - dj) + c10 * dj;
+                        double c1 = c01 * (1 - dj) + c11 * dj;
+
+                        new_values[i][j][k] = c0 * (1 - dk) + c1 * dk;
+                        count_interpolated++;
+                        // If we interpolated, we assume it's smooth and mark as false (already default)
+                    }
+                }
+            }
+        }
+
+        // Propagate the true values in new_refinement_map to include the kept old points neighbors
+        // If a new point was computed, its neighbors might need refinement next time.
+        // Actually simplest strategy: if any point in a block needs computation, the whole block in next iter needs check.
+        // But here we constructed new map.
+        // We need to ensure that if new_values[i][j][k] was copied from old grid, we set its map status correctly.
+        // If an old point was surrounded by activity, it stays active.
+        // Let's do a pass to set exact grid points map status based on neighbors or inheritance.
+#pragma omp parallel for
+        for (int i = 0; i < size[0]; ++i) {
+            for (int j = 0; j < size[1]; ++j) {
+                for (int k = 0; k < size[2]; ++k) {
+                    if (refinement_map[i][j][k]) {
+                        // Propagate to new exact location
+                        new_refinement_map[2 * i][2 * j][2 * k] = true;
+                    }
+                }
+            }
+        }
+
+        // Update cube properties to temporary state to check integral
+        // (We don't replace 'this' yet, just calculate integral manually or temporarily update)
+        // Calculating integral of new grid manually
+
+        // Recalculate dv for new grid
+        double new_dv = abs(new_vectors[0][0] * new_vectors[1][1] * new_vectors[2][2]
+            - new_vectors[2][0] * new_vectors[1][1] * new_vectors[0][2]
+            + new_vectors[0][1] * new_vectors[1][2] * new_vectors[2][0]
+            - new_vectors[2][1] * new_vectors[1][2] * new_vectors[0][0]
+            + new_vectors[0][2] * new_vectors[1][0] * new_vectors[2][1]
+            - new_vectors[2][2] * new_vectors[1][0] * new_vectors[0][1]);
+
+        double new_integral = 0.0;
+#pragma omp parallel for reduction(+:new_integral)
+        for (int i = 0; i < new_size[0]; ++i)
+            for (int j = 0; j < new_size[1]; ++j)
+                for (int k = 0; k < new_size[2]; ++k)
+                    new_integral += new_values[i][j][k];
+
+        new_integral *= new_dv;
+
+        double rel_error = abs(new_integral - current_integral) / (abs(new_integral) + 1e-20);
+
+        cout << "Refinement Level " << depth + 1
+            << ": Integral = " << new_integral
+            << ", Error = " << rel_error
+            << " (Computed: " << count_computed << ", Interpolated: " << count_interpolated << ")" << endl;
+
+        // Apply update
+        values = std::move(new_values);
+        refinement_map = std::move(new_refinement_map);
+        size = { new_size[0], new_size[1], new_size[2] };
+        vectors = new_vectors;
+        dv = new_dv;
+        current_integral = new_integral;
+
+        if (rel_error < target_error) {
+            cout << "Converged!" << endl;
+            break;
+        }
+    }
+}
