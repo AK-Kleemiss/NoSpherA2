@@ -50,13 +50,13 @@ void read_k_points(vec2& k_pt, hkl_list& hkl, std::ostream& file)
     k_points_file.read((char*)&nr, sizeof(nr));
     file << " expecting " << nr[0] << " k points... " << std::flush;
     double temp[1]{ 0.0 };
-    int hkl_temp[1]{ 0 };
+    int i3emp[1]{ 0 };
     k_pt.resize(3);
     for (int i = 0; i < 3; i++)
     {
         k_pt[i].reserve(nr[0]);
     }
-    hkl_t hkl_;
+    i3 hkl_;
     for (int run = 0; run < nr[0]; run++)
     {
         for (int i = 0; i < 3; i++)
@@ -64,9 +64,9 @@ void read_k_points(vec2& k_pt, hkl_list& hkl, std::ostream& file)
             k_points_file.read((char*)&temp, sizeof(temp));
             err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
             k_pt[i].emplace_back(temp[0]);
-            k_points_file.read((char*)&hkl_temp, sizeof(hkl_temp));
+            k_points_file.read((char*)&i3emp, sizeof(i3emp));
             err_checkf(!k_points_file.bad(), "Error reading hkl values from k-points file!", file);
-            hkl_[i] = hkl_temp[0];
+            hkl_[i] = i3emp[0];
         }
         hkl.emplace(hkl_);
     }
@@ -92,7 +92,7 @@ void save_k_points(vec2& k_pt, hkl_list& hkl)
     int nr[1] = { (int)k_pt[0].size() };
     k_points_file.write((char*)&nr, sizeof(nr));
     double temp[1]{ 0.0 };
-    int hkl_temp[1]{ 0 };
+    int i3emp[1]{ 0 };
     hkl_list_it hkl_ = hkl.begin();
     for (int run = 0; run < nr[0]; run++)
     {
@@ -100,8 +100,8 @@ void save_k_points(vec2& k_pt, hkl_list& hkl)
         {
             temp[0] = k_pt[i][run];
             k_points_file.write((char*)&temp, sizeof(temp));
-            hkl_temp[0] = (*hkl_)[i];
-            k_points_file.write((char*)&hkl_temp, sizeof(hkl_temp));
+            i3emp[0] = (*hkl_)[i];
+            k_points_file.write((char*)&i3emp, sizeof(i3emp));
         }
         hkl_ = next(hkl_);
     }
@@ -142,12 +142,12 @@ void make_k_pts(const bool& read_k_pts,
         if (debug)
             file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
         // Create local copy of hkl list for faster access
-        const std::vector<hkl_t> hkl_vector(hkl.begin(), hkl.end());
+        const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
 
 #pragma omp parallel for
         for (int ref = 0; ref < size; ref++)
         {
-            const hkl_t hkl_ = hkl_vector[ref];
+            const i3 hkl_ = hkl_vector[ref];
             for (int x = 0; x < 3; x++)
             {
                 for (int j = 0; j < 3; j++)
@@ -184,7 +184,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
     bool debug = false)
 {
     file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
-    hkl_t hkl_;
+    i3 hkl_;
     err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
     std::ifstream hkl_input(hkl_filename, std::ios::in);
     hkl_input.seekg(0, hkl_input.beg);
@@ -211,12 +211,12 @@ void read_hkl(const std::filesystem::path& hkl_filename,
         // if (debug) file << endl;
         hkl.emplace(hkl_);
     }
-    hkl_list_it found = hkl.find(hkl_t{ 0, 0, 0 });
+    hkl_list_it found = hkl.find(i3{ 0, 0, 0 });
     if (found != hkl.end())
     {
         if (debug)
             file << "popping back 0 0 0" << std::endl;
-        hkl.erase(hkl_t{ 0, 0, 0 });
+        hkl.erase(i3{ 0, 0, 0 });
     }
     hkl_input.close();
     file << " done!\nNr of reflections read from file: " << hkl.size() << std::endl;
@@ -225,9 +225,9 @@ void read_hkl(const std::filesystem::path& hkl_filename,
         file << "Number of reflections before twin: " << hkl.size() << std::endl;
     if (twin_law.size() > 0)
     {
-        for (const hkl_t& hkl__ : hkl)
+        for (const i3& hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
-                hkl.emplace(hkl_t{
+                hkl.emplace(i3{
                     static_cast<int>(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
                     static_cast<int>(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
                     static_cast<int>(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
@@ -257,7 +257,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
     else
         file << "Number of symmetry operations: " << sym[0][0].size() << std::endl;
 
-    hkl_t tempv;
+    i3 tempv;
     hkl_list hkl_enlarged = hkl;
     for (int s = 0; s < sym[0][0].size(); s++)
     {
@@ -267,7 +267,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
         {
             continue;
         }
-        for (const hkl_t& hkl__ : hkl)
+        for (const i3& hkl__ : hkl)
         {
             tempv = { 0, 0, 0 };
             for (int h = 0; h < 3; h++)
@@ -279,7 +279,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
         }
     }
 
-    for (const hkl_t& hkl__ : hkl_enlarged)
+    for (const i3& hkl__ : hkl_enlarged)
     {
         tempv = hkl__;
         tempv[0] *= -1;
@@ -292,8 +292,8 @@ void read_hkl(const std::filesystem::path& hkl_filename,
     }
     hkl = hkl_enlarged;
     // Remove 0 0 0 if it exists
-    if (hkl.find(hkl_t{ 0, 0, 0 }) != hkl.end())
-        hkl.erase(hkl_t{ 0, 0, 0 });
+    if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
+        hkl.erase(i3{ 0, 0, 0 });
     file << "Nr of reflections to be used: " << hkl.size() << std::endl;
 }
 
@@ -316,7 +316,7 @@ void generate_hkl(const double& dmin,
 {
     using namespace std;
     file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
-    hkl_t hkl_;
+    i3 hkl_;
     string line, temp;
     const ivec extreme = {
         int(unit_cell.get_a() / (dmin - 0.01)),
@@ -341,9 +341,9 @@ void generate_hkl(const double& dmin,
         file << "Number of reflections before twin: " << hkl.size() << endl;
     if (twin_law.size() > 0)
     {
-        for (const hkl_t& hkl__ : hkl)
+        for (const i3& hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
-                hkl.emplace(hkl_t{
+                hkl.emplace(i3{
                     int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
                     int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
                     int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
@@ -373,7 +373,7 @@ void generate_hkl(const double& dmin,
     else
         file << "Number of symmetry operations: " << setw(19) << sym[0][0].size() << endl;
 
-    hkl_t tempv;
+    i3 tempv;
     hkl_list hkl_enlarged = hkl;
     for (int s = 0; s < sym[0][0].size(); s++)
     {
@@ -383,7 +383,7 @@ void generate_hkl(const double& dmin,
         {
             continue;
         }
-        for (const hkl_t& hkl__ : hkl)
+        for (const i3& hkl__ : hkl)
         {
             tempv = { 0, 0, 0 };
             for (int h = 0; h < 3; h++)
@@ -398,7 +398,7 @@ void generate_hkl(const double& dmin,
     if (debug)
         file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
 
-    for (const hkl_t& hkl__ : hkl_enlarged)
+    for (const i3& hkl__ : hkl_enlarged)
     {
         if (hkl.find(hkl__) != hkl.end())
             continue;
@@ -412,8 +412,8 @@ void generate_hkl(const double& dmin,
         }
     }
     // Remove 0 0 0 if it exists
-    if (hkl.find(hkl_t{ 0, 0, 0 }) != hkl.end())
-        hkl.erase(hkl_t{ 0, 0, 0 });
+    if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
+        hkl.erase(i3{ 0, 0, 0 });
     file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
@@ -426,7 +426,7 @@ void generate_hkl(const ivec2& hkl_min_max,
     bool ED)
 {
     using namespace std;
-    hkl_t hkl_;
+    i3 hkl_;
     string line, temp;
     int h_max = std::max(abs(hkl_min_max[0][1]), abs(hkl_min_max[0][0])),
         k_max = std::max(abs(hkl_min_max[1][1]), abs(hkl_min_max[1][0])),
@@ -455,9 +455,9 @@ void generate_hkl(const ivec2& hkl_min_max,
         file << "Number of reflections before twin: " << hkl.size() << endl;
     if (twin_law.size() > 0)
     {
-        for (const hkl_t& hkl__ : hkl)
+        for (const i3& hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
-                hkl.emplace(hkl_t{
+                hkl.emplace(i3{
                     int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
                     int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
                     int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
@@ -487,7 +487,7 @@ void generate_hkl(const ivec2& hkl_min_max,
     else
         file << "Number of symmetry operations: " << setw(19) << sym[0][0].size() << endl;
 
-    hkl_t tempv;
+    i3 tempv;
     hkl_list hkl_enlarged = hkl;
     for (int s = 0; s < sym[0][0].size(); s++)
     {
@@ -497,7 +497,7 @@ void generate_hkl(const ivec2& hkl_min_max,
         {
             continue;
         }
-        for (const hkl_t& hkl__ : hkl)
+        for (const i3& hkl__ : hkl)
         {
             tempv = { 0, 0, 0 };
             for (int h = 0; h < 3; h++)
@@ -512,7 +512,7 @@ void generate_hkl(const ivec2& hkl_min_max,
     if (debug)
         file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
 
-    for (const hkl_t& hkl__ : hkl_enlarged)
+    for (const i3& hkl__ : hkl_enlarged)
     {
         if (hkl.find(hkl__) != hkl.end())
             continue;
@@ -526,8 +526,8 @@ void generate_hkl(const ivec2& hkl_min_max,
         }
     }
     // Remove 0 0 0 if it exists
-    if (hkl.find(hkl_t{ 0, 0, 0 }) != hkl.end())
-        hkl.erase(hkl_t{ 0, 0, 0 });
+    if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
+        hkl.erase(i3{ 0, 0, 0 });
     file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
@@ -552,7 +552,7 @@ void generate_fractional_hkl(const double& dmin,
 {
     using namespace std;
     file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
-    hkl_d hkl_;
+    d3 hkl_;
     string line, temp;
     const int extreme = 201;
     double dmin_l = 0.9 * dmin;
@@ -583,9 +583,9 @@ void generate_fractional_hkl(const double& dmin,
         file << "Number of reflections before twin: " << hkl.size() << endl;
     if (twin_law.size() > 0)
     {
-        for (const hkl_d& hkl__ : hkl)
+        for (const d3& hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
-                hkl.emplace(hkl_d{
+                hkl.emplace(d3{
                     (twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
                     (twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
                     (twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
@@ -1396,10 +1396,11 @@ void calc_spherical_values(
 #pragma omp for
         for (int g = 0; g < atoms_with_grids; g++)
         {
-            double ax = wave.get_atom_coordinate(i, 0), ay = wave.get_atom_coordinate(i, 1), az = wave.get_atom_coordinate(i, 2), d, temp;
+            const d3 ax = wave.get_atom_pos(i);
+            double d, temp;
             for (int p = 0; p < num_points[g]; p++)
             {
-                d = sqrt(pow(grid[g][GridIndex::x_coord][p] - ax, 2) + pow(grid[g][GridIndex::y_coord][p] - ay, 2) + pow(grid[g][GridIndex::z_coord][p] - az, 2));
+                d = array_length(d3{ grid[g][GridIndex::x_coord][p], grid[g][GridIndex::y_coord][p], grid[g][GridIndex::z_coord][p] }, ax);
                 temp = linear_interpolate_spherical_density(
                     radial_density[type_list_number],
                     radial_dist[type_list_number],
@@ -1788,9 +1789,7 @@ int make_atomic_grids(
         for (int i = 0; i < nr_pts; i++)
         {
             total_grid[TotalGridIndex::wavefunction_electron_density][i] = temp.compute_dens(
-                total_grid[TotalGridIndex::X][i],
-                total_grid[TotalGridIndex::Y][i],
-                total_grid[TotalGridIndex::Z][i],
+                { total_grid[TotalGridIndex::X][i], total_grid[TotalGridIndex::Y][i], total_grid[TotalGridIndex::Z][i] },
                 d_temp,
                 phi_temp);
         }
@@ -1814,9 +1813,9 @@ int make_atomic_grids(
 #pragma omp parallel for
                     for (int i = 0; i < total_grid[0].size(); i++)
                     {
-                        periodic_grid[j][i] = temp.compute_dens(total_grid[TotalGridIndex::X][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
+                        periodic_grid[j][i] = temp.compute_dens({ total_grid[TotalGridIndex::X][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
                             total_grid[TotalGridIndex::Y][i] + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2),
-                            total_grid[TotalGridIndex::Z][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2));
+                            total_grid[TotalGridIndex::Z][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2) });
                     }
                     j++;
                 }
@@ -2378,7 +2377,7 @@ void convert_to_ED(const ivec& asym_atom_list,
     const hkl_list& hkl)
 {
     double h2 = 0.0;
-    const std::vector<hkl_t> hkl_vector(hkl.begin(), hkl.end());
+    const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
     const int hkl_size = hkl.size();
 #pragma omp parallel for private(h2) shared(hkl_vector)
     for (int s = 0; s < hkl_size; s++)
@@ -2903,7 +2902,7 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
         opt.debug);
 
     cif_input.close();
-    vec2 d1, d2, d3, dens;
+    vec2 d1_, d2_, d3_, dens;
 
     make_atomic_grids(opt.pbc,
         opt.accuracy,
@@ -2912,7 +2911,7 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
         atom_type_list,
         asym_atom_list,
         needs_grid,
-        d1, d2, d3, dens,
+        d1_, d2_, d3_, dens,
         labels,
         std::cout,
         time_points,
@@ -2937,7 +2936,7 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
         log_file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
     }
     int i_ = 0;
-    for (const hkl_d& hkl_ : hkl)
+    for (const d3& hkl_ : hkl)
     {
         for (int x = 0; x < 3; x++)
         {
@@ -2973,9 +2972,9 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
     {
         pmax = static_cast<long long int>(dens[i].size());
         dens_local = dens[i].data();
-        d1_local = d1[i].data();
-        d2_local = d2[i].data();
-        d3_local = d3[i].data();
+        d1_local = d1_[i].data();
+        d2_local = d2_[i].data();
+        d3_local = d3_[i].data();
         sf_local = sf[i].data();
 #pragma omp parallel for private(work, rho)
         for (long long int s = 0; s < smax; s++)

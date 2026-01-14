@@ -91,7 +91,7 @@ public:
      * from the previous grid to save computation time (though for a regular grid structure,
      * we still store all points).
      *
-     * @param func The function to evaluate at grid positions. Takes std::array<double, 3> and returns double.
+     * @param func The function to evaluate at grid positions. Takes d3 and returns double.
      * @param target_error The relative error threshold for the integral convergence.
      * @param max_depth Maximum number of refinement iterations (limit total grid size).
      */

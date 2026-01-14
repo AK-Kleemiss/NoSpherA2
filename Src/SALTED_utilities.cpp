@@ -174,7 +174,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     WFN wfn = WFN(this->filepath.c_str());
     for (const atom& a : *wfn.get_atoms_ptr())
     {
-        std::array<double, 3> xyz = { constants::bohr2ang(a.get_coordinate(0)),
+        d3 xyz = { constants::bohr2ang(a.get_coordinate(0)),
                                       constants::bohr2ang(a.get_coordinate(1)),
                                       constants::bohr2ang(a.get_coordinate(2)) };
         featomic_system.add_atom(a.get_charge(), xyz);

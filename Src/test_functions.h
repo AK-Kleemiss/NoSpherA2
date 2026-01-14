@@ -245,7 +245,7 @@ double calc_spherically_averaged_at_r(const WFN& wavy,
                 const double st = sin(theta);
                 st0 = st * da2;
                 x0 = st * cp, y0 = st * sp, z0 = cos(theta);
-                v += wavy.compute_dens(r * x0, r * y0, r * z0, d, _phi) * st0;
+                v += wavy.compute_dens({ r * x0, r * y0, r * z0 }, d, _phi) * st0;
             }
         }
         if (v != 0.0)
@@ -343,10 +343,8 @@ double calc_grid_averaged_at_r(const WFN& wavy,
     for (int iang = start; iang < size; iang++)
     {
         p = angular_off + iang;
-        double x = angular_x[p] * r + wavy.get_atom_coordinate(0, 0);
-        double y = angular_y[p] * r + wavy.get_atom_coordinate(0, 1);
-        double z = angular_z[p] * r + wavy.get_atom_coordinate(0, 2);
-        dens += wavy.compute_dens(x, y, z, d, _phi) * constants::FOUR_PI * angular_w[p];
+        const d3 Pos = { angular_x[p] * r + wavy.get_atom_coordinate(0, 0), angular_y[p] * r + wavy.get_atom_coordinate(0, 1), angular_z[p] * r + wavy.get_atom_coordinate(0, 2) };
+        dens += wavy.compute_dens(Pos, d, _phi) * constants::FOUR_PI * angular_w[p];
     }
     // if (print)
     //     std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
@@ -415,10 +413,10 @@ double calc_hirsh_grid_averaged_at_r(const WFN& wavy,
         for (int iang = start; iang < size; iang++)
         {
             p = angular_off + iang;
-            const double x = angular_x[p] * r + wavy.get_atom_coordinate(i, 0); /// moving the lebedev points to the atom i
-            const double y = angular_y[p] * r + wavy.get_atom_coordinate(i, 1);
-            const double z = angular_z[p] * r + wavy.get_atom_coordinate(i, 2);
-            const std::array<double, 3> d_ = { angular_x[p] * r, angular_y[p] * r, angular_z[p] * r }; /// as the function get_radial_density needs a distance, the distance is calculated. The atom A is in the origin, the wavy.get_atom_coordinate(i,0) is 0
+            const d3 Pos = { angular_x[p] * r + wavy.get_atom_coordinate(i, 0), /// moving the lebedev points to the atom i
+            angular_y[p] * r + wavy.get_atom_coordinate(i, 1),
+            angular_z[p] * r + wavy.get_atom_coordinate(i, 2) };
+            const d3 d_ = { angular_x[p] * r, angular_y[p] * r, angular_z[p] * r }; /// as the function get_radial_density needs a distance, the distance is calculated. The atom A is in the origin, the wavy.get_atom_coordinate(i,0) is 0
             const double dist = array_length(d_);
             const double rho_a = A.get_radial_density(dist); /// the radial density of the atom i is calculated
             double rho_all = rho_a;                          /// the molecular density based on pro-atoms
@@ -426,13 +424,13 @@ double calc_hirsh_grid_averaged_at_r(const WFN& wavy,
             { /// a new for loop is started, which calculates the sum of rhos, with respect to the lebedev points
                 if (atom == i)
                     continue; /// if the atom is the same as the atom i, the loop is skipped
-                const std::array<double, 3> d_atom = { x - wavy.get_atom_coordinate(atom, 0), y - wavy.get_atom_coordinate(atom, 1), z - wavy.get_atom_coordinate(atom, 2) };
+                const d3 d_atom = { Pos[0] - wavy.get_atom_coordinate(atom, 0), Pos[1] - wavy.get_atom_coordinate(atom, 1), Pos[2] - wavy.get_atom_coordinate(atom, 2) };
                 const double dist_atom = array_length(d_atom); /// is like d_, but for another atom
                 Thakkar thakkar_atom(wavy.get_atom_charge(atom));
                 rho_all += thakkar_atom.get_radial_density(dist_atom);
             }
             const double hirsh_weight = rho_a / rho_all;
-            dens += wavy.compute_dens(x, y, z, d, _phi) * hirsh_weight * constants::FOUR_PI * angular_w[p];
+            dens += wavy.compute_dens(Pos, d, _phi) * hirsh_weight * constants::FOUR_PI * angular_w[p];
         }
     }
     if (print)
@@ -572,10 +570,10 @@ double calc_fukui_averaged_at_r(const WFN& wavy1,
         for (int iang = start; iang < size; iang++)
         {
             p = angular_off + iang;
-            const double x = angular_x[p] * r + wavy1.get_atom_coordinate(0, 0); /// moving the lebedev points to the atom i
-            const double y = angular_y[p] * r + wavy1.get_atom_coordinate(0, 1);
-            const double z = angular_z[p] * r + wavy1.get_atom_coordinate(0, 2);
-            dens += (wavy1.compute_dens(x, y, z, d, _phi) - wavy2.compute_dens(x, y, z, d, _phi)) * constants::FOUR_PI * angular_w[p];
+            const d3 Pos = { angular_x[p] * r + wavy1.get_atom_coordinate(0, 0),
+                                                 angular_y[p] * r + wavy1.get_atom_coordinate(0, 1),
+                                                 angular_z[p] * r + wavy1.get_atom_coordinate(0, 2) };
+            dens += (wavy1.compute_dens(Pos, d, _phi) - wavy2.compute_dens(Pos, d, _phi)) * constants::FOUR_PI * angular_w[p];
         }
     }
     if (print)
@@ -692,7 +690,7 @@ void bondwise_laplacian_plots(std::filesystem::path& wfn_name)
 #pragma omp parallel for
                 for (int k = 0; k < points; k++)
                 {
-                    std::array<double, 3> t_pos = { pos[0], pos[1], pos[2] };
+                    d3 t_pos = { pos[0], pos[1], pos[2] };
                     t_pos[0] += k * bond_vec[0];
                     t_pos[1] += k * bond_vec[1];
                     t_pos[2] += k * bond_vec[2];
@@ -772,8 +770,8 @@ void calc_partition_densities()
     for (int i = 0; i < size; i++)
     {
         x = (i + min) * fac;
-        HF_densities[i] = Hartree_Fock.compute_dens(x, 0, 0, d, phi);
-        DFT_densities[i] = DFT.compute_dens(x, 0, 0, d, phi);
+        HF_densities[i] = Hartree_Fock.compute_dens({ x, 0, 0 }, d, phi);
+        DFT_densities[i] = DFT.compute_dens({ x, 0, 0 }, d, phi);
         double temp = abs(x - Pos_C[0]);
         C_dens[i] = C.get_radial_density(temp);
         total_dens[i] = C_dens[i];
@@ -786,8 +784,8 @@ void calc_partition_densities()
         total_dens[i] += H.get_radial_density(temp);
         temp = sqrt(pow(x - Pos_H4[0], 2) + pow(Pos_H4[1], 2) + pow(Pos_H4[2], 2));
         total_dens[i] += H.get_radial_density(temp);
-        B_weights_C[i] = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa_b, pa_tv, chi).first;
-        B_weights_H[i] = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa_b, pa_tv, chi).first;
+        B_weights_C[i] = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa_b, pa_tv, chi)[0];
+        B_weights_H[i] = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa_b, pa_tv, chi)[0];
         pb.update();
     }
     //    }
@@ -1679,9 +1677,7 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options* opt)
             for (int i = 0; i < pointy[a]; i++)
             {
                 grid[a][4][i] = wavy.compute_dens(
-                    grid[a][0][i],
-                    grid[a][1][i],
-                    grid[a][2][i],
+                    { grid[a][0][i], grid[a][1][i], grid[a][2][i] },
                     d_temp,
                     phi_temp) * grid[a][5][i];
                 //grid[a][6][i] = calc_density_ML(

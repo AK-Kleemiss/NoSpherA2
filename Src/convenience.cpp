@@ -172,7 +172,7 @@ void copy_file(std::filesystem::path& from, std::filesystem::path& to)
     dest.close();
 };
 
-std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b)
+d3 cross(const d3& a, const d3& b)
 {
     return {
         a[1] * b[2] - a[2] * b[1],
@@ -180,7 +180,7 @@ std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<dou
         a[0] * b[1] - a[1] * b[0] };
 }
 
-double a_dot(const std::array<double, 3>& a, const std::array<double, 3>& b)
+double a_dot(const d3& a, const d3& b)
 {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 };
@@ -237,19 +237,11 @@ bool check_bohr(WFN& wave, bool debug)
     double min_length = 300.0;
     for (int i = 0; i < wave.get_ncen(); i++)
     {
-        double atom1[3]{ 0, 0, 0 };
-        for (int x = 0; x < 3; x++)
-            atom1[x] = wave.get_atom_coordinate(i, x);
+        d3 atom1 = wave.get_atom_pos(i);
         for (int j = i + 1; j < wave.get_ncen(); j++)
         {
-            double atom2[3]{ 0, 0, 0 };
-            for (int x = 0; x < 3; x++)
-                atom2[x] = wave.get_atom_coordinate(j, x);
-            double d[3]{ 0, 0, 0 };
-            d[0] = atom1[0] - atom2[0];
-            d[1] = atom1[1] - atom2[1];
-            d[2] = atom1[2] - atom2[2];
-            double length = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
+            d3 atom2 = wave.get_atom_pos(j);
+            const double length = array_length(atom1, atom2);
             if (debug)
                 std::cout << "Length for: " << i << ";" << j << ": " << length << ", min_length: " << min_length << std::endl;
             if (length < min_length)

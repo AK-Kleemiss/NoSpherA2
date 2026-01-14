@@ -121,7 +121,7 @@ int main(int argc, char** argv)
         {
             area += triangles_i[i].calc_area();
             volume += triangles_i[i].calc_inner_volume();
-            std::array<double, 3> pos = triangles_i[i].calc_center();
+            d3 pos = triangles_i[i].calc_center();
             double d_i = calc_d_i(pos, wavy[0]);
             double d_e = calc_d_i(pos, wavy[1]);
 #pragma omp critical

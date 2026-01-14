@@ -46,7 +46,7 @@ private:
     std::string ID;
     int nr, charge, ECP_electrons;
     double x, y, z;
-    std::array<double, 3> frac_coords;
+    d3 frac_coords;
     std::vector<basis_set_entry> basis_set;
     int basis_set_id;
     std::vector<unsigned int> shellcount;
@@ -81,8 +81,8 @@ public:
     void set_charge(const int& ch) { charge = ch; };
     void set_ECP_electrons(const int& ECP_els) { ECP_electrons = ECP_els; };
     void set_coordinate(const unsigned int& axis, const double& value);
-    std::array<double, 3> get_coords() const { return { x,y,z }; };
-    void set_frac_coords(const std::array<double, 3>& frac);
+    d3 get_pos() const { return { x,y,z }; };
+    void set_frac_coords(const d3& frac);
     std::string get_label() const { return label; };
     int get_nr() const { return nr; };
     void set_label(const std::string& l) { label = l; };

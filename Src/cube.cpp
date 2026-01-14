@@ -372,7 +372,7 @@ bool cube::write_xdgraph(const std::filesystem::path& given_path, bool debug)
     of << endl;
     of << fixed << setw(11) << setprecision(4) << origin[0] << " " << origin[1] << " " << origin[2] << endl;
     for (int j = 0; j < 3; j++)
-        of << fixed << setw(12) << setprecision(6) << sqrt(pow(vectors[j][0], 2) + pow(vectors[j][1], 2) + pow(vectors[j][2], 2));
+        of << fixed << setw(12) << setprecision(6) << array_length(d3{ vectors[j][0], vectors[j][1], vectors[j][2] });
     of << endl;
     of << "! Objects" << endl;
     of << setw(10) << na << endl;
@@ -618,7 +618,7 @@ bool has_converged(const double& current_value, double& previous_value, const do
 
 double cube::ewald_sum(const int kMax, const double conv) {
     calc_dv();
-    const std::array<double, 3> lengths{ array_length(vectors[0]) * size[0], array_length(vectors[1]) * size[1], array_length(vectors[2]) * size[2] };
+    const d3 lengths{ array_length(vectors[0]) * size[0], array_length(vectors[1]) * size[1], array_length(vectors[2]) * size[2] };
     const double shortest_length = std::min({ lengths[0], lengths[1], lengths[2] });
     const double alpha = 2.0 * constants::sqr_pi / shortest_length;
     std::cout << "shortest length: " << shortest_length << " alpha: " << alpha << std::endl;
@@ -626,7 +626,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     double reciprocalSpaceEnergy = 0.0;
     double selfEnergy = 0.0;
 
-    std::array<std::array<double, 3>, 3> cell_vectors;
+    std::array<d3, 3> cell_vectors;
     cell_vectors[0] = { vectors[0][0] * size[0], vectors[1][0] * size[0], vectors[2][0] * size[0] };
     cell_vectors[1] = { vectors[0][1] * size[1], vectors[1][1] * size[1], vectors[2][1] * size[1] };
     cell_vectors[2] = { vectors[0][2] * size[2], vectors[1][2] * size[2], vectors[2][2] * size[2] };
@@ -636,7 +636,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     }
 
     // Compute volume of the unit cell
-    const std::array<double, 3> crossProduct = cross(cell_vectors[1], cell_vectors[2]);
+    const d3 crossProduct = cross(cell_vectors[1], cell_vectors[2]);
     const double volume = fabs(dot_(cell_vectors[0], crossProduct));
     std::cout << "Volume: " << volume << std::endl;
     const int grid_points = size[0] * size[1] * size[2];
@@ -644,7 +644,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     std::cout << "dv*points: " << dv * grid_points << std::endl;
 
     // Compute reciprocal lattice vectors
-    std::array<std::array<double, 3>, 3> reciprocalLattice = {
+    std::array<d3, 3> reciprocalLattice = {
         cross(cell_vectors[1], cell_vectors[2]),
         cross(cell_vectors[2], cell_vectors[0]),
         cross(cell_vectors[0], cell_vectors[1])
@@ -724,7 +724,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
                     if (known) continue;
                     known_kVecs.push_back({ h, k, l });
 
-                    const std::array<double, 3> kvec = {
+                    const d3 kvec = {
                         h * reciprocalLattice[0][0] + k * reciprocalLattice[1][0] + l * reciprocalLattice[2][0],
                         h * reciprocalLattice[0][1] + k * reciprocalLattice[1][1] + l * reciprocalLattice[2][1],
                         h * reciprocalLattice[0][2] + k * reciprocalLattice[1][2] + l * reciprocalLattice[2][2]
@@ -735,13 +735,13 @@ double cube::ewald_sum(const int kMax, const double conv) {
                         double v1 = 0, kDotR = 0;
 #pragma ivdep
                         for (int d2 = 0; d2 < size[1]; d2++) {
-                            for (int d3 = 0; d3 < size[2]; d3++) {
-                                v1 = values[d1][d2][d3];
-                                const std::array<double, 3> ri = get_pos(d1, d2, d3);
+                            for (int d3_ = 0; d3_ < size[2]; d3_++) {
+                                v1 = values[d1][d2][d3_];
+                                const d3 ri = get_pos(d1, d2, d3_);
                                 for (int d4 = 0; d4 < size[0]; d4++) {
                                     for (int d5 = 0; d5 < size[1]; d5++) {
                                         for (int d6 = 0; d6 < size[2]; d6++) {
-                                            std::array<double, 3> rj = get_pos(d4, d5, d6);
+                                            d3 rj = get_pos(d4, d5, d6);
                                             rj = { rj[0] - ri[0], rj[1] - ri[1], rj[2] - ri[2] };
                                             kDotR = dot_(kvec, rj);
                                             temp += exp(-k2 / FOUR_alsq) / abs(k2) * v1 * values[d4][d5][d6] * cos(kDotR);
@@ -1243,7 +1243,7 @@ double cube::jaccard(const cube& right) const {
     return (top / bot); //RETURN Real Space R-value between this cube and the given one
 };
 
-void cube::adaptive_refine(std::function<const double(const std::array<double, 3>)> const func, double target_error, int max_depth) {
+void cube::adaptive_refine(std::function<const double(const d3)> const func, double target_error, int max_depth) {
     using namespace std;
     double current_integral = sum();
     cout << "Initial Integral: " << current_integral << endl;

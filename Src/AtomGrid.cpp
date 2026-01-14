@@ -15,11 +15,11 @@
 struct DensityExtremum
 {
     enum class Type { Minimum, Maximum } type;
-    double x{0}, y{0}, z{0};     // Cartesian position (Bohr)
-    double density{0};           // Electron density at extremum
-    double distA{0};             // Distance to atom A (Bohr)
-    double distB{0};             // Distance to atom B (Bohr)
-    double t{0};                 // Parameter along AB in [0,1]
+    d3 pos{ 0, 0, 0 };     // Cartesian position (Bohr)
+    double density{ 0 };           // Electron density at extremum
+    double distA{ 0 };             // Distance to atom A (Bohr)
+    double distB{ 0 };             // Distance to atom B (Bohr)
+    double t{ 0 };                 // Parameter along AB in [0,1]
 };
 
 // Find all local minima and maxima of the electron density along the straight
@@ -40,18 +40,14 @@ static std::vector<DensityExtremum> find_line_density_extrema(
     samples = std::max(samples, 5);
 
     // Atom positions (Bohr)
-    const double ax = wfn.get_atom_coordinate((unsigned)atomA, 0);
-    const double ay = wfn.get_atom_coordinate((unsigned)atomA, 1);
-    const double az = wfn.get_atom_coordinate((unsigned)atomA, 2);
-    const double bx = wfn.get_atom_coordinate((unsigned)atomB, 0);
-    const double by = wfn.get_atom_coordinate((unsigned)atomB, 1);
-    const double bz = wfn.get_atom_coordinate((unsigned)atomB, 2);
+    const d3 pos_a = wfn.get_atom_pos((unsigned)atomA);
+    const d3 pos_b = wfn.get_atom_pos((unsigned)atomB);
 
-    const double dx = bx - ax;
-    const double dy = by - ay;
-    const double dz = bz - az;
+    const d3 dx = { pos_b[0] - pos_a[0],
+       pos_b[1] - pos_a[1],
+       pos_b[2] - pos_a[2] };
 
-    const double ab_len = std::sqrt(dx*dx + dy*dy + dz*dz);
+    const double ab_len = array_length(dx);
     if (ab_len <= 0) return result;
 
     // Sampling t in (0,1); avoid endpoints to reduce numerical issues near nuclei
@@ -75,10 +71,10 @@ static std::vector<DensityExtremum> find_line_density_extrema(
     for (int i = 0; i < samples; ++i) {
         const double t = t0 + i * dt;
         ts[i] = t;
-        const double x = ax + dx * t;
-        const double y = ay + dy * t;
-        const double z = az + dz * t;
-        dens[i] = wfn.compute_dens(x, y, z);
+        const d3 Pos = { pos_a[0] + dx[0] * t,
+          pos_a[1] + dx[1] * t,
+          pos_a[2] + dx[2] * t };
+        dens[i] = wfn.compute_dens(Pos);
         if (wfn.get_ECP_mode() != 0) {
             dens[i] += spherical_temp1->get_core_density(ab_len * t, wfn.get_atom_ECP_electrons(atomA));
             dens[i] += spherical_temp2->get_core_density(ab_len * (1.0 - t), wfn.get_atom_ECP_electrons(atomB));
@@ -92,7 +88,7 @@ static std::vector<DensityExtremum> find_line_density_extrema(
         delete spherical_temp2;
         delete a1;
         delete a2;
-	}
+    }
 
     // Detect extrema via sign changes of the discrete derivative
     for (int i = 1; i < samples - 1; ++i) {
@@ -119,19 +115,19 @@ static std::vector<DensityExtremum> find_line_density_extrema(
                 // Clamp delta to [-1,1] to remain within the bracket
                 const double clamped = std::max(-1.0, std::min(1.0, delta));
                 t_ext = ts[i] + clamped * dt;
-                const double x = ax + dx * t_ext;
-                const double y = ay + dy * t_ext;
-                const double z = az + dz * t_ext;
-                f_ext = wfn.compute_dens(x, y, z);
+                const d3 Pos = { pos_a[0] + dx[0] * t_ext,
+                  pos_a[1] + dx[1] * t_ext,
+                  pos_a[2] + dx[2] * t_ext };
+                f_ext = wfn.compute_dens(Pos);
             }
         }
 
         DensityExtremum e;
         e.type = isMax ? DensityExtremum::Type::Maximum : DensityExtremum::Type::Minimum;
         e.t = t_ext;
-        e.x = ax + dx * t_ext;
-        e.y = ay + dy * t_ext;
-        e.z = az + dz * t_ext;
+        e.pos = { pos_a[0] + dx[0] * t_ext,
+          pos_a[1] + dx[1] * t_ext,
+          pos_a[2] + dx[2] * t_ext };
         e.density = f_ext;
         e.distA = t_ext * ab_len;
         e.distB = (1.0 - t_ext) * ab_len;
@@ -142,117 +138,117 @@ static std::vector<DensityExtremum> find_line_density_extrema(
 }
 
 AtomGrid::AtomGrid(const double radial_precision,
-  const int min_num_angular_points,
-  const int max_num_angular_points,
-  const int proton_charge,
-  const double alpha_max,
-  const int max_l_quantum_number,
-  const double alpha_min[],
-  std::ostream& file)
+    const int min_num_angular_points,
+    const int max_num_angular_points,
+    const int proton_charge,
+    const double alpha_max,
+    const int max_l_quantum_number,
+    const double alpha_min[],
+    std::ostream& file)
 {
-  using namespace std;
-  const int min_num_angular_points_closest =
-    constants::get_closest_num_angular(min_num_angular_points);
-  const int max_num_angular_points_closest =
-    constants::get_closest_num_angular(max_num_angular_points);
-  err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);
+    using namespace std;
+    const int min_num_angular_points_closest =
+        constants::get_closest_num_angular(min_num_angular_points);
+    const int max_num_angular_points_closest =
+        constants::get_closest_num_angular(max_num_angular_points);
+    err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);
 
-  vec angular_x(constants::max_LT * constants::MAG, 0.0);
-  vec angular_y(constants::max_LT * constants::MAG, 0.0);
-  vec angular_z(constants::max_LT * constants::MAG, 0.0);
-  vec angular_w(constants::max_LT * constants::MAG, 0.0);
-  int angular_off;
-  lebedev_sphere ls;
+    vec angular_x(constants::max_LT * constants::MAG, 0.0);
+    vec angular_y(constants::max_LT * constants::MAG, 0.0);
+    vec angular_z(constants::max_LT * constants::MAG, 0.0);
+    vec angular_w(constants::max_LT * constants::MAG, 0.0);
+    int angular_off;
+    lebedev_sphere ls;
 
-  for (int i = constants::get_angular_order(min_num_angular_points_closest); i < constants::get_angular_order(max_num_angular_points_closest) + 1; i++) {
-    angular_off = i * constants::MAG;
-    ls.ld_by_order(constants::lebedev_table[i],
-      angular_x.data() + angular_off,
-      angular_y.data() + angular_off,
-      angular_z.data() + angular_off,
-      angular_w.data() + angular_off);
-  }
-
-  // radial parameters
-  const double r_inner = get_r_inner(radial_precision, alpha_max * 2.0); // factor 2.0 to match DIRAC
-  double h = (std::numeric_limits<double>::max)();
-  double r_outer = 0.0;
-
-  for (int l = 0; l <= max_l_quantum_number; l++) {
-    if (alpha_min[l] > 0.0) {
-      //if (debug) 
-      //    file << "ATOM GRID: " 
-      //       << "l= " << l 
-      //       << " r_inner: " << r_inner 
-      //       << " alpha_min: " << alpha_min[l] << endl;
-      r_outer = (((r_outer) > (get_r_outer(radial_precision, alpha_min[l], l, 4.0 * constants::bragg_angstrom[proton_charge]))) ? (r_outer) : (get_r_outer(radial_precision, alpha_min[l], l, 4.0 * constants::bragg_angstrom[proton_charge])));
-      h = (((h) < (get_h(radial_precision, l, 0.1 * (r_outer - r_inner)))) ? (h) : (get_h(radial_precision, l, 0.1 * (r_outer - r_inner))));
-    }
-  }
-
-  //if (debug)
-  //  file << "ATOM GRID: "
-  //  << "r_inner: " << r_inner
-  //  << " h: " << h
-  //  << " r_outer: " << r_outer << endl;
-
-  num_radial_grid_points_ = 0;
-
-  const double rb = constants::bragg_angstrom[proton_charge] / (5.0E10 * constants::a0);
-  const double c = r_inner / (exp(h) - 1.0);
-  const int num_radial = int(log(1.0 + (r_outer / c)) / h);
-  radial_atom_grid_r_bohr_.reserve(num_radial);
-  radial_atom_grid_w_.reserve(num_radial);
-
-  //if (debug)
-  //  file << "ATOM GRID: "
-  //  << "rb: " << rb
-  //  << " c: " << c
-  //  << " num_radial: " << num_radial << endl;
-
-  for (int irad = 0; irad < num_radial; irad++) {
-    double radial_r = c * (exp(static_cast<double>(irad + 1.0) * h) - 1.0);
-    double radial_w = (radial_r + c) * radial_r * radial_r * h;
-
-    radial_atom_grid_r_bohr_.emplace_back(radial_r);
-    radial_atom_grid_w_.emplace_back(radial_w);
-    num_radial_grid_points_++;
-
-    int num_angular = max_num_angular_points_closest;
-    if (radial_r < rb) {
-      num_angular = static_cast<int>(max_num_angular_points_closest *
-        (radial_r / rb));
-      num_angular = constants::get_closest_num_angular(num_angular);
-      err_checkf(num_angular != -1, "No valid value for angular number found!", file);
-      if (num_angular < min_num_angular_points_closest)
-        num_angular = min_num_angular_points_closest;
+    for (int i = constants::get_angular_order(min_num_angular_points_closest); i < constants::get_angular_order(max_num_angular_points_closest) + 1; i++) {
+        angular_off = i * constants::MAG;
+        ls.ld_by_order(constants::lebedev_table[i],
+            angular_x.data() + angular_off,
+            angular_y.data() + angular_off,
+            angular_z.data() + angular_off,
+            angular_w.data() + angular_off);
     }
 
-    angular_off = constants::get_angular_order(num_angular) * constants::MAG;
-    err_checkf(angular_off != -constants::MAG, "Invalid angular order!", file);
-    const int start = (int) atom_grid_x_bohr_.size();
-    angular_off -= start;
-    const int size = start + num_angular;
-    int p = 0;
-    atom_grid_x_bohr_.resize(size);
-    atom_grid_y_bohr_.resize(size);
-    atom_grid_z_bohr_.resize(size);
-    atom_grid_w_.resize(size);
+    // radial parameters
+    const double r_inner = get_r_inner(radial_precision, alpha_max * 2.0); // factor 2.0 to match DIRAC
+    double h = (std::numeric_limits<double>::max)();
+    double r_outer = 0.0;
+
+    for (int l = 0; l <= max_l_quantum_number; l++) {
+        if (alpha_min[l] > 0.0) {
+            //if (debug) 
+            //    file << "ATOM GRID: " 
+            //       << "l= " << l 
+            //       << " r_inner: " << r_inner 
+            //       << " alpha_min: " << alpha_min[l] << endl;
+            r_outer = (((r_outer) > (get_r_outer(radial_precision, alpha_min[l], l, 4.0 * constants::bragg_angstrom[proton_charge]))) ? (r_outer) : (get_r_outer(radial_precision, alpha_min[l], l, 4.0 * constants::bragg_angstrom[proton_charge])));
+            h = (((h) < (get_h(radial_precision, l, 0.1 * (r_outer - r_inner)))) ? (h) : (get_h(radial_precision, l, 0.1 * (r_outer - r_inner))));
+        }
+    }
+
+    //if (debug)
+    //  file << "ATOM GRID: "
+    //  << "r_inner: " << r_inner
+    //  << " h: " << h
+    //  << " r_outer: " << r_outer << endl;
+
+    num_radial_grid_points_ = 0;
+
+    const double rb = constants::bragg_angstrom[proton_charge] / (5.0E10 * constants::a0);
+    const double c = r_inner / (exp(h) - 1.0);
+    const int num_radial = int(log(1.0 + (r_outer / c)) / h);
+    radial_atom_grid_r_bohr_.reserve(num_radial);
+    radial_atom_grid_w_.reserve(num_radial);
+
+    //if (debug)
+    //  file << "ATOM GRID: "
+    //  << "rb: " << rb
+    //  << " c: " << c
+    //  << " num_radial: " << num_radial << endl;
+
+    for (int irad = 0; irad < num_radial; irad++) {
+        double radial_r = c * (exp(static_cast<double>(irad + 1.0) * h) - 1.0);
+        double radial_w = (radial_r + c) * radial_r * radial_r * h;
+
+        radial_atom_grid_r_bohr_.emplace_back(radial_r);
+        radial_atom_grid_w_.emplace_back(radial_w);
+        num_radial_grid_points_++;
+
+        int num_angular = max_num_angular_points_closest;
+        if (radial_r < rb) {
+            num_angular = static_cast<int>(max_num_angular_points_closest *
+                (radial_r / rb));
+            num_angular = constants::get_closest_num_angular(num_angular);
+            err_checkf(num_angular != -1, "No valid value for angular number found!", file);
+            if (num_angular < min_num_angular_points_closest)
+                num_angular = min_num_angular_points_closest;
+        }
+
+        angular_off = constants::get_angular_order(num_angular) * constants::MAG;
+        err_checkf(angular_off != -constants::MAG, "Invalid angular order!", file);
+        const int start = (int)atom_grid_x_bohr_.size();
+        angular_off -= start;
+        const int size = start + num_angular;
+        int p = 0;
+        atom_grid_x_bohr_.resize(size);
+        atom_grid_y_bohr_.resize(size);
+        atom_grid_z_bohr_.resize(size);
+        atom_grid_w_.resize(size);
 #pragma omp parallel for private(p)
-    for (int iang = start; iang < size; iang++) {
-      p = angular_off + iang;
-      atom_grid_x_bohr_[iang] = angular_x[p] * radial_r;
-      atom_grid_y_bohr_[iang] = angular_y[p] * radial_r;
-      atom_grid_z_bohr_[iang] = angular_z[p] * radial_r;
+        for (int iang = start; iang < size; iang++) {
+            p = angular_off + iang;
+            atom_grid_x_bohr_[iang] = angular_x[p] * radial_r;
+            atom_grid_y_bohr_[iang] = angular_y[p] * radial_r;
+            atom_grid_z_bohr_[iang] = angular_z[p] * radial_r;
 
-      atom_grid_w_[iang] = constants::FOUR_PI * angular_w[p] * radial_w;
+            atom_grid_w_[iang] = constants::FOUR_PI * angular_w[p] * radial_w;
+        }
     }
-  }
 }
 
 AtomGrid::~AtomGrid() {}
 
-int AtomGrid::get_num_grid_points() const { return (int) atom_grid_x_bohr_.size(); }
+int AtomGrid::get_num_grid_points() const { return (int)atom_grid_x_bohr_.size(); }
 
 int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
@@ -260,7 +256,7 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug =
     vec2 chi(wfn.get_ncen(), vec(wfn.get_ncen(), 0.0));
     std::vector<std::vector<bool>> neighbours(wfn.get_ncen(), bvec(wfn.get_ncen(), true));
     double rijx2, rijy2, rijz2, xdist, disth;
-    for (int a = 0; a < wfn.get_ncen(); a++){
+    for (int a = 0; a < wfn.get_ncen(); a++) {
         for (int b = a + 1; b < wfn.get_ncen(); b++) {
             // Evaluating midpoint between a pair of atoms
             rijx2 = (wfn.get_atom_coordinate(b, 0) + wfn.get_atom_coordinate(a, 0)) / 2.0;
@@ -376,7 +372,8 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug =
                         std::cout << "WARNING: Division by zero detected for chi between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
                         chi[a][b] = 1.0;
                         chi[b][a] = 1.0;
-                    } else {
+                    }
+                    else {
                         chi[a][b] = extrema[use_extr].distA / extrema[use_extr].distB;
                         chi[b][a] = 1.0 / chi[a][b];
                     }
@@ -384,11 +381,11 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug =
                     double ri = extrema[use_extr].distA / (extrema[use_extr].distA + extrema[use_extr].distB);
                     if (ri >= 0.90 || ri <= 0.10) {
                         std::cout << "WARNING: Large bond polarization detected between atoms " << a << " and " << b
-                                  << " (ri = " << ri << ", ri >= 0.90 or ri <= 0.10). Please verify TFVC results." << std::endl;
+                            << " (ri = " << ri << ", ri >= 0.90 or ri <= 0.10). Please verify TFVC results." << std::endl;
                     }
                     // Some printing on the ratio between pair of atoms, for if strange results (or against chemical intuition) are obtained one can see if it is TFVC problem
                     // This is helpful to see if the "bcp" evaluation is broken, or one face a nasty scenario that is not yet included in the code...
-                    if(debug)
+                    if (debug)
                         std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a][b] << std::endl;
                 }
             }
@@ -418,26 +415,6 @@ void AtomGrid::get_grid(const int num_centers,
     vec2& chi,
     bool debug) const
 {
-    //vec pa(num_centers);
-    //double x = -1.836008, y = -0.292080, z = -0.861742;
-    //double weight1 = get_tfvc_w(num_centers,
-    //    proton_charges,
-    //    x_coordinates_bohr,
-    //    y_coordinates_bohr,
-    //    z_coordinates_bohr,
-    //    0,
-    //    x,
-    //    y,
-	//	z, pa, chi);
-    //double weight2 = get_tfvc_w(num_centers,
-    //    proton_charges,
-    //    x_coordinates_bohr,
-    //    y_coordinates_bohr,
-    //    z_coordinates_bohr,
-    //    1,
-    //    x,
-    //    y,
-	//	z, pa, chi);
 
     if (num_centers > 1) {
         if (chi.size() == 0)
@@ -446,7 +423,7 @@ void AtomGrid::get_grid(const int num_centers,
         {
             vec pa_b(num_centers);
             vec pa_tv(num_centers);
-            std::pair<double, double> result_weights;
+            std::array<double, 2> result_weights;
             double temp;
 #pragma omp for
             for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
@@ -468,8 +445,8 @@ void AtomGrid::get_grid(const int num_centers,
                     pa_tv,
                     chi
                 );
-                grid_becke_w[ipoint] = temp * result_weights.first;
-                grid_TFVC_w[ipoint] = temp * result_weights.second;
+                grid_becke_w[ipoint] = temp * result_weights[0];
+                grid_TFVC_w[ipoint] = temp * result_weights[1];
                 grid_aw[ipoint] = temp;
             }
         }
@@ -488,42 +465,42 @@ void AtomGrid::get_grid(const int num_centers,
 
 void AtomGrid::get_radial_grid(double grid_r_bohr[], double grid_w[]) const
 {
-  for (size_t ipoint = 0; ipoint < num_radial_grid_points_; ipoint++) {
-    grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
-    grid_w[ipoint] = radial_atom_grid_w_[ipoint];
-  }
+    for (size_t ipoint = 0; ipoint < num_radial_grid_points_; ipoint++) {
+        grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
+        grid_w[ipoint] = radial_atom_grid_w_[ipoint];
+    }
 }
 
 void AtomGrid::get_radial_distances(double grid_r_bohr[]) const
 {
-  for (size_t ipoint = 0; ipoint < num_radial_grid_points_; ipoint++)
-    grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
+    for (size_t ipoint = 0; ipoint < num_radial_grid_points_; ipoint++)
+        grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
 }
 
 void AtomGrid::get_radial_grid_omp(double grid_r_bohr[], double grid_w[]) const
 {
 #pragma omp parallel for
-  for (int ipoint = 0; ipoint < num_radial_grid_points_; ipoint++) {
-    grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
-    grid_w[ipoint] = radial_atom_grid_w_[ipoint];
-  }
+    for (int ipoint = 0; ipoint < num_radial_grid_points_; ipoint++) {
+        grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
+        grid_w[ipoint] = radial_atom_grid_w_[ipoint];
+    }
 }
 
 void AtomGrid::get_radial_distances_omp(double grid_r_bohr[]) const
 {
 #pragma omp parallel for
-  for (int ipoint = 0; ipoint < num_radial_grid_points_; ipoint++)
-    grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
+    for (int ipoint = 0; ipoint < num_radial_grid_points_; ipoint++)
+        grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
 }
 
 // JCP 88, 2547 (1988), eq. 20
 constexpr double f3(const double& x)
 {
-  double f = x;
-  f *= (1.5 - 0.5 * f * f); // First iteration
-  f *= (1.5 - 0.5 * f * f); // Second iteration
-  f *= (1.5 - 0.5 * f * f); // Third iteration
-  return f;
+    double f = x;
+    f *= (1.5 - 0.5 * f * f); // First iteration
+    f *= (1.5 - 0.5 * f * f); // Second iteration
+    f *= (1.5 - 0.5 * f * f); // Third iteration
+    return f;
 }
 
 // JCP 88, 2547 (1988), eq. 20
@@ -539,15 +516,15 @@ constexpr double f4(const double& x)
 
 constexpr double f(const double& x)
 {
-  double f = x;
-  for (int i = 0; i < constants::hardness; i++)
-    f *= (1.5 - 0.5 * f * f);
-  return f;
+    double f = x;
+    for (int i = 0; i < constants::hardness; i++)
+        f *= (1.5 - 0.5 * f * f);
+    return f;
 }
 
 // JCP 139, 071103 (2013) for TFVC
 // JCP 88, 2547 (1988) for Becke
-std::pair<double, double> get_integration_weights(const int& num_centers,
+std::array<double, 2> get_integration_weights(const int& num_centers,
     const int* proton_charges,
     const double* x_coordinates_bohr,
     const double* y_coordinates_bohr,
@@ -665,82 +642,82 @@ std::pair<double, double> get_integration_weights(const int& num_centers,
 // we evaluate r_inner for s functions
 const double get_r_inner(const double& max_error, const double& alpha_inner)
 {
-  double d = 1.9;
+    double d = 1.9;
 
-  double r = (d - log(1.0 / max_error)) * 2./3.;
-  r = exp(r) / (alpha_inner);
-  r = std::sqrt(r);
+    double r = (d - log(1.0 / max_error)) * 2. / 3.;
+    r = exp(r) / (alpha_inner);
+    r = std::sqrt(r);
 
-  return r;
+    return r;
 }
 
 #pragma GCC optimize("-fno-fast-math") //gcc fails to converge in this function when using fast math, so not use it
 // TCA 106, 178 (2001), eq. 19
 double get_r_outer(const double& max_error,
-  const double& alpha_outer,
-  const int& l,
-  const double& guess)
+    const double& alpha_outer,
+    const int& l,
+    const double& guess)
 {
-  const int m = 2 * l;
-  double r = guess;
-  double r_old = 1.0e50;
-  double c, a, e;
-  double step = 0.5;
-  double sign, sign_old;
-  double f = 1.0e50;
+    const int m = 2 * l;
+    double r = guess;
+    double r_old = 1.0e50;
+    double c, a, e;
+    double step = 0.5;
+    double sign, sign_old;
+    double f = 1.0e50;
 
-  (f > max_error) ? (sign = 1.0) : (sign = -1.0);
-
-  while (std::abs(r_old - r) > constants::cutoff)
-  {
-    c = tgamma((m + 3.0) / 2.0);
-    a = std::pow(alpha_outer * r * r, (m + 1.0) / 2.0);
-    e = std::exp(-alpha_outer * r * r);
-    f = c * a * e;
-
-    sign_old = sign;
     (f > max_error) ? (sign = 1.0) : (sign = -1.0);
-    if (r < 0.0)
-      sign = 1.0;
-    if (sign != sign_old)
-      step *= 0.1;
 
-    r_old = r;
-    r += sign * step;
-  }
+    while (std::abs(r_old - r) > constants::cutoff)
+    {
+        c = tgamma((m + 3.0) / 2.0);
+        a = std::pow(alpha_outer * r * r, (m + 1.0) / 2.0);
+        e = std::exp(-alpha_outer * r * r);
+        f = c * a * e;
 
-  return r;
+        sign_old = sign;
+        (f > max_error) ? (sign = 1.0) : (sign = -1.0);
+        if (r < 0.0)
+            sign = 1.0;
+        if (sign != sign_old)
+            step *= 0.1;
+
+        r_old = r;
+        r += sign * step;
+    }
+
+    return r;
 }
 
 // TCA 106, 178 (2001), eqs. 17 and 18
 double get_h(const double& max_error, const int& l, const double& guess)
 {
-  const int m = 2 * l;
-  double h = guess;
-  double h_old = h * 2;
-  double step = 0.1 * guess;
-  double sign = -1.0, sign_old, f, pl, rd0, e0;
-  const double cm = constants::TG32 / tgamma((m + 3.0) / 2.0);
+    const int m = 2 * l;
+    double h = guess;
+    double h_old = h * 2;
+    double step = 0.1 * guess;
+    double sign = -1.0, sign_old, f, pl, rd0, e0;
+    const double cm = constants::TG32 / tgamma((m + 3.0) / 2.0);
 
-  while (std::abs(h_old - h) > constants::cutoff)
-  {
-    e0 = std::exp(-constants::PI2 / (2.0 * h));
-    pl = std::pow(constants::PI / h, l);
-    rd0 = constants::C0 / h * e0;
-    f = cm * pl * rd0;
+    while (std::abs(h_old - h) > constants::cutoff)
+    {
+        e0 = std::exp(-constants::PI2 / (2.0 * h));
+        pl = std::pow(constants::PI / h, l);
+        rd0 = constants::C0 / h * e0;
+        f = cm * pl * rd0;
 
-    sign_old = sign;
-    (f > max_error) ? (sign = -1.0) : (sign = 1.0);
-    if (h < 0.0)
-      sign = 1.0;
-    if (sign != sign_old)
-      step *= 0.1;
+        sign_old = sign;
+        (f > max_error) ? (sign = -1.0) : (sign = 1.0);
+        if (h < 0.0)
+            sign = 1.0;
+        if (sign != sign_old)
+            step *= 0.1;
 
-    h_old = h;
-    h += sign * step;
-    //if (h < 0.007) h = 0.007;
-  }
+        h_old = h;
+        h += sign * step;
+        //if (h < 0.007) h = 0.007;
+    }
 
-  return h;
+    return h;
 }
 #pragma GCC optimize("fast-math")

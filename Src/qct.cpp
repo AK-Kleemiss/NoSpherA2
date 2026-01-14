@@ -491,15 +491,23 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
     /*execute the interactive menu*/
     run = menu(opt, wavy, run);
 
-    if (run.Frames != 1 || run.NbFiles > 1) promolecular = true;
+    if (run.Frames != 1 || run.NbFiles > 1)
+        promolecular = true;
 
+    properties_options opts = opt.properties;
+    opts.resolution = run.Increments[0];
 
-    cube* persistant_cube_rho;
-    cube* persistant_cube_RDG;
-    cube* persistant_cube_Elf;
-    cube* persistant_cube_Eli;
-    cube* persistant_cube_Lap;
-    cube* persistant_cube_ESP;
+    readxyzMinMax_fromWFN(
+        wavy[run.MoleculeFiles[0]],
+        opts,
+        false);
+
+    cube persistant_cube_rho(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rho && run.Frames > 1);
+    cube persistant_cube_RDG(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rdg && run.Frames > 1);
+    cube persistant_cube_Elf(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.elf && run.Frames > 1);
+    cube persistant_cube_Eli(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.eli && run.Frames > 1);
+    cube persistant_cube_Lap(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.lap && run.Frames > 1);
+    cube persistant_cube_ESP(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.esp && run.Frames > 1);
     //cube* persistant_cube_EF;
     //cube* persistant_cube_Hirsh;
     //cube *persistant_cube_def;
@@ -511,96 +519,90 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
     vector<vector<vector<int> > > sign_counter;
     vector<vector<vector<int> > > ignore_RDG;
     int negative_signs = 0;
-    properties_options opts = opt.properties;
-    opts.resolution = run.Increments[0];
 
-    readxyzMinMax_fromWFN(
-        wavy[run.MoleculeFiles[0]],
-        opts,
-        false);
     run.Oname = wavy[run.MoleculeFiles[0]].get_path().filename().string();
-    cube CubeRho(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rho || opts.eli || opts.lap),
-        CubeDEF(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.def),
-        CubeRDG(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rdg),
-        CubeElf(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.elf),
-        CubeEli(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.eli),
-        CubeLap(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.lap),
-        CubeESP(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.esp),
-        CubeHDEF(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.hdef);
-    CubeRho.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    CubeDEF.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    CubeRDG.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    CubeElf.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    CubeEli.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    CubeLap.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    CubeESP.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    CubeHDEF.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    std::vector<cube> cubes = { {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rho || opts.eli || opts.lap},
+        {},
+       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rdg},
+       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.elf},
+       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.eli},
+       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.lap},
+       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.esp},
+        {},
+       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.hdef},
+        {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.def},
+        {},
+        {},
+        {} };
+    cubes[cube_type::Rho].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    cubes[cube_type::DEF].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    cubes[cube_type::RDG].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    cubes[cube_type::Elf].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    cubes[cube_type::Eli].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    cubes[cube_type::Lap].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    cubes[cube_type::ESP].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    cubes[cube_type::HDEF].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
 
     //CubeHirsh(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[opt.MoleculeFiles[0]].get_ncen(), opt.dohirsh);
 
-    persistant_cube_rho = new cube(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rho && run.Frames > 1);
-    persistant_cube_RDG = new cube(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rdg && run.Frames > 1);
-    persistant_cube_Elf = new cube(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.elf && run.Frames > 1);
-    persistant_cube_Eli = new cube(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.eli && run.Frames > 1);
-    persistant_cube_Lap = new cube(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.lap && run.Frames > 1);
     //persistant_cube_Hirsh = new cube(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[opt.MoleculeFiles[0]].get_ncen(), opt.dohirsh);
-    persistant_cube_ESP = new cube(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.esp && run.Frames > 1);
+
     //persistant_cube_EF = new cube(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[opt.MoleculeFiles[0]].get_ncen(), opt.doef);
     //persistant_cube_def = new cube(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[opt.MoleculeFiles[0]].get_ncen(), opt.dodef);
 
     for (int i = 0; i < 3; i++) {
-        CubeRho.set_origin(i, opts.MinMax[i]);
-        CubeRDG.set_origin(i, opts.MinMax[i]);
-        CubeElf.set_origin(i, opts.MinMax[i]);
-        CubeEli.set_origin(i, opts.MinMax[i]);
-        CubeLap.set_origin(i, opts.MinMax[i]);
-        CubeESP.set_origin(i, opts.MinMax[i]);
-        CubeHDEF.set_origin(i, opts.MinMax[i]);
-        CubeDEF.set_origin(i, opts.MinMax[i]);
+        cubes[cube_type::Rho].set_origin(i, opts.MinMax[i]);
+        cubes[cube_type::RDG].set_origin(i, opts.MinMax[i]);
+        cubes[cube_type::Elf].set_origin(i, opts.MinMax[i]);
+        cubes[cube_type::Eli].set_origin(i, opts.MinMax[i]);
+        cubes[cube_type::Lap].set_origin(i, opts.MinMax[i]);
+        cubes[cube_type::ESP].set_origin(i, opts.MinMax[i]);
+        cubes[cube_type::HDEF].set_origin(i, opts.MinMax[i]);
+        cubes[cube_type::DEF].set_origin(i, opts.MinMax[i]);
         for (int j = 0; j < 3; j++) {
             if (i == j) {
-                CubeRho.set_vector(i, j, run.Increments[i]);
-                CubeRDG.set_vector(i, j, run.Increments[i]);
-                CubeElf.set_vector(i, j, run.Increments[i]);
-                CubeEli.set_vector(i, j, run.Increments[i]);
-                CubeLap.set_vector(i, j, run.Increments[i]);
-                CubeESP.set_vector(i, j, run.Increments[i]);
-                CubeHDEF.set_vector(i, j, run.Increments[i]);
-                CubeDEF.set_vector(i, j, run.Increments[i]);
+                cubes[cube_type::Rho].set_vector(i, j, run.Increments[i]);
+                cubes[cube_type::RDG].set_vector(i, j, run.Increments[i]);
+                cubes[cube_type::Elf].set_vector(i, j, run.Increments[i]);
+                cubes[cube_type::Eli].set_vector(i, j, run.Increments[i]);
+                cubes[cube_type::Lap].set_vector(i, j, run.Increments[i]);
+                cubes[cube_type::ESP].set_vector(i, j, run.Increments[i]);
+                cubes[cube_type::HDEF].set_vector(i, j, run.Increments[i]);
+                cubes[cube_type::DEF].set_vector(i, j, run.Increments[i]);
             }
             else {
-                CubeRho.set_vector(i, j, 0);
-                CubeRDG.set_vector(i, j, 0);
-                CubeElf.set_vector(i, j, 0);
-                CubeEli.set_vector(i, j, 0);
-                CubeLap.set_vector(i, j, 0);
-                CubeESP.set_vector(i, j, 0);
-                CubeHDEF.set_vector(i, j, 0);
-                CubeDEF.set_vector(i, j, 0);
+                cubes[cube_type::Rho].set_vector(i, j, 0);
+                cubes[cube_type::RDG].set_vector(i, j, 0);
+                cubes[cube_type::Elf].set_vector(i, j, 0);
+                cubes[cube_type::Eli].set_vector(i, j, 0);
+                cubes[cube_type::Lap].set_vector(i, j, 0);
+                cubes[cube_type::ESP].set_vector(i, j, 0);
+                cubes[cube_type::HDEF].set_vector(i, j, 0);
+                cubes[cube_type::DEF].set_vector(i, j, 0);
             }
         }
     }
-    CubeRho.set_comment1("Calculated density using QCT");
-    CubeRDG.set_comment1("Calculated reduced density gradient using QCT");
-    CubeElf.set_comment1("Calculated electron localization function using QCT");
-    CubeEli.set_comment1("Calculated same-spin electron localizability indicator using QCT");
-    CubeLap.set_comment1("Calculated laplacian of electron density using QCT");
-    CubeESP.set_comment1("Calculated electrostatic potential using QCT");
-    CubeHDEF.set_comment1("Calculated Hirshfeld deformation density using QCT");
-    CubeRho.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    CubeRDG.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    CubeElf.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    CubeLap.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    CubeESP.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    CubeHDEF.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    CubeRho.set_path(run.Oname + "_rho.cube");
-    CubeRDG.set_path(run.Oname + "_rdg.cube");
-    CubeElf.set_path(run.Oname + "_elf.cube");
-    CubeEli.set_path(run.Oname + "_eli.cube");
-    CubeLap.set_path(run.Oname + "_lap.cube");
-    CubeESP.set_path(run.Oname + "_esp.cube");
-    CubeHDEF.set_path(run.Oname + "_hdef.cube");
-    CubeDEF.set_path(run.Oname + "_def.cube");
+    cubes[cube_type::Rho].set_comment1("Calculated density using QCT");
+    cubes[cube_type::RDG].set_comment1("Calculated reduced density gradient using QCT");
+    cubes[cube_type::Elf].set_comment1("Calculated electron localization function using QCT");
+    cubes[cube_type::Eli].set_comment1("Calculated same-spin electron localizability indicator using QCT");
+    cubes[cube_type::Lap].set_comment1("Calculated laplacian of electron density using QCT");
+    cubes[cube_type::ESP].set_comment1("Calculated electrostatic potential using QCT");
+    cubes[cube_type::HDEF].set_comment1("Calculated Hirshfeld deformation density using QCT");
+    cubes[cube_type::Rho].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+    cubes[cube_type::RDG].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+    cubes[cube_type::Elf].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+    cubes[cube_type::Lap].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+    cubes[cube_type::ESP].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+    cubes[cube_type::HDEF].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+    cubes[cube_type::Rho].set_path(run.Oname + "_rho.cube");
+    cubes[cube_type::RDG].set_path(run.Oname + "_rdg.cube");
+    cubes[cube_type::Elf].set_path(run.Oname + "_elf.cube");
+    cubes[cube_type::Eli].set_path(run.Oname + "_eli.cube");
+    cubes[cube_type::Lap].set_path(run.Oname + "_lap.cube");
+    cubes[cube_type::ESP].set_path(run.Oname + "_esp.cube");
+    cubes[cube_type::HDEF].set_path(run.Oname + "_hdef.cube");
+    cubes[cube_type::DEF].set_path(run.Oname + "_def.cube");
 
     for (int iframe = 0; iframe < run.Frames; iframe++)
     {
@@ -658,57 +660,57 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
                     }
                 }
                 for (int i = 0; i < 3; i++) {
-                    persistant_cube_rho[0].set_origin(i, opts.MinMax[i]);
-                    persistant_cube_RDG[0].set_origin(i, opts.MinMax[i]);
-                    persistant_cube_Elf[0].set_origin(i, opts.MinMax[i]);
-                    persistant_cube_Eli[0].set_origin(i, opts.MinMax[i]);
-                    persistant_cube_Lap[0].set_origin(i, opts.MinMax[i]);
-                    persistant_cube_ESP[0].set_origin(i, opts.MinMax[i]);
+                    persistant_cube_rho.set_origin(i, opts.MinMax[i]);
+                    persistant_cube_RDG.set_origin(i, opts.MinMax[i]);
+                    persistant_cube_Elf.set_origin(i, opts.MinMax[i]);
+                    persistant_cube_Eli.set_origin(i, opts.MinMax[i]);
+                    persistant_cube_Lap.set_origin(i, opts.MinMax[i]);
+                    persistant_cube_ESP.set_origin(i, opts.MinMax[i]);
                     for (int j = 0; j < 3; j++) {
                         if (i == j) {
-                            persistant_cube_rho[0].set_vector(i, j, run.Increments[i]);
-                            persistant_cube_RDG[0].set_vector(i, j, run.Increments[i]);
-                            persistant_cube_Elf[0].set_vector(i, j, run.Increments[i]);
-                            persistant_cube_Eli[0].set_vector(i, j, run.Increments[i]);
-                            persistant_cube_Lap[0].set_vector(i, j, run.Increments[i]);
-                            persistant_cube_ESP[0].set_vector(i, j, run.Increments[i]);
+                            persistant_cube_rho.set_vector(i, j, run.Increments[i]);
+                            persistant_cube_RDG.set_vector(i, j, run.Increments[i]);
+                            persistant_cube_Elf.set_vector(i, j, run.Increments[i]);
+                            persistant_cube_Eli.set_vector(i, j, run.Increments[i]);
+                            persistant_cube_Lap.set_vector(i, j, run.Increments[i]);
+                            persistant_cube_ESP.set_vector(i, j, run.Increments[i]);
                         }
                         else {
-                            persistant_cube_rho[0].set_vector(i, j, 0);
-                            persistant_cube_RDG[0].set_vector(i, j, 0);
-                            persistant_cube_Elf[0].set_vector(i, j, 0);
-                            persistant_cube_Eli[0].set_vector(i, j, 0);
-                            persistant_cube_Lap[0].set_vector(i, j, 0);
-                            persistant_cube_ESP[0].set_vector(i, j, 0);
+                            persistant_cube_rho.set_vector(i, j, 0);
+                            persistant_cube_RDG.set_vector(i, j, 0);
+                            persistant_cube_Elf.set_vector(i, j, 0);
+                            persistant_cube_Eli.set_vector(i, j, 0);
+                            persistant_cube_Lap.set_vector(i, j, 0);
+                            persistant_cube_ESP.set_vector(i, j, 0);
                         }
                     }
                 }
-                persistant_cube_rho[0].set_comment1("Calculated density using QCT");
-                persistant_cube_RDG[0].set_comment1("Calculated reduced density gradient using QCT");
-                persistant_cube_Elf[0].set_comment1("Calculated electron localization function using QCT");
-                persistant_cube_Eli[0].set_comment1("Calculated same-spin electron localizability indicator using QCT");
-                persistant_cube_Lap[0].set_comment1("Calculated laplacian of electron density using QCT");
-                persistant_cube_ESP[0].set_comment1("Calculated electrostatic potential using QCT");
-                persistant_cube_rho[0].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-                persistant_cube_RDG[0].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-                persistant_cube_Elf[0].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-                persistant_cube_Lap[0].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-                persistant_cube_ESP[0].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-                persistant_cube_rho[0].set_path(run.Oname + "_rho.cube");
-                persistant_cube_RDG[0].set_path(run.Oname + "_rdg.cube");
-                persistant_cube_Elf[0].set_path(run.Oname + "_elf.cube");
-                persistant_cube_Eli[0].set_path(run.Oname + "_eli.cube");
-                persistant_cube_Lap[0].set_path(run.Oname + "_lap.cube");
-                persistant_cube_ESP[0].set_path(run.Oname + "_esp.cube");
+                persistant_cube_rho.set_comment1("Calculated density using QCT");
+                persistant_cube_RDG.set_comment1("Calculated reduced density gradient using QCT");
+                persistant_cube_Elf.set_comment1("Calculated electron localization function using QCT");
+                persistant_cube_Eli.set_comment1("Calculated same-spin electron localizability indicator using QCT");
+                persistant_cube_Lap.set_comment1("Calculated laplacian of electron density using QCT");
+                persistant_cube_ESP.set_comment1("Calculated electrostatic potential using QCT");
+                persistant_cube_rho.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+                persistant_cube_RDG.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+                persistant_cube_Elf.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+                persistant_cube_Lap.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+                persistant_cube_ESP.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
+                persistant_cube_rho.set_path(run.Oname + "_rho.cube");
+                persistant_cube_RDG.set_path(run.Oname + "_rdg.cube");
+                persistant_cube_Elf.set_path(run.Oname + "_elf.cube");
+                persistant_cube_Eli.set_path(run.Oname + "_eli.cube");
+                persistant_cube_Lap.set_path(run.Oname + "_lap.cube");
+                persistant_cube_ESP.set_path(run.Oname + "_esp.cube");
                 for (int x = 0; x < opts.NbSteps[0]; x++)
                     for (int y = 0; y < opts.NbSteps[1]; y++)
                         for (int z = 0; z < opts.NbSteps[2]; z++) {
-                            if (opts.rho) persistant_cube_rho[0].set_value(x, y, z, 0.0);
-                            if (opts.rdg) persistant_cube_RDG[0].set_value(x, y, z, 0.0);
-                            if (opts.elf || opts.eli) persistant_cube_Elf[0].set_value(x, y, z, 0.0);
-                            if (opts.lap) persistant_cube_Lap[0].set_value(x, y, z, 0.0);
+                            if (opts.rho) persistant_cube_rho.set_value(x, y, z, 0.0);
+                            if (opts.rdg) persistant_cube_RDG.set_value(x, y, z, 0.0);
+                            if (opts.elf || opts.eli) persistant_cube_Elf.set_value(x, y, z, 0.0);
+                            if (opts.lap) persistant_cube_Lap.set_value(x, y, z, 0.0);
                             //if (opts.dohirsh) persistant_cube_Hirsh[0].set_value(x, y, z, 0.0);
-                            if (opts.esp) persistant_cube_ESP[0].set_value(x, y, z, 0.0);
+                            if (opts.esp) persistant_cube_ESP.set_value(x, y, z, 0.0);
                             //if (opts.doef) persistant_cube_EF[0].set_value(x, y, z, 0.0);
                             //if (opts.dodef) persistant_cube_def[0].set_value(x, y, z, 0.0);
                             ignore_RDG[x][y][z] = 0;
@@ -718,7 +720,7 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
         }
         if (opt.ignore.size() > 0 && opts.rho && !opts.hdef) {
             Calc_Rho(
-                CubeRho,
+                cubes[cube_type::Rho],
                 wavy[run.MoleculeFiles[0]],
                 opts.radius,
                 std::cout,
@@ -727,12 +729,7 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
         }
         else if (opts.rho || opts.rdg || opts.elf || opts.eli || opts.lap || opts.def) {
             Calc_Prop(
-                CubeRho,
-                CubeRDG,
-                CubeElf,
-                CubeEli,
-                CubeLap,
-                CubeESP,
+                cubes,
                 wavy[run.MoleculeFiles[0]],
                 opts.radius,
                 std::cout,
@@ -743,8 +740,7 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
 
         if (opts.def) {
             Calc_Static_Def(
-                CubeDEF,
-                CubeRho,
+                cubes,
                 wavy[0],
                 opts.radius,
                 std::cout,
@@ -754,8 +750,7 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
 
         if (opts.hdef)
             Calc_Hirshfeld(
-                CubeHDEF,
-                CubeRho,
+                cubes,
                 wavy[run.MoleculeFiles[0]],
                 opts.radius,
                 opt.ignore[0],
@@ -765,7 +760,7 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
 
         if (opts.esp)
             Calc_ESP(
-                CubeESP,
+                cubes[cube_type::ESP],
                 wavy[run.MoleculeFiles[0]],
                 opts.radius,
                 opt.no_date,
@@ -778,24 +773,24 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
                 for (int y = 0; y < opts.NbSteps[1]; y++)
                     for (int z = 0; z < opts.NbSteps[2]; z++) {
                         if (opts.rho) {
-                            if (CubeRho.get_value(x, y, z) < 0) {
-                                persistant_cube_rho[0].set_value(x, y, z, persistant_cube_rho[0].get_value(x, y, z) - CubeRho.get_value(x, y, z));
+                            if (cubes[cube_type::Rho].get_value(x, y, z) < 0) {
+                                persistant_cube_rho.set_value(x, y, z, persistant_cube_rho.get_value(x, y, z) - cubes[cube_type::Rho].get_value(x, y, z));
                                 sign_counter[x][y][z]--;
                             }
                             else {
-                                if (opt.debug && CubeRho.get_value(x, y, z) == 0.0) z_counter++;
-                                persistant_cube_rho[0].set_value(x, y, z, persistant_cube_rho[0].get_value(x, y, z) + CubeRho.get_value(x, y, z));
+                                if (opt.debug && cubes[cube_type::Rho].get_value(x, y, z) == 0.0) z_counter++;
+                                persistant_cube_rho.set_value(x, y, z, persistant_cube_rho.get_value(x, y, z) + cubes[cube_type::Rho].get_value(x, y, z));
                                 sign_counter[x][y][z]++;
                             }
                         }
                         if (opts.rdg) {
-                            if (CubeRDG.get_value(x, y, z) < 0)
+                            if (cubes[cube_type::RDG].get_value(x, y, z) < 0)
                                 ignore_RDG[x][y][z]++;
-                            persistant_cube_RDG[0].set_value(x, y, z, persistant_cube_RDG[0].get_value(x, y, z) + abs(CubeRDG.get_value(x, y, z)));
+                            persistant_cube_RDG.set_value(x, y, z, persistant_cube_RDG.get_value(x, y, z) + abs(cubes[cube_type::RDG].get_value(x, y, z)));
                         }
-                        if (opts.elf || opts.eli) persistant_cube_Elf[0].set_value(x, y, z, persistant_cube_Elf[0].get_value(x, y, z) + CubeElf.get_value(x, y, z));
-                        if (opts.lap) persistant_cube_Lap[0].set_value(x, y, z, persistant_cube_Lap[0].get_value(x, y, z) + CubeLap.get_value(x, y, z));
-                        if (opts.esp) persistant_cube_ESP[0].set_value(x, y, z, persistant_cube_ESP[0].get_value(x, y, z) + CubeESP.get_value(x, y, z));
+                        if (opts.elf || opts.eli) persistant_cube_Elf.set_value(x, y, z, persistant_cube_Elf.get_value(x, y, z) + cubes[cube_type::Elf].get_value(x, y, z));
+                        if (opts.lap) persistant_cube_Lap.set_value(x, y, z, persistant_cube_Lap.get_value(x, y, z) + cubes[cube_type::Lap].get_value(x, y, z));
+                        if (opts.esp) persistant_cube_ESP.set_value(x, y, z, persistant_cube_ESP.get_value(x, y, z) + cubes[cube_type::ESP].get_value(x, y, z));
                         //if (opts.dodef) persistant_cube_def[i] += CubeDEF[i];
                     }
             if (opt.debug) std::cout << "\nFinished frame " << iframe << ", count_100= " << counter_100 << ", count_0= " << z_counter << "\n";
@@ -810,22 +805,22 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
                 for (int z = 0; z < opts.NbSteps[2]; z++) {
                     if (opts.rho) {
                         if (sign_counter[x][y][z] >= 0)
-                            persistant_cube_rho[0].set_value(x, y, z, persistant_cube_rho[0].get_value(x, y, z) / run.Frames);
+                            persistant_cube_rho.set_value(x, y, z, persistant_cube_rho.get_value(x, y, z) / run.Frames);
                         else {
-                            persistant_cube_rho[0].set_value(x, y, z, persistant_cube_rho[0].get_value(x, y, z) / -run.Frames);
+                            persistant_cube_rho.set_value(x, y, z, persistant_cube_rho.get_value(x, y, z) / -run.Frames);
                             negative_signs++;
                         }
                     }
                     if (opts.rdg) {
                         if (ignore_RDG[x][y][z] != run.Frames)
-                            persistant_cube_RDG[0].set_value(x, y, z, persistant_cube_RDG[0].get_value(x, y, z) / (run.Frames - ignore_RDG[x][y][z]));
+                            persistant_cube_RDG.set_value(x, y, z, persistant_cube_RDG.get_value(x, y, z) / (run.Frames - ignore_RDG[x][y][z]));
                         else
-                            persistant_cube_RDG[0].set_value(x, y, z, 100.0);
+                            persistant_cube_RDG.set_value(x, y, z, 100.0);
                     }
-                    if (opts.elf || opts.eli) persistant_cube_Elf[0].set_value(x, y, z, persistant_cube_Elf[0].get_value(x, y, z) / run.Frames);
-                    if (opts.lap) persistant_cube_Lap[0].set_value(x, y, z, persistant_cube_Lap[0].get_value(x, y, z) / run.Frames);
+                    if (opts.elf || opts.eli) persistant_cube_Elf.set_value(x, y, z, persistant_cube_Elf.get_value(x, y, z) / run.Frames);
+                    if (opts.lap) persistant_cube_Lap.set_value(x, y, z, persistant_cube_Lap.get_value(x, y, z) / run.Frames);
                     //if (opts.dohirsh) persistant_cube_Hirsh[i] /= opt.Frames;
-                    if (opts.esp)persistant_cube_ESP[0].set_value(x, y, z, persistant_cube_ESP[0].get_value(x, y, z) / run.Frames);
+                    if (opts.esp)persistant_cube_ESP.set_value(x, y, z, persistant_cube_ESP.get_value(x, y, z) / run.Frames);
                     //if (opts.doef) persistant_cube_EF[i] /= opt.Frames;
                     //if (opts.dodef) persistant_cube_def[i] /= opt.Frames;
                 }
@@ -834,16 +829,16 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
             for (int x = 0; x < opts.NbSteps[0]; x++)
                 for (int y = 0; y < opts.NbSteps[1]; y++)
                     for (int z = 0; z < opts.NbSteps[2]; z++)
-                        if (persistant_cube_RDG[0].get_value(x, y, z) != 0.0 && persistant_cube_rho[0].get_value(x, y, z) != 0.0)
-                            persistant_cube_RDG[0].set_value(x, y, z, persistant_cube_RDG[0].get_value(x, y, z) / pow(abs(persistant_cube_rho[0].get_value(x, y, z)), (double)1.3333333333333333333333));
+                        if (persistant_cube_RDG.get_value(x, y, z) != 0.0 && persistant_cube_rho.get_value(x, y, z) != 0.0)
+                            persistant_cube_RDG.set_value(x, y, z, persistant_cube_RDG.get_value(x, y, z) / pow(abs(persistant_cube_rho.get_value(x, y, z)), (double)1.3333333333333333333333));
     }
     else
         if (opts.rdg)
             for (int x = 0; x < opts.NbSteps[0]; x++)
                 for (int y = 0; y < opts.NbSteps[1]; y++)
                     for (int z = 0; z < opts.NbSteps[2]; z++)
-                        if (CubeRDG.get_value(x, y, z) != 0.0 && CubeRho.get_value(x, y, z) != 0.0)
-                            CubeRDG.set_value(x, y, z, CubeRDG.get_value(x, y, z) / pow(abs(CubeRho.get_value(x, y, z)), (double)1.3333333333333333333333));
+                        if (cubes[cube_type::RDG].get_value(x, y, z) != 0.0 && cubes[cube_type::Rho].get_value(x, y, z) != 0.0)
+                            cubes[cube_type::RDG].set_value(x, y, z, cubes[cube_type::RDG].get_value(x, y, z) / pow(abs(cubes[cube_type::Rho].get_value(x, y, z)), (double)1.3333333333333333333333));
 
     /*if (opt.Output == 1 || opt.Output == 3)
     {
@@ -854,8 +849,8 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
                 outdat(opt.Oname.c_str(),
                         opt.Cutoffs,
                         opt.NbSteps,
-                        persistant_cube_rho[0],
-                        persistant_cube_RDG[0]);
+                        persistant_cube_rho,
+                        persistant_cube_RDG);
             else
                 outdat(opt.Oname.c_str(),
                         opt.Cutoffs,
@@ -870,41 +865,41 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
         std::cout << "  *   Writing .cube files ...                                             *\n";
         if (run.Frames > 1) {
             if (opts.rho && !opts.rdg) {
-                persistant_cube_rho[0].set_path(run.Oname + "_rho.cube");
-                persistant_cube_rho[0].write_file(true, true);
+                persistant_cube_rho.set_path(run.Oname + "_rho.cube");
+                persistant_cube_rho.write_file(true, true);
             }
             if (opts.rdg) {
-                persistant_cube_rho[0].set_path(run.Oname + "_signed_rho.cube");
-                persistant_cube_rho[0].write_file(true);
-                persistant_cube_rho[0].set_path(run.Oname + "_rho.cube");
-                persistant_cube_rho[0].write_file(true, true);
-                persistant_cube_RDG[0].write_file(true);
+                persistant_cube_rho.set_path(run.Oname + "_signed_rho.cube");
+                persistant_cube_rho.write_file(true);
+                persistant_cube_rho.set_path(run.Oname + "_rho.cube");
+                persistant_cube_rho.write_file(true, true);
+                persistant_cube_RDG.write_file(true);
             }
-            if (opts.elf || opts.eli) persistant_cube_Elf[0].write_file(true);
-            if (opts.lap) persistant_cube_Lap[0].write_file(true);
-            if (opts.esp) persistant_cube_ESP[0].write_file(true);
+            if (opts.elf || opts.eli) persistant_cube_Elf.write_file(true);
+            if (opts.lap) persistant_cube_Lap.write_file(true);
+            if (opts.esp) persistant_cube_ESP.write_file(true);
             //if (opts.doef) outCubeEF(opts.Oname.c_str(),
             //if (opts.dodef) outCubeDEF(opts.Oname.c_str(),
             //if (opts.dohirsh) outCubeHirsh(opts.Oname.c_str(),
         }
         else {
             if (opts.rho && !opts.rdg) {
-                CubeRho.set_path(run.Oname + "_rho.cube");
-                CubeRho.write_file(true, true);
+                cubes[cube_type::Rho].set_path(run.Oname + "_rho.cube");
+                cubes[cube_type::Rho].write_file(true, true);
             }
             if (opts.rdg) {
-                CubeRho.set_path(run.Oname + "_signed_rho.cube");
-                CubeRho.write_file(true);
-                CubeRho.set_path(run.Oname + "_rho.cube");
-                CubeRho.write_file(true, true);
-                CubeRDG.write_file(true);
+                cubes[cube_type::Rho].set_path(run.Oname + "_signed_rho.cube");
+                cubes[cube_type::Rho].write_file(true);
+                cubes[cube_type::Rho].set_path(run.Oname + "_rho.cube");
+                cubes[cube_type::Rho].write_file(true, true);
+                cubes[cube_type::RDG].write_file(true);
             }
-            if (opts.elf) CubeElf.write_file(true);
-            if (opts.eli) CubeEli.write_file(true);
-            if (opts.lap) CubeLap.write_file(true);
-            if (opts.esp) CubeESP.write_file(true);
-            if (opts.hdef) CubeHDEF.write_file(true);
-            if (opts.def) CubeDEF.write_file(true);
+            if (opts.elf) cubes[cube_type::Elf].write_file(true);
+            if (opts.eli) cubes[cube_type::Eli].write_file(true);
+            if (opts.lap) cubes[cube_type::Lap].write_file(true);
+            if (opts.esp) cubes[cube_type::ESP].write_file(true);
+            if (opts.hdef) cubes[cube_type::HDEF].write_file(true);
+            if (opts.def) cubes[cube_type::DEF].write_file(true);
             //if(opt.dohirsh) outCubeHirsh(opt.Oname.c_str(),
             //if(opt.doef) outCubeEF(opt.Oname.c_str(),
         }

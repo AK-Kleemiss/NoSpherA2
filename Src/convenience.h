@@ -91,6 +91,14 @@ struct properties_options
     }
 };
 
+typedef std::array<int, 3> i3;
+typedef std::set<i3> hkl_list;
+typedef std::set<i3>::const_iterator hkl_list_it;
+
+typedef std::array<double, 3> d3;
+typedef std::set<d3> hkl_list_d;
+typedef std::set<d3>::const_iterator hkl_list_it_d;
+
 int vec_sum(const bvec& in);
 int vec_sum(const ivec& in);
 double vec_sum(const vec& in);
@@ -99,30 +107,19 @@ double vec_length(const vec& in);
 template <typename array>
 const double array_length(const array& in)
 {
-    double sum = 0.0;
-    for (double val : in)
-    {
-        sum += val * val;
-    }
-    return sqrt(sum);
+    return std::hypot(in[0], in[1], in[2]);
 }
 template <typename array>
 const double array_length(const array& in, const array& in2)
 {
-    double sum = 0.0;
-    auto it1 = in.begin();
-    auto it2 = in2.begin();
-    for (; it1 != in.end(); ++it1, ++it2) {
-        sum += (*it1 - *it2) * (*it1 - *it2);
-    }
-    return sqrt(sum);
+    return std::hypot(in[0] - in2[0], in[1] - in2[1], in[2] - in2[2]);
 }
 
 // Function to compute cross product
-std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b);
+d3 cross(const d3& a, const d3& b);
 
 // Function to compute dot product
-double a_dot(const std::array<double, 3>& a, const std::array<double, 3>& b);
+double a_dot(const d3& a, const d3& b);
 
 constexpr const std::complex<double> c_one(0, 1.0);
 
@@ -561,14 +558,6 @@ struct ECP_primitive : primitive
     ECP_primitive() : primitive(), n(0) {}
     ECP_primitive(int c, int t, double e, double coef, int n) : primitive(c, t, e, coef), n(n) {}
 };
-
-typedef std::array<int, 3> hkl_t;
-typedef std::set<hkl_t> hkl_list;
-typedef std::set<hkl_t>::const_iterator hkl_list_it;
-
-typedef std::array<double, 3> hkl_d;
-typedef std::set<hkl_d> hkl_list_d;
-typedef std::set<hkl_d>::const_iterator hkl_list_it_d;
 
 //---------------- Object for handling all input options -------------------------------
 struct options
