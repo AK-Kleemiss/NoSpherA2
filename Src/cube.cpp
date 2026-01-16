@@ -1071,6 +1071,11 @@ double cube::get_vector(int i, int j) const
         return (-1);
 };
 
+std::array<d3, 3> cube::get_vectors() const
+{
+    return vectors;
+}
+
 bool cube::set_vector(int i, int j, double value)
 {
     if (i < 3 && i >= 0 && j < 3 && j >= 0)
@@ -1078,6 +1083,12 @@ bool cube::set_vector(int i, int j, double value)
     else
         return (false);
     return (true);
+};
+
+void cube::set_vectors(std::array<d3, 3> value)
+{
+    vectors = value;
+    calc_dv();
 };
 
 double cube::get_origin(unsigned int i) const
@@ -1243,182 +1254,147 @@ double cube::jaccard(const cube& right) const {
     return (top / bot); //RETURN Real Space R-value between this cube and the given one
 };
 
-void cube::adaptive_refine(std::function<const double(const d3)> const func, double target_error, int max_depth) {
+void cube::adaptive_refine(std::function<const double(const d3)> const func, double target_error, double target_value, int max_depth) {
     using namespace std;
     double current_integral = sum();
     cout << "Initial Integral: " << current_integral << endl;
+    std::map<i3, double, I3Less> Refine_integrals;
+    bvec3 inhomog_fine(size[0], bvec2(size[1], bvec(size[2], false)));
 
-    // Initialize refinement map (true = needs checking/refining, false = converged/smooth)
-    // Initially, everything needs checking.
-    // Dimensions match the current 'values' grid.
-    vector<vector<vector<bool>>> refinement_map(size[0], vector<vector<bool>>(size[1], vector<bool>(size[2], true)));
+    const int total_size = size[0] * size[1] * size[2];
+    int initially_fine = 0;
+
+#pragma omp parallel for reduction(+:initially_fine)
+    for (int i = 0; i < size[0]; ++i) {
+        for (int j = 0; j < size[1]; ++j) {
+            for (int k = 0; k < size[2]; ++k) {
+
+                // 32 points integration    (Taylor)
+                //--------------------------------------------------------
+                double sum_side = 0;      // 6 side midpoints
+                double sum_edge = 0;      // 12 edge midpoints
+                double sum_vert = 0;      // 8 vertices
+                double sum_2edge = 0;     // 6 second edge midpoints
+                // Side points
+                if (k + 1 < size[2])              sum_side += values[i][j][k + 1];
+                if (k > 0)                        sum_side += values[i][j][k - 1];
+                if (j + 1 < size[1])              sum_side += values[i][j + 1][k];
+                if (j > 0)                        sum_side += values[i][j - 1][k];
+                if (i + 1 > size[0])              sum_side += values[i + 1][j][k];
+                if (i > 0)                        sum_side += values[i - 1][j][k];
+
+
+                if (i > 0 && j > 0)                        sum_edge += values[i - 1][j - 1][k];
+                if (i > 0 && k > 0)                        sum_edge += values[i - 1][j][k - 1];
+                if (j > 0 && k > 0)                        sum_edge += values[i][j - 1][k - 1];
+                if (k + 1 < size[2] && j + 1 > size[1])    sum_edge += values[i][j + 1][k + 1];
+                if (i + 1 < size[0] && j + 1 > size[1])    sum_edge += values[i + 1][j + 1][k];
+                if (k + 1 < size[2] && i + 1 > size[0])    sum_edge += values[i + 1][j][k + 1];
+                if (k + 1 < size[2] && i > 0)              sum_edge += values[i - 1][j][k + 1];
+                if (j + 1 < size[1] && i > 0)              sum_edge += values[i - 1][j + 1][k];
+                if (k + 1 < size[2] && j > 0)              sum_edge += values[i][j - 1][k + 1];
+                if (i + 1 < size[0] && j > 0)              sum_edge += values[i + 1][j - 1][k];
+                if (i + 1 < size[0] && k > 0)              sum_edge += values[i + 1][j][k - 1];
+                if (j + 1 < size[1] && k > 0)              sum_edge += values[i][j + 1][k - 1];
+
+                if (i > 0 && j > 0 && k > 0)                                  sum_vert += values[i - 1][j - 1][k - 1];
+                if (i + 1 < size[0] && j + 1 < size[1] && k + 1 < size[2])    sum_vert += values[i + 1][j + 1][k + 1];
+                if (i > 0 && j + 1 < size[1] && k + 1 < size[2])              sum_vert += values[i - 1][j + 1][k + 1];
+                if (i + 1 < size[0] && j > 0 && k + 1 < size[2])              sum_vert += values[i + 1][j - 1][k + 1];
+                if (i + 1 < size[0] && j + 1 < size[1] && k > 0)              sum_vert += values[i + 1][j + 1][k - 1];
+                if (i + 1 < size[0] && j > 0 && k > 0)                        sum_vert += values[i + 1][j - 1][k - 1];
+                if (i > 0 && j + 1 < size[1] && k > 0)                        sum_vert += values[i - 1][j + 1][k - 1];
+                if (i > 0 && j > 0 && k + 1 < size[2])                        sum_vert += values[i - 1][j - 1][k + 1];
+
+                if (k + 2 < size[2])              sum_side += values[i][j][k + 2];
+                if (k > 1)                        sum_side += values[i][j][k - 2];
+                if (j + 2 < size[1])              sum_side += values[i][j + 2][k];
+                if (j > 1)                        sum_side += values[i][j - 2][k];
+                if (i + 2 < size[0])              sum_side += values[i + 2][j][k];
+                if (i > 1)                        sum_side += values[i - 2][j][k];
+
+                const double inhomog = (-78 * values[i][j][k] + sum_side + 2 * sum_edge + 3 * sum_vert + 4 * sum_2edge) / 888.;
+                //--------------------------------------------------------
+
+                // If variation is significant compared to magnitude and target error, we recompute.
+                if (abs(inhomog) < 0.2 * target_error) {
+                    inhomog_fine[i][j][k] = true;
+                    initially_fine++;
+                }
+                else {
+#pragma omp critical
+                    Refine_integrals.emplace(i3{ i, j, k }, 0.0);
+                }
+            }
+        }
+    }
+
+    cout << "Out of " << total_size << " initially fine: " << initially_fine << endl;
+
+    ivec nr_fine(max_depth + 1, 0);
+    nr_fine[0] = initially_fine;
 
     for (int depth = 0; depth < max_depth; ++depth) {
-        // Create new dimensions
-        int new_size[3] = { size[0] * 2, size[1] * 2, size[2] * 2 };
-
-        // Create new values grid
-        vector<vector<vector<double>>> new_values(new_size[0]);
-        // Create new refinement map for the next iteration
-        vector<vector<vector<bool>>> new_refinement_map(new_size[0]);
-
-#pragma omp parallel for
-        for (int i = 0; i < new_size[0]; ++i) {
-            new_values[i].resize(new_size[1]);
-            new_refinement_map[i].resize(new_size[1]);
-            for (int j = 0; j < new_size[1]; ++j) {
-                new_values[i][j].resize(new_size[2]);
-                new_refinement_map[i][j].resize(new_size[2], false); // Default to false, set to true if we find we need it
-            }
-        }
+        // Create new dimensions to sample
+        const int fac = pow(2, depth + 1);
+        i3 new_size = { size[0] * fac, size[1] * fac, size[2] * fac };
 
         // New step vectors (half the size)
-        array<array<double, 3>, 3> new_vectors;
+        array<d3, 3> new_vectors;
         for (int d = 0; d < 3; ++d) {
             for (int k = 0; k < 3; ++k) {
-                new_vectors[d][k] = vectors[d][k] / 2.0;
+                new_vectors[d][k] = vectors[d][k] / fac;
             }
         }
 
-        // Populate new grid
-        // Strategy: 
-        // 1. Copy existing points (even indices)
-        // 2. Evaluate or Interpolate new points based on local gradient AND previous refinement map
+        // Logic:
+        // 1. Use old vectors - SKIP CALCULATIONS
+        // 2. For new points (odd indices), check local inhomogenity in old grid.
+        //    If it is high -> Compute & Add RefinePoint
+        // 3. Calcualte integral as contribution of:
+        //    a) points where no refinement was neccesarry (value * dv of cube)
+        //    b) where new Refine points are being added use them with smaller sizes
 
         long long count_computed = 0;
-        long long count_interpolated = 0;
 
-#pragma omp parallel for reduction(+:count_computed, count_interpolated)
+        ProgressBar* pb = new ProgressBar(new_size[0], 50, "#", " ", "Level " + to_string(depth + 1));
+
+#pragma omp parallel for reduction(+:count_computed) schedule(dynamic)
         for (int i = 0; i < new_size[0]; ++i) {
             for (int j = 0; j < new_size[1]; ++j) {
                 for (int k = 0; k < new_size[2]; ++k) {
                     // Check if this corresponds to an exact old point
                     if (i % 2 == 0 && j % 2 == 0 && k % 2 == 0) {
-                        new_values[i][j][k] = values[i / 2][j / 2][k / 2];
-                        // If the old parent needed refinement, the child might too (we'll check neighbors later or assume inheritance)
-                        // If we are at an exact old point, we just copy. 
-                        // The interesting part is filling the holes and deciding if those holes need computation.
                         continue;
                     }
 
-                    // Calculate position
-                    array<double, 3> pos = { 0.0, 0.0, 0.0 };
-                    for (int d = 0; d < 3; ++d) {
-                        pos[d] = origin[d] +
-                            i * new_vectors[0][d] +
-                            j * new_vectors[1][d] +
-                            k * new_vectors[2][d];
-                    }
-
                     // Map to continuous old coordinates
-                    double old_i = i / 2.0;
-                    double old_j = j / 2.0;
-                    double old_k = k / 2.0;
+                    const double old_i = double(i) / fac;
+                    const double old_j = double(j) / fac;
+                    const double old_k = double(k) / fac;
 
-                    int i0 = (int)std::floor(old_i);
-                    int j0 = (int)std::floor(old_j);
-                    int k0 = (int)std::floor(old_k);
+                    // Neighbors in old grid
+                    const int i0 = size[0] > 1 ? std::clamp((int)std::floor(old_i), 0, size[0] - 2) : 0;
+                    const int j0 = size[1] > 1 ? std::clamp((int)std::floor(old_j), 0, size[1] - 2) : 0;
+                    const int k0 = size[2] > 1 ? std::clamp((int)std::floor(old_k), 0, size[2] - 2) : 0;
 
-                    bool need_recompute = true;
-                    bool parent_needs_refinement = false;
-
-                    // Ensure we have enough points to check neighbors
-                    if (size[0] >= 2 && size[1] >= 2 && size[2] >= 2) {
-                        // Clamp to boundary
-                        i0 = std::clamp(i0, 0, size[0] - 2);
-                        j0 = std::clamp(j0, 0, size[1] - 2);
-                        k0 = std::clamp(k0, 0, size[2] - 2);
-
-                        // Check if any of the surrounding 8 points in the old grid were marked as "needs_refinement"
-                        for (int di = 0; di <= 1; ++di)
-                            for (int dj = 0; dj <= 1; ++dj)
-                                for (int dk = 0; dk <= 1; ++dk) {
-                                    if (refinement_map[i0 + di][j0 + dj][k0 + dk]) {
-                                        parent_needs_refinement = true;
-                                    }
-                                }
-
-                        // If parent region was already converged/smooth, we skip expensive checks and compute
-                        if (!parent_needs_refinement) {
-                            need_recompute = false;
-                        }
-                        else {
-                            // Check variation in the 2x2x2 block of the old grid
-                            double min_v = 1E100, max_v = -1E100;
-                            double avg_v = 0.0;
-
-                            for (int di = 0; di <= 1; ++di)
-                                for (int dj = 0; dj <= 1; ++dj)
-                                    for (int dk = 0; dk <= 1; ++dk) {
-                                        double v = values[i0 + di][j0 + dj][k0 + dk];
-                                        if (v < min_v) min_v = v;
-                                        if (v > max_v) max_v = v;
-                                        avg_v += abs(v);
-                                    }
-                            avg_v /= 8.0;
-
-                            // Decision threshold
-                            double local_var = max_v - min_v;
-                            if (local_var <= target_error * (avg_v + 1e-10))
-                                need_recompute = false;
-                        }
+                    if (inhomog_fine[i0][j0][k0]) {
+                        // Already marked as not inhomogeneous anymore
+                        continue;
                     }
 
-                    if (need_recompute) {
-                        new_values[i][j][k] = func(pos);
-                        count_computed++;
-                        // If we computed this point, we mark it as active for the next level
-                        new_refinement_map[i][j][k] = true;
-                    }
-                    else {
-                        // Linear Interpolation (Trilinear) from old values
-                        // We can use get_interpolated_value but we need to coordinate systems match.
-                        // Actually easier to just implement trilinear here since we have indices
+                    const double val = func(get_pos(old_i, old_j, old_k));
+                    err_checkf(!std::isnan(val) && !std::isinf(val), "Error in new value calculation!", cout);
 
-                        double di = old_i - i0;
-                        double dj = old_j - j0;
-                        double dk = old_k - k0;
-
-                        double c00 = values[i0][j0][k0] * (1 - di) + values[i0 + 1][j0][k0] * di;
-                        double c10 = values[i0][j0 + 1][k0] * (1 - di) + values[i0 + 1][j0 + 1][k0] * di;
-                        double c01 = values[i0][j0][k0 + 1] * (1 - di) + values[i0 + 1][j0][k0 + 1] * di;
-                        double c11 = values[i0][j0 + 1][k0 + 1] * (1 - di) + values[i0 + 1][j0 + 1][k0 + 1] * di;
-
-                        double c0 = c00 * (1 - dj) + c10 * dj;
-                        double c1 = c01 * (1 - dj) + c11 * dj;
-
-                        new_values[i][j][k] = c0 * (1 - dk) + c1 * dk;
-                        count_interpolated++;
-                        // If we interpolated, we assume it's smooth and mark as false (already default)
-                    }
+#pragma omp critical
+                    refine_points.emplace(i3{ i0, j0, k0 }, std::make_pair(val, d3{ old_i, old_j, old_k }));
+                    count_computed++;
                 }
             }
+            pb->update();
         }
+        delete pb;
 
-        // Propagate the true values in new_refinement_map to include the kept old points neighbors
-        // If a new point was computed, its neighbors might need refinement next time.
-        // Actually simplest strategy: if any point in a block needs computation, the whole block in next iter needs check.
-        // But here we constructed new map.
-        // We need to ensure that if new_values[i][j][k] was copied from old grid, we set its map status correctly.
-        // If an old point was surrounded by activity, it stays active.
-        // Let's do a pass to set exact grid points map status based on neighbors or inheritance.
-#pragma omp parallel for
-        for (int i = 0; i < size[0]; ++i) {
-            for (int j = 0; j < size[1]; ++j) {
-                for (int k = 0; k < size[2]; ++k) {
-                    if (refinement_map[i][j][k]) {
-                        // Propagate to new exact location
-                        new_refinement_map[2 * i][2 * j][2 * k] = true;
-                    }
-                }
-            }
-        }
-
-        // Update cube properties to temporary state to check integral
-        // (We don't replace 'this' yet, just calculate integral manually or temporarily update)
-        // Calculating integral of new grid manually
-
-        // Recalculate dv for new grid
         double new_dv = abs(new_vectors[0][0] * new_vectors[1][1] * new_vectors[2][2]
             - new_vectors[2][0] * new_vectors[1][1] * new_vectors[0][2]
             + new_vectors[0][1] * new_vectors[1][2] * new_vectors[2][0]
@@ -1427,32 +1403,62 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
             - new_vectors[2][2] * new_vectors[1][0] * new_vectors[0][1]);
 
         double new_integral = 0.0;
+        // Simple serial summation to avoid any reduction issues, or parallel if confident.
+        // Parallel reduction is fine for simple double sum.
 #pragma omp parallel for reduction(+:new_integral)
-        for (int i = 0; i < new_size[0]; ++i)
-            for (int j = 0; j < new_size[1]; ++j)
-                for (int k = 0; k < new_size[2]; ++k)
-                    new_integral += new_values[i][j][k];
+        for (int i = 0; i < size[0]; ++i)
+            for (int j = 0; j < size[1]; ++j)
+                for (int k = 0; k < size[2]; ++k) {
+                    //Look if there is any new refinement point, which we need to take into account and integrate finely
+                    double new_int = 0;
+                    bool new_point = false;
+                    auto [itBegin, itEnd] = refine_points.equal_range(i3{ i, j, k });
+                    for (auto it = itBegin; it != itEnd; it++) {
+                        new_point = true;
+                        new_int += new_dv * it->second.first;
+                        if (it == itBegin) {
+                            new_int += values[i][j][k] * new_dv;
+                        }
+                    }
+                    //If there is no new point, we simply use the coarse parent grid
+                    if (!new_point) {
+                        new_int += values[i][j][k] * dv;
+                    }
+                    else {
+                        const double old_int = Refine_integrals[i3{ i, j, k }];
+                        const double rerror = 1.0 - abs(old_int / (new_int)); //Relative integration error
+                        if (abs(rerror) < target_error) {
+                            inhomog_fine[i][j][k] = true;
+                            initially_fine++;
+                        }
+                        Refine_integrals[i3{ i, j, k }] = new_int;
+                    }
+                    new_integral += new_int;
+                }
 
-        new_integral *= new_dv;
+        nr_fine[depth + 1] = initially_fine;
+        //new_integral *= new_dv;
 
         double rel_error = abs(new_integral - current_integral) / (abs(new_integral) + 1e-20);
 
         cout << "Refinement Level " << depth + 1
             << ": Integral = " << new_integral
             << ", Error = " << rel_error
-            << " (Computed: " << count_computed << ", Interpolated: " << count_interpolated << ")" << endl;
+            << " (Computed: " << count_computed << " fixed: " << nr_fine[depth + 1] - nr_fine[depth] << ")" << endl;
 
         // Apply update
-        values = std::move(new_values);
-        refinement_map = std::move(new_refinement_map);
-        size = { new_size[0], new_size[1], new_size[2] };
-        vectors = new_vectors;
-        dv = new_dv;
         current_integral = new_integral;
-
-        if (rel_error < target_error) {
-            cout << "Converged!" << endl;
-            break;
+        if (target_value != -1E-100) {
+            if (rel_error < target_error && abs(current_integral - target_value) < target_error) {
+                cout << "Converged!" << endl;
+                break;
+            }
+        }
+        else {
+            if (rel_error < target_error) {
+                cout << "Converged!" << endl;
+                break;
+            }
         }
     }
 }

@@ -3608,7 +3608,7 @@ const double WFN::get_atom_coordinate(const unsigned int& nr, const unsigned int
 
 const d3 WFN::get_atom_pos(const unsigned int& nr) const
 {
-    err_checkf(!((int)nr >= ncen), "This input is invalid for get_atom_coordinate!", std::cout);
+    err_checkf(!(nr >= ncen), "This input is invalid for get_atom_coordinate!", std::cout);
     return atoms[nr].get_pos();
 };
 
@@ -7418,9 +7418,8 @@ const void WFN::computeELIELF(
     }
 };
 
-const void WFN::computeELI(
-    const d3& PosGrid, // [3] vector with current position on te grid
-    double& Eli            // Value of the ELI
+const double WFN::computeELI(
+    const d3& PosGrid // [3] vector with current position on te grid
 ) const
 {
     const int _nmo = get_nmo(false);
@@ -7481,7 +7480,7 @@ const void WFN::computeELI(
             }
             else
             {
-                return;
+                err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7516,12 +7515,11 @@ const void WFN::computeELI(
             tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
         }
     }
-    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    return Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
 };
 
-const void WFN::computeELF(
-    const d3& PosGrid, // [3] vector with current position on te grid
-    double& Elf            // Value of the ELF
+const double WFN::computeELF(
+    const d3& PosGrid // [3] vector with current position on te grid
 ) const
 {
     const int _nmo = get_nmo(false);
@@ -7582,7 +7580,7 @@ const void WFN::computeELF(
             }
             else
             {
-                return;
+                err_not_impl_f("Higher angular momentum of cartesian function in ELF computation", std::cout);
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7617,7 +7615,7 @@ const void WFN::computeELF(
             tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
         }
     }
-    Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
+    return 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
 };
 
 const void WFN::computeLapELIELF(

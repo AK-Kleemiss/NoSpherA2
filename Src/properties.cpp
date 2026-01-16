@@ -500,7 +500,7 @@ void Calc_Rho(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Values");
+    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
 
     const int low_i = wrap ? -CubeRho.get_size(0) : 0;
     const int high_i = wrap ? 2 * CubeRho.get_size(0) : CubeRho.get_size(0);
@@ -735,13 +735,9 @@ void Calc_Prop(
                         Elf,
                         Eli);
                 else if (Cubes[cube_type::Elf].get_loaded() && !Cubes[cube_type::Eli].get_loaded() && !Cubes[cube_type::RDG].get_loaded() && !Cubes[cube_type::Lap].get_loaded())
-                    wavy.computeELF(
-                        PosGrid,
-                        Elf);
+                    Elf = wavy.computeELF(PosGrid);
                 else if (!Cubes[cube_type::Elf].get_loaded() && Cubes[cube_type::Eli].get_loaded() && !Cubes[cube_type::RDG].get_loaded() && !Cubes[cube_type::Lap].get_loaded())
-                    wavy.computeELI(
-                        PosGrid,
-                        Eli);
+                    Eli = wavy.computeELI(PosGrid);
                 else if (Cubes[cube_type::Elf].get_loaded() && Cubes[cube_type::Eli].get_loaded() && Cubes[cube_type::Lap].get_loaded() && !Cubes[cube_type::RDG].get_loaded())
                     wavy.computeLapELIELF(
                         PosGrid,
@@ -1086,21 +1082,23 @@ void properties_calculation(options& opt)
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hirsh);
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef || opt.properties.hirsh);
 
-    for (auto cube : cubes)
+    for (cube& cube : cubes)
         cube.give_parent_wfn(wavy);
 
 
     for (int i = 0; i < 3; i++)
     {
-        for (auto cube : cubes)
+        for (cube& cube : cubes)
             cube.set_origin(i, opt.properties.MinMax[i]);
 
         for (int j = 0; j < 3; j++)
         {
-            for (auto cube : cubes)
+            for (cube& cube : cubes)
                 cube.set_vector(i, j, cell_matrix[i][j]);
         }
     }
+    for (cube& cube : cubes)
+        cube.calc_dv();
     if (opt.debug)
         log2 << "Origins etc. are set up" << endl;
     cubes[cube_type::Rho].set_comment1("Calculated density using NoSpherA2");
@@ -1156,6 +1154,15 @@ void properties_calculation(options& opt)
 
     log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
+    Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
+
+    if (opt.properties.integral_accuracy != -1) {
+        log2 << "Refining grid files to integral accuracy of " << opt.properties.integral_accuracy << " ..." << flush;
+        vec2 d(16, vec(wavy.get_ncen(), 0.0));
+        vec phi(wavy.get_nmo(true), 0.0);
+        cubes[cube_type::Rho].adaptive_refine([&wavy](const d3& pos) { return wavy.compute_dens(pos); }, opt.properties.integral_accuracy, wavy.get_nr_electrons(), 5);
+    }
+
     if (opt.properties.MO_numbers.size() != 0)
         for (int i = 0; i < opt.properties.MO_numbers.size(); i++)
         {
@@ -1169,11 +1176,15 @@ void properties_calculation(options& opt)
     wavy.delete_unoccupied_MOs();
     wavy.delete_Qs();
 
+    for (int i = 1; i < cubes.size(); i++) {
+        if (cubes[i].get_loaded())
+            cubes[i].resize(cubes[cube_type::Rho].get_sizes());
+        cubes[i].set_vectors(cubes[cube_type::Rho].get_vectors());
+    }
+
     if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
     {
-        log2 << "Calcualting Rho...";
-        Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
-        log2 << " ...done!" << endl;
+        cubes[cube_type::spherical_density].resize(cubes[cube_type::Rho].get_sizes());
         for (int i = 0; i < 3; i++)
         {
             cubes[cube_type::spherical_density].set_origin(i, opt.properties.MinMax[i]);
@@ -1222,12 +1233,6 @@ void properties_calculation(options& opt)
 
     if (opt.properties.s_rho)
         Calc_S_Rho(cubes[cube_type::Spin_Density], wavy, log2, opt.no_date);
-
-    if (opt.properties.integral_accuracy != -1) {
-        log2 << "Refining grid files to integral accuracy of " << opt.properties.integral_accuracy << " ..." << flush;
-        if (opt.properties.lap)
-            cubes[cube_type::Lap].adaptive_refine([&wavy](const d3& pos) { return wavy.computeLap(pos); }, opt.properties.integral_accuracy);
-    }
 
     log2 << "Writing cubes to Disk..." << flush;
     if (opt.properties.rdg)

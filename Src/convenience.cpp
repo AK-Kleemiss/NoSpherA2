@@ -2074,7 +2074,7 @@ void options::digest_options()
             properties.radius = stod(arguments[i + 1]);
         else if (temp == "-resolution")
             properties.resolution = stod(arguments[i + 1]);
-        else if (temp == "refine")
+        else if (temp == "-refine")
             argc > i + 1 ? properties.integral_accuracy = stod(arguments[i + 1]) : properties.integral_accuracy = 0.1;
         else if (temp == "-rdg")
             properties.rdg = true;
@@ -2387,19 +2387,19 @@ void options::look_for_debug(int& argc, char** argv)
     }
 };
 
-bool is_nan(double& in)
+bool is_nan(const double& in)
 {
     return in != in;
 };
-bool is_nan(float& in)
+bool is_nan(const float& in)
 {
     return in != in;
 };
-bool is_nan(long double& in)
+bool is_nan(const long double& in)
 {
     return in != in;
 };
-bool is_nan(cdouble& in)
+bool is_nan(const cdouble& in)
 {
     return in != in;
 };

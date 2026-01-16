@@ -6,6 +6,7 @@
 #include <cmath>
 #include <filesystem>
 #include <functional>
+#include "convenience.h"
 
 class WFN;
 class atom;
@@ -24,6 +25,7 @@ public:
     cube(const int g_na, const std::vector <int>& g_size, const std::vector <double>& g_origin, const std::vector < std::vector<double> >& g_vectors, const std::vector<std::vector<std::vector<double> > >& g_values);
     cube(const cube& given);
     int get_size(int direction) const;
+    i3 get_sizes() const { return size; };
     bool get_loaded() const { return loaded; };
     cube operator + (const cube& right) const;
     cube operator - (const cube& right) const;
@@ -42,7 +44,8 @@ public:
     double sum() const;
     double diff_sum() const;
     std::vector<double> double_sum() const;
-    inline std::array<double, 3> get_pos(const int& i, const int& j, const int& k) const {
+    template<typename T>
+    std::array<double, 3> get_pos(const T& i, const T& j, const T& k) const {
         return {
             i * vectors[0][0] + j * vectors[0][1] + k * vectors[0][2] + origin[0],
             i * vectors[1][0] + j * vectors[1][1] + k * vectors[1][2] + origin[1],
@@ -58,7 +61,9 @@ public:
     bool write_xdgraph(const std::filesystem::path& given_path, bool debug = false);
     bool fractal_dimension(const double stepsize) const;
     double get_vector(int i, int j) const;
+    std::array<d3, 3> get_vectors() const;
     bool set_vector(int i, int j, double value);
+    void set_vectors(std::array<d3, 3> value);
     double get_origin(unsigned int i) const;
     double ewald_sum(const int kMax = 15, const double conv = 5E-3);
     void calc_dv();
@@ -77,6 +82,7 @@ public:
     std::string get_comment2() const { return comment2; };
     std::filesystem::path get_path() const { return path; };
     void set_path(const std::filesystem::path& given) { path = given; };
+    void resize(const i3& g_size) { size = g_size; values.resize(size[0]); for (int i = 0; i < size[0]; i++) { values[i].resize(size[1]); for (int j = 0; j < size[1]; j++) values[i][j].resize(size[2]); } }
     std::vector<atom> get_parent_wfn_atoms() const;
     bool read_values(std::ifstream& file);
     double jaccard(const cube& right) const;
@@ -95,7 +101,7 @@ public:
      * @param target_error The relative error threshold for the integral convergence.
      * @param max_depth Maximum number of refinement iterations (limit total grid size).
      */
-    void adaptive_refine(std::function<const double(const std::array<double, 3>)> const func, double target_error, int max_depth = 3);
+    void adaptive_refine(std::function<const double(const std::array<double, 3>)> const func, double target_error, double target_value = -1E-100, int max_depth = 4);
 
 private:
     double dv;
@@ -103,12 +109,13 @@ private:
     bool loaded;
     std::string comment1;
     std::string comment2;
-    std::array <int, 3> size;
-    std::array <double, 3> origin;
-    std::array < std::array <double, 3>, 3> vectors;
-    std::vector < std::vector < std::vector <double> > > values;
+    i3 size;
+    d3 origin;
+    std::array <d3, 3> vectors;
+    vec3 values;
     std::filesystem::path path;
     WFN* parent_wavefunction;
+    Refinepointmap refine_points;
 };
 
 #include "wfn_class.h"

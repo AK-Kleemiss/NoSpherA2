@@ -460,9 +460,9 @@ public:
     /** Compute Laplacian only. */
     const double computeLap(const d3& PosGrid) const;
     /** Compute ELI alone. */
-    const void computeELI(const d3& PosGrid, double& Eli) const;
+    const double computeELI(const d3& PosGrid) const;
     /** Compute ELF alone. */
-    const void computeELF(const d3& PosGrid, double& Elf) const;
+    const double computeELF(const d3& PosGrid) const;
     /** Molecular orbital value at position (Cartesian primitives). */
     const double computeMO(const d3& PosGrid, const int& mo) const;
     /** Spherical MO value (not fully implemented). */

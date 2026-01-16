@@ -34,6 +34,7 @@ typedef std::vector<cvec2> cvec3;
 typedef std::vector<std::vector<cvec2>> cvec4;
 typedef std::vector<bool> bvec;
 typedef std::vector<bvec> bvec2;
+typedef std::vector<bvec2> bvec3;
 typedef std::vector<std::string> svec;
 typedef std::vector<std::filesystem::path> pathvec;
 typedef std::chrono::high_resolution_clock::time_point _time_point;
@@ -98,6 +99,17 @@ typedef std::set<i3>::const_iterator hkl_list_it;
 typedef std::array<double, 3> d3;
 typedef std::set<d3> hkl_list_d;
 typedef std::set<d3>::const_iterator hkl_list_it_d;
+
+struct I3Less {
+    bool operator()(const i3& a, const i3& b) const noexcept {
+        if (a[0] != b[0]) return a[0] < b[0];
+        if (a[1] != b[1]) return a[1] < b[1];
+        return a[2] < b[2];
+    }
+};
+
+//indexed by the major grid point the additional points belong to, this map of RefinePoints has field value and the non-integer index in the grid as second
+typedef std::multimap<i3, std::pair<double, d3>, I3Less> Refinepointmap;
 
 int vec_sum(const bvec& in);
 int vec_sum(const ivec& in);
@@ -689,10 +701,10 @@ cdouble hypergeometric(double a, double b, double c, cdouble x);
 
 bool ends_with(const std::string& str, const std::string& suffix);
 
-bool is_nan(double& in);
-bool is_nan(float& in);
-bool is_nan(long double& in);
-bool is_nan(cdouble& in);
+bool is_nan(const double& in);
+bool is_nan(const float& in);
+bool is_nan(const long double& in);
+bool is_nan(const cdouble& in);
 
 bool read_block_from_fortran_binary(std::ifstream& file, void* Target);
 template <typename T>
