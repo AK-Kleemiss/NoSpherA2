@@ -202,7 +202,7 @@ bool b2c(const cube* cub, const vector<atom>& atoms, bool debug, bool bcp)
                 for (int i = 0; i < neighbours[neighbours[b][n]].size(); i++)
                     if (neighbours[neighbours[b][n]][i] == b)
                         back_reference = i;
-                if (BCPs[b][n].x - BCPs[neighbours[b][n]][back_reference].x > 1 || BCPs[b][n].y - BCPs[neighbours[b][n]][back_reference].y > 2 || BCPs[b][n].z - BCPs[neighbours[b][n]][back_reference].z > 2) {
+                if(BCPs[b][n].x-BCPs[neighbours[b][n]][back_reference].x > 2 || BCPs[b][n].y-BCPs[neighbours[b][n]][back_reference].y > 2 || BCPs[b][n].z-BCPs[neighbours[b][n]][back_reference].z > 2){
                     std::cout << "The BCPs on both sides of the ZFS are too far apart..." << endl;
                 }
                 else {
@@ -356,24 +356,21 @@ bool b2c(const cube* cub, const vector<atom>& atoms, bool debug, bool bcp)
     }
     logfile << "Integral over all basins: " << Integral << endl;
     if (bcp)
-        for (int b = 0; b < iCP; b++)
-            for (int n = 0; n < neighbours[b].size(); n++) {
-                int back_reference = 0;
-                for (int i = 0; i < neighbours[neighbours[b][n]].size(); i++) if (neighbours[neighbours[b][n]][i] == b) back_reference = i;
-                logfile << "BCP: " << Labels[b] << "-" << Labels[neighbours[b][n]] << " ED: " << (BCPs[b][n].value + BCPs[neighbours[b][n]][back_reference].value) / 2 << " Position: "
-                    << (BCPs[b][n].x + BCPs[neighbours[b][n]][back_reference].x) / 2 * cub->get_vector(0, 0)
-                    + (BCPs[b][n].y + BCPs[neighbours[b][n]][back_reference].y) / 2 * cub->get_vector(1, 0)
-                    + (BCPs[b][n].z + BCPs[neighbours[b][n]][back_reference].z) / 2 * cub->get_vector(2, 0)
-                    + xmin << " "
-                    << (BCPs[b][n].x + BCPs[neighbours[b][n]][back_reference].x) / 2 * cub->get_vector(0, 1)
-                    + (BCPs[b][n].y + BCPs[neighbours[b][n]][back_reference].y) / 2 * cub->get_vector(1, 1)
-                    + (BCPs[b][n].z + BCPs[neighbours[b][n]][back_reference].z) / 2 * cub->get_vector(2, 1)
-                    + ymin
-                    << (BCPs[b][n].x + BCPs[neighbours[b][n]][back_reference].x) / 2 * cub->get_vector(0, 2)
-                    + (BCPs[b][n].y + BCPs[neighbours[b][n]][back_reference].y) / 2 * cub->get_vector(1, 2)
-                    + (BCPs[b][n].z + BCPs[neighbours[b][n]][back_reference].z) / 2 * cub->get_vector(2, 2)
-                    + zmin
-                    << endl;
+        for (int b=0; b<iCP; b++)
+            for (int n=0; n<neighbours[b].size(); n++){
+                int back_reference=0;
+                for (int i=0; i<neighbours[neighbours[b][n]].size(); i++) 
+                    if(neighbours[neighbours[b][n]][i]==b) 
+                        back_reference=i;
+                auto pos = cub->get_pos(
+                    (BCPs[b][n].x + BCPs[neighbours[b][n]][back_reference].x) / 2,
+                    (BCPs[b][n].y + BCPs[neighbours[b][n]][back_reference].y) / 2,
+                    (BCPs[b][n].z + BCPs[neighbours[b][n]][back_reference].z) / 2
+                );
+                logfile << "BCP: " << Labels[b] << "-" << Labels[neighbours[b][n]] << " ED: " << (BCPs[b][n].value+BCPs[neighbours[b][n]][back_reference].value)/2  << " Position: "
+                        << pos[0] << " "
+                        << pos[1] << " "
+                        << pos[2] << endl;
             }
     logfile.flush();
     logfile.close();
