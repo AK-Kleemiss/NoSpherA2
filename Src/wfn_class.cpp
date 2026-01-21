@@ -8181,10 +8181,7 @@ bool WFN::read_ptb(const std::filesystem::path& filename, std::ostream& file, co
         beta_els--;
         err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons: " + std::to_string(alpha_els) + "/" + std::to_string(beta_els), file);
     }
-    //for (int i = beta_els; i < alpha_els; i++)
-    //{
-    //    occ[i] = 1.0;
-    //}
+
     if (debug)
     {
         file << "al/be els after:" << alpha_els << " " << beta_els << std::endl;
@@ -8217,11 +8214,7 @@ bool WFN::read_ptb(const std::filesystem::path& filename, std::ostream& file, co
         }
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }
-    // To Do: This needs reviewing in light of mdspan!
-    //while (momat.size() < nbf) {
-    //    momat.push_back(vec(nbf, 0.0));
-    //    occ.push_back(0);
-    //}
+
     // build density matrix
     dMatrix2 temp_co = diag_dot(momat, occ, true);
     DM = dot(temp_co, momat, false, false);

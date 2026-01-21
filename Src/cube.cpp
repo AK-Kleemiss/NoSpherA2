@@ -1306,18 +1306,18 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                 if (i > 0 && j + 1 < size[1] && k > 0)                        sum_vert += values[i - 1][j + 1][k - 1];
                 if (i > 0 && j > 0 && k + 1 < size[2])                        sum_vert += values[i - 1][j - 1][k + 1];
 
-                if (k + 2 < size[2])              sum_side += values[i][j][k + 2];
-                if (k > 1)                        sum_side += values[i][j][k - 2];
-                if (j + 2 < size[1])              sum_side += values[i][j + 2][k];
-                if (j > 1)                        sum_side += values[i][j - 2][k];
-                if (i + 2 < size[0])              sum_side += values[i + 2][j][k];
-                if (i > 1)                        sum_side += values[i - 2][j][k];
+                if (k + 2 < size[2])              sum_2edge += values[i][j][k + 2];
+                if (k > 1)                        sum_2edge += values[i][j][k - 2];
+                if (j + 2 < size[1])              sum_2edge += values[i][j + 2][k];
+                if (j > 1)                        sum_2edge += values[i][j - 2][k];
+                if (i + 2 < size[0])              sum_2edge += values[i + 2][j][k];
+                if (i > 1)                        sum_2edge += values[i - 2][j][k];
 
                 const double inhomog = (-78 * values[i][j][k] + sum_side + 2 * sum_edge + 3 * sum_vert + 4 * sum_2edge) / 888.;
                 //--------------------------------------------------------
 
                 // If variation is significant compared to magnitude and target error, we recompute.
-                if (abs(inhomog) < 0.2 * target_error) {
+                if (abs(inhomog) < target_error) {
                     inhomog_fine[i][j][k] = true;
                     initially_fine++;
                 }
