@@ -1323,7 +1323,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                 }
                 else {
 #pragma omp critical
-                    Refine_integrals.emplace(i3{ i, j, k }, 0.0);
+                    Refine_integrals.emplace(i3{ i, j, k }, values[i][j][k] * dv);
                 }
             }
         }
@@ -1405,7 +1405,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         double new_integral = 0.0;
         // Simple serial summation to avoid any reduction issues, or parallel if confident.
         // Parallel reduction is fine for simple double sum.
-#pragma omp parallel for reduction(+:new_integral)
+#pragma omp parallel for reduction(+:new_integral, initially_fine)
         for (int i = 0; i < size[0]; ++i)
             for (int j = 0; j < size[1]; ++j)
                 for (int k = 0; k < size[2]; ++k) {
@@ -1435,8 +1435,8 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                     }
                     else {
                         const double old_int = Refine_integrals[i3{ i, j, k }];
-                        const double rerror = 1.0 - abs(old_int / (new_int)); //Relative integration error
-                        if (abs(rerror) < target_error) {
+                        const double rerror = abs(new_int - old_int) / (abs(new_int) + 1e-20); // Relative integration error
+                        if (rerror < target_error) {
                             inhomog_fine[i][j][k] = true;
                             initially_fine++;
                         }
