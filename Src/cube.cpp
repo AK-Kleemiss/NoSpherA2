@@ -1409,6 +1409,15 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         for (int i = 0; i < size[0]; ++i)
             for (int j = 0; j < size[1]; ++j)
                 for (int k = 0; k < size[2]; ++k) {
+                    if (inhomog_fine[i][j][k]) {
+                        auto it_ref = Refine_integrals.find(i3{ i,j,k });
+                        if (it_ref != Refine_integrals.end())
+                            new_integral += it_ref->second;
+                        else
+                            new_integral += values[i][j][k] * dv;
+                        continue;
+                    }
+
                     //Look if there is any new refinement point, which we need to take into account and integrate finely
                     double new_int = 0;
                     bool new_point = false;
