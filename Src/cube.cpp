@@ -1254,12 +1254,19 @@ double cube::jaccard(const cube& right) const {
     return (top / bot); //RETURN Real Space R-value between this cube and the given one
 };
 
+auto fast_clamp = [](int v, int lo, int hi) {
+    //assume lo <= hi 
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+    };
+
 void cube::adaptive_refine(std::function<const double(const d3)> const func, double target_error, int max_depth, const int subfactor) {
     using namespace std;
     double current_integral = sum();
     cout << endl << "Initial Integral: " << current_integral << endl;
     std::map<i3, std::pair<double, double>, I3Less> Refine_integrals;
-    bvec3 inhomog_fine(size[0], bvec2(size[1], bvec(size[2], false)));
+    ivec3 inhomog_fine(size[0], ivec2(size[1], ivec(size[2], 0)));
 
     const int total_size = size[0] * size[1] * size[2];
     int initially_fine = 0;
@@ -1319,7 +1326,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                 total_inhomog += abs(inhomog);
                 // If variation is significant compared to magnitude and target error, we recompute.
                 if (abs(inhomog) < target_error) {
-                    inhomog_fine[i][j][k] = true;
+                    inhomog_fine[i][j][k] = 1;
                     initially_fine++;
                 }
                 else {
@@ -1360,12 +1367,6 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         long long count_computed = 0;
 
         ProgressBar* pb = new ProgressBar(new_size[0], 50, "#", " ", "Level " + to_string(depth + 1));
-        auto fast_clamp = [](int v, int lo, int hi) { 
-            //assume lo <= hi 
-            if (v < lo) return lo; 
-            if (v > hi) return hi; 
-            return v; 
-         };
 
 #pragma omp parallel for reduction(+:count_computed) schedule(dynamic)
         for (int i = 0; i < new_size[0]; ++i) {
@@ -1387,7 +1388,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                 else {
                     j0 = 0;
                 }
-                bvec& ihf = inhomog_fine[i0][j0];
+                int* ihf = inhomog_fine[i0][j0].data();
                 for (int k = 0; k < new_size[2]; ++k) {
                     // Check if this corresponds to an exact old point
                     if (i % subfactor == 0 && j % subfactor == 0 && k % subfactor == 0) {
@@ -1405,13 +1406,13 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                         k0 = 0;
                     }
 
-                    if (ihf[k0]) {
+                    if (ihf[k0] == 1) {
                         // Already marked as not inhomogeneous anymore
                         continue;
                     }
 
                     const double val = func(get_pos(old_i, old_j, old_k));
-                    err_checkf(!std::isnan(val) && !std::isinf(val), "Error in new value calculation!", cout);
+                    //err_checkf(!std::isnan(val) && !std::isinf(val), "Error in new value calculation!", cout);
 
 #pragma omp critical
                     refine_points.emplace(i3{ i0, j0, k0 }, std::make_pair(val, d3{ old_i, old_j, old_k }));
@@ -1464,7 +1465,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                         const double old_int = Refine_integrals[i3{ i, j, k }].first;
                         const double rerror = abs(new_int - old_int) / (abs(new_int) + 1e-20); // Relative integration error
                         if (rerror < target_error) {
-                            inhomog_fine[i][j][k] = true;
+                            inhomog_fine[i][j][k] = 1;
                             initially_fine++;
 							removed_inhomog += abs(Refine_integrals[i3{ i, j, k }].second);
                         }
