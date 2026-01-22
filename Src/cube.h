@@ -101,7 +101,7 @@ public:
      * @param target_error The relative error threshold for the integral convergence.
      * @param max_depth Maximum number of refinement iterations (limit total grid size).
      */
-    void adaptive_refine(std::function<const double(const std::array<double, 3>)> const func, double target_error, double target_value = -1E-100, int max_depth = 4);
+    void adaptive_refine(std::function<const double(const std::array<double, 3>)> const func, double target_error, int max_depth = 4, const int subfactor = 2);
 
 private:
     double dv;

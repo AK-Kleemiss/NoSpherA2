@@ -1254,17 +1254,18 @@ double cube::jaccard(const cube& right) const {
     return (top / bot); //RETURN Real Space R-value between this cube and the given one
 };
 
-void cube::adaptive_refine(std::function<const double(const d3)> const func, double target_error, double target_value, int max_depth) {
+void cube::adaptive_refine(std::function<const double(const d3)> const func, double target_error, int max_depth, const int subfactor) {
     using namespace std;
     double current_integral = sum();
-    cout << "Initial Integral: " << current_integral << endl;
-    std::map<i3, double, I3Less> Refine_integrals;
+    cout << endl << "Initial Integral: " << current_integral << endl;
+    std::map<i3, std::pair<double, double>, I3Less> Refine_integrals;
     bvec3 inhomog_fine(size[0], bvec2(size[1], bvec(size[2], false)));
 
     const int total_size = size[0] * size[1] * size[2];
     int initially_fine = 0;
+	double total_inhomog = 0.0, removed_inhomog = 0.0, problematic_inhomog = 0.0;
 
-#pragma omp parallel for reduction(+:initially_fine)
+#pragma omp parallel for reduction(+:initially_fine, total_inhomog)
     for (int i = 0; i < size[0]; ++i) {
         for (int j = 0; j < size[1]; ++j) {
             for (int k = 0; k < size[2]; ++k) {
@@ -1276,67 +1277,68 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                 double sum_vert = 0;      // 8 vertices
                 double sum_2edge = 0;     // 6 second edge midpoints
                 // Side points
-                if (k + 1 < size[2])              sum_side += values[i][j][k + 1];
-                if (k > 0)                        sum_side += values[i][j][k - 1];
-                if (j + 1 < size[1])              sum_side += values[i][j + 1][k];
-                if (j > 0)                        sum_side += values[i][j - 1][k];
-                if (i + 1 > size[0])              sum_side += values[i + 1][j][k];
-                if (i > 0)                        sum_side += values[i - 1][j][k];
+                if (k + 1 < size[2]) sum_side += values[i][j][k + 1];
+                if (k > 0)           sum_side += values[i][j][k - 1];
+                if (j + 1 < size[1]) sum_side += values[i][j + 1][k];
+                if (j > 0)           sum_side += values[i][j - 1][k];
+                if (i + 1 > size[0]) sum_side += values[i + 1][j][k];
+                if (i > 0)           sum_side += values[i - 1][j][k];
 
 
-                if (i > 0 && j > 0)                        sum_edge += values[i - 1][j - 1][k];
-                if (i > 0 && k > 0)                        sum_edge += values[i - 1][j][k - 1];
-                if (j > 0 && k > 0)                        sum_edge += values[i][j - 1][k - 1];
-                if (k + 1 < size[2] && j + 1 > size[1])    sum_edge += values[i][j + 1][k + 1];
-                if (i + 1 < size[0] && j + 1 > size[1])    sum_edge += values[i + 1][j + 1][k];
-                if (k + 1 < size[2] && i + 1 > size[0])    sum_edge += values[i + 1][j][k + 1];
-                if (k + 1 < size[2] && i > 0)              sum_edge += values[i - 1][j][k + 1];
-                if (j + 1 < size[1] && i > 0)              sum_edge += values[i - 1][j + 1][k];
-                if (k + 1 < size[2] && j > 0)              sum_edge += values[i][j - 1][k + 1];
-                if (i + 1 < size[0] && j > 0)              sum_edge += values[i + 1][j - 1][k];
-                if (i + 1 < size[0] && k > 0)              sum_edge += values[i + 1][j][k - 1];
-                if (j + 1 < size[1] && k > 0)              sum_edge += values[i][j + 1][k - 1];
+                if (i > 0 && j > 0)                     sum_edge += values[i - 1][j - 1][k];
+                if (i > 0 && k > 0)                     sum_edge += values[i - 1][j][k - 1];
+                if (j > 0 && k > 0)                     sum_edge += values[i][j - 1][k - 1];
+                if (k + 1 < size[2] && j + 1 > size[1]) sum_edge += values[i][j + 1][k + 1];
+                if (i + 1 < size[0] && j + 1 > size[1]) sum_edge += values[i + 1][j + 1][k];
+                if (k + 1 < size[2] && i + 1 > size[0]) sum_edge += values[i + 1][j][k + 1];
+                if (k + 1 < size[2] && i > 0)           sum_edge += values[i - 1][j][k + 1];
+                if (j + 1 < size[1] && i > 0)           sum_edge += values[i - 1][j + 1][k];
+                if (k + 1 < size[2] && j > 0)           sum_edge += values[i][j - 1][k + 1];
+                if (i + 1 < size[0] && j > 0)           sum_edge += values[i + 1][j - 1][k];
+                if (i + 1 < size[0] && k > 0)           sum_edge += values[i + 1][j][k - 1];
+                if (j + 1 < size[1] && k > 0)           sum_edge += values[i][j + 1][k - 1];
 
-                if (i > 0 && j > 0 && k > 0)                                  sum_vert += values[i - 1][j - 1][k - 1];
-                if (i + 1 < size[0] && j + 1 < size[1] && k + 1 < size[2])    sum_vert += values[i + 1][j + 1][k + 1];
-                if (i > 0 && j + 1 < size[1] && k + 1 < size[2])              sum_vert += values[i - 1][j + 1][k + 1];
-                if (i + 1 < size[0] && j > 0 && k + 1 < size[2])              sum_vert += values[i + 1][j - 1][k + 1];
-                if (i + 1 < size[0] && j + 1 < size[1] && k > 0)              sum_vert += values[i + 1][j + 1][k - 1];
-                if (i + 1 < size[0] && j > 0 && k > 0)                        sum_vert += values[i + 1][j - 1][k - 1];
-                if (i > 0 && j + 1 < size[1] && k > 0)                        sum_vert += values[i - 1][j + 1][k - 1];
-                if (i > 0 && j > 0 && k + 1 < size[2])                        sum_vert += values[i - 1][j - 1][k + 1];
+                if (i > 0 && j > 0 && k > 0)                               sum_vert += values[i - 1][j - 1][k - 1];
+                if (i + 1 < size[0] && j + 1 < size[1] && k + 1 < size[2]) sum_vert += values[i + 1][j + 1][k + 1];
+                if (i > 0 && j + 1 < size[1] && k + 1 < size[2])           sum_vert += values[i - 1][j + 1][k + 1];
+                if (i + 1 < size[0] && j > 0 && k + 1 < size[2])           sum_vert += values[i + 1][j - 1][k + 1];
+                if (i + 1 < size[0] && j + 1 < size[1] && k > 0)           sum_vert += values[i + 1][j + 1][k - 1];
+                if (i + 1 < size[0] && j > 0 && k > 0)                     sum_vert += values[i + 1][j - 1][k - 1];
+                if (i > 0 && j + 1 < size[1] && k > 0)                     sum_vert += values[i - 1][j + 1][k - 1];
+                if (i > 0 && j > 0 && k + 1 < size[2])                     sum_vert += values[i - 1][j - 1][k + 1];
 
-                if (k + 2 < size[2])              sum_2edge += values[i][j][k + 2];
-                if (k > 1)                        sum_2edge += values[i][j][k - 2];
-                if (j + 2 < size[1])              sum_2edge += values[i][j + 2][k];
-                if (j > 1)                        sum_2edge += values[i][j - 2][k];
-                if (i + 2 < size[0])              sum_2edge += values[i + 2][j][k];
-                if (i > 1)                        sum_2edge += values[i - 2][j][k];
+                if (k + 2 < size[2]) sum_2edge += values[i][j][k + 2];
+                if (k > 1)           sum_2edge += values[i][j][k - 2];
+                if (j + 2 < size[1]) sum_2edge += values[i][j + 2][k];
+                if (j > 1)           sum_2edge += values[i][j - 2][k];
+                if (i + 2 < size[0]) sum_2edge += values[i + 2][j][k];
+                if (i > 1)           sum_2edge += values[i - 2][j][k];
 
                 const double inhomog = (-78 * values[i][j][k] + sum_side + 2 * sum_edge + 3 * sum_vert + 4 * sum_2edge) / 888.;
                 //--------------------------------------------------------
-
+                total_inhomog += abs(inhomog);
                 // If variation is significant compared to magnitude and target error, we recompute.
                 if (abs(inhomog) < target_error) {
                     inhomog_fine[i][j][k] = true;
                     initially_fine++;
                 }
                 else {
+                    problematic_inhomog += abs(inhomog);
 #pragma omp critical
-                    Refine_integrals.emplace(i3{ i, j, k }, values[i][j][k] * dv);
+                    Refine_integrals.emplace(i3{ i, j, k }, std::make_pair(values[i][j][k] * dv, inhomog));
                 }
             }
         }
     }
 
-    cout << "Out of " << total_size << " initially fine: " << initially_fine << endl;
+    cout << "Out of " << total_size << " initially fine: " << initially_fine << " with a problematic inhomogenity of: " << problematic_inhomog << " and a total inhomogenity of " << total_inhomog << endl;
 
     ivec nr_fine(max_depth + 1, 0);
     nr_fine[0] = initially_fine;
 
     for (int depth = 0; depth < max_depth; ++depth) {
         // Create new dimensions to sample
-        const int fac = pow(2, depth + 1);
+        const int fac = pow(subfactor, depth + 1);
         i3 new_size = { size[0] * fac, size[1] * fac, size[2] * fac };
 
         // New step vectors (half the size)
@@ -1358,27 +1360,52 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         long long count_computed = 0;
 
         ProgressBar* pb = new ProgressBar(new_size[0], 50, "#", " ", "Level " + to_string(depth + 1));
+        auto fast_clamp = [](int v, int lo, int hi) { 
+            //assume lo <= hi 
+            if (v < lo) return lo; 
+            if (v > hi) return hi; 
+            return v; 
+         };
 
 #pragma omp parallel for reduction(+:count_computed) schedule(dynamic)
         for (int i = 0; i < new_size[0]; ++i) {
+            const double old_i = double(i) / fac;
+            int i0 = static_cast<int>(old_i); 
+            if (size[0] > 1) { 
+                i0 = fast_clamp(i0, 0, size[0] - 2); 
+            }
+            else { 
+                i0 = 0; 
+            }
+            //const int i0 = size[0] > 1 ? std::clamp((int)std::floor(old_i), 0, size[0] - 2) : 0;
             for (int j = 0; j < new_size[1]; ++j) {
+                const double old_j = double(j) / fac;
+                int j0 = static_cast<int>(old_j);
+                if (size[1] > 1) {
+                    j0 = fast_clamp(j0, 0, size[1] - 2);
+                }
+                else {
+                    j0 = 0;
+                }
+                bvec& ihf = inhomog_fine[i0][j0];
                 for (int k = 0; k < new_size[2]; ++k) {
                     // Check if this corresponds to an exact old point
-                    if (i % 2 == 0 && j % 2 == 0 && k % 2 == 0) {
+                    if (i % subfactor == 0 && j % subfactor == 0 && k % subfactor == 0) {
                         continue;
                     }
 
                     // Map to continuous old coordinates
-                    const double old_i = double(i) / fac;
-                    const double old_j = double(j) / fac;
                     const double old_k = double(k) / fac;
-
+                    int k0 = static_cast<int>(old_k);
                     // Neighbors in old grid
-                    const int i0 = size[0] > 1 ? std::clamp((int)std::floor(old_i), 0, size[0] - 2) : 0;
-                    const int j0 = size[1] > 1 ? std::clamp((int)std::floor(old_j), 0, size[1] - 2) : 0;
-                    const int k0 = size[2] > 1 ? std::clamp((int)std::floor(old_k), 0, size[2] - 2) : 0;
+                    if (size[2] > 1) {
+                        k0 = fast_clamp(k0, 0, size[2] - 2);
+                    }
+                    else {
+                        k0 = 0;
+                    }
 
-                    if (inhomog_fine[i0][j0][k0]) {
+                    if (ihf[k0]) {
                         // Already marked as not inhomogeneous anymore
                         continue;
                     }
@@ -1395,7 +1422,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         }
         delete pb;
 
-        double new_dv = abs(new_vectors[0][0] * new_vectors[1][1] * new_vectors[2][2]
+        const double new_dv = abs(new_vectors[0][0] * new_vectors[1][1] * new_vectors[2][2]
             - new_vectors[2][0] * new_vectors[1][1] * new_vectors[0][2]
             + new_vectors[0][1] * new_vectors[1][2] * new_vectors[2][0]
             - new_vectors[2][1] * new_vectors[1][2] * new_vectors[0][0]
@@ -1405,14 +1432,14 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         double new_integral = 0.0;
         // Simple serial summation to avoid any reduction issues, or parallel if confident.
         // Parallel reduction is fine for simple double sum.
-#pragma omp parallel for reduction(+:new_integral, initially_fine)
+#pragma omp parallel for reduction(+:new_integral, initially_fine, removed_inhomog)
         for (int i = 0; i < size[0]; ++i)
             for (int j = 0; j < size[1]; ++j)
                 for (int k = 0; k < size[2]; ++k) {
                     if (inhomog_fine[i][j][k]) {
                         auto it_ref = Refine_integrals.find(i3{ i,j,k });
                         if (it_ref != Refine_integrals.end())
-                            new_integral += it_ref->second;
+                            new_integral += it_ref->second.first;
                         else
                             new_integral += values[i][j][k] * dv;
                         continue;
@@ -1434,13 +1461,14 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                         new_int += values[i][j][k] * dv;
                     }
                     else {
-                        const double old_int = Refine_integrals[i3{ i, j, k }];
+                        const double old_int = Refine_integrals[i3{ i, j, k }].first;
                         const double rerror = abs(new_int - old_int) / (abs(new_int) + 1e-20); // Relative integration error
                         if (rerror < target_error) {
                             inhomog_fine[i][j][k] = true;
                             initially_fine++;
+							removed_inhomog += abs(Refine_integrals[i3{ i, j, k }].second);
                         }
-                        Refine_integrals[i3{ i, j, k }] = new_int;
+                        Refine_integrals[i3{ i, j, k }].first = new_int;
                     }
                     new_integral += new_int;
                 }
@@ -1453,21 +1481,19 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         cout << "Refinement Level " << depth + 1
             << ": Integral = " << new_integral
             << ", Error = " << rel_error
+			<< ", left inhomogenity: " << total_inhomog - removed_inhomog
+			<< ", left problematic inhomogenity: " << problematic_inhomog - removed_inhomog
             << " (Computed: " << count_computed << " fixed: " << nr_fine[depth + 1] - nr_fine[depth] << ")" << endl;
 
         // Apply update
         current_integral = new_integral;
-        if (target_value != -1E-100) {
-            if (rel_error < target_error && abs(current_integral - target_value) < target_error) {
-                cout << "Converged!" << endl;
-                break;
-            }
+        if (rel_error < target_error && problematic_inhomog / total_inhomog < target_error) {
+            cout << "Converged!" << endl;
+            break;
         }
-        else {
-            if (rel_error < target_error) {
-                cout << "Converged!" << endl;
-                break;
-            }
+		if (initially_fine == total_size) {
+            cout << "All points refined!" << endl;
+            break;
         }
     }
 }

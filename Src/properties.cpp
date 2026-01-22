@@ -1160,7 +1160,7 @@ void properties_calculation(options& opt)
         log2 << "Refining grid files to integral accuracy of " << opt.properties.integral_accuracy << " ..." << flush;
         vec2 d(16, vec(wavy.get_ncen(), 0.0));
         vec phi(wavy.get_nmo(true), 0.0);
-        cubes[cube_type::Rho].adaptive_refine([&wavy](const d3& pos) { return wavy.compute_dens(pos); }, opt.properties.integral_accuracy, wavy.get_nr_electrons(), 5);
+        cubes[cube_type::Rho].adaptive_refine([&wavy](const d3& pos) { return wavy.compute_dens(pos); }, opt.properties.integral_accuracy, 8, 3);
     }
 
     if (opt.properties.MO_numbers.size() != 0)
