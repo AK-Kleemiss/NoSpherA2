@@ -17,6 +17,7 @@
 #include "SALTED_utilities.h"
 #include "GridManager.h"
 
+
 #ifdef PEOJECT_NAME
 #define FLO_CUDA
 #include "cuda_runtime.h"
@@ -2362,13 +2363,15 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
         if (debug) {
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                if (temp.find(wave.get_atom_charge(asym_atom_list[i])) == temp.end()) {
-                    temp.emplace(wave.get_atom_charge(asym_atom_list[i]), (wave.get_atom_charge(asym_atom_list[i]), mode));
+                const int charge = wave.get_atom_charge(asym_atom_list[i]);
+                if (temp.find(charge) == temp.end()) {
+                    temp.emplace(charge, Thakkar{ charge, mode });
+                    temp_G.emplace(charge, Spherical_Gaussian_Density{ charge, mode });
                     if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
                     {
-                        double k_0001 = temp[i].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
-                        double k_1 = temp[i].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.get_atom_ECP_electrons(asym_atom_list[i]));
-                        file << "Atom nr: " << wave.get_atom_charge(asym_atom_list[i]) << " number of ECP electrons: " << wave.get_atom_ECP_electrons(asym_atom_list[i]) << " core f(0) : "
+                        double k_0001 = temp[charge].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
+                        double k_1 = temp[charge].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.get_atom_ECP_electrons(asym_atom_list[i]));
+                        file << "Atom nr: " << charge << " number of ECP electrons: " << wave.get_atom_ECP_electrons(asym_atom_list[i]) << " core f(0) : "
                             << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
                     }
                 }
@@ -2377,12 +2380,10 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
         else {
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                int charge = wave.get_atom_charge(asym_atom_list[i]);
+                const int charge = wave.get_atom_charge(asym_atom_list[i]);
                 if (temp.find(charge) == temp.end()) {
-                    Thakkar t(charge, mode);
-                    Spherical_Gaussian_Density g(charge, mode);
-                    temp.emplace(charge, t);
-                    temp_G.emplace(charge, g);
+                    temp.emplace(charge, Thakkar{ charge, mode });
+                    temp_G.emplace(charge, Spherical_Gaussian_Density{ charge, mode });
                 }
             }
         }
@@ -2795,7 +2796,14 @@ tsc_block_type calculate_scattering_factors(
             //vec coefs = density_fit_hybrid(*wavy, wavy_aux, 'C',
             //                                2.0e-4, 1e-6, "Hirsh");
             //TODO: only compute coefs for atoms that are actually in the symmetric unit!
-            vec coefs = density_fit_unrestrained(*wavy, wavy_aux, 'C', false);
+            DensityFitting::CONFIG config;
+            config.analyze_quality = opt.debug;
+            //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+            //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+            //if (wavy->get_origin() == e_origin::ptb)
+            //    config.restraint_strength = 1.0e-4;
+
+            vec coefs = DensityFitting::density_fit(*wavy, wavy_aux, config);
             file << setw(12 * 4 + 2) << "... done!\n"
                 << flush;
             time_points.push_back(get_time());
@@ -2803,7 +2811,7 @@ tsc_block_type calculate_scattering_factors(
 
             vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
             file << "Table of Charges in electrons\n"
-                << "       Atom      ML" << endl;
+                << "       Atom  Charge_RI" << endl;
 
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
