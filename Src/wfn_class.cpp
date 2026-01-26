@@ -8,6 +8,7 @@
 #include "basis_set.h"
 #include "nos_math.h"
 #include "libCintMain.h"
+#include "JKFit.h"
 
 void WFN::fill_pre()
 {
@@ -8133,6 +8134,13 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         err_checkf(read_block_from_fortran_binary(inFile, &_charge[i]), "Error reading atom data for atom " + std::to_string(i), std::cout);
     }
 
+    // making it into the wavefunction data
+    for (int i = 0; i < ncent; i++)
+    {
+        err_checkf(push_back_atom(atom(atyp[i], "0000000000000", i, x[i], y[i], z[i], _charge[i])), "Error adding atom to WFN!", file);
+    }
+    err_checkf(ncen == ncent, "Error adding atoms to WFN!", file);
+
     ivec lao(nprims), aoatcart(nprims), ipao(nprims);
     for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &lao[i]), "Error reading basis set information lao of primitive " + std::to_string(i), std::cout);
     for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &aoatcart[i]), "Error reading basis set information aotcart of primitive " + std::to_string(i), std::cout);
@@ -8144,16 +8152,73 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     vec occ(nmomax), eval(nmomax);
     err_checkf(read_block_from_fortran_binary(inFile, occ.data()), "Error reading occupancies!", std::cout);
     err_checkf(read_block_from_fortran_binary(inFile, eval.data()), "Error reading energies!", std::cout);
+
+
+    //std::vector<char> test((size_t)nbf * (size_t)nmomax);
+    //err_checkf(read_block_from_fortran_binary(inFile, test.data()), "Error reading MO coefficients!", std::cout);
+
+
     vec tempvec((size_t)nbf* (size_t)nmomax);
     err_checkf(read_block_from_fortran_binary(inFile, tempvec.data()), "Error reading MO coefficients!", std::cout);
     dMatrix2 momat = reshape<dMatrix2>(tempvec, Shape2D(nmomax, nbf));
 
-    // making it into the wavefunction data
-    for (int i = 0; i < ncent; i++)
+    vec tempvec2((size_t)nmomax * (size_t)nmomax);
+    err_checkf(read_block_from_fortran_binary(inFile, tempvec2.data()), "Error reading spherical MO coefficients!", std::cout);
+
+//  Add Basis set information to atoms
+//  This is a cartesian basis
+//  Exp and Contr are given in therms of the correponding functions, thus for p-type basis functions, we get 3-times the same block
+//  lao tells us what type of function we got (s,p,d...)  (s = 1, p = 2-4, d = 5-10, f = 11-20, g = 21-35)
+//  aoatcart is the corresponding atom which we have to assign everything to
+//  ipao tells us the shells for every basis function
+    //int shell = 0;
+    //for (int prim = 0; prim < nprims;) {
+    //    int function_type = 1;
+    //    if (lao[prim] == 1) function_type = 1;
+    //    else if (lao[prim] >= 2 && lao[prim] <= 4) function_type = 2;
+    //    else if (lao[prim] >= 5 && lao[prim] <= 10) function_type = 3;
+    //    else if (lao[prim] >= 11 && lao[prim] <= 20) function_type = 4;
+    //    else if (lao[prim] >= 21 && lao[prim] <= 35) function_type = 5;
+    //    else err_checkf(true, "Error interpreting basis function type in ptb file!", file);
+    //    const int n_prim_type = (function_type * (function_type + 1)) / 2;  //Number of cartesian functions per type
+    //    int prims_in_this_shell = 1;
+    //    while (ipao[prim] == ipao[prim + 1]) {
+    //        atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell);
+    //        prim++;
+    //        prims_in_this_shell++;
+    //    }
+    //    atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell); // One extra time to catch the last one
+    //    prim++;
+    //    shell++;
+
+    //    if (function_type != 1) { //Skip all the repetition
+    //        prim += prims_in_this_shell * (n_prim_type-1);
+    //    }
+    //    if (aoatcart[prim - 1] != aoatcart[prim]) { // Reste the shellcounter, if at the 
+    //        shell = 0;
+    //    }
+    //    
+    //}
+
+    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set("ptb-vdzp");
+    set_basis_set_ptr(aux_basis->get_data());
+    int nr_coefs = 0;
+    for (int i = 0; i < get_ncen(); i++)
     {
-        err_checkf(push_back_atom(atom(atyp[i], "0000000000000", i, x[i], y[i], z[i], _charge[i])), "Error adding atom to WFN!", file);
+        int current_charge = get_atom_charge(i) - 1;
+        const std::span<const SimplePrimitive> basis = (*aux_basis)[current_charge];
+        int size = (int)basis.size();
+
+        //Different loop to keep the original contraction coefficients
+        for (int e = 0; e < size; e++)
+        {
+            push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, basis[e].type + 1, basis[e].shell);
+        }
+        //for (int e = 0; e < 5; e++)
+        //{
+        //    push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, 2, basis[e].shell);
+        //}
     }
-    err_checkf(ncen == ncent, "Error adding atoms to WFN!", file);
 
     int elcount = -get_charge();
     if (debug)
@@ -8162,6 +8227,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     {
         elcount += get_atom_charge(i);
         elcount -= constants::ECP_electrons_pTB[get_atom_charge(i)];
+        atoms[i].set_ECP_electrons(constants::ECP_electrons_pTB[get_atom_charge(i)]);
     }
     if (debug)
         file << "elcount after: " << elcount << std::endl;
@@ -8232,14 +8298,29 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         }
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }
-    // To Do: This needs reviewing in light of mdspan!
-    //while (momat.size() < nbf) {
-    //    momat.push_back(vec(nbf, 0.0));
-    //    occ.push_back(0);
-    //}
-    // build density matrix
-    dMatrix2 temp_co = diag_dot(momat, occ, true);
-    DM = dot(temp_co, momat, false, false);
+
+    dMatrix2 reorderd_coefs(nmomax, nmomax);
+    dMatrixRef2 coefs_2D_span(tempvec2.data(), nmomax, nmomax);
+
+    int index = 0;
+    for (const atom& _atom : atoms) {
+        std::vector<basis_set_entry> basis = _atom.get_basis_set();
+        int temp_bas_idx = 0;
+        for (unsigned int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
+            int type = basis[temp_bas_idx].get_type() - 1;
+            temp_bas_idx += _atom.get_shellcount(shell);
+            for (int m = -type; m <= type; m++) {
+                auto coefs_2D_slice = Kokkos::submdspan(coefs_2D_span, index + m + type, Kokkos::full_extent);
+                auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs.to_mdspan(), index + constants::orca_2_pySCF(type, m), Kokkos::full_extent);
+                std::copy(coefs_2D_slice.data_handle(), coefs_2D_slice.data_handle() + nmomax, reord_coefs_slice.data_handle());
+            }
+            index += 2 * type + 1;
+        }
+    }
+
+    dMatrix2 temp_co = diag_dot(reorderd_coefs, occ, true);
+    DM = dot(temp_co, reorderd_coefs, false, false);
+
 
     err_checkf(nprims == nex, "Error adding primitives to WFN!", file);
     inFile.close();

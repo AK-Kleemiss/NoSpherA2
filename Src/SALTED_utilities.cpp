@@ -439,6 +439,7 @@ vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
             atom_elecs[a] += radial * coefs[coef_counter];
             coef_counter++;
         }
+        atom_elecs[a] += atoms[a].get_ECP_electrons();
     }
     return atom_elecs;
 }

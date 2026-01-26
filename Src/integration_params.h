@@ -58,6 +58,8 @@ public:
     unsigned long long get_nao() const { return nao; };    // Number of atomic orbitals  
     unsigned long long get_natoms() const { return ncen; };
 
+    std::map<int, LibCintBasis> get_basis_sets() const { return basis_sets; };
+
     static vec normalize_gto(vec coef, const vec& exp, const int l);
 
     void print_data(std::string name); //FOR DEBUG PURPOSES

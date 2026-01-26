@@ -1417,8 +1417,15 @@ void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>>& aux_basis,
 
 
     WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-    vec ri_coefs_u = density_fit_unrestrained(wavy, wavy_aux, 'C');
-    vec ri_coefs_tfvc = density_fit_hybrid(wavy, wavy_aux, 'C', 2.0E-4, 1E-6, "TFVC", true);
+    DensityFitting::CONFIG RI_config;
+    RI_config.analyze_quality = true;
+    vec ri_coefs_u = DensityFitting::density_fit(wavy, wavy_aux, RI_config);
+
+    RI_config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+    RI_config.charge_scheme = DensityFitting::CHARGE_SCHEME::TFVC;
+    RI_config.restraint_strength = 2.0E-4;
+    RI_config.tikhonov_lambda = 1E-6;
+    vec ri_coefs_tfvc = DensityFitting::density_fit(wavy, wavy_aux, RI_config);
 
    vec2 dens_hirsh(2);
    vec2 dens_becke(2);
@@ -1725,7 +1732,12 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     std::vector<std::shared_ptr<BasisSet>> aux_basis_set{ BasisSetLibrary().get_basis_set("def2-universal-jkfit") };
 
     WFN wavy_aux = generate_aux_wfn(wavy, aux_basis_set);
-    vec ri_coefs = density_fit_restrain(wavy, wavy_aux, opt->mem, 'C', opt->debug);
+
+    DensityFitting::CONFIG RI_config;
+    RI_config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+    RI_config.analyze_quality = opt->debug;
+
+    vec ri_coefs = density_fit(wavy, wavy_aux, RI_config);
 
 
     vec3 grid;

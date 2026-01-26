@@ -20,10 +20,11 @@ With functions:
 */
 
 DECLARE_CINT_KERNEL(Coulomb2C_SPH, true);
+DECLARE_CINT_KERNEL(Coulomb2C_CRT, true);
 DECLARE_CINT_KERNEL(Overlap2C_SPH, false);
 DECLARE_CINT_KERNEL(Overlap2C_CRT, false);
-
 DECLARE_CINT_KERNEL(Coulomb3C_SPH, true);
+DECLARE_CINT_KERNEL(Coulomb3C_CRT, true);
 DECLARE_CINT_KERNEL(Overlap3C_SPH, false);
 
 #undef DECLARE_CINT_KERNEL

@@ -117,6 +117,7 @@ void compute2C(Int_Params& params, vec& ret) {
     }
 }
 template void compute2C<Coulomb2C_SPH>(Int_Params& params, vec& ret);
+template void compute2C<Coulomb2C_CRT>(Int_Params& params, vec& ret);
 template void compute2C<Overlap2C_SPH>(Int_Params& params, vec& ret);
 template void compute2C<Overlap2C_CRT>(Int_Params& params, vec& ret);
 
@@ -176,6 +177,7 @@ void calc_screend_functions_and_max_ij(
 
                 const double crit = -dist2 * (worst_exp[atom_i] + worst_exp[atom_j]);
                 if (crit < exp_cutoff) {
+                //if (false){
                     //local_output += "Screening atom pair (" + std::to_string(atom_i) + ", " + std::to_string(atom_j) + ") with distance " + std::to_string(dist) + " and criterion " + std::to_string(crit) + " < " + std::to_string(exp_cutoff) + "\n";
                     screened[atom_i][atom_j] = true;
                     continue;
@@ -270,7 +272,6 @@ void computeRho(
     const int nat = combined.get_natoms();
     const int nbas = combined.get_nbas();
 
-    //ivec aoloc = make_loc(bas, nbas);
     ivec aoloc = Kernel::gen_loc(bas, nbas);
 
     rho.resize(aoloc[nQM + nAux] - aoloc[nQM], 0.0);
@@ -291,7 +292,8 @@ void computeRho(
     CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
-#pragma omp parallel for schedule(dynamic)
+    ProgressBar pb(natoms, 60, "#", " ", "Calculating Eri3c Matrix");
+#pragma omp parallel for schedule(dynamic) shared(pb, rho)
     for (int atm_idx = 0; atm_idx < natoms; atm_idx++) {
         double* rho_atom = rho.data() + aoloc[nQM + bas_aux_indices[atm_idx]] - aoloc[nQM];
         int shl_slice[6] = {
@@ -355,6 +357,7 @@ void computeRho(
                     1);
             }
         }
+        pb.update(std::cout);
     }
     if (opty) {
         delete opty;
@@ -362,6 +365,11 @@ void computeRho(
     }
 }
 template void computeRho<Coulomb3C_SPH>(
+    const Int_Params& normal_basis,
+    const Int_Params& aux_basis,
+    const dMatrix2& dm,
+    vec& rho);
+template void computeRho<Coulomb3C_CRT>(
     const Int_Params& normal_basis,
     const Int_Params& aux_basis,
     const dMatrix2& dm,
@@ -395,6 +403,7 @@ void compute3C(Int_Params& param1,
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
     ivec shl_slice = { 0, nQM, 0, nQM, nQM, nQM + nAux };
     Kernel::drv(eri3c.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
+
 }
 template void compute3C<Coulomb3C_SPH>(Int_Params& param1,
     Int_Params& param2,
@@ -402,3 +411,106 @@ template void compute3C<Coulomb3C_SPH>(Int_Params& param1,
 template void compute3C<Overlap3C_SPH>(Int_Params& param1,
     Int_Params& param2,
     vec& eri3c);
+
+
+
+//Cartesian to real spherical transformation matrix
+//
+//Kwargs :
+//normalized:
+//How the Cartesian GTOs are normalized.  'sp' means the s and p
+//functions are normalized(this is the convention used by libcint
+//    library).
+dMatrix2 cart2sph(const int l, const bool normalized) {
+    int n_cart = (l + 1) * (l + 2) / 2;
+
+    dMatrix2 c_tensor(n_cart, n_cart);
+    for (int i = 0; i < n_cart; i++) {
+        c_tensor(i,i) = 1.0;
+    }
+
+    if (l == 0 || l == 1) { //For s and p functions, the transformation is trivial
+        if (normalized) {
+            return c_tensor;
+        }
+        else {
+            double norm_factor = (l == 0) ? 0.282094791773878143 : 0.488602511902919921;
+            for (auto& val : c_tensor.container()) {
+                val *= norm_factor;
+            }
+            return c_tensor;
+        }
+    }
+
+    err_chkf(l <= 15, "cart2sph_matrix: l must be <= 15", std::cout);
+
+    int n_sph = 2 * l + 1;
+    vec c_sph(n_sph * n_cart, 0.0);
+
+    CINTc2s_ket_sph(c_sph.data(), n_cart, c_tensor.data(), l);
+    //Transform back to row-major order
+    dMatrix2 c_sph_RM(n_cart, n_sph);
+    for (int i = 0; i < n_cart; i++) {
+        for (int j = 0; j < n_sph; j++) {
+            c_sph_RM(i, j) = c_sph[j * n_cart + i];
+        }
+    }
+    return c_sph_RM;
+}
+
+
+//Returns a n_cart*n_sph matrix used in transforming a cartesian DM to a spherical DM
+dMatrix2 get_cart2sph_matrix(const WFN& cart_wfn, const bool normalized) {
+    //First collect the complete number of spherical and cartesian functions used in the wavefunction
+    int max_l = 0;
+    int n_cart = 0, n_sph = 0;
+    for (const atom& a : cart_wfn.get_atoms()) {
+        int prim = 0;
+        for (int shell = 0; shell < a.get_shellcount_size(); shell++) {
+            const int type = a.get_basis_set_type(prim) - 1;
+
+            n_cart += ((type + 1) * (type + 2)) / 2;
+            n_sph += 2 * type + 1;
+            if (type > max_l) {
+                max_l = type;
+            }
+
+            prim += a.get_shellcount(shell);
+        }
+    }
+
+    std::vector<dMatrix2> conversion_matrices(max_l + 1);
+    for (int l = 0; l <= max_l; l++) {
+        conversion_matrices[l] = cart2sph(l, normalized);
+    }
+
+    std::cout << "Number of cartesian functions: " << n_cart << ", number of spherical functions: " << n_sph << std::endl;
+    dMatrix2 c_dm(n_cart, n_sph);
+    int cart_idx = 0;
+    for (const atom& a : cart_wfn.get_atoms()) {
+        int prim = 0;
+        for (int shell = 0; shell < a.get_shellcount_size(); shell++) {
+            const int type = a.get_basis_set_type(prim) - 1;
+            const dMatrix2& c_sph = conversion_matrices[type];
+            const int n_cart_shell = ((type + 1) * (type + 2)) / 2;
+            const int n_sph_shell = 2 * type + 1;
+            //Fill in the appropriate block in the c_dm matrix
+            for (int i = 0; i < n_cart_shell; i++) {
+                for (int j = 0; j < n_sph_shell; j++) {
+                    c_dm(cart_idx + i, cart_idx + j) = c_sph(i, j);
+                }
+            }
+            cart_idx += n_cart_shell;
+            prim += a.get_shellcount(shell);
+        }
+    }
+    ////print all of c_dm
+    //for (int i = 0; i < c_dm.extent(0); i++) {
+    //    for (int j = 0; j < c_dm.extent(1); j++) {
+    //        std::cout << c_dm(i, j) << " ";
+    //    }
+    //    std::cout << std::endl;
+    //}
+
+    return c_dm;
+}

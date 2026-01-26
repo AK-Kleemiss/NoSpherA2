@@ -2112,7 +2112,11 @@ void options::digest_options()
         else if (temp == "-write_ri_coefs"){
             WFN wavy(wfn);
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-            vec ri_coefs = density_fit_unrestrained(wavy, wavy_aux,'C', debug);
+            DensityFitting::CONFIG config;
+            config.analyze_quality = debug;
+            //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+            //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+            vec ri_coefs = density_fit(wavy, wavy_aux, config);
             npy::npy_data<double> np_coeffs;
             np_coeffs.data = ri_coefs;
             np_coeffs.fortran_order = false;
@@ -2304,7 +2308,7 @@ void options::digest_options()
 
             WFN wavy(wfn);
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-            demonstrate_enhanced_density_fitting(wavy, wavy_aux);
+            DensityFitting::demonstrate_enhanced_density_fitting(wavy, wavy_aux);
 
             //exit(0);
         }

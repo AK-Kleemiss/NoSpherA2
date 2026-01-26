@@ -218,12 +218,17 @@ template ivec make_loc<COORDINATE_TYPE::SPH>(ivec& bas, int nbas);
 extern "C" {
     extern CINTOptimizerFunction int3c2e_optimizer;
     extern CINTIntegralFunction int3c2e_sph;
+    extern CINTIntegralFunction int3c2e_cart;
 
     extern CINTOptimizerFunction int2c2e_optimizer;
     extern CINTIntegralFunction int2c2e_sph;
+    extern CINTIntegralFunction int2c2e_cart;
 
     extern CINTOptimizerFunction int3c1e_optimizer;
     extern CINTIntegralFunction int3c1e_sph;
+
+    // Add missing overlap function declarations
+    extern CINTOptimizerFunction int1e_ovlp_optimizer;
 }
 
 #define ADD_FUNCS_TO_KERNEL(Kernel, optimizer_func, driver_func, integral_func, coord_type) \
@@ -266,9 +271,12 @@ extern "C" {
     }
 
 ADD_FUNCS_TO_KERNEL(Coulomb2C_SPH, int2c2e_optimizer, GTOint2c, int2c2e_sph, COORDINATE_TYPE::SPH)
+ADD_FUNCS_TO_KERNEL(Coulomb2C_CRT, int2c2e_optimizer, GTOint2c, int2c2e_cart, COORDINATE_TYPE::CART)
 ADD_FUNCS_TO_KERNEL(Overlap2C_SPH, int1e_ovlp_optimizer, GTOint2c, int1e_ovlp_sph, COORDINATE_TYPE::SPH) //If this is suddenly wrong, use the NOOPT version
 ADD_FUNCS_TO_KERNEL(Overlap2C_CRT, int1e_ovlp_optimizer, GTOint2c, int1e_ovlp_cart, COORDINATE_TYPE::CART)
+
 ADD_FUNCS_TO_KERNEL_3C(Coulomb3C_SPH, int3c2e_optimizer, GTOnr3c_drv, int3c2e_sph, GTOnr3c_fill_s1, COORDINATE_TYPE::SPH)
+ADD_FUNCS_TO_KERNEL_3C(Coulomb3C_CRT, int3c2e_optimizer, GTOnr3c_drv, int3c2e_cart, GTOnr3c_fill_s1, COORDINATE_TYPE::CART)
 ADD_FUNCS_TO_KERNEL_3C(Overlap3C_SPH, int3c1e_optimizer, GTOnr3c_drv, int3c1e_sph, GTOnr3c_fill_s1, COORDINATE_TYPE::SPH) //If this is suddenly wrong, use the NOOPT version
 
 #undef ADD_FUNCS_TO_KERNEL

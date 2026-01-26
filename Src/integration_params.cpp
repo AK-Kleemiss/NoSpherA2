@@ -79,20 +79,34 @@ vec Int_Params::normalize_gto(vec coef, const vec& exp, const int l)
             ee[i][j] = ee[j][i] = gaussian_int(l * 2 + 2, exp[i] + exp[j]);
         }
     }
-    double s1;
+    //double s1;
+    //for (int i = 0; i < coef.size(); i++)
+    //{
+    //    s1 = 0.0;
+    //    for (int j = 0; j < coef.size(); j++)
+    //    {
+    //        for (int k = 0; k < coef.size(); k++)
+    //        {
+    //            s1 += coef[k] * ee[k][j] * coef[j];
+    //        }
+    //    }
+    //    s1 = 1.0 / std::sqrt(s1);
+    //    coef[i] *= s1;
+    //}
+    double s1 = 0.0;
+    for (int j = 0; j < coef.size(); j++)
+    {
+        for (int k = 0; k < coef.size(); k++)
+        {
+            s1 += coef[k] * ee[k][j] * coef[j];
+        }
+    }
+    s1 = 1.0 / std::sqrt(s1);
     for (int i = 0; i < coef.size(); i++)
     {
-        s1 = 0.0;
-        for (int j = 0; j < coef.size(); j++)
-        {
-            for (int k = 0; k < coef.size(); k++)
-            {
-                s1 += coef[k] * ee[k][j] * coef[j];
-            }
-        }
-        s1 = 1.0 / std::sqrt(s1);
         coef[i] *= s1;
     }
+
     return std::move(coef);
 }
 
@@ -115,7 +129,7 @@ void Int_Params::collect_basis_data()
             exponents.push_back(basis[shell].get_exponent());
         }
         // Normalize the GTOs depending on the context
-        if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx)
+        if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx )
         {
             for (int i = 0; i < coefficients.size(); i++)
             {
@@ -123,15 +137,26 @@ void Int_Params::collect_basis_data()
                 coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2*l+1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
             }
         }
-        else if (wfn_origin == e_origin::NOT_YET_DEFINED)
+        else if (wfn_origin == e_origin::tonto )
+        {
+            for (int i = 0; i < coefficients.size(); i++)
+            {
+                int l = basis[i].get_type() - 1;
+                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from Tonto to libcint  ... something something, cartesian harmonics...
+                if (l == 2) // D functions need an extra normalization factor
+                    coefficients[i] *= std::sqrt(10. / 4.0 / constants::PI); // ... something something, cartesian harmonics...^2
+            }
+        }
+        else if (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::ptb)
         {
             int coef_idx = 0;
             for (unsigned int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++)
             {
+                const int type = (wfn_origin == e_origin::NOT_YET_DEFINED) ? basis[coef_idx].get_type() : basis[coef_idx].get_type() - 1;
                 vec shell_coefs(coefficients.begin() + coef_idx, coefficients.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
                 vec shell_exp(exponents.begin() + coef_idx, exponents.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
 
-                shell_coefs = normalize_gto(shell_coefs, shell_exp, basis[shell].get_type());
+                shell_coefs = normalize_gto(shell_coefs, shell_exp, type);
 
                 // Place the new coefs at the correct place in the coefficients vector
                 std::copy(shell_coefs.begin(), shell_coefs.end(), coefficients.begin() + coef_idx);
@@ -148,7 +173,7 @@ void Int_Params::collect_basis_data()
         {
             int new_l = 0;
             if (wfn_origin == e_origin::NOT_YET_DEFINED)      new_l = basis[func].get_type();
-            else if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto) new_l = basis[func].get_type() - 1;
+            else if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb) new_l = basis[func].get_type() - 1;
             else {
                 std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
                 new_l = basis[func].get_type() - 1;
@@ -165,11 +190,10 @@ void Int_Params::collect_basis_data()
             for (unsigned int shell_idx = 0; shell_idx < atoms[atom_idx].get_shellcount_size(); shell_idx++) {
                 int curr_funcs = (int)atoms[atom_idx].get_shellcount()[shell_idx];
 
-                if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) { //Sort functions regarding the angular momentum
-                    if (wfn_origin != e_origin::NOT_YET_DEFINED 
-                        && wfn_origin != e_origin::gbw 
-                        && wfn_origin != e_origin::wfx) 
-                        std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
+                //Sort functions regarding the angular momentum
+                if (((basis[n_funcs].get_type()-1 != l) && //First case, function type start with s=1
+                        (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb || wfn_origin == e_origin::xtb))  ||
+                        ((basis[n_funcs].get_type() != l) && (wfn_origin == e_origin::NOT_YET_DEFINED))) {  //Second type s = 0
                     n_funcs += curr_funcs;
                     continue;
                 }

@@ -56,3 +56,6 @@ template <typename Kernel>
 void compute3C(Int_Params& param1,
     Int_Params& param2,
     vec& eri3c);
+
+
+dMatrix2 get_cart2sph_matrix(const WFN& cart_wfn, const bool normalized);
