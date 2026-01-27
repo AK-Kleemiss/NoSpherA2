@@ -127,6 +127,17 @@ const double array_length(const array& in, const array& in2)
 {
     return std::hypot(in[0] - in2[0], in[1] - in2[1], in[2] - in2[2]);
 }
+template <typename array>
+const double array_length(const array& in, const array& in2)
+{
+    double sum = 0.0;
+    auto it1 = in.begin();
+    auto it2 = in2.begin();
+    for (; it1 != in.end(); ++it1, ++it2) {
+        sum += (*it1 - *it2) * (*it1 - *it2);
+    }
+    return sqrt(sum);
+}
 
 // Function to compute cross product
 d3 cross(const d3& a, const d3& b);
