@@ -225,9 +225,9 @@ double calc_spherically_averaged_at_r(const WFN& wavy,
     double ratio = abs(old_result / new_result - 1.0);
     vec2 d;
     vec _phi(wavy.get_nmo(), 0.0);
-    d.resize(16);
-    for (int i = 0; i < 16; i++)
-        d[i].resize(1, 0.0);
+    d.resize(1);
+    for (int i = 0; i < 1; i++)
+        d[i].resize(16, 0.0);
 
     while (ratio > rel_precision)
     {
@@ -333,9 +333,9 @@ double calc_grid_averaged_at_r(const WFN& wavy,
     const int start = 0;
     vec2 d;
     vec _phi(wavy.get_nmo(), 0.0);
-    d.resize(16);
-    for (int i = 0; i < 16; i++)
-        d[i].resize(1, 0.0);
+    d.resize(1);
+    for (int i = 0; i < 1; i++)
+        d[i].resize(16, 0.0);
     angular_off -= start;
     const int size = start + num_angular;
     int p = 0;
@@ -405,10 +405,10 @@ double calc_hirsh_grid_averaged_at_r(const WFN& wavy,
     Thakkar A(wavy.get_atom_charge(i)); /// for the atom i, a Thakkar object is created
 #pragma omp parallel
     {
-        vec2 d(16);
+        vec2 d(wavy.get_ncen());
         vec _phi(wavy.get_nmo(), 0.0);
-        for (int j = 0; j < 16; j++)
-            d[j].resize(wavy.get_ncen(), 0.0);
+        for (int j = 0; j < wavy.get_ncen(); j++)
+            d[j].resize(16, 0.0);
 #pragma omp for reduction(+ : dens)
         for (int iang = start; iang < size; iang++)
         {
@@ -562,10 +562,10 @@ double calc_fukui_averaged_at_r(const WFN& wavy1,
 
 #pragma omp parallel
     {
-        vec2 d(16);
+        vec2 d(wavy1.get_ncen());
         vec _phi(std::max(wavy1.get_nmo(), wavy2.get_nmo()), 0.0);
-        for (int j = 0; j < 16; j++)
-            d[j].resize(wavy1.get_ncen(), 0.0);
+        for (int j = 0; j < wavy1.get_ncen(); j++)
+            d[j].resize(16, 0.0);
 #pragma omp for reduction(+ : dens)
         for (int iang = start; iang < size; iang++)
         {
@@ -758,9 +758,9 @@ void calc_partition_densities()
     ProgressBar pb(size, 100, "=", "", "Calculating densities");
     // #pragma omp parallel
     //     {
-    vec2 d(16);
-    for (int i = 0; i < 16; i++)
-        d[i].resize(DFT.get_ncen());
+    vec2 d(DFT.get_ncen());
+    for (int i = 0; i < DFT.get_ncen(); i++)
+        d[i].resize(16);
     vec phi(DFT.get_nmo(), 0.0);
     double x = 0;
     vec pa_b(5);
@@ -1665,10 +1665,10 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options* opt)
     ivec pointy = fuckery(wavy, grid, 1);
 #pragma omp parallel
     {
-        vec2 d_temp(16);
-        for (int i = 0; i < 16; i++)
+        vec2 d_temp(wavy.get_ncen());
+        for (int i = 0; i < wavy.get_ncen(); i++)
         {
-            d_temp[i].resize(wavy.get_ncen(), 0.0);
+            d_temp[i].resize(16, 0.0);
         }
         vec phi_temp(wavy.get_nmo(), 0.0);
 

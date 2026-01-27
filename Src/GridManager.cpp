@@ -810,10 +810,10 @@ void GridManager::calculateNonSphericalDensities(const WFN& wave, const cell& un
 
 #pragma omp parallel
     {
-        vec2 d_temp(16);
-        for (int i = 0; i < 16; i++)
+        vec2 d_temp(wave.get_ncen());
+        for (int i = 0; i < wave.get_ncen(); i++)
         {
-            d_temp[i].resize(wave.get_ncen(), 0.0);
+            d_temp[i].resize(16, 0.0);
         }
         vec phi_temp(wave.get_nmo(true), 0.0);
         for (int g = 0; g < grid_data_.atomic_grids.size(); ++g) {

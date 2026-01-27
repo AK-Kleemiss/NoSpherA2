@@ -1779,10 +1779,10 @@ int make_atomic_grids(
     }
 #pragma omp parallel
     {
-        vec2 d_temp(16);
-        for (int i = 0; i < 16; i++)
+        vec2 d_temp(nr_cen);
+        for (int i = 0; i < nr_cen; i++)
         {
-            d_temp[i].resize(nr_cen, 0.0);
+            d_temp[i].resize(16, 0.0);
         }
         vec phi_temp(nr_mos, 0.0);
 #pragma omp for

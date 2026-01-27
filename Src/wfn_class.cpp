@@ -6619,7 +6619,7 @@ const double WFN::compute_dens(
     //}
     //else
     //{
-    err_checkf(d.size() >= 16, "d is too small!", std::cout);
+    err_checkf(d.size() >= ncen, "d is too small!", std::cout);
     err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
     return compute_dens_cartesian(Pos, d, phi);
     //}
@@ -6642,9 +6642,9 @@ const double WFN::compute_dens(
     //}
     //else
     //{
-    d.resize(16);
-    for (int i = 0; i < 16; i++)
-        d[i].resize(ncen, 0.0);
+    d.resize(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(16, 0.0);
     return compute_dens_cartesian(Pos, d, phi);
     //}
 };
@@ -6663,7 +6663,7 @@ const double WFN::compute_spin_dens(
     //}
     //else
     //{
-    err_checkf(d.size() >= 4, "d is too small!", std::cout);
+    err_checkf(d.size() >= ncen, "d is too small!", std::cout);
     err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
     return compute_spin_dens_cartesian(Pos, d, phi);
     //}
@@ -6685,9 +6685,9 @@ const double WFN::compute_spin_dens(
     //}
     //else
     //{
-    d.resize(16);
-    for (int i = 0; i < 16; i++)
-        d[i].resize(ncen, 0.0);
+    d.resize(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(16, 0.0);
     return compute_spin_dens_cartesian(Pos, d, phi);
     //}
 };
@@ -6707,29 +6707,31 @@ const double WFN::compute_dens_cartesian(
     // precalculate some distances and powers of distances for faster computation
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = Pos[0] - atoms[iat].get_coordinate(0);
-        d[1][iat] = Pos[1] - atoms[iat].get_coordinate(1);
-        d[2][iat] = Pos[2] - atoms[iat].get_coordinate(2);
-        d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
-        d[4][iat] = d[0][iat] * d[0][iat];
-        d[5][iat] = d[1][iat] * d[1][iat];
-        d[6][iat] = d[2][iat] * d[2][iat];
-        d[7][iat] = d[0][iat] * d[4][iat];
-        d[8][iat] = d[1][iat] * d[5][iat];
-        d[9][iat] = d[2][iat] * d[6][iat];
-        d[10][iat] = d[0][iat] * d[7][iat];
-        d[11][iat] = d[1][iat] * d[8][iat];
-        d[12][iat] = d[2][iat] * d[9][iat];
-        d[13][iat] = d[0][iat] * d[10][iat];
-        d[14][iat] = d[1][iat] * d[11][iat];
-        d[15][iat] = d[2][iat] * d[12][iat];
+        double* d_ = d[iat].data();
+        d_[0] = Pos[0] - atoms[iat].get_coordinate(0);
+        d_[1] = Pos[1] - atoms[iat].get_coordinate(1);
+        d_[2] = Pos[2] - atoms[iat].get_coordinate(2);
+        d_[3] = d_[0] * d_[0] + d_[1] * d_[1] + d_[2] * d_[2];
+        d_[4] = d_[0] * d_[0];
+        d_[5] = d_[1] * d_[1];
+        d_[6] = d_[2] * d_[2];
+        d_[7] = d_[0] * d_[4];
+        d_[8] = d_[1] * d_[5];
+        d_[9] = d_[2] * d_[6];
+        d_[10] = d_[0] * d_[7];
+        d_[11] = d_[1] * d_[8];
+        d_[12] = d_[2] * d_[9];
+        d_[13] = d_[0] * d_[10];
+        d_[14] = d_[1] * d_[11];
+        d_[15] = d_[2] * d_[12];
     }
 
     for (j = 0; j < nex; j++)
     {
         iat = centers[j] - 1;
+        double* d_ = d[iat].data();
         constants::type2vector(types[j], l);
-        ex = -exponents[j] * d[3][iat];
+        ex = -exponents[j] * d_[3];
         if (ex < constants::exp_cutoff)
         { // corresponds to cutoff of maximum density contribution of 1E-5
             continue;
@@ -6737,18 +6739,28 @@ const double WFN::compute_dens_cartesian(
         ex = exp(ex);
         for (k = 0; k < 3; k++)
         {
-            if (l[k] == 0)
-                continue;
-            else if (l[k] == 1)
-                ex *= d[k][iat];
-            else if (l[k] == 2)
-                ex *= d[k + 4][iat];
-            else if (l[k] == 3)
-                ex *= d[k + 7][iat];
-            else if (l[k] == 4)
-                ex *= d[k + 10][iat];
-            else if (l[k] == 5)
-                ex *= d[k + 13][iat];
+            switch (l[k])
+            {
+            case 0:
+                break;
+            case 1:
+                ex *= d_[k];
+                break;
+            case 2:
+                ex *= d_[k + 4];
+                break;
+            case 3:
+                ex *= d_[k + 7];
+                break;
+            case 4:
+                ex *= d_[k + 10];
+                break;
+            case 5:
+                ex *= d_[k + 13];
+                break;
+            default:
+                break;
+            }
         }
         double* run = phi.data();
         const MO* run2 = MOs.data();
@@ -6786,22 +6798,22 @@ const double WFN::compute_spin_dens_cartesian(
 
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = Pos[0] - atoms[iat].get_coordinate(0);
-        d[1][iat] = Pos[1] - atoms[iat].get_coordinate(1);
-        d[2][iat] = Pos[2] - atoms[iat].get_coordinate(2);
-        d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
-        d[4][iat] = d[0][iat] * d[0][iat];
-        d[5][iat] = d[1][iat] * d[1][iat];
-        d[6][iat] = d[2][iat] * d[2][iat];
-        d[7][iat] = d[0][iat] * d[4][iat];
-        d[8][iat] = d[1][iat] * d[5][iat];
-        d[9][iat] = d[2][iat] * d[6][iat];
-        d[10][iat] = d[0][iat] * d[7][iat];
-        d[11][iat] = d[1][iat] * d[8][iat];
-        d[12][iat] = d[2][iat] * d[9][iat];
-        d[13][iat] = d[0][iat] * d[10][iat];
-        d[14][iat] = d[1][iat] * d[11][iat];
-        d[15][iat] = d[2][iat] * d[12][iat];
+        d[iat][0] = Pos[0] - atoms[iat].get_coordinate(0);
+        d[iat][1] = Pos[1] - atoms[iat].get_coordinate(1);
+        d[iat][2] = Pos[2] - atoms[iat].get_coordinate(2);
+        d[iat][3] = d[iat][0] * d[iat][0] + d[iat][1] * d[iat][1] + d[iat][2] * d[iat][2];
+        d[iat][4] = d[iat][0] * d[iat][0];
+        d[iat][5] = d[iat][1] * d[iat][1];
+        d[iat][6] = d[iat][2] * d[iat][2];
+        d[iat][7] = d[iat][0] * d[iat][4];
+        d[iat][8] = d[iat][1] * d[iat][5];
+        d[iat][9] = d[iat][2] * d[iat][6];
+        d[iat][10] = d[iat][0] * d[iat][7];
+        d[iat][11] = d[iat][1] * d[iat][8];
+        d[iat][12] = d[iat][2] * d[iat][9];
+        d[iat][13] = d[iat][0] * d[iat][10];
+        d[iat][14] = d[iat][1] * d[iat][11];
+        d[iat][15] = d[iat][2] * d[iat][12];
     }
 
     for (j = 0; j < nex; j++)
@@ -6816,18 +6828,26 @@ const double WFN::compute_spin_dens_cartesian(
         ex = exp(ex);
         for (k = 0; k < 3; k++)
         {
-            if (l[k] == 0)
-                continue;
-            else if (l[k] == 1)
-                ex *= d[k][iat];
-            else if (l[k] == 2)
-                ex *= d[k + 4][iat];
-            else if (l[k] == 3)
-                ex *= d[k + 7][iat];
-            else if (l[k] == 4)
-                ex *= d[k + 10][iat];
-            else if (l[k] == 5)
-                ex *= d[k + 13][iat];
+            switch (l[k])
+            {
+            case 0:
+                break;
+            case 1:
+                ex *= d[iat][k];
+                break;
+            case 2:
+                ex *= d[iat][k + 4];
+                break;
+            case 3:
+                ex *= d[iat][k + 7];
+                break;
+            case 4:
+                ex *= d[iat][k + 10];
+                break;
+            case 5:
+                ex *= d[iat][k + 13];
+                break;
+            }
         }
         double* run = phi.data();
         const MO* run2 = MOs.data();
@@ -7763,41 +7783,49 @@ const void WFN::computeLapELI(
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
         {
-            if (l[k] == 0)
+            switch (l[k])
+            {
+            case 0:
             {
                 xl[k][0] = 1.0;
                 xl[k][1] = 0.0;
                 xl[k][2] = 0.0;
+                break;
             }
-            else if (l[k] == 1)
+            case 1:
             {
                 xl[k][0] = d[k];
                 xl[k][1] = 1.0;
                 xl[k][2] = 0.0;
+                break;
             }
-            else if (l[k] == 2)
+            case 2:
             {
                 xl[k][0] = d[k] * d[k];
                 xl[k][1] = 2 * d[k];
                 xl[k][2] = 2;
+                break;
             }
-            else if (l[k] == 3)
+            case 3:
             {
                 double d2 = d[k] * d[k];
                 xl[k][0] = d2 * d[k];
                 xl[k][1] = 3 * d2;
                 xl[k][2] = 6 * d[k];
+                break;
             }
-            else if (l[k] == 4)
+            case 4:
             {
                 double d2 = d[k] * d[k];
                 xl[k][0] = d2 * d2;
                 xl[k][1] = 4 * d2 * d[k];
                 xl[k][2] = 12 * d2;
+                break;
             }
-            else
+            default:
             {
-                return;
+                break;
+            }
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7872,41 +7900,50 @@ const double WFN::computeLap(
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
         {
-            if (l[k] == 0)
+            switch (l[k])
+            {
+            case 0:
             {
                 xl[k][0] = 1.0;
                 xl[k][1] = 0.0;
                 xl[k][2] = 0.0;
+                break;
             }
-            else if (l[k] == 1)
+            case 1:
             {
                 xl[k][0] = d[k];
                 xl[k][1] = 1.0;
                 xl[k][2] = 0.0;
+                break;
             }
-            else if (l[k] == 2)
+            case 2:
             {
                 xl[k][0] = d[k] * d[k];
                 xl[k][1] = 2 * d[k];
                 xl[k][2] = 2;
+                break;
             }
-            else if (l[k] == 3)
+            case 3:
             {
                 double d2 = d[k] * d[k];
                 xl[k][0] = d2 * d[k];
                 xl[k][1] = 3 * d2;
                 xl[k][2] = 6 * d[k];
+                break;
             }
-            else if (l[k] == 4)
+            case 4:
             {
                 double d2 = d[k] * d[k];
                 xl[k][0] = d2 * d2;
                 xl[k][1] = 4 * d2 * d[k];
                 xl[k][2] = 12 * d2;
+                break;
             }
-            else
+            default:
             {
                 return -100;
+                break;
+            }
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7954,16 +7991,16 @@ const double WFN::computeMO(
     double temp = 0;
 
     // x, y, z and dsqd
-    vec2 d(4);
-    for (int i = 0; i < 4; i++)
-        d[i].resize(ncen);
+    vec2 d(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(4);
 
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = PosGrid[0] - atoms[iat].get_coordinate(0);
-        d[1][iat] = PosGrid[1] - atoms[iat].get_coordinate(1);
-        d[2][iat] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
+        d[iat][0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[iat][1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[iat][2] = PosGrid[2] - atoms[iat].get_coordinate(2);
+        d[iat][3] = pow(std::hypot(d[iat][0], d[iat][1], d[iat][2]), 2);
     }
 
     for (int j = 0; j < nex; j++)
@@ -7976,20 +8013,7 @@ const double WFN::computeMO(
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
-        {
-            if (l[k] == 0)
-                continue;
-            else if (l[k] == 1)
-                ex *= d[k][iat];
-            else if (l[k] == 2)
-                ex *= d[k][iat] * d[k][iat];
-            else if (l[k] == 3)
-                ex *= pow(d[k][iat], 3);
-            else if (l[k] == 4)
-                ex *= pow(d[k][iat], 4);
-            else if (l[k] == 5)
-                ex *= pow(d[k][iat], 5);
-        }
+            ex *= pow(d[k][iat], l[k]);
         result += MOs[mo].get_coefficient_f(j) * ex; // build MO values at this point
     }
     shrink_vector<vec>(d);
@@ -8663,9 +8687,9 @@ void WFN::calc_rho_cube(cube& cube_data) const
     {
         vec2 d;
         vec phi((*this).get_nmo(), 0.0);
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize((*this).get_ncen(), 0.0);
+        d.resize((*this).get_ncen());
+        for (int i = 0; i < (*this).get_ncen(); i++)
+            d[i].resize(16, 0.0);
 #pragma omp for schedule(dynamic)
         for (int index = 0; index < total_size; index++)
         {
