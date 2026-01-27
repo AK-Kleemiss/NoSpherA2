@@ -89,7 +89,8 @@ struct properties_options
         return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || MO_numbers.size() > 0;
     }
     size_t n_grid_points() const {
-        return unsigned long long(NbSteps[0]) * NbSteps[1] * NbSteps[2];
+        size_t result = static_cast<size_t>(NbSteps[0]) * NbSteps[1] * NbSteps[2];
+        return result;
     }
 };
 
