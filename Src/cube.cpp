@@ -10,34 +10,33 @@ cube::cube()
     parent_wavefunction = new WFN(e_origin::cub);
     size = { 0, 0, 0 };
     origin = { 0.0, 0.0, 0.0 };
-    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
+    calc_dv();
 };
 
-cube::cube(int x, int y, int z, int g_na, bool grow_values)
+cube::cube(const std::array<int, 3> xyz, int g_na, bool grow_values)
 {
-    size[0] = x;
-    size[1] = y;
-    size[2] = z;
+    size = xyz;
+
     origin = { 0.0, 0.0, 0.0 };
     loaded = grow_values;
     if (grow_values)
     {
-        values.resize(x);
+        values.resize(xyz[0]);
 #pragma omp parallel for
-        for (int i = 0; i < x; i++)
+        for (int i = 0; i < xyz[0]; i++)
         {
-            values[i].resize(y);
-            for (int j = 0; j < y; j++)
-                values[i][j].resize(z, 0.0);
+            values[i].resize(xyz[1]);
+            for (int j = 0; j < xyz[1]; j++)
+                values[i][j].resize(xyz[2], 0.0);
         }
     }
     na = g_na;
     parent_wavefunction = new WFN(e_origin::cub);
     vectors = { { { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 } } };
-    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
+    calc_dv();
 };
 
-cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ostream &file, const bool expert, const bool header)
+cube::cube(const std::filesystem::path& filepath, bool read, WFN& wave, std::ostream& file, const bool expert, const bool header)
 {
     err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
     parent_wavefunction = &wave;
@@ -45,18 +44,18 @@ cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ost
     path = filepath;
     err_checkf(read_file(read, header, expert), "Sorry, something went wrong while reading!", file);
     loaded = read;
-    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
+    calc_dv();
 };
 
-cube::cube(const int g_na, const ivec &g_size, const vec &g_origin, const vec2 &g_vectors, const vec3 &g_values)
+cube::cube(const int g_na, const ivec& g_size, const vec& g_origin, const vec2& g_vectors, const vec3& g_values)
 {
     using namespace std;
     na = g_na;
     parent_wavefunction = new WFN(e_origin::cub);
-   std::cout << "Assigned Nr of Atoms" << endl;
+    std::cout << "Assigned Nr of Atoms" << endl;
     for (int i = 0; i < 3; i++)
     {
-       std::cout << i << ". dimension" << endl;
+        std::cout << i << ". dimension" << endl;
         size[i] = g_size[i];
         origin[i] = g_origin[i];
         for (int j = 0; j < 3; j++)
@@ -75,10 +74,10 @@ cube::cube(const int g_na, const ivec &g_size, const vec &g_origin, const vec2 &
         }
     }
     loaded = true;
-    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
+    calc_dv();
 };
 
-cube::cube(const cube &given)
+cube::cube(const cube& given)
 {
     na = given.get_na();
     path = given.path;
@@ -163,7 +162,7 @@ bool cube::read_values(std::ifstream& file) {
                     }
                 else
                 {
-                   std::cout << "This should not happen! Read a value outside of range!"
+                    std::cout << "This should not happen! Read a value outside of range!"
                         << " Run_x: " << run_x
                         << " Run_y: " << run_y
                         << " rest2: " << rest2
@@ -185,10 +184,10 @@ bool cube::read_values(std::ifstream& file) {
     }
     if (run_x != size[0] || run_y != size[1] || run_z != size[2])
     {
-       std::cout << "This file ended before i read all expected values!" << endl;
+        std::cout << "This file ended before i read all expected values!" << endl;
         if (file.eof())
-           std::cout << "ENCOUNTERED EOF!" << endl;
-       std::cout << "x,y,reads1,z: " << run_x << " " << run_y << " " << reads1 << "," << run_z << endl;
+            std::cout << "ENCOUNTERED EOF!" << endl;
+        std::cout << "x,y,reads1,z: " << run_x << " " << run_y << " " << reads1 << "," << run_z << endl;
         return (false);
     }
     file.close();
@@ -214,6 +213,8 @@ bool cube::read_file(bool full, bool header, bool expert)
             iss = std::istringstream(line);
             iss >> size[i] >> vectors[i][0] >> vectors[i][1] >> vectors[i][2];
         }
+
+        calc_dv();
 
         int atnr;
         double atp[3] = { 0, 0, 0 };
@@ -296,7 +297,7 @@ bool cube::write_file(bool force, bool absolute)
     return (true);
 };
 
-bool cube::write_file(const std::filesystem::path &given_path, bool debug)
+bool cube::write_file(const std::filesystem::path& given_path, bool debug)
 {
     using namespace std;
     stringstream stream;
@@ -304,7 +305,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
     ofstream of(given_path, ios::out);
     of << comment1 << "\n";
     of << comment2 << "\n";
-    of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << "\n";
+    of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(5) << setprecision(6) << origin[2] << "\n";
     for (int i = 0; i < 3; i++)
     {
         of << setw(5) << size[i];
@@ -320,7 +321,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
         of << "\n";
     }
     if (debug)
-       std::cout << "Finished atoms!" << endl;
+        std::cout << "Finished atoms!" << endl;
     if (get_loaded())
         for (int run_x = 0; run_x < size[0]; run_x++)
             for (int run_y = 0; run_y < size[1]; run_y++)
@@ -334,7 +335,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
                         of << "\n";
                 }
                 if (debug)
-                   std::cout << "Write Z-line!" << endl;
+                    std::cout << "Write Z-line!" << endl;
                 if (temp_write % 6 != 0)
                     of << "\n";
             }
@@ -357,21 +358,21 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
     return (true);
 };
 
-bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
+bool cube::write_xdgraph(const std::filesystem::path& given_path, bool debug)
 {
     using namespace std;
     stringstream stream;
     ofstream of(given_path, ios::out);
     of << "2DGRDFIL  0" << endl
-       << "cuQCT    FOU" << endl
-       << endl;
+        << "cuQCT    FOU" << endl
+        << endl;
     of << "! Gridpoints, Origin, Physical Dimensions" << endl;
     for (int i = 0; i < 3; i++)
         of << setw(14) << size[i];
     of << endl;
     of << fixed << setw(11) << setprecision(4) << origin[0] << " " << origin[1] << " " << origin[2] << endl;
     for (int j = 0; j < 3; j++)
-        of << fixed << setw(12) << setprecision(6) << sqrt(pow(vectors[j][0], 2) + pow(vectors[j][1], 2) + pow(vectors[j][2], 2));
+        of << fixed << setw(12) << setprecision(6) << array_length(d3{ vectors[j][0], vectors[j][1], vectors[j][2] });
     of << endl;
     of << "! Objects" << endl;
     of << setw(10) << na << endl;
@@ -384,10 +385,10 @@ bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
         of << " ATOM" << endl;
     }
     if (debug)
-       std::cout << "Finished atoms!" << endl;
+        std::cout << "Finished atoms!" << endl;
     of << "! Connections" << endl
-       << "         0" << endl
-       << "! Values" << endl;
+        << "         0" << endl
+        << "! Values" << endl;
     if (!get_loaded())
         read_file(true, false, false);
     for (int run_x = 0; run_x < size[0]; run_x++)
@@ -402,7 +403,7 @@ bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
                     of << endl;
             }
             if (debug)
-               std::cout << "Write Y-line!" << endl;
+                std::cout << "Write Y-line!" << endl;
             if (temp_write % 6 != 0)
                 of << endl;
         }
@@ -416,18 +417,18 @@ bool cube::fractal_dimension(const double stepsize) const
 {
     double min = 100, max = -100;
     for (const auto& inner_vec : values) {
-      for (const auto& innerest_vec : inner_vec) {
-        auto local_min_it = std::min_element(innerest_vec.begin(), innerest_vec.end());
-        auto local_max_it = std::max_element(innerest_vec.begin(), innerest_vec.end());
+        for (const auto& innerest_vec : inner_vec) {
+            auto local_min_it = std::min_element(innerest_vec.begin(), innerest_vec.end());
+            auto local_max_it = std::max_element(innerest_vec.begin(), innerest_vec.end());
 
-        if (*local_min_it < min) {
-          min = *local_min_it;
-        }
+            if (*local_min_it < min) {
+                min = *local_min_it;
+            }
 
-        if (*local_max_it > max) {
-          max = *local_max_it;
+            if (*local_max_it > max) {
+                max = *local_max_it;
+            }
         }
-      }
     }
     const double map_min = min, map_max = max;
     vec e = double_sum();
@@ -443,46 +444,46 @@ bool cube::fractal_dimension(const double stepsize) const
     double lv1, lv2;
 #pragma omp parallel private(lv1,lv2)
     {
-      long long int x, y, z;
+        long long int x, y, z;
 #pragma omp for
-      for (long long int i = 0; i < (size_t)size[0] * size[1] * ((size_t)size[2] - 1); i++)
-      {
-        x = i / ((size_t)size[1] * ((size_t)size[2] - 1));
-        y = (i / ((size_t)size[2] - 1)) % size[1];
-        z = i % ((size_t)size[2] - 1);
-        lv1 = values[x][y][z];
-        lv2 = values[x][y][z + 1];
-        for (int _i = 0; _i < steps; _i++)
-          if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
+        for (long long int i = 0; i < (size_t)size[0] * size[1] * ((size_t)size[2] - 1); i++)
+        {
+            x = i / ((size_t)size[1] * ((size_t)size[2] - 1));
+            y = (i / ((size_t)size[2] - 1)) % size[1];
+            z = i % ((size_t)size[2] - 1);
+            lv1 = values[x][y][z];
+            lv2 = values[x][y][z + 1];
+            for (int _i = 0; _i < steps; _i++)
+                if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
-            bins[_i]++;
-      }
+                    bins[_i]++;
+        }
 #pragma omp for
-      for (long long int i = 0; i < (size_t)size[0] * size[2] * ((size_t)size[1] - 1); i++)
-      {
-        z = i / ((size_t)size[0] * (size[1] - 1));
-        x = (i / ((size_t)size[1] - 1)) % size[0];
-        y = i % ((size_t)size[1] - 1);
-        lv1 = values[x][y][z];
-        lv2 = values[x][y + 1][z];
-        for (int _i = 0; _i < steps; _i++)
-          if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
+        for (long long int i = 0; i < (size_t)size[0] * size[2] * ((size_t)size[1] - 1); i++)
+        {
+            z = i / ((size_t)size[0] * (size[1] - 1));
+            x = (i / ((size_t)size[1] - 1)) % size[0];
+            y = i % ((size_t)size[1] - 1);
+            lv1 = values[x][y][z];
+            lv2 = values[x][y + 1][z];
+            for (int _i = 0; _i < steps; _i++)
+                if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
-            bins[_i]++;
-      }
+                    bins[_i]++;
+        }
 #pragma omp for
-      for (long long int i = 0; i < (size_t)size[1] * size[2] * ((size_t)size[0] - 1); i++)
-      {
-        y = i / (((size_t)size[0] - 1) * size[2]);
-        z = (i / ((size_t)size[0] - 1)) % size[2];
-        x = i % ((size_t)size[0] - 1);
-        lv1 = values[x][y][z];
-        lv2 = values[x + 1][y][z];
-        for (int _i = 0; _i < steps; _i++)
-          if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
+        for (long long int i = 0; i < (size_t)size[1] * size[2] * ((size_t)size[0] - 1); i++)
+        {
+            y = i / (((size_t)size[0] - 1) * size[2]);
+            z = (i / ((size_t)size[0] - 1)) % size[2];
+            x = i % ((size_t)size[0] - 1);
+            lv1 = values[x][y][z];
+            lv2 = values[x + 1][y][z];
+            for (int _i = 0; _i < steps; _i++)
+                if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
-            bins[_i]++;
-      }
+                    bins[_i]++;
+        }
     }
     const double epsilon = log(1 / (pow(comparisons, -constants::c_13)));
     for (int i = 0; i < steps; i++)
@@ -539,7 +540,7 @@ double cube::get_interpolated_value(double x, double y, double z) const
     double c1 = c01 * (1 - y1) + c11 * y1;
     return (c0 * (1 - z1) + c1 * z1);
 };
-    
+
 double cube::get_value(int x, int y, int z) const
 {
     if (x < size[0] && y < size[1] && z < size[2] && x >= 0 && y >= 0 && z >= 0)
@@ -617,7 +618,7 @@ bool has_converged(const double& current_value, double& previous_value, const do
 
 double cube::ewald_sum(const int kMax, const double conv) {
     calc_dv();
-    const std::array<double, 3> lengths{ array_length(vectors[0])*size[0], array_length(vectors[1])*size[1], array_length(vectors[2])*size[2]};
+    const d3 lengths{ array_length(vectors[0]) * size[0], array_length(vectors[1]) * size[1], array_length(vectors[2]) * size[2] };
     const double shortest_length = std::min({ lengths[0], lengths[1], lengths[2] });
     const double alpha = 2.0 * constants::sqr_pi / shortest_length;
     std::cout << "shortest length: " << shortest_length << " alpha: " << alpha << std::endl;
@@ -625,7 +626,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     double reciprocalSpaceEnergy = 0.0;
     double selfEnergy = 0.0;
 
-    std::array<std::array<double, 3>, 3> cell_vectors;
+    std::array<d3, 3> cell_vectors;
     cell_vectors[0] = { vectors[0][0] * size[0], vectors[1][0] * size[0], vectors[2][0] * size[0] };
     cell_vectors[1] = { vectors[0][1] * size[1], vectors[1][1] * size[1], vectors[2][1] * size[1] };
     cell_vectors[2] = { vectors[0][2] * size[2], vectors[1][2] * size[2], vectors[2][2] * size[2] };
@@ -635,7 +636,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     }
 
     // Compute volume of the unit cell
-    const std::array<double, 3> crossProduct = cross(cell_vectors[1], cell_vectors[2]);
+    const d3 crossProduct = cross(cell_vectors[1], cell_vectors[2]);
     const double volume = fabs(dot_(cell_vectors[0], crossProduct));
     std::cout << "Volume: " << volume << std::endl;
     const int grid_points = size[0] * size[1] * size[2];
@@ -643,7 +644,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     std::cout << "dv*points: " << dv * grid_points << std::endl;
 
     // Compute reciprocal lattice vectors
-    std::array<std::array<double, 3>, 3> reciprocalLattice = {
+    std::array<d3, 3> reciprocalLattice = {
         cross(cell_vectors[1], cell_vectors[2]),
         cross(cell_vectors[2], cell_vectors[0]),
         cross(cell_vectors[0], cell_vectors[1])
@@ -655,32 +656,32 @@ double cube::ewald_sum(const int kMax, const double conv) {
     for (int i = 0; i < 3; i++) {
         std::cout << std::setw(10) << reciprocalLattice[i][0] << std::setw(10) << reciprocalLattice[i][1] << std::setw(10) << reciprocalLattice[i][2] << std::endl;
     }
-	ProgressBar *pb = new ProgressBar(grid_points, 60, "-", " ", "Real-space");
-	double v00 = vectors[0][0], v01 = vectors[0][1], v02 = vectors[0][2];
-	double v10 = vectors[1][0], v11 = vectors[1][1], v12 = vectors[1][2];
-	double v20 = vectors[2][0], v21 = vectors[2][1], v22 = vectors[2][2];
+    ProgressBar* pb = new ProgressBar(grid_points, 60, "-", " ", "Real-space");
+    double v00 = vectors[0][0], v01 = vectors[0][1], v02 = vectors[0][2];
+    double v10 = vectors[1][0], v11 = vectors[1][1], v12 = vectors[1][2];
+    double v20 = vectors[2][0], v21 = vectors[2][1], v22 = vectors[2][2];
     // Real-space contribution
 #pragma omp parallel for reduction(+:realSpaceEnergy)
     for (int i = 0; i < size[0]; i++) {
         double length = 0, fac = 0, v1 = 0;
-        double l0 = -i*v00, l1 = -i*v10, l2 = -i*v20;
+        double l0 = -i * v00, l1 = -i * v10, l2 = -i * v20;
         for (int j = 0; j < size[1]; j++) {
-			l0 -= j * v01;
-			l1 -= j * v11;
-			l2 -= j * v21;
+            l0 -= j * v01;
+            l1 -= j * v11;
+            l2 -= j * v21;
             for (int k = 0; k < size[2]; k++) {
-				l0 -= k * v02;
-				l1 -= k * v12;
-				l2 -= k * v22;
+                l0 -= k * v02;
+                l1 -= k * v12;
+                l2 -= k * v22;
                 v1 = values[i][j][k];
                 for (int l = 0; l < size[0]; l++) {
-					l0 += l * v00;
-					l1 += l * v10;
-					l2 += l * v20;
+                    l0 += l * v00;
+                    l1 += l * v10;
+                    l2 += l * v20;
                     for (int m = 0; m < size[1]; m++) {
-						l0 += m * v01;
-						l1 += m * v11;
-						l2 += m * v21;
+                        l0 += m * v01;
+                        l1 += m * v11;
+                        l2 += m * v21;
                         for (int n = 0; n < size[2]; n++) {
                             length = std::hypot(l0 + n * v02, l1 + n * v12, l2 + n * v22);
                             if (length > 6.0 || length == 0) continue;
@@ -723,7 +724,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
                     if (known) continue;
                     known_kVecs.push_back({ h, k, l });
 
-                    const std::array<double, 3> kvec = {
+                    const d3 kvec = {
                         h * reciprocalLattice[0][0] + k * reciprocalLattice[1][0] + l * reciprocalLattice[2][0],
                         h * reciprocalLattice[0][1] + k * reciprocalLattice[1][1] + l * reciprocalLattice[2][1],
                         h * reciprocalLattice[0][2] + k * reciprocalLattice[1][2] + l * reciprocalLattice[2][2]
@@ -734,14 +735,14 @@ double cube::ewald_sum(const int kMax, const double conv) {
                         double v1 = 0, kDotR = 0;
 #pragma ivdep
                         for (int d2 = 0; d2 < size[1]; d2++) {
-                            for (int d3 = 0; d3 < size[2]; d3++) {
-                                v1 = values[d1][d2][d3];
-                                const std::array<double, 3> ri = get_pos(d1, d2, d3);
+                            for (int d3_ = 0; d3_ < size[2]; d3_++) {
+                                v1 = values[d1][d2][d3_];
+                                const d3 ri = get_pos(d1, d2, d3_);
                                 for (int d4 = 0; d4 < size[0]; d4++) {
                                     for (int d5 = 0; d5 < size[1]; d5++) {
                                         for (int d6 = 0; d6 < size[2]; d6++) {
-                                            std::array<double, 3> rj = get_pos(d4, d5, d6);
-											rj = { rj[0] - ri[0], rj[1] - ri[1], rj[2] - ri[2] };
+                                            d3 rj = get_pos(d4, d5, d6);
+                                            rj = { rj[0] - ri[0], rj[1] - ri[1], rj[2] - ri[2] };
                                             kDotR = dot_(kvec, rj);
                                             temp += exp(-k2 / FOUR_alsq) / abs(k2) * v1 * values[d4][d5][d6] * cos(kDotR);
                                         }
@@ -750,7 +751,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
                             }
                         }
                     }
-					pb->update();
+                    pb->update();
                 }
             }
         }
@@ -784,7 +785,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     return totalEnergy;
 }
 
-void cube::operator=(const cube &right)
+void cube::operator=(const cube& right)
 {
     for (int i = 0; i < 3; i++)
         size[i] = right.get_size(i);
@@ -804,6 +805,7 @@ void cube::operator=(const cube &right)
         for (int j = 0; j < 3; j++)
             vectors[i][j] = right.get_vector(i, j);
     }
+    calc_dv();
     if (right.get_loaded())
     {
 #pragma omp parallel for
@@ -818,7 +820,7 @@ void cube::operator=(const cube &right)
     parent_wavefunction = right.parent_wavefunction;
 };
 
-cube cube::operator+(const cube &right) const
+cube cube::operator+(const cube& right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "+" + right.get_path().stem().string() + ".cube");
@@ -834,7 +836,7 @@ cube cube::operator+(const cube &right) const
     return (res_cube);
 };
 
-cube cube::operator-(const cube &right) const
+cube cube::operator-(const cube& right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "-" + right.get_path().stem().string() + ".cube");
@@ -842,15 +844,15 @@ cube cube::operator-(const cube &right) const
         if (size[i] != right.get_size(i))
             return (cube());
 #pragma omp parallel for
-        for (int x = 0; x < size[0]; x++)
-            for (int y = 0; y < size[1]; y++)
-                for (int z = 0; z < size[2]; z++)
-                    res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) - right.get_value(x, y, z));
- 
+    for (int x = 0; x < size[0]; x++)
+        for (int y = 0; y < size[1]; y++)
+            for (int z = 0; z < size[2]; z++)
+                res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) - right.get_value(x, y, z));
+
     return (res_cube);
 };
 
-cube cube::operator*(const cube &right) const
+cube cube::operator*(const cube& right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "*" + right.get_path().stem().string() + ".cube");
@@ -862,11 +864,11 @@ cube cube::operator*(const cube &right) const
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
                 res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
-    
+
     return (res_cube);
 };
 
-cube cube::operator/(const cube &right) const
+cube cube::operator/(const cube& right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "_" + right.get_path().stem().string() + ".cube");
@@ -883,11 +885,11 @@ cube cube::operator/(const cube &right) const
                 else
                     res_cube.set_value(x, y, z, 0);
             }
- 
+
     return (res_cube);
 };
 
-bool cube::operator+=(const cube &right)
+bool cube::operator+=(const cube& right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -900,7 +902,7 @@ bool cube::operator+=(const cube &right)
     return (true);
 };
 
-bool cube::operator-=(const cube &right)
+bool cube::operator-=(const cube& right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -913,7 +915,7 @@ bool cube::operator-=(const cube &right)
     return (true);
 };
 
-bool cube::operator*=(const cube &right)
+bool cube::operator*=(const cube& right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -926,7 +928,7 @@ bool cube::operator*=(const cube &right)
     return (true);
 };
 
-bool cube::operator/=(const cube &right)
+bool cube::operator/=(const cube& right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -939,7 +941,7 @@ bool cube::operator/=(const cube &right)
     return (true);
 };
 
-bool cube::mask(const cube &right)
+bool cube::mask(const cube& right)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -965,7 +967,7 @@ bool cube::thresh(const double& thresh)
     return (true);
 }
 
-bool cube::thresh(const cube &right, const double& thresh)
+bool cube::thresh(const cube& right, const double& thresh)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -978,7 +980,7 @@ bool cube::thresh(const cube &right, const double& thresh)
     return (true);
 };
 
-bool cube::negative_mask(const cube &right)
+bool cube::negative_mask(const cube& right)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -1069,6 +1071,11 @@ double cube::get_vector(int i, int j) const
         return (-1);
 };
 
+std::array<d3, 3> cube::get_vectors() const
+{
+    return vectors;
+}
+
 bool cube::set_vector(int i, int j, double value)
 {
     if (i < 3 && i >= 0 && j < 3 && j >= 0)
@@ -1078,22 +1085,16 @@ bool cube::set_vector(int i, int j, double value)
     return (true);
 };
 
+void cube::set_vectors(std::array<d3, 3> value)
+{
+    vectors = value;
+    calc_dv();
+};
+
 double cube::get_origin(unsigned int i) const
 {
-    switch (i)
-    {
-    case 0:
-        return (origin[0]);
-        break;
-    case 1:
-        return (origin[1]);
-        break;
-    case 2:
-        return (origin[2]);
-        break;
-    default:
-        return (-1);
-    }
+    err_checkf(i >= 0 && i < 3, "Invalid origin dimension!", std::cout);
+    return origin[i];
 };
 
 bool cube::set_origin(unsigned int i, double value)
@@ -1108,26 +1109,26 @@ bool cube::set_origin(unsigned int i, double value)
 std::filesystem::path cube::super_cube()
 {
     using namespace std;
-    int m[3]{0, 0, 0};
-   std::cout << "How many times in X-direction? ";
+    int m[3]{ 0, 0, 0 };
+    std::cout << "How many times in X-direction? ";
     cin >> m[0];
     while (m[0] <= 0 || m[0] > 20)
     {
-       std::cout << "This is unreasonable, try again! (between 1-20): ";
+        std::cout << "This is unreasonable, try again! (between 1-20): ";
         cin >> m[0];
     }
-   std::cout << "Y-direction? ";
+    std::cout << "Y-direction? ";
     cin >> m[1];
     while (m[1] <= 0 || m[1] > 20)
     {
-       std::cout << "This is unreasonable, try again! (between 1-20): ";
+        std::cout << "This is unreasonable, try again! (between 1-20): ";
         cin >> m[1];
     }
-   std::cout << "Z-direction? ";
+    std::cout << "Z-direction? ";
     cin >> m[2];
     while (m[2] <= 0 || m[2] > 20)
     {
-       std::cout << "This is unreasonable, try again! (between 1-20): ";
+        std::cout << "This is unreasonable, try again! (between 1-20): ";
         cin >> m[2];
     }
     std::filesystem::path new_path(path);
@@ -1201,7 +1202,7 @@ cube cube::super_cube(int x, int y, int z)
                 }
 
     new_path.replace_extension(".cube_super");
-    cube out = cube(m[0] * size[0], m[1] * size[1], m[2] * size[2], m[0] * m[1] * m[2] * parent_wavefunction->get_ncen(), true);
+    cube out = cube({ m[0] * size[0], m[1] * size[1], m[2] * size[2] }, m[0] * m[1] * m[2] * parent_wavefunction->get_ncen(), true);
     out.set_path(new_path);
     out.parent_wavefunction = &super_wfn;
     out.set_comment1(comment1 + " SUPER CUBE");
@@ -1252,3 +1253,248 @@ double cube::jaccard(const cube& right) const {
             }
     return (top / bot); //RETURN Real Space R-value between this cube and the given one
 };
+
+auto fast_clamp = [](int v, int lo, int hi) {
+    //assume lo <= hi 
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+    };
+
+void cube::adaptive_refine(std::function<const double(const d3)> const func, double target_error, int max_depth, const int subfactor) {
+    using namespace std;
+    double current_integral = sum();
+    cout << endl << "Initial Integral: " << current_integral << endl;
+    std::map<i3, std::pair<double, double>, I3Less> Refine_integrals;
+    ivec3 inhomog_fine(size[0], ivec2(size[1], ivec(size[2], 0)));
+
+    const int total_size = size[0] * size[1] * size[2];
+    int initially_fine = 0;
+	double total_inhomog = 0.0, removed_inhomog = 0.0, problematic_inhomog = 0.0;
+
+#pragma omp parallel for reduction(+:initially_fine, total_inhomog)
+    for (int i = 0; i < size[0]; ++i) {
+        for (int j = 0; j < size[1]; ++j) {
+            for (int k = 0; k < size[2]; ++k) {
+
+                // 32 points integration    (Taylor)
+                //--------------------------------------------------------
+                double sum_side = 0;      // 6 side midpoints
+                double sum_edge = 0;      // 12 edge midpoints
+                double sum_vert = 0;      // 8 vertices
+                double sum_2edge = 0;     // 6 second edge midpoints
+                // Side points
+                if (k + 1 < size[2]) sum_side += values[i][j][k + 1];
+                if (k > 0)           sum_side += values[i][j][k - 1];
+                if (j + 1 < size[1]) sum_side += values[i][j + 1][k];
+                if (j > 0)           sum_side += values[i][j - 1][k];
+                if (i + 1 > size[0]) sum_side += values[i + 1][j][k];
+                if (i > 0)           sum_side += values[i - 1][j][k];
+
+
+                if (i > 0 && j > 0)                     sum_edge += values[i - 1][j - 1][k];
+                if (i > 0 && k > 0)                     sum_edge += values[i - 1][j][k - 1];
+                if (j > 0 && k > 0)                     sum_edge += values[i][j - 1][k - 1];
+                if (k + 1 < size[2] && j + 1 > size[1]) sum_edge += values[i][j + 1][k + 1];
+                if (i + 1 < size[0] && j + 1 > size[1]) sum_edge += values[i + 1][j + 1][k];
+                if (k + 1 < size[2] && i + 1 > size[0]) sum_edge += values[i + 1][j][k + 1];
+                if (k + 1 < size[2] && i > 0)           sum_edge += values[i - 1][j][k + 1];
+                if (j + 1 < size[1] && i > 0)           sum_edge += values[i - 1][j + 1][k];
+                if (k + 1 < size[2] && j > 0)           sum_edge += values[i][j - 1][k + 1];
+                if (i + 1 < size[0] && j > 0)           sum_edge += values[i + 1][j - 1][k];
+                if (i + 1 < size[0] && k > 0)           sum_edge += values[i + 1][j][k - 1];
+                if (j + 1 < size[1] && k > 0)           sum_edge += values[i][j + 1][k - 1];
+
+                if (i > 0 && j > 0 && k > 0)                               sum_vert += values[i - 1][j - 1][k - 1];
+                if (i + 1 < size[0] && j + 1 < size[1] && k + 1 < size[2]) sum_vert += values[i + 1][j + 1][k + 1];
+                if (i > 0 && j + 1 < size[1] && k + 1 < size[2])           sum_vert += values[i - 1][j + 1][k + 1];
+                if (i + 1 < size[0] && j > 0 && k + 1 < size[2])           sum_vert += values[i + 1][j - 1][k + 1];
+                if (i + 1 < size[0] && j + 1 < size[1] && k > 0)           sum_vert += values[i + 1][j + 1][k - 1];
+                if (i + 1 < size[0] && j > 0 && k > 0)                     sum_vert += values[i + 1][j - 1][k - 1];
+                if (i > 0 && j + 1 < size[1] && k > 0)                     sum_vert += values[i - 1][j + 1][k - 1];
+                if (i > 0 && j > 0 && k + 1 < size[2])                     sum_vert += values[i - 1][j - 1][k + 1];
+
+                if (k + 2 < size[2]) sum_2edge += values[i][j][k + 2];
+                if (k > 1)           sum_2edge += values[i][j][k - 2];
+                if (j + 2 < size[1]) sum_2edge += values[i][j + 2][k];
+                if (j > 1)           sum_2edge += values[i][j - 2][k];
+                if (i + 2 < size[0]) sum_2edge += values[i + 2][j][k];
+                if (i > 1)           sum_2edge += values[i - 2][j][k];
+
+                const double inhomog = (-78 * values[i][j][k] + sum_side + 2 * sum_edge + 3 * sum_vert + 4 * sum_2edge) / 888.;
+                //--------------------------------------------------------
+                total_inhomog += abs(inhomog);
+                // If variation is significant compared to magnitude and target error, we recompute.
+                if (abs(inhomog) < target_error) {
+                    inhomog_fine[i][j][k] = 1;
+                    initially_fine++;
+                }
+                else {
+                    problematic_inhomog += abs(inhomog);
+#pragma omp critical
+                    Refine_integrals.emplace(i3{ i, j, k }, std::make_pair(values[i][j][k] * dv, inhomog));
+                }
+            }
+        }
+    }
+
+    cout << "Out of " << total_size << " initially fine: " << initially_fine << " with a problematic inhomogenity of: " << problematic_inhomog << " and a total inhomogenity of " << total_inhomog << endl;
+
+    ivec nr_fine(max_depth + 1, 0);
+    nr_fine[0] = initially_fine;
+
+    for (int depth = 0; depth < max_depth; ++depth) {
+        // Create new dimensions to sample
+        const int fac = pow(subfactor, depth + 1);
+        i3 new_size = { size[0] * fac, size[1] * fac, size[2] * fac };
+
+        // New step vectors (half the size)
+        array<d3, 3> new_vectors;
+        for (int d = 0; d < 3; ++d) {
+            for (int k = 0; k < 3; ++k) {
+                new_vectors[d][k] = vectors[d][k] / fac;
+            }
+        }
+
+        // Logic:
+        // 1. Use old vectors - SKIP CALCULATIONS
+        // 2. For new points (odd indices), check local inhomogenity in old grid.
+        //    If it is high -> Compute & Add RefinePoint
+        // 3. Calcualte integral as contribution of:
+        //    a) points where no refinement was neccesarry (value * dv of cube)
+        //    b) where new Refine points are being added use them with smaller sizes
+
+        long long count_computed = 0;
+
+        ProgressBar* pb = new ProgressBar(new_size[0], 50, "#", " ", "Level " + to_string(depth + 1));
+
+#pragma omp parallel for reduction(+:count_computed) schedule(dynamic)
+        for (int i = 0; i < new_size[0]; ++i) {
+            const double old_i = double(i) / fac;
+            int i0 = static_cast<int>(old_i); 
+            if (size[0] > 1) { 
+                i0 = fast_clamp(i0, 0, size[0] - 2); 
+            }
+            else { 
+                i0 = 0; 
+            }
+            //const int i0 = size[0] > 1 ? std::clamp((int)std::floor(old_i), 0, size[0] - 2) : 0;
+            for (int j = 0; j < new_size[1]; ++j) {
+                const double old_j = double(j) / fac;
+                int j0 = static_cast<int>(old_j);
+                if (size[1] > 1) {
+                    j0 = fast_clamp(j0, 0, size[1] - 2);
+                }
+                else {
+                    j0 = 0;
+                }
+                int* ihf = inhomog_fine[i0][j0].data();
+                for (int k = 0; k < new_size[2]; ++k) {
+                    // Check if this corresponds to an exact old point
+                    if (i % subfactor == 0 && j % subfactor == 0 && k % subfactor == 0) {
+                        continue;
+                    }
+
+                    // Map to continuous old coordinates
+                    const double old_k = double(k) / fac;
+                    int k0 = static_cast<int>(old_k);
+                    // Neighbors in old grid
+                    if (size[2] > 1) {
+                        k0 = fast_clamp(k0, 0, size[2] - 2);
+                    }
+                    else {
+                        k0 = 0;
+                    }
+
+                    if (ihf[k0] == 1) {
+                        // Already marked as not inhomogeneous anymore
+                        continue;
+                    }
+
+                    const double val = func(get_pos(old_i, old_j, old_k));
+                    //err_checkf(!std::isnan(val) && !std::isinf(val), "Error in new value calculation!", cout);
+
+#pragma omp critical
+                    refine_points.emplace(i3{ i0, j0, k0 }, std::make_pair(val, d3{ old_i, old_j, old_k }));
+                    count_computed++;
+                }
+            }
+            pb->update();
+        }
+        delete pb;
+
+        const double new_dv = abs(new_vectors[0][0] * new_vectors[1][1] * new_vectors[2][2]
+            - new_vectors[2][0] * new_vectors[1][1] * new_vectors[0][2]
+            + new_vectors[0][1] * new_vectors[1][2] * new_vectors[2][0]
+            - new_vectors[2][1] * new_vectors[1][2] * new_vectors[0][0]
+            + new_vectors[0][2] * new_vectors[1][0] * new_vectors[2][1]
+            - new_vectors[2][2] * new_vectors[1][0] * new_vectors[0][1]);
+
+        double new_integral = 0.0;
+        // Simple serial summation to avoid any reduction issues, or parallel if confident.
+        // Parallel reduction is fine for simple double sum.
+#pragma omp parallel for reduction(+:new_integral, initially_fine, removed_inhomog)
+        for (int i = 0; i < size[0]; ++i)
+            for (int j = 0; j < size[1]; ++j)
+                for (int k = 0; k < size[2]; ++k) {
+                    if (inhomog_fine[i][j][k]) {
+                        auto it_ref = Refine_integrals.find(i3{ i,j,k });
+                        if (it_ref != Refine_integrals.end())
+                            new_integral += it_ref->second.first;
+                        else
+                            new_integral += values[i][j][k] * dv;
+                        continue;
+                    }
+
+                    //Look if there is any new refinement point, which we need to take into account and integrate finely
+                    double new_int = 0;
+                    bool new_point = false;
+                    auto [itBegin, itEnd] = refine_points.equal_range(i3{ i, j, k });
+                    for (auto it = itBegin; it != itEnd; it++) {
+                        new_point = true;
+                        new_int += new_dv * it->second.first;
+                        if (it == itBegin) {
+                            new_int += values[i][j][k] * new_dv;
+                        }
+                    }
+                    //If there is no new point, we simply use the coarse parent grid
+                    if (!new_point) {
+                        new_int += values[i][j][k] * dv;
+                    }
+                    else {
+                        const double old_int = Refine_integrals[i3{ i, j, k }].first;
+                        const double rerror = abs(new_int - old_int) / (abs(new_int) + 1e-20); // Relative integration error
+                        if (rerror < target_error) {
+                            inhomog_fine[i][j][k] = 1;
+                            initially_fine++;
+							removed_inhomog += abs(Refine_integrals[i3{ i, j, k }].second);
+                        }
+                        Refine_integrals[i3{ i, j, k }].first = new_int;
+                    }
+                    new_integral += new_int;
+                }
+
+        nr_fine[depth + 1] = initially_fine;
+        //new_integral *= new_dv;
+
+        double rel_error = abs(new_integral - current_integral) / (abs(new_integral) + 1e-20);
+
+        cout << "Refinement Level " << depth + 1
+            << ": Integral = " << new_integral
+            << ", Error = " << rel_error
+			<< ", left inhomogenity: " << total_inhomog - removed_inhomog
+			<< ", left problematic inhomogenity: " << problematic_inhomog - removed_inhomog
+            << " (Computed: " << count_computed << " fixed: " << nr_fine[depth + 1] - nr_fine[depth] << ")" << endl;
+
+        // Apply update
+        current_integral = new_integral;
+        if (rel_error < target_error && problematic_inhomog / total_inhomog < target_error) {
+            cout << "Converged!" << endl;
+            break;
+        }
+		if (initially_fine == total_size) {
+            cout << "All points refined!" << endl;
+            break;
+        }
+    }
+}

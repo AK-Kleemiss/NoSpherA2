@@ -330,7 +330,7 @@ static const int cornerIndexB[12] = {
 // A tiny helper to linearly interpolate a point along an edge between two corners
 // based on the isosurface value. 
 //
-std::array<double, 3> interpolateIso(const std::array<double, 3>& p1, const std::array<double, 3>& p2, const double valP1, const double valP2, const double isoVal)
+d3 interpolateIso(const d3& p1, const d3& p2, const double valP1, const double valP2, const double isoVal)
 {
     // If valP1 == valP2, avoid divide-by-zero; just return midpoint
     if (std::fabs(valP2 - valP1) < 1e-12) {
@@ -346,7 +346,7 @@ std::array<double, 3> interpolateIso(const std::array<double, 3>& p1, const std:
 
 void get_colour(Triangle& t, const cube& volumeData, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
     RGB colour;
-    std::array<double, 3> p = t.calc_center();
+    d3 p = t.calc_center();
     double val = volumeData.get_interpolated_value(p[0], p[1], p[2]);
     if (val < low_lim) {
         colour = Colourcode[0];
@@ -375,9 +375,9 @@ void get_colour(Triangle& t, const cube& volumeData, std::array<std::array<int, 
     t.set_colour(colour);
 };
 
-double calc_d_i(const std::array<double, 3>& p_t, const WFN& wavy) {
+double calc_d_i(const d3& p_t, const WFN& wavy) {
     double d_i = 1E100;
-    std::array<double, 3> p_a = { 0, 0, 0 };
+    d3 p_a = { 0, 0, 0 };
     for (int i = 0; i < wavy.get_ncen(); i++) {
         p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
         double d = array_length(p_a);
@@ -387,11 +387,11 @@ double calc_d_i(const std::array<double, 3>& p_t, const WFN& wavy) {
     return d_i;
 }
 
-void get_colour(Triangle& t, double(*func)(const std::array<double, 3>&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
+void get_colour(Triangle& t, double(*func)(const d3&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
     const double mid_point = (low_lim + high_lim) / 2.0;
     //const double range = high_lim - low_lim;
     RGB colour;
-    const std::array<double, 3> p = t.calc_center();
+    const d3 p = t.calc_center();
     double val = func(p, wavy);
     if (val < low_lim) {
         colour = Colourcode[0];
@@ -425,8 +425,8 @@ void get_colour(Triangle& t, double(*func)(const std::array<double, 3>&, const W
 };
 
 // Function to subdivide a cube into smaller cubes
-std::vector<std::array<double, 3>> subdivideCube(const std::array<double, 3>& p1, const std::array<double, 3>& p2, int level) {
-    std::vector<std::array<double, 3>> points;
+std::vector<d3> subdivideCube(const d3& p1, const d3& p2, int level) {
+    std::vector<d3> points;
     double step = 1.0 / level;
     for (int i = 0; i <= level; ++i) {
         for (int j = 0; j <= level; ++j) {
@@ -472,7 +472,7 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
                 //             (x+1, y,   z+1)
                 //             (x+1, y+1, z+1)
                 //             (x,   y+1, z+1)
-                std::array<double, 3> cornerPos[8] = {
+                d3 cornerPos[8] = {
                     volumeData.get_pos(x,y,z),
                     volumeData.get_pos(x + 1,y,z),
                     volumeData.get_pos(x + 1,y + 1,z),
@@ -509,7 +509,7 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
                 }
 
                 // Find the points where the isosurface intersects the edges of this cube
-                std::array<double, 3> vertList[12];
+                d3 vertList[12];
                 int edges = edgeTable[cubeIndex]; // bitmask of edges
                 for (int j = 0; j < 12; j++) {
                     if (edges & (1 << j)) {

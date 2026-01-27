@@ -1007,7 +1007,7 @@ bool WFN::read_xyz(const std::filesystem::path& filename, std::ostream& file, co
 bool WFN::read_wfx(const std::filesystem::path& fileName, const bool& debug, std::ostream& file)
 {
     origin = e_origin::wfx;
-	d_f_switch = true;
+    d_f_switch = true;
     using namespace std;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName.c_str());
@@ -1769,7 +1769,7 @@ bool WFN::read_molden(const std::filesystem::path& filename, std::ostream& file,
     }
     else if (!d5 && !f7 && !g9)
     {
-		d_f_switch = true;
+        d_f_switch = true;
         int run = 0;
         string sym;
         bool spin; // alpha = false, beta = true
@@ -2052,7 +2052,7 @@ bool WFN::read_molden(const std::filesystem::path& filename, std::ostream& file,
     {
         err_not_impl_f("PLEASE DONT MIX CARTESIAN AND SPERHICAL HARMINICS; THAT IS ANNOYING!", std::cout);
     }
-	//Make the matrix square for later use
+    //Make the matrix square for later use
     while (coefficients[0].size() < coefficients[0][0].size()) {
         coefficients[0].push_back(vec(coefficients[0][0].size(), 0.0));
         occ.push_back(0);
@@ -3604,6 +3604,12 @@ const double WFN::get_atom_coordinate(const unsigned int& nr, const unsigned int
 {
     err_checkf(!((int)nr >= ncen || axis > 2), "This input is invalid for get_atom_coordinate!", std::cout);
     return atoms[nr].get_coordinate(axis);
+};
+
+const d3 WFN::get_atom_pos(const unsigned int& nr) const
+{
+    err_checkf(!(nr >= ncen), "This input is invalid for get_atom_coordinate!", std::cout);
+    return atoms[nr].get_pos();
 };
 
 bool WFN::write_wfn(const std::filesystem::path& fileName, const bool& debug, const bool occupied) const
@@ -6601,9 +6607,7 @@ bool WFN::read_fchk(const std::filesystem::path& filename, std::ostream& log, co
 };
 
 const double WFN::compute_dens(
-    const double& Pos1,
-    const double& Pos2,
-    const double& Pos3,
+    const d3& Pos,
     vec2& d,
     vec& phi) const
 {
@@ -6615,16 +6619,15 @@ const double WFN::compute_dens(
     //}
     //else
     //{
-        err_checkf(d.size() >= 16, "d is too small!", std::cout);
-        err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+    err_checkf(d.size() >= ncen, "d is too small!", std::cout);
+    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    return compute_dens_cartesian(Pos, d, phi);
     //}
 };
 
 const double WFN::compute_dens(
-    const double& Pos1,
-    const double& Pos2,
-    const double& Pos3) const
+    const d3& Pos)
+    const
 {
     vec2 d;
     vec phi(nmo, 0.0);
@@ -6639,17 +6642,15 @@ const double WFN::compute_dens(
     //}
     //else
     //{
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize(ncen, 0.0);
-        return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+    d.resize(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(16, 0.0);
+    return compute_dens_cartesian(Pos, d, phi);
     //}
 };
 
 const double WFN::compute_spin_dens(
-    const double& Pos1,
-    const double& Pos2,
-    const double& Pos3,
+    const d3& Pos,
     vec2& d,
     vec& phi) const
 {
@@ -6662,16 +6663,14 @@ const double WFN::compute_spin_dens(
     //}
     //else
     //{
-        err_checkf(d.size() >= 4, "d is too small!", std::cout);
-        err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+    err_checkf(d.size() >= ncen, "d is too small!", std::cout);
+    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    return compute_spin_dens_cartesian(Pos, d, phi);
     //}
 };
 
 const double WFN::compute_spin_dens(
-    const double& Pos1,
-    const double& Pos2,
-    const double& Pos3) const
+    const d3& Pos) const
 {
     vec2 d;
     vec phi(nmo, 0.0);
@@ -6686,17 +6685,15 @@ const double WFN::compute_spin_dens(
     //}
     //else
     //{
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize(ncen, 0.0);
-        return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+    d.resize(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(16, 0.0);
+    return compute_spin_dens_cartesian(Pos, d, phi);
     //}
 };
 
 const double WFN::compute_dens_cartesian(
-    const double& Pos1,
-    const double& Pos2,
-    const double& Pos3,
+    const d3& Pos,
     vec2& d,
     vec& phi) const
 {
@@ -6710,29 +6707,31 @@ const double WFN::compute_dens_cartesian(
     // precalculate some distances and powers of distances for faster computation
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = Pos1 - atoms[iat].get_coordinate(0);
-        d[1][iat] = Pos2 - atoms[iat].get_coordinate(1);
-        d[2][iat] = Pos3 - atoms[iat].get_coordinate(2);
-        d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
-        d[4][iat] = d[0][iat] * d[0][iat];
-        d[5][iat] = d[1][iat] * d[1][iat];
-        d[6][iat] = d[2][iat] * d[2][iat];
-        d[7][iat] = d[0][iat] * d[4][iat];
-        d[8][iat] = d[1][iat] * d[5][iat];
-        d[9][iat] = d[2][iat] * d[6][iat];
-        d[10][iat] = d[0][iat] * d[7][iat];
-        d[11][iat] = d[1][iat] * d[8][iat];
-        d[12][iat] = d[2][iat] * d[9][iat];
-        d[13][iat] = d[0][iat] * d[10][iat];
-        d[14][iat] = d[1][iat] * d[11][iat];
-        d[15][iat] = d[2][iat] * d[12][iat];
+        double* d_ = d[iat].data();
+        d_[0] = Pos[0] - atoms[iat].get_coordinate(0);
+        d_[1] = Pos[1] - atoms[iat].get_coordinate(1);
+        d_[2] = Pos[2] - atoms[iat].get_coordinate(2);
+        d_[3] = d_[0] * d_[0] + d_[1] * d_[1] + d_[2] * d_[2];
+        d_[4] = d_[0] * d_[0];
+        d_[5] = d_[1] * d_[1];
+        d_[6] = d_[2] * d_[2];
+        d_[7] = d_[0] * d_[4];
+        d_[8] = d_[1] * d_[5];
+        d_[9] = d_[2] * d_[6];
+        d_[10] = d_[0] * d_[7];
+        d_[11] = d_[1] * d_[8];
+        d_[12] = d_[2] * d_[9];
+        d_[13] = d_[0] * d_[10];
+        d_[14] = d_[1] * d_[11];
+        d_[15] = d_[2] * d_[12];
     }
 
     for (j = 0; j < nex; j++)
     {
         iat = centers[j] - 1;
+        double* d_ = d[iat].data();
         constants::type2vector(types[j], l);
-        ex = -exponents[j] * d[3][iat];
+        ex = -exponents[j] * d_[3];
         if (ex < constants::exp_cutoff)
         { // corresponds to cutoff of maximum density contribution of 1E-5
             continue;
@@ -6740,18 +6739,28 @@ const double WFN::compute_dens_cartesian(
         ex = exp(ex);
         for (k = 0; k < 3; k++)
         {
-            if (l[k] == 0)
-                continue;
-            else if (l[k] == 1)
-                ex *= d[k][iat];
-            else if (l[k] == 2)
-                ex *= d[k + 4][iat];
-            else if (l[k] == 3)
-                ex *= d[k + 7][iat];
-            else if (l[k] == 4)
-                ex *= d[k + 10][iat];
-            else if (l[k] == 5)
-                ex *= d[k + 13][iat];
+            switch (l[k])
+            {
+            case 0:
+                break;
+            case 1:
+                ex *= d_[k];
+                break;
+            case 2:
+                ex *= d_[k + 4];
+                break;
+            case 3:
+                ex *= d_[k + 7];
+                break;
+            case 4:
+                ex *= d_[k + 10];
+                break;
+            case 5:
+                ex *= d_[k + 13];
+                break;
+            default:
+                break;
+            }
         }
         double* run = phi.data();
         const MO* run2 = MOs.data();
@@ -6776,9 +6785,7 @@ const double WFN::compute_dens_cartesian(
 }
 
 const double WFN::compute_spin_dens_cartesian(
-    const double& Pos1,
-    const double& Pos2,
-    const double& Pos3,
+    const d3& Pos,
     vec2& d,
     vec& phi) const
 {
@@ -6791,22 +6798,22 @@ const double WFN::compute_spin_dens_cartesian(
 
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = Pos1 - atoms[iat].get_coordinate(0);
-        d[1][iat] = Pos2 - atoms[iat].get_coordinate(1);
-        d[2][iat] = Pos3 - atoms[iat].get_coordinate(2);
-        d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
-        d[4][iat] = d[0][iat] * d[0][iat];
-        d[5][iat] = d[1][iat] * d[1][iat];
-        d[6][iat] = d[2][iat] * d[2][iat];
-        d[7][iat] = d[0][iat] * d[4][iat];
-        d[8][iat] = d[1][iat] * d[5][iat];
-        d[9][iat] = d[2][iat] * d[6][iat];
-        d[10][iat] = d[0][iat] * d[7][iat];
-        d[11][iat] = d[1][iat] * d[8][iat];
-        d[12][iat] = d[2][iat] * d[9][iat];
-        d[13][iat] = d[0][iat] * d[10][iat];
-        d[14][iat] = d[1][iat] * d[11][iat];
-        d[15][iat] = d[2][iat] * d[12][iat];
+        d[iat][0] = Pos[0] - atoms[iat].get_coordinate(0);
+        d[iat][1] = Pos[1] - atoms[iat].get_coordinate(1);
+        d[iat][2] = Pos[2] - atoms[iat].get_coordinate(2);
+        d[iat][3] = d[iat][0] * d[iat][0] + d[iat][1] * d[iat][1] + d[iat][2] * d[iat][2];
+        d[iat][4] = d[iat][0] * d[iat][0];
+        d[iat][5] = d[iat][1] * d[iat][1];
+        d[iat][6] = d[iat][2] * d[iat][2];
+        d[iat][7] = d[iat][0] * d[iat][4];
+        d[iat][8] = d[iat][1] * d[iat][5];
+        d[iat][9] = d[iat][2] * d[iat][6];
+        d[iat][10] = d[iat][0] * d[iat][7];
+        d[iat][11] = d[iat][1] * d[iat][8];
+        d[iat][12] = d[iat][2] * d[iat][9];
+        d[iat][13] = d[iat][0] * d[iat][10];
+        d[iat][14] = d[iat][1] * d[iat][11];
+        d[iat][15] = d[iat][2] * d[iat][12];
     }
 
     for (j = 0; j < nex; j++)
@@ -6821,18 +6828,26 @@ const double WFN::compute_spin_dens_cartesian(
         ex = exp(ex);
         for (k = 0; k < 3; k++)
         {
-            if (l[k] == 0)
-                continue;
-            else if (l[k] == 1)
-                ex *= d[k][iat];
-            else if (l[k] == 2)
-                ex *= d[k + 4][iat];
-            else if (l[k] == 3)
-                ex *= d[k + 7][iat];
-            else if (l[k] == 4)
-                ex *= d[k + 10][iat];
-            else if (l[k] == 5)
-                ex *= d[k + 13][iat];
+            switch (l[k])
+            {
+            case 0:
+                break;
+            case 1:
+                ex *= d[iat][k];
+                break;
+            case 2:
+                ex *= d[iat][k + 4];
+                break;
+            case 3:
+                ex *= d[iat][k + 7];
+                break;
+            case 4:
+                ex *= d[iat][k + 10];
+                break;
+            case 5:
+                ex *= d[iat][k + 13];
+                break;
+            }
         }
         double* run = phi.data();
         const MO* run2 = MOs.data();
@@ -6858,16 +6873,11 @@ const double WFN::compute_spin_dens_cartesian(
 }
 
 const double WFN::compute_MO_spherical(
-    const double& Pos1,
-    const double& Pos2,
-    const double& Pos3,
+    const d3& Pos,
     const int& MO) const
 {
     err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", std::cout);
     return 0.0;
-    (void)Pos1;
-    (void)Pos2;
-    (void)Pos3;
     (void)MO;
     //err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
     //int iat;
@@ -7015,17 +7025,12 @@ const double WFN::compute_MO_spherical(
 }
 
 const double WFN::compute_dens_spherical(
-    const double& Pos1,
-    const double& Pos2,
-    const double& Pos3,
+    const d3& Pos,
     vec2& d,
     vec& phi) const
 {
     err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", std::cout);
     return 0.0;
-    (void)Pos1;
-    (void)Pos2;
-    (void)Pos3;
     (void)d;
     (void)phi;
     //err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
@@ -7191,7 +7196,7 @@ void WFN::pop_back_MO()
 }
 
 const void WFN::computeValues(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
+    const d3& PosGrid, // [3] vector with current position on te grid
     double& Rho,           // Value of Electron Density
     double& normGrad,      // Gradiant Vector
     double* Hess,          // Hessian Matrix, later used to determine lambda2
@@ -7328,7 +7333,7 @@ const void WFN::computeValues(
 };
 
 const void WFN::computeELIELF(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
+    const d3& PosGrid, // [3] vector with current position on te grid
     double& Elf,           // Value of the ELF
     double& Eli            // Value of the ELI
 ) const
@@ -7433,9 +7438,8 @@ const void WFN::computeELIELF(
     }
 };
 
-const void WFN::computeELI(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
-    double& Eli            // Value of the ELI
+const double WFN::computeELI(
+    const d3& PosGrid // [3] vector with current position on te grid
 ) const
 {
     const int _nmo = get_nmo(false);
@@ -7496,7 +7500,7 @@ const void WFN::computeELI(
             }
             else
             {
-                return;
+                err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7531,12 +7535,11 @@ const void WFN::computeELI(
             tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
         }
     }
-    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    return Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
 };
 
-const void WFN::computeELF(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
-    double& Elf            // Value of the ELF
+const double WFN::computeELF(
+    const d3& PosGrid // [3] vector with current position on te grid
 ) const
 {
     const int _nmo = get_nmo(false);
@@ -7597,7 +7600,7 @@ const void WFN::computeELF(
             }
             else
             {
-                return;
+                err_not_impl_f("Higher angular momentum of cartesian function in ELF computation", std::cout);
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7632,11 +7635,11 @@ const void WFN::computeELF(
             tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
         }
     }
-    Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
+    return 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
 };
 
 const void WFN::computeLapELIELF(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
+    const d3& PosGrid, // [3] vector with current position on te grid
     double& Elf,           // Value of the ELF
     double& Eli,           // Value of the ELI
     double& Lap            // Value for the Laplacian
@@ -7751,7 +7754,7 @@ const void WFN::computeLapELIELF(
 };
 
 const void WFN::computeLapELI(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
+    const d3& PosGrid, // [3] vector with current position on te grid
     double& Eli,           // Value of the ELI
     double& Lap            // Value for the Laplacian
 ) const
@@ -7780,41 +7783,49 @@ const void WFN::computeLapELI(
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
         {
-            if (l[k] == 0)
+            switch (l[k])
+            {
+            case 0:
             {
                 xl[k][0] = 1.0;
                 xl[k][1] = 0.0;
                 xl[k][2] = 0.0;
+                break;
             }
-            else if (l[k] == 1)
+            case 1:
             {
                 xl[k][0] = d[k];
                 xl[k][1] = 1.0;
                 xl[k][2] = 0.0;
+                break;
             }
-            else if (l[k] == 2)
+            case 2:
             {
                 xl[k][0] = d[k] * d[k];
                 xl[k][1] = 2 * d[k];
                 xl[k][2] = 2;
+                break;
             }
-            else if (l[k] == 3)
+            case 3:
             {
                 double d2 = d[k] * d[k];
                 xl[k][0] = d2 * d[k];
                 xl[k][1] = 3 * d2;
                 xl[k][2] = 6 * d[k];
+                break;
             }
-            else if (l[k] == 4)
+            case 4:
             {
                 double d2 = d[k] * d[k];
                 xl[k][0] = d2 * d2;
                 xl[k][1] = 4 * d2 * d[k];
                 xl[k][2] = 12 * d2;
+                break;
             }
-            else
+            default:
             {
-                return;
+                break;
+            }
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7862,7 +7873,7 @@ const void WFN::computeLapELI(
 };
 
 const double WFN::computeLap(
-    const std::array<double, 3>& PosGrid // [3] vector with current position on te grid
+    const d3& PosGrid // [3] vector with current position on te grid
 ) const
 {
     const int _nmo = get_nmo(false);
@@ -7889,41 +7900,50 @@ const double WFN::computeLap(
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
         {
-            if (l[k] == 0)
+            switch (l[k])
+            {
+            case 0:
             {
                 xl[k][0] = 1.0;
                 xl[k][1] = 0.0;
                 xl[k][2] = 0.0;
+                break;
             }
-            else if (l[k] == 1)
+            case 1:
             {
                 xl[k][0] = d[k];
                 xl[k][1] = 1.0;
                 xl[k][2] = 0.0;
+                break;
             }
-            else if (l[k] == 2)
+            case 2:
             {
                 xl[k][0] = d[k] * d[k];
                 xl[k][1] = 2 * d[k];
                 xl[k][2] = 2;
+                break;
             }
-            else if (l[k] == 3)
+            case 3:
             {
                 double d2 = d[k] * d[k];
                 xl[k][0] = d2 * d[k];
                 xl[k][1] = 3 * d2;
                 xl[k][2] = 6 * d[k];
+                break;
             }
-            else if (l[k] == 4)
+            case 4:
             {
                 double d2 = d[k] * d[k];
                 xl[k][0] = d2 * d2;
                 xl[k][1] = 4 * d2 * d[k];
                 xl[k][2] = 12 * d2;
+                break;
             }
-            else
+            default:
             {
                 return -100;
+                break;
+            }
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7961,7 +7981,7 @@ const double WFN::computeLap(
 };
 
 const double WFN::computeMO(
-    const std::array<double, 3>& PosGrid, // [3] array with current position on the grid
+    const d3& PosGrid, // [3] array with current position on the grid
     const int& mo) const
 {
     double result = 0.0;
@@ -7971,16 +7991,16 @@ const double WFN::computeMO(
     double temp = 0;
 
     // x, y, z and dsqd
-    vec2 d(4);
-    for (int i = 0; i < 4; i++)
-        d[i].resize(ncen);
+    vec2 d(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(4);
 
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = PosGrid[0] - atoms[iat].get_coordinate(0);
-        d[1][iat] = PosGrid[1] - atoms[iat].get_coordinate(1);
-        d[2][iat] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
+        d[iat][0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[iat][1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[iat][2] = PosGrid[2] - atoms[iat].get_coordinate(2);
+        d[iat][3] = pow(std::hypot(d[iat][0], d[iat][1], d[iat][2]), 2);
     }
 
     for (int j = 0; j < nex; j++)
@@ -7993,20 +8013,7 @@ const double WFN::computeMO(
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
-        {
-            if (l[k] == 0)
-                continue;
-            else if (l[k] == 1)
-                ex *= d[k][iat];
-            else if (l[k] == 2)
-                ex *= d[k][iat] * d[k][iat];
-            else if (l[k] == 3)
-                ex *= pow(d[k][iat], 3);
-            else if (l[k] == 4)
-                ex *= pow(d[k][iat], 4);
-            else if (l[k] == 5)
-                ex *= pow(d[k][iat], 5);
-        }
+            ex *= pow(d[k][iat], l[k]);
         result += MOs[mo].get_coefficient_f(j) * ex; // build MO values at this point
     }
     shrink_vector<vec>(d);
@@ -8198,10 +8205,7 @@ bool WFN::read_ptb(const std::filesystem::path& filename, std::ostream& file, co
         beta_els--;
         err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons: " + std::to_string(alpha_els) + "/" + std::to_string(beta_els), file);
     }
-    //for (int i = beta_els; i < alpha_els; i++)
-    //{
-    //    occ[i] = 1.0;
-    //}
+
     if (debug)
     {
         file << "al/be els after:" << alpha_els << " " << beta_els << std::endl;
@@ -8234,11 +8238,7 @@ bool WFN::read_ptb(const std::filesystem::path& filename, std::ostream& file, co
         }
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }
-    // To Do: This needs reviewing in light of mdspan!
-    //while (momat.size() < nbf) {
-    //    momat.push_back(vec(nbf, 0.0));
-    //    occ.push_back(0);
-    //}
+
     // build density matrix
     dMatrix2 temp_co = diag_dot(momat, occ, true);
     DM = dot(temp_co, momat, false, false);
@@ -8251,7 +8251,7 @@ bool WFN::read_ptb(const std::filesystem::path& filename, std::ostream& file, co
     return true;
 }
 
-const double WFN::computeESP(const std::array<double, 3>& PosGrid, const vec2& d2) const
+const double WFN::computeESP(const d3& PosGrid, const vec2& d2) const
 {
     double ESP = 0;
     double P[3]{ 0, 0, 0 };
@@ -8294,7 +8294,7 @@ const double WFN::computeESP(const std::array<double, 3>& PosGrid, const vec2& d
         pos[0][iat] = atoms[iat].get_coordinate(0);
         pos[1][iat] = atoms[iat].get_coordinate(1);
         pos[2][iat] = atoms[iat].get_coordinate(2);
-        ESP += get_atom_charge(iat) * pow(sqrt(pow(PosGrid[0] - pos[0][iat], 2) + pow(PosGrid[1] - pos[1][iat], 2) + pow(PosGrid[2] - pos[2][iat], 2)), -1);
+        ESP += get_atom_charge(iat) / sqrt(pow(PosGrid[0] - pos[0][iat], 2) + pow(PosGrid[1] - pos[1][iat], 2) + pow(PosGrid[2] - pos[2][iat], 2));
     }
 
     for (int iprim = 0; iprim < nprim; iprim++)
@@ -8415,7 +8415,7 @@ const double WFN::computeESP(const std::array<double, 3>& PosGrid, const vec2& d
     return ESP;
 };
 
-const double WFN::computeESP_noCore(const std::array<double, 3>& PosGrid, const vec2& d2) const
+const double WFN::computeESP_noCore(const d3& PosGrid, const vec2& d2) const
 {
     double ESP = 0;
     double P[3]{ 0, 0, 0 };
@@ -8687,9 +8687,9 @@ void WFN::calc_rho_cube(cube& cube_data) const
     {
         vec2 d;
         vec phi((*this).get_nmo(), 0.0);
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize((*this).get_ncen(), 0.0);
+        d.resize((*this).get_ncen());
+        for (int i = 0; i < (*this).get_ncen(); i++)
+            d[i].resize(16, 0.0);
 #pragma omp for schedule(dynamic)
         for (int index = 0; index < total_size; index++)
         {
@@ -8702,7 +8702,7 @@ void WFN::calc_rho_cube(cube& cube_data) const
                 i * v1[1] + j * v2[1] + k * v3[1] + orig[1],
                 i * v1[2] + j * v2[2] + k * v3[2] + orig[2] };
 
-            cube_data.set_value(i, j, k, (*this).compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
+            cube_data.set_value(i, j, k, (*this).compute_dens(cube_data.get_pos(i, j, k), d, phi));
             progress->update();
         }
     }
@@ -8722,19 +8722,20 @@ void WFN::calc_rho_cube(cube& cube_data) const
 
 void WFN::write_rho_cube(const double& radius, const double& increment) const {
     using namespace std;
-    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-    int steps[3]{ 0, 0, 0 };
+    properties_options opts;
+    opts.radius = radius;
+    opts.resolution = increment;
     WFN dummy = (*this);
-    readxyzMinMax_fromWFN(dummy, MinMax, steps, radius, increment, true);
-    cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
+    readxyzMinMax_fromWFN(dummy, opts, true);
+    cube CubeRho(opts.NbSteps, dummy.get_ncen(), true);
     dummy.delete_unoccupied_MOs();
     CubeRho.give_parent_wfn(dummy);
     std::cout << "Starting work..." << endl;
 
     for (int i = 0; i < 3; i++)
     {
-        CubeRho.set_origin(i, MinMax[i]);
-        CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+        CubeRho.set_origin(i, opts.MinMax[i]);
+        CubeRho.set_vector(i, i, (opts.MinMax[i + 3] - opts.MinMax[i]) / opts.NbSteps[i]);
     }
     CubeRho.set_comment1("Calculated density using NoSpherA2");
     CubeRho.set_comment2("from " + dummy.get_path().string());

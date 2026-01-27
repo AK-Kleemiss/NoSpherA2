@@ -28,12 +28,14 @@ typedef std::vector<vec> vec2;
 typedef std::vector<vec2> vec3;
 typedef std::vector<int> ivec;
 typedef std::vector<ivec> ivec2;
+typedef std::vector<ivec2> ivec3;
 typedef std::vector<cdouble> cvec;
 typedef std::vector<cvec> cvec2;
 typedef std::vector<cvec2> cvec3;
 typedef std::vector<std::vector<cvec2>> cvec4;
 typedef std::vector<bool> bvec;
 typedef std::vector<bvec> bvec2;
+typedef std::vector<bvec2> bvec3;
 typedef std::vector<std::string> svec;
 typedef std::vector<std::filesystem::path> pathvec;
 typedef std::chrono::high_resolution_clock::time_point _time_point;
@@ -63,6 +65,54 @@ typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic
 typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> cMatrixRef4;
 typedef Kokkos::mdspan<const cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> ccMatrixRef4;
 
+struct properties_options
+{
+    bool rho = false;
+    bool eli = false;
+    bool esp = false;
+    bool elf = false;
+    bool lap = false;
+    bool rdg = false;
+    bool hdef = false;
+    bool def = false;
+    bool hirsh = false;
+    bool s_rho = false;
+    bool all_mos = false;
+    double resolution = 0.1;
+    double radius = 2.0;
+    double integral_accuracy = -1;
+    std::array<int, 3> NbSteps = { 0, 0, 0 };
+    std::array<double, 6> MinMax = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    ivec MO_numbers;
+    int hirsh_number = 0;
+    bool calc() const {
+        return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || MO_numbers.size() > 0;
+    }
+    size_t n_grid_points() const {
+        size_t result = static_cast<size_t>(NbSteps[0]) * NbSteps[1] * NbSteps[2];
+        return result;
+    }
+};
+
+typedef std::array<int, 3> i3;
+typedef std::set<i3> hkl_list;
+typedef std::set<i3>::const_iterator hkl_list_it;
+
+typedef std::array<double, 3> d3;
+typedef std::set<d3> hkl_list_d;
+typedef std::set<d3>::const_iterator hkl_list_it_d;
+
+struct I3Less {
+    bool operator()(const i3& a, const i3& b) const noexcept {
+        if (a[0] != b[0]) return a[0] < b[0];
+        if (a[1] != b[1]) return a[1] < b[1];
+        return a[2] < b[2];
+    }
+};
+
+//indexed by the major grid point the additional points belong to, this map of RefinePoints has field value and the non-integer index in the grid as second
+typedef std::multimap<i3, std::pair<double, d3>, I3Less> Refinepointmap;
+
 int vec_sum(const bvec& in);
 int vec_sum(const ivec& in);
 double vec_sum(const vec& in);
@@ -71,30 +121,29 @@ double vec_length(const vec& in);
 template <typename array>
 const double array_length(const array& in)
 {
-    double sum = 0.0;
-    for (double val : in)
-    {
-        sum += val * val;
-    }
-    return sqrt(sum);
+    return std::hypot(in[0], in[1], in[2]);
 }
 template <typename array>
 const double array_length(const array& in, const array& in2)
 {
+    if (std::size(in) == 3 && std::size(in2) == 3)
+    {
+        return std::hypot(in[0] - in2[0], in[1] - in2[1], in[2] - in2[2]);
+    }
     double sum = 0.0;
-    auto it1 = in.begin();
-    auto it2 = in2.begin();
-    for (; it1 != in.end(); ++it1, ++it2) {
+    auto it1 = std::begin(in);
+    auto it2 = std::begin(in2);
+    for (; it1 != std::end(in); ++it1, ++it2) {
         sum += (*it1 - *it2) * (*it1 - *it2);
     }
     return sqrt(sum);
 }
 
 // Function to compute cross product
-std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b);
+d3 cross(const d3& a, const d3& b);
 
 // Function to compute dot product
-double a_dot(const std::array<double, 3>& a, const std::array<double, 3>& b);
+double a_dot(const d3& a, const d3& b);
 
 constexpr const std::complex<double> c_one(0, 1.0);
 
@@ -315,18 +364,13 @@ private:
 
 void readxyzMinMax_fromWFN(
     WFN& wavy,
-    double* CoordMinMax,
-    int* NbSteps,
-    double Radius,
-    double Increments,
+    properties_options& opts,
     bool no_bohr = false);
 
 void readxyzMinMax_fromCIF(
     std::filesystem::path cif,
-    double* CoordMinMax,
-    int* NbSteps,
-    vec2& cm,
-    double Resolution);
+    properties_options& opts,
+    vec2& cm);
 
 bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug);
 
@@ -539,14 +583,6 @@ struct ECP_primitive : primitive
     ECP_primitive(int c, int t, double e, double coef, int n) : primitive(c, t, e, coef), n(n) {}
 };
 
-typedef std::array<int, 3> hkl_t;
-typedef std::set<hkl_t> hkl_list;
-typedef std::set<hkl_t>::const_iterator hkl_list_it;
-
-typedef std::array<double, 3> hkl_d;
-typedef std::set<hkl_d> hkl_list_d;
-typedef std::set<hkl_d>::const_iterator hkl_list_it_d;
-
 //---------------- Object for handling all input options -------------------------------
 struct options
     /**
@@ -561,15 +597,11 @@ struct options
      */
 {
     std::ostream& log_file;
-    double resolution = 0.1;
-    double radius = 2.0;
     double d_sfac_scan = 0.0;
     double sfac_diffuse = 0.0;
     double dmin = 99.0;
     double mem = 1000.0; // In MB
     double efield = 0.005;
-    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-    ivec MOs;
     ivec2 groups;
     ivec2 hkl_min_max{ {-100, 100}, {-100, 100}, {-100, 100} };
     vec2 twin_law;
@@ -600,26 +632,15 @@ struct options
     std::filesystem::path coef_file;
     std::filesystem::path hirshfeld_surface;
     std::filesystem::path hirshfeld_surface2;
-    std::string fract_name;
+    std::filesystem::path fract_name;
     std::filesystem::path wavename;
     std::filesystem::path gaussian_path;
     std::filesystem::path turbomole_path;
     std::filesystem::path basis_set_path;
-    std::string cwd;
+    std::filesystem::path cwd;
+    properties_options properties;
     bool debug = false;
     bool all_charges = false;
-    bool rho = false;
-    bool calc = false;
-    bool eli = false;
-    bool esp = false;
-    bool elf = false;
-    bool lap = false;
-    bool rdg = false;
-    bool hdef = false;
-    bool def = false;
-    bool fract = false;
-    bool hirsh = false;
-    bool s_rho = false;
     bool SALTED = false;
     bool Olex2_1_3_switch = false;
     bool iam_switch = false;
@@ -632,7 +653,6 @@ struct options
     bool gbw2wfn = false;
     bool old_tsc = false;
     bool write_CIF = false;
-    bool all_mos = false;
     bool test = false;
     bool electron_diffraction = false;
     bool ECP = false;
@@ -640,8 +660,7 @@ struct options
     bool needs_Thakkar_fill = false;
     bool qct = false;
     bool rgbi = false;
-    int hirsh_number = 0;
-    int NbSteps[3]{ 0, 0, 0 };
+    bool fract = false;
     int accuracy = 2;
     int threads = -1;
     int pbc = 0;
@@ -694,10 +713,10 @@ cdouble hypergeometric(double a, double b, double c, cdouble x);
 
 bool ends_with(const std::string& str, const std::string& suffix);
 
-bool is_nan(double& in);
-bool is_nan(float& in);
-bool is_nan(long double& in);
-bool is_nan(cdouble& in);
+bool is_nan(const double& in);
+bool is_nan(const float& in);
+bool is_nan(const long double& in);
+bool is_nan(const cdouble& in);
 
 bool read_block_from_fortran_binary(std::ifstream& file, void* Target);
 template <typename T>

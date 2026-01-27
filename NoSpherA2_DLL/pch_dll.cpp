@@ -64,7 +64,7 @@ std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(const std::filesyste
     {
         area += triangles_i[i].calc_area();
         volume += triangles_i[i].calc_inner_volume();
-        std::array<double, 3> pos = triangles_i[i].calc_center();
+        d3 pos = triangles_i[i].calc_center();
         double d_i = calc_d_i(pos, wfn1);
 #pragma omp critical
         {
