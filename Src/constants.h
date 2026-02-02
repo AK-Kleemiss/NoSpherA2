@@ -177,180 +177,28 @@ namespace constants
         return result;
     }
 
+
     //Conversion between ORCA and PySCF Orbital orderings
     // ORCA: 0,1,-1,2,-2,3,-3...
     // PySCF: -3,-2,-1,0,1,2,3...
     //MAP Layout: {l {m,new_index}}
-    constexpr size_t orca_2_pySCF(const unsigned int& l,const int& m) {
-        if (l == 0) {
-            //std::map<int, std::map<int, int>> orca_2_pySCF{ {0, {{0,0}}},
-            if (m == 0) return 0;
-            else return -20000; //error
+    constexpr std::optional<std::size_t> orca_2_pySCF(unsigned int l, int m_idx) {
+        switch (l) {
+        case 0: { constexpr std::array<std::size_t, 1>  map = { 0 }; return map[m_idx]; }
+        case 1: { constexpr std::array<std::size_t, 3>  map = { 2,0,1 }; return map[m_idx]; }
+        case 2: { constexpr std::array<std::size_t, 5>  map = { 2,3,1,4,0 }; return map[m_idx]; }
+        case 3: { constexpr std::array<std::size_t, 7>  map = { 3,4,2,5,1,6,0 }; return map[m_idx]; }
+        case 4: { constexpr std::array<std::size_t, 9>  map = { 4,5,3,6,2,7,1,8,0 }; return map[m_idx]; }
+        case 5: { constexpr std::array<std::size_t, 11> map = { 5,6,4,7,3,8,2,9,1,10,0 }; return map[m_idx]; }
+        case 6: { constexpr std::array<std::size_t, 13> map = { 6,7,5,8,4,9,3,10,2,11,1,12,0 }; return map[m_idx]; }
+        case 7: { constexpr std::array<std::size_t, 15> map = { 7,8,6,9,5,10,4,11,3,12,2,13,1,14,0 }; return map[m_idx]; }
+        case 8: { constexpr std::array<std::size_t, 17> map = { 8,9,7,10,6,11,5,12,4,13,3,14,2,15,1,16,0 }; return map[m_idx]; }
+        case 9: { constexpr std::array<std::size_t, 19> map = { 9,10,8,11,7,12,6,13,5,14,4,15,3,16,2,17,1,18,0 }; return map[m_idx]; }
+        case 10: { constexpr std::array<std::size_t, 21> map = { 10,11,9,12,8,13,7,14,6,15,5,16,4,17,3,18,2,19,1,20,0 }; return map[m_idx]; }
+        default:
+            return std::nullopt;
         }
-        else if (l == 1) {
-            //                                                {1, {{-1,2}, {0,0}, {1,1}}},
-            if (m == -1) return 2;
-            else if (m == 0) return 0;
-            else if (m == 1) return 1;
-            else return -20000; //error
-        }
-        else if (l == 2) {
-            //                                                {2, {{-2,2}, {-1,3}, {0,1}, {1,4}, {2,0},}},
-            if (m == -2) return 2;
-            else if (m == -1) return 3;
-            else if (m == 0) return 1;
-            else if (m == 1) return 4;
-            else if (m == 2) return 0;
-            else return -20000; //error
-        }
-        else if (l == 3) {
-            //                                                {3, {{-3,3}, {-2,4}, {-1,2}, {0,5}, {1,1}, {2,6}, {3,0}}},
-            if (m == -3) return 3;
-            else if (m == -2) return 4;
-            else if (m == -1) return 2;
-            else if (m == 0) return 5;
-            else if (m == 1) return 1;
-            else if (m == 2) return 6;
-            else if (m == 3) return 0;
-            else return -20000; //error
-        }
-        else if (l == 4) {
-            //                                                {4, {{-4,4}, {-3,5}, {-2,3}, {-1,6}, {0,2}, {1,7}, {2,1}, {3,8}, {4,0}}},
-            if (m == -4) return 4;
-            else if (m == -3) return 5;
-            else if (m == -2) return 3;
-            else if (m == -1) return 6;
-            else if (m == 0) return 2;
-            else if (m == 1) return 7;
-            else if (m == 2) return 1;
-            else if (m == 3) return 8;
-            else if (m == 4) return 0;
-            else return -20000; //error
-        }
-        else if (l == 5) {
-            //                                                {5, {{-5,5}, {-4,6}, {-3,4}, {-2,7}, {-1,3}, {0,8}, {1,2}, {2,9}, {3,1}, {4,10}, {5,0}}},
-            if (m == -5) return 5;
-            else if (m == -4) return 6;
-            else if (m == -3) return 4;
-            else if (m == -2) return 7;
-            else if (m == -1) return 3;
-            else if (m == 0) return 8;
-            else if (m == 1) return 2;
-            else if (m == 2) return 9;
-            else if (m == 3) return 1;
-            else if (m == 4) return 10;
-            else if (m == 5) return 0;
-            else return -20000; //error
-        }
-        else if (l == 6) {
-            //                                                {6, {{-6,6}, {-5,7}, {-4,5}, {-3,8}, {-2,4}, {-1,9}, {0,3}, {1,10}, {2,2}, {3,11}, {4,1}, {5,12}, {6,0}}},
-            if (m == -6) return 6;
-            else if (m == -5) return 7;
-            else if (m == -4) return 5;
-            else if (m == -3) return 8;
-            else if (m == -2) return 4;
-            else if (m == -1) return 9;
-            else if (m == 0) return 3;
-            else if (m == 1) return 10;
-            else if (m == 2) return 2;
-            else if (m == 3) return 11;
-            else if (m == 4) return 1;
-            else if (m == 5) return 12;
-            else if (m == 6) return 0;
-            else return -20000; //error
-        }
-        else if (l == 7) {
-            //                                                {7, {{-7,7}, {-6,8}, {-5,6}, {-4,9}, {-3,5}, {-2,10}, {-1,4}, {0,11}, {1,3}, {2,12}, {3,2}, {4,13}, {5,1}, {6,14}, {7,0}}}, //From here generated by Copilot
-            if (m == -7) return 7;
-            else if (m == -6) return 8;
-            else if (m == -5) return 6;
-            else if (m == -4) return 9;
-            else if (m == -3) return 5;
-            else if (m == -2) return 10;
-            else if (m == -1) return 4;
-            else if (m == 0) return 11;
-            else if (m == 1) return 3;
-            else if (m == 2) return 12;
-            else if (m == 3) return 2;
-            else if (m == 4) return 13;
-            else if (m == 5) return 1;
-            else if (m == 6) return 14;
-            else if (m == 7) return 0;
-            else return -20000; //error
-        }
-        else if (l == 8) {
-            //                                                {8, {{-8,8}, {-7,9}, {-6,7}, {-5,10}, {-4,6}, {-3,11}, {-2,5}, {-1,12}, {0,4}, {1,13}, {2,3}, {3,14}, {4,2}, {5,15}, {6,1}, {7,16}, {8,0}}},
-            if (m == -8) return 8;
-            else if (m == -7) return 9;
-            else if (m == -6) return 7;
-            else if (m == -5) return 10;
-            else if (m == -4) return 6;
-            else if (m == -3) return 11;
-            else if (m == -2) return 5;
-            else if (m == -1) return 12;
-            else if (m == 0) return 4;
-            else if (m == 1) return 13;
-            else if (m == 2) return 3;
-            else if (m == 3) return 14;
-            else if (m == 4) return 2;
-            else if (m == 5) return 15;
-            else if (m == 6) return 1;
-            else if (m == 7) return 16;
-            else if (m == 8) return 0;
-            else return -20000; //error
-        }
-        else if (l == 9) {
-            //                                                {9, {{-9,9}, {-8,10}, {-7,8}, {-6,11}, {-5,7}, {-4,12}, {-3,6}, {-2,13}, {-1,5}, {0,14}, {1,4}, {2,15}, {3,3}, {4,16}, {5,2}, {6,17}, {7,1}, {8,18}, {9,0}}},
-            if (m == -9) return 9;
-            else if (m == -8) return 10;
-            else if (m == -7) return 8;
-            else if (m == -6) return 11;
-            else if (m == -5) return 7;
-            else if (m == -4) return 12;
-            else if (m == -3) return 6;
-            else if (m == -2) return 13;
-            else if (m == -1) return 5;
-            else if (m == 0) return 14;
-            else if (m == 1) return 4;
-            else if (m == 2) return 15;
-            else if (m == 3) return 3;
-            else if (m == 4) return 16;
-            else if (m == 5) return 2;
-            else if (m == 6) return 17;
-            else if (m == 7) return 1;
-            else if (m == 8) return 18;
-            else if (m == 9) return 0;
-            else return -20000; //error
-        }
-        else if (l == 10) {
-            //                                                {10, {{-10,10}, {-9,11}, {-8,9}, {-7,12}, {-6,8}, {-5,13}, {-4,7}, {-3,14}, {-2,6}, {-1,15}, {0,5}, {1,16}, {2,4}, {3,17}, {4,3}, {5,18}, {6,2}, {7,19}, {8,1}, {9,20}, {10,0}}}
-            if (m == -10) return 10;
-            else if (m == -9) return 11;
-            else if (m == -8) return 9;
-            else if (m == -7) return 12;
-            else if (m == -6) return 8;
-            else if (m == -5) return 13;
-            else if (m == -4) return 7;
-            else if (m == -3) return 14;
-            else if (m == -2) return 6;
-            else if (m == -1) return 15;
-            else if (m == 0) return 5;
-            else if (m == 1) return 16;
-            else if (m == 2) return 4;
-            else if (m == 3) return 17;
-            else if (m == 4) return 3;
-            else if (m == 5) return 18;
-            else if (m == 6) return 2;
-            else if (m == 7) return 19;
-            else if (m == 8) return 1;
-            else if (m == 9) return 20;
-            else if (m == 10) return 0;
-            else return -20000; //error
-        }
-        else {
-            return -20000; //error
-        }
-    };
+    }
 
     constexpr unsigned int type_2_nbo(const int& type) {
         if (type == 1) return 1;

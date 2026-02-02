@@ -3218,7 +3218,6 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
         dMatrixRef2 coefs_2D_s1_span(coefficients[0].data(), dimension, dimension);
         dMatrixRef2 coefs_2D_s2_span(coefficients[1].data(), dimension, dimension);
-
         int index = 0;
         for (const atom& _atom : atoms) {
             std::vector<basis_set_entry> basis = _atom.get_basis_set();
@@ -3226,13 +3225,15 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             for (unsigned int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
                 int type = basis[temp_bas_idx].get_type() - 1;
                 temp_bas_idx += _atom.get_shellcount(shell);
-                for (int m = -type; m <= type; m++) {
-                    auto coefs_2D_s1_slice = Kokkos::submdspan(coefs_2D_s1_span, index + m + type, Kokkos::full_extent);
-                    auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s1.to_mdspan(), index + constants::orca_2_pySCF(type,m), Kokkos::full_extent);
+                for (int m_idx = 0; m_idx < 2*type+1; m_idx++) {
+                    int offset = constants::orca_2_pySCF(type, m_idx).value();
+
+                    auto coefs_2D_s1_slice = Kokkos::submdspan(coefs_2D_s1_span, index + m_idx, Kokkos::full_extent);
+                    auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s1.to_mdspan(), index + offset, Kokkos::full_extent);
                     std::copy(coefs_2D_s1_slice.data_handle(), coefs_2D_s1_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
                     if (operators == 2) {
-                        auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m + type, Kokkos::full_extent);
-                        reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF(type,m), Kokkos::full_extent);
+                        auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m_idx, Kokkos::full_extent);
+                        reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + offset, Kokkos::full_extent);
                         std::copy(coefs_2D_s2_slice.data_handle(), coefs_2D_s2_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
                     } 
                 }
@@ -8154,16 +8155,15 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     err_checkf(read_block_from_fortran_binary(inFile, eval.data()), "Error reading energies!", std::cout);
 
 
-    //std::vector<char> test((size_t)nbf * (size_t)nmomax);
-    //err_checkf(read_block_from_fortran_binary(inFile, test.data()), "Error reading MO coefficients!", std::cout);
-
-
     vec tempvec((size_t)nbf* (size_t)nmomax);
     err_checkf(read_block_from_fortran_binary(inFile, tempvec.data()), "Error reading MO coefficients!", std::cout);
     dMatrix2 momat = reshape<dMatrix2>(tempvec, Shape2D(nmomax, nbf));
 
-    vec tempvec2((size_t)nmomax * (size_t)nmomax);
-    err_checkf(read_block_from_fortran_binary(inFile, tempvec2.data()), "Error reading spherical MO coefficients!", std::cout);
+    //vec tempvec2((size_t)nmomax * (size_t)nmomax);
+    //err_checkf(read_block_from_fortran_binary(inFile, tempvec2.data()), "Error reading spherical MO coefficients!", std::cout);
+
+    vec Pmat((size_t)nmomax * (size_t)(nmomax + 1) / 2);
+    err_checkf(read_block_from_fortran_binary(inFile, Pmat.data()), "Error reading density matrix!", std::cout);
 
 //  Add Basis set information to atoms
 //  This is a cartesian basis
@@ -8190,7 +8190,6 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     //    atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell); // One extra time to catch the last one
     //    prim++;
     //    shell++;
-
     //    if (function_type != 1) { //Skip all the repetition
     //        prim += prims_in_this_shell * (n_prim_type-1);
     //    }
@@ -8299,27 +8298,60 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }
 
-    dMatrix2 reorderd_coefs(nmomax, nmomax);
-    dMatrixRef2 coefs_2D_span(tempvec2.data(), nmomax, nmomax);
+    //Now turn Pmat into a full matrix
+    DM = dMatrix2(nmomax, nmomax);
 
-    int index = 0;
-    for (const atom& _atom : atoms) {
-        std::vector<basis_set_entry> basis = _atom.get_basis_set();
-        int temp_bas_idx = 0;
-        for (unsigned int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
-            int type = basis[temp_bas_idx].get_type() - 1;
-            temp_bas_idx += _atom.get_shellcount(shell);
-            for (int m = -type; m <= type; m++) {
-                auto coefs_2D_slice = Kokkos::submdspan(coefs_2D_span, index + m + type, Kokkos::full_extent);
-                auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs.to_mdspan(), index + constants::orca_2_pySCF(type, m), Kokkos::full_extent);
-                std::copy(coefs_2D_slice.data_handle(), coefs_2D_slice.data_handle() + nmomax, reord_coefs_slice.data_handle());
-            }
-            index += 2 * type + 1;
+    double* pmat_ptr = Pmat.data();
+    for (int j = 0; j < nmomax; j++) {
+        for (int i = 0; i < j; i++) {
+            const double v = *pmat_ptr++;
+            DM(i, j) = v;
+            DM(j, i) = v;
         }
+        DM(j, j) = *pmat_ptr++;
     }
 
-    dMatrix2 temp_co = diag_dot(reorderd_coefs, occ, true);
-    DM = dot(temp_co, reorderd_coefs, false, false);
+    ////If i ever need it again, we can reorder the orbitals
+    ////""" Reorder L=1 components from +1,-1,0 to -1,0,+1 in the overlap matrix"""
+    //auto get_new_index = [](const int l, const int m_idx) {
+    //    switch (l) {
+    //    case 1: { constexpr std::array<int, 3>  map = { 2,0,1 }; return map[m_idx]; }
+    //    default: return m_idx;
+    //    }
+    //    };
+    //ivec permutations(nmomax);
+    //size_t ao = 0;
+    //for (const atom& at : atoms) {
+    //    int prim = 0;
+    //    for (unsigned int shell = 0; shell < at.get_shellcount_size(); ++shell) {
+    //        const int l = at.get_basis_set_type(prim) - 1;
+    //        const size_t shell_start = ao;
+    //        const int l21 = 2 * l + 1;
+    //        for (int m_idx = 0; m_idx < l21; m_idx++) {
+    //            const size_t old_idx = shell_start + size_t(m_idx);
+    //            const size_t new_idx = shell_start + size_t(get_new_index(l, m_idx));
+
+    //            // perm[old] = new
+    //            permutations[old_idx] = int(new_idx);
+    //        }
+
+    //        ao += size_t(l21);
+    //        prim += at.get_shellcount(shell);
+    //    }
+    //}
+    //for (int j = 0; j < nmomax; j++) {
+    //    const int pj = permutations[j];
+    //    // Handle diagonal separately (no redundant assignment)
+    //    for (int i = 0; i < j; i++) {
+    //        const int pi = permutations[i];
+    //        const double v = *pmat_ptr++;
+    //        DM(pi, pj) = v;
+    //        DM(pj, pi) = v;
+    //    }
+    //    // Diagonal element
+    //    DM(pj, pj) = *pmat_ptr++;
+    //}
+
 
 
     err_checkf(nprims == nex, "Error adding primitives to WFN!", file);
