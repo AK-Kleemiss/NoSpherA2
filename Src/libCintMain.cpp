@@ -251,7 +251,6 @@ void get_matrix_slice(const dMatrix2& dm, std::pair<int, int> row_range, std::pa
             dm_slice[idx++] = dm(row_idx, col_range.first + j) * weight;
         }
     }
-#endif
 }
 
 template <typename Kernel>

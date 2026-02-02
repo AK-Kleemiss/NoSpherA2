@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "GridManager.h"
 #include "spherical_density.h"
-#include "integrator.h"
 
 double make_sphericals(
     vec2& dens,
@@ -318,7 +317,7 @@ void GridManager::getIntegrationGrid1D(const WFN& wave, const int atom_1, const 
     vec2 chi = make_chi(wave, 40, true, config_.debug);
     for (int g = 0; g < grid_data_.atomic_grids.size(); g++) {
         for (int p = 0; p < num_points; ++p) {
-            std::pair<double, double> result_weights = get_integration_weights(
+            std::array<double, 2> result_weights = get_integration_weights(
                 wave.get_ncen(),
                 proton_charges.data(),
                 x_coords.data(),
@@ -331,8 +330,8 @@ void GridManager::getIntegrationGrid1D(const WFN& wave, const int atom_1, const 
                 pa_b,
                 pa_tv,
                 chi);
-            grid_data_.atomic_grids[g][GridData::BECKE_WEIGHT][p] = result_weights.first;
-            grid_data_.atomic_grids[g][GridData::TFVC_WEIGHT][p] = result_weights.second;
+            grid_data_.atomic_grids[g][GridData::BECKE_WEIGHT][p] = result_weights[0];
+            grid_data_.atomic_grids[g][GridData::TFVC_WEIGHT][p] = result_weights[1];
         }
     }
 }

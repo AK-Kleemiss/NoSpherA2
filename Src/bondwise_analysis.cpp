@@ -874,9 +874,9 @@ void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
     Int_Params basis(wavy);
     vec S_full;
     if (wavy.get_d_f_switch())
-        compute2c_Overlap_Cart(basis, S_full);
+        compute2C<Overlap2C_CRT>(basis, S_full);
     else
-        compute2C<Overlap2C>(basis, S_full);
+        compute2C<Overlap2C_SPH>(basis, S_full);
 
     overlap_matrix = reshape<dMatrix2>(S_full, Shape2D(density_matrix.extent(0), density_matrix.extent(1)));
 
