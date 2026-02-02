@@ -380,12 +380,13 @@ void DensityFitting::analyze_density_fit_quality(const vec& coefficients, const 
     std::cout << "\n=== Density Fitting Quality Analysis ===" << std::endl;
 
     vec atomic_populations(wavy_aux.get_ncen(), 0.0);
+    int expected_total_electrons = 0;
     int coef_idx = 0;
 
     // Calculate atomic populations from coefficients using only s-orbitals
     for (int atm_idx = 0; atm_idx < wavy_aux.get_ncen(); atm_idx++) {
         atom current_atom = wavy_aux.get_atoms()[atm_idx];
-
+        expected_total_electrons += current_atom.get_charge();
         int type = -1, prim = 0;
         for (unsigned int shell = 0; shell < current_atom.get_shellcount().size(); shell++) {
             type = current_atom.get_basis_set_entry(prim).get_type();
@@ -435,6 +436,8 @@ void DensityFitting::analyze_density_fit_quality(const vec& coefficients, const 
             std::cout << "Warning: Significant deviation for atom " << atm_idx + 1 << "!" << std::endl;
         }
     }
+    double real_total_electrons = std::accumulate(atomic_populations.begin(), atomic_populations.end(), 0.0);
+    std::cout << "Expected / Real total electrons: " << expected_total_electrons << " / " << std::fixed << std::setprecision(3) << real_total_electrons << std::endl;
 }
 
 #include "SALTED_utilities.h"
