@@ -2174,6 +2174,15 @@ void options::digest_options()
             np_coeffs.shape = { static_cast<unsigned long>(coefs.size()) };
             npy::write_npy("SALTED_COEFS.npy", np_coeffs);
         }
+        else if (temp == "-SALTED_Training") {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+
+            WFN wavy(wfn);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+
+            create_SALTED_training_data(wavy, wavy_aux);
+        }
         else if (temp == "-test_reading_SALTED_binary") {
             test_reading_SALTED_binary_file();
             exit(0);
