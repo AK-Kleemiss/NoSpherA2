@@ -76,7 +76,7 @@ WFN::WFN(e_origin given_origin)
     fill_Afac_pre();
 };
 
-WFN::WFN(const std::filesystem::path & filename, const bool& debug)
+WFN::WFN(const std::filesystem::path& filename, const bool& debug)
 {
     ncen = 0;
     nfunc = 0;
@@ -119,7 +119,7 @@ WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_
     read_known_wavefunction_format(filename, std::cout, debug);
 };
 
-bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)
+bool WFN::push_back_atom(const std::string& label, const double& x, const double& y, const double& z, const int& _charge, const std::string& ID)
 {
     ncen++;
     if (_charge >= 1)
@@ -132,14 +132,14 @@ bool WFN::push_back_atom(const std::string &label, const double &x, const double
     return true;
 };
 
-bool WFN::push_back_atom(const atom &given)
+bool WFN::push_back_atom(const atom& given)
 {
     ncen++;
     atoms.push_back(given);
     return true;
 };
 
-bool WFN::erase_atom(const int &nr)
+bool WFN::erase_atom(const int& nr)
 {
     err_checkf(nr < ncen, "unreasonable atom number", std::cout);
     removeElement(atoms, atoms[nr]);
@@ -147,7 +147,7 @@ bool WFN::erase_atom(const int &nr)
     return true;
 };
 
-bool WFN::push_back_MO(const int &nr, const double &occ, const double &ener)
+bool WFN::push_back_MO(const int& nr, const double& occ, const double& ener)
 {
     nmo++;
     err_checkf(nr <= nmo, "unreasonable MO number", std::cout);
@@ -155,33 +155,33 @@ bool WFN::push_back_MO(const int &nr, const double &occ, const double &ener)
     return true;
 };
 
-bool WFN::push_back_MO(const int &nr, const double &occ, const double &ener, const int &oper)
+bool WFN::push_back_MO(const int& nr, const double& occ, const double& ener, const int& oper)
 {
     nmo++;
     MOs.push_back(MO(nr, occ, ener, oper));
     return true;
 };
 
-bool WFN::push_back_MO(const MO &given)
+bool WFN::push_back_MO(const MO& given)
 {
     nmo++;
     MOs.push_back(given);
     return true;
 };
 
-void WFN::push_back_MO_coef(const int &nr, const double &value)
+void WFN::push_back_MO_coef(const int& nr, const double& value)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs[nr].push_back_coef(value);
 };
 
-void WFN::assign_MO_coefs(const int &nr, vec &values)
+void WFN::assign_MO_coefs(const int& nr, vec& values)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs[nr].assign_coefs(values);
 };
 
-const double& WFN::get_MO_energy(const int &mo) const
+const double& WFN::get_MO_energy(const int& mo) const
 {
     err_checkf(mo < nmo, "not enough MOs", std::cout);
     return MOs[mo].get_energy();
@@ -194,7 +194,7 @@ const void WFN::clear_MOs()
     nmo = 0;
 }
 
-bool WFN::push_back_center(const int &cent)
+bool WFN::push_back_center(const int& cent)
 {
     if (cent <= ncen && cent > 0)
         centers.push_back(cent);
@@ -203,13 +203,13 @@ bool WFN::push_back_center(const int &cent)
     return true;
 };
 
-bool WFN::erase_center(const int &g_nr)
+bool WFN::erase_center(const int& g_nr)
 {
     centers.erase(centers.begin() + g_nr - 1);
     return true;
 };
 
-const std::string WFN::get_centers(const bool &bohr) const
+const std::string WFN::get_centers(const bool& bohr) const
 {
     std::string temp;
     for (int i = 0; i < ncen; i++)
@@ -217,19 +217,19 @@ const std::string WFN::get_centers(const bool &bohr) const
         temp.append(atoms[i].get_label());
         temp.append(" ");
         if (bohr)
-            temp.append(std::to_string(get_atom_coordinate(i,0)));
+            temp.append(std::to_string(get_atom_coordinate(i, 0)));
         else
-            temp.append(std::to_string(constants::bohr2ang(get_atom_coordinate(i,0))));
+            temp.append(std::to_string(constants::bohr2ang(get_atom_coordinate(i, 0))));
         temp.append(" ");
         if (bohr)
-            temp.append(std::to_string(get_atom_coordinate(i,1)));
+            temp.append(std::to_string(get_atom_coordinate(i, 1)));
         else
-            temp.append(std::to_string(constants::bohr2ang(get_atom_coordinate(i,1))));
+            temp.append(std::to_string(constants::bohr2ang(get_atom_coordinate(i, 1))));
         temp.append(" ");
         if (bohr)
-            temp.append(std::to_string(get_atom_coordinate(i,2)));
+            temp.append(std::to_string(get_atom_coordinate(i, 2)));
         else
-            temp.append(std::to_string(constants::bohr2ang(get_atom_coordinate(i,2))));
+            temp.append(std::to_string(constants::bohr2ang(get_atom_coordinate(i, 2))));
         temp.append("\n");
     }
     return temp;
@@ -240,12 +240,12 @@ const void WFN::list_centers() const
     for (int i = 0; i < ncen; i++)
     {
         std::cout << atoms[i].get_nr() << " " << atoms[i].get_label() << " "
-             << get_atom_coordinate(i,0) << " " << get_atom_coordinate(i,1) << " "
-             << get_atom_coordinate(i,2) << " " << get_atom_charge(i) << std::endl;
+            << get_atom_coordinate(i, 0) << " " << get_atom_coordinate(i, 1) << " "
+            << get_atom_coordinate(i, 2) << " " << get_atom_charge(i) << std::endl;
     }
 };
 
-const MO &WFN::get_MO(const int &n) const
+const MO& WFN::get_MO(const int& n) const
 {
     if (n < nmo)
         return MOs[n];
@@ -255,7 +255,7 @@ const MO &WFN::get_MO(const int &n) const
         return MOs[0];
     }
 }
-const int WFN::get_MO_op_count(const int &op) const
+const int WFN::get_MO_op_count(const int& op) const
 {
     int count = 0;
 #pragma omp parallel for reduction(+ : count)
@@ -265,33 +265,33 @@ const int WFN::get_MO_op_count(const int &op) const
     return count;
 };
 
-void WFN::delete_MO(const int &nr)
+void WFN::delete_MO(const int& nr)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs.erase(MOs.begin() + nr);
     nmo--;
 };
 
-bool WFN::push_back_type(const int &type)
+bool WFN::push_back_type(const int& type)
 {
     types.push_back(type);
     return true;
 };
 
-bool WFN::erase_type(const int &nr)
+bool WFN::erase_type(const int& nr)
 {
     err_checkf(nr >= 1, "Wrong type to erase!", std::cout);
     types.erase(types.begin() + nr - 1);
     return true;
 };
 
-bool WFN::push_back_exponent(const double &e)
+bool WFN::push_back_exponent(const double& e)
 {
     exponents.push_back(e);
     return true;
 };
 
-bool WFN::erase_exponent(const int &nr)
+bool WFN::erase_exponent(const int& nr)
 {
     if (nr < 1)
         return false;
@@ -299,7 +299,7 @@ bool WFN::erase_exponent(const int &nr)
     return true;
 };
 
-bool WFN::remove_primitive(const int &nr)
+bool WFN::remove_primitive(const int& nr)
 {
     nex--;
     if (erase_center(nr) && erase_exponent(nr) && erase_type(nr))
@@ -312,7 +312,7 @@ bool WFN::remove_primitive(const int &nr)
         return false;
 };
 
-bool WFN::add_primitive(const int &cent, const int &type, const double &e, double *values)
+bool WFN::add_primitive(const int& cent, const int& type, const double& e, double* values)
 {
     nex++;
     if (push_back_center(cent) && push_back_type(type) && push_back_exponent(e))
@@ -323,7 +323,7 @@ bool WFN::add_primitive(const int &cent, const int &type, const double &e, doubl
     return true;
 };
 
-void WFN::change_type(const int &nr)
+void WFN::change_type(const int& nr)
 {
     err_checkf(nr < nex, "Wrong input", std::cout);
     bool end = false;
@@ -343,7 +343,7 @@ void WFN::change_type(const int &nr)
     }
 };
 
-void WFN::change_exponent(const int &nr)
+void WFN::change_exponent(const int& nr)
 {
     err_checkf(nr < nex, "Wrong input", std::cout);
     bool end = false;
@@ -363,7 +363,7 @@ void WFN::change_exponent(const int &nr)
     }
 };
 
-void WFN::change_center(const int &nr)
+void WFN::change_center(const int& nr)
 {
     bool end = false;
     while (!end)
@@ -382,7 +382,7 @@ void WFN::change_center(const int &nr)
     }
 };
 
-bool WFN::set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value)
+bool WFN::set_MO_coef(const int& nr_mo, const int& nr_primitive, const double& value)
 {
     err_checkf(nr_mo <= MOs.size(), "MO doesn't exist!", std::cout);
     return MOs[nr_mo].set_coefficient(nr_primitive, value);
@@ -396,7 +396,7 @@ const void WFN::list_primitives() const
     }
 };
 
-bool WFN::remove_center(const int &nr)
+bool WFN::remove_center(const int& nr)
 {
     erase_center(nr);
     try
@@ -414,7 +414,7 @@ bool WFN::remove_center(const int &nr)
     return true;
 }
 
-bool WFN::add_exp(const int &cent, const int &type, const double &e)
+bool WFN::add_exp(const int& cent, const int& type, const double& e)
 {
     nex++;
     if (!push_back_center(cent) || !push_back_type(type) || !push_back_exponent(e))
@@ -423,31 +423,31 @@ bool WFN::add_exp(const int &cent, const int &type, const double &e)
         return true;
 };
 
-const double& WFN::get_MO_coef(const int &nr_mo, const int &nr_primitive) const
+const double& WFN::get_MO_coef(const int& nr_mo, const int& nr_primitive) const
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_coefficient(nr_primitive);
 };
 
-const double& WFN::get_MO_coef_f(const int &nr_mo, const int &nr_primitive) const
+const double& WFN::get_MO_coef_f(const int& nr_mo, const int& nr_primitive) const
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_coefficient_f(nr_primitive);
 };
 
-const double* WFN::get_MO_coef_ptr(const int &nr_mo)
+const double* WFN::get_MO_coef_ptr(const int& nr_mo)
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_coefficient_ptr();
 };
 
-const int WFN::get_MO_primitive_count(const int &nr_mo) const
+const int WFN::get_MO_primitive_count(const int& nr_mo) const
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_primitive_count();
 };
 
-const std::string WFN::hdr(const bool &occupied) const
+const std::string WFN::hdr(const bool& occupied) const
 {
     std::string temp = "GAUSSIAN            ";
     if (!occupied)
@@ -519,7 +519,7 @@ const std::string WFN::hdr(const bool &occupied) const
     return temp;
 };
 
-void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, std::ostream &file, const bool debug)
+void WFN::read_known_wavefunction_format(const std::filesystem::path& fileName, std::ostream& file, const bool debug)
 {
     if (fileName.extension() == ".wfn")
         err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
@@ -537,17 +537,17 @@ void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, 
         err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
     else if (fileName.extension() == ".xtb")
         err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
-	else if (fileName.extension() == ".stda")
+    else if (fileName.extension() == ".stda")
         err_checkf(read_ptb(fileName, file, debug), "Problem reading ptb file", file);
-	else if (fileName.extension() == ".orbital_energies,restricted" || fileName.extension() == ".MO_energies,r"
+    else if (fileName.extension() == ".orbital_energies,restricted" || fileName.extension() == ".MO_energies,r"
         || fileName.extension() == ".molecular_orbitals,restricted" || fileName.extension() == ".MOs,r"
         || fileName.string().find("stdout") != std::string::npos)
-		err_checkf(read_tonto(fileName, file, debug), "Problem reading tonto file", file);
+        err_checkf(read_tonto(fileName, file, debug), "Problem reading tonto file", file);
     else
         err_checkf(false, "Unknown filetype!", file);
 };
 
-bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
+bool WFN::read_wfn(const std::filesystem::path& fileName, const bool& debug, std::ostream& file)
 {
     using namespace std;
     if (ncen > 0)
@@ -559,6 +559,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         return false;
     }
     origin = e_origin::wfn;
+    d_f_switch = true;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName);
     if (rf.good())
@@ -635,7 +636,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
                 dum_center[exnum] = stoi(tempchar);
                 if (dum_center[exnum] > e_nuc)
                 {
-                   std::cout << "this center doesn't exist.. some weird problem!\n";
+                    std::cout << "this center doesn't exist.. some weird problem!\n";
                     return false;
                 }
                 exnum++;
@@ -839,7 +840,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     while (!(line.compare(0, 3, "END") == 0) && !rf.eof())
     {
         if (monum == e_nmo)
-        {            
+        {
             file << "monum went higher than expected values in MO reading, thats suspicius, lets stop here...\n";
             break;
         }
@@ -867,7 +868,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         {
             last_ener = -DBL_MAX;
             oper++;
-			is_unrestricted = true;
+            is_unrestricted = true;
         }
         push_back_MO(temp_nr, temp_occ, temp_ener, oper);
         //---------------------------Start reading MO coefficients-----------------------
@@ -938,7 +939,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     return true;
 };
 
-bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, const bool debug)
+bool WFN::read_xyz(const std::filesystem::path& filename, std::ostream& file, const bool debug)
 {
     using namespace std;
     err_checkf(filesystem::exists(filename), "Couldn't open or find " + filename.string() + ", leaving", file);
@@ -985,11 +986,11 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
         if (debug)
         {
             file << "label:" << dum_label[i]
-                 << " nr: " << dum_nr[i]
-                 << " x: " << dum_x[i]
-                 << " y: " << dum_y[i]
-                 << " z: " << dum_z[i]
-                 << " charge: " << dum_ch[i] << endl;
+                << " nr: " << dum_nr[i]
+                << " x: " << dum_x[i]
+                << " y: " << dum_y[i]
+                << " z: " << dum_z[i]
+                << " charge: " << dum_ch[i] << endl;
         }
     }
     isBohr = true;
@@ -1002,9 +1003,10 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
     return true;
 };
 
-bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
+bool WFN::read_wfx(const std::filesystem::path& fileName, const bool& debug, std::ostream& file)
 {
     origin = e_origin::wfx;
+    d_f_switch = true;
     using namespace std;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName.c_str());
@@ -1057,7 +1059,7 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
         getline(rf, line);
     vec2 pos;
     pos.resize(3);
-    double temp[3]{0, 0, 0};
+    double temp[3]{ 0, 0, 0 };
     while (true)
     {
         getline(rf, line);
@@ -1315,7 +1317,7 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
 
   //  DM = dot(coeff_mo, coeff_small, (int)MOs_mat.size(), (int)n_occ, (int)MOs_mat.size(), (int)n_occ, false, true);
 
-    
+
 
     while (line.find("<Energy =") == string::npos)
         getline(rf, line);
@@ -1333,24 +1335,24 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
 const double WFN::get_maximum_MO_coefficient(bool occu) const {
     double max_coef = 0.0;
     for (int i = 0; i < nmo; i++) {
-        if (occu && MOs[i].get_occ() == 0.0) 
+        if (occu && MOs[i].get_occ() == 0.0)
             continue;
-        for(int j=0; j<nex; j++){
+        for (int j = 0; j < nex; j++) {
             if (std::abs(MOs[i].get_coefficients()[j]) > max_coef) {
-                max_coef  = std::abs(MOs[i].get_coefficients()[j]);
+                max_coef = std::abs(MOs[i].get_coefficients()[j]);
             }
         }
     }
     return max_coef;
 };
 
-bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file, const bool debug)
+bool WFN::read_molden(const std::filesystem::path& filename, std::ostream& file, const bool debug)
 {
     using namespace std;
     err_checkf(std::filesystem::exists(filename), "couldn't open or find " + filename.string() + ", leaving", file);
     if (debug)
         file << "File is valid, continuing...\n"
-             << GetCurrentDir << endl;
+        << GetCurrentDir << endl;
     origin = e_origin::molden;
     ifstream rf(filename.c_str());
     if (rf.good())
@@ -1380,18 +1382,18 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         remove_empty_elements(temp);
         if (au_bohr)
             err_checkf(push_back_atom(temp[0],
-                                      constants::ang2bohr(stod(temp[3])),
-                                      constants::ang2bohr(stod(temp[4])),
-                                      constants::ang2bohr(stod(temp[5])),
-                                      stoi(temp[2])),
-                       "Error pushing back atom", file);
+                constants::ang2bohr(stod(temp[3])),
+                constants::ang2bohr(stod(temp[4])),
+                constants::ang2bohr(stod(temp[5])),
+                stoi(temp[2])),
+                "Error pushing back atom", file);
         else
             err_checkf(push_back_atom(temp[0],
-                                      stod(temp[3]),
-                                      stod(temp[4]),
-                                      stod(temp[5]),
-                                      stoi(temp[2])),
-                       "Error pushing back atom", file);
+                stod(temp[3]),
+                stod(temp[4]),
+                stod(temp[5]),
+                stoi(temp[2])),
+                "Error pushing back atom", file);
         getline(rf, line);
     }
     err_checkf(line.find("[STO]") == string::npos, "ERROR: STOs are not yet suupported!", file);
@@ -1537,7 +1539,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 spin = false;
             else {
                 spin = true;
-				is_unrestricted = true;
+                is_unrestricted = true;
             }
             getline(rf, line);
             temp = split_string<string>(line, " ");
@@ -1766,6 +1768,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     }
     else if (!d5 && !f7 && !g9)
     {
+        d_f_switch = true;
         int run = 0;
         string sym;
         bool spin; // alpha = false, beta = true
@@ -2048,7 +2051,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     {
         err_not_impl_f("PLEASE DONT MIX CARTESIAN AND SPERHICAL HARMINICS; THAT IS ANNOYING!", std::cout);
     }
-    //Make the matrix symmetric
+    //Make the matrix square for later use
     while (coefficients[0].size() < coefficients[0][0].size()) {
         coefficients[0].push_back(vec(coefficients[0][0].size(), 0.0));
         occ.push_back(0);
@@ -2070,11 +2073,12 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, const bool debug, const std::filesystem::path& energies_filename, const std::filesystem::path& orbitals_filename)
 {
     using namespace std;
+    d_f_switch = true;
     err_checkf(std::filesystem::exists(filename), "couldn't open or find " + filename.string() + ", leaving", file);
     std::filesystem::path energies_file, orbitals_file, stdout_file;
     ifstream rf;
     string line;
-	string scf_kind;
+    string scf_kind;
     bool restricted_search = true;
     if (energies_filename == "" && orbitals_filename == "") {
         if (filename.string().find("stdout") != std::string::npos) {
@@ -2094,8 +2098,8 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
             scf_kind = split_string<string>(line, " ")[3];
             if (scf_kind == "rhf" || scf_kind == "rks" || scf_kind == "xray_rhf" || scf_kind == "xray_rks")
                 restricted_search = true;
-			else //there could be other kinds like ghf, but at the moment let me expect either uhf/uks or rhf/rks
-				restricted_search = false;
+            else //there could be other kinds like ghf, but at the moment let me expect either uhf/uks or rhf/rks
+                restricted_search = false;
 
             method = scf_kind;
 
@@ -2104,7 +2108,7 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
                 energies_file = filename.parent_path() / (jobname + ".MO_energies,r");
             if (!std::filesystem::exists(energies_file)) {
                 energies_file = filename.parent_path() / (jobname + ".orbital_energies,alpha");
-				restricted_search = false;
+                restricted_search = false;
             }
             if (!std::filesystem::exists(energies_file)) {
                 energies_file = filename.parent_path() / (jobname + ".MO_energies,a");
@@ -2166,14 +2170,14 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
     else {
         energies_file = energies_filename;
         orbitals_file = orbitals_filename;
-        if(energies_file.string().find("alpha") != string::npos || energies_file.string().find(",a") != string::npos)
-			restricted_search = false;
+        if (energies_file.string().find("alpha") != string::npos || energies_file.string().find(",a") != string::npos)
+            restricted_search = false;
         stdout_file = filename;
         err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
         err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
         err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
         rf.open(stdout_file.string().c_str(), ios::in);
-	}
+    }
 
     const bool restricted = restricted_search;
 
@@ -2226,14 +2230,14 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
             orbitals_file = std::filesystem::path(std::move(s));;
             restricted_search = false;
         }
-		rf_e.open(energies_file.string().c_str(), ios::binary);
-		rf_o.open(orbitals_file.string().c_str(), ios::binary);
+        rf_e.open(energies_file.string().c_str(), ios::binary);
+        rf_o.open(orbitals_file.string().c_str(), ios::binary);
         err_checkf(rf_e.good(), "couldn't open " + energies_file.string() + ", leaving", file);
         err_checkf(rf_o.good(), "couldn't open " + orbitals_file.string() + ", leaving", file);
         read_block_from_fortran_binary(rf_e, energies_beta);
         read_block_from_fortran_binary(rf_o, orbitals_beta);
-		is_unrestricted = true;
-	}
+        is_unrestricted = true;
+    }
 
     rf_e.close();
     rf_o.close();
@@ -2287,7 +2291,7 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
             x = constants::ang2bohr(stod(line_digest[3]));
             y = constants::ang2bohr(stod(line_digest[4]));
             z = constants::ang2bohr(stod(line_digest[5]));
-            
+
         }
         else if (line_digest.size() == 7) {
             x = constants::ang2bohr(stod(line_digest[4]));
@@ -2468,11 +2472,11 @@ __________________________________
     }
     err_checkf(expected_coefs == no_bf, "Expected number of basis functions (" + to_string(expected_coefs) + ") does not match number in file (" + to_string(no_bf) + ")!", file);
 
-	const unsigned int nr_operators = restricted ? 1 : 2;
+    const unsigned int nr_operators = restricted ? 1 : 2;
 
     for (int op = 0; op < nr_operators; op++) {
-        if(debug)
-			file << "Reading " << (op == 0 ? "alpha/restricted" : "beta") << " orbitals..." << std::endl;
+        if (debug)
+            file << "Reading " << (op == 0 ? "alpha/restricted" : "beta") << " orbitals..." << std::endl;
 
         dMatrix2 coefficients;
         vec occ(expected_coefs, 0.0);
@@ -2487,7 +2491,7 @@ __________________________________
                 if (restricted) {
                     if (MO_run < alpha_els && multi == 1) { //RHF all paired
                         push_back_MO(MO_run, 2.0, energies[MO_run], 0);
-						occ[MO_run] = 2.0;
+                        occ[MO_run] = 2.0;
                     }
                     else if (multi != 1 && MO_run < beta_els) { // RHF only 2 until beta electrons
                         push_back_MO(MO_run, 2.0, energies[MO_run], 0);
@@ -2515,8 +2519,8 @@ __________________________________
                     push_back_MO(expected_coefs + MO_run, 1.0, energies_beta[MO_run], 1);
                     occ[MO_run] = 1.0;
                 }
-                else 
-					push_back_MO(expected_coefs + MO_run, 0.0, energies_beta[MO_run], 1);
+                else
+                    push_back_MO(expected_coefs + MO_run, 0.0, energies_beta[MO_run], 1);
             }
             int p_run = 0;
             vec2 p_temp(3);
@@ -2568,13 +2572,9 @@ __________________________________
                     {
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            double temp_coef = 0;
                             for (int cart = 0; cart < 3; cart++)
                             {
-                                temp_coef = p_temp[cart][s];
-                                if (abs(temp_coef) < 1E-10)
-                                    temp_coef = 0;
-                                op == 0 ? push_back_MO_coef(MO_run, temp_coef) : push_back_MO_coef(MO_run + expected_coefs, temp_coef);
+                                op == 0 ? push_back_MO_coef(MO_run, p_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, p_temp[cart][s]);
                                 if (MO_run == 0 && op == 0)
                                 {
                                     push_back_exponent(prims[basis_run + s].get_exp());
@@ -2607,10 +2607,9 @@ __________________________________
                     {
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            for (int _i = 0; _i < 6; _i++)
-                                op == 0 ? push_back_MO_coef(MO_run, d_temp[_i][s]) : push_back_MO_coef(MO_run + expected_coefs, d_temp[_i][s]);
                             for (int cart = 0; cart < 6; cart++)
                             {
+                                op == 0 ? push_back_MO_coef(MO_run, d_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, d_temp[cart][s]);
                                 if (MO_run == 0 && op == 0)
                                 {
                                     push_back_exponent(prims[basis_run + s].get_exp());
@@ -2706,13 +2705,13 @@ __________________________________
             err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
         }
         dMatrix2 temp_co = diag_dot(coefficients, occ, true);
-        if(op == 0)
+        if (op == 0)
             DM = dot(temp_co, coefficients);
         else {
-			dMatrix2 DM_beta = dot(temp_co, coefficients);
-            for(int i=0; i<expected_coefs; i++)
-                for(int j=0; j<expected_coefs; j++)
-					DM(i, j) += DM_beta(i, j);
+            dMatrix2 DM_beta = dot(temp_co, coefficients);
+            for (int i = 0; i < expected_coefs; i++)
+                for (int j = 0; j < expected_coefs; j++)
+                    DM(i, j) += DM_beta(i, j);
         }
     }
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
@@ -2755,14 +2754,14 @@ void move_columns(T& matrix, int dimension, int from_col, int num_cols, int to_c
 }
 
 
-bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, const bool debug, const bool _has_ECPs)
+bool WFN::read_gbw(const std::filesystem::path& filename, std::ostream& file, const bool debug, const bool _has_ECPs)
 {
     using namespace std;
     // Details form https://orcaforum.kofo.mpg.de/viewtopic.php?f=8&t=3299&start=20
     err_checkf(std::filesystem::exists(filename), "couldn't open or find " + filename.string() + ", leaving", file);
     if (debug)
         file << "File is valid, continuing...\n"
-             << GetCurrentDir << endl;
+        << GetCurrentDir << endl;
     origin = e_origin::gbw;
     ifstream rf(filename.c_str(), ios::binary);
     if (rf.good())
@@ -2771,15 +2770,15 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     int geo_start_bit = 8;
     int basis_start_bit = 16;
     int MO_start_bit = 24;
-    int soi = constants::soi; 
+    int soi = constants::soi;
     int geo_int_lim = 5;
 
     try
     {
         rf.seekg(0, ios::beg);
         int64_t magic = 0;
-        rf.read((char *)&magic, sizeof(magic));
-        if (magic == -1){
+        rf.read((char*)&magic, sizeof(magic));
+        if (magic == -1) {
             geo_start_bit += 24;
             basis_start_bit += 24;
             MO_start_bit += 24;
@@ -2789,81 +2788,81 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         // Reading geometry
         rf.seekg(geo_start_bit, ios::beg);
         int64_t geo_start = 0;
-        rf.read((char *)&geo_start, sizeof(geo_start));
+        rf.read((char*)&geo_start, sizeof(geo_start));
         err_checkf(geo_start != 0, "Could not read geometry information location from GBW file!", file);
         if (debug)
             file << "I read the pointer of geometry successfully" << endl;
         rf.seekg(geo_start, ios::beg);
         int at = 0;
-        rf.read((char *)&at, constants::soi);
-        double geo_vals[6]{0, 0, 0, 0, 0, 0}; // x,y,z, ch, exp_fin_nuc, mass
-        int geo_ints[5]{0, 0, 0, 0, 0};
+        rf.read((char*)&at, constants::soi);
+        double geo_vals[6]{ 0, 0, 0, 0, 0, 0 }; // x,y,z, ch, exp_fin_nuc, mass
+        int geo_ints[5]{ 0, 0, 0, 0, 0 };
         for (int a = 0; a < at; a++)
         {
             for (int i = 0; i < 6; i++)
             {
-                rf.read((char *)&(geo_vals[i]), constants::sod);
+                rf.read((char*)&(geo_vals[i]), constants::sod);
                 err_checkf(rf.good(), "Error reading geo_val", file);
             }
             for (int i = 0; i < geo_int_lim; i++)
             {
-                rf.read((char *)&(geo_ints[i]), soi);
+                rf.read((char*)&(geo_ints[i]), soi);
                 err_checkf(rf.good(), "Error reading geo_int", file);
             }
             string temp = constants::atnr2letter(geo_ints[0]);
             err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
             err_checkf(push_back_atom(temp,
-                                      geo_vals[0],
-                                      geo_vals[1],
-                                      geo_vals[2],
-                                      geo_ints[0]),
-                       "Error pushing back atom", file);
+                geo_vals[0],
+                geo_vals[1],
+                geo_vals[2],
+                geo_ints[0]),
+                "Error pushing back atom", file);
         }
         if (debug)
             file << "I read the geometry of " << at << " atoms successfully" << endl;
 
         rf.seekg(basis_start_bit, ios::beg);
         int64_t basis_start = 0;
-        rf.read((char *)&basis_start, constants::soli);
+        rf.read((char*)&basis_start, constants::soli);
         err_checkf(basis_start != 0, "Could not read beasis information location from GBW file!", file);
         if (debug)
             file << "I read the pointer of basis set successfully" << endl;
         rf.seekg(basis_start, ios::beg);
         int atoms2 = 0, temp = 0;
-        rf.read((char *)&temp, constants::soi);
-        rf.read((char *)&atoms2, constants::soi);
+        rf.read((char*)&temp, constants::soi);
+        rf.read((char*)&atoms2, constants::soi);
         // long unsigned int atoms_with_basis = 0;
         vec exp(37, 0);
         vec con(37, 0);
         for (int a = 0; a < atoms2; a++)
         {
             int atom_based = 0, nr_shells = 0;
-            rf.read((char *)&atom_based, constants::soi);
+            rf.read((char*)&atom_based, constants::soi);
             err_checkf(rf.good(), "Error reading atom_based", file);
-            rf.read((char *)&nr_shells, constants::soi);
+            rf.read((char*)&nr_shells, constants::soi);
             err_checkf(rf.good(), "Error reading nr_shells", file);
             int shell = 0;
             for (int p = 0; p < nr_shells; p++)
             {
                 int ang_mom = 0, coeff_ind = 0, nr_funct = 0, center = 0;
-                rf.read((char *)&ang_mom, constants::soi);
+                rf.read((char*)&ang_mom, constants::soi);
                 err_checkf(rf.good(), "Error reading ang_mom", file);
                 if (ang_mom >= 5)
                     err_not_impl_f("Higher angular momentum basis functions than G", file);
-                rf.read((char *)&coeff_ind, constants::soi);
+                rf.read((char*)&coeff_ind, constants::soi);
                 err_checkf(rf.good(), "Error reading ceof_ind", file);
-                rf.read((char *)&nr_funct, constants::soi);
+                rf.read((char*)&nr_funct, constants::soi);
                 err_checkf(rf.good(), "Error reading nr_func", file);
-                rf.read((char *)&center, constants::soi);
+                rf.read((char*)&center, constants::soi);
                 err_checkf(rf.good(), "Error reading center", file);
                 for (int b = 0; b < 37; b++)
                 {
-                    rf.read((char *)&(exp[b]), constants::sod);
+                    rf.read((char*)&(exp[b]), constants::sod);
                     err_checkf(rf.good(), "Error reading exp", file);
                 }
                 for (int b = 0; b < 37; b++)
                 {
-                    rf.read((char *)&(con[b]), constants::sod);
+                    rf.read((char*)&(con[b]), constants::sod);
                     err_checkf(rf.good(), "Error reading con", file);
                     if (exp[b] != 0 && con[b] != 0)
                     {
@@ -2934,16 +2933,16 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
         rf.seekg(MO_start_bit, ios::beg);
         int64_t MOs_start = 0;
-        rf.read((char *)&MOs_start, constants::soli);
+        rf.read((char*)&MOs_start, constants::soli);
         err_checkf(rf.good(), "Error reading MO_start", file);
         err_checkf(MOs_start != 0, "Could not read MO information location from GBW file!", file);
         if (debug)
             file << "I read the pointer of MOs successfully" << endl;
         rf.seekg(MOs_start, ios::beg);
         int operators = 0, dimension = 0;
-        rf.read((char *)&operators, constants::soi);
+        rf.read((char*)&operators, constants::soi);
         err_checkf(rf.good(), "Error reading operators", file);
-        rf.read((char *)&dimension, soi);
+        rf.read((char*)&dimension, soi);
         err_checkf(rf.good(), "Error reading dimnesion", file);
         size_t coef_nr = size_t(dimension) * size_t(dimension);
         vec2 coefficients(operators);
@@ -2952,7 +2951,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         ivec2 irreps(operators);
         ivec2 cores(operators);
         if (operators > 1)
-			is_unrestricted = true;
+            is_unrestricted = true;
         for (int i = 0; i < operators; i++)
         {
             coefficients[i].resize(coef_nr, 0);
@@ -2962,23 +2961,23 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             cores[i].resize(dimension, 0);
             if (debug)
                 file << "operators: " << operators << " coef_nr: " << coef_nr << " dimension: " << dimension << endl;
-            rf.read((char *)coefficients[i].data(), constants::sod * coef_nr);
+            rf.read((char*)coefficients[i].data(), constants::sod * coef_nr);
             err_checkf(rf.good(), "Error reading coefficients", file);
             if (debug)
                 file << "I read the coefficients successfully" << endl;
-            rf.read((char *)occupations[i].data(), constants::sod * dimension);
+            rf.read((char*)occupations[i].data(), constants::sod * dimension);
             err_checkf(rf.good(), "Error reading occupations", file);
             if (debug)
                 file << "I read the occupations successfully" << endl;
-            rf.read((char *)energies[i].data(), constants::sod * dimension);
+            rf.read((char*)energies[i].data(), constants::sod * dimension);
             err_checkf(rf.good(), "Error reading energies", file);
             if (debug)
                 file << "I read the energies successfully" << endl;
-            rf.read((char *)irreps[i].data(), constants::soi * dimension);
+            rf.read((char*)irreps[i].data(), constants::soi * dimension);
             err_checkf(rf.good(), "Error reading irreps", file);
             if (debug)
                 file << "I read the irreps successfully" << endl;
-            rf.read((char *)cores[i].data(), constants::soi * dimension);
+            rf.read((char*)cores[i].data(), constants::soi * dimension);
             err_checkf(rf.good(), "Error reading cores", file);
             if (debug)
             {
@@ -3213,7 +3212,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         }
 
 
-        dMatrix2 reorderd_coefs_s1(dimension,dimension), reorderd_coefs_s2;
+        dMatrix2 reorderd_coefs_s1(dimension, dimension), reorderd_coefs_s2;
         if (operators == 2) reorderd_coefs_s2 = dMatrix2(dimension, dimension);
 
         dMatrixRef2 coefs_2D_s1_span(coefficients[0].data(), dimension, dimension);
@@ -3235,7 +3234,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                         auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m_idx, Kokkos::full_extent);
                         reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + offset, Kokkos::full_extent);
                         std::copy(coefs_2D_s2_slice.data_handle(), coefs_2D_s2_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
-                    } 
+                    }
                 }
                 index += 2 * type + 1;
             }
@@ -3273,12 +3272,12 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
 
         int n_occ = 0;
-        for (int i = 0; i < occupations[0].size(); i++) {if (occupations[0][i] > 0.0) n_occ++;}
-        
+        for (int i = 0; i < occupations[0].size(); i++) { if (occupations[0][i] > 0.0) n_occ++; }
+
         dMatrix2 coeff_mo_s1(dimension, dimension), coeff_small_s1(dimension, dimension);
         dMatrix2 coeff_mo_s2, coeff_small_s2;
         if (operators == 2)  coeff_mo_s2 = dMatrix2(dimension, dimension); coeff_small_s2 = dMatrix2(dimension, dimension);
-        
+
         for (int i = 0; i < dimension; i++) {
             for (int oc = 0; oc < occupations[0].size(); oc++) {
                 if (occupations[0][oc] <= 0.0) continue;
@@ -3296,7 +3295,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         else {
             dMatrix2 DM_s1 = dot(coeff_mo_s1, coeff_small_s1, false, true);
             dMatrix2 DM_s2 = dot(coeff_mo_s2, coeff_small_s2, false, true);
-            
+
             std::transform(DM_s1.container().begin(), DM_s1.container().end(), DM_s2.data(), DM_s1.data(), std::plus<double>());
 
             DM = DM_s1;
@@ -3314,7 +3313,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             // Reading ECPs?
             rf.seekg(32, ios::beg);
             long int ECP_start = 0;
-            rf.read((char *)&ECP_start, sizeof(ECP_start));
+            rf.read((char*)&ECP_start, sizeof(ECP_start));
             err_checkf(rf.good(), "Error reading center in ECPs", file);
             err_checkf(ECP_start != 0, "Could not read ECP information location from GBW file!", file);
             if (debug)
@@ -3324,12 +3323,12 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             int i2 = 0;
             const int soi = 4;
             const int sod = 8;
-            rf.read((char *)&i1, 8);
+            rf.read((char*)&i1, 8);
             err_checkf(rf.good(), "Error reading center in ECPs", file);
             file << "First line: " << i1 << endl;
             for (int i = 0; i < i1; i++)
             {
-                rf.read((char *)&i2, 1);
+                rf.read((char*)&i2, 1);
                 int Z = 0;
                 int nr_core = 0;
                 int temp_0 = 0;
@@ -3341,35 +3340,35 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 int type = 0;
                 double e = 0;
                 double c = 0;
-                rf.read((char *)&Z, soi);
+                rf.read((char*)&Z, soi);
                 err_checkf(Z > 0, "Error reading Z in ECPs", file);
                 err_checkf(rf.good(), "Error reading Z in ECPs", file);
-                rf.read((char *)&temp_0, soi);
+                rf.read((char*)&temp_0, soi);
                 err_checkf(temp_0 > 0, "Error reading temp_0 in ECPs", file);
                 err_checkf(rf.good(), "Error reading temp_0 in ECPs", file);
-                char *temp_c = new char[temp_0];
+                char* temp_c = new char[temp_0];
                 rf.read(temp_c, temp_0);
                 err_checkf(rf.good(), "Error reading temp_c in ECPs", file);
-                rf.read((char *)&nr_core, soi);
+                rf.read((char*)&nr_core, soi);
                 err_checkf(nr_core >= 0, "Error reading nr_core in ECPs", file);
                 err_checkf(rf.good(), "Error reading nr_core in ECPs", file);
                 atoms[i].set_ECP_electrons(nr_core);
-                rf.read((char *)&max_contract, soi);
+                rf.read((char*)&max_contract, soi);
                 err_checkf(max_contract > 0, "Error reading max_contract in ECPs", file);
                 err_checkf(rf.good(), "Error reading max_contract in ECPs", file);
-                rf.read((char *)&max_angular, soi);
+                rf.read((char*)&max_angular, soi);
                 err_checkf(max_angular > 0, "Error reading max_angular in ECPs", file);
                 err_checkf(rf.good(), "Error reading max_angular in ECPs", file);
-                rf.read((char *)&center, soi);
+                rf.read((char*)&center, soi);
                 err_checkf(center > 0, "Error reading center in ECPs", file);
                 err_checkf(rf.good(), "Error reading center in ECPs", file);
                 file << "I read " << Z << " " << temp_0 << " " << nr_core << " " << max_contract << " " << max_angular << endl;
                 for (int l = 0; l < max_angular; l++)
                 {
-                    rf.read((char *)&exps, soi);
+                    rf.read((char*)&exps, soi);
                     err_checkf(exps > 0, "Error reading exps in ECPs", file);
                     err_checkf(rf.good(), "Error reading center in ECPs", file);
-                    rf.read((char *)&type, soi);
+                    rf.read((char*)&type, soi);
                     err_checkf(type >= 0, "Error reading type in ECPs", file);
                     err_checkf(rf.good(), "Error reading center in ECPs", file);
                     err_checkf(type < 200, "This type will give me a headache...", file);
@@ -3378,13 +3377,13 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                     for (int fun = 0; fun < exps; fun++)
                     {
 
-                        rf.read((char *)&n, sod);
+                        rf.read((char*)&n, sod);
                         err_checkf(n < 200, "This Exponent will give me a headache...", file);
                         err_checkf(rf.good(), "Error reading center in ECPs", file);
-                        rf.read((char *)&c, sod);
+                        rf.read((char*)&c, sod);
                         err_checkf(c < 200, "This Coefficient will give me a headache...", file);
                         err_checkf(rf.good(), "Error reading center in ECPs", file);
-                        rf.read((char *)&e, sod);
+                        rf.read((char*)&e, sod);
                         err_checkf(e < 200, "This Exponent will give me a headache...", file);
                         err_checkf(rf.good(), "Error reading center in ECPs", file);
                         file << fun << " " << c << " " << e << " " << n << endl;
@@ -3401,7 +3400,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             }
         }
     }
-    catch (const exception &e)
+    catch (const exception& e)
     {
         err_checkf(false, "Error during reading of the gbw file! " + string(e.what()), file);
     }
@@ -3409,7 +3408,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     return true;
 };
 
-const vec WFN::get_norm_const(std::ostream &file, bool debug) const
+const vec WFN::get_norm_const(std::ostream& file, bool debug) const
 {
     err_checkf(get_nr_basis_set_loaded() != 0, "No basis set loaded!", file);
     err_checkf(get_nr_basis_set_loaded() == get_ncen(), "Not all atoms have a basis set loaded!", file);
@@ -3468,9 +3467,9 @@ const vec WFN::get_norm_const(std::ostream &file, bool debug) const
             if (debug)
             {
                 std::cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << std::endl
-                 << "start: " << get_shell_start(a, s) << std::flush
-                 << " stop: " << get_shell_end(a, s) << std::flush << std::endl
-                 << "factor: ";
+                    << "start: " << get_shell_start(a, s) << std::flush
+                    << " stop: " << get_shell_end(a, s) << std::flush << std::endl
+                    << "factor: ";
             }
             switch (type_temp)
             {
@@ -3495,7 +3494,7 @@ const vec WFN::get_norm_const(std::ostream &file, bool debug) const
                     if (debug)
                     {
                         std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << std::endl
-                         << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
+                            << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
                     }
                     basis_coefficients[a][i] *= factor;
                     norm_const.push_back(basis_coefficients[a][i]);
@@ -3523,7 +3522,7 @@ const vec WFN::get_norm_const(std::ostream &file, bool debug) const
                     if (debug)
                     {
                         std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << std::endl
-                         << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
+                            << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
                     }
                     basis_coefficients[a][i] *= factor;
                     for (int k = 0; k < 3; k++)
@@ -3552,7 +3551,7 @@ const vec WFN::get_norm_const(std::ostream &file, bool debug) const
                     if (debug)
                     {
                         std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << std::endl
-                         << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
+                            << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
                     }
                     basis_coefficients[a][i] *= factor;
                     for (int k = 0; k < 3; k++)
@@ -3583,7 +3582,7 @@ const vec WFN::get_norm_const(std::ostream &file, bool debug) const
                     if (debug)
                     {
                         std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << std::endl
-                         << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
+                            << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
                     }
                     basis_coefficients[a][i] *= factor;
                     for (int l = 0; l < 3; l++)
@@ -3601,26 +3600,32 @@ const vec WFN::get_norm_const(std::ostream &file, bool debug) const
     return norm_const;
 }
 
-const double WFN::get_atom_coordinate(const unsigned int &nr, const unsigned int &axis) const
+const double WFN::get_atom_coordinate(const unsigned int& nr, const unsigned int& axis) const
 {
     err_checkf(!((int)nr >= ncen || axis > 2), "This input is invalid for get_atom_coordinate!", std::cout);
     return atoms[nr].get_coordinate(axis);
 };
 
-bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, const bool occupied) const
+const d3 WFN::get_atom_pos(const unsigned int& nr) const
+{
+    err_checkf(!(nr >= ncen), "This input is invalid for get_atom_coordinate!", std::cout);
+    return atoms[nr].get_pos();
+};
+
+bool WFN::write_wfn(const std::filesystem::path& fileName, const bool& debug, const bool occupied) const
 {
     using namespace std;
     if (debug)
     {
         if (std::filesystem::exists(fileName))
         {
-           std::cout << "File already existed!";
+            std::cout << "File already existed!";
             return false;
         }
         else
         {
             if (debug)
-               std::cout << "File didn't exist before, writing comment to it now." << endl;
+                std::cout << "File didn't exist before, writing comment to it now." << endl;
         }
     }
 
@@ -3628,18 +3633,18 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     string line;
     if (!rf.is_open())
     {
-       std::cout << "Sorry, can't open the file...\n";
+        std::cout << "Sorry, can't open the file...\n";
         return false;
     }
     rf << comment << endl;
     if (debug)
-       std::cout << "comment written, now for the header..\n";
+        std::cout << "comment written, now for the header..\n";
     rf << hdr(occupied);
     if (debug)
     {
-       std::cout << "header written, now for the centers..\n";
-       std::cout << "this is the header: \n"
-             << hdr(occupied);
+        std::cout << "header written, now for the centers..\n";
+        std::cout << "this is the header: \n"
+            << hdr(occupied);
     }
     rf.flush();
     for (int i = 0; i < ncen; i++)
@@ -3650,18 +3655,18 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << ' ';
         rf << i + 1 << ") ";
         rf << fixed << showpoint << setprecision(8);
-        rf << setw(12) << get_atom_coordinate(i,0);
-        rf << setw(12) << get_atom_coordinate(i,1);
-        rf << setw(12) << get_atom_coordinate(i,2);
+        rf << setw(12) << get_atom_coordinate(i, 0);
+        rf << setw(12) << get_atom_coordinate(i, 1);
+        rf << setw(12) << get_atom_coordinate(i, 2);
         rf << "  CHARGE = ";
         rf << fixed << showpoint << setprecision(1) << setw(2) << get_atom_charge(i);
         rf << ".0";
         rf << '\n';
     }
     if (debug)
-       std::cout << "centers written, now for the center_assignement..\n";
+        std::cout << "centers written, now for the center_assignement..\n";
     if (debug)
-       std::cout << "ncen: " << ncen << " nex: " << nex << " nmo: " << nmo << endl;
+        std::cout << "ncen: " << ncen << " nex: " << nex << " nmo: " << nmo << endl;
     int run = 0;
     int exnum = 0;
     for (int i = 0; i < nex / 20; i++)
@@ -3672,9 +3677,9 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << setw(3) << centers[exnum];
             if (exnum > nex)
             {
-               std::cout << "run is too big in center writing";
+                std::cout << "run is too big in center writing";
                 if (debug)
-                   std::cout << "in 20er-lines...\n";
+                    std::cout << "in 20er-lines...\n";
                 return false;
             }
             exnum++;
@@ -3683,7 +3688,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         rf << '\n';
     }
     if (debug)
-       std::cout << "this should be the last line... \n";
+        std::cout << "this should be the last line... \n";
     if (exnum < nex)
     {
         rf << "CENTRE ASSIGNMENTS  ";
@@ -3692,9 +3697,9 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << setw(3) << centers[exnum];
             if (exnum > nex)
             {
-               std::cout << "run is too big in center writing";
+                std::cout << "run is too big in center writing";
                 if (debug)
-                   std::cout << " in last line... trying to access # " << exnum << "\n";
+                    std::cout << " in last line... trying to access # " << exnum << "\n";
                 return false;
             }
             exnum++;
@@ -3703,11 +3708,11 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     }
     if (run * 20 < nex / 20 - 1)
     {
-       std::cout << "Problem during writing of Centre assignments... stopping...\n";
+        std::cout << "Problem during writing of Centre assignments... stopping...\n";
         return false;
     }
     if (debug)
-       std::cout << "center assignements written, now for the types..\n";
+        std::cout << "center assignements written, now for the types..\n";
     run = 0;
     exnum = 0;
     for (int i = 0; i < nex / 20; i++)
@@ -3718,7 +3723,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << setw(3) << types[exnum];
             if (exnum > nex)
             {
-               std::cout << "run is too big in types writing\n";
+                std::cout << "run is too big in types writing\n";
                 return false;
             }
             exnum++;
@@ -3735,23 +3740,23 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << setw(3) << types[exnum];
             if (exnum > nex)
             {
-               std::cout << "run is too big in types writing";
+                std::cout << "run is too big in types writing";
                 return false;
             }
             final_j = j;
             exnum++;
         }
         if (debug)
-           std::cout << "final_j: " << final_j << endl;
+            std::cout << "final_j: " << final_j << endl;
         rf << '\n';
     }
     if (run * 20 < nex / 20 - 1)
     {
-       std::cout << "Problem during writing of Type assignments... stopping...";
+        std::cout << "Problem during writing of Type assignments... stopping...";
         return false;
     }
     if (debug)
-       std::cout << "types assignements written, now for the exponents..\n";
+        std::cout << "types assignements written, now for the exponents..\n";
     run = 0;
     exnum = 0;
     for (int i = 0; i < nex / 5; i++)
@@ -3766,7 +3771,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << temp;
             if (exnum > nex)
             {
-               std::cout << "run is too big in exponents writing";
+                std::cout << "run is too big in exponents writing";
                 return false;
             }
             exnum++;
@@ -3786,7 +3791,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << temp;
             if (run > nex)
             {
-               std::cout << "run is too big in exponents writing";
+                std::cout << "run is too big in exponents writing";
                 return false;
             }
             exnum++;
@@ -3795,13 +3800,13 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     }
     if (run * 5 < nex / 5 - 1)
     {
-       std::cout << "Problem during writing of Exponents... stopping...";
+        std::cout << "Problem during writing of Exponents... stopping...";
         return false;
     }
     if (debug)
-       std::cout << "exponents assignements written, now for the MOs.." << endl
-             << "For informational purposes: ncen "
-             << ncen << " nmo " << nmo << " nex " << nex << endl;
+        std::cout << "exponents assignements written, now for the MOs.." << endl
+        << "For informational purposes: ncen "
+        << ncen << " nmo " << nmo << " nex " << nex << endl;
     int mo_run = 1;
     for (int mo_counter = 0; mo_counter < nmo; mo_counter++)
     {
@@ -3809,7 +3814,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             continue;
         // rf << MOs[mo_counter].hdr();
         rf << "MO" << setw(3) << mo_run << setw(29) << "OCC NO =" << setw(13) << fixed << setprecision(8) << MOs[mo_counter].get_occ()
-           << setw(14) << "ORB. ENERGY =" << setw(13) << fixed << setprecision(8) << MOs[mo_counter].get_energy() << endl;
+            << setw(14) << "ORB. ENERGY =" << setw(13) << fixed << setprecision(8) << MOs[mo_counter].get_energy() << endl;
         run = 0;
         for (int i = 0; i < nex / 5; i++)
         {
@@ -3822,7 +3827,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
                 rf << temp;
                 if (run > nex)
                 {
-                   std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
+                    std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
                     return false;
                 }
                 run++;
@@ -3832,7 +3837,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         if (run < nex)
         {
             if (debug)
-               std::cout << "Still some left to write... going in % for loop...." << endl;
+                std::cout << "Still some left to write... going in % for loop...." << endl;
             for (int j = 0; j < nex % 5; j++)
             {
                 stringstream stream;
@@ -3842,7 +3847,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
                 rf << temp;
                 if (run > nex)
                 {
-                   std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
+                    std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
                     return false;
                 }
                 run++;
@@ -3853,9 +3858,9 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     }
     if (run != nex)
     {
-       std::cout << "Problem during writing of MOs... stopping...";
+        std::cout << "Problem during writing of MOs... stopping...";
         if (debug)
-           std::cout << "run: " << run << endl;
+            std::cout << "run: " << run << endl;
         return false;
     }
     rf << "END DATA" << endl;
@@ -3868,7 +3873,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
 {
     //We want to write a .47 file that looks like this according to the NBO manual:
     /*
- $GENNBO NATOMS=7 NBAS=28 UPPER BODM FORMAT=PRECISE $END 
+ $GENNBO NATOMS=7 NBAS=28 UPPER BODM FORMAT=PRECISE $END
  $NBO $END
  $COORD
  Methylamine in 3-21G basis set
@@ -3883,55 +3888,55 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
  $BASIS
     CENTER = 1 1 1 1 1 1 1 1 1 2 2 2 2
              2 2 2 2 2 3 3 4 4 5 5 6 6
-             7 7 
-    LABEL = 1 1 101 102 103 1 101 102 103 1 1 101 102 
-            103 1 101 102 103 1 1 1 1 1 1 1 1 
-            1 1 
- $END 
+             7 7
+    LABEL = 1 1 101 102 103 1 101 102 103 1 1 101 102
+            103 1 101 102 103 1 1 1 1 1 1 1 1
+            1 1
+ $END
  $CONTRACT
-  NSHELL = 16 
-    NEXP = 27 
-   NCOMP = 1 4 4 1 4 4 1 1 1 1 1 1 1 
-           1 1 1 
-   NPRIM = 3 2 1 3 2 1 2 1 2 1 2 1 2 
-           1 2 1 
-    NPTR = 1 4 6 7 10 12 13 15 16 18 19 21 22 24 25 27 
-    EXP = 0.172256000000E+03 0.259109000000E+02 0.553335000000E+01 
-          0.366498000000E+01 0.770545000000E+00 0.195857000000E+00 
-          0.242766000000E+03 0.364851000000E+02 0.781449000000E+01 
-          0.542522000000E+01 0.114915000000E+01 0.283205000000E+00 
-          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00 
-          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00 
-          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00 
-          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00 
-          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00 
-     CS = 0.617669074000E-01 0.358794043000E+00 0.700713084000E+00 
-         -0.395895162000E+00 0.121583436000E+01 0.100000000000E+01 
-          0.598657005000E-01 0.352955003000E+00 0.706513006000E+00 
-         -0.413300077000E+00 0.122441727000E+01 0.100000000000E+01 
-          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01 
-          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01 
-          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01 
-          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01 
-          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01 
-     CP = 0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
-          0.236459947000E+00 0.860618806000E+00 0.100000000000E+01 
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
-          0.237972016000E+00 0.858953059000E+00 0.100000000000E+01 
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
- $END 
- $OVERLAP 
-          0.100000000000E+01 0.191447444408E+00 0.100000000000E+01 
- $END 
- $DENSITY 
-          0.203642496554E+01 0.110916720865E+00 0.103889621321E+00 
- $END 
- $LCAOMO 
-         -0.581395484288E-03 -0.241638924924E-02 -0.179639931958E-02 
+  NSHELL = 16
+    NEXP = 27
+   NCOMP = 1 4 4 1 4 4 1 1 1 1 1 1 1
+           1 1 1
+   NPRIM = 3 2 1 3 2 1 2 1 2 1 2 1 2
+           1 2 1
+    NPTR = 1 4 6 7 10 12 13 15 16 18 19 21 22 24 25 27
+    EXP = 0.172256000000E+03 0.259109000000E+02 0.553335000000E+01
+          0.366498000000E+01 0.770545000000E+00 0.195857000000E+00
+          0.242766000000E+03 0.364851000000E+02 0.781449000000E+01
+          0.542522000000E+01 0.114915000000E+01 0.283205000000E+00
+          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00
+          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00
+          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00
+          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00
+          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00
+     CS = 0.617669074000E-01 0.358794043000E+00 0.700713084000E+00
+         -0.395895162000E+00 0.121583436000E+01 0.100000000000E+01
+          0.598657005000E-01 0.352955003000E+00 0.706513006000E+00
+         -0.413300077000E+00 0.122441727000E+01 0.100000000000E+01
+          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01
+          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01
+          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01
+          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01
+          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01
+     CP = 0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
+          0.236459947000E+00 0.860618806000E+00 0.100000000000E+01
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
+          0.237972016000E+00 0.858953059000E+00 0.100000000000E+01
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
+ $END
+ $OVERLAP
+          0.100000000000E+01 0.191447444408E+00 0.100000000000E+01
+ $END
+ $DENSITY
+          0.203642496554E+01 0.110916720865E+00 0.103889621321E+00
+ $END
+ $LCAOMO
+         -0.581395484288E-03 -0.241638924924E-02 -0.179639931958E-02
  $END
     */
     using namespace std;
@@ -4107,7 +4112,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 std::cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << endl;
         }
     }
-	unsigned int run = 0;
+    unsigned int run = 0;
     vec2 changed_coefs;
     changed_coefs.resize(get_nmo());
 #pragma omp parallel for
@@ -4125,7 +4130,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
     for (int m = 0; m < get_nmo(); m++)
     {
         int run_2 = 0;
-        if (MOs[m].get_op() != 0) 
+        if (MOs[m].get_op() != 0)
             continue;
         for (int a = 0; a < get_ncen(); a++)
         {
@@ -4148,14 +4153,14 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                         std::cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                     break;
                 case 3:
-					nao += 6;
+                    nao += 6;
                     for (int i = 0; i < 6; i++)
                         CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
                     if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
                         std::cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                     break;
                 case 4:
-					nao += 10;
+                    nao += 10;
                     // this hardcoded piece is due to the order of f-type functions in the fchk
                     for (int i = 0; i < 10; i++)
                         CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
@@ -4252,44 +4257,44 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 }
                 else if (MOs[m].get_op() == 1)
                 {
-                    CDM[iuv] += occ * CMO_beta[iu + ((m%nao) * nao)] * CMO_beta[iv + ((m % nao) * nao)];
+                    CDM[iuv] += occ * CMO_beta[iu + ((m % nao) * nao)] * CMO_beta[iv + ((m % nao) * nao)];
                 }
             }
         }
     }
 
     vec OVLP_matrix = {};
-	Int_Params int_params(*this);
+    Int_Params int_params(*this);
 
     compute2C<Overlap2C_CRT>(int_params, OVLP_matrix);
 	//We have the overlap matrix, now write it to file
 
     ofstream rf(fileName, ios::out);
     string line;
-	stringstream stream;
+    stringstream stream;
     if (!rf.is_open())
     {
         std::cout << "Sorry, can't open the file...\n";
         return false;
-    }    
+    }
 
-	rf << " $GENNBO NATOMS=" << ncen << " NBAS=" << nex << " UPPER BODM FORMAT=PRECISE $END" << endl;
-	rf << " $NBO NBO NRT $END" << endl;
-	rf << " $COORD" << endl;
-	rf << " .47 file generated by NoSpherA2 based on " << path << endl;
-	for (int i = 0; i < ncen; i++)
+    rf << " $GENNBO NATOMS=" << ncen << " NBAS=" << nex << " UPPER BODM FORMAT=PRECISE $END" << endl;
+    rf << " $NBO NBO NRT $END" << endl;
+    rf << " $COORD" << endl;
+    rf << " .47 file generated by NoSpherA2 based on " << path << endl;
+    for (int i = 0; i < ncen; i++)
         //To-do: Fix second charge mention for ECPs depending on the mode of the wfn / maybe by file type?!
-		rf << " " << setw(2) << get_atom_charge(i) << " " << setw(2) << get_atom_charge(i) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 0) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 1) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 2) << endl;
-	rf << " $END" << endl;
-	rf << " $BASIS" << endl;
-	rf << "    CENTER = ";
+        rf << " " << setw(2) << get_atom_charge(i) << " " << setw(2) << get_atom_charge(i) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 0) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 1) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 2) << endl;
+    rf << " $END" << endl;
+    rf << " $BASIS" << endl;
+    rf << "    CENTER = ";
     for (int i = 0; i < nex; i++) {
-		rf << centers.at(i) << " ";
-        if (i%13 == 0 && i!= 0)
-			rf << "\n             ";
+        rf << centers.at(i) << " ";
+        if (i % 13 == 0 && i != 0)
+            rf << "\n             ";
     }
     rf.flush();
-	rf << "\n    LABEL = ";
+    rf << "\n    LABEL = ";
 
     int highest_angular = -1;
     for (int i = 0; i < nex; i++) {
@@ -4298,10 +4303,10 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
             rf << "\n             ";
     }
     rf.flush();
-	rf << "\n $END" << endl;
+    rf << "\n $END" << endl;
 
     string comp_string = "";
-	string exp_string = "";
+    string exp_string = "";
     string nprim_string = "";
     string nptr_string = "";
     svec cx_string(5);
@@ -4355,7 +4360,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 cx_string[4] += "0.100000000000E+01 ";
                 highest_angular = std::max(highest_angular, 4);
             }
-			stream << setw(18) << scientific << setprecision(11) << exponents.at(i);
+            stream << setw(18) << scientific << setprecision(11) << exponents.at(i);
             exp_string += stream.str();
             stream.str("");
             nprim_string += "  1 ";
@@ -4374,43 +4379,43 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
             }
         }
     }
-	rf << " $CONTRACT" << endl;
-	rf << "  NSHELL = " << nshell << endl;
-	rf << "    NEXP = " << nshell << endl;
+    rf << " $CONTRACT" << endl;
+    rf << "  NSHELL = " << nshell << endl;
+    rf << "    NEXP = " << nshell << endl;
     rf << "   NCOMP =  " << comp_string << endl;
-	rf << "   NPRIM =  " << nprim_string << endl;
+    rf << "   NPRIM =  " << nprim_string << endl;
     rf << "    NPTR = " << nptr_string << endl;
-	rf << "     EXP =" << exp_string << endl;
-	if (highest_angular >= 0) rf << "      CS = " << cx_string[0] << endl;
-	if (highest_angular >= 1) rf << "      CP = " << cx_string[1] << endl;
-	if (highest_angular >= 2) rf << "      CD = " << cx_string[2] << endl;
-	if (highest_angular >= 3) rf << "      CF = " << cx_string[3] << endl;
-	if (highest_angular >= 4) rf << "      CG = " << cx_string[4] << endl;
-	rf << " $END" << endl;
-	rf << " $OVERLAP " << endl;
-	dMatrixRef2 OVLP_mat(OVLP_matrix.data(), nao, nao);
-	int runner = 0;
+    rf << "     EXP =" << exp_string << endl;
+    if (highest_angular >= 0) rf << "      CS = " << cx_string[0] << endl;
+    if (highest_angular >= 1) rf << "      CP = " << cx_string[1] << endl;
+    if (highest_angular >= 2) rf << "      CD = " << cx_string[2] << endl;
+    if (highest_angular >= 3) rf << "      CF = " << cx_string[3] << endl;
+    if (highest_angular >= 4) rf << "      CG = " << cx_string[4] << endl;
+    rf << " $END" << endl;
+    rf << " $OVERLAP " << endl;
+    dMatrixRef2 OVLP_mat(OVLP_matrix.data(), nao, nao);
+    int runner = 0;
     for (int i = 0; i < nao; i++) {
         for (int j = i; j < nao; j++) {
-			runner++;
+            runner++;
             stream.str("");
             stream << uppercase << scientific << showpoint << setprecision(12) << setw(19) << OVLP_mat(i, j);
             rf << stream.str() << " ";
             if (runner % 3 == 0)
-				rf << "\n";
+                rf << "\n";
         }
     }
-	rf << " $END" << endl;
-	rf << " $DENSITY " << endl;
+    rf << " $END" << endl;
+    rf << " $DENSITY " << endl;
     for (int i = 0; i < naotr; i++) {
         stream.str("");
         stream << uppercase << scientific << showpoint << setprecision(12) << setw(19) << CDM[i];
         rf << stream.str() << " ";
-        if ((i+1) % 3 == 0)
+        if ((i + 1) % 3 == 0)
             rf << "\n";
     }
-	rf << " $END" << endl;
-	rf << " $LCAOMO " << endl;
+    rf << " $END" << endl;
+    rf << " $LCAOMO " << endl;
     for (int mo_counter = 0; mo_counter < nao; mo_counter++)
     {
         if (debug)
@@ -4422,8 +4427,8 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
             if ((i + 1) % 3 == 0)
                 rf << "\n";
         }
-	}
-	rf << " $END" << endl;
+    }
+    rf << " $END" << endl;
     rf.close();
     return true;
 };
@@ -4437,30 +4442,31 @@ bool WFN::write_xyz(const std::filesystem::path& fileName)
         f << "XYZ File written by NoSpherA2 based on " << path << endl;
         for (int i = 0; i < ncen; i++)
             if (atoms[i].get_label() == "")
-                f << constants::atnr2letter(get_atom_charge(i)) << setw(14) << setprecision(8) << get_atom_coordinate(i,0) << setw(14) << setprecision(8) << get_atom_coordinate(i,1) << setw(14) << setprecision(8) << get_atom_coordinate(i,2) << endl;
-            else{
+                f << constants::atnr2letter(get_atom_charge(i)) << setw(14) << setprecision(8) << get_atom_coordinate(i, 0) << setw(14) << setprecision(8) << get_atom_coordinate(i, 1) << setw(14) << setprecision(8) << get_atom_coordinate(i, 2) << endl;
+            else {
                 if (isBohr) {
-                    f << atoms[i].get_label() << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i,0)) << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i,1)) << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i,2)) << endl;
-                }else
+                    f << atoms[i].get_label() << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i, 0)) << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i, 1)) << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i, 2)) << endl;
+                }
+                else
                 {
-                    f << atoms[i].get_label() << setw(14) << setprecision(8) << get_atom_coordinate(i,0) << setw(14) << setprecision(8) << get_atom_coordinate(i,1) << setw(14) << setprecision(8) << get_atom_coordinate(i,2) << endl;
+                    f << atoms[i].get_label() << setw(14) << setprecision(8) << get_atom_coordinate(i, 0) << setw(14) << setprecision(8) << get_atom_coordinate(i, 1) << setw(14) << setprecision(8) << get_atom_coordinate(i, 2) << endl;
                 }
             }
         f.flush();
         f.close();
     }
     catch (exception) {
-        err("Error writing the xyz file! Aborting!",std::cout);
+        err("Error writing the xyz file! Aborting!", std::cout);
         return false;
     }
     return true;
 };
 
-void WFN::print_primitive(const int &nr) const
+void WFN::print_primitive(const int& nr) const
 {
     std::cout << "center assignement: " << centers[nr] << " type: " << types[nr]
-         << " exponent: " << exponents[nr] << std::endl
-         << "MO coefficients:";
+        << " exponent: " << exponents[nr] << std::endl
+        << "MO coefficients:";
     for (int i = 0; i < nmo; i++)
     {
         std::cout << MOs[nr].get_coefficient(i) << "   ";
@@ -4469,7 +4475,7 @@ void WFN::print_primitive(const int &nr) const
     }
 };
 
-const int WFN::get_nmo(const bool &only_occ) const
+const int WFN::get_nmo(const bool& only_occ) const
 {
     if (!only_occ)
         return nmo;
@@ -4505,7 +4511,7 @@ const unsigned int WFN::get_nr_ECP_electrons() const
     return count;
 }
 
-double WFN::count_nr_electrons(void) const 
+double WFN::count_nr_electrons(void) const
 {
     double count = 0;
     for (int i = 0; i < nmo; i++)
@@ -4513,7 +4519,7 @@ double WFN::count_nr_electrons(void) const
     return count;
 };
 
-const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim) const
+const double WFN::get_atom_basis_set_exponent(const int& nr_atom, const int& nr_prim) const
 {
     if (nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
         return atoms[nr_atom].get_basis_set_exponent(nr_prim);
@@ -4521,7 +4527,7 @@ const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_
         return -1;
 };
 
-const double WFN::get_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim) const
+const double WFN::get_atom_basis_set_coefficient(const int& nr_atom, const int& nr_prim) const
 {
     if (nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
         return atoms[nr_atom].get_basis_set_coefficient(nr_prim);
@@ -4529,7 +4535,7 @@ const double WFN::get_atom_basis_set_coefficient(const int &nr_atom, const int &
         return -1;
 };
 
-bool WFN::change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim, const double &value)
+bool WFN::change_atom_basis_set_exponent(const int& nr_atom, const int& nr_prim, const double& value)
 {
     if (nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
     {
@@ -4541,7 +4547,7 @@ bool WFN::change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim,
         return false;
 };
 
-bool WFN::change_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim, const double &value)
+bool WFN::change_atom_basis_set_coefficient(const int& nr_atom, const int& nr_prim, const double& value)
 {
     err_checkf(nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0, "Wrong input!", std::cout);
     atoms[nr_atom].set_basis_set_coefficient(nr_prim, value);
@@ -4549,7 +4555,7 @@ bool WFN::change_atom_basis_set_coefficient(const int &nr_atom, const int &nr_pr
     return true;
 };
 
-const int WFN::get_atom_primitive_count(const int &nr) const
+const int WFN::get_atom_primitive_count(const int& nr) const
 {
     if (nr <= ncen && nr >= 0)
         return (int)atoms[nr].get_basis_set_size();
@@ -4557,7 +4563,7 @@ const int WFN::get_atom_primitive_count(const int &nr) const
         return -1;
 };
 
-const int WFN::get_basis_set_shell(const unsigned int &nr_atom, const unsigned int &nr_prim) const
+const int WFN::get_basis_set_shell(const unsigned int& nr_atom, const unsigned int& nr_prim) const
 {
     if ((int)nr_atom <= ncen && atoms[nr_atom].get_basis_set_size() >= (int)nr_prim)
     {
@@ -4575,7 +4581,7 @@ const int WFN::get_atom_primitive_type(const int& nr_atom, const int& nr_prim) c
         return -1;
 };
 
-const int WFN::get_atom_shell_count(const unsigned int &nr) const
+const int WFN::get_atom_shell_count(const unsigned int& nr) const
 {
     if ((int)nr <= ncen)
         return (int)atoms[nr].get_shellcount_size();
@@ -4583,7 +4589,7 @@ const int WFN::get_atom_shell_count(const unsigned int &nr) const
         return -1;
 };
 
-const int WFN::get_atom_shell_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell) const
+const int WFN::get_atom_shell_primitives(const unsigned int& nr_atom, const unsigned int& nr_shell) const
 {
     if ((int)nr_atom <= ncen && (int)nr_shell < atoms[nr_atom].get_shellcount_size())
         return atoms[nr_atom].get_shellcount(nr_shell);
@@ -4591,7 +4597,7 @@ const int WFN::get_atom_shell_primitives(const unsigned int &nr_atom, const unsi
         return -1;
 };
 
-const int WFN::get_shell_type(const unsigned int &nr_atom, const unsigned int &nr_shell) const
+const int WFN::get_shell_type(const unsigned int& nr_atom, const unsigned int& nr_shell) const
 {
     if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].get_shellcount_size())
     {
@@ -4604,7 +4610,7 @@ const int WFN::get_shell_type(const unsigned int &nr_atom, const unsigned int &n
         return -1;
 };
 
-const int WFN::get_shell_center(const unsigned int &nr_atom, const unsigned int &nr_shell) const
+const int WFN::get_shell_center(const unsigned int& nr_atom, const unsigned int& nr_shell) const
 {
     if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].get_shellcount_size())
         return centers[get_shell_start_in_primitives(nr_atom, nr_shell)];
@@ -4612,7 +4618,7 @@ const int WFN::get_shell_center(const unsigned int &nr_atom, const unsigned int 
         return -1;
 };
 
-const int WFN::get_shell_start(const unsigned int &nr_atom, const unsigned int &nr_shell) const
+const int WFN::get_shell_start(const unsigned int& nr_atom, const unsigned int& nr_shell) const
 {
     if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].get_shellcount_size() - 1)
     {
@@ -4626,7 +4632,7 @@ const int WFN::get_shell_start(const unsigned int &nr_atom, const unsigned int &
         return -1;
 };
 
-const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell) const
+const int WFN::get_shell_start_in_primitives(const unsigned int& nr_atom, const unsigned int& nr_shell) const
 {
     if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].get_shellcount_size() - 1)
     {
@@ -4672,7 +4678,7 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
         return -1;
 };
 
-const int WFN::get_shell_end(const unsigned int &nr_atom, const unsigned int &nr_shell) const
+const int WFN::get_shell_end(const unsigned int& nr_atom, const unsigned int& nr_shell) const
 {
     if (static_cast<int>(nr_atom) <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].get_shellcount_size() && static_cast<int>(nr_atom) >= 0)
     {
@@ -4687,7 +4693,7 @@ const int WFN::get_shell_end(const unsigned int &nr_atom, const unsigned int &nr
         return -1;
 };
 
-const std::string WFN::get_atom_label(const unsigned int &nr) const
+const std::string WFN::get_atom_label(const unsigned int& nr) const
 {
     std::string error_return{ '?' };
     if (nr < static_cast<unsigned int>(ncen))
@@ -4705,7 +4711,7 @@ const int WFN::get_nr_basis_set_loaded() const
     return count;
 };
 
-const bool WFN::get_atom_basis_set_loaded(const int &nr) const
+const bool WFN::get_atom_basis_set_loaded(const int& nr) const
 {
     if (nr <= ncen && nr >= 0)
         return atoms[nr].get_basis_set_loaded();
@@ -4716,7 +4722,7 @@ const bool WFN::get_atom_basis_set_loaded(const int &nr) const
     }
 };
 
-const int WFN::get_atom_charge(const int &nr) const
+const int WFN::get_atom_charge(const int& nr) const
 {
     if (nr <= ncen && nr >= 0)
         return atoms[nr].get_charge();
@@ -4727,17 +4733,17 @@ const int WFN::get_atom_charge(const int &nr) const
     }
 };
 
-void WFN::push_back_DM(const double &value)
+void WFN::push_back_DM(const double& value)
 {
     UT_DensityMatrix.push_back(value);
 };
 
-void WFN::resize_DM(const int &size, const double &value)
+void WFN::resize_DM(const int& size, const double& value)
 {
     UT_DensityMatrix.resize(size, value);
 };
 
-const double WFN::get_DM(const int &nr) const
+const double WFN::get_DM(const int& nr) const
 {
     if (nr >= 0 && nr < UT_DensityMatrix.size())
         return UT_DensityMatrix[nr];
@@ -4748,7 +4754,7 @@ const double WFN::get_DM(const int &nr) const
     }
 };
 
-bool WFN::set_DM(const int &nr, const double &value)
+bool WFN::set_DM(const int& nr, const double& value)
 {
     if (nr >= 0 && nr < UT_DensityMatrix.size())
     {
@@ -4762,17 +4768,17 @@ bool WFN::set_DM(const int &nr, const double &value)
     }
 };
 
-void WFN::push_back_SDM(const double &value)
+void WFN::push_back_SDM(const double& value)
 {
     UT_SpinDensityMatrix.push_back(value);
 };
 
-void WFN::resize_SDM(const int &size, const double &value)
+void WFN::resize_SDM(const int& size, const double& value)
 {
     UT_SpinDensityMatrix.resize(size, value);
 };
 
-const double WFN::get_SDM(const int &nr) const
+const double WFN::get_SDM(const int& nr) const
 {
     if (nr >= 0 && nr < UT_SpinDensityMatrix.size())
         return UT_SpinDensityMatrix[nr];
@@ -4783,7 +4789,7 @@ const double WFN::get_SDM(const int &nr) const
     }
 };
 
-bool WFN::set_SDM(const int &nr, const double &value)
+bool WFN::set_SDM(const int& nr, const double& value)
 {
     if (nr >= 0 && nr < UT_SpinDensityMatrix.size())
     {
@@ -4801,14 +4807,14 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
     using namespace std;
     int elcount = -get_charge();
     if (debug)
-       std::cout << "elcount: " << elcount << std::endl;
+        std::cout << "elcount: " << elcount << std::endl;
     for (int i = 0; i < ncen; i++)
     {
         elcount += get_atom_charge(i);
         elcount -= constants::ECP_electrons_pTB[get_atom_charge(i)];
     }
     if (debug)
-       std::cout << "elcount after: " << elcount << std::endl;
+        std::cout << "elcount after: " << elcount << std::endl;
     int alpha_els = 0, beta_els = 0, temp_els = elcount;
     while (temp_els > 1)
     {
@@ -4816,51 +4822,51 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
         beta_els++;
         temp_els -= 2;
         if (debug)
-           std::cout << temp_els << std::endl;
-        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons! a or b are negative!",std::cout);
-        err_checkf(alpha_els + beta_els <= elcount, "Error setting alpha and beta electrons! Sum a + b > elcount!",std::cout);
-        err_checkf(temp_els > -elcount, "Error setting alpha and beta electrons! Ran below -elcount!",std::cout);
+            std::cout << temp_els << std::endl;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons! a or b are negative!", std::cout);
+        err_checkf(alpha_els + beta_els <= elcount, "Error setting alpha and beta electrons! Sum a + b > elcount!", std::cout);
+        err_checkf(temp_els > -elcount, "Error setting alpha and beta electrons! Ran below -elcount!", std::cout);
     }
     alpha_els += temp_els;
     if (debug)
-       std::cout << "al/be els:" << alpha_els << " " << beta_els << std::endl;
+        std::cout << "al/be els:" << alpha_els << " " << beta_els << std::endl;
     const int mult = get_multi();
     int diff = 0;
     if (mult != 0)
         diff = get_multi() - 1;
     if (debug)
-       std::cout << "diff: " << diff << std::endl;
+        std::cout << "diff: " << diff << std::endl;
     while (alpha_els - beta_els != diff)
     {
         alpha_els++;
         beta_els--;
-        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons!",std::cout);
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons!", std::cout);
     }
     if (debug)
     {
-       std::cout << "alpha, beta, elcount: " << setw(5) << alpha_els << setw(5) << beta_els << setw(5) << elcount << endl;
+        std::cout << "alpha, beta, elcount: " << setw(5) << alpha_els << setw(5) << beta_els << setw(5) << elcount << endl;
     }
     if (get_nr_basis_set_loaded() == 0)
     {
         if (debug)
-           std::cout << "No basis set loaded, will load a complete basis set now!" << endl;
-        err_checkf(read_basis_set_vanilla(basis_set_path, *this, debug), "ERROR during reading of missing basis set!",std::cout);
+            std::cout << "No basis set loaded, will load a complete basis set now!" << endl;
+        err_checkf(read_basis_set_vanilla(basis_set_path, *this, debug), "ERROR during reading of missing basis set!", std::cout);
     }
     else if (get_nr_basis_set_loaded() < get_ncen())
     {
-       std::cout << "Not all atoms have a basis set loaded!\nLaoding the missing atoms..." << flush;
-        err_checkf(read_basis_set_missing(basis_set_path, *this, debug), "ERROR during reading of missing basis set!",std::cout);
+        std::cout << "Not all atoms have a basis set loaded!\nLaoding the missing atoms..." << flush;
+        err_checkf(read_basis_set_missing(basis_set_path, *this, debug), "ERROR during reading of missing basis set!", std::cout);
     }
     else if (get_nr_basis_set_loaded() > get_ncen())
     {
-        err_checkf(false, "# of loaded > # atoms\nSorry, this should not happen... aborting!!!",std::cout);
+        err_checkf(false, "# of loaded > # atoms\nSorry, this should not happen... aborting!!!", std::cout);
     }
     // set_modified();
     vec CMO;
     vec CMO_beta;
     if (debug)
     {
-       std::cout << "Origin: " << get_origin() << endl;
+        std::cout << "Origin: " << get_origin() << endl;
     }
     if (get_origin() == 2 || get_origin() == 4 || get_origin() == 9 || get_origin() == 8)
     {
@@ -4868,20 +4874,20 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
         sort_wfn(check_order(debug), debug);
         //---------------normalize basis set---------------------------------
         if (debug)
-           std::cout << "starting to normalize the basis set" << endl;
+            std::cout << "starting to normalize the basis set" << endl;
         vec norm_const;
         //-----------debug output---------------------------------------------------------
         if (debug)
         {
-           std::cout << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
+            std::cout << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
             print_atom_long(0);
-           std::cout << "ended normalizing the basis set, now for the MO_coeffs" << endl;
-           std::cout << "Status report:" << endl;
-           std::cout << "size of norm_const: " << norm_const.size() << endl;
-           std::cout << "WFN MO counter: " << get_nmo() << endl;
-           std::cout << "Number of atoms: " << get_ncen() << endl;
-           std::cout << "Primitive count of zero MO: " << get_MO_primitive_count(0) << endl;
-           std::cout << "Primitive count of first MO: " << get_MO_primitive_count(1) << endl;
+            std::cout << "ended normalizing the basis set, now for the MO_coeffs" << endl;
+            std::cout << "Status report:" << endl;
+            std::cout << "size of norm_const: " << norm_const.size() << endl;
+            std::cout << "WFN MO counter: " << get_nmo() << endl;
+            std::cout << "Number of atoms: " << get_ncen() << endl;
+            std::cout << "Primitive count of zero MO: " << get_MO_primitive_count(0) << endl;
+            std::cout << "Primitive count of first MO: " << get_MO_primitive_count(1) << endl;
         }
 
         //-------------------normalize the basis set shell wise into a copy vector---------
@@ -4907,12 +4913,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                     temp_c = 32768 * pow(temp_c, 9) / (225 * constants::PI3);
                     break;
                 case -1:
-                   std::cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
+                    std::cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
                     break;
                 }
                 temp_c = pow(temp_c, 0.25) * get_atom_basis_set_coefficient(a, p);
                 if (debug)
-                   std::cout << "temp_c:" << temp_c << std::endl;
+                    std::cout << "temp_c:" << temp_c << std::endl;
                 basis_coefficients[a].push_back(temp_c);
             }
         }
@@ -4923,10 +4929,10 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             for (int s = 0; s < get_atom_shell_count(a); s++)
             {
                 int type_temp = get_shell_type(a, s);
-                err_chkf(type_temp != -1, "ERROR in type assignement!!",std::cout);
+                err_chkf(type_temp != -1, "ERROR in type assignement!!", std::cout);
                 if (debug)
                 {
-                   std::cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
+                    std::cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
                         << "start: " << get_shell_start(a, s)
                         << " stop: " << get_shell_end(a, s) << endl
                         << "factor: ";
@@ -4949,12 +4955,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         return false;
                     factor = pow(factor, -0.5);
                     if (debug)
-                       std::cout << factor << endl;
+                        std::cout << factor << endl;
                     for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                     {
                         if (debug)
                         {
-                           std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                            std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
                                 << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
                         }
                         // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
@@ -4978,12 +4984,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         return false;
                     factor = pow(factor, -0.5);
                     if (debug)
-                       std::cout << factor << endl;
+                        std::cout << factor << endl;
                     for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                     {
                         if (debug)
                         {
-                           std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                            std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
                                 << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
                         }
                         // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
@@ -5008,12 +5014,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         return false;
                     factor = (pow(factor, -0.5)) / sqrt(3);
                     if (debug)
-                       std::cout << factor << endl;
+                        std::cout << factor << endl;
                     for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                     {
                         if (debug)
                         {
-                           std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                            std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
                                 << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
                         }
                         // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
@@ -5040,12 +5046,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         return false;
                     factor = pow(factor, -0.5) / sqrt(15);
                     if (debug)
-                       std::cout << factor << endl;
+                        std::cout << factor << endl;
                     for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                     {
                         if (debug)
                         {
-                           std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                            std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
                                 << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
                         }
                         // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
@@ -5059,21 +5065,21 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                     break;
                 }
                 if (debug)
-                   std::cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << endl;
+                    std::cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << endl;
             }
         }
         //-----------debug output---------------------------------------------------------
         if (debug)
         {
-           std::cout << "exemplary output of the first atom with all it's properties: " << endl;
+            std::cout << "exemplary output of the first atom with all it's properties: " << endl;
             print_atom_long(0);
-           std::cout << "ended normalizing the basis set, now for the norm_cprims" << endl;
-           std::cout << "Status report:" << endl;
-           std::cout << "size of norm_const: " << norm_const.size() << endl;
-           std::cout << "WFN MO counter: " << get_nmo() << endl;
-           std::cout << "Number of atoms: " << get_ncen() << endl;
-           std::cout << "Primitive count of zero MO: " << get_MO_primitive_count(0) << endl;
-           std::cout << "Primitive count of first MO: " << get_MO_primitive_count(1) << endl;
+            std::cout << "ended normalizing the basis set, now for the norm_cprims" << endl;
+            std::cout << "Status report:" << endl;
+            std::cout << "size of norm_const: " << norm_const.size() << endl;
+            std::cout << "WFN MO counter: " << get_nmo() << endl;
+            std::cout << "Number of atoms: " << get_ncen() << endl;
+            std::cout << "Primitive count of zero MO: " << get_MO_primitive_count(0) << endl;
+            std::cout << "Primitive count of first MO: " << get_MO_primitive_count(1) << endl;
         }
         //---------------------To not mix up anything start normalizing WFN_matrix now--------------------------
         int run = 0;
@@ -5081,7 +5087,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
         changed_coefs.resize(get_nmo());
         if (debug)
         {
-           std::cout << "Opening norm_cprim!" << endl;
+            std::cout << "Opening norm_cprim!" << endl;
             ofstream norm_cprim("norm_prim.debug", ofstream::out);
             for (int m = 0; m < get_nmo(); m++)
             {
@@ -5091,7 +5097,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                 {
                     changed_coefs[m][p] = get_MO_coef(m, p) / norm_const[p];
                     if (m == 0)
-                       std::cout << p << ". primitive; " << m << ". MO "
+                        std::cout << p << ". primitive; " << m << ". MO "
                         << "norm nonst: " << norm_const[p]
                         << " temp after normalization: " << changed_coefs[m][p] << "\n";
                     norm_cprim << " " << changed_coefs[m][p] << endl;
@@ -5100,8 +5106,8 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             }
             norm_cprim.flush();
             norm_cprim.close();
-           std::cout << "See norm_cprim.debug for the CPRIM vectors" << endl;
-           std::cout << "Total count in CPRIM: " << run << endl;
+            std::cout << "See norm_cprim.debug for the CPRIM vectors" << endl;
+            std::cout << "Total count in CPRIM: " << run << endl;
         }
         else
         {
@@ -5152,19 +5158,19 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                     case 1:
                         CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s)]);
                         if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                           std::cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
+                            std::cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
                         break;
                     case 2:
                         for (int i = 0; i < 3; i++)
                             CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
                         if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                           std::cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                            std::cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                         break;
                     case 3:
                         for (int i = 0; i < 6; i++)
                             CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
                         if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                           std::cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                            std::cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                         break;
                     case 4:
                         // this hardcoded piece is due to the order of f-type functions in the fchk
@@ -5178,16 +5184,16 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 5]);
                         CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 9]);
                         if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                           std::cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                            std::cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                         break;
                     }
                     run_2++;
                 }
                 if (debug && m == 0)
-                   std::cout << "finished with atom!" << endl;
+                    std::cout << "finished with atom!" << endl;
             }
             if (debug)
-               std::cout << "finished with MO!" << endl;
+                std::cout << "finished with MO!" << endl;
             if (nshell != run_2)
                 nshell = run_2;
         }
@@ -5201,7 +5207,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                     for (int s = 0; s < get_atom_shell_count(a); s++)
                     {
                         if (debug)
-                           std::cout << "Going to load the " << get_shell_start_in_primitives(a, s) << ". value" << endl;
+                            std::cout << "Going to load the " << get_shell_start_in_primitives(a, s) << ". value" << endl;
                         switch (get_shell_type(a, s))
                         {
                         case 1:
@@ -5209,13 +5215,13 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                             if (m == 0)
                                 nao++;
                             if (debug && get_atom_shell_primitives(a, s) != 1)
-                               std::cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
+                                std::cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
                             break;
                         case 2:
                             for (int i = 0; i < 3; i++)
                                 CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
                             if (debug && get_atom_shell_primitives(a, s) != 1)
-                               std::cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                                std::cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                             if (m == 0)
                                 nao += 3;
                             break;
@@ -5223,7 +5229,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                             for (int i = 0; i < 6; i++)
                                 CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
                             if (debug && get_atom_shell_primitives(a, s) != 1)
-                               std::cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                                std::cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                             if (m == 0)
                                 nao += 6;
                             break;
@@ -5239,7 +5245,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                             CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 5]);
                             CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 9]);
                             if (debug && get_atom_shell_primitives(a, s) != 1)
-                               std::cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                                std::cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                             if (m == 0)
                                 nao += 10;
                             break;
@@ -5247,10 +5253,10 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         run_2++;
                     }
                     if (debug)
-                       std::cout << "finished with atom!" << endl;
+                        std::cout << "finished with atom!" << endl;
                 }
                 if (debug)
-                   std::cout << "finished with MO!" << endl;
+                    std::cout << "finished with MO!" << endl;
                 if (nshell != run_2)
                     nshell = run_2;
             }
@@ -5270,10 +5276,10 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             }
             cmo.flush();
             cmo.close();
-           std::cout << CMO.size() << " Elements in CMO" << endl;
-           std::cout << norm_const.size() << " = nprim" << endl;
-           std::cout << nao << " = nao" << endl;
-           std::cout << nshell << " = nshell" << endl;
+            std::cout << CMO.size() << " Elements in CMO" << endl;
+            std::cout << norm_const.size() << " = nprim" << endl;
+            std::cout << nao << " = nao" << endl;
+            std::cout << nshell << " = nshell" << endl;
         }
         //------------------ make the DM -----------------------------
         int naotr = nao * (nao + 1) / 2;
@@ -5283,9 +5289,9 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             resize_SDM(naotr, 0.0);
         if (debug)
         {
-           std::cout << "I made kp!" << endl
+            std::cout << "I made kp!" << endl
                 << nao << " is the maximum for iu" << endl;
-           std::cout << "Making DM now!" << endl;
+            std::cout << "Making DM now!" << endl;
         }
         for (int iu = 0; iu < nao; iu++)
         {
@@ -5321,7 +5327,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         if (get_MO_occ(m) == 0.0)
                             continue;
                         temp = get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
-                        err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM!",std::cout);
+                        err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM!", std::cout);
                     }
                     // else if (debug)std::cout << "DM after: " << get_DM(iuv) << endl;
                 }
@@ -5331,20 +5337,20 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
     }
     else
     {
-       std::cout << "Sorry, this origin is not supported yet!" << endl;
+        std::cout << "Sorry, this origin is not supported yet!" << endl;
         return false;
     }
     return true;
 };
 
-int WFN::check_order(const bool &debug) const
+int WFN::check_order(const bool& debug) const
 {
     for (int i = 0; i < ncen; i++)
     {
         if (!get_atom_basis_set_loaded(i))
         {
             std::cout << "Sorry, consistency check only works if basis set is loaded for all atoms!" << std::endl
-                 << "Failing atom: " << i << " " << get_atom_label(i) << std::endl;
+                << "Failing atom: " << i << " " << get_atom_label(i) << std::endl;
             return -1;
         }
     }
@@ -5505,12 +5511,12 @@ int WFN::check_order(const bool &debug) const
                                 if (debug)
                                 {
                                     std::cout << "The checked types are 6 from #" << primcounter << " and are:" << std::endl
-                                         << types[get_shell_start_in_primitives(a, s) + 0 * get_atom_shell_primitives(a, s) + i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 1 * get_atom_shell_primitives(a, s) + i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 2 * get_atom_shell_primitives(a, s) + i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 3 * get_atom_shell_primitives(a, s) + i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 4 * get_atom_shell_primitives(a, s) + i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 5 * get_atom_shell_primitives(a, s) + i] << std::endl;
+                                        << types[get_shell_start_in_primitives(a, s) + 0 * get_atom_shell_primitives(a, s) + i] << " "
+                                        << types[get_shell_start_in_primitives(a, s) + 1 * get_atom_shell_primitives(a, s) + i] << " "
+                                        << types[get_shell_start_in_primitives(a, s) + 2 * get_atom_shell_primitives(a, s) + i] << " "
+                                        << types[get_shell_start_in_primitives(a, s) + 3 * get_atom_shell_primitives(a, s) + i] << " "
+                                        << types[get_shell_start_in_primitives(a, s) + 4 * get_atom_shell_primitives(a, s) + i] << " "
+                                        << types[get_shell_start_in_primitives(a, s) + 5 * get_atom_shell_primitives(a, s) + i] << std::endl;
                                 }
                                 std::cout << "Something seems to be wrong in the order of your D-Types..." << std::endl;
                             }
@@ -5530,12 +5536,12 @@ int WFN::check_order(const bool &debug) const
                                 if (debug)
                                 {
                                     std::cout << "The checked types are 6 from #" << primcounter << " and are:" << std::endl
-                                         << types[get_shell_start_in_primitives(a, s) + 0 + 6 * i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 1 + 6 * i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 2 + 6 * i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 3 + 6 * i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 4 + 6 * i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 5 + 6 * i] << std::endl;
+                                        << types[get_shell_start_in_primitives(a, s) + 0 + 6 * i] << " "
+                                        << types[get_shell_start_in_primitives(a, s) + 1 + 6 * i] << " "
+                                        << types[get_shell_start_in_primitives(a, s) + 2 + 6 * i] << " "
+                                        << types[get_shell_start_in_primitives(a, s) + 3 + 6 * i] << " "
+                                        << types[get_shell_start_in_primitives(a, s) + 4 + 6 * i] << " "
+                                        << types[get_shell_start_in_primitives(a, s) + 5 + 6 * i] << std::endl;
                                 }
                                 std::cout << "Something seems to be wrong in the order of your D-Types..." << std::endl;
                             }
@@ -5564,11 +5570,11 @@ int WFN::check_order(const bool &debug) const
                             if (debug)
                             {
                                 std::cout << "The checked types are 10 from #" << primcounter << " and are:\n"
-                                     << types[primcounter] << " " << types[primcounter + 1] << " " << types[primcounter + 2] << " "
-                                     << types[primcounter + 3] << " " << types[primcounter + 4] << " " << types[primcounter + 5] << " "
-                                     << types[primcounter + 6] << " " << types[primcounter + 7] << " " << types[primcounter + 8] << " "
-                                     << types[primcounter + 9] << std::endl
-                                     << "Appears to be already okay..." << std::endl;
+                                    << types[primcounter] << " " << types[primcounter + 1] << " " << types[primcounter + 2] << " "
+                                    << types[primcounter + 3] << " " << types[primcounter + 4] << " " << types[primcounter + 5] << " "
+                                    << types[primcounter + 6] << " " << types[primcounter + 7] << " " << types[primcounter + 8] << " "
+                                    << types[primcounter + 9] << std::endl
+                                    << "Appears to be already okay..." << std::endl;
                             }
                             primcounter += 10;
                         }
@@ -5612,7 +5618,7 @@ int WFN::check_order(const bool &debug) const
     return (f_order * 10 + order);
 };
 
-bool WFN::sort_wfn(const int &g_order, const bool &debug)
+bool WFN::sort_wfn(const int& g_order, const bool& debug)
 {
     set_modified();
     int primcounter = 0;
@@ -5856,7 +5862,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                             for (int m = 0; m < nmo; m++)
                                 temp_MO_coefficients[m][j] = MOs[m].get_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + j);
                         }
-                        ivec mask{0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
+                        ivec mask{ 0, 1, 2, 6, 3, 4, 7, 8, 5, 9 };
                         for (int j = 0; j < 10; j++)
                         {
                             centers[get_shell_start_in_primitives(a, s) + 10 * i + j] = temp_center[mask[j]];
@@ -5908,7 +5914,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                             for (int m = 0; m < nmo; m++)
                                 temp_MO_coefficients[m][j] = MOs[m].get_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + j);
                         }
-                        ivec mask{0, 1, 2, 3, 4, 6, 5, 7, 8, 9};
+                        ivec mask{ 0, 1, 2, 3, 4, 6, 5, 7, 8, 9 };
                         for (int j = 0; j < 10; j++)
                         {
                             centers[get_shell_start_in_primitives(a, s) + 10 * i + j] = temp_center[mask[j]];
@@ -5943,7 +5949,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
     return true;
 };
 
-void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &ECP_mode)
+void WFN::set_has_ECPs(const bool& in, const bool& apply_to_atoms, const int& ECP_mode)
 {
     has_ECPs = in;
     ECP_m = ECP_mode;
@@ -5982,7 +5988,7 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
     }
 };
 
-void WFN::set_ECPs(ivec &nr, ivec &elcount)
+void WFN::set_ECPs(ivec& nr, ivec& elcount)
 {
     has_ECPs = true;
     err_chkf(nr.size() == elcount.size(), "mismatch in size of atoms and ECP electrons!", std::cout);
@@ -6002,7 +6008,7 @@ void WFN::set_ECPs(ivec &nr, ivec &elcount)
     }
 };
 
-void WFN::operator=(const WFN &right)
+void WFN::operator=(const WFN& right)
 {
     isBohr = right.isBohr;
     ncen = right.get_ncen();
@@ -6069,7 +6075,7 @@ int WFN::calculate_charge()
     return atomic_charges - (int)mo_charges;
 };
 
-int WFN::calculate_charge(std::ostream &file)
+int WFN::calculate_charge(std::ostream& file)
 {
     int atomic_charges = 0;
     double mo_charges = 0;
@@ -6090,7 +6096,7 @@ int WFN::calculate_charge(std::ostream &file)
     return atomic_charges - (int)mo_charges;
 };
 
-bool WFN::guess_multiplicity(std::ostream &file)
+bool WFN::guess_multiplicity(std::ostream& file)
 {
     if (get_nr_electrons() % 2 == 0)
     {
@@ -6110,7 +6116,7 @@ bool WFN::guess_multiplicity(std::ostream &file)
     return true;
 };
 
-bool WFN::push_back_cube(const std::string &filepath, const bool &full, const bool &expert)
+bool WFN::push_back_cube(const std::string& filepath, const bool& full, const bool& expert)
 {
     cub.emplace_back(filepath, full, *this, std::cout, expert);
     return true;
@@ -6121,7 +6127,7 @@ void WFN::pop_back_cube()
     cub.pop_back();
 }
 
-const unsigned int WFN::get_atom_integer_mass(const unsigned int &atomnr) const
+const unsigned int WFN::get_atom_integer_mass(const unsigned int& atomnr) const
 {
     if (get_atom_charge(atomnr) > 86)
     {
@@ -6136,7 +6142,7 @@ const unsigned int WFN::get_atom_integer_mass(const unsigned int &atomnr) const
     return constants::integer_masses[get_atom_charge(atomnr) - 1];
 };
 
-const double WFN::get_atom_real_mass(const int &atomnr) const
+const double WFN::get_atom_real_mass(const int& atomnr) const
 {
     if (get_atom_charge(atomnr) > 86)
     {
@@ -6151,12 +6157,12 @@ const double WFN::get_atom_real_mass(const int &atomnr) const
     return constants::real_masses[get_atom_charge(atomnr) - 1];
 }
 
-const double& WFN::get_MO_occ(const int &nr) const
+const double& WFN::get_MO_occ(const int& nr) const
 {
     return MOs[nr].get_occ();
 };
 
-const int& WFN::get_MO_op(const int &nr) const
+const int& WFN::get_MO_op(const int& nr) const
 {
     return MOs[nr].get_op();
 };
@@ -6179,13 +6185,13 @@ void WFN::delete_Qs() {
             atoms.erase(atoms.begin() + i);
             ncen--;
             for (int j = 0; j < centers.size(); j++)
-                if (centers[j] >= i) 
+                if (centers[j] >= i)
                     centers[j]--;
         }
     }
 }
 
-bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, const bool debug)
+bool WFN::read_fchk(const std::filesystem::path& filename, std::ostream& log, const bool debug)
 {
     int r_u_ro_switch = 0;
     std::ifstream fchk(filename, std::ios::in);
@@ -6276,7 +6282,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
             is_spherical = true;
     if (debug)
         log << "This fchk contains spherical harmonics, which will be transformed into cartesian functions!" << std::endl
-            << "Loading basis set information..." << std::endl;
+        << "Loading basis set information..." << std::endl;
     ivec nr_prims_shell;
     if (!read_fchk_integer_block(fchk, "Number of primitives per shell", nr_prims_shell))
     {
@@ -6343,7 +6349,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     }
     else
     { // Unrestricted
-		is_unrestricted = true;
+        is_unrestricted = true;
         if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", MOene[0]))
         {
             log << "Error during reading of Alpha Energies" << std::endl;
@@ -6396,94 +6402,94 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     int exp_run = 0;
     for (int a = 0; a < shell_types.size(); a++)
     {
-         double confac = 1.0;
-         if (abs(shell_types[a]) == 0)
-         {
-             for (int i = 0; i < nr_prims_shell[a]; i++)
-             {
-                 confac = pow(8 * pow(exp[exp_run], 3) / constants::PI3, 0.25);
-                 con_coefs.push_back(con[exp_run] * confac);
-                 push_back_exponent(exp[exp_run]);
-                 push_back_center(shell2atom[a]);
-                 push_back_type(abs(shell_types[a])+1);
-                 exp_run++;
-             }
-         }
-         else if (abs(shell_types[a]) == 1)
-         {
-             for (int cart = 0; cart < 3; cart++) {
-                 for (int i = 0; i < nr_prims_shell[a]; i++)
-                 {
-                     confac = pow(128 * pow(exp[exp_run + i], 5) / constants::PI3, 0.25);
-                     con_coefs.push_back(con[exp_run + i] * confac);
-                     push_back_exponent(exp[exp_run + i]);
-                     push_back_center(shell2atom[a]);
-                     push_back_type(2 + cart);
-                 }
-             }
-             exp_run += nr_prims_shell[a];
-         }
-         else if (abs(shell_types[a]) == 2)
-         {
-             for (int cart = 0; cart < 6; cart++) {
-                 for (int i = 0; i < nr_prims_shell[a]; i++)
-                 {
-                     confac = pow(2048 * pow(exp[exp_run + i], 7) / constants::PI3, 0.25);
-                     con_coefs.push_back(con[exp_run + i] * confac);
-                     push_back_exponent(exp[exp_run + i]);
-                     push_back_center(shell2atom[a]);
-                     push_back_type(5 + cart);
-                 }
-             }
-             exp_run += nr_prims_shell[a];
-         }
-         else if (abs(shell_types[a]) == 3)
-         {
-             for (int cart = 0; cart < 10; cart++) {
-                 for (int i = 0; i < nr_prims_shell[a]; i++)
-                 {
-                     confac = pow(32768 * pow(exp[exp_run + i], 9) / constants::PI3, 0.25);
-                     con_coefs.push_back(con[exp_run + i] * confac);
-                     push_back_exponent(exp[exp_run + i]);
-                     push_back_center(shell2atom[a]);
-                     push_back_type(11 + cart);
-                 }
-             }
-             exp_run += nr_prims_shell[a];
-         }
-         else if (abs(shell_types[a]) == 4)
-         {
-             for (int cart = 0; cart < 15; cart++) {
-                 for (int i = 0; i < nr_prims_shell[a]; i++)
-                 {
-                     confac = pow(524288 * pow(exp[exp_run + i], 11) / constants::PI3, 0.25);
-                     con_coefs.push_back(con[exp_run + i] * confac);
-                     push_back_exponent(exp[exp_run + i]);
-                     push_back_center(shell2atom[a]);
-                     push_back_type(21 + cart);
-                 }
-             }
-             exp_run += nr_prims_shell[a];
-         }
-         else if (abs(shell_types[a]) == 5)
-         {
-             for (int cart = 0; cart < 21; cart++) {
-                 for (int i = 0; i < nr_prims_shell[a]; i++)
-                 {
-                     confac = pow(8388608 * pow(exp[exp_run + i], 13) / constants::PI3, 0.25);
-                     con_coefs.push_back(con[exp_run + i] * confac);
-                     push_back_exponent(exp[exp_run + i]);
-                     push_back_center(shell2atom[a]);
-                     push_back_type(36 + cart);
-                 }
-             }
-             exp_run += nr_prims_shell[a];
-         }
-         else if (abs(shell_types[a]) == 6)
-         {
-             //to-do: Have to calcualte confac for higher l
-         }
-         
+        double confac = 1.0;
+        if (abs(shell_types[a]) == 0)
+        {
+            for (int i = 0; i < nr_prims_shell[a]; i++)
+            {
+                confac = pow(8 * pow(exp[exp_run], 3) / constants::PI3, 0.25);
+                con_coefs.push_back(con[exp_run] * confac);
+                push_back_exponent(exp[exp_run]);
+                push_back_center(shell2atom[a]);
+                push_back_type(abs(shell_types[a]) + 1);
+                exp_run++;
+            }
+        }
+        else if (abs(shell_types[a]) == 1)
+        {
+            for (int cart = 0; cart < 3; cart++) {
+                for (int i = 0; i < nr_prims_shell[a]; i++)
+                {
+                    confac = pow(128 * pow(exp[exp_run + i], 5) / constants::PI3, 0.25);
+                    con_coefs.push_back(con[exp_run + i] * confac);
+                    push_back_exponent(exp[exp_run + i]);
+                    push_back_center(shell2atom[a]);
+                    push_back_type(2 + cart);
+                }
+            }
+            exp_run += nr_prims_shell[a];
+        }
+        else if (abs(shell_types[a]) == 2)
+        {
+            for (int cart = 0; cart < 6; cart++) {
+                for (int i = 0; i < nr_prims_shell[a]; i++)
+                {
+                    confac = pow(2048 * pow(exp[exp_run + i], 7) / constants::PI3, 0.25);
+                    con_coefs.push_back(con[exp_run + i] * confac);
+                    push_back_exponent(exp[exp_run + i]);
+                    push_back_center(shell2atom[a]);
+                    push_back_type(5 + cart);
+                }
+            }
+            exp_run += nr_prims_shell[a];
+        }
+        else if (abs(shell_types[a]) == 3)
+        {
+            for (int cart = 0; cart < 10; cart++) {
+                for (int i = 0; i < nr_prims_shell[a]; i++)
+                {
+                    confac = pow(32768 * pow(exp[exp_run + i], 9) / constants::PI3, 0.25);
+                    con_coefs.push_back(con[exp_run + i] * confac);
+                    push_back_exponent(exp[exp_run + i]);
+                    push_back_center(shell2atom[a]);
+                    push_back_type(11 + cart);
+                }
+            }
+            exp_run += nr_prims_shell[a];
+        }
+        else if (abs(shell_types[a]) == 4)
+        {
+            for (int cart = 0; cart < 15; cart++) {
+                for (int i = 0; i < nr_prims_shell[a]; i++)
+                {
+                    confac = pow(524288 * pow(exp[exp_run + i], 11) / constants::PI3, 0.25);
+                    con_coefs.push_back(con[exp_run + i] * confac);
+                    push_back_exponent(exp[exp_run + i]);
+                    push_back_center(shell2atom[a]);
+                    push_back_type(21 + cart);
+                }
+            }
+            exp_run += nr_prims_shell[a];
+        }
+        else if (abs(shell_types[a]) == 5)
+        {
+            for (int cart = 0; cart < 21; cart++) {
+                for (int i = 0; i < nr_prims_shell[a]; i++)
+                {
+                    confac = pow(8388608 * pow(exp[exp_run + i], 13) / constants::PI3, 0.25);
+                    con_coefs.push_back(con[exp_run + i] * confac);
+                    push_back_exponent(exp[exp_run + i]);
+                    push_back_center(shell2atom[a]);
+                    push_back_type(36 + cart);
+                }
+            }
+            exp_run += nr_prims_shell[a];
+        }
+        else if (abs(shell_types[a]) == 6)
+        {
+            //to-do: Have to calcualte confac for higher l
+        }
+
     }
     vec2 p_pure_2_cart;
     vec2 d_pure_2_cart;
@@ -6601,104 +6607,95 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 };
 
 const double WFN::compute_dens(
-    const double &Pos1,
-    const double &Pos2,
-    const double &Pos3,
-    vec2 &d,
-    vec &phi) const
+    const d3& Pos,
+    vec2& d,
+    vec& phi) const
 {
-    if (d_f_switch)
-    {
-        err_checkf(d.size() >= 5, "d is too small!", std::cout);
-        err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
-    }
-    else
-    {
-        err_checkf(d.size() >= 16, "d is too small!", std::cout);
-        err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
-    }
+    //if (d_f_switch)
+    //{
+    //    err_checkf(d.size() >= 5, "d is too small!", std::cout);
+    //    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    //    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
+    //}
+    //else
+    //{
+    err_checkf(d.size() >= ncen, "d is too small!", std::cout);
+    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    return compute_dens_cartesian(Pos, d, phi);
+    //}
 };
 
 const double WFN::compute_dens(
-    const double &Pos1,
-    const double &Pos2,
-    const double &Pos3) const
+    const d3& Pos)
+    const
 {
     vec2 d;
     vec phi(nmo, 0.0);
 
-    if (d_f_switch)
-    {
-        d.resize(5);
-        for (int i = 0; i < 5; i++)
-            d[i].resize(ncen, 0.0);
-        err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
-    }
-    else
-    {
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize(ncen, 0.0);
-        return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
-    }
+    //if (d_f_switch)
+    //{
+    //    d.resize(5);
+    //    for (int i = 0; i < 5; i++)
+    //        d[i].resize(ncen, 0.0);
+    //    err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
+    //    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
+    //}
+    //else
+    //{
+    d.resize(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(16, 0.0);
+    return compute_dens_cartesian(Pos, d, phi);
+    //}
 };
 
 const double WFN::compute_spin_dens(
-    const double &Pos1,
-    const double &Pos2,
-    const double &Pos3,
-    vec2 &d,
-    vec &phi) const
+    const d3& Pos,
+    vec2& d,
+    vec& phi) const
 {
-    if (d_f_switch)
-    {
-        err_checkf(d.size() >= 5, "d is too small!", std::cout);
-        err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
-    }
-    else
-    {
-        err_checkf(d.size() >= 4, "d is too small!", std::cout);
-        err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
-    }
+    //if (d_f_switch)
+    //{
+    //    err_checkf(d.size() >= 5, "d is too small!", std::cout);
+    //    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    //    err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
+    //    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
+    //}
+    //else
+    //{
+    err_checkf(d.size() >= ncen, "d is too small!", std::cout);
+    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    return compute_spin_dens_cartesian(Pos, d, phi);
+    //}
 };
 
 const double WFN::compute_spin_dens(
-    const double &Pos1,
-    const double &Pos2,
-    const double &Pos3) const
+    const d3& Pos) const
 {
     vec2 d;
     vec phi(nmo, 0.0);
 
-    if (d_f_switch)
-    {
-        d.resize(5);
-        for (int i = 0; i < 5; i++)
-            d[i].resize(ncen, 0.0);
-        err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
-    }
-    else
-    {
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize(ncen, 0.0);
-        return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
-    }
+    //if (d_f_switch)
+    //{
+    //    d.resize(5);
+    //    for (int i = 0; i < 5; i++)
+    //        d[i].resize(ncen, 0.0);
+    //    err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
+    //    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
+    //}
+    //else
+    //{
+    d.resize(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(16, 0.0);
+    return compute_spin_dens_cartesian(Pos, d, phi);
+    //}
 };
 
 const double WFN::compute_dens_cartesian(
-    const double &Pos1,
-    const double &Pos2,
-    const double &Pos3,
-    vec2 &d,
-    vec &phi) const
+    const d3& Pos,
+    vec2& d,
+    vec& phi) const
 {
     std::fill(phi.begin(), phi.end(), 0.0);
     double Rho = 0.0;
@@ -6710,29 +6707,31 @@ const double WFN::compute_dens_cartesian(
     // precalculate some distances and powers of distances for faster computation
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = Pos1 - atoms[iat].get_coordinate(0);
-        d[1][iat] = Pos2 - atoms[iat].get_coordinate(1);
-        d[2][iat] = Pos3 - atoms[iat].get_coordinate(2);
-        d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
-        d[4][iat] = d[0][iat] * d[0][iat];
-        d[5][iat] = d[1][iat] * d[1][iat];
-        d[6][iat] = d[2][iat] * d[2][iat];
-        d[7][iat] = d[0][iat] * d[4][iat];
-        d[8][iat] = d[1][iat] * d[5][iat];
-        d[9][iat] = d[2][iat] * d[6][iat];
-        d[10][iat] = d[0][iat] * d[7][iat];
-        d[11][iat] = d[1][iat] * d[8][iat];
-        d[12][iat] = d[2][iat] * d[9][iat];
-        d[13][iat] = d[0][iat] * d[10][iat];
-        d[14][iat] = d[1][iat] * d[11][iat];
-        d[15][iat] = d[2][iat] * d[12][iat];
+        double* d_ = d[iat].data();
+        d_[0] = Pos[0] - atoms[iat].get_coordinate(0);
+        d_[1] = Pos[1] - atoms[iat].get_coordinate(1);
+        d_[2] = Pos[2] - atoms[iat].get_coordinate(2);
+        d_[3] = d_[0] * d_[0] + d_[1] * d_[1] + d_[2] * d_[2];
+        d_[4] = d_[0] * d_[0];
+        d_[5] = d_[1] * d_[1];
+        d_[6] = d_[2] * d_[2];
+        d_[7] = d_[0] * d_[4];
+        d_[8] = d_[1] * d_[5];
+        d_[9] = d_[2] * d_[6];
+        d_[10] = d_[0] * d_[7];
+        d_[11] = d_[1] * d_[8];
+        d_[12] = d_[2] * d_[9];
+        d_[13] = d_[0] * d_[10];
+        d_[14] = d_[1] * d_[11];
+        d_[15] = d_[2] * d_[12];
     }
 
     for (j = 0; j < nex; j++)
     {
         iat = centers[j] - 1;
+        double* d_ = d[iat].data();
         constants::type2vector(types[j], l);
-        ex = -exponents[j] * d[3][iat];
+        ex = -exponents[j] * d_[3];
         if (ex < constants::exp_cutoff)
         { // corresponds to cutoff of maximum density contribution of 1E-5
             continue;
@@ -6740,21 +6739,31 @@ const double WFN::compute_dens_cartesian(
         ex = exp(ex);
         for (k = 0; k < 3; k++)
         {
-            if (l[k] == 0)
-                continue;
-            else if (l[k] == 1)
-                ex *= d[k][iat];
-            else if (l[k] == 2)
-                ex *= d[k + 4][iat];
-            else if (l[k] == 3)
-                ex *= d[k + 7][iat];
-            else if (l[k] == 4)
-                ex *= d[k + 10][iat];
-            else if (l[k] == 5)
-                ex *= d[k + 13][iat];
+            switch (l[k])
+            {
+            case 0:
+                break;
+            case 1:
+                ex *= d_[k];
+                break;
+            case 2:
+                ex *= d_[k + 4];
+                break;
+            case 3:
+                ex *= d_[k + 7];
+                break;
+            case 4:
+                ex *= d_[k + 10];
+                break;
+            case 5:
+                ex *= d_[k + 13];
+                break;
+            default:
+                break;
+            }
         }
-        double *run = phi.data();
-        const MO *run2 = MOs.data();
+        double* run = phi.data();
+        const MO* run2 = MOs.data();
         for (mo = 0; mo < nmo; mo++)
         {
             *run += (*run2).get_coefficient_f(j) * ex; // build MO values at this point
@@ -6776,11 +6785,9 @@ const double WFN::compute_dens_cartesian(
 }
 
 const double WFN::compute_spin_dens_cartesian(
-    const double &Pos1,
-    const double &Pos2,
-    const double &Pos3,
-    vec2 &d,
-    vec &phi) const
+    const d3& Pos,
+    vec2& d,
+    vec& phi) const
 {
     std::fill(phi.begin(), phi.end(), 0.0);
     double alpha = 0.0, beta = 0.0;
@@ -6791,22 +6798,22 @@ const double WFN::compute_spin_dens_cartesian(
 
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = Pos1 - atoms[iat].get_coordinate(0);
-        d[1][iat] = Pos2 - atoms[iat].get_coordinate(1);
-        d[2][iat] = Pos3 - atoms[iat].get_coordinate(2);
-        d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
-        d[4][iat] = d[0][iat] * d[0][iat];
-        d[5][iat] = d[1][iat] * d[1][iat];
-        d[6][iat] = d[2][iat] * d[2][iat];
-        d[7][iat] = d[0][iat] * d[4][iat];
-        d[8][iat] = d[1][iat] * d[5][iat];
-        d[9][iat] = d[2][iat] * d[6][iat];
-        d[10][iat] = d[0][iat] * d[7][iat];
-        d[11][iat] = d[1][iat] * d[8][iat];
-        d[12][iat] = d[2][iat] * d[9][iat];
-        d[13][iat] = d[0][iat] * d[10][iat];
-        d[14][iat] = d[1][iat] * d[11][iat];
-        d[15][iat] = d[2][iat] * d[12][iat];
+        d[iat][0] = Pos[0] - atoms[iat].get_coordinate(0);
+        d[iat][1] = Pos[1] - atoms[iat].get_coordinate(1);
+        d[iat][2] = Pos[2] - atoms[iat].get_coordinate(2);
+        d[iat][3] = d[iat][0] * d[iat][0] + d[iat][1] * d[iat][1] + d[iat][2] * d[iat][2];
+        d[iat][4] = d[iat][0] * d[iat][0];
+        d[iat][5] = d[iat][1] * d[iat][1];
+        d[iat][6] = d[iat][2] * d[iat][2];
+        d[iat][7] = d[iat][0] * d[iat][4];
+        d[iat][8] = d[iat][1] * d[iat][5];
+        d[iat][9] = d[iat][2] * d[iat][6];
+        d[iat][10] = d[iat][0] * d[iat][7];
+        d[iat][11] = d[iat][1] * d[iat][8];
+        d[iat][12] = d[iat][2] * d[iat][9];
+        d[iat][13] = d[iat][0] * d[iat][10];
+        d[iat][14] = d[iat][1] * d[iat][11];
+        d[iat][15] = d[iat][2] * d[iat][12];
     }
 
     for (j = 0; j < nex; j++)
@@ -6821,21 +6828,29 @@ const double WFN::compute_spin_dens_cartesian(
         ex = exp(ex);
         for (k = 0; k < 3; k++)
         {
-            if (l[k] == 0)
-                continue;
-            else if (l[k] == 1)
-                ex *= d[k][iat];
-            else if (l[k] == 2)
-                ex *= d[k + 4][iat];
-            else if (l[k] == 3)
-                ex *= d[k + 7][iat];
-            else if (l[k] == 4)
-                ex *= d[k + 10][iat];
-            else if (l[k] == 5)
-                ex *= d[k + 13][iat];
+            switch (l[k])
+            {
+            case 0:
+                break;
+            case 1:
+                ex *= d[iat][k];
+                break;
+            case 2:
+                ex *= d[iat][k + 4];
+                break;
+            case 3:
+                ex *= d[iat][k + 7];
+                break;
+            case 4:
+                ex *= d[iat][k + 10];
+                break;
+            case 5:
+                ex *= d[iat][k + 13];
+                break;
+            }
         }
-        double *run = phi.data();
-        const MO *run2 = MOs.data();
+        double* run = phi.data();
+        const MO* run2 = MOs.data();
         for (mo = 0; mo < nmo; mo++)
         {
             *run += (*run2).get_coefficient_f(j) * ex; // build MO values at this point
@@ -6843,8 +6858,8 @@ const double WFN::compute_spin_dens_cartesian(
         }
     }
 
-    double *run = phi.data();
-    const MO *run2 = MOs.data();
+    double* run = phi.data();
+    const MO* run2 = MOs.data();
     for (mo = 0; mo < nmo; mo++)
     {
         if ((*run2).get_op())
@@ -6858,16 +6873,11 @@ const double WFN::compute_spin_dens_cartesian(
 }
 
 const double WFN::compute_MO_spherical(
-    const double &Pos1,
-    const double &Pos2,
-    const double &Pos3,
-    const int &MO) const
+    const d3& Pos,
+    const int& MO) const
 {
     err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", std::cout);
     return 0.0;
-    (void)Pos1;
-    (void)Pos2;
-    (void)Pos3;
     (void)MO;
     //err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
     //int iat;
@@ -7015,17 +7025,12 @@ const double WFN::compute_MO_spherical(
 }
 
 const double WFN::compute_dens_spherical(
-    const double &Pos1,
-    const double &Pos2,
-    const double &Pos3,
-    vec2 &d,
-    vec &phi) const
+    const d3& Pos,
+    vec2& d,
+    vec& phi) const
 {
     err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", std::cout);
     return 0.0;
-    (void)Pos1;
-    (void)Pos2;
-    (void)Pos3;
     (void)d;
     (void)phi;
     //err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
@@ -7191,25 +7196,25 @@ void WFN::pop_back_MO()
 }
 
 const void WFN::computeValues(
-    const std::array<double,3>& PosGrid, // [3] vector with current position on te grid
-    double &Rho,           // Value of Electron Density
-    double &normGrad,      // Gradiant Vector
-    double *Hess,          // Hessian Matrix, later used to determine lambda2
-    double &Elf,           // Value of the ELF
-    double &Eli,           // Value of the ELI
-    double &Lap            // Value for the Laplacian
+    const d3& PosGrid, // [3] vector with current position on te grid
+    double& Rho,           // Value of Electron Density
+    double& normGrad,      // Gradiant Vector
+    double* Hess,          // Hessian Matrix, later used to determine lambda2
+    double& Elf,           // Value of the ELF
+    double& Eli,           // Value of the ELI
+    double& Lap            // Value for the Laplacian
 ) const
 {
     const int _nmo = get_nmo(false);
     vec phi(10 * _nmo, 0.0);
-    double *phi_temp;
-    double chi[10]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    double d[4]{0, 0, 0, 0};
+    double* phi_temp;
+    double chi[10]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    double d[4]{ 0, 0, 0, 0 };
     int iat = 0;
-    int l[3]{0, 0, 0};
+    int l[3]{ 0, 0, 0 };
     double ex = 0;
-    double xl[3][3]{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    double Grad[3]{0, 0, 0};
+    double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
+    double Grad[3]{ 0, 0, 0 };
     double tau = 0;
 
     Rho = 0;
@@ -7328,20 +7333,20 @@ const void WFN::computeValues(
 };
 
 const void WFN::computeELIELF(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
-    double &Elf,           // Value of the ELF
-    double &Eli            // Value of the ELI
+    const d3& PosGrid, // [3] vector with current position on te grid
+    double& Elf,           // Value of the ELF
+    double& Eli            // Value of the ELI
 ) const
 {
     const int _nmo = get_nmo(false);
     vec phi(4 * _nmo, 0.0);
-    double *phi_temp;
-    double chi[4]{0, 0, 0, 0};
-    double d[3]{0, 0, 0};
+    double* phi_temp;
+    double chi[4]{ 0, 0, 0, 0 };
+    double d[3]{ 0, 0, 0 };
     int iat = 0;
-    int l[3]{0, 0, 0};
+    int l[3]{ 0, 0, 0 };
     double ex = 0;
-    double xl[3][3]{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
     for (int j = 0; j < nex; j++)
     {
@@ -7408,7 +7413,7 @@ const void WFN::computeELIELF(
         }
     }
 
-    double Grad[3]{0, 0, 0};
+    double Grad[3]{ 0, 0, 0 };
     double tau = 0;
     double Rho = 0;
 
@@ -7433,20 +7438,19 @@ const void WFN::computeELIELF(
     }
 };
 
-const void WFN::computeELI(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
-    double &Eli            // Value of the ELI
+const double WFN::computeELI(
+    const d3& PosGrid // [3] vector with current position on te grid
 ) const
 {
     const int _nmo = get_nmo(false);
     vec phi(4 * _nmo, 0.0);
-    double *phi_temp;
-    double chi[4]{0, 0, 0, 0};
-    double d[3]{0, 0, 0};
+    double* phi_temp;
+    double chi[4]{ 0, 0, 0, 0 };
+    double d[3]{ 0, 0, 0 };
     int iat = 0;
-    int l[3]{0, 0, 0};
+    int l[3]{ 0, 0, 0 };
     double ex = 0;
-    double xl[3][3]{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
     for (int j = 0; j < nex; j++)
     {
@@ -7496,7 +7500,7 @@ const void WFN::computeELI(
             }
             else
             {
-                return;
+                err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7513,7 +7517,7 @@ const void WFN::computeELI(
         }
     }
 
-    double Grad[3]{0, 0, 0};
+    double Grad[3]{ 0, 0, 0 };
     double tau = 0;
     double Rho = 0;
 
@@ -7531,23 +7535,22 @@ const void WFN::computeELI(
             tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
         }
     }
-    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    return Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
 };
 
-const void WFN::computeELF(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
-    double &Elf            // Value of the ELF
+const double WFN::computeELF(
+    const d3& PosGrid // [3] vector with current position on te grid
 ) const
 {
     const int _nmo = get_nmo(false);
     vec phi(4 * _nmo, 0.0);
-    double *phi_temp;
-    double chi[4]{0, 0, 0, 0};
-    double d[3]{0, 0, 0};
+    double* phi_temp;
+    double chi[4]{ 0, 0, 0, 0 };
+    double d[3]{ 0, 0, 0 };
     int iat = 0;
-    int l[3]{0, 0, 0};
+    int l[3]{ 0, 0, 0 };
     double ex = 0;
-    double xl[3][3]{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
     for (int j = 0; j < nex; j++)
     {
@@ -7597,7 +7600,7 @@ const void WFN::computeELF(
             }
             else
             {
-                return;
+                err_not_impl_f("Higher angular momentum of cartesian function in ELF computation", std::cout);
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7614,7 +7617,7 @@ const void WFN::computeELF(
         }
     }
 
-    double Grad[3]{0, 0, 0};
+    double Grad[3]{ 0, 0, 0 };
     double tau = 0;
     double Rho = 0;
 
@@ -7632,237 +7635,14 @@ const void WFN::computeELF(
             tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
         }
     }
-    Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
+    return 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
 };
 
 const void WFN::computeLapELIELF(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
-    double &Elf,           // Value of the ELF
-    double &Eli,           // Value of the ELI
-    double &Lap            // Value for the Laplacian
-) const
-{
-    const int _nmo = get_nmo(false);
-    vec phi(7 * _nmo, 0.0);
-    double *phi_temp;
-    double chi[7]{0, 0, 0, 0, 0, 0, 0};
-    double d[3]{0, 0, 0};
-    int iat = 0;
-    int l[3]{0, 0, 0};
-    double ex = 0;
-    double xl[3][3]{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-
-    for (int j = 0; j < nex; j++)
-    {
-        iat = get_center(j) - 1;
-
-        constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
-        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
-        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        if (temp < constants::exp_cutoff)
-            continue;
-        ex = exp(temp);
-        for (int k = 0; k < 3; k++)
-        {
-            if (l[k] == 0)
-            {
-                xl[k][0] = 1.0;
-                xl[k][1] = 0.0;
-                xl[k][2] = 0.0;
-            }
-            else if (l[k] == 1)
-            {
-                xl[k][0] = d[k];
-                xl[k][1] = 1.0;
-                xl[k][2] = 0.0;
-            }
-            else if (l[k] == 2)
-            {
-                xl[k][0] = d[k] * d[k];
-                xl[k][1] = 2 * d[k];
-                xl[k][2] = 2;
-            }
-            else if (l[k] == 3)
-            {
-                double d2 = d[k] * d[k];
-                xl[k][0] = d2 * d[k];
-                xl[k][1] = 3 * d2;
-                xl[k][2] = 6 * d[k];
-            }
-            else if (l[k] == 4)
-            {
-                double d2 = d[k] * d[k];
-                xl[k][0] = d2 * d2;
-                xl[k][1] = 4 * d2 * d[k];
-                xl[k][2] = 12 * d2;
-            }
-            else
-            {
-                return;
-            }
-        }
-        double ex2 = 2 * get_exponent(j);
-        chi[0] = xl[0][0] * xl[1][0] * xl[2][0] * ex;
-        chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
-        chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
-        chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
-        double temp_ex = pow(ex2, 2);
-        chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + temp_ex * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
-        chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
-        chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
-        for (int mo = 0; mo < _nmo; mo++)
-        {
-            phi_temp = &phi[mo * 7];
-            for (int i = 0; i < 7; i++)
-                //                if( abs(chi[i]) * coefficients[nprim*maxc[j]+j] > pow(10.0,-10) )
-                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
-        }
-    }
-
-    double Grad[3]{0, 0, 0};
-    double Hess[3]{0, 0, 0};
-    double tau = 0;
-    double Rho = 0;
-
-    Elf = 0;
-
-    for (int mo = 0; mo < _nmo; mo++)
-    {
-        const double occ = get_MO_occ(mo);
-        const double docc = 2 * occ;
-        if (occ != 0)
-        {
-            phi_temp = &phi[mo * 7];
-            Rho += occ * pow(*phi_temp, 2);
-            Grad[0] += docc * *phi_temp * phi_temp[1];
-            Grad[1] += docc * *phi_temp * phi_temp[2];
-            Grad[2] += docc * *phi_temp * phi_temp[3];
-            Hess[0] += docc * (*phi_temp * phi_temp[4] + pow(phi_temp[1], 2));
-            Hess[1] += docc * (*phi_temp * phi_temp[5] + pow(phi_temp[2], 2));
-            Hess[2] += docc * (*phi_temp * phi_temp[6] + pow(phi_temp[3], 2));
-            tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
-        }
-    }
-    Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
-    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
-    Lap = Hess[0] + Hess[1] + Hess[2];
-};
-
-const void WFN::computeLapELI(
-    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
-    double &Eli,           // Value of the ELI
-    double &Lap            // Value for the Laplacian
-) const
-{
-    const int _nmo = get_nmo(false);
-    vec phi(7 * _nmo, 0.0);
-    double *phi_temp;
-    double chi[7]{0, 0, 0, 0, 0, 0, 0};
-    double d[3]{0, 0, 0};
-    int iat = 0;
-    int l[3]{0, 0, 0};
-    double ex = 0;
-    double xl[3][3]{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-
-    for (int j = 0; j < nex; j++)
-    {
-        iat = get_center(j) - 1;
-
-        constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
-        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
-        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        if (temp < constants::exp_cutoff)
-            continue;
-        ex = exp(temp);
-        for (int k = 0; k < 3; k++)
-        {
-            if (l[k] == 0)
-            {
-                xl[k][0] = 1.0;
-                xl[k][1] = 0.0;
-                xl[k][2] = 0.0;
-            }
-            else if (l[k] == 1)
-            {
-                xl[k][0] = d[k];
-                xl[k][1] = 1.0;
-                xl[k][2] = 0.0;
-            }
-            else if (l[k] == 2)
-            {
-                xl[k][0] = d[k] * d[k];
-                xl[k][1] = 2 * d[k];
-                xl[k][2] = 2;
-            }
-            else if (l[k] == 3)
-            {
-                double d2 = d[k] * d[k];
-                xl[k][0] = d2 * d[k];
-                xl[k][1] = 3 * d2;
-                xl[k][2] = 6 * d[k];
-            }
-            else if (l[k] == 4)
-            {
-                double d2 = d[k] * d[k];
-                xl[k][0] = d2 * d2;
-                xl[k][1] = 4 * d2 * d[k];
-                xl[k][2] = 12 * d2;
-            }
-            else
-            {
-                return;
-            }
-        }
-        double ex2 = 2 * get_exponent(j);
-        chi[0] = xl[0][0] * xl[1][0] * xl[2][0] * ex;
-        chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
-        chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
-        chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
-        double temp_ex = pow(ex2, 2);
-        chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + temp_ex * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
-        chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
-        chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
-        for (int mo = 0; mo < _nmo; mo++)
-        {
-            phi_temp = &phi[mo * 7];
-            for (int i = 0; i < 7; i++)
-                //                if( abs(chi[i]) * coefficients[nprim*maxc[j]+j] > pow(10.0,-10) )
-                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
-        }
-    }
-
-    double Grad[3]{0, 0, 0};
-    double Hess[3]{0, 0, 0};
-    double tau = 0;
-    double Rho = 0;
-
-    for (int mo = 0; mo < _nmo; mo++)
-    {
-        const double occ = get_MO_occ(mo);
-        const double docc = 2 * occ;
-        if (occ != 0)
-        {
-            phi_temp = &phi[mo * 7];
-            Rho += occ * pow(*phi_temp, 2);
-            Grad[0] += docc * *phi_temp * phi_temp[1];
-            Grad[1] += docc * *phi_temp * phi_temp[2];
-            Grad[2] += docc * *phi_temp * phi_temp[3];
-            Hess[0] += docc * (*phi_temp * phi_temp[4] + pow(phi_temp[1], 2));
-            Hess[1] += docc * (*phi_temp * phi_temp[5] + pow(phi_temp[2], 2));
-            Hess[2] += docc * (*phi_temp * phi_temp[6] + pow(phi_temp[3], 2));
-            tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
-        }
-    }
-    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
-    Lap = Hess[0] + Hess[1] + Hess[2];
-};
-
-const double WFN::computeLap(
-    const std::array<double, 3>& PosGrid // [3] vector with current position on te grid
+    const d3& PosGrid, // [3] vector with current position on te grid
+    double& Elf,           // Value of the ELF
+    double& Eli,           // Value of the ELI
+    double& Lap            // Value for the Laplacian
 ) const
 {
     const int _nmo = get_nmo(false);
@@ -7923,7 +7703,247 @@ const double WFN::computeLap(
             }
             else
             {
+                return;
+            }
+        }
+        double ex2 = 2 * get_exponent(j);
+        chi[0] = xl[0][0] * xl[1][0] * xl[2][0] * ex;
+        chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
+        chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
+        chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
+        double temp_ex = pow(ex2, 2);
+        chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + temp_ex * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
+        chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
+        chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
+        for (int mo = 0; mo < _nmo; mo++)
+        {
+            phi_temp = &phi[mo * 7];
+            for (int i = 0; i < 7; i++)
+                //                if( abs(chi[i]) * coefficients[nprim*maxc[j]+j] > pow(10.0,-10) )
+                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
+        }
+    }
+
+    double Grad[3]{ 0, 0, 0 };
+    double Hess[3]{ 0, 0, 0 };
+    double tau = 0;
+    double Rho = 0;
+
+    Elf = 0;
+
+    for (int mo = 0; mo < _nmo; mo++)
+    {
+        const double occ = get_MO_occ(mo);
+        const double docc = 2 * occ;
+        if (occ != 0)
+        {
+            phi_temp = &phi[mo * 7];
+            Rho += occ * pow(*phi_temp, 2);
+            Grad[0] += docc * *phi_temp * phi_temp[1];
+            Grad[1] += docc * *phi_temp * phi_temp[2];
+            Grad[2] += docc * *phi_temp * phi_temp[3];
+            Hess[0] += docc * (*phi_temp * phi_temp[4] + pow(phi_temp[1], 2));
+            Hess[1] += docc * (*phi_temp * phi_temp[5] + pow(phi_temp[2], 2));
+            Hess[2] += docc * (*phi_temp * phi_temp[6] + pow(phi_temp[3], 2));
+            tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
+        }
+    }
+    Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
+    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    Lap = Hess[0] + Hess[1] + Hess[2];
+};
+
+const void WFN::computeLapELI(
+    const d3& PosGrid, // [3] vector with current position on te grid
+    double& Eli,           // Value of the ELI
+    double& Lap            // Value for the Laplacian
+) const
+{
+    const int _nmo = get_nmo(false);
+    vec phi(7 * _nmo, 0.0);
+    double* phi_temp;
+    double chi[7]{ 0, 0, 0, 0, 0, 0, 0 };
+    double d[3]{ 0, 0, 0 };
+    int iat = 0;
+    int l[3]{ 0, 0, 0 };
+    double ex = 0;
+    double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
+
+    for (int j = 0; j < nex; j++)
+    {
+        iat = get_center(j) - 1;
+
+        constants::type2vector(get_type(j), l);
+        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
+        double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        if (temp < constants::exp_cutoff)
+            continue;
+        ex = exp(temp);
+        for (int k = 0; k < 3; k++)
+        {
+            switch (l[k])
+            {
+            case 0:
+            {
+                xl[k][0] = 1.0;
+                xl[k][1] = 0.0;
+                xl[k][2] = 0.0;
+                break;
+            }
+            case 1:
+            {
+                xl[k][0] = d[k];
+                xl[k][1] = 1.0;
+                xl[k][2] = 0.0;
+                break;
+            }
+            case 2:
+            {
+                xl[k][0] = d[k] * d[k];
+                xl[k][1] = 2 * d[k];
+                xl[k][2] = 2;
+                break;
+            }
+            case 3:
+            {
+                double d2 = d[k] * d[k];
+                xl[k][0] = d2 * d[k];
+                xl[k][1] = 3 * d2;
+                xl[k][2] = 6 * d[k];
+                break;
+            }
+            case 4:
+            {
+                double d2 = d[k] * d[k];
+                xl[k][0] = d2 * d2;
+                xl[k][1] = 4 * d2 * d[k];
+                xl[k][2] = 12 * d2;
+                break;
+            }
+            default:
+            {
+                break;
+            }
+            }
+        }
+        double ex2 = 2 * get_exponent(j);
+        chi[0] = xl[0][0] * xl[1][0] * xl[2][0] * ex;
+        chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
+        chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
+        chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
+        double temp_ex = pow(ex2, 2);
+        chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + temp_ex * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
+        chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
+        chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
+        for (int mo = 0; mo < _nmo; mo++)
+        {
+            phi_temp = &phi[mo * 7];
+            for (int i = 0; i < 7; i++)
+                //                if( abs(chi[i]) * coefficients[nprim*maxc[j]+j] > pow(10.0,-10) )
+                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
+        }
+    }
+
+    double Grad[3]{ 0, 0, 0 };
+    double Hess[3]{ 0, 0, 0 };
+    double tau = 0;
+    double Rho = 0;
+
+    for (int mo = 0; mo < _nmo; mo++)
+    {
+        const double occ = get_MO_occ(mo);
+        const double docc = 2 * occ;
+        if (occ != 0)
+        {
+            phi_temp = &phi[mo * 7];
+            Rho += occ * pow(*phi_temp, 2);
+            Grad[0] += docc * *phi_temp * phi_temp[1];
+            Grad[1] += docc * *phi_temp * phi_temp[2];
+            Grad[2] += docc * *phi_temp * phi_temp[3];
+            Hess[0] += docc * (*phi_temp * phi_temp[4] + pow(phi_temp[1], 2));
+            Hess[1] += docc * (*phi_temp * phi_temp[5] + pow(phi_temp[2], 2));
+            Hess[2] += docc * (*phi_temp * phi_temp[6] + pow(phi_temp[3], 2));
+            tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
+        }
+    }
+    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    Lap = Hess[0] + Hess[1] + Hess[2];
+};
+
+const double WFN::computeLap(
+    const d3& PosGrid // [3] vector with current position on te grid
+) const
+{
+    const int _nmo = get_nmo(false);
+    vec phi(7 * _nmo, 0.0);
+    double* phi_temp;
+    double chi[7]{ 0, 0, 0, 0, 0, 0, 0 };
+    double d[3]{ 0, 0, 0 };
+    int iat = 0;
+    int l[3]{ 0, 0, 0 };
+    double ex = 0;
+    double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
+
+    for (int j = 0; j < nex; j++)
+    {
+        iat = get_center(j) - 1;
+
+        constants::type2vector(get_type(j), l);
+        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
+        double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        if (temp < constants::exp_cutoff)
+            continue;
+        ex = exp(temp);
+        for (int k = 0; k < 3; k++)
+        {
+            switch (l[k])
+            {
+            case 0:
+            {
+                xl[k][0] = 1.0;
+                xl[k][1] = 0.0;
+                xl[k][2] = 0.0;
+                break;
+            }
+            case 1:
+            {
+                xl[k][0] = d[k];
+                xl[k][1] = 1.0;
+                xl[k][2] = 0.0;
+                break;
+            }
+            case 2:
+            {
+                xl[k][0] = d[k] * d[k];
+                xl[k][1] = 2 * d[k];
+                xl[k][2] = 2;
+                break;
+            }
+            case 3:
+            {
+                double d2 = d[k] * d[k];
+                xl[k][0] = d2 * d[k];
+                xl[k][1] = 3 * d2;
+                xl[k][2] = 6 * d[k];
+                break;
+            }
+            case 4:
+            {
+                double d2 = d[k] * d[k];
+                xl[k][0] = d2 * d2;
+                xl[k][1] = 4 * d2 * d[k];
+                xl[k][2] = 12 * d2;
+                break;
+            }
+            default:
+            {
                 return -100;
+                break;
+            }
             }
         }
         double ex2 = 2 * get_exponent(j);
@@ -7961,26 +7981,26 @@ const double WFN::computeLap(
 };
 
 const double WFN::computeMO(
-    const std::array<double, 3>& PosGrid, // [3] array with current position on the grid
-    const int &mo) const
+    const d3& PosGrid, // [3] array with current position on the grid
+    const int& mo) const
 {
     double result = 0.0;
     int iat = 0;
-    int l[3]{0, 0, 0};
+    int l[3]{ 0, 0, 0 };
     double ex = 0;
     double temp = 0;
 
     // x, y, z and dsqd
-    vec2 d(4);
-    for (int i = 0; i < 4; i++)
-        d[i].resize(ncen);
+    vec2 d(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(4);
 
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = PosGrid[0] - atoms[iat].get_coordinate(0);
-        d[1][iat] = PosGrid[1] - atoms[iat].get_coordinate(1);
-        d[2][iat] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
+        d[iat][0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[iat][1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[iat][2] = PosGrid[2] - atoms[iat].get_coordinate(2);
+        d[iat][3] = pow(std::hypot(d[iat][0], d[iat][1], d[iat][2]), 2);
     }
 
     for (int j = 0; j < nex; j++)
@@ -7993,27 +8013,14 @@ const double WFN::computeMO(
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
-        {
-            if (l[k] == 0)
-                continue;
-            else if (l[k] == 1)
-                ex *= d[k][iat];
-            else if (l[k] == 2)
-                ex *= d[k][iat] * d[k][iat];
-            else if (l[k] == 3)
-                ex *= pow(d[k][iat], 3);
-            else if (l[k] == 4)
-                ex *= pow(d[k][iat], 4);
-            else if (l[k] == 5)
-                ex *= pow(d[k][iat], 5);
-        }
+            ex *= pow(d[k][iat], l[k]);
         result += MOs[mo].get_coefficient_f(j) * ex; // build MO values at this point
     }
     shrink_vector<vec>(d);
     return result;
 }
 
-double Integrate(int &m, double i, double &expn)
+double Integrate(int& m, double i, double& expn)
 {
     int x;
     if (i <= 10)
@@ -8061,7 +8068,7 @@ double Integrate(int &m, double i, double &expn)
     }
     return -1;
 };
-const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
+const double WFN::fj(int& j, int& l, int& m, double& aa, double& bb) const
 {
     double temp = 0.0;
     double temp2 = 0.0;
@@ -8081,7 +8088,7 @@ const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
     return temp;
 };
 
-const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp) const
+const double WFN::Afac(int& l, int& r, int& i, double& PC, double& gamma, double& fjtmp) const
 {
     double temp = fjtmp * pow(0.25 / gamma, r + i) / Afac_pre[l][r][i];
     int num = l - 2 * r - 2 * i;
@@ -8093,7 +8100,7 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
         return temp;
 }
 
-bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, const bool debug)
+bool WFN::read_ptb(const std::filesystem::path& filename, std::ostream& file, const bool debug)
 {
     origin = e_origin::ptb;
     if (debug)
@@ -8117,7 +8124,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     int nprims = infos[3];
 
     svec atyp(ncent);
-    char temp[3]{0, 0, '\0'};
+    char temp[3]{ 0, 0, '\0' };
     for (int i = 0; i < ncent; ++i)
     {
         err_checkf(read_block_from_fortran_binary(inFile, temp), "Error reading atom label " + std::to_string(i), std::cout);
@@ -8154,8 +8161,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     err_checkf(read_block_from_fortran_binary(inFile, occ.data()), "Error reading occupancies!", std::cout);
     err_checkf(read_block_from_fortran_binary(inFile, eval.data()), "Error reading energies!", std::cout);
 
-
-    vec tempvec((size_t)nbf* (size_t)nmomax);
+    vec tempvec((size_t)nbf * (size_t)nmomax);
     err_checkf(read_block_from_fortran_binary(inFile, tempvec.data()), "Error reading MO coefficients!", std::cout);
     dMatrix2 momat = reshape<dMatrix2>(tempvec, Shape2D(nmomax, nbf));
 
@@ -8233,7 +8239,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     if (multi == 0)
         multi = elcount % 2 + 1;
     err_checkf((elcount % 2 == 0 && multi % 2 == 1) || elcount % 2 == 1 && multi % 2 == 0, "Impossible combination of number of electrons and multiplicity! " + std::to_string(elcount) + " " + std::to_string(multi), std::cout);
-    
+
     int alpha_els = 0, beta_els = 0, temp_els = elcount;
     while (temp_els > 1)
     {
@@ -8261,10 +8267,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         beta_els--;
         err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons: " + std::to_string(alpha_els) + "/" + std::to_string(beta_els), file);
     }
-    //for (int i = beta_els; i < alpha_els; i++)
-    //{
-    //    occ[i] = 1.0;
-    //}
+
     if (debug)
     {
         file << "al/be els after:" << alpha_els << " " << beta_els << std::endl;
@@ -8282,7 +8285,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
             err_checkf(push_back_MO(MO(i, occ[i], eval[i], 0)), "Error adding MO to WFN!", file);
         else {
             err_checkf(push_back_MO(MO(i, occ[i], eval[i], 1)), "Error adding MO to WFN!", file);
-			is_unrestricted = true;
+            is_unrestricted = true;
         }
     }
     err_checkf(nmo == nmomax, "Error adding MOs to WFN!", file);
@@ -8356,40 +8359,40 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
 
     err_checkf(nprims == nex, "Error adding primitives to WFN!", file);
     inFile.close();
-    if(debug)
+    if (debug)
         this->write_wfn("test_convert_from_xtb.wfn", false, false);
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
     return true;
 }
 
-const double WFN::computeESP(const std::array<double, 3>& PosGrid, const vec2 &d2) const
+const double WFN::computeESP(const d3& PosGrid, const vec2& d2) const
 {
     double ESP = 0;
-    double P[3]{0, 0, 0};
-    double Pi[3]{0, 0, 0};
-    double Pj[3]{0, 0, 0};
-    double PC[3]{0, 0, 0};
-    double Fn[11]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    double Al[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    double Am[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    double An[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int maplrsl[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int maplrsm[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int maplrsn[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int l_i[3]{0, 0, 0};
-    int l_j[3]{0, 0, 0};
+    double P[3]{ 0, 0, 0 };
+    double Pi[3]{ 0, 0, 0 };
+    double Pj[3]{ 0, 0, 0 };
+    double PC[3]{ 0, 0, 0 };
+    double Fn[11]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    double Al[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    double Am[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    double An[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int maplrsl[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int maplrsm[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int maplrsn[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int l_i[3]{ 0, 0, 0 };
+    int l_j[3]{ 0, 0, 0 };
     int iat = 0, jat = 0, MaxFn = 0;
     double ex_sum = 0,
-           sqd = 0,
-           sqpc = 0,
-           prefac = 0,
-           expc = 0,
-           term = 0,
-           addesp = 0,
-           fjtmp = 0,
-           twoexpc = 0,
-           iex = 0,
-           jex = 0;
+        sqd = 0,
+        sqpc = 0,
+        prefac = 0,
+        expc = 0,
+        term = 0,
+        addesp = 0,
+        fjtmp = 0,
+        twoexpc = 0,
+        iex = 0,
+        jex = 0;
 
     const int MO = get_nmo(true);
     const int nprim = get_nex();
@@ -8405,7 +8408,7 @@ const double WFN::computeESP(const std::array<double, 3>& PosGrid, const vec2 &d
         pos[0][iat] = atoms[iat].get_coordinate(0);
         pos[1][iat] = atoms[iat].get_coordinate(1);
         pos[2][iat] = atoms[iat].get_coordinate(2);
-        ESP += get_atom_charge(iat) * pow(sqrt(pow(PosGrid[0] - pos[0][iat], 2) + pow(PosGrid[1] - pos[1][iat], 2) + pow(PosGrid[2] - pos[2][iat], 2)), -1);
+        ESP += get_atom_charge(iat) / sqrt(pow(PosGrid[0] - pos[0][iat], 2) + pow(PosGrid[1] - pos[1][iat], 2) + pow(PosGrid[2] - pos[2][iat], 2));
     }
 
     for (int iprim = 0; iprim < nprim; iprim++)
@@ -8526,34 +8529,34 @@ const double WFN::computeESP(const std::array<double, 3>& PosGrid, const vec2 &d
     return ESP;
 };
 
-const double WFN::computeESP_noCore(const std::array<double, 3>& PosGrid, const vec2 &d2) const
+const double WFN::computeESP_noCore(const d3& PosGrid, const vec2& d2) const
 {
     double ESP = 0;
-    double P[3]{0, 0, 0};
-    double Pi[3]{0, 0, 0};
-    double Pj[3]{0, 0, 0};
-    double PC[3]{0, 0, 0};
-    double Fn[11]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    double Al[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    double Am[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    double An[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int maplrsl[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int maplrsm[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int maplrsn[54]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int l_i[3]{0, 0, 0};
-    int l_j[3]{0, 0, 0};
+    double P[3]{ 0, 0, 0 };
+    double Pi[3]{ 0, 0, 0 };
+    double Pj[3]{ 0, 0, 0 };
+    double PC[3]{ 0, 0, 0 };
+    double Fn[11]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    double Al[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    double Am[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    double An[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int maplrsl[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int maplrsm[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int maplrsn[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int l_i[3]{ 0, 0, 0 };
+    int l_j[3]{ 0, 0, 0 };
     int iat = 0, jat = 0, MaxFn = 0;
     double ex_sum = 0,
-           sqd = 0,
-           sqpc = 0,
-           prefac = 0,
-           expc = 0,
-           term = 0,
-           addesp = 0,
-           fjtmp = 0,
-           twoexpc = 0,
-           iex = 0,
-           jex = 0;
+        sqd = 0,
+        sqpc = 0,
+        prefac = 0,
+        expc = 0,
+        term = 0,
+        addesp = 0,
+        fjtmp = 0,
+        twoexpc = 0,
+        iex = 0,
+        jex = 0;
 
     const int MO = get_nmo(true);
     const int nprim = get_nex();
@@ -8798,9 +8801,9 @@ void WFN::calc_rho_cube(cube& cube_data) const
     {
         vec2 d;
         vec phi((*this).get_nmo(), 0.0);
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize((*this).get_ncen(), 0.0);
+        d.resize((*this).get_ncen());
+        for (int i = 0; i < (*this).get_ncen(); i++)
+            d[i].resize(16, 0.0);
 #pragma omp for schedule(dynamic)
         for (int index = 0; index < total_size; index++)
         {
@@ -8813,7 +8816,7 @@ void WFN::calc_rho_cube(cube& cube_data) const
                 i * v1[1] + j * v2[1] + k * v3[1] + orig[1],
                 i * v1[2] + j * v2[2] + k * v3[2] + orig[2] };
 
-            cube_data.set_value(i, j, k, (*this).compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
+            cube_data.set_value(i, j, k, (*this).compute_dens(cube_data.get_pos(i, j, k), d, phi));
             progress->update();
         }
     }
@@ -8831,21 +8834,22 @@ void WFN::calc_rho_cube(cube& cube_data) const
     std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << cube_data.sum() << std::endl;
 };
 
-void WFN::write_rho_cube(const double& radius, const double& increment) const{
+void WFN::write_rho_cube(const double& radius, const double& increment) const {
     using namespace std;
-    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-    int steps[3]{ 0, 0, 0 };
+    properties_options opts;
+    opts.radius = radius;
+    opts.resolution = increment;
     WFN dummy = (*this);
-    readxyzMinMax_fromWFN(dummy, MinMax, steps, radius, increment, true);
-    cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
+    readxyzMinMax_fromWFN(dummy, opts, true);
+    cube CubeRho(opts.NbSteps, dummy.get_ncen(), true);
     dummy.delete_unoccupied_MOs();
     CubeRho.give_parent_wfn(dummy);
     std::cout << "Starting work..." << endl;
 
     for (int i = 0; i < 3; i++)
     {
-        CubeRho.set_origin(i, MinMax[i]);
-        CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+        CubeRho.set_origin(i, opts.MinMax[i]);
+        CubeRho.set_vector(i, i, (opts.MinMax[i + 3] - opts.MinMax[i]) / opts.NbSteps[i]);
     }
     CubeRho.set_comment1("Calculated density using NoSpherA2");
     CubeRho.set_comment2("from " + dummy.get_path().string());

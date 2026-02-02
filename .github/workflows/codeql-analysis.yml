@@ -22,58 +22,49 @@ jobs:
 
     steps:
     - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
+      uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
       with:
         egress-policy: audit
 
     - name: Checkout repository
-      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         submodules: recursive
         fetch-depth: 1
 
+    - name: Setup Build Environment
+      uses: ./.github/actions/setup-build-env
+      with:
+        platform: Linux
+
+    - name: Cache Dependencies
+      uses: ./.github/actions/cache-deps
+      with:
+        platform: Linux
+
+    - name: Build Dependencies
+      uses: ./.github/actions/build-deps
+      with:
+        platform: Linux
+
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@cf1bb45a277cb3c205638b2cd5c984db1c46a412 # v4.31.7
+      uses: github/codeql-action/init@19b2f06db2b6f5108140aeb04014ef02b648f789 # v4.31.11
       with:
         languages: ${{ matrix.language }}
         source-root: ./Src
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gfortran clang build-essential
-
-    # Cache featomic
-    - name: Cache featomic Build
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-      id: cache-featomic-linux
-      with:
-        path: Lib/featomic_install  # Adjust if featomic installs elsewhere
-        key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
-        restore-keys: |
-          featomic-linux-${{ runner.os }}-
-  
-    - name: Build featomic
-      if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
-      run: |
-          cd featomic/featomic 
-          mkdir -p build
-          cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
-          make install
 
     - name: make_Linux
       run: make
       continue-on-error: true
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@cf1bb45a277cb3c205638b2cd5c984db1c46a412 # v4.31.7
+      uses: github/codeql-action/analyze@19b2f06db2b6f5108140aeb04014ef02b648f789 # v4.31.11
       with:
         output: 'codeql-results.sarif'  # Specify output file for CodeQL results
       continue-on-error: true
 
     - name: Upload analysis results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@cf1bb45a277cb3c205638b2cd5c984db1c46a412 # v4.31.7
+      uses: github/codeql-action/upload-sarif@19b2f06db2b6f5108140aeb04014ef02b648f789 # v4.31.11
       with:
         sarif_file: ${{github.workspace}}/codeql-results.sarif
       continue-on-error: true
@@ -88,12 +79,12 @@ jobs:
       security-events: write
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
         with:
           egress-policy: audit
 
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
             submodules: false
             fetch-depth: 1
@@ -106,7 +97,7 @@ jobs:
         continue-on-error: true
           
       - name: Upload analysis results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@cf1bb45a277cb3c205638b2cd5c984db1c46a412 # v4.31.7
+        uses: github/codeql-action/upload-sarif@19b2f06db2b6f5108140aeb04014ef02b648f789 # v4.31.11
         with:
           sarif_file: ${{github.workspace}}/flawfinder_results.sarif
           category: flawfinder

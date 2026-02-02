@@ -183,7 +183,7 @@ void atom::set_coordinate(const unsigned int& axis, const double& value) {
     else if (axis == 2) z = value;
 };
 
-void atom::set_frac_coords(const std::array<double, 3>& frac) {
+void atom::set_frac_coords(const d3& frac) {
     frac_coords = frac;
 };
 

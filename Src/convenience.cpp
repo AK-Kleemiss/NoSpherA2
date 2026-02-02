@@ -172,7 +172,7 @@ void copy_file(std::filesystem::path& from, std::filesystem::path& to)
     dest.close();
 };
 
-std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b)
+d3 cross(const d3& a, const d3& b)
 {
     return {
         a[1] * b[2] - a[2] * b[1],
@@ -180,7 +180,7 @@ std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<dou
         a[0] * b[1] - a[1] * b[0] };
 }
 
-double a_dot(const std::array<double, 3>& a, const std::array<double, 3>& b)
+double a_dot(const d3& a, const d3& b)
 {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 };
@@ -237,19 +237,11 @@ bool check_bohr(WFN& wave, bool debug)
     double min_length = 300.0;
     for (int i = 0; i < wave.get_ncen(); i++)
     {
-        double atom1[3]{ 0, 0, 0 };
-        for (int x = 0; x < 3; x++)
-            atom1[x] = wave.get_atom_coordinate(i, x);
+        d3 atom1 = wave.get_atom_pos(i);
         for (int j = i + 1; j < wave.get_ncen(); j++)
         {
-            double atom2[3]{ 0, 0, 0 };
-            for (int x = 0; x < 3; x++)
-                atom2[x] = wave.get_atom_coordinate(j, x);
-            double d[3]{ 0, 0, 0 };
-            d[0] = atom1[0] - atom2[0];
-            d[1] = atom1[1] - atom2[1];
-            d[2] = atom1[2] - atom2[2];
-            double length = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
+            d3 atom2 = wave.get_atom_pos(j);
+            const double length = array_length(atom1, atom2);
             if (debug)
                 std::cout << "Length for: " << i << ";" << j << ": " << length << ", min_length: " << min_length << std::endl;
             if (length < min_length)
@@ -573,10 +565,7 @@ bool unsaved_files(std::vector<WFN>& wavy)
 
 void readxyzMinMax_fromWFN(
     WFN& wavy,
-    double* CoordMinMax,
-    int* NbSteps,
-    double Radius,
-    double Increments,
+    properties_options& opts,
     bool no_bohr)
 {
     vec2 PosAtoms;
@@ -598,32 +587,30 @@ void readxyzMinMax_fromWFN(
                 PosAtoms[i][j] = constants::ang2bohr(PosAtoms[i][j]);
         }
     }
-    CoordMinMax[0] = *std::min_element(PosAtoms[0].begin(), PosAtoms[0].end());
-    CoordMinMax[3] = *std::max_element(PosAtoms[0].begin(), PosAtoms[0].end());
-    CoordMinMax[1] = *std::min_element(PosAtoms[1].begin(), PosAtoms[1].end());
-    CoordMinMax[4] = *std::max_element(PosAtoms[1].begin(), PosAtoms[1].end());
-    CoordMinMax[2] = *std::min_element(PosAtoms[2].begin(), PosAtoms[2].end());
-    CoordMinMax[5] = *std::max_element(PosAtoms[2].begin(), PosAtoms[2].end());
+    opts.MinMax[0] = *std::min_element(PosAtoms[0].begin(), PosAtoms[0].end());
+    opts.MinMax[3] = *std::max_element(PosAtoms[0].begin(), PosAtoms[0].end());
+    opts.MinMax[1] = *std::min_element(PosAtoms[1].begin(), PosAtoms[1].end());
+    opts.MinMax[4] = *std::max_element(PosAtoms[1].begin(), PosAtoms[1].end());
+    opts.MinMax[2] = *std::min_element(PosAtoms[2].begin(), PosAtoms[2].end());
+    opts.MinMax[5] = *std::max_element(PosAtoms[2].begin(), PosAtoms[2].end());
 
-    const double temp_rad = constants::ang2bohr(Radius);
-    CoordMinMax[0] -= temp_rad;
-    CoordMinMax[3] += temp_rad;
-    CoordMinMax[1] -= temp_rad;
-    CoordMinMax[4] += temp_rad;
-    CoordMinMax[2] -= temp_rad;
-    CoordMinMax[5] += temp_rad;
+    const double temp_rad = constants::ang2bohr(opts.radius);
+    opts.MinMax[0] -= temp_rad;
+    opts.MinMax[3] += temp_rad;
+    opts.MinMax[1] -= temp_rad;
+    opts.MinMax[4] += temp_rad;
+    opts.MinMax[2] -= temp_rad;
+    opts.MinMax[5] += temp_rad;
 
-    NbSteps[0] = (int)ceil(constants::bohr2ang(CoordMinMax[3] - CoordMinMax[0]) / Increments);
-    NbSteps[1] = (int)ceil(constants::bohr2ang(CoordMinMax[4] - CoordMinMax[1]) / Increments);
-    NbSteps[2] = (int)ceil(constants::bohr2ang(CoordMinMax[5] - CoordMinMax[2]) / Increments);
+    opts.NbSteps[0] = (int)ceil(constants::bohr2ang(opts.MinMax[3] - opts.MinMax[0]) / opts.resolution);
+    opts.NbSteps[1] = (int)ceil(constants::bohr2ang(opts.MinMax[4] - opts.MinMax[1]) / opts.resolution);
+    opts.NbSteps[2] = (int)ceil(constants::bohr2ang(opts.MinMax[5] - opts.MinMax[2]) / opts.resolution);
 }
 
 void readxyzMinMax_fromCIF(
     std::filesystem::path cif,
-    double* CoordMinMax,
-    int* NbSteps,
-    vec2& cm,
-    double Resolution)
+    properties_options& opts,
+    vec2& cm)
 {
     using namespace std;
     cell cell(cif);
@@ -635,21 +622,21 @@ void readxyzMinMax_fromCIF(
     cm[1][2] = constants::ang2bohr(cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg());
     cm[2][2] = constants::ang2bohr(cell.get_V() / (cell.get_a() * cell.get_b() * cell.get_sg()));
 
-    CoordMinMax[0] = 0.0;
-    CoordMinMax[1] = 0.0;
-    CoordMinMax[2] = 0.0;
+    opts.MinMax[0] = 0.0;
+    opts.MinMax[1] = 0.0;
+    opts.MinMax[2] = 0.0;
 
-    CoordMinMax[3] = (cell.get_a() + cell.get_b() * cell.get_cg() + cell.get_c() * cell.get_cb()) / 0.529177249;
-    CoordMinMax[4] = (cell.get_b() * cell.get_sg() + cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg()) / 0.529177249;
-    CoordMinMax[5] = cm[2][2];
+    opts.MinMax[3] = (cell.get_a() + cell.get_b() * cell.get_cg() + cell.get_c() * cell.get_cb()) / 0.529177249;
+    opts.MinMax[4] = (cell.get_b() * cell.get_sg() + cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg()) / 0.529177249;
+    opts.MinMax[5] = cm[2][2];
 
-    NbSteps[0] = (int)ceil(cell.get_a() / Resolution);
-    NbSteps[1] = (int)ceil(cell.get_b() / Resolution);
-    NbSteps[2] = (int)ceil(cell.get_c() / Resolution);
+    opts.NbSteps[0] = (int)ceil(cell.get_a() / opts.resolution);
+    opts.NbSteps[1] = (int)ceil(cell.get_b() / opts.resolution);
+    opts.NbSteps[2] = (int)ceil(cell.get_c() / opts.resolution);
 
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
-            cm[i][j] /= NbSteps[j];
+            cm[i][j] /= opts.NbSteps[j];
 }
 
 bool generate_sph2cart_mat(vec2& p, vec2& d, vec2& f, vec2& g)
@@ -1814,7 +1801,7 @@ void options::digest_options()
             exit(0);
         }
         else if (temp == "-def" || temp == "-DEF")
-            def = calc = true;
+            properties.def = true;
         else if (temp == "-density_difference" || temp == "-density-difference")
         {
             wfn2 = arguments[i + 1];
@@ -1836,18 +1823,18 @@ void options::digest_options()
             vec opts = split_string<double>(arguments[i + 1], ",");
             int l = static_cast<int>(opts[0]);
             int m = static_cast<int>(opts[1]);
-            resolution = 0.025;
-            radius = 3.5;
+            properties.resolution = 0.025;
+            properties.radius = 3.5;
             if (opts.size() >= 3)
             {
-                resolution = opts[2];
+                properties.resolution = opts[2];
             }
             if (opts.size() == 4)
             {
-                radius = opts[3];
+                properties.radius = opts[3];
             }
 
-            draw_orbital(l, m, resolution, radius);
+            draw_orbital(l, m, properties.resolution, properties.radius);
             exit(0);
         }
         else if (temp == "-e_field")
@@ -1863,14 +1850,14 @@ void options::digest_options()
         else if (temp == "-ED")
             electron_diffraction = true;
         else if (temp == "-eli")
-            calc = eli = true;
+            properties.eli = true;
         else if (temp == "-elf")
-            calc = elf = true;
+            properties.elf = true;
         else if (temp == "-equi_bench") {
             exit(0);
         }
         else if (temp == "-esp")
-            calc = esp = true;
+            properties.esp = true;
         else if (temp == "-ewal_sum")
         {
             // bool read, WFN& wave, std::ostream& file,
@@ -1910,9 +1897,9 @@ void options::digest_options()
             i += n;
         }
         else if (temp == "-HDEF")
-            hdef = calc = true;
+            properties.hdef = true;
         else if (temp == "-hirsh")
-            calc = hirsh = true, hirsh_number = stoi(arguments[i + 1]);
+            properties.hirsh = true, properties.hirsh_number = stoi(arguments[i + 1]);
         else if (temp == "-hirshfeld_surface")
         {
             hirshfeld_surface = arguments[i + 1];
@@ -1936,7 +1923,7 @@ void options::digest_options()
         else if (temp == "-IAM")
             iam_switch = true;
         else if (temp == "-lap")
-            calc = lap = true;
+            properties.lap = true;
         else if (temp == "-mem")
         {
             mem = stod(arguments[i + 1]); // In MB
@@ -1978,10 +1965,9 @@ void options::digest_options()
         else if (temp == "-MO")
         {
             if (string(arguments[i + 1]) != "all")
-                MOs.push_back(stoi(arguments[i + 1]));
+                properties.MO_numbers.push_back(stoi(arguments[i + 1]));
             else
-                all_mos = true;
-            calc = true;
+                properties.all_mos = true;
         }
         else if (temp == "-mtc")
         {
@@ -2064,11 +2050,15 @@ void options::digest_options()
         else if (temp == "-QCT" || temp == "-qct")
             qct = true;
         else if (temp == "-radius")
-            radius = stod(arguments[i + 1]);
+            properties.radius = stod(arguments[i + 1]);
         else if (temp == "-resolution")
-            resolution = stod(arguments[i + 1]);
+            properties.resolution = stod(arguments[i + 1]);
+        else if (temp == "-refine")
+            argc > i + 1 ? properties.integral_accuracy = stod(arguments[i + 1]) : properties.integral_accuracy = 0.1;
         else if (temp == "-rdg")
-            calc = rdg = true;
+            properties.rdg = true;
+        else if (temp == "-rgbi")
+            rgbi = true;
         else if (temp.find("-rkpts") < 1)
             read_k_pts = true;
         else if (temp == "-rho_cube")
@@ -2140,7 +2130,7 @@ void options::digest_options()
         }
 
         else if (temp.find("-s_rho") < 1)
-            s_rho = true;
+            properties.s_rho = true;
         else if (temp == "-SALTED" || temp == "-salted")
         {
             SALTED = true;
@@ -2398,19 +2388,19 @@ void options::look_for_debug(int& argc, char** argv)
     }
 };
 
-bool is_nan(double& in)
+bool is_nan(const double& in)
 {
     return in != in;
 };
-bool is_nan(float& in)
+bool is_nan(const float& in)
 {
     return in != in;
 };
-bool is_nan(long double& in)
+bool is_nan(const long double& in)
 {
     return in != in;
 };
-bool is_nan(cdouble& in)
+bool is_nan(const cdouble& in)
 {
     return in != in;
 };
@@ -2960,16 +2950,16 @@ void error_check(const bool condition, const std::source_location loc, const std
 {
     if (!condition)
     {
-        log_file << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << std::endl;
+        log_file << "Error in " << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << std::endl;
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
-        std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << std::endl;
+        std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " line: " << loc.line() << " " << error_message << std::endl;
         exit(-1);
     }
 };
 void not_implemented(const std::source_location loc, const std::string& error_message, std::ostream& log_file)
 {
-    log_file << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << " not yet implemented!" << std::endl;
+    log_file << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << " not yet implemented!" << std::endl;
     log_file.flush();
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << " not yet implemented!" << std::endl;
