@@ -48,7 +48,7 @@ jobs:
         platform: Linux
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@19b2f06db2b6f5108140aeb04014ef02b648f789 # v4.31.11
+      uses: github/codeql-action/init@6bc82e05fd0ea64601dd4b465378bbcf57de0314 # v4.32.1
       with:
         languages: ${{ matrix.language }}
         source-root: ./Src
@@ -58,13 +58,13 @@ jobs:
       continue-on-error: true
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@19b2f06db2b6f5108140aeb04014ef02b648f789 # v4.31.11
+      uses: github/codeql-action/analyze@6bc82e05fd0ea64601dd4b465378bbcf57de0314 # v4.32.1
       with:
         output: 'codeql-results.sarif'  # Specify output file for CodeQL results
       continue-on-error: true
 
     - name: Upload analysis results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@19b2f06db2b6f5108140aeb04014ef02b648f789 # v4.31.11
+      uses: github/codeql-action/upload-sarif@6bc82e05fd0ea64601dd4b465378bbcf57de0314 # v4.32.1
       with:
         sarif_file: ${{github.workspace}}/codeql-results.sarif
       continue-on-error: true
@@ -97,7 +97,7 @@ jobs:
         continue-on-error: true
           
       - name: Upload analysis results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@19b2f06db2b6f5108140aeb04014ef02b648f789 # v4.31.11
+        uses: github/codeql-action/upload-sarif@6bc82e05fd0ea64601dd4b465378bbcf57de0314 # v4.32.1
         with:
           sarif_file: ${{github.workspace}}/flawfinder_results.sarif
           category: flawfinder
