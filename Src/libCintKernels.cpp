@@ -1,4 +1,3 @@
-#pragma once
 #include "convenience.h"
 
 #include "libCintKernels.h"
@@ -226,9 +225,6 @@ extern "C" {
 
     extern CINTOptimizerFunction int3c1e_optimizer;
     extern CINTIntegralFunction int3c1e_sph;
-
-    // Add missing overlap function declarations
-    extern CINTOptimizerFunction int1e_ovlp_optimizer;
 }
 
 #define ADD_FUNCS_TO_KERNEL(Kernel, optimizer_func, driver_func, integral_func, coord_type) \

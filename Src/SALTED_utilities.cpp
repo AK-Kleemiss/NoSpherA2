@@ -514,7 +514,7 @@ cube calc_cube_ML(const vec& data, WFN& dummy, const int& atom_nr)
 };
 
 #include "integrator.h"
-#include "libCintMain.h""
+#include "libCintMain.h"
 #include "nos_math.h"
 #include "npy.h"
 void create_SALTED_training_data(const WFN& orbital, const WFN& aux) {
