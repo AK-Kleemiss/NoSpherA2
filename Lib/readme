@@ -1,3 +1,4 @@
-The compilation of each OS is supposed to create the following fodlers here:
+The compilation of each OS is supposed to create the following folders here:
 featomic_install
 Intel MKL Libraries
+LibCint

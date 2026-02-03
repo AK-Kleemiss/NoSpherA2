@@ -17,6 +17,7 @@
 #include "SALTED_utilities.h"
 #include "GridManager.h"
 
+
 #ifdef PEOJECT_NAME
 #define FLO_CUDA
 #include "cuda_runtime.h"
@@ -2047,51 +2048,102 @@ cdouble sfac_bessel(
     return constants::FOUR_PI_i_pows[p.get_type()] * fourier_bessel_integral(p, k_point[3]) * p.get_coef() * constants::spherical_harmonic(p.get_type(), k_point, coefs);
 }
 
+//TODO´: This breaks if the aux_basis is contracted... Need to fix that!
 void calc_SF_SALTED(const vec2& k_pt,
     const vec& coefs,
     const std::vector<atom>& atom_list,
+    const ivec& asym_atom_list,
     cvec2& sf)
 {
-    sf.resize(atom_list.size());
+    const int num_atoms = (int)atom_list.size();
+    const int num_asym_atoms = (int)asym_atom_list.size();
 
+    // coefficients per *atom* (full list)
+    std::vector<int> atom_ncoefs(num_atoms, 0);
+
+    // global offset for each atom in coefs[]
+    std::vector<int> atom_offsets(num_atoms + 1, 0);
+
+#pragma omp parallel for
+    for (int iat = 0; iat < num_atoms; ++iat) {
+        const atom& a = atom_list[iat];
+
+        int prim = 0;
+        int n_this = 0;
+
+        for (int shell = 0; shell < a.get_shellcount_size(); ++shell) {
+            int L = a.get_basis_set_type(prim);
+            n_this += 2 * L + 1;
+            prim += a.get_shellcount(shell);
+        }
+
+        atom_ncoefs[iat] = n_this;
+    }
+
+    // prefix sum over *all* atoms
+    std::partial_sum(atom_ncoefs.begin(),
+        atom_ncoefs.end(),
+        atom_offsets.begin() + 1);
+
+
+    ivec coef_offsets(num_asym_atoms + 1, 0);
+
+    for (int ia = 0; ia < num_asym_atoms; ++ia) {
+        coef_offsets[ia] = atom_offsets[asym_atom_list[ia]];
+    }
+
+    sf.resize(num_asym_atoms);
     ProgressBar pb(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
+
 #pragma omp parallel shared(pb, sf)
     {
+    // init SF
 #pragma omp for
-        for (int i = 0; i < sf.size(); i++)
-        {
-            sf[i].resize(k_pt[0].size(), constants::cnull);
-        }
-        primitive basis;
-#pragma omp for
-        for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++)
-        {
-            const int num_atoms = (int)atom_list.size();
-            const double* coef_slice_ptr = coefs.data();
-            double k_pt_local[4] = { k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt], 0.0 };
-            k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
+    for (int ia = 0; ia < num_asym_atoms; ++ia) {
+        sf[ia].assign(k_pt[0].size(), constants::cnull);
+    }
 
-            //Normalize K-point
-            for (int i = 0; i < 3; i++)
+#pragma omp for
+        for (int i_kpt = 0; i_kpt < (int)k_pt[0].size(); ++i_kpt)
+        {
+            double k_pt_local[4] = {
+                k_pt[0][i_kpt],
+                k_pt[1][i_kpt],
+                k_pt[2][i_kpt],
+                0.0
+            };
+
+            //k_pt_local[3] = std::sqrt(
+            //    k_pt_local[0] * k_pt_local[0] +
+            //    k_pt_local[1] * k_pt_local[1] +
+            //    k_pt_local[2] * k_pt_local[2]);
+
+            k_pt_local[3] = std::hypot(k_pt_local[0], k_pt_local[1], k_pt_local[2]);
+
+            for (int i = 0; i < 3; ++i)
                 k_pt_local[i] /= k_pt_local[3];
 
-            const atom* atom_ptr = &(atom_list[0]);
-            const basis_set_entry* basis_ptr = NULL;
-            for (int iat = 0; iat < num_atoms; iat++, atom_ptr++)
+            for (int ia = 0; ia < num_asym_atoms; ++ia)
             {
-                const int lim = (int)atom_ptr->get_basis_set_size();
-                basis_ptr = &(atom_ptr->get_basis_set_entry(0));
-                for (int i_basis = 0; i_basis < lim; i_basis++, basis_ptr++, coef_slice_ptr += 2 * basis.get_type() + 1)
+                const atom& a = atom_list[asym_atom_list[ia]];
+
+                const basis_set_entry* basis_ptr = &a.get_basis_set_entry(0);
+                const int lim = (int)a.get_basis_set_size();
+
+                const double* coef_slice_ptr = coefs.data() + coef_offsets[ia];
+
+                for (int i_basis = 0; i_basis < lim; ++i_basis, ++basis_ptr)
                 {
-                    basis = basis_ptr->get_primitive();
-                    sf[iat][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
+                    // IMPORTANT: make basis local, not shared between threads
+                    primitive basis = basis_ptr->get_primitive();
+                    sf[ia][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
+                    coef_slice_ptr += 2 * basis.get_type() + 1;
                 }
             }
             pb.update();
         }
     }
 }
-
 /**
  * Calculates the scattering factors for a given set of parameters.
  *
@@ -2310,13 +2362,15 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
         if (debug) {
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                if (temp.find(wave.get_atom_charge(asym_atom_list[i])) == temp.end()) {
-                    temp.emplace(wave.get_atom_charge(asym_atom_list[i]), (wave.get_atom_charge(asym_atom_list[i]), mode));
+                const int charge = wave.get_atom_charge(asym_atom_list[i]);
+                if (temp.find(charge) == temp.end()) {
+                    temp.emplace(charge, Thakkar{ charge, mode });
+                    temp_G.emplace(charge, Spherical_Gaussian_Density{ charge, mode });
                     if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
                     {
-                        double k_0001 = temp[i].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
-                        double k_1 = temp[i].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.get_atom_ECP_electrons(asym_atom_list[i]));
-                        file << "Atom nr: " << wave.get_atom_charge(asym_atom_list[i]) << " number of ECP electrons: " << wave.get_atom_ECP_electrons(asym_atom_list[i]) << " core f(0) : "
+                        double k_0001 = temp[charge].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
+                        double k_1 = temp[charge].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.get_atom_ECP_electrons(asym_atom_list[i]));
+                        file << "Atom nr: " << charge << " number of ECP electrons: " << wave.get_atom_ECP_electrons(asym_atom_list[i]) << " core f(0) : "
                             << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
                     }
                 }
@@ -2325,12 +2379,10 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
         else {
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                int charge = wave.get_atom_charge(asym_atom_list[i]);
+                const int charge = wave.get_atom_charge(asym_atom_list[i]);
                 if (temp.find(charge) == temp.end()) {
-                    Thakkar t(charge, mode);
-                    Spherical_Gaussian_Density g(charge, mode);
-                    temp.emplace(charge, t);
-                    temp_G.emplace(charge, g);
+                    temp.emplace(charge, Thakkar{ charge, mode });
+                    temp_G.emplace(charge, Spherical_Gaussian_Density{ charge, mode });
                 }
             }
         }
@@ -2418,8 +2470,8 @@ int make_atomic_grids_wrapper(
     WFN temp = wave;
     temp.delete_unoccupied_MOs();
     // Setup grids for the molecule
-    grid_manager.setupGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
-    grid_manager.add_timing_info_to_vecs(time_points, time_descriptions);
+    grid_manager.setup3DGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+    grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
 
     // Calculate partitioned charges
     auto results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
@@ -2686,6 +2738,7 @@ tsc_block_type calculate_scattering_factors(
             k_pt,
             coefs,
             calculator.wavy.get_atoms(),
+            asym_atom_list,
             sf);
         file << setw(13 * 4) << "... done!\n"
             << flush;
@@ -2731,26 +2784,23 @@ tsc_block_type calculate_scattering_factors(
                 opt.debug,
                 opt.no_date);
 
-            time_points.push_back(end1);
+            time_points.push_back(get_time());
             time_descriptions.push_back("Fourier transform");
         }
         else if (opt.partition_type == PartitionType::RI)
         {
             file << "\nGenerating densities... " << endl;
-            //If no basis is yet loaded, assume a auto aux should be generated
-            for (shared_ptr<BasisSet>& aux_basis_set : opt.aux_basis) { if ((*aux_basis_set).get_primitive_count() == 0) (*aux_basis_set).gen_auto_aux(*wavy); }
+            WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis);
 
-            shared_ptr<BasisSet> combined_aux_basis = opt.aux_basis[0];
-            for (int basis_nr = 1; basis_nr < opt.aux_basis.size(); basis_nr++) { (*combined_aux_basis) += (*opt.aux_basis[basis_nr]); }
+            //TODO: only compute coefs for atoms that are actually in the symmetric unit!
+            DensityFitting::CONFIG config;
+            config.analyze_quality = opt.debug;
+            //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+            //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+            //if (wavy->get_origin() == e_origin::ptb)
+            //    config.restraint_strength = 1.0e-4;
 
-            WFN wavy_aux(e_origin::NOT_YET_DEFINED);
-            wavy_aux.set_atoms(wavy->get_atoms());
-            wavy_aux.set_ncen(wavy->get_ncen());
-            wavy_aux.delete_basis_set();
-            load_basis_into_WFN(wavy_aux, combined_aux_basis);
-
-            vec coefs = density_fit_hybrid(*wavy, wavy_aux, opt.mem, 'C',
-                0.0002, 1e-6, "TFVC");
+            vec coefs = DensityFitting::density_fit(*wavy, wavy_aux, config);
             file << setw(12 * 4 + 2) << "... done!\n"
                 << flush;
             time_points.push_back(get_time());
@@ -2758,15 +2808,15 @@ tsc_block_type calculate_scattering_factors(
 
             vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
             file << "Table of Charges in electrons\n"
-                << "       Atom      ML" << endl;
+                << "       Atom  Charge_RI" << endl;
 
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
                 int a = asym_atom_list[i];
                 file << setw(10) << labels[i]
-                    << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[i];
+                     << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[a];
                 if (opt.debug)
-                    file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+                    file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[a];
                 file << endl;
             }
 
@@ -2779,6 +2829,7 @@ tsc_block_type calculate_scattering_factors(
                 k_pt,
                 coefs,
                 wavy_aux.get_atoms(),
+                asym_atom_list,
                 sf);
             file << setw(12 * 4 + 2) << "... done!" << endl;
             time_points.push_back(get_time());
@@ -2815,10 +2866,13 @@ tsc_block_type calculate_scattering_factors(
     if (opt.needs_Thakkar_fill)
     {
         file << "Performing the remaining calculation of spherical atoms..." << std::endl;
+        opt.needs_Thakkar_fill = false;
         vector<WFN> tempy;
         tempy.emplace_back(opt.wfn);
         opt.m_hkl_list = hkl;
-        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN>>(opt, tempy, file, labels, 0);
+        opt.iam_switch = true;
+        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, tempy, file, labels, 0);
+        opt.iam_switch = false;
         blocky.append(std::move(blocky_thakkar), file);
         time_points.push_back(get_time());
         time_descriptions.push_back("Spherical Atoms");

@@ -486,6 +486,8 @@ public:
     void resize_DM(const int& size, const double& value = 0.0);
     /** Full symmetric density matrix (mdarray form) if available. */
     dMatrix2 get_dm() const { return DM; };
+    /** Set density matrix*/
+    void set_dm(const dMatrix2& in) { DM = in; };
     //----------S_DM Handling--------------------------------
     /** Append spin density matrix element. */
     void push_back_SDM(const double& value = 0.0);

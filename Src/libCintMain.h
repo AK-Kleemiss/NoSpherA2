@@ -1,29 +1,10 @@
 #pragma once
 
 #include "convenience.h"
+
+//Include both, as they are both required when calling the functions declared here
 #include "integration_params.h"
-
-
-//DEPRICATED::Function to compute electron repulsion integrals
-void computeEri3c(Int_Params& param1,
-    Int_Params& param2,
-    vec& eri3c);
-
-struct Coulomb2C {
-    static constexpr bool NeedsOpt = true;
-    static void optimizer(CINTOpt*& opt,
-        int* atm, int nat, int* bas, int nbas, double* env);
-    static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
-};
-
-struct Overlap2C {
-    static constexpr bool NeedsOpt = false;
-    static void optimizer(CINTOpt*& opt,
-        const int*, int, const int*, int, const double*);
-    static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
-};
+#include "libCintKernels.h"
 
 /**
  * @brief Computes 2-center integrals using the specified kernel type.
@@ -43,31 +24,6 @@ struct Overlap2C {
 template <typename Kernel>
 void compute2C(Int_Params& params, vec& ret);
 
-
-struct Coulomb3C {
-    static constexpr bool NeedsOpt = true;
-
-    static void optimizer(CINTOpt*& opt,
-        int* atm, int nat, int* bas, int nbas, double* env);
-
-    static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
-};
-
-struct Overlap3C {
-    static constexpr bool NeedsOpt = false;
-
-    static void optimizer(CINTOpt*& opt,
-        const int*, int, const int*, int, const double*);
-
-        static void drv(double* out, int comp, int* shl_slice, int* aoloc,
-            CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
-};
-
-// Function to compute Overlap integrals
-void compute2c_Overlap_Cart(Int_Params& param1,
-    vec& overlap_2c);
-
 /*
 * Function to compute fitting coefficients for the density matrix using the desired metric indicated by the Kernel template parameter
 * This function combines the calculation of 3-center 2-electron integrals and the fitting coefficients
@@ -81,11 +37,25 @@ void compute2c_Overlap_Cart(Int_Params& param1,
  * param2: Int_Params object for the auxiliary basis
  * dm: Density matrix
  * rho: Resulting density matrix
- * max_mem: Maximum available memory in MB
  */
 template <typename Kernel>
-void computeRho(Int_Params& param1,
-    Int_Params& param2,
+void computeRho(
+    const Int_Params& normal_basis,
+    const Int_Params& aux_basis,
     const dMatrix2& dm,
-    vec& rho,
-    double max_mem);
+    vec& rho);
+
+
+//DEPRICATED::Function to compute electron repulsion integrals
+template <typename Kernel>
+void computeEri3c(Int_Params& param1,
+    Int_Params& param2,
+    vec& eri3c);
+
+template <typename Kernel>
+void compute3C(Int_Params& param1,
+    Int_Params& param2,
+    vec& eri3c);
+
+
+dMatrix2 get_cart2sph_matrix(const WFN& cart_wfn, const bool normalized);

@@ -140,7 +140,7 @@ int main(int argc, char** argv)
     aux_file << "    std::array<int, 118> offsets{};\n";
     aux_file << "    int sum = 0;\n";
     aux_file << "    for (int i = 0; i < 118; ++i) {\n";
-    aux_file << "        offsets[i] = sum;\n";
+    aux_file << "        offsets[i] = (counts[i] == 0) ? -1 : sum;\n";
     aux_file << "        sum += counts[i];\n";
     aux_file << "    }\n";
     aux_file << "    return offsets;\n";

@@ -21,6 +21,13 @@ else
   endif
 endif
 
+#Set some environemt variables for macOS builds
+ifeq ($(NAME),MAC)
+export MACOSX_DEPLOYMENT_TARGET=13.3
+export CMAKE_OSX_DEPLOYMENT_TARGET=13.3
+export RUSTFLAGS=-C link-arg=-mmacosx-version-min=13.3
+endif
+
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 all: check_rust NoSpherA2
@@ -28,11 +35,7 @@ all: check_rust NoSpherA2
 # --- Cross-platform rust check ---
 ifeq ($(OS),Windows_NT)
 check_rust:
-	@where rustc >NUL 2>&1 && ( \
-	  for /f "usebackq delims=" %%V in (`rustc --version`) do @echo Found: %%V \
-	) || ( \
-	  echo Rust is not installed or not on PATH. Install via https://www.rust-lang.org/tools/install & exit /b 1 \
-	)
+	@powershell -NoProfile -Command "if (Get-Command rustc -ErrorAction SilentlyContinue) { rustc --version } else { Write-Error 'Rust not found install via https://www.rust-lang.org/tools/install'; exit 1 }"
 else
 check_rust:
 	@command -v rustc >/dev/null 2>&1 || { \
@@ -56,8 +59,22 @@ featomic: check_rust
 		echo featomic already built \
 	)
 else ifeq ($(NAME),MAC)
-featomic: check_rust featomic_$(NATIVE_ARCH)
-	@echo Built featomic for $(NATIVE_ARCH)
+featomic:  check_rust
+	@if [ ! -f Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a ]; then \
+		echo 'Building featomic for $(NATIVE_ARCH), since Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a doesnt exist'; \
+		cd $(MAKEFILE_DIR)/featomic/featomic && \
+		mkdir -p build_$(NATIVE_ARCH) && \
+		cd build_$(NATIVE_ARCH) && \
+		if [ "$(NATIVE_ARCH)" = "x86_64" ]; then \
+			rustup target add x86_64-apple-darwin; \
+			cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_$(NATIVE_ARCH) -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. ; \
+		else \
+			cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_$(NATIVE_ARCH) .. ; \
+		fi && \
+		make install || true; \
+	else \
+		echo 'Skipping featomic build, Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a already exists'; \
+	fi
 else
 featomic: check_rust
 	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
@@ -72,30 +89,12 @@ featomic: check_rust
 	fi
 endif
 
-featomic_x86_64: check_rust
-	@if [ ! -f Lib/featomic_install_x86/lib/libfeatomic.a ]; then \
-		echo 'Building featomic for x86_64, since Lib/featomic_install_x86/lib/libfeatomic.a doesnt exist'; \
-		rustup target add x86_64-apple-darwin; \
-		cd $(MAKEFILE_DIR)/featomic/featomic && \
-		mkdir -p build_x86_64 && \
-		cd build_x86_64 && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. && \
-		make install; \
-	else \
-		echo 'Skipping featomic build, Lib/featomic_install_x86/lib/libfeatomic.a already exists'; \
-	fi
+featomic_x86_64:
+	@$(MAKE) NATIVE_ARCH=x86_64 featomic
 
 featomic_arm64: check_rust
-	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
-		echo 'Building featomic, since Lib/featomic_install/lib/libfeatomic.a doesnt exist'; \
-		cd $(MAKEFILE_DIR)/featomic/featomic && \
-		mkdir -p build && \
-		cd build && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
-		make install || true; \
-	else \
-		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
-	fi
+	@$(MAKE) NATIVE_ARCH=arm64 featomic
+
 
 intel_ROOT := $(CURDIR)/Lib/MKL
 IntelMKL:
@@ -115,10 +114,44 @@ endif
 
 
 ifeq ($(NAME),WINDOWS)
-NoSpherA2: IntelMKL featomic
+LibCint:
+	@if not exist Lib\LibCint\lib\cint.lib ( \
+		echo Building LibCint for $(NAME) &&\
+		@cd libcint && (if not exist build mkdir build) && cd build && cmake -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=install -DCMAKE_C_COMPILER=cl .. && cmake --build . --config release && cd ../.. && \
+		(if not exist Lib\LibCint\lib mkdir Lib\LibCint\lib) && copy libcint\build\Release\cint.lib Lib\LibCint\lib\cint.lib \
+	) else ( \
+		echo Skipping LibCint build, Lib\LibCint\lib\cint.lib already exists \
+	)
+else ifeq ($(NAME),MAC)
+LibCint:
+	@if [ ! -f Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a ]; then \
+		echo 'Building LibCint for $(NATIVE_ARCH), since Lib/LibCint_$(NATIVE_ARCH)/lib/cint.a doesnt exist'; \
+		cd libcint && mkdir -p build_$(NATIVE_ARCH) && cd build_$(NATIVE_ARCH) && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=install -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && make install && cd ../.. && \
+		mkdir -p Lib/LibCint/lib_$(NATIVE_ARCH) && cp libcint/build_$(NATIVE_ARCH)/install/lib/libcint.a Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a; \
+	else \
+		echo 'Skipping LibCint build, Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a already exists'; \
+	fi
+else
+LibCint:
+	@if [ ! -f Lib/LibCint/lib/cint.a ]; then \
+		cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=install .. && make install && cd ../.. && \
+		mkdir Lib/LibCint/lib && cp libcint/build/install/lib/libcint.a Lib/LibCint/lib/cint.a; \
+	else \
+		echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
+	fi
+endif
+
+LibCint_x86_64:
+	@$(MAKE) NATIVE_ARCH=x86_64 LibCint
+
+LibCint_arm64:
+	@$(MAKE) NATIVE_ARCH=arm64 LibCint
+
+ifeq ($(NAME),WINDOWS)
+NoSpherA2: IntelMKL featomic LibCint
 	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe . && copy Windows\x64\Release\libiomp5md.dll
 
-NoSpherA2_Debug: IntelMKL featomic
+NoSpherA2_Debug: IntelMKL featomic LibCint
 	@echo Building NoSpherA2_Debug for $(NAME)
 	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
 
@@ -127,12 +160,12 @@ clean:
 endif
 
 ifeq ($(NAME),LINUX)
-NoSpherA2: IntelMKL featomic
+NoSpherA2: IntelMKL featomic LibCint
 	@echo Start making Linux executable
 	@rm -f NoSpherA2
 	@cd Linux && rm -f NoSpherA2 && make all -j
 
-NoSpherA2_Debug: IntelMKL featomic
+NoSpherA2_Debug: IntelMKL featomic LibCint
 	@echo Building NoSpherA2_Debug for $(NAME)
 	@rm -f NoSpherA2_Debug
 	@cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
@@ -143,22 +176,22 @@ clean:
 endif
 
 ifeq ($(NAME),MAC)
-NoSpherA2: IntelMKL featomic_$(NATIVE_ARCH)
+NoSpherA2: IntelMKL featomic LibCint
 	@echo Start making Mac $(NATIVE_ARCH) executable
 	@rm -f NoSpherA2_$(NATIVE_ARCH)
 	@cd Mac && rm -f NoSpherA2_$(NATIVE_ARCH) && make NoSpherA2_$(NATIVE_ARCH) -j && cp NoSpherA2_$(NATIVE_ARCH) ../NoSpherA2
 
-NoSpherA2_arm64: IntelMKL featomic_arm64
+NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint_arm64
 	@echo Start making Mac arm64 executable
 	@rm -f NoSpherA2_arm64
 	@cd Mac && rm -f NoSpherA2_arm64 && make NoSpherA2_arm64 -j && cp NoSpherA2_arm64 ../NoSpherA2
 
-NoSpherA2_x86_64: IntelMKL featomic_x86_64
+NoSpherA2_x86_64: IntelMKL featomic_x86_64 LibCint_x86_64
 	@echo Start making Mac x86_64 executable
 	@rm -f NoSpherA2_x86_64
 	@cd Mac && rm -f NoSpherA2_x86_64 && make NoSpherA2_x86_64 -j && cp NoSpherA2_x86_64 ../NoSpherA2_x86_64
 
-NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64
+NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint_arm64 LibCint_x86_64
 	@echo Start making Mac universal executable
 	@rm -f NoSpherA2
 	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j
@@ -173,4 +206,4 @@ tests: NoSpherA2
 	make -C tests all -k -B
 
 
-.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust
+.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust LibCint

@@ -35,16 +35,10 @@ public:
     }
 
     //Constructor for the generation of a basis set from a given WFN and beta value
-    BasisSet(const WFN& wavy, const double beta) : BasisSet() {
-        _beta = beta;
+    BasisSet(const WFN& wavy) : BasisSet() {
         gen_auto_aux(wavy);
     }
 
-    //Constructor for the initialization of a auto_aux basis set
-    //By calling the gen_etb_aux function on this object, the basis set will be generated
-    BasisSet(const double beta) : BasisSet()  {
-        _beta = beta;
-    }
 
 
     std::shared_ptr<std::array<std::vector<primitive>, 118>> get_data();
@@ -74,9 +68,14 @@ public:
         return _primitives;
     }
     
-    void gen_etb_aux(const WFN& orbital_wfn);
     void gen_auto_aux(const WFN& orbital_wfn);
-    
+    void gen_auto_aux_for_element(const atom& atm);
+
+    void SVD_prune_aux_basis(const WFN& orbital_wfn);
+
+    bool has_element(const int& element) const {
+        return _elementCounts[element - 1] != 0;
+    }
 private:
     std::vector<SimplePrimitive> _ownedPrimitives;
     SimplePrimitive* _primitives = nullptr;
@@ -85,7 +84,6 @@ private:
     std::array<int, 118> _elementCounts; // Size 118
     std::array<int, 118> _elementOffsets; // Size 118
     std::array<std::vector<primitive>, 118> _convertedData;
-    double _beta = 2.0;
 };
 
 
@@ -97,6 +95,8 @@ public:
     std::shared_ptr<BasisSet> get_basis_set(std::string basis_name);
     bool check_basis_set_exists(std::string basis_name);
 private:
-
     BasisSet auxiliary_basis;
 };
+
+int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b);
+WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>> &aux_basis);

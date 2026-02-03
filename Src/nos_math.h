@@ -53,7 +53,6 @@ template <class T>
 std::vector<std::vector<T>> transpose(const std::vector<std::vector<T>>& mat);
 template <typename T>
 Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> transpose(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat);
-
 // Flat 2D MATRIX
 template <class T>
 std::vector<T> transpose(const std::vector<T>& mat, const int rows, const int cols);
