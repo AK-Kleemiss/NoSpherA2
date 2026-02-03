@@ -8,6 +8,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
+  #SETUP RUST STUFF
     - name: Setup Cargo environment (Unix)
       if: inputs.platform != 'Windows'
       shell: bash
@@ -32,40 +33,32 @@ runs:
         & "$env:USERPROFILE\.cargo\bin\cargo.exe" --version
         & "$env:USERPROFILE\.cargo\bin\rustc.exe" --version
 
-    - name: Build featomic (Unix)
-      if: inputs.platform != 'Windows'
+  #BUILD DEPENDENCIES USING MAKEFILE TARGETS (UNIX)
+    - name: Build deps (macOS ARM64)
+      if: inputs.platform == 'Mac_ARM64'
       shell: bash
       run: |
-        source ~/.cargo/env
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         export PATH="$HOME/.cargo/bin:$PATH"
-    
-        if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
-          echo "Building featomic for ${{ inputs.platform }}"
-          cd featomic/featomic
-          mkdir -p build
-          cd build
-          cmake ${{ env.FEATOMIC_CMAKE_FLAGS }} -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install ..
-          make install
-        else
-          echo 'Skipping featomic build, already exists'
-        fi
+        make featomic_arm64 LibCint_arm64 -j
 
-    - name: Build Intel MKL (Linux)
+    - name: Build deps (macOS x86_64)
+      if: inputs.platform == 'Mac_x86_64'
+      shell: bash
+      run: |
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        export PATH="$HOME/.cargo/bin:$PATH"
+        make featomic_x86_64 LibCint_x86_64 -j
+
+    - name: Build deps (Linux)
       if: inputs.platform == 'Linux'
       shell: bash
       run: |
-        if [ ! -f Lib/MKL/mkl/2025.2/lib/libmkl_core.a ]; then
-          wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh
-          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=${{ github.workspace }}/Lib/MKL --eula accept
-        else
-          echo 'Skipping IntelMKL build, already exists'
-        fi
+        source ~/.cargo/env || true
+        export PATH="$HOME/.cargo/bin:$PATH"
+        make IntelMKL featomic LibCint -j
 
-    - name: Set LD_LIBRARY_PATH for Intel OpenMP (Linux)
-      if: inputs.platform == 'Linux'
-      shell: bash
-      run: echo "LD_LIBRARY_PATH=${{ github.workspace }}/Lib/MKL/compiler/2025.2/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-
+  #BUILD DEPENDENCIES USING CUSTOM STEPS (WINDOWS)
     - name: Build dependencies (Windows)
       if: inputs.platform == 'Windows'
       shell: powershell
@@ -92,3 +85,20 @@ runs:
         cd ${{ github.workspace }}
         # Get Intel MKL
         MSBuild .\Windows\NoSpherA2.sln /t:Restore /p:RestorePackagesPath=Windows/packages /p:RestoreTimeout=300000
+
+  #BUILD INTEL MKL (LINUX)
+    - name: Build Intel MKL (Linux)
+      if: inputs.platform == 'Linux'
+      shell: bash
+      run: |
+        if [ ! -f Lib/MKL/mkl/2025.2/lib/libmkl_core.a ]; then
+          wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh
+          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=${{ github.workspace }}/Lib/MKL --eula accept
+        else
+          echo 'Skipping IntelMKL build, already exists'
+        fi
+
+    - name: Set LD_LIBRARY_PATH for Intel OpenMP (Linux)
+      if: inputs.platform == 'Linux'
+      shell: bash
+      run: echo "LD_LIBRARY_PATH=${{ github.workspace }}/Lib/MKL/compiler/2025.2/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
