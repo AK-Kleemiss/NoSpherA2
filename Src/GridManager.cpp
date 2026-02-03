@@ -931,13 +931,14 @@ void GridManager::calculateNonSphericalDensities(const WFN& wave, const cell& un
 }
 
 vec GridManager::evaluateFunctionOnGrid(const vec2& grid_points, std::function<double(double, double, double)> func) const {
-    vec results(grid_points[0].size());
+    const std::size_t num_points = grid_points[0].size();
+    vec results(num_points);
 #pragma omp parallel for
-    for (int p = 0; p < grid_points[0].size(); ++p) {
+    for (std::size_t p = 0; p < num_points; ++p) {
         results[p] = func(grid_points[GridData::GridIndex::X][p], grid_points[GridData::GridIndex::Y][p], grid_points[GridData::GridIndex::Z][p]) * grid_points[GridData::GridIndex::WEIGHT][p];
     }
 
-    return std::move(results);
+    return results;
 }
 
 void GridManager::pruneGrid() {
