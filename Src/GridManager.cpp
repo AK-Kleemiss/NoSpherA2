@@ -275,6 +275,7 @@ void GridManager::getIntegrationGrid1D(const WFN& wave, const int atom_1, const 
         bond[i] = pos2[i] - pos1[i];
     }
     double distance = sqrt(pow(pos2[0] - pos1[0], 2) + pow(pos2[1] - pos1[1], 2) + pow(pos2[2] - pos1[2], 2));
+    err_chkf(distance > 1e-8, "Error: Atoms are at the same position!", std::cout);
     for (int i = 0; i < 3; ++i) {
         pos1[i] -= padding * (bond[i] / distance);
         pos2[i] += padding * (bond[i] / distance);
@@ -931,10 +932,10 @@ void GridManager::calculateNonSphericalDensities(const WFN& wave, const cell& un
 }
 
 vec GridManager::evaluateFunctionOnGrid(const vec2& grid_points, std::function<double(double, double, double)> func) const {
-    const std::size_t num_points = grid_points[0].size();
+    const long long int num_points = grid_points[0].size();
     vec results(num_points);
 #pragma omp parallel for
-    for (std::size_t p = 0; p < num_points; ++p) {
+    for (long long int p = 0; p < num_points; ++p) {
         results[p] = func(grid_points[GridData::GridIndex::X][p], grid_points[GridData::GridIndex::Y][p], grid_points[GridData::GridIndex::Z][p]) * grid_points[GridData::GridIndex::WEIGHT][p];
     }
 
