@@ -126,7 +126,7 @@ ifeq ($(NAME),WINDOWS)
 else
 	@if [ ! -f Lib/LibCint/lib/cint.a ]; then \
 		cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 .. && cmake --build . --config Release && cd ../.. && \
-		cp libcint/build/libcint.a Lib/LibCint/lib/cint.a; \
+		cp libcint/libcint.a Lib/LibCint/lib/cint.a; \
 	else \
 		echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
 	fi
