@@ -118,8 +118,8 @@ LibCint:
 	echo Building LibCint for $(NAME) &&    \
 	@if not exist Lib\LibCint\lib\cint.lib ( \
 		echo Building LibCint for $(NAME) &&\
-		@cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 .. && cmake --build . --config Release && cd ../.. && \
-		copy libcint\build\Release\cint.lib Lib\LibCint\lib \
+		@cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=install .. && cmake --build . --config Release --target INSTALL&& cd ../.. && \
+		copy libcint\build\install\lib\cint.lib Lib\LibCint\lib \
 	) else ( \
 		echo Skipping LibCint build, Lib\LibCint\lib\cint.lib already exists \
 	)
@@ -127,16 +127,16 @@ else ifeq ($(NAME),MAC)
 LibCint:
 	@if [ ! -f Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a ]; then \
 		echo 'Building LibCint for $(NATIVE_ARCH), since Lib/LibCint_$(NATIVE_ARCH)/lib/cint.a doesnt exist'; \
-		cd libcint && mkdir -p build_$(NATIVE_ARCH) && cd build_$(NATIVE_ARCH) && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && cmake --build . --config Release && cd ../.. && \
-		mkdir -p Lib/LibCint/lib_$(NATIVE_ARCH) && cp libcint/build_$(NATIVE_ARCH)/libcint.a Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a; \
+		cd libcint && mkdir -p build_$(NATIVE_ARCH) && cd build_$(NATIVE_ARCH) && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=install -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && make install && cd ../.. && \
+		mkdir -p Lib/LibCint/lib_$(NATIVE_ARCH) && cp libcint/build_$(NATIVE_ARCH)/install/lib/libcint.a Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a; \
 	else \
 		echo 'Skipping LibCint build, Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a already exists'; \
 	fi
 else
 LibCint:
 	@if [ ! -f Lib/LibCint/lib/cint.a ]; then \
-		cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 .. && cmake --build . --config Release && cd ../.. && \
-		mkdir Lib/LibCint/lib && cp libcint/build/libcint.a Lib/LibCint/lib/cint.a; \
+		cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=install .. && make install && cd ../.. && \
+		mkdir Lib/LibCint/lib && cp libcint/build/install/lib/libcint.a Lib/LibCint/lib/cint.a; \
 	else \
 		echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
 	fi
