@@ -113,8 +113,9 @@ else
 	fi
 endif
 
-LibCint:
+
 ifeq ($(NAME),WINDOWS)
+LibCint:
 	echo Building LibCint for $(NAME) &&    \
 	@if not exist Lib\LibCint\lib\cint.lib ( \
 		echo Building LibCint for $(NAME) &&\
@@ -123,7 +124,10 @@ ifeq ($(NAME),WINDOWS)
 	) else ( \
 		echo Skipping LibCint build, Lib\LibCint\lib\cint.lib already exists \
 	)
+else ifeq ($(NAME),MAC)
+LibCint: libcint_$(NATIVE_ARCH)
 else
+LibCint:
 	@if [ ! -f Lib/LibCint/lib/cint.a ]; then \
 		cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 .. && cmake --build . --config Release && cd ../.. && \
 		mkdir Lib/LibCint/lib && cp libcint/build/libcint.a Lib/LibCint/lib/cint.a; \
@@ -131,6 +135,25 @@ else
 		echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
 	fi
 endif
+
+LibCint_x86_64:
+	@if [ ! -f Lib/LibCint_x86/lib/cint.a ]; then \
+		echo 'Building LibCint for x86_64, since Lib/LibCint_x86/lib/cint.a doesnt exist'; \
+		rustup target add x86_64-apple-darwin; \
+		cd libcint && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && cmake --build . --config Release && cd ../.. && \
+		mkdir -p Lib/LibCint_x86/lib && cp libcint/build_x86_64/libcint.a Lib/LibCint_x86/lib/cint.a; \
+	else \
+		echo 'Skipping LibCint build, Lib/LibCint_x86/lib/cint.a already exists'; \
+	fi
+
+LibCint_arm64:
+	@if [ ! -f Lib/LibCint/lib/cint.a ]; then \
+		echo 'Building LibCint for arm64, since Lib/LibCint/lib/cint.a doesnt exist'; \
+		cd libcint && mkdir -p build && cd build && cmake -DCMAKE_OSX_ARCHITECTURES=arm64 .. && cmake --build . --config Release && cd ../.. && \
+		mkdir -p Lib/LibCint/lib && cp libcint/build/libcint.a Lib/LibCint/lib/cint.a; \
+	else \
+		echo 'Skipping LibCint build, Lib/LibCint/lib/cint.a already exists'; \
+	fi
 
 
 
