@@ -35,11 +35,7 @@ all: check_rust NoSpherA2
 # --- Cross-platform rust check ---
 ifeq ($(OS),Windows_NT)
 check_rust:
-	@where rustc >NUL 2>&1 && ( \
-	  for /f "usebackq delims=" %%V in (`rustc --version`) do @echo Found: %%V \
-	) || ( \
-	  echo Rust is not installed or not on PATH. Install via https://www.rust-lang.org/tools/install & exit /b 1 \
-	)
+	@powershell -NoProfile -Command "if (Get-Command rustc -ErrorAction SilentlyContinue) { rustc --version } else { Write-Error 'Rust not found install via https://www.rust-lang.org/tools/install'; exit 1 }"
 else
 check_rust:
 	@command -v rustc >/dev/null 2>&1 || { \

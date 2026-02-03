@@ -8,18 +8,34 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Cache Featomic (Win and Linux)
-      if: inputs.platform == 'Linux' || inputs.platform == 'Windows'
+    - name: Cache Dependencys (Linux)
+      if: inputs.platform == 'Linux'
       uses: actions/cache@v4.2.4
       with:
-        path: Lib/featomic_install
-        key: featomic-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('featomic/**') }}
+        path: |
+          Lib/featomic_install
+          Lib/LibCint/lib
+          Lib/MKL
+        key: linux-deps-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('featomic/**') }}
         restore-keys: |
-          featomic-${{ inputs.platform }}-${{ runner.os }}-
+          linux-deps-${{ inputs.platform }}-
 
-    - name: Cache Featomic (macOS ARM64)
+    - name: Cache Dependencys (Windows)
+      if:  inputs.platform == 'Windows'
+      uses: actions/cache@v4.2.4
+      with:
+        path: |
+          Lib/featomic_install
+          Windows/packages
+          ~/.nuget/packages
+          Lib/LibCint/lib
+        key: windows-deps-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('featomic/**') }}
+        restore-keys: |
+          windows-deps-${{ inputs.platform }}-
+
+    - name: Cache Dependencys (macOS ARM64)
       if: inputs.platform == 'Mac_ARM64'
-      uses: actions/cache@v4
+      uses: actions/cache@v4.2.4
       with:
         path: |
           Lib/featomic_install_arm64
@@ -28,9 +44,9 @@ runs:
         restore-keys: |
           macos-arm64-deps-${{ runner.os }}-
 
-    - name: Cache Featomic (macOS x86_64)
+    - name: Cache Dependencys (macOS x86_64)
       if: inputs.platform == 'Mac_x86_64'
-      uses: actions/cache@v4
+      uses: actions/cache@v4.2.4
       with:
         path: |
           Lib/featomic_install_x86_64
@@ -38,23 +54,3 @@ runs:
         key: macos-x86_64-deps-${{ runner.os }}-${{ hashFiles('featomic/**') }}
         restore-keys: |
           macos-x86_64-deps-${{ runner.os }}-
-
-    - name: Cache Intel MKL (Linux)
-      if: inputs.platform == 'Linux'
-      uses: actions/cache@v4.2.4
-      with:
-        path: Lib/MKL
-        key: intelmkl-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('Lib/MKL/**') }}
-        restore-keys: |
-          intelmkl-${{ inputs.platform }}-${{ runner.os }}-
-
-    - name: Cache Intel MKL NuGet Packages (Windows)
-      if: inputs.platform == 'Windows'
-      uses: actions/cache@v4.2.4
-      with:
-        path: |
-          Windows/packages
-          ~/.nuget/packages
-        key: nuget-mkl-${{ inputs.platform }}-${{ hashFiles('Windows/**/*.vcxproj', 'Windows/**/*.sln') }}
-        restore-keys: |
-          nuget-mkl-${{ inputs.platform }}-
