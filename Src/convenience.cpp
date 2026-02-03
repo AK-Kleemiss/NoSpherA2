@@ -2106,7 +2106,7 @@ void options::digest_options()
             config.analyze_quality = debug;
             //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
             //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
-            vec ri_coefs = density_fit(wavy, wavy_aux, config);
+            vec ri_coefs = DensityFitting::density_fit(wavy, wavy_aux, config);
             npy::npy_data<double> np_coeffs;
             np_coeffs.data = ri_coefs;
             np_coeffs.fortran_order = false;
