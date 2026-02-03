@@ -21,6 +21,13 @@ else
   endif
 endif
 
+#Set some environemt variables for macOS builds
+ifeq ($(NAME),MAC)
+	export MACOSX_DEPLOYMENT_TARGET=13.3;
+	export CMAKE_OSX_DEPLOYMENT_TARGET=13.3;
+	export RUSTFLAGS="-C link-arg=-mmacosx-version-min=13.3";
+endif
+
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 all: check_rust NoSpherA2
@@ -79,7 +86,7 @@ featomic_x86_64: check_rust
 		cd $(MAKEFILE_DIR)/featomic/featomic && \
 		mkdir -p build_x86_64 && \
 		cd build_x86_64 && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_x86 -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. && \
+		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=x86_64 -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_x86 -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. && \
 		make install; \
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install_x86/lib/libfeatomic.a already exists'; \
@@ -91,7 +98,7 @@ featomic_arm64: check_rust
 		cd $(MAKEFILE_DIR)/featomic/featomic && \
 		mkdir -p build && \
 		cd build && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
+		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=arm64 -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
 		make install || true; \
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
