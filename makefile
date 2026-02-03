@@ -23,9 +23,9 @@ endif
 
 #Set some environemt variables for macOS builds
 ifeq ($(NAME),MAC)
-	export MACOSX_DEPLOYMENT_TARGET=13.3;
-	export CMAKE_OSX_DEPLOYMENT_TARGET=13.3;
-	export RUSTFLAGS="-C link-arg=-mmacosx-version-min=13.3";
+	export MACOSX_DEPLOYMENT_TARGET=13.3
+	export CMAKE_OSX_DEPLOYMENT_TARGET=13.3
+	export RUSTFLAGS=-C link-arg=-mmacosx-version-min=13.3
 endif
 
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -132,7 +132,14 @@ LibCint:
 		echo Skipping LibCint build, Lib\LibCint\lib\cint.lib already exists \
 	)
 else ifeq ($(NAME),MAC)
-LibCint: LibCint_$(NATIVE_ARCH)
+LibCint:
+	@if [ ! -f Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a ]; then \
+		echo 'Building LibCint for $(NATIVE_ARCH), since Lib/LibCint_$(NATIVE_ARCH)/lib/cint.a doesnt exist'; \
+		cd libcint && mkdir -p build_$(NATIVE_ARCH) && cd build_$(NATIVE_ARCH) && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && cmake --build . --config Release && cd ../.. && \
+		mkdir -p Lib/LibCint/lib_$(NATIVE_ARCH) && cp libcint/build_$(NATIVE_ARCH)/libcint.a Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a; \
+	else \
+		echo 'Skipping LibCint build, Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a already exists'; \
+	fi
 else
 LibCint:
 	@if [ ! -f Lib/LibCint/lib/cint.a ]; then \
@@ -142,26 +149,6 @@ LibCint:
 		echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
 	fi
 endif
-
-LibCint_x86_64:
-	@if [ ! -f Lib/LibCint_x86/lib/cint.a ]; then \
-		echo 'Building LibCint for x86_64, since Lib/LibCint_x86/lib/cint.a doesnt exist'; \
-		rustup target add x86_64-apple-darwin; \
-		cd libcint && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && cmake --build . --config Release && cd ../.. && \
-		mkdir -p Lib/LibCint_x86/lib && cp libcint/build_x86_64/libcint.a Lib/LibCint_x86/lib/cint.a; \
-	else \
-		echo 'Skipping LibCint build, Lib/LibCint_x86/lib/cint.a already exists'; \
-	fi
-
-LibCint_arm64:
-	@if [ ! -f Lib/LibCint/lib/cint.a ]; then \
-		echo 'Building LibCint for arm64, since Lib/LibCint/lib/cint.a doesnt exist'; \
-		cd libcint && mkdir -p build && cd build && cmake -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && cmake --build . --config Release && cd ../.. && \
-		mkdir -p Lib/LibCint/lib && cp libcint/build/libcint.a Lib/LibCint/lib/cint.a; \
-	else \
-		echo 'Skipping LibCint build, Lib/LibCint/lib/cint.a already exists'; \
-	fi
-
 
 
 ifeq ($(NAME),WINDOWS)
