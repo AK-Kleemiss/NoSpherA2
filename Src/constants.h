@@ -1,6 +1,9 @@
 #pragma once
 
-#include "pch.h"
+#include <array>
+#include <utility>
+#include <limits>
+#include <cstddef>
 
 namespace constants
 {
