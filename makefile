@@ -150,6 +150,17 @@ LibCint:
 	fi
 endif
 
+LibCint_x86_64:
+	OLD_NATIVE_ARCH=$(NATIVE_ARCH); \
+	export NATIVE_ARCH=x86_64; \
+	$(MAKE) LibCint; \
+	export NATIVE_ARCH=$(OLD_NATIVE_ARCH);
+
+LibCint_arm64:
+	OLD_NATIVE_ARCH=$(NATIVE_ARCH); \
+	export NATIVE_ARCH=arm64; \
+	$(MAKE) LibCint; \
+	export NATIVE_ARCH=$(OLD_NATIVE_ARCH);
 
 ifeq ($(NAME),WINDOWS)
 NoSpherA2: IntelMKL featomic LibCint
