@@ -100,18 +100,15 @@ Number of electrons: 110.000000
 Reading:                             "residues/3.cif" done!
 There are:
   34 atoms read from the wavefunction, of which 
-  22 are identified as asymmetric unit atoms!
+  19 are identified as asymmetric unit atoms!
 
 Selected accuracy: 0
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 4998 grid points.
+GridManager: Generated total of 3696 grid points.
 Table of Charges in electrons
     Atom       Becke   Hirshfeld   TFVC
-       N_3    -0.124    -0.075    -1.081
-       C_3    -0.135     0.125     1.695
-       O_3    -0.207    -0.347    -1.226
       Hb_3     0.182     0.166     0.342
       C1_3    -0.073     0.059     0.243
       H1_3     0.129     0.083    -0.026
@@ -132,9 +129,9 @@ Table of Charges in electrons
      H1b_3     0.255     0.234     0.522
      H1c_3     0.242     0.233     0.512
 Total number of electrons:
- Becke:      69.933371
- Hirshfeld:  69.858416
- TVFC:       69.792187
+ Becke:      48.467828
+ Hirshfeld:  48.561406
+ TVFC:       48.180716
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Number of protons: 102
@@ -176,5 +173,5 @@ Total number of electrons:
  TVFC:       61.981728
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
-Final number of atoms in .tsc file: 18
+Final number of atoms in .tsc file: 72
 Writing tsc file...  ... done!

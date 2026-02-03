@@ -94,10 +94,10 @@ featomic: check_rust
 endif
 
 featomic_x86_64:
-	@$(make) NATIVE_ARCH=x86_64 featomic
+	@$(MAKE) NATIVE_ARCH=x86_64 featomic
 
 featomic_arm64: check_rust
-	@$(make) NATIVE_ARCH=arm64 featomic
+	@$(MAKE) NATIVE_ARCH=arm64 featomic
 
 
 intel_ROOT := $(CURDIR)/Lib/MKL
