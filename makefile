@@ -23,9 +23,9 @@ endif
 
 #Set some environemt variables for macOS builds
 ifeq ($(NAME),MAC)
-	export MACOSX_DEPLOYMENT_TARGET=13.3
-	export CMAKE_OSX_DEPLOYMENT_TARGET=13.3
-	export RUSTFLAGS=-C link-arg=-mmacosx-version-min=13.3
+export MACOSX_DEPLOYMENT_TARGET=13.3
+export CMAKE_OSX_DEPLOYMENT_TARGET=13.3
+export RUSTFLAGS=-C link-arg=-mmacosx-version-min=13.3
 endif
 
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -63,8 +63,22 @@ featomic: check_rust
 		echo featomic already built \
 	)
 else ifeq ($(NAME),MAC)
-featomic: check_rust featomic_$(NATIVE_ARCH)
-	@echo Built featomic for $(NATIVE_ARCH)
+featomic:  check_rust
+	@if [ ! -f Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a ]; then \
+		echo 'Building featomic for $(NATIVE_ARCH), since Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a doesnt exist'; \
+		cd $(MAKEFILE_DIR)/featomic/featomic && \
+		mkdir -p build_$(NATIVE_ARCH) && \
+		cd build_$(NATIVE_ARCH) && \
+		if [ "$(NATIVE_ARCH)" = "x86_64" ]; then \
+			rustup target add x86_64-apple-darwin; \
+			cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_$(NATIVE_ARCH) -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. ; \
+		else \
+			cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_$(NATIVE_ARCH) .. ; \
+		fi && \
+		make install || true; \
+	else \
+		echo 'Skipping featomic build, Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a already exists'; \
+	fi
 else
 featomic: check_rust
 	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
@@ -79,30 +93,12 @@ featomic: check_rust
 	fi
 endif
 
-featomic_x86_64: check_rust
-	@if [ ! -f Lib/featomic_install_x86/lib/libfeatomic.a ]; then \
-		echo 'Building featomic for x86_64, since Lib/featomic_install_x86/lib/libfeatomic.a doesnt exist'; \
-		rustup target add x86_64-apple-darwin; \
-		cd $(MAKEFILE_DIR)/featomic/featomic && \
-		mkdir -p build_x86_64 && \
-		cd build_x86_64 && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=x86_64 -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_x86 -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. && \
-		make install; \
-	else \
-		echo 'Skipping featomic build, Lib/featomic_install_x86/lib/libfeatomic.a already exists'; \
-	fi
+featomic_x86_64:
+	@$(make) NATIVE_ARCH=x86_64 featomic
 
 featomic_arm64: check_rust
-	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
-		echo 'Building featomic, since Lib/featomic_install/lib/libfeatomic.a doesnt exist'; \
-		cd $(MAKEFILE_DIR)/featomic/featomic && \
-		mkdir -p build && \
-		cd build && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=arm64 -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
-		make install || true; \
-	else \
-		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
-	fi
+	@$(make) NATIVE_ARCH=arm64 featomic
+
 
 intel_ROOT := $(CURDIR)/Lib/MKL
 IntelMKL:
@@ -151,16 +147,10 @@ LibCint:
 endif
 
 LibCint_x86_64:
-	OLD_NATIVE_ARCH=$(NATIVE_ARCH); \
-	export NATIVE_ARCH=x86_64; \
-	$(MAKE) LibCint; \
-	export NATIVE_ARCH=$(OLD_NATIVE_ARCH);
+	@$(MAKE) NATIVE_ARCH=x86_64 LibCint
 
 LibCint_arm64:
-	OLD_NATIVE_ARCH=$(NATIVE_ARCH); \
-	export NATIVE_ARCH=arm64; \
-	$(MAKE) LibCint; \
-	export NATIVE_ARCH=$(OLD_NATIVE_ARCH);
+	@$(MAKE) NATIVE_ARCH=arm64 LibCint
 
 ifeq ($(NAME),WINDOWS)
 NoSpherA2: IntelMKL featomic LibCint
@@ -191,12 +181,12 @@ clean:
 endif
 
 ifeq ($(NAME),MAC)
-NoSpherA2: IntelMKL featomic_$(NATIVE_ARCH) LibCint
+NoSpherA2: IntelMKL featomic LibCint
 	@echo Start making Mac $(NATIVE_ARCH) executable
 	@rm -f NoSpherA2_$(NATIVE_ARCH)
 	@cd Mac && rm -f NoSpherA2_$(NATIVE_ARCH) && make NoSpherA2_$(NATIVE_ARCH) -j && cp NoSpherA2_$(NATIVE_ARCH) ../NoSpherA2
 
-NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint_arm64:
+NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint_arm64
 	@echo Start making Mac arm64 executable
 	@rm -f NoSpherA2_arm64
 	@cd Mac && rm -f NoSpherA2_arm64 && make NoSpherA2_arm64 -j && cp NoSpherA2_arm64 ../NoSpherA2
