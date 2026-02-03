@@ -10,11 +10,16 @@ ARCHS := arm64 x86_64
 
 # Source & include roots
 SRC_DIR := ../Src
-INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include
+INC_DIRS := ../Src ../Lib ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint/include
 
 # Local static libs (adjust as needed)
-EXTRA_LIBS := ../Lib/featomic_install/lib/libfeatomic.a \
-			  ../Lib/featomic_install/lib/libmetatensor.a
+EXTRA_LIBS_ARM := ../Lib/featomic_install_arm64/lib/libfeatomic.a \
+			  ../Lib/featomic_install_arm64/lib/libmetatensor.a \
+			  ../Lib/LibCint/lib_arm64/cint.a
+
+EXTRA_LIBS_x86 := ../Lib/featomic_install_x86_64/lib/libfeatomic.a \
+				../Lib/featomic_install_x86_64/lib/libmetatensor.a \
+				../Lib/LibCint/lib_x86_64/cint.a
 
 # Sources - automatically discover all .cpp files in SRC_DIR
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
@@ -84,12 +89,12 @@ NoSpherA2: NoSpherA2_arm64 NoSpherA2_x86_64
 NoSpherA2_arm64: $(OBJS_arm64)
 	@echo "Building MAC executable for arm64"
 	@echo "Link (arm64)…"
-	@$(COMP) $^ $(EXTRA_LIBS) $(LDFLAGS_arm64) -o $@
+	@$(COMP) $^ $(EXTRA_LIBS_ARM) $(LDFLAGS_arm64) -o $@
 
 NoSpherA2_x86_64: $(OBJS_x86_64)
 	@echo "Building MAC executable for x86_64"
 	@echo "Link (x86_64)…"
-	@$(COMP) $^ $(EXTRA_LIBS) $(LDFLAGS_x86_64) -o $@
+	@$(COMP) $^ $(EXTRA_LIBS_x86) $(LDFLAGS_x86_64) -o $@
 
 # Architecture-specific basis set converter
 basis_set_converter:

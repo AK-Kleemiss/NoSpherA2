@@ -4,3 +4,6 @@
 [submodule "featomic"]
 	path = featomic
 	url = https://github.com/metatensor/featomic
+[submodule "libcint"]
+	path = libcint
+	url = https://github.com/RealUranar/libcint.git

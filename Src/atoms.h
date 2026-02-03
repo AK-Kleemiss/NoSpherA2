@@ -62,7 +62,7 @@ public:
     atom(const std::string& l, const std::string& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
     atom& operator=(const atom& rhs);
     void print_values() const;
-    bool push_back_basis_set(const double& coefficient, const double& exponent, const int& type, const int& shell);
+    bool push_back_basis_set(const double & exponent, const double &coefficient, const int &type, const int &shell);
     void print_values_long() const;
     bool get_basis_set_loaded() const;
     bool is_anharm() const;
@@ -118,6 +118,7 @@ public:
     vec2 get_ADPs() const { return ADPs; };
     bool get_is_asym() const { return is_asym; };
     void set_is_asym(const bool& val) { is_asym = val; };
+    double distance_to(const atom& other) const;
 
 
     bool operator==(const atom& other) const;

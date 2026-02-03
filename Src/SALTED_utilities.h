@@ -89,3 +89,5 @@ vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs);
 
 cube calc_cube_ML(const vec& data, WFN &dummy, const int& atom_nr = -1);
 void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr = -1);
+
+void create_SALTED_training_data(const WFN& orbital, const WFN& aux);

@@ -280,13 +280,14 @@ const double calc_density_ML(const double& x,
 {
     double dens = 0, radial;
     int coef_counter = 0;
-    unsigned int e = 0, size = 0;
+    unsigned int shell = 0, n_shells = 0, prim = 0;
     basis_set_entry bf;
     primitive p;
 
     for (int a = 0; a < atoms.size(); a++)
     {
-        size = (int)atoms[a].get_basis_set_size();
+        prim = 0;
+        n_shells = static_cast<unsigned int>(atoms[a].get_shellcount().size());
         double d[4]{
             x - atoms[a].get_coordinate(0),
             y - atoms[a].get_coordinate(1),
@@ -295,18 +296,18 @@ const double calc_density_ML(const double& x,
         d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (d[3] < -46.0517)
         { // corresponds to cutoff of ex ~< 1E-20
-            for (e = 0; e < size; e++)
+            for (shell = 0; shell < n_shells; shell++)
             {
-                bf = atoms[a].get_basis_set_entry(e);
-                coef_counter += (2 * bf.get_type() + 1);
+                coef_counter += (2 * atoms[a].get_basis_set_type(prim) + 1);
+                prim += atoms[a].get_shellcount()[shell];
             }
             continue;
         }
         // normalize distances for spherical harmonic
-        for (e = 0; e < 3; e++)
-            d[e] /= d[3];
-        int prim = 0;
-        for (int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
+        for (int i = 0; i < 3; i++)
+            d[i] /= d[3];
+        
+        for (int shell = 0; shell < n_shells; shell++) {
             radial = 0;
             int type = atoms[a].get_basis_set_entry(prim).get_type();
 
@@ -338,19 +339,21 @@ const double calc_density_ML(const double& x,
 {
     double dens = 0, radial = 0;
     int coef_counter = 0;
-    int e = 0, size = 0;
+    unsigned int shell = 0, n_shells = 0;
 
     for (int a = 0; a < atoms.size(); a++)
     {
+        n_shells = static_cast<unsigned int>(atoms[a].get_shellcount().size());
+        unsigned int prim = 0;
         if (a != atom_nr) {
-            for (e = 0; e < size; e++)
+            for (shell = 0; shell < n_shells; shell++)
             {
-                coef_counter += (2 * atoms[a].get_basis_set_type(e) + 1);
+                coef_counter += (2 * atoms[a].get_basis_set_type(prim) + 1);
+                prim += atoms[a].get_shellcount()[shell];
             }
             continue;
         }
-        size = (int)atoms[a].get_basis_set_size();
-
+        
         basis_set_entry bf;
         double d[4]{
             x - atoms[a].get_coordinate(0),
@@ -359,10 +362,9 @@ const double calc_density_ML(const double& x,
         // store r in last element
         d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         // normalize distances for spherical harmonic
-        for (e = 0; e < 3; e++)
-            d[e] /= d[3];
-        unsigned int prim = 0;
-        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
+        for (int i = 0; i < 3; i++)
+            d[i] /= d[3];
+        for (shell = 0; shell < n_shells; shell++) {
             radial = 0;
             unsigned int type = atoms[a].get_basis_set_entry(prim).get_type();
 
@@ -387,18 +389,6 @@ const double calc_density_ML(const double& x,
     return -1;
 }
 
-
-
-double helper_even(const int l) {
-    if (l == 0) {
-        return 1.0;
-    }
-    double res = 1.0;
-    for (int i = 0; i <= l; i += 2) {
-        res *= i;
-    }
-    return res;
-}
 
 /**
  * Calculates the atomic density for a given list of atoms and coefficients.
@@ -437,6 +427,7 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs)
             atom_elecs[a] += radial * coefs[coef_counter];
             coef_counter++;
         }
+        atom_elecs[a] += atoms[a].get_ECP_electrons();
     }
     return atom_elecs;
 }
@@ -521,3 +512,96 @@ cube calc_cube_ML(const vec& data, WFN& dummy, const int& atom_nr)
 
     return CubeRho;
 };
+
+#include "integrator.h"
+#include "libCintMain.h"
+#include "nos_math.h"
+#include "npy.h"
+void create_SALTED_training_data(const WFN& orbital, const WFN& aux) {
+    DensityFitting::CONFIG config;
+    config.analyze_quality = true;
+    //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+    //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+    //if (wavy->get_origin() == e_origin::ptb)
+    //    config.restraint_strength = 1.0e-4;
+
+
+    //dMatrixRef2 DM_ref(orbital.get_dm());
+    ////print out dm
+    //for (int i = 0; i < DM_ref.extent(0); i++) {
+    //    std::cout << "[";
+    //    for (int j = 0; j < DM_ref.extent(1); j++) {
+    //        std::cout << DM_ref(i, j) << ", ";
+    //    }
+    //    std::cout << "]," << std::endl;
+    //}
+
+
+    vec coefs = DensityFitting::density_fit(orbital, aux, config);
+
+    vec overlap;
+    Int_Params aux_basis(aux);
+    compute2C<Overlap2C_SPH>(aux_basis, overlap);
+    const int nao_max = aux_basis.get_nao();
+    dMatrixRef2 overlap_orig(overlap.data(), nao_max, nao_max);
+    
+    //""" Reorder L=1 components from +1,-1,0 to -1,0,+1 in the overlap matrix"""
+    auto get_new_index = [](const int l, const int m_idx) {
+        switch (l) {
+        case 1: { constexpr std::array<int, 3>  map = { 2,0,1 }; return map[m_idx]; }
+        default: return m_idx;
+        }
+     };
+
+    ivec permutations(aux_basis.get_nao());
+    size_t ao = 0;
+    for (const atom& at : aux_basis.get_atoms()) {
+        int prim = 0;
+        for (unsigned int shell = 0; shell < at.get_shellcount_size(); ++shell) {
+            const int l = at.get_basis_set_type(prim) - 1;
+            const size_t shell_start = ao;
+
+            for (int m_idx = 0; m_idx < 2 * l + 1; m_idx++) {
+                permutations[ao++] = int(shell_start + size_t(get_new_index(l, m_idx)));
+            }
+            prim += at.get_shellcount(shell);
+        }
+    }
+    dMatrix2 overlap_permuted(nao_max, nao_max);
+    for (int j = 0; j < nao_max; j++) {
+        const int pj = permutations[j];
+        for (int i = 0; i < j; i++) {
+            const int pi = permutations[i];
+            const double v = overlap_orig(i, j);
+            overlap_permuted(pi, pj) = v;
+            overlap_permuted(pj, pi) = v;
+        }
+        overlap_permuted(pj, pj) = overlap_orig(j, j);
+    }
+    dMatrix1 coefs_vec(coefs.size());
+    coefs_vec.container() = coefs;
+
+    dMatrix1 proj = dot(overlap_permuted, coefs_vec);
+
+    npy::write_npy("coefficients.npy", 
+        npy::npy_data<double>{
+            coefs, 
+            { static_cast<unsigned long>(coefs.size()) },
+            false}
+    );
+
+    npy::write_npy("projections.npy",
+        npy::npy_data<double>{
+        proj.container(),
+        { static_cast<unsigned long>(proj.size()) },
+            false}
+    );
+
+    npy::write_npy("overlap.npy",
+        npy::npy_data<double>{
+        overlap_permuted.container(),
+        { static_cast<unsigned long>(overlap_permuted.extent(0)), static_cast<unsigned long>(overlap_permuted.extent(1)) },
+            false}
+    );
+
+}

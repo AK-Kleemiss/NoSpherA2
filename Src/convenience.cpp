@@ -1529,26 +1529,6 @@ double bessel_first_kind(const int l, const double x)
     }
 }
 
-int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b)
-{
-    wavy.set_basis_set_ptr((*b).get_data());
-    int nr_coefs = 0;
-    for (int i = 0; i < wavy.get_ncen(); i++)
-    {
-        int current_charge = wavy.get_atom_charge(i) - 1;
-        const std::span<const SimplePrimitive> basis = (*b)[current_charge];
-        int size = (int)basis.size();
-        for (int e = 0; e < size; e++)
-        {
-            wavy.push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, basis[e].type, basis[e].shell);
-            //wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
-
-            nr_coefs += 2 * basis[e].type + 1; //HIER WEITER MACHEN!!
-        }
-    }
-    return nr_coefs;
-}
-
 
 double get_decimal_precision_from_CIF_number(std::string& given_string)
 {
@@ -1732,7 +1712,6 @@ void options::digest_options()
 #ifdef _OPENMP
             omp_set_num_threads(threads);
             omp_set_dynamic(0);
-
 #endif
         }
         else if (temp == "-cmtc")
@@ -2107,20 +2086,33 @@ void options::digest_options()
                     if (next_basis_set + 1 < argc && arguments[next_basis_set + 1].find("-") != 0) {
                         beta = std::stod(arguments[next_basis_set + 1]);
                     }
-                    aux_basis.push_back(std::make_shared<BasisSet>(beta));
+                    aux_basis.push_back(std::make_shared<BasisSet>());
                     break;
                 }
-                if (!BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set])) {
-                    cout << "Basis set " << arguments[i + 1] << " not found in the library. Exiting." << endl;
-                    exit(1);
-                }
+                err_chkf(BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set]), 
+                    "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
                 aux_basis.push_back(BasisSetLibrary().get_basis_set(arguments[next_basis_set]));
                 next_basis_set++;
             }
             if (aux_basis.size() == 0) {
                 cout << "No basis set specified. Falling back to automatic generation using beta = 2.0!" << endl;
-                aux_basis.push_back(std::make_shared<BasisSet>(2.0));
+                aux_basis.push_back(std::make_shared<BasisSet>());
             }
+        }
+        else if (temp == "-write_ri_coefs"){
+            WFN wavy(wfn);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+            DensityFitting::CONFIG config;
+            config.analyze_quality = debug;
+            //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+            //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+            vec ri_coefs = DensityFitting::density_fit(wavy, wavy_aux, config);
+            npy::npy_data<double> np_coeffs;
+            np_coeffs.data = ri_coefs;
+            np_coeffs.fortran_order = false;
+            np_coeffs.shape = { static_cast<unsigned long>(ri_coefs.size()) };
+            npy::write_npy("RI_COEFS.npy", np_coeffs);
+            exit(0);
         }
         else if (temp == "-RI_CUBE" || temp == "-ri_cube")
         {
@@ -2160,14 +2152,26 @@ void options::digest_options()
             string df_basis_name = SP.get_dfbasis_name();
             filesystem::path salted_model_path = SP.get_salted_filename();
             log_file << "Using " << salted_model_path << " for the prediction" << endl;
-            std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
-            load_basis_into_WFN(SP.wavy, aux_basis);
+            if (!SP.basis_set_loaded()) {
+                string df_basis_name = SP.get_dfbasis_name();
+                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                load_basis_into_WFN(SP.wavy, aux_basis);
+            }
             vec coefs = SP.gen_SALTED_densities();
             npy::npy_data<double> np_coeffs;
             np_coeffs.data = coefs;
             np_coeffs.fortran_order = false;
             np_coeffs.shape = { static_cast<unsigned long>(coefs.size()) };
             npy::write_npy("SALTED_COEFS.npy", np_coeffs);
+        }
+        else if (temp == "-SALTED_Training") {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+
+            WFN wavy(wfn);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+
+            create_SALTED_training_data(wavy, wavy_aux);
         }
         else if (temp == "-test_reading_SALTED_binary") {
             test_reading_SALTED_binary_file();
@@ -2297,51 +2301,15 @@ void options::digest_options()
         }
         else if (temp == "-test_RI")
         {
-            //Check that wfn is not empty
-            if (wfn.empty())
-            {
-                std::cout << "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction." << std::endl;
-                exit(1);
-            }
-            if (aux_basis.empty())
-            {
-                std::cout << "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set." << std::endl;
-                exit(1);
-            }
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
 
 
             WFN wavy(wfn);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+            DensityFitting::demonstrate_enhanced_density_fitting(wavy, wavy_aux);
 
-            WFN wavy_aux(e_origin::NOT_YET_DEFINED);
-            wavy_aux.set_atoms(wavy.get_atoms());
-            wavy_aux.set_ncen(wavy.get_ncen());
-            wavy_aux.delete_basis_set();
-
-            for (shared_ptr<BasisSet>& aux_basis_set : aux_basis) { if ((*aux_basis_set).get_primitive_count() == 0) (*aux_basis_set).gen_auto_aux(wavy); }
-
-            shared_ptr<BasisSet> combined_aux_basis = aux_basis[0];
-            for (int basis_nr = 1; basis_nr < aux_basis.size(); basis_nr++) { (*combined_aux_basis) += (*aux_basis[basis_nr]); }
-
-            load_basis_into_WFN(wavy_aux, combined_aux_basis);
-            demonstrate_enhanced_density_fitting(wavy, wavy_aux);
-            //dMatrix2 dm = wavy.get_dm();
-            //vec charges_sand = calculate_expected_charges(wavy, wavy_aux, "sanderson_estimate");
-            //vec charges_mul = calculate_expected_charges(wavy, wavy_aux, "mulliken");
-
-            //for (int i = 0; i < charges_mul.size(); i++)
-            //    std::cout << "Charge on atom " << i << " (" << wavy.get_atom_label(i) << "): Mulliken: " << charges_mul[i] << " Sanderson: " << charges_sand[i] << std::endl;
-
-            //aux_basis = std::make_shared<BasisSet>();
-            //aux_basis->gen_auto_aux(wavy);
-
-            //WFN wavy_aux2(0);
-            //wavy_aux2.set_atoms(wavy.get_atoms());
-            //wavy_aux2.set_ncen(wavy.get_ncen());
-            //wavy_aux2.delete_basis_set();
-            //load_basis_into_WFN(wavy_aux2, aux_basis);
-            //demonstrate_enhanced_density_fitting(wavy, wavy_aux2);
-
-            exit(0);
+            //exit(0);
         }
         else if (temp == "-wfn")
         {
@@ -2364,6 +2332,39 @@ void options::digest_options()
         else if (temp == "-partitioning_test")
         {
             calc_partition_densities();
+        }
+        else if (temp == "-lukas_test")
+        {
+            //Check that wfn is not empty
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option to specify a wavefunction.", std::cout);
+
+        }
+        else if (temp == "-calc_dens_1D")
+        {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -calc_dens_1D to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -calc_dens_1D to specify an auxiliary basis set.", std::cout);
+            int atom_idx_1 = 0;
+            int atom_idx_2 = 1;
+            int gridpoints = 1000;
+            double padding = 2.0;
+            if (string(arguments[i + 1]).find("-") != 0) {
+                atom_idx_1 = stoi(arguments[i + 1]);
+            }
+            if (string(arguments[i + 2]).find("-") != 0) {
+                atom_idx_2 = stoi(arguments[i + 2]);
+            }
+            if (string(arguments[i + 3]).find("-") != 0) {
+                gridpoints = stoi(arguments[i + 3]);
+            }
+            if (string(arguments[i + 4]).find("-") != 0) {
+                padding = stod(arguments[i + 4]);
+            }
+
+            WFN wavy(wfn);
+            string out = "Calculating 1D density between atoms " + wavy.get_atom_label(atom_idx_1) + " (" + std::to_string(atom_idx_1) + ") and " + wavy.get_atom_label(atom_idx_2) + " (" + std::to_string(atom_idx_2) + ") with " + std::to_string(gridpoints) + " gridpoints and " + std::to_string(padding) + " Angstrom padding.";
+            std::cout << out << std::endl;
+            get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
+            exit(0);
         }
     }
 };

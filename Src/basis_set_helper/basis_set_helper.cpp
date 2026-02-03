@@ -82,7 +82,7 @@ std::string write_basis_set(std::ofstream& file, const std::string basis_name, s
         int func = 0;
         for (const auto& p : basis_set[i]) {
             for (int j = 0; j < p.exp.size(); j++) {
-                file << "    {" << p.center << ", " << p.type << ", " << p.exp[j] << ", " << p.coefficient[j] << ", " << func << "},\n";
+                file << "    {" << p.center << ", " << p.type << ", " << std::fixed << std::setprecision(16) << p.exp[j] << ", " << p.coefficient[j] << ", " << func << "},\n";
             }
             func++;
         }
