@@ -115,7 +115,6 @@ endif
 
 ifeq ($(NAME),WINDOWS)
 LibCint:
-	echo Building LibCint for $(NAME) &&    \
 	@if not exist Lib\LibCint\lib\cint.lib ( \
 		echo Building LibCint for $(NAME) &&\
 		@cd libcint && (if not exist build mkdir build) && cd build && cmake -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=install -DCMAKE_C_COMPILER=cl .. && cmake --build . --config release && cd ../.. && \
