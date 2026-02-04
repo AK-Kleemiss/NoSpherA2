@@ -18,7 +18,7 @@ SRC_DIR := ../Src
 INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include ../Lib/LibCint/include
 
 #LibCint local libs
-LIBCINT		   := ../Lib/LibCint/lib/cint.a
+LIBCINT		   := ../Lib/LibCint/lib/libcint.a
 
 # Featomic local libs
 LIBRASCALINE   := ../Lib/featomic_install/lib/libfeatomic.a
