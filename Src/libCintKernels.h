@@ -1,21 +1,29 @@
 #pragma once
 
-#ifdef _MSC_VER
-    typedef struct _Dcomplex {
-        double _Val[2];   // [0]=real, [1]=imag
-    } _Dcomplex;
+//This is really stupid... but at least it works.
+//Although this will probably break complex support in libCint if ever needed!
+#if !defined(_MSC_VER)
+#define _FAKE_MSC_VER
+#define _MSC_VER 1930   // any reasonable MSVC version
+#endif
+
+typedef struct _Dcomplex {
+    double _Val[2];   // [0]=real, [1]=imag
+} _Dcomplex;
 #define _SILENCE_CXX17_C_HEADER_DEPRECATION_WARNING
 #pragma warning(push)
 #pragma warning(disable:4996)
-#endif
 
 extern "C" {
     #include "cint.h"
 }
 
-#ifdef _MSC_VER
 #pragma warning(pop)
+#ifdef _FAKE_MSC_VER
+#undef _MSC_VER
+#undef _FAKE_MSC_VER
 #endif
+
 
 #define DECLARE_CINT_KERNEL(NAME, NEEDS_OPT) \
     struct NAME { \
