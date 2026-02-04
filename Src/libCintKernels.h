@@ -1,8 +1,22 @@
 #pragma once
+
+#ifdef _MSC_VER
+    typedef struct _Dcomplex {
+        double _Val[2];   // [0]=real, [1]=imag
+    } _Dcomplex;
+#define _SILENCE_CXX17_C_HEADER_DEPRECATION_WARNING
+#pragma warning(push)
+#pragma warning(disable:4996)
+#endif
+
 extern "C" {
-    typedef std::complex<double> _Dcomplex;
     #include "cint.h"
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 #define DECLARE_CINT_KERNEL(NAME, NEEDS_OPT) \
     struct NAME { \
         static constexpr bool NeedsOpt = NEEDS_OPT; \
