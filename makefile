@@ -29,7 +29,6 @@ export RUSTFLAGS=-C link-arg=-mmacosx-version-min=13.3
 endif
 
 ifeq ($(OS),Windows_NT)
-
 # Find latest VS installation path via vswhere (PowerShell used only to query)
 VS_INSTALL := $(strip $(shell powershell -NoProfile -Command "& '%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe' -latest -products * -property installationPath" ))
 
