@@ -1,6 +1,8 @@
 #pragma once
-#include "cint.h"
-
+extern "C" {
+    typedef std::complex<double> _Dcomplex;
+    #include "cint.h"
+}
 #define DECLARE_CINT_KERNEL(NAME, NEEDS_OPT) \
     struct NAME { \
         static constexpr bool NeedsOpt = NEEDS_OPT; \

@@ -28,6 +28,20 @@ export CMAKE_OSX_DEPLOYMENT_TARGET=13.3
 export RUSTFLAGS=-C link-arg=-mmacosx-version-min=13.3
 endif
 
+ifeq ($(OS),Windows_NT)
+
+# Find latest VS installation path via vswhere (PowerShell used only to query)
+VS_INSTALL := $(strip $(shell powershell -NoProfile -Command "& '%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe' -latest -products * -property installationPath" ))
+
+VCVARSALL   := $(VS_INSTALL)\VC\Auxiliary\Build\vcvarsall.bat
+#Print found VS path
+ifeq ($(VS_INSTALL),)
+$(error "Visual Studio not found. Please install Visual Studio 2022 with C++ workload.")
+else
+$(info Found Visual Studio installation at: $(VS_INSTALL))
+endif
+endif
+
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 all: check_rust NoSpherA2
@@ -117,8 +131,9 @@ ifeq ($(NAME),WINDOWS)
 LibCint:
 	@if not exist Lib\LibCint\lib\cint.lib ( \
 		echo Building LibCint for $(NAME) &&\
-		@cd libcint && (if not exist build mkdir build) && cd build && cmake -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=install -DCMAKE_C_COMPILER=cl .. && cmake --build . --config release && cd ../.. && \
-		(if not exist Lib\LibCint\lib mkdir Lib\LibCint\lib) && copy libcint\build\Release\cint.lib Lib\LibCint\lib\cint.lib \
+		@cd libcint && (if not exist build mkdir build) && cd build && \
+		cmd /S /C "call "$(VCVARSALL)" x64 >nul && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint -DCMAKE_C_COMPILER=cl .." && \
+		cmake --build . --config release && cmake --install . \
 	) else ( \
 		echo Skipping LibCint build, Lib\LibCint\lib\cint.lib already exists \
 	)
@@ -126,16 +141,17 @@ else ifeq ($(NAME),MAC)
 LibCint:
 	@if [ ! -f Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a ]; then \
 		echo 'Building LibCint for $(NATIVE_ARCH), since Lib/LibCint_$(NATIVE_ARCH)/lib/cint.a doesnt exist'; \
-		cd libcint && mkdir -p build_$(NATIVE_ARCH) && cd build_$(NATIVE_ARCH) && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=install -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && make install && cd ../.. && \
-		mkdir -p Lib/LibCint/lib_$(NATIVE_ARCH) && cp libcint/build_$(NATIVE_ARCH)/install/lib/libcint.a Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a; \
+		cd libcint && mkdir -p build_$(NATIVE_ARCH) && cd build_$(NATIVE_ARCH) &&\
+		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && \
+		make install \
 	else \
 		echo 'Skipping LibCint build, Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a already exists'; \
 	fi
 else
 LibCint:
 	@if [ ! -f Lib/LibCint/lib/cint.a ]; then \
-		cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=install .. && make install && cd ../.. && \
-		mkdir Lib/LibCint/lib && cp libcint/build/install/lib/libcint.a Lib/LibCint/lib/cint.a; \
+		cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint .. && \
+		make install \
 	else \
 		echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
 	fi

@@ -1,8 +1,9 @@
 #include "convenience.h"
 
 #include "libCintKernels.h"
-
-#include "cint_funcs.h"
+extern "C" {
+    #include "cint_funcs.h"
+}
 
 #define BLKSIZE 8
 /*
