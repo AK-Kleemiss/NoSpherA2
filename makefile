@@ -150,7 +150,7 @@ LibCint:
 else
 LibCint:
 	@if [ ! -f Lib/LibCint/lib/cint.a ]; then \
-		cd libcint && mkdir build && cd build && \
+		cd libcint && mkdir -p build && cd build && \
 		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint .. && \
 		make install; \
 	else \
