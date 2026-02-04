@@ -94,7 +94,7 @@ runs:
           New-Item -ItemType Directory -Force -Path $build | Out-Null
           Push-Location $build
 
-          cmake cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint -DCMAKE_C_COMPILER=cl ..
+          cmake cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX="../../Lib/LibCint" -DCMAKE_C_COMPILER=cl ..
           cmake --build . --config RELEASE
           cmake --install .
         }
