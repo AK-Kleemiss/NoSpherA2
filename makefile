@@ -130,10 +130,10 @@ endif
 ifeq ($(NAME),WINDOWS)
 LibCint:
 	@if not exist Lib\LibCint\lib\cint.lib ( \
-		echo Building LibCint for $(NAME) &&\
+		echo Building LibCint for $(NAME) && \
 		@cd libcint && (if not exist build mkdir build) && cd build && \
 		cmd /S /C "call "$(VCVARSALL)" x64 >nul && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint -DCMAKE_C_COMPILER=cl .." && \
-		cmake --build . --config release && cmake --install . \
+		cmake --build . --config RELEASE && cmake --install . \
 	) else ( \
 		echo Skipping LibCint build, Lib\LibCint\lib\cint.lib already exists \
 	)
@@ -143,15 +143,16 @@ LibCint:
 		echo 'Building LibCint for $(NATIVE_ARCH), since Lib/LibCint_$(NATIVE_ARCH)/lib/cint.a doesnt exist'; \
 		cd libcint && mkdir -p build_$(NATIVE_ARCH) && cd build_$(NATIVE_ARCH) &&\
 		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && \
-		make install \
+		make install; \
 	else \
 		echo 'Skipping LibCint build, Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a already exists'; \
 	fi
 else
 LibCint:
 	@if [ ! -f Lib/LibCint/lib/cint.a ]; then \
-		cd libcint && mkdir build && cd build && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint .. && \
-		make install \
+		cd libcint && mkdir build && cd build && \
+		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint .. && \
+		make install; \
 	else \
 		echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
 	fi
