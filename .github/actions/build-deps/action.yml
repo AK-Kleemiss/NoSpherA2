@@ -85,27 +85,19 @@ runs:
           Write-Host "Skipping featomic build, already exists"
         }
 
-        $src = Join-Path $env:GITHUB_WORKSPACE "libcint"
-        $build = Join-Path $src "build"
+        $build = Join-Path $env:GITHUB_WORKSPACE "libcint\build"
         $outDir = Join-Path $env:GITHUB_WORKSPACE "Lib\LibCint\lib"
-        $cintLib = Join-Path $build "Release\cint.lib"
 
-        if (!(Test-Path $cintLib)) {
+        if (!(Test-Path $outDir)) {
           Write-Host "Building LibCint for Windows..."
 
           New-Item -ItemType Directory -Force -Path $build | Out-Null
           Push-Location $build
 
-          cmake -DBUILD_SHARED_LIBS=0 ..
-          cmake --build . --config Release
-
-          Pop-Location
-
-          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-          Copy-Item -Force $cintLib (Join-Path $outDir "cint.lib")
-
-          Write-Host "LibCint built and copied to $outDir"
+          cmake cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint -DCMAKE_C_COMPILER=cl ..
+          cmake --build . --config RELEASE
+          cmake --install .
         }
         else {
-          Write-Host "Skipping LibCint build, $cintLib already exists"
+          Write-Host "Skipping LibCint build, $outDir already exists"
         }
