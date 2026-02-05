@@ -88,7 +88,7 @@ endif
 ifeq ($(NAME),LINUX)
 MKLROOT := $(CURDIR)/Lib/MKL
 IntelMKL:
-ifeq ($(strip $(MKLROOT)),)
+ifeq ($(wildcard $(MKLROOT)),)
 	@echo MKL not found, building/installing Intel MKL for Linux
 	@wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/6a17080f-f0de-41b9-b587-52f92512c59a/intel-onemkl-2025.3.1.11_offline.sh
 	@echo Installing MKL, this will take some time! DO NOT CLOSE THE TERMINAL!

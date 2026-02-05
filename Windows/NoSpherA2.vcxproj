@@ -13733,10 +13733,21 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="MKL.auto.props" Condition="Exists('MKL.auto.props')" />
   <Import Project="MKL.props" Condition="Exists('MKL.props')" />
+  
   <PropertyGroup>
-    <!-- Your stated path -->
-    <IompDll>$(MKLROOT)\..\..\compiler\latest\bin\libiomp5md.dll</IompDll>
+    <!-- Candidate paths (absolute or relative) -->
+    <IompDllCandidate1>$(MKLROOT)\..\..\compiler\latest\bin\libiomp5md.dll</IompDllCandidate1>
+    <IompDllCandidate2>$(MKLROOT)\intelopenmp.redist.win\runtimes\win-x64\native</IompDllCandidate2>
   </PropertyGroup>
+  
+  <!-- First match wins -->
+  <PropertyGroup Condition="Exists('$(IompDllCandidate1)')">
+    <IompDll>$(IompDllCandidate1)</IompDll>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IompDll)'=='' and Exists('$(IompDllCandidate2)')">
+    <IompDll>$(IompDllCandidate2)</IompDll>
+  </PropertyGroup>
+
   <Target Name="CopyIntelOpenMP" AfterTargets="Build">
     <!-- Copy if it exists -->
     <Message Text="Copying Intel OpenMP runtime: $(IompDll) -&gt; $(TargetDir)" Importance="High" Condition="Exists('$(IompDll)')" />
