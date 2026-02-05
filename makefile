@@ -79,22 +79,6 @@ endif
 
 
 
-define DETECT_MKL
-ifeq ($(NAME),LINUX)
-  _MKL_MATCHES := $(wildcard \
-    $(MKLROOT)/include/mkl.h \
-    /opt/intel/oneapi/mkl/latest/include/mkl.h \
-    /usr/local/intel/oneapi/mkl/latest/include/mkl.h \
-    /usr/intel/oneapi/mkl/latest/include/mkl.h \
-  )
-  ifneq ($$(_MKL_MATCHES),)
-    MKLROOT := $$(patsubst %/include/mkl.h,%,$$(_MKL_MATCHES))
-  endif
-endif
-endef
-$(eval $(DETECT_MKL))
-
-
 ifeq ($(NAME),MAC)
 IntelMKL:
 	@brew list --versions libomp >/dev/null 2>&1 || \
@@ -102,14 +86,13 @@ IntelMKL:
 endif
 
 ifeq ($(NAME),LINUX)
-intel_ROOT := $(CURDIR)/Lib/MKL
+MKLROOT := $(CURDIR)/Lib/MKL
 IntelMKL:
 ifeq ($(strip $(MKLROOT)),)
 	@echo MKL not found, building/installing Intel MKL for Linux
 	@wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/6a17080f-f0de-41b9-b587-52f92512c59a/intel-onemkl-2025.3.1.11_offline.sh
 	@echo Installing MKL, this will take some time! DO NOT CLOSE THE TERMINAL!
-	@sh intel-onemkl-2025.3.1.11_offline.sh -a -s --install-dir=$(intel_ROOT) --eula accept
-	@$(eval $(DETECT_MKL))
+	@sh intel-onemkl-2025.3.1.11_offline.sh -a -s --install-dir=$(MKLROOT) --eula accept
 else
 	@echo Skipping IntelMKL build, found MKL at: $(MKLROOT)
 endif
