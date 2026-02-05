@@ -28,19 +28,6 @@ export CMAKE_OSX_DEPLOYMENT_TARGET=13.3
 export RUSTFLAGS=-C link-arg=-mmacosx-version-min=13.3
 endif
 
-ifeq ($(OS),Windows_NT)
-# Find latest VS installation path via vswhere (PowerShell used only to query)
-VS_INSTALL := $(strip $(shell powershell -NoProfile -Command "& '%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe' -latest -products * -property installationPath" ))
-
-VCVARSALL   := $(VS_INSTALL)\VC\Auxiliary\Build\vcvarsall.bat
-#Print found VS path
-ifeq ($(VS_INSTALL),)
-$(error "Visual Studio not found. Please install Visual Studio 2022 with C++ workload.")
-else
-$(info Found Visual Studio installation at: $(VS_INSTALL))
-endif
-endif
-
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 all: NoSpherA2
@@ -124,7 +111,7 @@ IntelMKL:
 	else
 		@echo Skipping IntelMKL build, found MKL at: $(MKLROOT)
 	endif
-	endif
+endif
 
 
 

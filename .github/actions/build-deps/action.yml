@@ -113,22 +113,63 @@ runs:
           Write-Host "Skipping LibCint build, $outDir already exists"
         }
 
-    - name: Generate MKL.auto.props from NuGet install
-      if: inputs.platform == 'Windows'
-      shell: powershell
-      run: |
-        $dev = Join-Path $env:GITHUB_WORKSPACE "Windows\packages_mkl\intelmkl.devel.win-x64"
-        if (-not (Test-Path (Join-Path $dev "include\mkl.h"))) {
-          throw "mkl.h not found under $dev\include. NuGet layout changed?"
-        }
+- name: Generate MKL.auto.props from NuGet MKL package
+  if: inputs.platform == 'Windows'
+  shell: powershell
+  run: |
+    $ErrorActionPreference = "Stop"
 
-        $propsPath = Join-Path $env:GITHUB_WORKSPACE "Windows\MKL.auto.props"
-        $xml = @"
-        <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-          <PropertyGroup>
-            <MKLROOT>$dev</MKLROOT>
-          </PropertyGroup>
-        </Project>
-        "@
-        Set-Content -Path $propsPath -Value $xml -Encoding UTF8
-        Write-Host "Wrote $propsPath with MKLROOT=$dev"
+    # Candidate locations:
+    # 1) workspace local install (your OutputDirectory)
+    $candidates = @()
+    $candidates += Join-Path $env:GITHUB_WORKSPACE "Windows\packages_mkl"
+
+    # 2) global nuget cache (nuget also installs here)
+    $candidates += Join-Path $env:USERPROFILE ".nuget\packages\intelmkl.devel.win-x64"
+
+    function Find-MklHeader([string]$root) {
+      if (-not (Test-Path $root)) { return $null }
+      return Get-ChildItem -Path $root -Recurse -Filter "mkl.h" -File -ErrorAction SilentlyContinue |
+             Select-Object -First 1
+    }
+
+    $mklh = $null
+    foreach ($c in $candidates) {
+      $mklh = Find-MklHeader $c
+      if ($mklh) { break }
+    }
+
+    if (-not $mklh) {
+      throw "Could not find mkl.h under: $($candidates -join ', ')"
+    }
+
+    Write-Host "Found mkl.h at: $($mklh.FullName)"
+
+    # MKLROOT = parent of include\ (i.e., ...\something\include\mkl.h -> ...\something)
+    $includeDir = Split-Path $mklh.FullName -Parent
+    $mklRoot    = Split-Path $includeDir -Parent
+
+    # sanity check: must contain include\mkl.h
+    if (-not (Test-Path (Join-Path $mklRoot "include\mkl.h"))) {
+      throw "Computed MKLROOT does not contain include\mkl.h: $mklRoot"
+    }
+
+    # Optional sanity: look for a well-known .lib somewhere under MKLROOT
+    $libHit = Get-ChildItem -Path $mklRoot -Recurse -Filter "mkl_core.lib" -File -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+    if ($libHit) {
+      Write-Host "Found mkl_core.lib at: $($libHit.FullName)"
+    } else {
+      Write-Host "Warning: mkl_core.lib not found under MKLROOT (may still be ok depending on layout)."
+    }
+
+    $propsPath = Join-Path $env:GITHUB_WORKSPACE "Windows\MKL.auto.props"
+    $xml = @"
+    <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+      <PropertyGroup>
+        <MKLROOT>$mklRoot</MKLROOT>
+      </PropertyGroup>
+    </Project>
+    "@
+    Set-Content -Path $propsPath -Value $xml -Encoding UTF8
+    Write-Host "Wrote $propsPath with MKLROOT=$mklRoot"
