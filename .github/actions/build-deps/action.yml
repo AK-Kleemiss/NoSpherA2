@@ -76,7 +76,7 @@ runs:
         nuget install intelmkl.static.win-x64 -OutputDirectory Windows\packages_mkl -ExcludeVersion
 
         # Absolute path to the packages folder
-        $packages = Join-Path Join-Path $env:GITHUB_WORKSPACE "Windows\packages_mkl"
+        $packages = Join-Path $env:GITHUB_WORKSPACE "Windows\packages_mkl"
         $propsPath = Join-Path $env:GITHUB_WORKSPACE "Windows\MKL.auto.props"
 
         $xml = '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">' +
