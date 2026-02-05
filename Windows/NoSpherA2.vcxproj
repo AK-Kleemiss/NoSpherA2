@@ -13737,7 +13737,7 @@
   <PropertyGroup>
     <!-- Candidate paths (absolute or relative) -->
     <IompDllCandidate1>$(MKLROOT)\..\..\compiler\latest\bin\libiomp5md.dll</IompDllCandidate1>
-    <IompDllCandidate2>$(MKLROOT)\intelopenmp.redist.win\runtimes\win-x64\native</IompDllCandidate2>
+    <IompDllCandidate2>$(MKLROOT)\intelopenmp.redist.win\runtimes\win-x64\native\libiomp5md.dll</IompDllCandidate2>
   </PropertyGroup>
   
   <!-- First match wins -->
