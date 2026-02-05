@@ -47,9 +47,6 @@
     <ClCompile Include="..\Src\basis_set.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\cart2sph.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\constants.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -105,15 +102,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\integrator.cpp">
-      <Filter>Source Files\libCInt</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\rys_roots.cpp">
-      <Filter>Source Files\libCInt</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\int_g2e.cpp">
-      <Filter>Source Files\libCInt</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\int_optimizer.cpp">
       <Filter>Source Files\libCInt</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\integration_params.cpp">

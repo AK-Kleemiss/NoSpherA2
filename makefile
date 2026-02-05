@@ -43,35 +43,16 @@ endif
 
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-all: check_rust NoSpherA2
+all: NoSpherA2
 
 # --- Cross-platform rust check ---
-ifeq ($(OS),Windows_NT)
-check_rust:
-	@powershell -NoProfile -Command "if (Get-Command rustc -ErrorAction SilentlyContinue) { rustc --version } else { Write-Error 'Rust not found install via https://www.rust-lang.org/tools/install'; exit 1 }"
-else
 check_rust:
 	@command -v rustc >/dev/null 2>&1 || { \
 	  echo "Rust is not installed or not on PATH. Install via https://www.rust-lang.org/tools/install"; exit 1; }; \
 	echo "Found: $$(rustc --version)"
-endif
 
-ifeq ($(NAME),WINDOWS)
-featomic: check_rust
-	@if not exist Lib\featomic_install\lib\metatensor.lib ( \
-		echo Building featomic for $(NAME) && \
-		cd $(MAKEFILE_DIR)/featomic/featomic && \
-		(if exist build rd /s /q build) && \
-		mkdir build && \
-		cd build && \
-		echo Starting build && \
-		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" .. && \
-		msbuild -nologo .\featomic.sln -p:Configuration=Release && \
-		msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release \
-	) else ( \
-		echo featomic already built \
-	)
-else ifeq ($(NAME),MAC)
+
+ifeq ($(NAME),MAC)
 featomic:  check_rust
 	@if [ ! -f Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a ]; then \
 		echo 'Building featomic for $(NATIVE_ARCH), since Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a doesnt exist'; \
@@ -88,7 +69,14 @@ featomic:  check_rust
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a already exists'; \
 	fi
-else
+featomic_x86_64:
+	@$(MAKE) NATIVE_ARCH=x86_64 featomic
+
+featomic_arm64: check_rust
+	@$(MAKE) NATIVE_ARCH=arm64 featomic
+endif
+
+ifeq ($(NAME),LINUX)
 featomic: check_rust
 	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
 		echo 'Building featomic, since Lib/featomic_install/lib/libfeatomic.a doesnt exist'; \
@@ -102,41 +90,45 @@ featomic: check_rust
 	fi
 endif
 
-featomic_x86_64:
-	@$(MAKE) NATIVE_ARCH=x86_64 featomic
-
-featomic_arm64: check_rust
-	@$(MAKE) NATIVE_ARCH=arm64 featomic
 
 
-intel_ROOT := $(CURDIR)/Lib/MKL
+define DETECT_MKL
+ifeq ($(NAME),LINUX)
+  _MKL_MATCHES := $(wildcard \
+    $(MKLROOT)/include/mkl.h \
+    /opt/intel/oneapi/mkl/latest/include/mkl.h \
+    /usr/local/intel/oneapi/mkl/latest/include/mkl.h \
+    /usr/intel/oneapi/mkl/latest/include/mkl.h \
+  )
+  ifneq ($$(_MKL_MATCHES),)
+    MKLROOT := $$(patsubst %/include/mkl.h,%,$$(_MKL_MATCHES))
+  endif
+endif
+endef
+$(eval $(DETECT_MKL))
+
+
+ifeq ($(NAME),MAC)
 IntelMKL:
-ifeq ($(NAME),WINDOWS)
-	MSBuild .\Windows\NoSpherA2.sln /t:Restore /p:RestorePackagesPath=Windows/packages /p:RestoreTimeout=300000
-else ifeq ($(NAME),MAC)
 	@brew list --versions libomp >/dev/null 2>&1 || \
 	  { echo "Installing libomp (arm64)…"; brew install libomp; }
-else
-	@if [ ! -f Lib/MKL/mkl/2025.2/lib/libmkl_core.a ]; then \
-		wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh; \
-		sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=$(intel_ROOT) --eula accept; \
-	else \
-		echo 'Skipping IntelMKL build, MKL\\mkl\\2025.2\\lib\\libmkl_core.a already exists'; \
-	fi
 endif
 
+ifeq ($(NAME),LINUX)
+IntelMKL:
+	ifeq ($(strip $(MKLROOT)),)
+		@echo MKL not found, building/installing Intel MKL for Linux
+		wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh
+		@echo Installing MKL, this will take some time! DO NOT CLOSE THE TERMINAL!
+		sh intel-onemkl-2025.2.0.629_offline.sh -a -r -s --eula accept
+	else
+		@echo Skipping IntelMKL build, found MKL at: $(MKLROOT)
+	endif
+	endif
 
-ifeq ($(NAME),WINDOWS)
-LibCint:
-	@if not exist Lib\LibCint\lib\cint.lib ( \
-		echo Building LibCint for $(NAME) && \
-		@cd libcint && (if not exist build mkdir build) && cd build && \
-		cmd /S /C "call "$(VCVARSALL)" x64 >nul && cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint -DCMAKE_C_COMPILER=cl .." && \
-		cmake --build . --config RELEASE && cmake --install . \
-	) else ( \
-		echo Skipping LibCint build, Lib\LibCint\lib\cint.lib already exists \
-	)
-else ifeq ($(NAME),MAC)
+
+
+ifeq ($(NAME),MAC)
 LibCint:
 	@if [ ! -f Lib/LibCint/lib_$(NATIVE_ARCH)/libcint.a ]; then \
 		echo 'Building LibCint for $(NATIVE_ARCH), since Lib/LibCint_$(NATIVE_ARCH)/lib/cint.a doesnt exist'; \
@@ -146,7 +138,17 @@ LibCint:
 	else \
 		echo 'Skipping LibCint build, Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a already exists'; \
 	fi
-else
+	
+LibCint_x86_64:
+	@$(MAKE) NATIVE_ARCH=x86_64 LibCint
+
+LibCint_arm64:
+	@$(MAKE) NATIVE_ARCH=arm64 LibCint
+endif
+
+
+
+ifeq ($(NAME),LINUX)
 LibCint:
 	@if [ ! -f Lib/LibCint/lib/libcint.a ]; then \
 		cd libcint && mkdir -p build && cd build && \
@@ -157,22 +159,20 @@ LibCint:
 	fi
 endif
 
-LibCint_x86_64:
-	@$(MAKE) NATIVE_ARCH=x86_64 LibCint
-
-LibCint_arm64:
-	@$(MAKE) NATIVE_ARCH=arm64 LibCint
-
 ifeq ($(NAME),WINDOWS)
-NoSpherA2: IntelMKL featomic LibCint
-	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe . && copy Windows\x64\Release\libiomp5md.dll
+WIN_SLN  ?= Windows/NoSpherA2.sln
+WIN_CFG  ?= Release
+WIN_PLAT ?= x64
+NoSpherA2: 
+	echo Building $(WIN_SLN) ($(WIN_CFG) $(WIN_PLAT)) 
+	msbuild $(WIN_SLN) /p:Configuration=$(WIN_CFG) /p:Platform=$(WIN_PLAT)
 
-NoSpherA2_Debug: IntelMKL featomic LibCint
+NoSpherA2_Debug:
 	@echo Building NoSpherA2_Debug for $(NAME)
-	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
+	@$(MAKE) WIN_CFG=Debug NoSpherA2
 
 clean:
-	@cd Windows && if exist x64 rd /s /q x64
+	@msbuild $(WIN_SLN) /t:Clean /p:Configuration=$(WIN_CFG) /p:Platform=$(WIN_PLAT)
 endif
 
 ifeq ($(NAME),LINUX)
@@ -188,7 +188,6 @@ NoSpherA2_Debug: IntelMKL featomic LibCint
 
 clean:
 	@cd Linux && make clean
-
 endif
 
 ifeq ($(NAME),MAC)

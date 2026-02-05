@@ -1,0 +1,21 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- If MKLROOT isn't set, error out with a clear message -->
+  <Target Name="CheckMKLROOT" BeforeTargets="ClCompile">
+    <Error Condition="'$(MKLROOT)'==''"
+           Text="MKLROOT is not set. In Visual Studio: define MKLROOT as an environment variable or create Windows\MKL.user.props with your local MKL path."/>
+  </Target>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(MKLROOT)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(MKLROOT)\lib;$(MKLROOT)\..\..\compiler\latest\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>
+        mkl_intel_lp64.lib;mkl_core.lib;mkl_intel_thread.lib;libiomp5md.lib;%(AdditionalDependencies)
+      </AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+</Project>
