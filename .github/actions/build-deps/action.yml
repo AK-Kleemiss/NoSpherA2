@@ -86,7 +86,6 @@ runs:
 
         Set-Content -Path $propsPath -Value $xml -Encoding UTF8
         Write-Host "Wrote $propsPath"
-        Write-Host "MKLROOT=$mklRoot"
 
         #Build featomic
         if (-not (Test-Path "Lib\featomic_install\lib\metatensor.lib")) {
