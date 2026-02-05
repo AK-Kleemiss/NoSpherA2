@@ -73,12 +73,20 @@ runs:
         }
 
         New-Item -ItemType Directory -Force -Path Windows\packages_mkl | Out-Null
+        nuget install intelmkl.static.win-x64 -OutputDirectory Windows\packages_mkl -ExcludeVersion
 
-        # Development package: headers + .lib import libs
-        nuget install intelmkl.devel.win-x64 -OutputDirectory Windows\packages_mkl -ExcludeVersion
+        # Absolute path to the packages folder
+        $packages = Join-Path Join-Path $env:GITHUB_WORKSPACE "Windows\packages_mkl"
+        $propsPath = Join-Path $env:GITHUB_WORKSPACE "Windows\MKL.auto.props"
 
-        # Runtime package: DLLs needed at runtime
-        nuget install intelmkl.redist.win-x64 -OutputDirectory Windows\packages_mkl -ExcludeVersion
+        $xml = '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">' +
+               "`n  <PropertyGroup>`n" +
+               "    <MKLROOT>$packages</MKLROOT>`n" +
+               "  </PropertyGroup>`n</Project>`n"
+
+        Set-Content -Path $propsPath -Value $xml -Encoding UTF8
+        Write-Host "Wrote $propsPath"
+        Write-Host "MKLROOT=$mklRoot"
 
         #Build featomic
         if (-not (Test-Path "Lib\featomic_install\lib\metatensor.lib")) {
@@ -112,44 +120,3 @@ runs:
         else {
           Write-Host "Skipping LibCint build, $outDir already exists"
         }
-
-    - name: Generate MKL.auto.props from NuGet MKL package
-      if: inputs.platform == 'Windows'
-      shell: powershell
-      run: |
-        $ErrorActionPreference = "Stop"
-
-        $candidates = @()
-        $candidates += Join-Path $env:GITHUB_WORKSPACE "Windows\packages_mkl"
-        $candidates += Join-Path $env:USERPROFILE ".nuget\packages\intelmkl.devel.win-x64"
-
-        function Find-MklHeader([string]$root) {
-          if (-not (Test-Path $root)) { return $null }
-          Get-ChildItem -Path $root -Recurse -Filter "mkl.h" -File -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-        }
-
-        $mklh = $null
-        foreach ($c in $candidates) {
-          $mklh = Find-MklHeader $c
-          if ($mklh) { break }
-        }
-
-        if (-not $mklh) {
-          throw "Could not find mkl.h under: $($candidates -join ', ')"
-        }
-
-        $includeDir = Split-Path $mklh.FullName -Parent
-        $mklRoot    = Split-Path $includeDir -Parent
-
-        if (-not (Test-Path (Join-Path $mklRoot "include\mkl.h"))) {
-          throw "Computed MKLROOT does not contain include\mkl.h: $mklRoot"
-        }
-
-        $propsPath = Join-Path $env:GITHUB_WORKSPACE "Windows\MKL.auto.props"
-
-        $xml = '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">' +
-               "`n  <PropertyGroup>`n    <MKLROOT>$mklRoot</MKLROOT>`n  </PropertyGroup>`n</Project>`n"
-
-        Set-Content -Path $propsPath -Value $xml -Encoding UTF8
-        Write-Host "Wrote $propsPath with MKLROOT=$mklRoot"

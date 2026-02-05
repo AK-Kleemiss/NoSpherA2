@@ -11,7 +11,7 @@
       <AdditionalIncludeDirectories>$(MKLROOT)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(MKLROOT)\lib;$(MKLROOT)\..\..\compiler\latest\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(MKLROOT)\lib;$(MKLROOT)\..\..\compiler\latest\lib;(MKLROOT)\intelmkl.static.win-x64\build\native\win-x64;$(MKLROOT)\intelopenmp.devel.win\build\native\win-x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>
         mkl_intel_lp64.lib;mkl_core.lib;mkl_intel_thread.lib;libiomp5md.lib;%(AdditionalDependencies)
       </AdditionalDependencies>
