@@ -65,9 +65,20 @@ runs:
       run: |
         # Ensure cargo is in PATH
         $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-        
+
         #Build Intel MKL
-        MSBuild .\Windows\NoSpherA2.sln /t:Restore /p:RestorePackagesPath=Windows/packages /p:RestoreTimeout=300000
+        # Ensure nuget.exe is available
+        if (-not (Get-Command nuget -ErrorAction SilentlyContinue)) {
+          choco install nuget.commandline -y
+        }
+
+        New-Item -ItemType Directory -Force -Path Windows\packages_mkl | Out-Null
+
+        # Development package: headers + .lib import libs
+        nuget install intelmkl.devel.win-x64 -OutputDirectory Windows\packages_mkl -ExcludeVersion
+
+        # Runtime package: DLLs needed at runtime
+        nuget install intelmkl.redist.win-x64 -OutputDirectory Windows\packages_mkl -ExcludeVersion
 
         #Build featomic
         if (-not (Test-Path "Lib\featomic_install\lib\metatensor.lib")) {
@@ -101,3 +112,23 @@ runs:
         else {
           Write-Host "Skipping LibCint build, $outDir already exists"
         }
+
+    - name: Generate MKL.auto.props from NuGet install
+      if: inputs.platform == 'Windows'
+      shell: powershell
+      run: |
+        $dev = Join-Path $env:GITHUB_WORKSPACE "Windows\packages_mkl\intelmkl.devel.win-x64"
+        if (-not (Test-Path (Join-Path $dev "include\mkl.h"))) {
+          throw "mkl.h not found under $dev\include. NuGet layout changed?"
+        }
+
+        $propsPath = Join-Path $env:GITHUB_WORKSPACE "Windows\MKL.auto.props"
+        $xml = @"
+        <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+          <PropertyGroup>
+            <MKLROOT>$dev</MKLROOT>
+          </PropertyGroup>
+        </Project>
+        "@
+        Set-Content -Path $propsPath -Value $xml -Encoding UTF8
+        Write-Host "Wrote $propsPath with MKLROOT=$dev"

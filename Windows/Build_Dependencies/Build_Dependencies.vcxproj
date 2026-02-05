@@ -51,12 +51,18 @@
   <PropertyGroup Label="UserMacros" />
 
   <PropertyGroup>
-    <RepoRoot>$([System.IO.Path]::GetFullPath('$(SolutionDir)..'))</RepoRoot>
+	 <!-- This vcxproj lives in: ...\Windows\Build_Dependencies\ -->
+	<WindowsDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\' ))</WindowsDir>
+	<RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..' ))</RepoRoot>
+	  
+	<!-- Choose where the script actually is -->
+	<DepsScript>$(MSBuildProjectDirectory)\build_deps.ps1</DepsScript>
   </PropertyGroup>
 
   <Target Name="BuildDependencies" BeforeTargets="Build">
     <Message Text="=== deps: RepoRoot=$(RepoRoot) ===" Importance="High" />
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(SolutionDir)Build_Dependencies\build_deps.ps1&quot; -RepoRoot &quot;$(RepoRoot)&quot; -Configuration $(Configuration) -Platform $(Platform) -InstallMKLIfMissing" />
+    <Message Text="=== deps: Script=$(DepsScript) ===" Importance="High" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(DepsScript)&quot; -RepoRoot &quot;$(RepoRoot)&quot; -Configuration $(Configuration) -Platform $(Platform) -InstallMKLIfMissing" />
   </Target>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
