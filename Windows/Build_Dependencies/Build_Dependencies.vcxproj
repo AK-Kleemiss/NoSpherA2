@@ -59,7 +59,7 @@
 	<DepsScript>$(MSBuildProjectDirectory)\build_deps.ps1</DepsScript>
   </PropertyGroup>
 
-  <Target Name="BuildDependencies" BeforeTargets="Build">
+  <Target Name="BuildDependencies" BeforeTargets="Build" Condition="'$(SkipBuildDependencies)' != 'true'">
     <Message Text="=== deps: RepoRoot=$(RepoRoot) ===" Importance="High" />
     <Message Text="=== deps: Script=$(DepsScript) ===" Importance="High" />
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(DepsScript)&quot; -RepoRoot &quot;$(RepoRoot)&quot; -Configuration $(Configuration) -Platform $(Platform) -InstallMKLIfMissing" />

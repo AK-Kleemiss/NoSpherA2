@@ -103,14 +103,15 @@ endif
 
 ifeq ($(NAME),LINUX)
 IntelMKL:
-	ifeq ($(strip $(MKLROOT)),)
-		@echo MKL not found, building/installing Intel MKL for Linux
-		wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh
-		@echo Installing MKL, this will take some time! DO NOT CLOSE THE TERMINAL!
-		sh intel-onemkl-2025.2.0.629_offline.sh -a -r -s --eula accept
-	else
-		@echo Skipping IntelMKL build, found MKL at: $(MKLROOT)
-	endif
+ifeq ($(strip $(MKLROOT)),)
+	@echo MKL not found, building/installing Intel MKL for Linux
+	@wget -q https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh
+	@echo Installing MKL, this will take some time! DO NOT CLOSE THE TERMINAL!
+	@sh intel-onemkl-2025.2.0.629_offline.sh -a -r -s --eula accept
+	@$(eval $(DETECT_MKL))
+else
+	@echo Skipping IntelMKL build, found MKL at: $(MKLROOT)
+endif
 endif
 
 

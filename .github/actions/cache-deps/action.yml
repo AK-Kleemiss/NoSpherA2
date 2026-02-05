@@ -26,8 +26,8 @@ runs:
       with:
         path: |
           Lib/featomic_install
-          Windows/packages
-          ~/.nuget/packages
+          Windows\MKL.auto.props
+          Windows\packages_mkl
           Lib/LibCint
         key: windows-deps-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('featomic/**') }}
         restore-keys: |

@@ -50,7 +50,7 @@ jobs:
             name: Windows
             build-script: |
               cd Windows 
-              msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64
+              msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64 -p:SkipBuildDependencies=true
             artifact-name: executable_Windows
             artifact-path: |
               Windows/x64/Release/NoSpherA2.exe
