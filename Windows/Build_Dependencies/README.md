@@ -11,8 +11,9 @@ To mitigate supply-chain security risks, the build script supports SHA256 checks
 1. Visit the official Intel oneMKL download page:
    https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html
 
-2. Locate the SHA256 checksum for version `2025.3.1.10` Windows offline installer:
-   - Look in the download details section or release notes
+2. Locate the SHA256 checksum for the Windows offline installer version matching the one used in the build script:
+   - Check the `build_deps.ps1` script to see which version is currently configured (look for the `$url` variable in the `Install-MKL` function)
+   - Look in the download details section or release notes on Intel's website
    - The checksum is typically displayed near the download link or in a separate verification file
    - Intel may provide a `.sha256` file or list checksums in the product documentation
 

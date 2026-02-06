@@ -65,8 +65,8 @@ function Verify-FileChecksum {
   Write-Host "[deps] Verifying SHA256 checksum of $FilePath"
   $hash = (Get-FileHash -Path $FilePath -Algorithm SHA256).Hash
   
-  # Case-insensitive comparison (Get-FileHash returns uppercase, user input may vary)
-  if ($hash -ne $ExpectedSHA256.ToUpper()) {
+  # Case-insensitive comparison (normalize both to uppercase)
+  if ($hash.ToUpper() -ne $ExpectedSHA256.ToUpper()) {
     Write-Error "[deps] CHECKSUM VERIFICATION FAILED!"
     Write-Error "[deps]   Expected: $($ExpectedSHA256.ToUpper())"
     Write-Error "[deps]   Actual:   $hash"
@@ -84,6 +84,7 @@ function Install-MKL {
     [Parameter(Mandatory=$false)][string]$ExpectedSHA256
   )
   $url = "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ae472ff5-aa01-4a72-a452-ce7b559ef041/intel-onemkl-2025.3.1.10_offline.exe"
+  # Use a clearer filename locally (original: intel-onemkl-2025.3.1.10_offline.exe)
   $exeName = "intel-onemkl-2025.3.1.10-windows.exe"
   $exePath = Join-Path $RepoRoot $exeName
 
