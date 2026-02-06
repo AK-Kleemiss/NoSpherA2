@@ -12,11 +12,10 @@
 #include "nos_math.h"
 #include "featomic.hpp"
 #include "metatensor.h"
+#include "GridManager.h"
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif
-
-#include "GridManager.h"
 
 void sfac_scan(options &opt, std::ostream &log_file)
 {

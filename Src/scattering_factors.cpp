@@ -2033,11 +2033,11 @@ int make_atomic_grids(
 // This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759), assuming that H = 2 \pi S
 double fourier_bessel_integral(
     const primitive& p,
-    const double& H)
+    const double& H,
+    const int& l)
 {
-    const int l = p.get_type();
     const double b = p.get_exp();
-    return p.normalization_constant() * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (constants::pow_2[l + 2] * pow(b, l + 1.5));
+    return (pow(H, l) * exp(-H * H / (4.0 * b))) / (constants::pow_2[l] * p.get_exp_l_plus_3_2());
 }
 
 cdouble sfac_bessel(
@@ -2045,7 +2045,20 @@ cdouble sfac_bessel(
     const double* k_point,
     const double* coefs)
 {
-    return constants::FOUR_PI_i_pows[p.get_type()] * fourier_bessel_integral(p, k_point[3]) * p.get_coef() * constants::spherical_harmonic(p.get_type(), k_point, coefs);
+    const int l = p.get_type();
+    switch (l%4) {
+    case 0:
+        return cdouble(constants::PI3_2 * fourier_bessel_integral(p, k_point[3], l) * p.get_normalized_coefficient() * constants::spherical_harmonic(l, k_point, coefs), 0);
+    case 1:
+        return cdouble(0, constants::PI3_2 * fourier_bessel_integral(p, k_point[3], l) * p.get_normalized_coefficient() * constants::spherical_harmonic(l, k_point, coefs));
+    case 2:
+        return cdouble(-constants::PI3_2 * fourier_bessel_integral(p, k_point[3], l) * p.get_normalized_coefficient() * constants::spherical_harmonic(l, k_point, coefs), 0);
+    case 3:
+        return cdouble(0, -constants::PI3_2 * fourier_bessel_integral(p, k_point[3], l) * p.get_normalized_coefficient() * constants::spherical_harmonic(l, k_point, coefs));
+    default:
+        //should normally never happen
+        return constants::cnull;
+    }
 }
 
 //TODO´: This breaks if the aux_basis is contracted... Need to fix that!
@@ -2113,11 +2126,6 @@ void calc_SF_SALTED(const vec2& k_pt,
                 0.0
             };
 
-            //k_pt_local[3] = std::sqrt(
-            //    k_pt_local[0] * k_pt_local[0] +
-            //    k_pt_local[1] * k_pt_local[1] +
-            //    k_pt_local[2] * k_pt_local[2]);
-
             k_pt_local[3] = std::hypot(k_pt_local[0], k_pt_local[1], k_pt_local[2]);
 
             for (int i = 0; i < 3; ++i)
@@ -2135,7 +2143,7 @@ void calc_SF_SALTED(const vec2& k_pt,
                 for (int i_basis = 0; i_basis < lim; ++i_basis, ++basis_ptr)
                 {
                     // IMPORTANT: make basis local, not shared between threads
-                    primitive basis = basis_ptr->get_primitive();
+                    const primitive& basis = basis_ptr->get_primitive();
                     sf[ia][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
                     coef_slice_ptr += 2 * basis.get_type() + 1;
                 }
