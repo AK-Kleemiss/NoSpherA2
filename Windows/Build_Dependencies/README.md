@@ -19,9 +19,13 @@ To mitigate supply-chain security risks, the build script supports SHA256 checks
 
 3. Alternatively, if you already have a trusted copy of the installer from a previous verified download, compute its SHA256:
    ```powershell
+   # For the renamed file (if already processed by build_deps.ps1)
    Get-FileHash -Path "intel-onemkl-2025.3.1.10-windows.exe" -Algorithm SHA256
+   
+   # For the original download (before renaming)
+   Get-FileHash -Path "intel-onemkl-2025.3.1.10_offline.exe" -Algorithm SHA256
    ```
-   Note: This method only works if you already have a verified copy from a trusted source.
+   Note: The build script renames the downloaded file from `*_offline.exe` to `*-windows.exe` for clarity. Both refer to the same file content and will have the same checksum.
 
 ### Using Checksum Verification
 
