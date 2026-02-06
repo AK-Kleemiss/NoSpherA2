@@ -109,3 +109,7 @@ Mac/basis_set_helper.o_arm64_basis
 *CopilotSnapshots*
 Windows/Build_Dependencies/deps.stamp
 Windows/MKL.auto.props
+
+Lib\LibCint\include\cint.h
+Lib\LibCint\include\cint_config.h
+Lib\LibCint\include\cint_funcs.h
