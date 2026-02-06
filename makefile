@@ -102,13 +102,13 @@ endif
 
 ifeq ($(NAME),MAC)
 LibCint:
-	@if [ ! -f Lib/LibCint/lib_$(NATIVE_ARCH)/libcint.a ]; then \
-		echo 'Building LibCint for $(NATIVE_ARCH), since Lib/LibCint_$(NATIVE_ARCH)/lib/cint.a doesnt exist'; \
+	@if [ ! -f Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a ]; then \
+		echo 'Building LibCint for $(NATIVE_ARCH), since Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a doesnt exist'; \
 		cd libcint && mkdir -p build_$(NATIVE_ARCH) && cd build_$(NATIVE_ARCH) &&\
 		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint_$(NATIVE_ARCH) -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && \
 		make install; \
 	else \
-		echo 'Skipping LibCint build, Lib/LibCint/lib_$(NATIVE_ARCH)/cint.a already exists'; \
+		echo 'Skipping LibCint build, Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a already exists'; \
 	fi
 	
 LibCint_x86_64:
@@ -127,7 +127,7 @@ LibCint:
 		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint .. && \
 		make install; \
 	else \
-		echo 'Skipping LibCint build, Lib\LibCint\lib\cint.a already exists'; \
+		echo 'Skipping LibCint build, Lib/LibCint/lib/libcint.a already exists'; \
 	fi
 endif
 
