@@ -2,7 +2,8 @@ param(
   [Parameter(Mandatory=$true)][string]$RepoRoot,
   [string]$Configuration = "Release",
   [string]$Platform = "x64",
-  [switch]$InstallMKLIfMissing
+  [switch]$InstallMKLIfMissing,
+  [string]$MKLInstallerSHA256 = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,19 +56,59 @@ function Download-File($Url, $OutFile) {
   Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing
 }
 
+function Verify-FileChecksum {
+  param(
+    [Parameter(Mandatory=$true)][string]$FilePath,
+    [Parameter(Mandatory=$true)][string]$ExpectedSHA256
+  )
+  
+  Write-Host "[deps] Verifying SHA256 checksum of $FilePath"
+  $hash = (Get-FileHash -Path $FilePath -Algorithm SHA256).Hash
+  
+  if ($hash -ne $ExpectedSHA256) {
+    Write-Error "[deps] CHECKSUM VERIFICATION FAILED!"
+    Write-Error "[deps]   Expected: $ExpectedSHA256"
+    Write-Error "[deps]   Actual:   $hash"
+    Write-Error "[deps] The downloaded file may be corrupted or tampered with."
+    Write-Error "[deps] Please verify the checksum manually or re-download the file."
+    throw "Checksum verification failed for $FilePath"
+  }
+  
+  Write-Host "[deps] Checksum verified successfully: $hash"
+}
+
 function Install-MKL {
   param(
-    [Parameter(Mandatory=$true)][string]$RepoRoot
+    [Parameter(Mandatory=$true)][string]$RepoRoot,
+    [Parameter(Mandatory=$false)][string]$ExpectedSHA256
   )
   $url = "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ae472ff5-aa01-4a72-a452-ce7b559ef041/intel-onemkl-2025.3.1.10_offline.exe"
   $exeName = "intel-onemkl-2025.3.1.10-windows.exe"
   $exePath = Join-Path $RepoRoot $exeName
 
   Write-Host "[deps] MKL not found, downloading/installing Intel oneMKL for Windows"
+  
+  # Warn if no checksum is provided
+  if ([string]::IsNullOrEmpty($ExpectedSHA256)) {
+    Write-Warning "[deps] **************************************************************"
+    Write-Warning "[deps] WARNING: No SHA256 checksum provided for MKL installer!"
+    Write-Warning "[deps] This creates a supply-chain security risk."
+    Write-Warning "[deps] To verify the installer, obtain the official SHA256 from:"
+    Write-Warning "[deps]   https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html"
+    Write-Warning "[deps] Then pass it via: -MKLInstallerSHA256 '<checksum>'"
+    Write-Warning "[deps] **************************************************************"
+    Start-Sleep -Seconds 3
+  }
+  
   if (-not (Test-Path $exePath)) {
     Download-File -Url $url -OutFile $exePath
   } else {
     Write-Host "[deps] Installer already present: $exePath"
+  }
+  
+  # Verify checksum if provided
+  if (-not [string]::IsNullOrEmpty($ExpectedSHA256)) {
+    Verify-FileChecksum -FilePath $exePath -ExpectedSHA256 $ExpectedSHA256
   }
   
   Write-Host "[deps] Installing MKL, this will take some time! DO NOT CLOSE THE TERMINAL!"
@@ -84,7 +125,7 @@ function Install-MKL {
 $found = Find-MKLRoot
 if (-not $found) {
   if ($InstallMKLIfMissing) {
-    Install-MKL -RepoRoot $RepoRoot
+    Install-MKL -RepoRoot $RepoRoot -ExpectedSHA256 $MKLInstallerSHA256
     $found = Find-MKLRoot
   }
 }
