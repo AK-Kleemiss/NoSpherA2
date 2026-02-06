@@ -65,9 +65,10 @@ function Verify-FileChecksum {
   Write-Host "[deps] Verifying SHA256 checksum of $FilePath"
   $hash = (Get-FileHash -Path $FilePath -Algorithm SHA256).Hash
   
-  if ($hash -ne $ExpectedSHA256) {
+  # Case-insensitive comparison (Get-FileHash returns uppercase, user input may vary)
+  if ($hash -ne $ExpectedSHA256.ToUpper()) {
     Write-Error "[deps] CHECKSUM VERIFICATION FAILED!"
-    Write-Error "[deps]   Expected: $ExpectedSHA256"
+    Write-Error "[deps]   Expected: $($ExpectedSHA256.ToUpper())"
     Write-Error "[deps]   Actual:   $hash"
     Write-Error "[deps] The downloaded file may be corrupted or tampered with."
     Write-Error "[deps] Please verify the checksum manually or re-download the file."
