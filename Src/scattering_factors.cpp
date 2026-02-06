@@ -327,7 +327,7 @@ void generate_hkl(const double& dmin,
         file << "extreme: " << extreme[0] << " " << extreme[1] << " " << extreme[2] << endl;
     for (int h = -extreme[0]; h < extreme[0]; h++)
     {
-        for (int k = -extreme[1]; k < extreme[2]; k++)
+        for (int k = -extreme[1]; k < extreme[1]; k++)
         {
             for (int l = -extreme[2]; l < extreme[2]; l++)
             {
@@ -2048,7 +2048,7 @@ cdouble sfac_bessel(
     return constants::FOUR_PI_i_pows[p.get_type()] * fourier_bessel_integral(p, k_point[3]) * p.get_coef() * constants::spherical_harmonic(p.get_type(), k_point, coefs);
 }
 
-//TODO´: This breaks if the aux_basis is contracted... Need to fix that!
+//TODOï¿½: This breaks if the aux_basis is contracted... Need to fix that!
 void calc_SF_SALTED(const vec2& k_pt,
     const vec& coefs,
     const std::vector<atom>& atom_list,
@@ -2097,11 +2097,11 @@ void calc_SF_SALTED(const vec2& k_pt,
 
 #pragma omp parallel shared(pb, sf)
     {
-    // init SF
+        // init SF
 #pragma omp for
-    for (int ia = 0; ia < num_asym_atoms; ++ia) {
-        sf[ia].assign(k_pt[0].size(), constants::cnull);
-    }
+        for (int ia = 0; ia < num_asym_atoms; ++ia) {
+            sf[ia].assign(k_pt[0].size(), constants::cnull);
+        }
 
 #pragma omp for
         for (int i_kpt = 0; i_kpt < (int)k_pt[0].size(); ++i_kpt)
@@ -2814,7 +2814,7 @@ tsc_block_type calculate_scattering_factors(
             {
                 int a = asym_atom_list[i];
                 file << setw(10) << labels[i]
-                     << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[a];
+                    << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[a];
                 if (opt.debug)
                     file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[a];
                 file << endl;
