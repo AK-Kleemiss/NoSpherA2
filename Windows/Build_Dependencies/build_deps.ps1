@@ -1,9 +1,7 @@
 param(
   [Parameter(Mandatory=$true)][string]$RepoRoot,
   [string]$Configuration = "Release",
-  [string]$Platform = "x64",
-  [switch]$InstallMKLIfMissing,
-  [string]$MKLInstallerSHA256 = ""
+  [string]$Platform = "x64"
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,134 +13,263 @@ function Fail($m) { Write-Error "[deps] $m"; exit 1 }
 $RepoRoot = (Resolve-Path $RepoRoot).Path
 $LibDir   = Join-Path $RepoRoot "Lib"
 
+function Import-VsDevCmdEnvironment {
+  param(
+    [Parameter(Mandatory=$true)][string]$VsDevCmdBat,
+    [string]$Arch = "x64"
+  )
+
+  if (-not (Test-Path $VsDevCmdBat)) {
+    throw "VsDevCmd not found: $VsDevCmdBat"
+  }
+
+  # Call VsDevCmd.bat, then dump environment via `set` and import into this PS session
+  $cmd = 'call "{0}" -arch={1} >nul && set' -f $VsDevCmdBat, $Arch
+
+  cmd.exe /s /c $cmd | ForEach-Object {
+    if ($_ -match '^(.*?)=(.*)$') {
+      Set-Item -Path ("Env:\" + $matches[1]) -Value $matches[2]
+    }
+  }
+}
+
+function Add-ToPathFront([string]$p) {
+  if (-not [string]::IsNullOrWhiteSpace($p) -and (Test-Path $p)) {
+    $env:PATH = $p + ";" + $env:PATH
+  }
+}
+
+function Ensure-RustToolchain {
+
+  # ------------------------------------------------------------
+  # Check if it is just loaded
+  # ------------------------------------------------------------
+  if ((Get-Command rustc -ErrorAction SilentlyContinue) -and
+      (Get-Command cargo -ErrorAction SilentlyContinue)) {
+    return
+  }
+
+  Info "Rust not found in PATH. Searching common installation locations..."
+
+  # ------------------------------------------------------------
+  # Check common directories
+  # ------------------------------------------------------------
+  $candidateBins = @(
+    (Join-Path $env:USERPROFILE ".cargo\bin"),
+    (Join-Path $env:LOCALAPPDATA "Programs\Rust\bin"),
+    "C:\Program Files\Rust\bin",
+    "C:\Program Files (x86)\Rust\bin"
+  )
+
+  foreach ($bin in $candidateBins) {
+    if (Test-Path (Join-Path $bin "rustc.exe")) {
+      Add-ToPathFront $bin
+      if ((Get-Command rustc -ErrorAction SilentlyContinue) -and
+          (Get-Command cargo -ErrorAction SilentlyContinue)) {
+        Info "Rust toolchain found at: $bin"
+        return
+      }
+    }
+  }
+
+  # ------------------------------------------------------------
+  # Fail if not found
+  # ------------------------------------------------------------
+  Write-Host ""
+  Write-Host "============================================================" -ForegroundColor Red
+  Write-Host "  Rust toolchain not detected" -ForegroundColor Red
+  Write-Host "============================================================" -ForegroundColor Red
+  Write-Host ""
+  Write-Host "This project requires Rust (rustc + cargo) to build a dependency."
+  Write-Host ""
+  Write-Host "  Please install Rust via rustup:"
+  Write-Host "     https://www.rust-lang.org/tools/install"
+  Write-Host "   After installation please restart the console"
+  Write-Host ""
+  Write-Host "Expected default location:"
+  Write-Host "  %USERPROFILE%\.cargo\bin"
+  Write-Host ""
+  Write-Host "You can verify manually with:"
+  Write-Host "  rustc --version"
+  Write-Host "  cargo --version"
+  Write-Host ""
+  exit 1
+}
+
+function Try-Load-MKLFromAutoProps {
+  param(
+    [Parameter(Mandatory=$true)]
+    [string]$RepoRoot
+  )
+
+  $propsPath = Join-Path $RepoRoot "Windows\MKL.auto.props"
+
+  if (-not (Test-Path $propsPath)) {
+    return
+  }
+
+  Info "Found MKL.auto.props - loading MKLROOT..."
+
+  try {
+    $content = Get-Content $propsPath -Raw
+
+    # Simple regex extraction (no XML namespace headaches)
+    if ($content -match '<MKLROOT>(.*?)</MKLROOT>') {
+      $mklRoot = $matches[1].Trim()
+
+      if ($mklRoot) {
+        $env:MKLROOT = $mklRoot
+        Info "MKLROOT loaded from MKL.auto.props: $mklRoot"
+        return
+      }
+    }
+
+    Info "MKL.auto.props exists but MKLROOT not found."
+    return
+  }
+  catch {
+    Info "Failed to read MKL.auto.props: $_"
+    return
+  }
+}
+
+function Ensure-MKL {
+  # ------------------------------------------------------------
+  # Check if it is just loaded
+  # ------------------------------------------------------------
+  Try-Load-MKLFromAutoProps -RepoRoot $RepoRoot
+  if ($env:MKLROOT) {
+    $inc = Join-Path $env:MKLROOT "include\mkl.h"
+    if (Test-Path $inc) {
+      Info "MKL detected via MKLROOT=$env:MKLROOT"
+      return
+    }
+  }
+
+  Info "MKL not detected. Searching common installation locations..."
+
+  # ------------------------------------------------------------
+  # Check common directories
+  # ------------------------------------------------------------
+  $candidateRoots = @(
+    # Standard oneAPI "latest"
+    "C:\Program Files (x86)\Intel\oneAPI\mkl\latest",
+    "C:\Program Files\Intel\oneAPI\mkl\latest",
+    (Join-Path $env:USERPROFILE "Intel\oneAPI\mkl\latest"),
+
+    # Some installs use explicit version folders instead of "latest"
+    "C:\Program Files (x86)\Intel\oneAPI\mkl",
+    "C:\Program Files\Intel\oneAPI\mkl",
+    (Join-Path $env:USERPROFILE "Intel\oneAPI\mkl")
+  )
+
+  # helper: validate a potential MKL root
+  function Test-MKLRoot([string]$root) {
+    if (-not $root) { return $false }
+
+    # If this is the parent "...mkl", try to resolve a child version folder or "latest"
+    if (-not (Test-Path (Join-Path $root "include\mkl.h"))) {
+      # Try common subfolders: latest, and the newest-looking version folder
+      $latest = Join-Path $root "latest"
+      if (Test-Path (Join-Path $latest "include\mkl.h")) {
+        $script:FoundMKL = $latest
+        return $true
+      }
+
+      try {
+        $ver = Get-ChildItem -Path $root -Directory -ErrorAction SilentlyContinue |
+               Sort-Object Name -Descending |
+               Select-Object -First 1
+        if ($ver -and (Test-Path (Join-Path $ver.FullName "include\mkl.h"))) {
+          $script:FoundMKL = $ver.FullName
+          return $true
+        }
+      } catch {
+        return $false
+      }
+
+      return $false
+    }
+
+    $script:FoundMKL = $root
+    return $true
+  }
+
+  $script:FoundMKL = $null
+  foreach ($p in $candidateRoots) {
+    if (Test-MKLRoot $p) {
+      $env:MKLROOT = $script:FoundMKL
+      Info "MKL found at: $env:MKLROOT"
+      return
+    }
+  }
+
+  # ------------------------------------------------------------
+  # Fail if not found
+  # ------------------------------------------------------------
+  Write-Host ""
+  Write-Host "============================================================" -ForegroundColor Red
+  Write-Host "  Intel oneMKL not detected" -ForegroundColor Red
+  Write-Host "============================================================" -ForegroundColor Red
+  Write-Host ""
+  Write-Host "This project requires Intel oneMKL (headers + libraries)."
+  Write-Host ""
+  Write-Host "How MKL is detected:"
+  Write-Host "  - Environment variable MKLROOT, AND"
+  Write-Host "  - The file %MKLROOT%\include\mkl.h must exist"
+  Write-Host ""
+  Write-Host "Fix options:"
+  Write-Host "  1) Please install Intel oneAPI oneMKL:"
+  Write-Host "     https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html"
+  Write-Host ""
+  Write-Host "  2) If MKL is already installed somewhere else, set MKLROOT manually:"
+  Write-Host '     setx MKLROOT "C:\Program Files (x86)\Intel\oneAPI\mkl\latest"'
+  Write-Host ""
+  Write-Host "After installing / setting MKLROOT:"
+  Write-Host "  - Restart Visual Studio (important)"
+  Write-Host "  - Or open a new terminal so the environment refreshes"
+  Write-Host ""
+  Write-Host "Common install locations we looked in:"
+  Write-Host "  C:\Program Files (x86)\Intel\oneAPI\mkl\latest"
+  Write-Host "  C:\Program Files\Intel\oneAPI\mkl\latest"
+  Write-Host "  %USERPROFILE%\Intel\oneAPI\mkl\latest"
+  Write-Host ""
+  exit 1
+}
+
+# -----------------------------
+# 0) Initialize Visual Studio build environment (so cl/cmake/msbuild exist)
+# -----------------------------
+$vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+if (-not (Test-Path $vswhere)) { Fail "vswhere.exe not found at: $vswhere" }
+
+$vsPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+if ([string]::IsNullOrWhiteSpace($vsPath)) { Fail "Visual Studio installation not found (vswhere returned empty)." }
+
+$vsdev = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
+Import-VsDevCmdEnvironment -VsDevCmdBat $vsdev -Arch $Platform
+
+
 # -----------------------------
 # 0) Tool checks
 # -----------------------------
 if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) { Fail "cmake not found on PATH" }
 if (-not (Get-Command msbuild -ErrorAction SilentlyContinue)) { Fail "msbuild not found on PATH (use VS Developer Prompt or ensure VS Build Tools installed)" }
 
-if (-not (Get-Command rustc -ErrorAction SilentlyContinue)) { Fail "rustc not found. Install Rust: https://www.rust-lang.org/tools/install" }
+Ensure-RustToolchain
 Info ("Rust: " + (rustc --version))
 
 # -----------------------------
 # 1) Detect MKLROOT
 # -----------------------------
-function Find-MKLRoot {
-  $candidates = @()
-  if ($env:MKLROOT) { $candidates += $env:MKLROOT }
-  $candidates += "C:\Program Files (x86)\Intel\oneAPI\mkl\latest"
-  $candidates += "C:\Program Files\Intel\oneAPI\mkl\latest"
-  $candidates += (Join-Path $env:USERPROFILE "Intel\oneAPI\mkl\latest")
-
-  foreach ($p in $candidates) {
-    if ($p -and (Test-Path (Join-Path $p "include\mkl.h"))) { return $p }
-  }
-  return $null
-}
-
-function Download-File($Url, $OutFile) {
-  Write-Host "[deps] Downloading $Url"
-  Write-Host "[deps] -> $OutFile"
-
-  # Prefer curl.exe on Windows if available (matches your Makefile)
-  $curl = (Get-Command curl.exe -ErrorAction SilentlyContinue)
-  if ($curl) {
-    $p = Start-Process -FilePath $curl.Source -ArgumentList @("-L", "-o", $OutFile, $Url) -Wait -PassThru
-    if ($p.ExitCode -ne 0) { throw "curl failed with exit code $($p.ExitCode)" }
-    return
-  }
-
-  # Fallback
-  Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing
-}
-
-function Verify-FileChecksum {
-  param(
-    [Parameter(Mandatory=$true)][string]$FilePath,
-    [Parameter(Mandatory=$true)][string]$ExpectedSHA256
-  )
-  
-  Write-Host "[deps] Verifying SHA256 checksum of $FilePath"
-  $hash = (Get-FileHash -Path $FilePath -Algorithm SHA256).Hash
-  
-  # Case-insensitive comparison (normalize both to uppercase)
-  if ($hash.ToUpper() -ne $ExpectedSHA256.ToUpper()) {
-    Write-Error "[deps] CHECKSUM VERIFICATION FAILED!"
-    Write-Error "[deps]   Expected: $($ExpectedSHA256.ToUpper())"
-    Write-Error "[deps]   Actual:   $hash"
-    Write-Error "[deps] The downloaded file may be corrupted or tampered with."
-    Write-Error "[deps] Please verify the checksum manually or re-download the file."
-    throw "Checksum verification failed for $FilePath"
-  }
-  
-  Write-Host "[deps] Checksum verified successfully: $hash"
-}
-
-function Install-MKL {
-  param(
-    [Parameter(Mandatory=$true)][string]$RepoRoot,
-    [Parameter(Mandatory=$false)][string]$ExpectedSHA256
-  )
-  $url = "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ae472ff5-aa01-4a72-a452-ce7b559ef041/intel-onemkl-2025.3.1.10_offline.exe"
-  # Use a clearer filename locally (original: intel-onemkl-2025.3.1.10_offline.exe)
-  $exeName = "intel-onemkl-2025.3.1.10-windows.exe"
-  $exePath = Join-Path $RepoRoot $exeName
-
-  Write-Host "[deps] MKL not found, downloading/installing Intel oneMKL for Windows"
-  
-  # Warn if no checksum is provided
-  if ([string]::IsNullOrEmpty($ExpectedSHA256)) {
-    Write-Warning "[deps] **************************************************************"
-    Write-Warning "[deps] WARNING: No SHA256 checksum provided for MKL installer!"
-    Write-Warning "[deps] This creates a supply-chain security risk."
-    Write-Warning "[deps] To verify the installer, obtain the official SHA256 from:"
-    Write-Warning "[deps]   https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html"
-    Write-Warning "[deps] Then pass it via: -MKLInstallerSHA256 '<checksum>'"
-    Write-Warning "[deps] **************************************************************"
-    Start-Sleep -Seconds 3
-  }
-  
-  if (-not (Test-Path $exePath)) {
-    Download-File -Url $url -OutFile $exePath
-  } else {
-    Write-Host "[deps] Installer already present: $exePath"
-  }
-  
-  # Verify checksum if provided
-  if (-not [string]::IsNullOrEmpty($ExpectedSHA256)) {
-    Verify-FileChecksum -FilePath $exePath -ExpectedSHA256 $ExpectedSHA256
-  }
-  
-  Write-Host "[deps] Installing MKL, this will take some time! DO NOT CLOSE THE TERMINAL!"
-  # Run silent install + accept EULA
-  $args = @("-a", "-s", "--eula=accept")
-  $p = Start-Process -FilePath $exePath -ArgumentList $args -Wait -PassThru
-  if ($p.ExitCode -ne 0) {
-    throw "oneMKL installer failed with exit code $($p.ExitCode)"
-  }
-
-  Write-Host "[deps] oneMKL installer finished successfully"
-}
-
-$found = Find-MKLRoot
-if (-not $found) {
-  if ($InstallMKLIfMissing) {
-    Install-MKL -RepoRoot $RepoRoot -ExpectedSHA256 $MKLInstallerSHA256
-    $found = Find-MKLRoot
-  }
-}
-
-if (-not $found) {
-  throw "MKL not found. Set MKLROOT or install Intel oneMKL."
-}
-
+Ensure-MKL
 $genDir = Join-Path $RepoRoot "Windows"
 $autoProps = Join-Path $genDir "MKL.auto.props"
 
 $xml = @"
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <MKLROOT>$found</MKLROOT>
+    <MKLROOT>$env:MKLROOT</MKLROOT>
   </PropertyGroup>
 </Project>
 "@
@@ -150,7 +277,6 @@ $xml = @"
 Set-Content -Path $autoProps -Value $xml -Encoding UTF8
 Write-Host "[deps] Wrote $autoProps"
 
-$env:MKLROOT = $found
 Info "Found MKLROOT=$env:MKLROOT"
 
 # -----------------------------
