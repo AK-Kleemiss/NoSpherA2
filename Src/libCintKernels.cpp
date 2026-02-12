@@ -2,7 +2,19 @@
 
 #include "libCintKernels.h"
 
-#include "cint_funcs.h"
+#if !defined(_MSC_VER)
+#define _FAKE_MSC_VER
+#define _MSC_VER 1930   // any reasonable MSVC version
+#endif
+
+extern "C" {
+    #include "cint_funcs.h"
+}
+
+#ifdef _FAKE_MSC_VER
+#undef _MSC_VER
+#undef _FAKE_MSC_VER
+#endif
 
 #define BLKSIZE 8
 /*

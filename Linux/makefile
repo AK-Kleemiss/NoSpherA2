@@ -18,7 +18,7 @@ SRC_DIR := ../Src
 INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include ../Lib/LibCint/include
 
 #LibCint local libs
-LIBCINT		   := ../Lib/LibCint/lib/cint.a
+LIBCINT		   := ../Lib/LibCint/lib/libcint.a
 
 # Featomic local libs
 LIBRASCALINE   := ../Lib/featomic_install/lib/libfeatomic.a
@@ -119,14 +119,14 @@ NoSpherA2: ${OBJS}
 	@echo 'Building target: $@'
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ${LIBS}
 	cp NoSpherA2 ../
-	cp ../Lib/MKL/compiler/2025.2/lib/libiomp5.so ../
+	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d}
 	@echo 'Building target: $@'
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ${LIBS}
 	cp NoSpherA2_Debug ../
-	cp ../Lib/MKL/compiler/2025.2/lib/libiomp5.so ../
+	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
 	@echo 'Done building Debug version of NoSpherA2'
 
 clean:

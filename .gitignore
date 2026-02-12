@@ -91,6 +91,7 @@ auxiliary_basis.cpp
 checkpoint.txt
 tests/NiP3_fchk/in.fchk
 Lib/featomic_install
+Lib/LibCint
 Windows/packages*
 *tbb*.dll
 *libiomp*.dll
@@ -106,3 +107,9 @@ tests/cytidine_tonto/temp_wavefunction.wfn
 Mac/BasisSetConverter.o_arm64_basis
 Mac/basis_set_helper.o_arm64_basis
 *CopilotSnapshots*
+Windows/Build_Dependencies/deps.stamp
+Windows/MKL.auto.props
+
+Lib\LibCint\include\cint.h
+Lib\LibCint\include\cint_config.h
+Lib\LibCint\include\cint_funcs.h
