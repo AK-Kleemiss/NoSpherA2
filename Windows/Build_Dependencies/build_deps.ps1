@@ -247,7 +247,10 @@ $vsPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -
 if ([string]::IsNullOrWhiteSpace($vsPath)) { Fail "Visual Studio installation not found (vswhere returned empty)." }
 
 $vsdev = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
-Import-VsDevCmdEnvironment -VsDevCmdBat $vsdev -Arch $Platform
+
+$vsArch = $Platform
+if ($vsArch -ieq "Win32") { $vsArch = "x86" }
+Import-VsDevCmdEnvironment -VsDevCmdBat $vsdev -Arch $vsArch
 
 
 # -----------------------------
