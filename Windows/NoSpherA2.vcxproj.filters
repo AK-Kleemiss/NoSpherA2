@@ -138,6 +138,9 @@
     <ClCompile Include="..\Src\libCintKernels.cpp">
       <Filter>Quelldateien\libCint</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\vec_nos_math.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/atoms.h">
@@ -286,6 +289,7 @@
     <None Include="..\.github\actions\build-deps\action.yml" />
     <None Include="..\.github\actions\cache-deps\action.yml" />
     <None Include="..\.github\actions\setup-build-env\action.yml" />
+    <None Include="..\makefile" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
