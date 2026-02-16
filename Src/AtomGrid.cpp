@@ -735,10 +735,9 @@ std::vector<std::pair<vec,vec>> make_MBIS_vectors(
     for(auto & atom : atoms){
         sig_pop_vector.emplace_back(get_shsig_shpop(atom.get_charge()));
     }
-    const double crit = 0.0001;
+    const double crit = 0.01;
     std::vector<std::pair<vec,vec>> copy_of_input = sig_pop_vector;
     double varmax = 0, rho0 = 0, varsig = 0;
-    vec2 rho0shell(6, vec(wavy.get_ncen(), 0.0));
     for(size_t it=0; it<2000; it++){
         for (int j = 0; j < wavy.get_ncen(); j++) {
             std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
@@ -750,11 +749,10 @@ std::vector<std::pair<vec,vec>> make_MBIS_vectors(
         for(int i = 0; i < wavy.get_ncen(); i++){
             const int start = std::accumulate(num_grid_points.begin(), num_grid_points.begin() + i, 0);
             const int end = start + num_grid_points[i];
+#pragma omp parallel for private(sigval, popval, tmp, density)
             for(int point = start; point < end; point++){
-                for(int k=0; k<6; k++){
-                    std::fill(rho0shell[k].begin(), rho0shell[k].end(), 0.0);
-                }
-                rho0 = 0.0;
+                vec2 rho0shell(6, vec(wavy.get_ncen(), 0.0));
+                double rho0 = 0.0;
                 for(int j= 0; j < wavy.get_ncen(); j++){
                     d3 dr = { grid[0][point] - wavy.get_atom_coordinate(j, 0),
                               grid[1][point] - wavy.get_atom_coordinate(j, 1),
@@ -763,7 +761,7 @@ std::vector<std::pair<vec,vec>> make_MBIS_vectors(
                     if (dis > 2 * constants::far_away)
                         continue;
                     for(int shell=0; shell < constants::MBIS_function[wavy.get_atom_charge(j)]; shell++){
-                        sigval = copy_of_input[j].first[shell];
+                        double sigval = copy_of_input[j].first[shell];
                         tmp = copy_of_input[j].second[shell]/(pow(sigval,3) * constants::EIGHT_PI) * exp(-dis/sigval);
                         if (abs(tmp) < 1e-20)
                             continue;
@@ -790,8 +788,11 @@ std::vector<std::pair<vec,vec>> make_MBIS_vectors(
                     double temp_res = 0.0;
                     for(int shell=0; shell < constants::MBIS_function[wavy.get_atom_charge(j)]; shell++){
                         temp_res = density * rho0shell[shell][j] / rho0;
-                        sig_pop_vector[j].first[shell] += temp_res * dis;
-                        sig_pop_vector[j].second[shell] += temp_res;
+#pragma omp critical
+                        {
+                            sig_pop_vector[j].first[shell] += temp_res * dis;
+                            sig_pop_vector[j].second[shell] += temp_res;
+                        }
                     }
                 }
             }

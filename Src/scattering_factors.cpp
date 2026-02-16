@@ -1578,9 +1578,9 @@ int make_atomic_grids(
     const ivec& atom_type_list,
     const ivec& cif2wfn_list,
     bvec& needs_grid,
-    vec2& d1,
-    vec2& d2,
-    vec2& d3,
+    vec2& _d1,
+    vec2& _d2,
+    vec2& _d3,
     vec2& dens,
     const svec& labels,
     std::ostream& file,
@@ -1779,6 +1779,24 @@ int make_atomic_grids(
             1.005,
             1.0E-7,
             accuracy);
+
+        err_checkf(lincr != -1000, "error during creations of sphericals", file);
+
+        calc_spherical_values(
+            wave,
+            atoms_with_grids,
+            grid,
+            spherical_density,
+            radial_density,
+            radial_dist,
+            atom_type_list,
+            num_points,
+            cif2wfn_list,
+            file,
+            lincr,
+            pbc,
+            unit_cell,
+            debug);
     }
     else if (type == PartitionType::MBIS){
         lincr = make_sphericals<MBIS_Atom>(
@@ -1791,24 +1809,64 @@ int make_atomic_grids(
             1.005,
             1.0E-7,
             accuracy);
-    } 
-    err_checkf(lincr != -1000, "error during creations of sphericals", file);
 
-    calc_spherical_values(
-        wave,
-        atoms_with_grids,
-        grid,
-        spherical_density,
-        radial_density,
-        radial_dist,
-        atom_type_list,
-        num_points,
-        cif2wfn_list,
-        file,
-        lincr,
-        pbc,
-        unit_cell,
-        debug);
+        err_checkf(lincr != -1000, "error during creations of sphericals", file);
+
+        int type_list_number = -1;
+        if (debug)
+        {
+            file << "Cleared the sphericals!" << endl;
+        }
+#pragma omp parallel for
+        for (int g = 0; g < atoms_with_grids; g++)
+        {
+            spherical_density[g].resize(num_points[g], 0.0);
+        }
+        for (int i = 0; i < wave.get_ncen(); i++)
+        {
+            type_list_number = -1;
+            // Determine which type in the type list of sphericals to use
+            for (int j = 0; j < atom_type_list.size(); j++)
+                if (wave.get_atom_charge(i) == atom_type_list[j])
+                {
+                    type_list_number = j;
+                    break;
+                }
+            if (debug && type_list_number != -1)
+            {
+                file << type_list_number << " Atom type: " << atom_type_list[type_list_number] << endl;
+            }
+            if (type_list_number == -1)
+            {
+                file << "I skipped an atom! make sure this is okay!" << endl;
+                continue;
+            }
+#pragma omp for
+            for (int g = 0; g < atoms_with_grids; g++)
+            {
+                const d3 ax = wave.get_atom_pos(i);
+                double d, temp;
+				const int start = std::accumulate(num_points.begin(), num_points.begin() + g, 0);
+				const int end = start + num_points[g];
+                for (int p = start; p < end; p++)
+                {
+                    d = array_length(d3{ total_grid[TotalGridIndex::X][p], total_grid[TotalGridIndex::Y][p], total_grid[TotalGridIndex::Z][p] }, ax);
+                    temp = linear_interpolate_spherical_density(
+                        radial_density[type_list_number],
+                        radial_dist[type_list_number],
+                        d,
+                        lincr,
+                        1.0E-7);
+                    int index = start - p;
+                    err_checkf(index <= spherical_density[g].size(), "reading invalid value... Dont!", file);
+                    if (i == cif2wfn_list[g])
+                        spherical_density[g][index] += temp;
+                    total_grid[TotalGridIndex::spherical_electron_density][p] += temp;
+                }
+            }
+        }
+    } 
+
     for (int i = 0; i < atoms_with_grids; i++)
         err_checkf(num_points[i] == spherical_density[i].size(), "mismatch in number of spherical density points! i=" + toString(i), file);
 
@@ -1824,16 +1882,7 @@ int make_atomic_grids(
 
     if (type != PartitionType::MBIS)
         prune_grid(grid, total_grid, spherical_density, num_points, cutoff(accuracy), type);
-    else{
-#pragma omp parallel for
-        for(int p=0; p<total_grid[GridIndex::electron_density].size(); p++)
-        {
-            for(int a=0; a<spherical_density.size(); a++)
-            {
-                total_grid[TotalGridIndex::spherical_electron_density][p] += spherical_density[a][p];
-            }
-        }
-    }
+
     points = vec_sum(num_points);
 
     // total_grid[5].resize(total_grid[0].size());
@@ -2029,9 +2078,9 @@ int make_atomic_grids(
     dens.resize(cif2wfn_list.size());
     if (debug)
         file << "resized outer dens" << endl;
-    d1.resize(cif2wfn_list.size());
-    d2.resize(cif2wfn_list.size());
-    d3.resize(cif2wfn_list.size());
+    _d1.resize(cif2wfn_list.size());
+    _d2.resize(cif2wfn_list.size());
+    _d3.resize(cif2wfn_list.size());
     if (debug)
         file << "resized outer d1-3" << endl;
 
@@ -2040,9 +2089,9 @@ int make_atomic_grids(
     for (int i = 0; i < cif2wfn_list.size(); i++)
     {
         dens[i].resize(num_points[i]);
-        d1[i].resize(num_points[i]);
-        d2[i].resize(num_points[i]);
-        d3[i].resize(num_points[i]);
+        _d1[i].resize(num_points[i]);
+        _d2[i].resize(num_points[i]);
+        _d3[i].resize(num_points[i]);
     }
     double upper = 0, diffs = 0, avg = 0, lower = 0, _cut = cutoff(accuracy);
 #pragma omp parallel for reduction(+ : points, upper, avg, diffs, lower)
@@ -2073,13 +2122,13 @@ int make_atomic_grids(
             {
                 densy = 0;
                 dens[i][run] = (res);
-                d1[i][run] = (total_grid[TotalGridIndex::X][p] - wave.get_atom_coordinate(ci, 0));
-                d2[i][run] = (total_grid[TotalGridIndex::Y][p] - wave.get_atom_coordinate(ci, 1));
-                d3[i][run] = (total_grid[TotalGridIndex::Z][p] - wave.get_atom_coordinate(ci, 2));
+                _d1[i][run] = (total_grid[TotalGridIndex::X][p] - wave.get_atom_coordinate(ci, 0));
+                _d2[i][run] = (total_grid[TotalGridIndex::Y][p] - wave.get_atom_coordinate(ci, 1));
+                _d3[i][run] = (total_grid[TotalGridIndex::Z][p] - wave.get_atom_coordinate(ci, 2));
                 diff = (total_grid[TotalGridIndex::wavefunction_electron_density][p] - total_grid[TotalGridIndex::spherical_electron_density][p]) * total_grid[TotalGridIndex::quadrature_weight][p];
                 if (wave.get_atom_ECP_electrons(ci) != 0)
                 {
-                    dist = vec_length({ d1[i][run], d2[i][run], d3[i][run] });
+                    dist = vec_length({ _d1[i][run], _d2[i][run], _d3[i][run] });
                     densy = spherical_temp.get_core_density(dist, wave.get_atom_ECP_electrons(ci)) * total_grid[TotalGridIndex::quadrature_weight][p];
                     if (wave.get_ECP_mode() != 0)
                         densy += Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[TotalGridIndex::quadrature_weight][p];
@@ -2095,9 +2144,9 @@ int make_atomic_grids(
         points += run;
         shrink_vector<double>(spherical_density[i]);
         dens[i].resize(run);
-        d1[i].resize(run);
-        d2[i].resize(run);
-        d3[i].resize(run);
+        _d1[i].resize(run);
+        _d2[i].resize(run);
+        _d3[i].resize(run);
     }
     if (no_date == false)
     {
