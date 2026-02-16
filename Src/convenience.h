@@ -6,7 +6,7 @@ class WFN;
 class cell;
 class atom;
 class BasisSet;
-enum PartitionType { Becke, TFVC, Hirshfeld, RI };
+enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
 
 inline std::streambuf* coutbuf = std::cout.rdbuf(); // save old buf
 void error_check(const bool condition, const std::source_location loc, const std::string& error_mesasge, std::ostream& log_file = std::cout);

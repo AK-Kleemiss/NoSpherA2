@@ -1468,6 +1468,9 @@ void prune_grid(
     ivec new_gridsize(num_points.size(), 0);
     ivec reductions(num_points.size(), 0);
     int final_size = 0;
+    bool sphericals_exist = true;
+    if (spherical_density.size() == 0)
+        sphericals_exist = false;
 #pragma omp parallel for reduction(+ : final_size)
     for (int i = 0; i < num_points.size(); i++)
     {
@@ -1480,6 +1483,8 @@ void prune_grid(
                 use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::molecular_becke_weight][p]) > cutoff);
             else if (type == PartitionType::TFVC)
                 use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::molecular_TFVC_weight][p]) > cutoff);
+            else if (type == PartitionType::MBIS)
+                use_point = (abs(grid[i][GridIndex::molecular_becke_weight][p]) > cutoff);
             else
                 use_point = false;
             if (use_point)
@@ -1511,6 +1516,8 @@ void prune_grid(
                 use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::molecular_becke_weight][p]) > cutoff);
             else if (type == PartitionType::TFVC)
                 use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::molecular_TFVC_weight][p]) > cutoff);
+            else if (type == PartitionType::MBIS)
+                use_point = (abs(grid[i][GridIndex::molecular_becke_weight][p]) > cutoff);
             else
                 use_point = false;
             if (use_point)
@@ -1525,7 +1532,8 @@ void prune_grid(
             }
             else
             {
-                spherical_density[i].erase(spherical_density[i].begin() + pr);
+                if (sphericals_exist)
+                    spherical_density[i].erase(spherical_density[i].begin() + pr);
                 reduction++;
             }
         }
@@ -1606,7 +1614,7 @@ int make_atomic_grids(
         debug,
         no_date)
 #endif
-        int atoms_with_grids = vec_sum(needs_grid);
+    int atoms_with_grids = vec_sum(needs_grid);
     if (debug)
     {
         int run = 0;
@@ -1700,6 +1708,55 @@ int make_atomic_grids(
     time_points.push_back(get_time());
     time_descriptions.push_back("Becke Grid setup");
 
+    // Total grid as a sum of all atomic grids.
+    // Dimensions: [c] [p]
+    // p = the number of gridpoint
+    // c = coordinate, which is 0=x, 1=y, 2=z, 3=numerical grid weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight, 7=TFVC weight, 8=MBIS weight
+    vec2 total_grid(9);
+    
+    //placeholder in case of Hirshfeld, Becke or any other, only used for MBIS
+    std::vector<std::pair<vec, vec>> sig_pop;
+
+    if (type == PartitionType::MBIS){
+        //Need to make the electron denisty grid already here
+        file << "Calculating non-spherical densities..." << flush;
+        vec2 empty;
+        prune_grid(grid, total_grid, empty, num_points, cutoff(accuracy), type);
+        const int nr_pts = static_cast<int>(total_grid[TotalGridIndex::X].size());
+        const int nr_mos = temp.get_nmo(true);
+        const int nr_cen = temp.get_ncen();
+        if (debug)
+        {
+            file << endl
+                << "Using " << temp.get_nmo() << " MOs in temporary wavefunction" << endl;
+            temp.write_wfn("temp_wavefunction.wfn", false, true);
+            file << "There are " << nr_pts << " points to evaluate." << endl;
+        }
+#pragma omp parallel
+        {
+            vec2 d_temp(nr_cen);
+            for (int i = 0; i < nr_cen; i++)
+            {
+                d_temp[i].resize(16, 0.0);
+            }
+            vec phi_temp(nr_mos, 0.0);
+#pragma omp for
+            for (int i = 0; i < nr_pts; i++)
+            {
+                total_grid[TotalGridIndex::wavefunction_electron_density][i] = temp.compute_dens(
+                    { total_grid[TotalGridIndex::X][i], total_grid[TotalGridIndex::Y][i], total_grid[TotalGridIndex::Z][i] },
+                    d_temp,
+                    phi_temp);
+            }
+            for (int i = 0; i < 16; i++)
+                shrink_vector<double>(d_temp[i]);
+            shrink_vector<vec>(d_temp);
+            shrink_vector<double>(phi_temp);
+        }
+        //now make MBIS_vectors for MBIS atoms
+        sig_pop = make_MBIS_vectors(wave, total_grid, num_points);
+    }
+
     file << "Calculating spherical densities..." << flush;
 
     // density of spherical atom at each
@@ -1709,16 +1766,32 @@ int make_atomic_grids(
     vec2 spherical_density(atoms_with_grids);
     vec2 radial_density(atom_type_list.size());
     vec2 radial_dist(atom_type_list.size());
-
-    const double lincr = make_sphericals(
-        radial_density,
-        radial_dist,
-        atom_type_list,
-        file,
-        debug,
-        1.005,
-        1.0E-7,
-        accuracy);
+    double lincr = -1000;
+    
+    if (type == PartitionType::Hirshfeld){
+        lincr = make_sphericals<Thakkar>(
+            radial_density,
+            radial_dist,
+            atom_type_list,
+            file,
+            sig_pop,
+            debug,
+            1.005,
+            1.0E-7,
+            accuracy);
+    }
+    else if (type == PartitionType::MBIS){
+        lincr = make_sphericals<MBIS_Atom>(
+            radial_density,
+            radial_dist,
+            atom_type_list,
+            file,
+            sig_pop,
+            debug,
+            1.005,
+            1.0E-7,
+            accuracy);
+    } 
     err_checkf(lincr != -1000, "error during creations of sphericals", file);
 
     calc_spherical_values(
@@ -1747,14 +1820,20 @@ int make_atomic_grids(
     time_points.push_back(get_time());
     time_descriptions.push_back("spherical density");
 
-    // Total grid as a sum of all atomic grids.
-    // Dimensions: [c] [p]
-    // p = the number of gridpoint
-    // c = coordinate, which is 0=x, 1=y, 2=z, 3=numerical grid weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight, 7=TFVC weight
-    vec2 total_grid(8);
     file << "Pruning Grid..." << flush;
 
-    prune_grid(grid, total_grid, spherical_density, num_points, cutoff(accuracy), type);
+    if (type != PartitionType::MBIS)
+        prune_grid(grid, total_grid, spherical_density, num_points, cutoff(accuracy), type);
+    else{
+#pragma omp parallel for
+        for(int p=0; p<total_grid[GridIndex::electron_density].size(); p++)
+        {
+            for(int a=0; a<spherical_density.size(); a++)
+            {
+                total_grid[TotalGridIndex::spherical_electron_density][p] += spherical_density[a][p];
+            }
+        }
+    }
     points = vec_sum(num_points);
 
     // total_grid[5].resize(total_grid[0].size());
@@ -1766,183 +1845,186 @@ int make_atomic_grids(
     time_points.push_back(get_time());
     time_descriptions.push_back("Grid Pruning");
 
-    file << "Calculating non-spherical densities..." << flush;
-    vec2 periodic_grid;
-    const int nr_pts = static_cast<int>(total_grid[TotalGridIndex::X].size());
-    const int nr_mos = temp.get_nmo(true);
-    const int nr_cen = temp.get_ncen();
-    if (debug)
-    {
-        file << endl
-            << "Using " << temp.get_nmo() << " MOs in temporary wavefunction" << endl;
-        temp.write_wfn("temp_wavefunction.wfn", false, true);
-        file << "There are " << nr_pts << " points to evaluate." << endl;
-    }
-#pragma omp parallel
-    {
-        vec2 d_temp(nr_cen);
-        for (int i = 0; i < nr_cen; i++)
-        {
-            d_temp[i].resize(16, 0.0);
-        }
-        vec phi_temp(nr_mos, 0.0);
-#pragma omp for
-        for (int i = 0; i < nr_pts; i++)
-        {
-            total_grid[TotalGridIndex::wavefunction_electron_density][i] = temp.compute_dens(
-                { total_grid[TotalGridIndex::X][i], total_grid[TotalGridIndex::Y][i], total_grid[TotalGridIndex::Z][i] },
-                d_temp,
-                phi_temp);
-        }
-        for (int i = 0; i < 16; i++)
-            shrink_vector<double>(d_temp[i]);
-        shrink_vector<vec>(d_temp);
-        shrink_vector<double>(phi_temp);
-    }
-    if (pbc != 0)
-    {
-        periodic_grid.resize((int)pow(pbc * 2 + 1, 3));
-        int j = 0;
-        for (int d = 0; d < (int)pow(pbc * 2 + 1, 3); d++)
-            periodic_grid[d].resize(total_grid[5].size());
-        for (int _x = -pbc; _x < pbc + 1; _x++)
-            for (int _y = -pbc; _y < pbc + 1; _y++)
-                for (int _z = -pbc; _z < pbc + 1; _z++)
-                {
-                    if (_x == 0 && _y == 0 && _z == 0)
-                        continue;
-#pragma omp parallel for
-                    for (int i = 0; i < total_grid[0].size(); i++)
-                    {
-                        periodic_grid[j][i] = temp.compute_dens({ total_grid[TotalGridIndex::X][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
-                            total_grid[TotalGridIndex::Y][i] + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2),
-                            total_grid[TotalGridIndex::Z][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2) });
-                    }
-                    j++;
-                }
+    if (type != PartitionType::MBIS){
+        file << "Calculating non-spherical densities..." << flush;
+        vec2 periodic_grid;
+        const int nr_pts = static_cast<int>(total_grid[TotalGridIndex::X].size());
+        const int nr_mos = temp.get_nmo(true);
+        const int nr_cen = temp.get_ncen();
         if (debug)
         {
-            for (int i = 0; i < total_grid[0].size(); i++)
+            file << endl
+                << "Using " << temp.get_nmo() << " MOs in temporary wavefunction" << endl;
+            temp.write_wfn("temp_wavefunction.wfn", false, true);
+            file << "There are " << nr_pts << " points to evaluate." << endl;
+        }
+#pragma omp parallel
+        {
+            vec2 d_temp(nr_cen);
+            for (int i = 0; i < nr_cen; i++)
             {
-                if (i % 1000 == 0)
-                    file << "Old dens: " << total_grid[5][i] << " contributions of neighbour-cells:";
-                for (int _j = 0; _j < pow(pbc * 2 + 1, 3) - 1; _j++)
+                d_temp[i].resize(16, 0.0);
+            }
+            vec phi_temp(nr_mos, 0.0);
+#pragma omp for
+            for (int i = 0; i < nr_pts; i++)
+            {
+                total_grid[TotalGridIndex::wavefunction_electron_density][i] = temp.compute_dens(
+                    { total_grid[TotalGridIndex::X][i], total_grid[TotalGridIndex::Y][i], total_grid[TotalGridIndex::Z][i] },
+                    d_temp,
+                    phi_temp);
+            }
+            for (int i = 0; i < 16; i++)
+                shrink_vector<double>(d_temp[i]);
+            shrink_vector<vec>(d_temp);
+            shrink_vector<double>(phi_temp);
+        }
+        if (pbc != 0)
+        {
+            periodic_grid.resize((int)pow(pbc * 2 + 1, 3));
+            int j = 0;
+            for (int d = 0; d < (int)pow(pbc * 2 + 1, 3); d++)
+                periodic_grid[d].resize(total_grid[5].size());
+            for (int _x = -pbc; _x < pbc + 1; _x++)
+                for (int _y = -pbc; _y < pbc + 1; _y++)
+                    for (int _z = -pbc; _z < pbc + 1; _z++)
+                    {
+                        if (_x == 0 && _y == 0 && _z == 0)
+                            continue;
+#pragma omp parallel for
+                        for (int i = 0; i < total_grid[0].size(); i++)
+                        {
+                            periodic_grid[j][i] = temp.compute_dens({ total_grid[TotalGridIndex::X][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
+                                total_grid[TotalGridIndex::Y][i] + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2),
+                                total_grid[TotalGridIndex::Z][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2) });
+                        }
+                        j++;
+                    }
+            if (debug)
+            {
+                for (int i = 0; i < total_grid[0].size(); i++)
                 {
                     if (i % 1000 == 0)
-                        file << " " << periodic_grid[_j][i];
-                    total_grid[5][i] += periodic_grid[_j][i];
+                        file << "Old dens: " << total_grid[5][i] << " contributions of neighbour-cells:";
+                    for (int _j = 0; _j < pow(pbc * 2 + 1, 3) - 1; _j++)
+                    {
+                        if (i % 1000 == 0)
+                            file << " " << periodic_grid[_j][i];
+                        total_grid[5][i] += periodic_grid[_j][i];
+                    }
+                    if (i % 1000 == 0)
+                        file << endl;
                 }
-                if (i % 1000 == 0)
-                    file << endl;
             }
         }
-    }
 
-    if (debug)
-        file << endl;
-    file << "                done!" << endl
-        << "Applying integration weights and integrating charge..." << flush;
-    double el_sum_becke = 0.0;
-    double el_sum_TFVC = 0.0;
-    double el_sum_hirshfeld = 0.0;
-    enum AtomSum {
-        Becke = 0,
-        Spherical = 1,
-        Hirshfeld = 2,
-        TFVC = 3
-    };
-    // Vector containing integrated numbers of electrons
-    // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density 3=TFVC weighted density
-    // dimension 1: atoms of asym_atom_list
-    vec2 atom_els(4);
-    for (int n = 0; n < 4; n++)
-    {
-        atom_els[n].resize(cif2wfn_list.size(), 0.0);
-    }
-
-    if (debug)
-    {
-        file << "before loop\n asym atom list: " << endl;
-        for (int i = 0; i < cif2wfn_list.size(); i++)
-            file << cif2wfn_list[i] << " ";
-    }
-    // Generate Electron sums
-#pragma omp parallel for reduction(+ : el_sum_becke, el_sum_hirshfeld, el_sum_TFVC)
-    for (int i = 0; i < cif2wfn_list.size(); i++)
-    {
-        // if (debug) file << "i=" << i << endl;
-        int start_p = 0;
-        for (int a = 0; a < i; a++)
-            start_p += num_points[a];
-        for (int p = start_p; p < start_p + num_points[i]; p++)
-        {
-            if (abs(total_grid[TotalGridIndex::becke_weight][p]) > cutoff(accuracy))
-            {
-                atom_els[AtomSum::Becke][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::wavefunction_electron_density][p];
-                //atom_els[AtomSum::Spherical][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::spherical_electron_density][p];
-                atom_els[AtomSum::TFVC][i] += total_grid[TotalGridIndex::wavefunction_electron_density][p] * total_grid[TotalGridIndex::TFVC_weight][p];
-
-            }
-            if (total_grid[TotalGridIndex::spherical_electron_density][p] != 0)
-            {
-                atom_els[AtomSum::Hirshfeld][i] += total_grid[TotalGridIndex::wavefunction_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p] * spherical_density[i][p - start_p] / total_grid[TotalGridIndex::spherical_electron_density][p];
-            }
-        }
-        el_sum_becke += atom_els[AtomSum::Becke][i];
-        el_sum_hirshfeld += atom_els[AtomSum::Hirshfeld][i];
-        el_sum_TFVC += atom_els[AtomSum::TFVC][i];
-        if (wave.get_has_ECPs())
-        {
-            int n = wave.get_atom_ECP_electrons(cif2wfn_list[i]);
-            el_sum_becke += n;
-            el_sum_hirshfeld += n;
-            el_sum_TFVC += n;
-            atom_els[AtomSum::Becke][i] += n;
-            atom_els[AtomSum::Hirshfeld][i] += n;
-            atom_els[AtomSum::TFVC][i] += n;
-        }
-    }
-
-    if (debug)
-    {
-        file << "Integration grid with weights done!" << endl;
-    }
-    file << "done!" << endl
-        << "Number of points evaluated: " << total_grid[0].size() << "." << endl
-        << endl
-        << "Table of Charges in electrons" << endl
-        << endl
-        << "    Atom       Becke   Hirshfeld   TFVC";
-    if (debug)
-        file << "   ----debug---- charge    N(Becke)    N(Sph.)   N(Hirshf.)    TFVC";
-    file << endl;
-
-    for (int i = 0; i < cif2wfn_list.size(); i++)
-    {
-        int a = cif2wfn_list[i];
-        file << setw(10) << labels[i]
-            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::Becke][i]
-            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::Hirshfeld][i]
-            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::TFVC][i];
         if (debug)
-            file << "   ----debug---- " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Becke][i]
-            << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Spherical][i]
-            << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Hirshfeld][i]
-            << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::TFVC][i];
+            file << endl;
+        file << "                done!" << endl
+            << "Applying integration weights and integrating charge..." << flush;
+        double el_sum_becke = 0.0;
+        double el_sum_TFVC = 0.0;
+        double el_sum_hirshfeld = 0.0;
+        enum AtomSum {
+            Becke = 0,
+            Spherical = 1,
+            Hirshfeld = 2,
+            TFVC = 3
+        };
+        // Vector containing integrated numbers of electrons
+        // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density 3=TFVC weighted density
+        // dimension 1: atoms of asym_atom_list
+        vec2 atom_els(4);
+        for (int n = 0; n < 4; n++)
+        {
+            atom_els[n].resize(cif2wfn_list.size(), 0.0);
+        }
+
+        if (debug)
+        {
+            file << "before loop\n asym atom list: " << endl;
+            for (int i = 0; i < cif2wfn_list.size(); i++)
+                file << cif2wfn_list[i] << " ";
+        }
+        // Generate Electron sums
+#pragma omp parallel for reduction(+ : el_sum_becke, el_sum_hirshfeld, el_sum_TFVC)
+        for (int i = 0; i < cif2wfn_list.size(); i++)
+        {
+            // if (debug) file << "i=" << i << endl;
+            int start_p = 0;
+            for (int a = 0; a < i; a++)
+                start_p += num_points[a];
+            for (int p = start_p; p < start_p + num_points[i]; p++)
+            {
+                if (abs(total_grid[TotalGridIndex::becke_weight][p]) > cutoff(accuracy))
+                {
+                    atom_els[AtomSum::Becke][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::wavefunction_electron_density][p];
+                    //atom_els[AtomSum::Spherical][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::spherical_electron_density][p];
+                    atom_els[AtomSum::TFVC][i] += total_grid[TotalGridIndex::wavefunction_electron_density][p] * total_grid[TotalGridIndex::TFVC_weight][p];
+
+                }
+                if (total_grid[TotalGridIndex::spherical_electron_density][p] != 0)
+                {
+                    atom_els[AtomSum::Hirshfeld][i] += total_grid[TotalGridIndex::wavefunction_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p] * spherical_density[i][p - start_p] /    total_grid[TotalGridIndex::spherical_electron_density][p];
+                }
+            }
+            el_sum_becke += atom_els[AtomSum::Becke][i];
+            el_sum_hirshfeld += atom_els[AtomSum::Hirshfeld][i];
+            el_sum_TFVC += atom_els[AtomSum::TFVC][i];
+            if (wave.get_has_ECPs())
+            {
+                int n = wave.get_atom_ECP_electrons(cif2wfn_list[i]);
+                el_sum_becke += n;
+                el_sum_hirshfeld += n;
+                el_sum_TFVC += n;
+                atom_els[AtomSum::Becke][i] += n;
+                atom_els[AtomSum::Hirshfeld][i] += n;
+                atom_els[AtomSum::TFVC][i] += n;
+            }
+        }
+
+        if (debug)
+        {
+            file << "Integration grid with weights done!" << endl;
+        }
+        file << "done!" << endl
+            << "Number of points evaluated: " << total_grid[0].size() << "." << endl
+            << endl
+            << "Table of Charges in electrons" << endl
+            << endl
+            << "    Atom       Becke   Hirshfeld   TFVC";
+        if (debug)
+            file << "   ----debug---- charge    N(Becke)    N(Sph.)   N(Hirshf.)    TFVC";
         file << endl;
-    }
 
-    file << "Total number of electrons in the asymmetric unit:" << endl << setw(10) << setprecision(6)
-        << " Becke:     " << el_sum_becke << endl
-        << " Hirshfeld: " << el_sum_hirshfeld << endl
-        << " TVFC:      " << el_sum_TFVC << endl;
+        for (int i = 0; i < cif2wfn_list.size(); i++)
+        {
+            int a = cif2wfn_list[i];
+            file << setw(10) << labels[i]
+                << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::Becke][i]
+                << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::Hirshfeld][i]
+                << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::TFVC][i];
+            if (debug)
+                file << "   ----debug---- " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Becke][i]
+                << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Spherical][i]
+                << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Hirshfeld][i]
+                << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::TFVC][i];
+            file << endl;
+        }
 
-    if (debug)
-    {
-        file << "Taking time..." << endl;
+        file << "Total number of electrons in the asymmetric unit:" << endl << setw(10) << setprecision(6)
+            << " Becke:     " << el_sum_becke << endl
+            << " Hirshfeld: " << el_sum_hirshfeld << endl
+            << " TVFC:      " << el_sum_TFVC << endl;
+
+        if (debug)
+        {
+            file << "Taking time..." << endl;
+        }
+    
+        time_points.push_back(get_time());
+        time_descriptions.push_back("aspherical density");
     }
-    time_points.push_back(get_time());
-    time_descriptions.push_back("aspherical density");
 
     dens.resize(cif2wfn_list.size());
     if (debug)
@@ -1983,7 +2065,7 @@ int make_atomic_grids(
                 res = total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::wavefunction_electron_density][p];
             else if (type == PartitionType::TFVC)
                 res = total_grid[TotalGridIndex::TFVC_weight][p] * total_grid[TotalGridIndex::wavefunction_electron_density][p];
-            else if (type == PartitionType::Hirshfeld)
+            else if (type == PartitionType::Hirshfeld || type == PartitionType::MBIS)
                 res = total_grid[TotalGridIndex::wavefunction_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p] * spherical_density[i][p - start_p] / total_grid[TotalGridIndex::spherical_electron_density][p];
             else
                 res = 0;
@@ -2780,6 +2862,44 @@ tsc_block_type calculate_scattering_factors(
                 time_descriptions,
                 d1, d2, d3, dens,
                 opt);
+
+            _time_point end1;
+            calc_SF(points,
+                k_pt,
+                d1, d2, d3, dens,
+                sf,
+                file,
+                time_points.front(),
+                end1,
+                opt.debug,
+                opt.no_date);
+
+            time_points.push_back(get_time());
+            time_descriptions.push_back("Fourier transform");
+        }
+        else if (opt.partition_type == PartitionType::MBIS){
+            WFN temp = *wavy;
+            temp.delete_unoccupied_MOs();
+
+            vec2 d1, d2, d3, dens;
+            auto points = make_atomic_grids(0,
+                opt.accuracy,
+                unit_cell,
+                temp,
+                atom_type_list,
+                asym_atom_list,
+                needs_grid,
+                d1,
+                d2,
+                d3,
+                dens,
+                labels,
+                file,
+                time_points,
+                time_descriptions,
+                opt.debug,
+                opt.no_date,
+                opt.partition_type);
 
             _time_point end1;
             calc_SF(points,

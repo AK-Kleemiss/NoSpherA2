@@ -651,6 +651,178 @@ const double get_r_inner(const double& max_error, const double& alpha_inner)
     return r;
 }
 
+std::pair<vec,vec> get_shsig_shpop(const int& atom_type){
+    vec shsig(constants::MBIS_function[atom_type], 0.0);
+    vec shpop(constants::MBIS_function[atom_type], 0.0);
+
+    switch(constants::MBIS_function[atom_type]){
+        case 0:
+            err_not_impl_f("MBIS does not work with ghost atoms. Please dont do that to me!", std::cout);
+            break;
+        case 1:
+            shsig[0] = 1.0/(2*atom_type);
+            shpop[0] = atom_type;
+            break;
+        case 2:
+            shsig[0] = 1.0/(2*atom_type);
+            shpop[0] = 2;
+            shsig[1] = 0.5;
+            shpop[1] = atom_type - 2;
+            break;
+        case 3:
+            shsig[0] = 1.0/(2*atom_type);
+            shpop[0] = 2;
+            shsig[1] = 1.0/(2*pow(atom_type, 0.5));
+            shpop[1] = 8;
+            shsig[2] = 0.5;
+            shpop[2] = atom_type - 10;
+            break;
+        case 4:
+            shsig[0] = 1.0/(2*atom_type);
+            shpop[0] = 2;
+            shsig[1] = 1.0/(2*pow(atom_type, constants::c_23));
+            shpop[1] = 8;
+            shsig[2] = 1.0/(2*pow(atom_type, constants::c_13));
+            shpop[2] = 8;
+            shsig[3] = 0.5;
+            shpop[3] = atom_type - 18;
+            break;
+        case 5:
+            shsig[0] = 1.0/(2*atom_type);
+            shpop[0] = 2;
+            shsig[1] = 1.0/(2*pow(atom_type, 0.25));
+            shpop[1] = 8;
+            shsig[2] = 1.0/(2*pow(atom_type, 0.5));
+            shpop[2] = 8;
+            shsig[3] = 1.0/(2*pow(atom_type, 0.75));
+            shpop[3] = 18;
+            shsig[4] = 0.5;
+            shpop[4] = atom_type - 36;
+            break;
+        case 6:
+            shsig[0] = 1.0/(2*atom_type);
+            shpop[0] = 2;
+            shsig[1] = 1.0/(2*pow(atom_type, 0.2));
+            shpop[1] = 8;
+            shsig[2] = 1.0/(2*pow(atom_type, 0.4));
+            shpop[2] = 8;
+            shsig[3] = 1.0/(2*pow(atom_type, 0.6));
+            shpop[3] = 18;
+            shsig[4] = 1.0/(2*pow(atom_type, 0.8));
+            shpop[4] = 18;
+            shsig[5] = 0.5;
+            shpop[5] = atom_type - 54;
+            break;
+        default:
+            err_not_impl_f("MBIS does not work with more than 6 shells. Please dont do that to me!", std::cout);
+            break;
+    }
+
+    return std::make_pair(shsig, shpop);
+}
+
+// grids here are the total_grid in the SF calculator functions, just as a not to myself and future me
+std::vector<std::pair<vec,vec>> make_MBIS_vectors(
+        const WFN& wavy, 
+        const vec2& grid, 
+        const ivec& num_grid_points,
+        const bool debug)
+{
+    auto atoms = wavy.get_atoms();
+    vec charges(atoms.size(), 0.0);
+    vec last_charges(atoms.size(), 0.0);
+    std::vector<std::pair<vec,vec>> sig_pop_vector;
+    for(auto & atom : atoms){
+        sig_pop_vector.emplace_back(get_shsig_shpop(atom.get_charge()));
+    }
+    const double crit = 0.0001;
+    std::vector<std::pair<vec,vec>> copy_of_input = sig_pop_vector;
+    double varmax = 0, rho0 = 0, varsig = 0;
+    vec2 rho0shell(6, vec(wavy.get_ncen(), 0.0));
+    for(size_t it=0; it<2000; it++){
+        for (int j = 0; j < wavy.get_ncen(); j++) {
+            std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
+            std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
+        }
+        it == 0 ? std::cout << "Starting MBIS iterations..." << std::endl : std::cout << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
+        varmax = 0.0, varsig = 0.0;
+        double sigval, popval, tmp, density;
+        for(int i = 0; i < wavy.get_ncen(); i++){
+            const int start = std::accumulate(num_grid_points.begin(), num_grid_points.begin() + i, 0);
+            const int end = start + num_grid_points[i];
+            for(int point = start; point < end; point++){
+                for(int k=0; k<6; k++){
+                    std::fill(rho0shell[k].begin(), rho0shell[k].end(), 0.0);
+                }
+                rho0 = 0.0;
+                for(int j= 0; j < wavy.get_ncen(); j++){
+                    d3 dr = { grid[0][point] - wavy.get_atom_coordinate(j, 0),
+                              grid[1][point] - wavy.get_atom_coordinate(j, 1),
+                              grid[2][point] - wavy.get_atom_coordinate(j, 2) };
+                    const double dis = array_length(dr);
+                    if (dis > 2 * constants::far_away)
+                        continue;
+                    for(int shell=0; shell < constants::MBIS_function[wavy.get_atom_charge(j)]; shell++){
+                        sigval = copy_of_input[j].first[shell];
+                        tmp = copy_of_input[j].second[shell]/(pow(sigval,3) * constants::EIGHT_PI) * exp(-dis/sigval);
+                        if (abs(tmp) < 1e-20)
+                            continue;
+                        rho0shell[shell][j] = tmp;
+                        rho0 += tmp;
+                    }
+                }
+                //X = 0,
+                //Y = 1,
+                //Z = 2,
+                //quadrature_weight = 3,
+                //spherical_electron_density = 4,
+                //wavefunction_electron_density = 5,
+                //becke_weight = 6,
+                //TFVC_weight = 7,
+                //MBIS_weight = 8
+                density = grid[5][point] * grid[6][point];
+                for(int j=0; j<wavy.get_ncen(); j++){
+                    d3 dr = { grid[0][point] - wavy.get_atom_coordinate(j, 0),
+                              grid[1][point] - wavy.get_atom_coordinate(j, 1),
+                              grid[2][point] - wavy.get_atom_coordinate(j, 2) };
+                    const double dis = array_length(dr);
+                    //const double dis2 = dis*dis;
+                    double temp_res = 0.0;
+                    for(int shell=0; shell < constants::MBIS_function[wavy.get_atom_charge(j)]; shell++){
+                        temp_res = density * rho0shell[shell][j] / rho0;
+                        sig_pop_vector[j].first[shell] += temp_res * dis;
+                        sig_pop_vector[j].second[shell] += temp_res;
+                    }
+                }
+            }
+        }
+        //back to the cycle main loop, we updated sig and pop based on information loss :)
+
+        for(int i=0; i<wavy.get_ncen(); i++){
+            for(int shell=0; shell < constants::MBIS_function[wavy.get_atom_charge(i)]; shell++){
+                if (sig_pop_vector[i].second[shell] != 0)
+                    sig_pop_vector[i].first[shell] /= 3.0 * sig_pop_vector[i].second[shell];
+                varsig = std::max(varsig, std::abs(sig_pop_vector[i].first[shell] - copy_of_input[i].first[shell]));
+            }
+            const double pop_sum = vec_sum(sig_pop_vector[i].second);
+            const double Z = wavy.get_atom_charge(i);
+            charges[i] = Z - pop_sum + wavy.get_atom_ECP_electrons(i);
+            varmax = std::max(varmax, std::abs(charges[i] - last_charges[i]));
+            if (debug)
+                std::cout << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
+        }
+        if (varmax < crit || varsig < crit) {
+            std::cout << "MBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
+            return sig_pop_vector;
+        }
+        copy_of_input = sig_pop_vector;
+        last_charges = charges;
+
+    }
+    std::cout << "MBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
+    return sig_pop_vector;
+}
+
 #pragma GCC optimize("-fno-fast-math") //gcc fails to converge in this function when using fast math, so not use it
 // TCA 106, 178 (2001), eq. 19
 double get_r_outer(const double& max_error,

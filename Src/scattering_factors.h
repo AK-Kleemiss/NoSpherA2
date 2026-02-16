@@ -51,7 +51,8 @@ enum TotalGridIndex
     spherical_electron_density = 4,
     wavefunction_electron_density = 5,
     becke_weight = 6,
-    TFVC_weight = 7
+    TFVC_weight = 7,
+    MBIS_weight = 8
 };
 
 /**

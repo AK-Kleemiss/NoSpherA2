@@ -221,6 +221,19 @@ public:
     double get_interpolated_density(const double& dist) override;
 };
 
+class MBIS_Atom : public Spherical_Atom
+{
+private:
+    vec sig, pop;
+
+public:
+    MBIS_Atom(const int g_atom_number, const vec &sig, const vec &pop);
+    MBIS_Atom();
+    const double get_radial_density(const double &dist) override;
+    void make_interpolator(const double& incr, const double& min_dist) override;
+    double get_interpolated_density(const double& dist) override;
+};
+
 class Thakkar_Anion : public Thakkar
 {
 public:

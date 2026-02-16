@@ -503,6 +503,76 @@ double Thakkar::get_interpolated_density(const double& dist) {
     return result;
 };
 
+MBIS_Atom::MBIS_Atom(const int g_atom_number, const vec& g_sig, const vec& g_pop)
+{
+    nex = NULL;
+    _first_ex = 0;
+    ns = NULL;
+    np = NULL;
+    nd = NULL;
+    nf = NULL;
+    occ = NULL;
+    n = NULL;
+    z = NULL;
+    c = NULL;
+    _prev_coef = 0;
+    this->sig = g_sig;
+    this->pop = g_pop;
+};
+MBIS_Atom::MBIS_Atom() : Spherical_Atom()
+{
+    nex = NULL;
+    _first_ex = 0;
+    ns = NULL;
+    np = NULL;
+    nd = NULL;
+    nf = NULL;
+    occ = NULL;
+    n = NULL;
+    z = NULL;
+    c = NULL;
+    _prev_coef = 0;
+    sig = {};
+    pop = {};
+};
+
+const double MBIS_Atom::get_radial_density(const double& dist)
+{
+    double Rho = 0.0;
+    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
+    {
+        Rho += pop[m] / constants::EIGHT_PI / pow(sig[m], 3) * exp(-sig[m] * dist);
+    }
+    return Rho;
+};
+
+void MBIS_Atom::make_interpolator(const double& incr, const double& min_dist) {
+    lincr = log(incr);
+    start = min_dist;
+    double current = 1;
+    double _dist = min_dist;
+    while (current > 1E-12)
+    {
+        radial_dist.push_back(_dist);
+        current = get_radial_density(_dist);
+        radial_density.push_back(current);
+        _dist *= incr;
+    }
+};
+
+double MBIS_Atom::get_interpolated_density(const double& dist) {
+    double result = 0;
+    if (dist > radial_dist.back())
+        return 0;
+    else if (dist < radial_dist[0])
+        return radial_density[0];
+    int nr = int(floor(log(dist / start) / lincr));
+    result = radial_density[nr] + (radial_density[nr + 1] - radial_density[nr]) / (radial_dist[nr] - radial_dist[nr - 1]) * (dist - radial_dist[nr - 1]);
+    if (result < 1E-16)
+        return 0;
+    return result;
+};
+
 Thakkar_Anion::Thakkar_Anion(int g_atom_number) : Thakkar(g_atom_number)
 {
     if (g_atom_number != 1 && g_atom_number != 6 && g_atom_number != 8 && g_atom_number != 15 && g_atom_number != 17)

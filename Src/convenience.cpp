@@ -1928,6 +1928,10 @@ void options::digest_options()
             iam_switch = true;
         else if (temp == "-lap")
             properties.lap = true;
+        else if (temp == "-mbis" || temp == "-MBIS")
+        {
+            partition_type = PartitionType::MBIS;
+        }
         else if (temp == "-mem")
         {
             mem = stod(arguments[i + 1]); // In MB

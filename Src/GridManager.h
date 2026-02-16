@@ -4,12 +4,13 @@
 #include "wfn_class.h"
 #include "AtomGrid.h"
 #include "cell.h"
-
+template<typename AtomType>
 double make_sphericals(
     vec2& dens,
     vec2& dist,
     const ivec& atom_type_list,
     std::ostream& file,
+    std::vector<std::pair<vec, vec>>& pop_sig,
     bool debug = false,
     double incr_start = 1.005,
     double min_dist = 0.0000001,
@@ -39,7 +40,7 @@ struct GridConfiguration {
 };
 
 struct GridData {
-    enum GridIndex { X = 0, Y = 1, Z = 2, WEIGHT = 3, HIRSH_WEIGHT = 4, BECKE_WEIGHT = 5, TFVC_WEIGHT = 6, WFN_DENSITY = 7};
+    enum GridIndex { X = 0, Y = 1, Z = 2, WEIGHT = 3, HIRSH_WEIGHT = 4, BECKE_WEIGHT = 5, TFVC_WEIGHT = 6, WFN_DENSITY = 7, MBIS_WEIGHT = 8};
     vec3 atomic_grids;           // [atom][coord_type][point]
     ivec num_points_per_atom;    // Number of points for each atom
     int total_points = 0;

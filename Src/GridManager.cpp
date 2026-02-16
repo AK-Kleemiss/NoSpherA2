@@ -2,11 +2,13 @@
 #include "GridManager.h"
 #include "spherical_density.h"
 
+template<typename AtomType>
 double make_sphericals(
     vec2& dens,
     vec2& dist,
     const ivec& atom_type_list,
     std::ostream& file,
+    std::vector<std::pair<vec, vec>>& pop_sig,
     bool debug,
     double incr_start,
     double min_dist,
@@ -15,9 +17,22 @@ double make_sphericals(
     using namespace std;
     const double incr = pow(incr_start, max(1, accuracy - 1));
     const double lincr = log(incr);
-    vector<Thakkar> sphericals; // sphericals is a vector that will store objects of type Thakkar.
-    for (int i = 0; i < atom_type_list.size(); i++)
-        sphericals.emplace_back(atom_type_list[i]); // push_back is like a copy without making a copy
+    vector<AtomType> sphericals; // sphericals is a vector that will store objects of type AtomType.
+    for (int i = 0; i < atom_type_list.size(); i++){
+        //If we are AtomType == Thakkar, we jsut give the atomic number, if we are AtomType == MBIS_Atom, we give the atomic number and the pop and sig vectors for that atom
+        if constexpr (std::is_same_v<AtomType, Thakkar>) {
+            sphericals.emplace_back(atom_type_list[i]);
+        }
+        else if constexpr (std::is_same_v<AtomType, MBIS_Atom>) {
+            int atom_type = atom_type_list[i];
+            vec sig = pop_sig[i].first;
+            vec pop = pop_sig[i].second;
+            sphericals.emplace_back(atom_type, sig, pop);
+        }
+        else {
+            err_not_impl_f("Unsupported AtomType in make_sphericals!", file);
+        }
+    }
     // Make radial grids
     if (debug)
     {
@@ -43,7 +58,7 @@ double make_sphericals(
                     dist[i].push_back(_dist);
                     current = sphericals[i].get_radial_density(_dist);
                     if (current == -20)
-                        return false;
+                        return -10000;
                     dens[i].push_back(current);
                     _dist *= incr;
                 }
@@ -82,6 +97,9 @@ double make_sphericals(
     }
     return lincr;
 }
+template double make_sphericals<Thakkar>(vec2& dens, vec2& dist, const ivec& atom_type_list, std::ostream& file, std::vector<std::pair<vec, vec>>& pop_sig, bool debug, double incr_start, double min_dist, int accuracy);
+template double make_sphericals<MBIS_Atom>(vec2& dens, vec2& dist, const ivec& atom_type_list, std::ostream& file, std::vector<std::pair<vec, vec>>& pop_sig, bool debug, double incr_start, double min_dist, int accuracy);
+
 
 // Add this constexpr function before the GridManager class methods
 constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, int max_l_temp) {
@@ -742,6 +760,7 @@ void PartitionResults::printChargeTable(const svec& labels, const WFN& wave, con
 void GridManager::calculateSphericalDensities(const WFN& wave, const cell& unit_cell, const ivec& atom_list, vec2& single_spherical_density, vec2& combined_spherical_density) {
     bvec fake_needs_grid(wave.get_ncen(), true);
     ivec complete_type_list = identifyAtomTypes(wave, fake_needs_grid);
+    std::vector<std::pair<vec, vec>> pop_sig;
 
     if (config_.debug) {
         std::cout << "GridManager: Calculating spherical densities..." << std::endl;
@@ -757,8 +776,8 @@ void GridManager::calculateSphericalDensities(const WFN& wave, const cell& unit_
     }
 
     // Calculate radial densities using Thakkar spherical atoms
-    lincr_ = make_sphericals(radial_density_, radial_distances_, complete_type_list,
-        std::cout, config_.debug, 1.005, 1.0E-7, config_.accuracy);
+    lincr_ = make_sphericals<Thakkar>(radial_density_, radial_distances_, complete_type_list,
+        std::cout, pop_sig, config_.debug, 1.005, 1.0E-7, config_.accuracy);
     err_checkf(lincr_ != -1000, "error during creations of sphericals", std::cout);
 
     single_spherical_density.resize(grid_data_.atomic_grids.size());
