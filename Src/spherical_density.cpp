@@ -541,7 +541,7 @@ const double MBIS_Atom::get_radial_density(const double& dist)
     double Rho = 0.0;
     for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
     {
-        Rho += pop[m] / constants::EIGHT_PI / pow(sig[m], 3) * exp(-sig[m] * dist);
+        Rho += pop[m] / (constants::EIGHT_PI * pow(sig[m], 3)) * exp(-dist / sig[m]);
     }
     return Rho;
 };
