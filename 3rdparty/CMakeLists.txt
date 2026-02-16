@@ -30,18 +30,43 @@ CPMAddPackage(
 )
 
 list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
-CPMAddPackage(
-    NAME featomic
-    GITHUB_REPOSITORY "metatensor/featomic"
-    SOURCE_SUBDIR "featomic"
-    OPTIONS
-        "G Ninja"
-        "CMAKE_BUILD_TYPE Release"
-        "FEATOMIC_FETCH_METATENSOR ON"
-        "BUILD_SHARED_LIBS OFF"
-        "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
-        "FEATOMIC_USE_STATIC_METATENSOR ON"
-)
+set(CMAKE_PATCH_PROGRAM "git")
+if (NOT PATCHED_FEATOMIC)
+    set(PATCHED_FEATOMIC ON CACHE INTERNAL "Whether to apply patches to featomic")
+    CPMAddPackage(
+          NAME featomic
+          GITHUB_REPOSITORY "metatensor/featomic"
+          PATCHES
+              "${CMAKE_SOURCE_DIR}/cmake/patches/featomic-norebuild.patch"
+          SOURCE_SUBDIR "featomic"
+          OPTIONS
+              "G Ninja"
+              "CMAKE_BUILD_TYPE Release"
+              "FEATOMIC_FETCH_METATENSOR ON"
+              "BUILD_SHARED_LIBS OFF"
+              "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
+              "FEATOMIC_USE_STATIC_METATENSOR ON"
+    )
+
+    execute_process(
+        COMMAND patch -p1 < ${CMAKE_SOURCE_DIR}/cmake/patches/metatensor-norebuild.patch
+        WORKING_DIRECTORY ${featomic_SOURCE_DIR}/../metatensor-src
+    )
+else()
+    CPMAddPackage(
+          NAME featomic
+          GITHUB_REPOSITORY "metatensor/featomic"
+          SOURCE_SUBDIR "featomic"
+          OPTIONS
+              "G Ninja"
+              "CMAKE_BUILD_TYPE Release"
+              "FEATOMIC_FETCH_METATENSOR ON"
+              "BUILD_SHARED_LIBS OFF"
+              "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
+              "FEATOMIC_USE_STATIC_METATENSOR ON"
+    )
+endif ()
+
 if (WIN32)
     set(featomic_st_name "featomic.lib")
 else ()

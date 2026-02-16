@@ -15,20 +15,40 @@ CPMDeclarePackage(mdspan
   GITHUB_REPOSITORY kokkos/mdspan
 )
 # featomic
-CPMDeclarePackage(featomic
-  NAME featomic
-  GITHUB_REPOSITORY "metatensor/featomic"
-  GIT_TAG "95fb774c16a0da7a32f76dfd53df4fb1dcb765db"
-  VERSION 0.6.4
-  SOURCE_SUBDIR "featomic"
-  OPTIONS
-    "G Ninja"
-    "CMAKE_BUILD_TYPE Release"
-    "FEATOMIC_FETCH_METATENSOR ON"
-    "BUILD_SHARED_LIBS OFF"
-    "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
-    "FEATOMIC_USE_STATIC_METATENSOR ON"
-)
+if (NOT PATCHED_FEATOMIC)
+  set(PATCHED_FEATOMIC ON CACHE INTERNAL "Whether to apply patches to featomic")
+  CPMDeclarePackage(featomic
+          NAME featomic
+          GITHUB_REPOSITORY "metatensor/featomic"
+          GIT_TAG "95fb774c16a0da7a32f76dfd53df4fb1dcb765db"
+          PATCHES
+            "${CMAKE_SOURCE_DIR}/cmake/patches/featomic-norebuild.patch"
+          VERSION 0.6.4
+          SOURCE_SUBDIR "featomic"
+          OPTIONS
+          "G Ninja"
+          "CMAKE_BUILD_TYPE Release"
+          "FEATOMIC_FETCH_METATENSOR ON"
+          "BUILD_SHARED_LIBS OFF"
+          "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
+          "FEATOMIC_USE_STATIC_METATENSOR ON"
+  )
+else ()
+  CPMDeclarePackage(featomic
+      NAME featomic
+      GITHUB_REPOSITORY "metatensor/featomic"
+      GIT_TAG "95fb774c16a0da7a32f76dfd53df4fb1dcb765db"
+      VERSION 0.6.4
+      SOURCE_SUBDIR "featomic"
+      OPTIONS
+      "G Ninja"
+      "CMAKE_BUILD_TYPE Release"
+      "FEATOMIC_FETCH_METATENSOR ON"
+      "BUILD_SHARED_LIBS OFF"
+      "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
+      "FEATOMIC_USE_STATIC_METATENSOR ON"
+  )
+endif ()
 # occ (unversioned)
 # CPMDeclarePackage(occ
 #  NAME occ
