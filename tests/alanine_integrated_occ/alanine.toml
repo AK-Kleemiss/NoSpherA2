@@ -1,0 +1,9 @@
+threads = 4
+
+[scf]
+input = "alanine.xyz"
+method = "r2scan"
+basis = "def2-tzvp"
+multiplicity = 1
+spherical = true
+output = "fchk"

@@ -1,0 +1,92 @@
+data_alanine
+_audit_creation_method            
+ 'Olex2: Apr  7 2025 21:57:45 MSC:194334809 on WIN64, Python: 3.8.6, wxWidgets: 3.1.5'
+_chemical_name_common              '?'
+_chemical_name_systematic          '?'
+_chemical_formula_moiety           'C3 H7 N O2'
+_chemical_formula_sum              'C3 H7 N O2'
+_chemical_formula_weight           89.09
+_chemical_melting_point            ?
+_space_group_crystal_system        'orthorhombic'
+_space_group_IT_number             19
+_space_group_name_H-M_alt          'P 21 21 21'
+_space_group_name_Hall             'P 2ac 2ab'
+loop_
+  _space_group_symop_id
+  _space_group_symop_operation_xyz
+ 1 +X,+Y,+Z
+ 2 1/2-X,-Y,1/2+Z
+ 3 1/2+X,1/2-Y,-Z
+ 4 -X,1/2+Y,1/2-Z
+
+_cell_length_a                     5.791(2)
+_cell_length_b                     5.944(2)
+_cell_length_c                     12.269(2)
+_cell_angle_alpha                  90
+_cell_angle_beta                   90
+_cell_angle_gamma                  90
+_cell_volume                       422.3(2)
+_cell_formula_units_Z              4
+_diffrn_reflns_av_R_equivalents    0.0000
+_diffrn_reflns_av_unetI/netI       0.0109
+_diffrn_reflns_limit_h_max         6
+_diffrn_reflns_limit_h_min         -6
+_diffrn_reflns_limit_k_max         7
+_diffrn_reflns_limit_k_min         -7
+_diffrn_reflns_limit_l_max         14
+_diffrn_reflns_limit_l_min         -14
+_diffrn_reflns_number              776
+_diffrn_reflns_theta_max           69.07
+_diffrn_reflns_theta_min           7.22
+_diffrn_ambient_temperature        100.15
+_diffrn_radiation_wavelength       1.54178
+_reflns_number_total               776
+_refine_diff_density_max           0.1
+loop_
+  _atom_site_label
+  _atom_site_type_symbol
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_U_iso_or_equiv
+  _atom_site_adp_type
+  _atom_site_occupancy
+  _atom_site_refinement_flags_posn
+  _atom_site_site_symmetry_order
+  _atom_site_disorder_group
+ C1 C 0.64578 0.968 0.33877 0.010433 Uani 1 . 1 .
+ H1 H 0.65697 0.92414 0.25288 0.02251 Uani 1 . 1 .
+ C2 C 0.39997 1.05506 0.35909 0.01014 Uani 1 . 1 .
+ O3 O 0.37518 1.22697 0.41618 0.01399 Uani 1 . 1 .
+ O4 O 0.23902 0.94258 0.31581 0.013827 Uani 1 . 1 .
+ N5 N 0.81666 1.14854 0.36238 0.011633 Uani 1 . 1 .
+ C6 C 0.69674 0.76232 0.4092 0.014547 Uani 1 . 1 .
+ H6b H 0.86441 0.69103 0.39029 0.032713 Uani 1 . 1 .
+ H6a H 0.56878 0.63321 0.39469 0.034977 Uani 1 . 1 .
+ H6c H 0.6937 0.80643 0.4951 0.034197 Uani 1 . 1 .
+ H5a H 0.79803 1.20526 0.44026 0.02656 Uani 1 . 1 .
+ H5b H 0.78905 1.27947 0.30923 0.02729 Uani 1 . 1 .
+ H5c H 0.97993 1.08795 0.3511 0.03152 Uani 1 . 1 .
+
+loop_
+  _atom_site_aniso_label
+  _atom_site_aniso_U_11
+  _atom_site_aniso_U_22
+  _atom_site_aniso_U_33
+  _atom_site_aniso_U_23
+  _atom_site_aniso_U_13
+  _atom_site_aniso_U_12
+ C1 0.00854 0.01229 0.01047 -0.00081 0.00033 0.00158
+ H1 0.02355 0.03233 0.01165 -0.00471 0.00132 -0.00077
+ C2 0.00904 0.01194 0.00944 -0.00051 0.00007 0.0001
+ O3 0.01209 0.01534 0.01454 -0.00386 0.0008 0.00125
+ O4 0.00886 0.01683 0.01579 -0.00379 -0.0011 -0.00056
+ N5 0.00893 0.01312 0.01285 -0.00081 0.00006 -0.00053
+ C6 0.01219 0.01377 0.01768 0.00178 -0.0007 0.00072
+ H6b 0.01427 0.03784 0.04603 0.00178 0.00167 0.01098
+ H6a 0.02859 0.03338 0.04296 -0.00362 -0.00486 -0.00679
+ H6c 0.04686 0.03642 0.01931 0.00174 -0.00135 0.00634
+ H5a 0.02971 0.02915 0.02082 -0.00615 0.00703 -0.00813
+ H5b 0.02787 0.01577 0.03823 0.00273 -0.00038 0.00473
+ H5c 0.02556 0.03495 0.03405 -0.00211 -0.00744 -0.00538
+

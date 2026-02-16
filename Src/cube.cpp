@@ -2,7 +2,6 @@
 #include "cube.h"
 #include "convenience.h"
 #include "constants.h"
-
 cube::cube()
 {
     loaded = false;
@@ -848,7 +847,6 @@ cube cube::operator-(const cube& right) const
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
                 res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) - right.get_value(x, y, z));
-
     return (res_cube);
 };
 
@@ -1255,7 +1253,7 @@ double cube::jaccard(const cube& right) const {
 };
 
 auto fast_clamp = [](int v, int lo, int hi) {
-    //assume lo <= hi 
+    //assume lo <= hi
     if (v < lo) return lo;
     if (v > hi) return hi;
     return v;
@@ -1371,12 +1369,12 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
 #pragma omp parallel for reduction(+:count_computed) schedule(dynamic)
         for (int i = 0; i < new_size[0]; ++i) {
             const double old_i = double(i) / fac;
-            int i0 = static_cast<int>(old_i); 
-            if (size[0] > 1) { 
-                i0 = fast_clamp(i0, 0, size[0] - 2); 
+            int i0 = static_cast<int>(old_i);
+            if (size[0] > 1) {
+                i0 = fast_clamp(i0, 0, size[0] - 2);
             }
-            else { 
-                i0 = 0; 
+            else {
+                i0 = 0;
             }
             //const int i0 = size[0] > 1 ? std::clamp((int)std::floor(old_i), 0, size[0] - 2) : 0;
             for (int j = 0; j < new_size[1]; ++j) {

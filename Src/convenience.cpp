@@ -2093,7 +2093,7 @@ void options::digest_options()
                     aux_basis.push_back(std::make_shared<BasisSet>());
                     break;
                 }
-                err_chkf(BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set]), 
+                err_chkf(BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set]),
                     "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
                 aux_basis.push_back(BasisSetLibrary().get_basis_set(arguments[next_basis_set]));
                 next_basis_set++;
