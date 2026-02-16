@@ -136,7 +136,7 @@ bool cube::read_values(std::ifstream& file) {
             reads1 = 0;
             getline(file, line);
             std::istringstream iss(line);
-            for (int i = 0; i < 6; ++i) {
+            for (int i = 0; i < 6; i++) {
                 if (!(iss >> tmp[i]))
                     tmp[i] = std::nan(""); // Default value if there are fewer than 6 values
                 else
@@ -707,9 +707,9 @@ double cube::ewald_sum(const int kMax, const double conv) {
     for (int k_vec = 1; k_vec <= kMax; k_vec++) {
         double temp = 0;
         pb = new ProgressBar(8 * k_vec * k_vec * k_vec, 60, "-", " ", "Reciprocal-space " + k_vec);
-        for (int h = -k_vec; h <= k_vec; ++h) {
-            for (int k = -k_vec; k <= k_vec; ++k) {
-                for (int l = -k_vec; l <= k_vec; ++l) {
+        for (int h = -k_vec; h <= k_vec; h++) {
+            for (int k = -k_vec; k <= k_vec; k++) {
+                for (int l = -k_vec; l <= k_vec; l++) {
                     if (h == 0 && k == 0 && l == 0) continue;
                     if (abs(h) + abs(k) + abs(l) != k_vec) continue;
                     bool known = false;
@@ -1270,12 +1270,12 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
 
     const int total_size = size[0] * size[1] * size[2];
     int initially_fine = 0;
-	double total_inhomog = 0.0, removed_inhomog = 0.0, problematic_inhomog = 0.0;
+    double total_inhomog = 0.0, removed_inhomog = 0.0, problematic_inhomog = 0.0;
 
 #pragma omp parallel for reduction(+:initially_fine, total_inhomog)
-    for (int i = 0; i < size[0]; ++i) {
-        for (int j = 0; j < size[1]; ++j) {
-            for (int k = 0; k < size[2]; ++k) {
+    for (int i = 0; i < size[0]; i++) {
+        for (int j = 0; j < size[1]; j++) {
+            for (int k = 0; k < size[2]; k++) {
 
                 // 32 points integration    (Taylor)
                 //--------------------------------------------------------
@@ -1343,15 +1343,15 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
     ivec nr_fine(max_depth + 1, 0);
     nr_fine[0] = initially_fine;
 
-    for (int depth = 0; depth < max_depth; ++depth) {
+    for (int depth = 0; depth < max_depth; depth++) {
         // Create new dimensions to sample
         const int fac = pow(subfactor, depth + 1);
         i3 new_size = { size[0] * fac, size[1] * fac, size[2] * fac };
 
         // New step vectors (half the size)
         array<d3, 3> new_vectors;
-        for (int d = 0; d < 3; ++d) {
-            for (int k = 0; k < 3; ++k) {
+        for (int d = 0; d < 3; d++) {
+            for (int k = 0; k < 3; k++) {
                 new_vectors[d][k] = vectors[d][k] / fac;
             }
         }
@@ -1369,17 +1369,17 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         ProgressBar* pb = new ProgressBar(new_size[0], 50, "#", " ", "Level " + to_string(depth + 1));
 
 #pragma omp parallel for reduction(+:count_computed) schedule(dynamic)
-        for (int i = 0; i < new_size[0]; ++i) {
+        for (int i = 0; i < new_size[0]; i++) {
             const double old_i = double(i) / fac;
-            int i0 = static_cast<int>(old_i); 
-            if (size[0] > 1) { 
-                i0 = fast_clamp(i0, 0, size[0] - 2); 
+            int i0 = static_cast<int>(old_i);
+            if (size[0] > 1) {
+                i0 = fast_clamp(i0, 0, size[0] - 2);
             }
-            else { 
-                i0 = 0; 
+            else {
+                i0 = 0;
             }
             //const int i0 = size[0] > 1 ? std::clamp((int)std::floor(old_i), 0, size[0] - 2) : 0;
-            for (int j = 0; j < new_size[1]; ++j) {
+            for (int j = 0; j < new_size[1]; j++) {
                 const double old_j = double(j) / fac;
                 int j0 = static_cast<int>(old_j);
                 if (size[1] > 1) {
@@ -1389,7 +1389,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                     j0 = 0;
                 }
                 int* ihf = inhomog_fine[i0][j0].data();
-                for (int k = 0; k < new_size[2]; ++k) {
+                for (int k = 0; k < new_size[2]; k++) {
                     // Check if this corresponds to an exact old point
                     if (i % subfactor == 0 && j % subfactor == 0 && k % subfactor == 0) {
                         continue;
@@ -1434,9 +1434,9 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         // Simple serial summation to avoid any reduction issues, or parallel if confident.
         // Parallel reduction is fine for simple double sum.
 #pragma omp parallel for reduction(+:new_integral, initially_fine, removed_inhomog)
-        for (int i = 0; i < size[0]; ++i)
-            for (int j = 0; j < size[1]; ++j)
-                for (int k = 0; k < size[2]; ++k) {
+        for (int i = 0; i < size[0]; i++)
+            for (int j = 0; j < size[1]; j++)
+                for (int k = 0; k < size[2]; k++) {
                     if (inhomog_fine[i][j][k]) {
                         auto it_ref = Refine_integrals.find(i3{ i,j,k });
                         if (it_ref != Refine_integrals.end())
@@ -1467,7 +1467,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                         if (rerror < target_error) {
                             inhomog_fine[i][j][k] = 1;
                             initially_fine++;
-							removed_inhomog += abs(Refine_integrals[i3{ i, j, k }].second);
+                            removed_inhomog += abs(Refine_integrals[i3{ i, j, k }].second);
                         }
                         Refine_integrals[i3{ i, j, k }].first = new_int;
                     }
@@ -1482,8 +1482,8 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         cout << "Refinement Level " << depth + 1
             << ": Integral = " << new_integral
             << ", Error = " << rel_error
-			<< ", left inhomogenity: " << total_inhomog - removed_inhomog
-			<< ", left problematic inhomogenity: " << problematic_inhomog - removed_inhomog
+            << ", left inhomogenity: " << total_inhomog - removed_inhomog
+            << ", left problematic inhomogenity: " << problematic_inhomog - removed_inhomog
             << " (Computed: " << count_computed << " fixed: " << nr_fine[depth + 1] - nr_fine[depth] << ")" << endl;
 
         // Apply update
@@ -1492,7 +1492,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
             cout << "Converged!" << endl;
             break;
         }
-		if (initially_fine == total_size) {
+        if (initially_fine == total_size) {
             cout << "All points refined!" << endl;
             break;
         }

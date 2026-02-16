@@ -1772,22 +1772,6 @@ void options::digest_options()
                 j++;
             }
         }
-        else if (temp == "-core_dens-corrected")
-        {
-            double prec = stod(arguments[i + 1]);
-            ivec a = split_string<int>(arguments[i + 3], ",");
-            ivec b = split_string<int>(arguments[i + 4], ",");
-            test_core_dens_corrected(prec, threads, arguments[i + 2], a, b);
-            exit(0);
-        }
-        else if (temp == "-core_tsc-corrected")
-        {
-            double prec = stod(arguments[i + 1]);
-            ivec a = split_string<int>(arguments[i + 3], ",");
-            ivec b = split_string<int>(arguments[i + 4], ",");
-            test_core_sfac_corrected(prec, threads, arguments[i + 2], a, b);
-            exit(0);
-        }
         else if (temp == "-convert_to_47") {
             err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
             std::filesystem::path wfn = arguments[i + 1];
@@ -2097,7 +2081,7 @@ void options::digest_options()
                     aux_basis.push_back(std::make_shared<BasisSet>());
                     break;
                 }
-                err_chkf(BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set]), 
+                err_chkf(BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set]),
                     "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
                 aux_basis.push_back(BasisSetLibrary().get_basis_set(arguments[next_basis_set]));
                 next_basis_set++;
@@ -2107,7 +2091,7 @@ void options::digest_options()
                 aux_basis.push_back(std::make_shared<BasisSet>());
             }
         }
-        else if (temp == "-write_ri_coefs"){
+        else if (temp == "-write_ri_coefs") {
             WFN wavy(wfn);
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
             DensityFitting::CONFIG config;
@@ -2187,14 +2171,6 @@ void options::digest_options()
         }
         else if (temp == "-skpts")
             save_k_pts = true;
-        else if (temp == "-sfac_scan")
-        {
-            d_sfac_scan = fromString<double>(arguments[i + 1]);
-            cif = arguments[i + 2];
-            wfn = arguments[i + 3];
-            sfac_scan(*this, log_file);
-            exit(0);
-        }
         else if (temp == "-sfac_diffuse")
         {
             sfac_diffuse = fromString<double>(arguments[i + 1]);
@@ -2503,7 +2479,7 @@ int CountWords(const char* str)
             inSpaces = false;
         }
 
-        ++str;
+        str++;
     }
 
     return numWords;
@@ -2979,13 +2955,13 @@ void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
     uint32_t w[64];
     uint32_t a, b, c, d, e, f, g, h;
 
-    for (int i = 0; i < 16; ++i)
+    for (int i = 0; i < 16; i++)
     {
         w[i] = (block[i * 4] << 24) | (block[i * 4 + 1] << 16) |
             (block[i * 4 + 2] << 8) | (block[i * 4 + 3]);
     }
 
-    for (int i = 16; i < 64; ++i)
+    for (int i = 16; i < 64; i++)
     {
         w[i] = SIG1(w[i - 2]) + w[i - 7] + SIG0(w[i - 15]) + w[i - 16];
     }
@@ -2999,7 +2975,7 @@ void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
     g = state[6];
     h = state[7];
 
-    for (int i = 0; i < 64; ++i)
+    for (int i = 0; i < 64; i++)
     {
         uint32_t temp1 = h + EP1(e) + CH(e, f, g) + k[i] + w[i];
         uint32_t temp2 = EP0(a) + MAJ(a, b, c);
@@ -3026,7 +3002,7 @@ void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
 // SHA-256 update function
 void sha::sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t* data, size_t len, uint64_t& bitlen)
 {
-    for (size_t i = 0; i < len; ++i)
+    for (size_t i = 0; i < len; i++)
     {
         size_t buf_idx = (bitlen / 8) % 64;
         if (buf_idx >= 64) {
@@ -3080,7 +3056,7 @@ void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, u
     memcpy(buffer + 56, &bitlen, 8);
     sha256_transform(state, buffer);
 
-    for (i = 0; i < 8; ++i)
+    for (i = 0; i < 8; i++)
     {
         constexpr size_t HASH_SIZE = 32;
         const size_t off = static_cast<size_t>(i) * 4;
@@ -3109,7 +3085,7 @@ std::string sha::sha256(const std::string& input)
     sha256_final(state, buffer, bitlen, hash);
 
     std::stringstream ss;
-    for (int i = 0; i < 32; ++i)
+    for (int i = 0; i < 32; i++)
     {
         ss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
     }
@@ -3166,7 +3142,7 @@ void ProgressBar::write_progress(std::ostream& os)
     os << "[";
 
     const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
-    for (size_t i = 0; i <= completed; ++i)
+    for (size_t i = 0; i <= completed; i++)
     {
         os << fill_;
     }

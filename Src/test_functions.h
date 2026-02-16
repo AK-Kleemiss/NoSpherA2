@@ -17,190 +17,6 @@
 #include "TargetConditionals.h"
 #endif
 
-void sfac_scan(options &opt, std::ostream &log_file)
-{
-    using namespace std;
-    std::vector<WFN> wavy;
-    auto t = new WFN(opt.wfn);
-    wavy.push_back(*t);
-    delete t;
-    Thakkar O(wavy[0].get_atom_charge(0));
-    Thakkar_Cation O_cat(wavy[0].get_atom_charge(0));
-    Thakkar_Anion O_an(wavy[0].get_atom_charge(0));
-    err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
-    err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
-    // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-
-    std::vector<_time_point> time_points;
-    std::vector<std::string> time_descriptions;
-
-    cell unit_cell(opt.cif, std::cout, opt.debug);
-    ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    ivec atom_type_list;
-    ivec asym_atom_to_type_list;
-    ivec asym_atom_list;
-    bvec constant_atoms;
-    bvec needs_grid(wavy[0].get_ncen(), false);
-    svec known_atoms;
-
-    auto labels = read_atoms_from_CIF(cif_input,
-        opt.groups[0],
-        unit_cell,
-        wavy[0],
-        known_atoms,
-        atom_type_list,
-        asym_atom_to_type_list,
-        asym_atom_list,
-        needs_grid,
-        std::cout,
-        constant_atoms,
-        opt.debug);
-
-    cif_input.close();
-    vec2 d1, d2, d3, dens;
-
-    make_atomic_grids(opt.pbc,
-        opt.accuracy,
-        unit_cell,
-        wavy[0],
-        atom_type_list,
-        asym_atom_list,
-        needs_grid,
-        d1, d2, d3, dens,
-        labels,
-        std::cout,
-        time_points,
-        time_descriptions,
-        opt.debug,
-        opt.no_date,
-        opt.partition_type);
-
-    std::cout << "finished partitioning" << endl;
-    const int size = 4000;
-    const int phi_size = 50;
-    const int theta_size = 50;
-    const double phi_step = 360.0 / phi_size * constants::PI_180;
-    const double theta_step = 180.0 / phi_size * constants::PI_180;
-
-    // This bit is basically the substitute for make_k_pts, where we sample the whole sphere
-    //  by iterating over both spherical angles by a fixed step defined above
-    vec2 k_pt;
-    k_pt.resize(4);
-#pragma omp parallel for
-    for (int i = 0; i < 4; i++)
-        k_pt[i].resize(size * phi_size * theta_size, 0.0);
-
-    // int null = 0;
-#pragma omp parallel for
-    for (int ref = 1; ref <= size; ref++)
-    {
-        for (int p = 0; p < phi_size; p++)
-        {
-            for (int _t = 0; _t < theta_size; _t++)
-            {
-                int ind = _t + (p + (ref - 1) * phi_size) * theta_size;
-                double k_length = constants::bohr2ang(constants::FOUR_PI * ref / size * opt.d_sfac_scan);
-                k_pt[0][ind] = k_length * sin(_t * theta_step) * cos(p * phi_step);
-                k_pt[1][ind] = k_length * sin(_t * theta_step) * sin(p * phi_step);
-                k_pt[2][ind] = k_length * cos(_t * theta_step);
-                k_pt[3][ind] = k_length;
-            }
-        }
-    }
-    // below is a strip of Calc_SF without the file IO or progress bar
-    cvec2 sf;
-
-    const int imax = (int)dens.size();
-    const int smax = (int)k_pt[0].size();
-    int pmax = (int)dens[0].size();
-    std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
-    sf.resize(imax);
-#pragma omp parallel for
-    for (int i = 0; i < imax; i++)
-        sf[i].resize(k_pt[0].size());
-    double* dens_local, * d1_local, * d2_local, * d3_local;
-    complex<double>* sf_local;
-    const double* k1_local = k_pt[0].data();
-    const double* k2_local = k_pt[1].data();
-    const double* k3_local = k_pt[2].data();
-    double work, rho;
-    ProgressBar* progress = new ProgressBar(smax, 50, "=", " ", "Calculating Scattering factors");
-    for (int i = 0; i < imax; i++)
-    {
-        pmax = (int)dens[i].size();
-        dens_local = dens[i].data();
-        d1_local = d1[i].data();
-        d2_local = d2[i].data();
-        d3_local = d3[i].data();
-        sf_local = sf[i].data();
-#pragma omp parallel for private(work, rho)
-        for (int s = 0; s < smax; s++)
-        {
-            for (int p = pmax - 1; p >= 0; p--)
-            {
-                rho = dens_local[p];
-                work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
-                sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
-            }
-            progress->update();
-        }
-    }
-    delete (progress);
-    if (true)
-    { // Change if oyu do not want X-ray
-        ofstream result("sfacs.dat", ios::out);
-        log_file << "Writing X-ray sfacs...";
-        log_file.flush();
-        // Now we just need to write the result to a file, together with the spherical results and separated for valence and core
-        for (int i = 0; i < k_pt[0].size(); i++)
-        {
-            result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][i] / constants::FOUR_PI);
-            result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor((k_pt[3][i]));
-            result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor((k_pt[3][i]));
-            result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor((k_pt[3][i]));
-            result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
-            result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), 1, 0, 0, 0, 0, 0, 0, 0);
-            result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), 2, 1, 0, 0, 1, 0, 0, 0);
-            result << "\n";
-        }
-        log_file << " ... done!" << endl;
-        result.flush();
-        result.close();
-    }
-    if (true)
-    { // change if you do not want ED sfacs
-        log_file << "Writing ED sfacs...";
-        log_file.flush();
-        ofstream result = ofstream("sfacs_ED.dat", ios::out);
-        const double fact = 0.023934;
-        double h2;
-        for (int s = 0; s < k_pt[0].size(); s++)
-        {
-            h2 = pow(constants::ang2bohr(k_pt[3][s] / constants::FOUR_PI), 2);
-            sf[0][s] = std::complex<double>(fact * (wavy[0].get_atom_charge(0) - sf[0][s].real()) / h2, -fact * sf[0][s].imag() / h2);
-
-            result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][s] / constants::FOUR_PI);
-            double temp = fact * (wavy[0].get_atom_charge(0) - O.get_form_factor(k_pt[3][s])) / h2;
-            result << showpos << setw(16) << setprecision(8) << scientific << temp;
-            temp = fact * (wavy[0].get_atom_charge(0) - O_an.get_form_factor(k_pt[3][s])) / h2;
-            result << showpos << setw(16) << setprecision(8) << scientific << temp;
-            temp = fact * (wavy[0].get_atom_charge(0) - O_cat.get_form_factor(k_pt[3][s])) / h2;
-            result << showpos << setw(16) << setprecision(8) << scientific << temp;
-
-            result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][s].real(), 2) + pow(sf[0][s].imag(), 2));
-
-            temp = fact * (2 - O.get_custom_form_factor(k_pt[3][s], 1, 0, 0, 0, 0, 0, 0, 0)) / h2;
-            result << showpos << setw(16) << setprecision(8) << scientific << temp;
-            temp = fact * (6 - O.get_custom_form_factor(k_pt[3][s], 2, 1, 0, 0, 1, 0, 0, 0)) / h2;
-            result << showpos << setw(16) << setprecision(8) << scientific << temp;
-            result << "\n";
-        }
-        result.flush();
-        result.close();
-        log_file << " ... done!" << endl;
-    }
-}
-
 template <typename T>
 std::vector<T> geomspace(T start, T stop, int num)
 {
@@ -1134,244 +950,6 @@ void test_xtb_molden(options& opt, std::ostream& log_file)
     }
 }
 
-void test_core_dens_corrected(double& precisison, int ncpus = 4, std::string ele = "Au", ivec val_els_alpha = {}, ivec val_els_beta = {})
-{
-    if (ncpus == -1)
-        ncpus = 4;
-    using namespace std;
-#ifdef _OPENMP
-    omp_set_num_threads(ncpus);
-#endif
-    vec2 res(6);
-    for (int i = 0; i < res.size(); i++)
-        res[i].resize(10000, 0.0);
-
-    string dat = "core_dens_" + ele + ".dat";
-    int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
-    Thakkar T_Au(el_nr);
-    string def2 = ele + "_def2TZVP.gbw";
-    WFN ECP_way_Au(def2);
-    ECP_way_Au.delete_unoccupied_MOs();
-    ECP_way_Au.set_has_ECPs(true, true, 1);
-
-    string jorge = ele + "_jorge.gbw";
-    WFN wavy_full_Au(jorge);
-    wavy_full_Au.delete_unoccupied_MOs();
-    WFN wavy_val_Au(jorge);
-    wavy_val_Au.delete_unoccupied_MOs();
-    std::cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
-    bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
-    int deleted = 0;
-    if (val_els_alpha.size() > 0)
-    {
-        // Delete core orbitals
-        int offset = wavy_val_Au.get_MO_op_count(0);
-        for (int i = offset - 1; i >= 0; i--)
-            // only delete if i is not an element of val_els
-            if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
-            {
-                std::cout << "Deleting from Alpha: " << i << endl;
-                wavy_val_Au.delete_MO(i);
-                MOs_to_delete[i] = true;
-                deleted++;
-            }
-        offset = wavy_val_Au.get_MO_op_count(0);
-        for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
-            if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
-            {
-                std::cout << "Deleting from Beta: " << i - offset << endl;
-                wavy_val_Au.delete_MO(i);
-                MOs_to_delete[i + deleted] = true;
-            }
-    }
-    std::cout << "MOs deleted: " << deleted << endl;
-    std::cout << "MO map:" << endl;
-    for (int i = 0; i < MOs_to_delete.size(); i++)
-        std::cout << i << " " << MOs_to_delete[i] << endl;
-    std::cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
-    std::cout << "\n\nEnergies / Occu after:" << endl;
-    for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-        std::cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
-
-    _time_point start = get_time();
-
-    const int upper = static_cast<int>(res[0].size());
-    ProgressBar* progress = new ProgressBar(upper, 60, "=", " ", "Calculating Densities");
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 1; i < upper; i++)
-    {
-        double sr = i * 0.001;
-        res[0][i] = sr;
-        res[1][i] = T_Au.get_core_density(sr, ECP_way_Au.get_atom_ECP_electrons(0));
-        res[2][i] = T_Au.get_radial_density(sr);
-        res[3][i] = calc_spherically_averaged_at_r(ECP_way_Au, sr, precisison, 60);
-        res[4][i] = calc_spherically_averaged_at_r(wavy_full_Au, sr, precisison, 60);
-        res[5][i] = calc_spherically_averaged_at_r(wavy_val_Au, sr, precisison, 60);
-        progress->update();
-    }
-    delete (progress);
-    _time_point end = get_time();
-    std::cout << "Time taken: " << round(get_sec(start, end) / 60) << " m " << get_sec(start, end) % 60 << " s " << get_msec(start, end) << " ms" << endl;
-    ofstream dat_out(dat, ios::out);
-    dat_out << scientific << setprecision(12) << setw(20);
-    for (int i = 0; i < res[0].size(); i++)
-    {
-        for (int j = 0; j < 6; j++)
-        {
-            auto t = res[j][i];
-            dat_out << t;
-            dat_out << " ";
-        }
-        dat_out << "\n";
-    }
-    dat_out << flush;
-    dat_out.close();
-}
-
-void test_core_sfac_corrected(double& precisison, int ncpus = 4, std::string ele = "Au", ivec val_els_alpha = {}, ivec val_els_beta = {})
-{
-    if (ncpus == -1)
-        ncpus = 4;
-    using namespace std;
-#ifdef _OPENMP
-    omp_set_num_threads(ncpus);
-#endif
-    cvec2 res(6);
-    for (int i = 0; i < res.size(); i++)
-        res[i].resize(1000, 0.0);
-
-    string dat = "core_sfac_" + ele + ".dat";
-    const int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
-    Thakkar T_Au(el_nr);
-
-    WFN ECP_way_Au(ele + "_def2TZVP.gbw");
-    ECP_way_Au.delete_unoccupied_MOs();
-    ECP_way_Au.set_has_ECPs(true, true, 1);
-
-    WFN wavy_full_Au(ele + "_jorge.gbw");
-    wavy_full_Au.delete_unoccupied_MOs();
-    WFN wavy_val_Au(ele + "_jorge.gbw");
-    wavy_val_Au.delete_unoccupied_MOs();
-    std::cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
-    bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
-    int deleted = 0;
-    if (val_els_alpha.size() > 0)
-    {
-        // Delete core orbitals
-        int offset = wavy_val_Au.get_MO_op_count(0);
-        for (int i = offset - 1; i >= 0; i--)
-            // only delete if i is not an element of val_els
-            if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
-            {
-                std::cout << "Deleting from Alpha: " << i << endl;
-                wavy_val_Au.delete_MO(i);
-                MOs_to_delete[i] = true;
-                deleted++;
-            }
-        offset = wavy_val_Au.get_MO_op_count(0);
-        for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
-            if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
-            {
-                std::cout << "Deleting from Beta: " << i - offset << endl;
-                wavy_val_Au.delete_MO(i);
-                MOs_to_delete[i + deleted] = true;
-            }
-    }
-    std::cout << "MOs deleted: " << deleted << endl;
-    std::cout << "MO map:" << endl;
-    for (int i = 0; i < MOs_to_delete.size(); i++)
-        std::cout << i << " " << MOs_to_delete[i] << endl;
-    std::cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
-    std::cout << "\n\nEnergies / Occu after:" << endl;
-    for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-        std::cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
-
-    std::vector<_time_point> time_points;
-    std::vector<std::string> time_descriptions;
-
-    ivec atom_type_list({ el_nr });
-    ivec asym_atom_list({ 0 });
-    bvec needs_grid({ true });
-    vec2 d1_ECP, d2_ECP, d3_ECP, dens_ECP;
-    vec2 d1_all, d2_all, d3_all, dens_all;
-    vec2 d1_val, d2_val, d3_val, dens_val;
-    svec labels({ ele });
-
-    auto temp_cell = cell();
-    make_atomic_grids(0,
-        3,
-        temp_cell,
-        ECP_way_Au,
-        atom_type_list,
-        asym_atom_list,
-        needs_grid,
-        d1_ECP, d2_ECP, d3_ECP, dens_ECP,
-        labels,
-        std::cout,
-        time_points,
-        time_descriptions);
-    make_atomic_grids(0,
-        3,
-        temp_cell,
-        wavy_full_Au,
-        atom_type_list,
-        asym_atom_list,
-        needs_grid,
-        d1_all, d2_all, d3_all, dens_all,
-        labels,
-        std::cout,
-        time_points,
-        time_descriptions);
-    make_atomic_grids(0,
-        3,
-        temp_cell,
-        wavy_val_Au,
-        atom_type_list,
-        asym_atom_list,
-        needs_grid,
-        d1_val, d2_val, d3_val, dens_val,
-        labels,
-        std::cout,
-        time_points,
-        time_descriptions);
-
-    const int upper = static_cast<int>(res[0].size());
-    ProgressBar* progress = new ProgressBar(upper, 60, "=", " ", "Calculating SFACs");
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 1; i < upper; i++)
-    {
-        double sr = i * 0.01;
-        res[0][i] = sr;
-        res[1][i] = T_Au.get_core_form_factor(sr, ECP_way_Au.get_atom_ECP_electrons(0));
-        res[2][i] = T_Au.get_form_factor(sr);
-        res[3][i] = calc_spherically_averaged_at_k(d1_ECP, d2_ECP, d3_ECP, dens_ECP, sr, precisison, 150.0);
-        res[4][i] = calc_spherically_averaged_at_k(d1_all, d2_all, d3_all, dens_all, sr, precisison, 150.0);
-        res[5][i] = calc_spherically_averaged_at_k(d1_val, d2_val, d3_val, dens_val, sr, precisison, 150.0);
-        progress->update();
-    }
-    delete (progress);
-
-    ofstream dat_out("core_sfac_" + ele + ".dat", ios::out);
-    _time_point end = get_time();
-    std::cout << "Time taken: " << get_sec(time_points.front(), time_points.back()) << " s " << get_msec(time_points.front(), time_points.back()) << " ms" << endl;
-    dat_out << scientific << setprecision(12) << setw(20);
-    double t = 0;
-    for (int i = 0; i < res[0].size(); i++)
-    {
-        for (int j = 0; j < 6; j++)
-        {
-            t = res[j][i].real();
-            dat_out << t;
-            dat_out << " ";
-        }
-        dat_out << "\n";
-    }
-    dat_out << flush;
-    dat_out.close();
-}
-
 double calc_pot_by_integral(vec3& grid, const double& r, const double& cube_dist, const double& dr)
 {
     double res = 0;
@@ -1403,7 +981,7 @@ void test_openblas()
 }
 
 
-void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>>& aux_basis, const int atom_idx_1, const int atom_idx_2, const int gridpoints = 1000, const double padding = 2.0) {
+void get1DGridData(WFN& wavy, std::vector<std::shared_ptr<BasisSet>>& aux_basis, const int atom_idx_1, const int atom_idx_2, const int gridpoints = 1000, const double padding = 2.0) {
     GridConfiguration config;
     config.accuracy = 0;
     config.partition_type = PartitionType::TFVC;
@@ -1426,60 +1004,60 @@ void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>>& aux_basis,
     RI_config.tikhonov_lambda = 1E-6;
     vec ri_coefs_tfvc = DensityFitting::density_fit(wavy, wavy_aux, RI_config);
 
-   vec2 dens_hirsh(2);
-   vec2 dens_becke(2);
-   vec2 dens_tfvc(2);
-   vec2 dens_RI_u(2);
-   vec2 dens_RI_tfvc(2);
-   ivec atom_indices = { atom_idx_1, atom_idx_2 };
-   for (int g = 0; g < 2; ++g) {
-       dens_hirsh[g].resize(gridpoints), dens_becke[g].resize(gridpoints), dens_tfvc[g].resize(gridpoints), dens_RI_u[g].resize(gridpoints), dens_RI_tfvc[g].resize(gridpoints);
-       for (int p = 0; p < gridpoints; ++p) {
-           dens_hirsh[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::HIRSH_WEIGHT][p];
-           dens_becke[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::BECKE_WEIGHT][p];
-           dens_tfvc[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::TFVC_WEIGHT][p];
-           dens_RI_u[g][p] = calc_density_ML(
-               atomic_grids_local[g][GridData::X][p],
-               atomic_grids_local[g][GridData::Y][p],
-               atomic_grids_local[g][GridData::Z][p],
-               ri_coefs_u,
-               wavy_aux.get_atoms(),
-               atom_indices[g]);
-           dens_RI_tfvc[g][p] = calc_density_ML(
-               atomic_grids_local[g][GridData::X][p],
-               atomic_grids_local[g][GridData::Y][p],
-               atomic_grids_local[g][GridData::Z][p],
-               ri_coefs_tfvc,
-               wavy_aux.get_atoms(),
-               atom_indices[g]);
-       }
-   }
+    vec2 dens_hirsh(2);
+    vec2 dens_becke(2);
+    vec2 dens_tfvc(2);
+    vec2 dens_RI_u(2);
+    vec2 dens_RI_tfvc(2);
+    ivec atom_indices = { atom_idx_1, atom_idx_2 };
+    for (int g = 0; g < 2; ++g) {
+        dens_hirsh[g].resize(gridpoints), dens_becke[g].resize(gridpoints), dens_tfvc[g].resize(gridpoints), dens_RI_u[g].resize(gridpoints), dens_RI_tfvc[g].resize(gridpoints);
+        for (int p = 0; p < gridpoints; ++p) {
+            dens_hirsh[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::HIRSH_WEIGHT][p];
+            dens_becke[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::BECKE_WEIGHT][p];
+            dens_tfvc[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::TFVC_WEIGHT][p];
+            dens_RI_u[g][p] = calc_density_ML(
+                atomic_grids_local[g][GridData::X][p],
+                atomic_grids_local[g][GridData::Y][p],
+                atomic_grids_local[g][GridData::Z][p],
+                ri_coefs_u,
+                wavy_aux.get_atoms(),
+                atom_indices[g]);
+            dens_RI_tfvc[g][p] = calc_density_ML(
+                atomic_grids_local[g][GridData::X][p],
+                atomic_grids_local[g][GridData::Y][p],
+                atomic_grids_local[g][GridData::Z][p],
+                ri_coefs_tfvc,
+                wavy_aux.get_atoms(),
+                atom_indices[g]);
+        }
+    }
 
-   std::vector<std::pair<std::string, vec>> data_atom1(
-         {  
-            {"hirsh", dens_hirsh[0]},
-            {"becke", dens_becke[0]},
-            {"tfvc", dens_tfvc[0]},
-            {"ri_u", dens_RI_u[0]},
-            { "ri_tfvc", dens_RI_tfvc[0] }
-       }
-   );
-   std::vector<std::pair<std::string, vec>> data_atom2(
-       {
-           {"hirsh", dens_hirsh[1]},
-           {"becke", dens_becke[1]},
-           {"tfvc", dens_tfvc[1]},
-           {"ri_u", dens_RI_u[1]},
-           { "ri_tfvc", dens_RI_tfvc[1] }
-       }
-   );
+    std::vector<std::pair<std::string, vec>> data_atom1(
+        {
+           {"hirsh", dens_hirsh[0]},
+           {"becke", dens_becke[0]},
+           {"tfvc", dens_tfvc[0]},
+           {"ri_u", dens_RI_u[0]},
+           { "ri_tfvc", dens_RI_tfvc[0] }
+        }
+    );
+    std::vector<std::pair<std::string, vec>> data_atom2(
+        {
+            {"hirsh", dens_hirsh[1]},
+            {"becke", dens_becke[1]},
+            {"tfvc", dens_tfvc[1]},
+            {"ri_u", dens_RI_u[1]},
+            { "ri_tfvc", dens_RI_tfvc[1] }
+        }
+    );
 
-   //std::string atom_specifier = std::format("{}{}_{}{}", wavy.get_atom_label(atom_idx_1), atom_idx_1, wavy.get_atom_label(atom_idx_2), atom_idx_2);
-   std::string atom_specifier = wavy.get_atom_label(atom_idx_1) + std::to_string(atom_idx_1) + "_" + wavy.get_atom_label(atom_idx_2) + std::to_string(atom_idx_2);
-   vec2 grid_points = { atomic_grids_local[0][GridData::X], atomic_grids_local[0][GridData::Y], atomic_grids_local[0][GridData::Z] };
-   grid_manager.writeSimpleGrid("WFN_density_" + atom_specifier + ".dat", grid_points, { {"WFN_density",atomic_grids_local[0][GridData::WFN_DENSITY]} });
-   grid_manager.writeSimpleGrid("Density_" + wavy.get_atom_label(atom_idx_1) + std::to_string(atom_idx_1) + ".dat", grid_points, data_atom1);
-   grid_manager.writeSimpleGrid("Density_" + wavy.get_atom_label(atom_idx_2) + std::to_string(atom_idx_2) + ".dat", grid_points, data_atom2);
+    //std::string atom_specifier = std::format("{}{}_{}{}", wavy.get_atom_label(atom_idx_1), atom_idx_1, wavy.get_atom_label(atom_idx_2), atom_idx_2);
+    std::string atom_specifier = wavy.get_atom_label(atom_idx_1) + std::to_string(atom_idx_1) + "_" + wavy.get_atom_label(atom_idx_2) + std::to_string(atom_idx_2);
+    vec2 grid_points = { atomic_grids_local[0][GridData::X], atomic_grids_local[0][GridData::Y], atomic_grids_local[0][GridData::Z] };
+    grid_manager.writeSimpleGrid("WFN_density_" + atom_specifier + ".dat", grid_points, { {"WFN_density",atomic_grids_local[0][GridData::WFN_DENSITY]} });
+    grid_manager.writeSimpleGrid("Density_" + wavy.get_atom_label(atom_idx_1) + std::to_string(atom_idx_1) + ".dat", grid_points, data_atom1);
+    grid_manager.writeSimpleGrid("Density_" + wavy.get_atom_label(atom_idx_2) + std::to_string(atom_idx_2) + ".dat", grid_points, data_atom2);
 }
 
 void test_analytical_fourier(bool full)

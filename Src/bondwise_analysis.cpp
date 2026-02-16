@@ -614,13 +614,13 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
     make_Eigenvalues(P, occu);
 #ifdef NSA2DEBUG
     std::cout << "Eigenvalues of projected density P:\n";
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; i++) {
         std::cout << std::setw(14) << std::setprecision(8) << std::fixed << W[i] << " ";
     }
     print_dmatrix2(reshape<dMatrix2>(P, Shape2D(n, n)), "Projected density P");
 #endif
 
-    for (int i = 0; i < n; ++i)
+    for (int i = 0; i < n; i++)
         W[i] = abs(W[i]) < 1E-10 ? 0.0 : 1.0 / W[i];
 
     vec Temp2(n * n, 0.0);
@@ -677,13 +677,13 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
     vec sorted_evecs;
     sorted_evecs.reserve(n * n);
 
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; i++) {
         int original_idx = idx[i];
         if (result.eigenvalues[original_idx] < 0.075)
             continue;
         sorted_evals.emplace_back(result.eigenvalues[original_idx]);
 
-        for (int row = 0; row < n; ++row) {
+        for (int row = 0; row < n; row++) {
             sorted_evecs.emplace_back(result.eigenvectors[row * n + original_idx]);
         }
     }
@@ -747,7 +747,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
      // Construct S^-1/2 = U * Lambda^(-1/2) * U^T
      std::fill(S_PNAO.begin(), S_PNAO.end(), 0.0); // Reuse S_PNAO to store S^-1/2
 
-     for (int k = 0; k < n; ++k) {
+     for (int k = 0; k < n; k++) {
          double scale = 1.0 / std::sqrt(W[k]);
          // Add contribution of k-th eigenvector: scale * (v_k * v_k^T)
          // v_k is the k-th ROW of U.
@@ -755,8 +755,8 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
 
          // This is a rank-1 update (dger), but we can just sum manually or loop
          // Since we need the full matrix for the next multiplication
-         for (int i = 0; i < n; ++i) {
-             for (int j = 0; j < n; ++j) {
+         for (int i = 0; i < n; i++) {
+             for (int j = 0; j < n; j++) {
                  S_PNAO[i * n + j] += scale * v_k[i] * v_k[j];
              }
          }

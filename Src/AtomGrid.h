@@ -87,8 +87,8 @@ double get_r_outer(const double& max_error,
 
 double get_h(const double& max_error, const int& l, const double& guess);
 
-std::vector<std::pair<vec,vec>> make_MBIS_vectors(
-        const WFN& wavy, 
-        const vec2& grid, 
-        const ivec& num_grid_points,
-        const bool debug = false );
+std::vector<std::pair<vec, vec>> make_MBIS_vectors(
+    const WFN& wavy,
+    const vec3& grid,
+    const ivec& num_grid_points,
+    const bool debug = false);

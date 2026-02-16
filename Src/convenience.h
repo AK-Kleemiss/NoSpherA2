@@ -131,10 +131,11 @@ const double array_length(const array& in, const array& in2)
     {
         return std::hypot(in[0] - in2[0], in[1] - in2[1], in[2] - in2[2]);
     }
+
     double sum = 0.0;
     auto it1 = std::begin(in);
     auto it2 = std::begin(in2);
-    for (; it1 != std::end(in); ++it1, ++it2) {
+    for (; it1 != std::end(in); it1++, it2++) {
         sum += (*it1 - *it2) * (*it1 - *it2);
     }
     return sqrt(sum);

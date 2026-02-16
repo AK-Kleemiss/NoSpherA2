@@ -45,7 +45,7 @@ namespace constants
 
     constexpr double constexpr_pow(double base, int exponent) {
         double result = 1.0;
-        for (int i = 0; i < exponent; ++i) result *= base;
+        for (int i = 0; i < exponent; i++) result *= base;
         return result;
     }
 
@@ -173,7 +173,7 @@ namespace constants
     constexpr double exp_approx(const double& x, int n = 25) {
         double result = 1.0;
         double term = 1.0;
-        for (int i = 1; i <= n; ++i) {
+        for (int i = 1; i <= n; i++) {
             term *= x / i;
             result += term;
         }
@@ -285,7 +285,7 @@ namespace constants
         std::array<size_t, MAX_FACTORIAL> ft{};
 
         ft[0] = 1;
-        for (int i = 1; i < MAX_FACTORIAL; ++i) {
+        for (int i = 1; i < MAX_FACTORIAL; i++) {
             ft[i] = ft[i - 1] * i;
         }
         return ft;
@@ -684,8 +684,8 @@ namespace constants
 
         // l = 0 case
         norms[0][0] = constants::c_1_4p;
-        for (int l = 1; l <= ASSOCIATED_LEGENDRE_MAX_L; ++l) {
-            for (int m = -l; m <= l; ++m) {
+        for (int l = 1; l <= ASSOCIATED_LEGENDRE_MAX_L; l++) {
+            for (int m = -l; m <= l; m++) {
                 norms[l][m + l] = sqrt(((2 * l + 1) * double(constants::ft[l - m])) / (constants::TWO_PI * double(constants::ft[l + m])));
             }
             norms[l][l] = sqrt(((2 * l + 1) / constants::FOUR_PI));

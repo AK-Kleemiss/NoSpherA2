@@ -15,11 +15,11 @@ vec einsum_ijk_ij_p(const dMatrix3& v1, const dMatrix2& v2)
     vec rho(P, 0.0);
 
     // Perform the summation
-    for (int p = 0; p < P; ++p)
+    for (int p = 0; p < P; p++)
     {
-        for (int i = 0; i < I; ++i)
+        for (int i = 0; i < I; i++)
         {
-            for (int j = 0; j < J; ++j)
+            for (int j = 0; j < J; j++)
             {
                 rho[p] += v1(i, j, p) * v2(i, j);
             }
@@ -307,13 +307,13 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
         vec mulliken_pop(wavy.get_ncen(), 0.0);
 
         size_t mu_begin = 0;
-        for (unsigned iat = 0; iat < wavy.get_ncen(); ++iat) {
+        for (unsigned iat = 0; iat < wavy.get_ncen(); iat++) {
             const atom A = wavy.get_atoms()[iat];
 
             // determine how many AOs belong to this atom (use contracted shells, not primitives!)
             size_t nAO_A = 0;
             int prim = 0;
-            for (size_t sh = 0; sh < A.get_shellcount().size(); ++sh) {
+            for (size_t sh = 0; sh < A.get_shellcount().size(); sh++) {
                 int l = A.get_basis_set_entry(prim).get_type() - 1;
                 nAO_A += size_t(2 * l + 1);
                 prim += A.get_shellcount()[sh];
@@ -321,9 +321,9 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
             size_t mu_end = mu_begin + nAO_A;
 
             double GA = 0.0;
-            for (size_t m = mu_begin; m < mu_end; ++m) {
+            for (size_t m = mu_begin; m < mu_end; m++) {
                 double diag_PS = 0.0;
-                for (size_t n = 0; n < nao; ++n)
+                for (size_t n = 0; n < nao; n++)
                     diag_PS += dm(m, n) * eri2c_ref(n, m);
                 GA += diag_PS;
             }
