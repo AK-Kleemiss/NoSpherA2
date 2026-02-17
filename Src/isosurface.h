@@ -38,12 +38,12 @@ public:
     double calc_area() const {
         d3 a = { v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2] };
         d3 b = { v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2] };
-        return 0.5 * array_length(cross(a, b));
+        return 0.5 * array_length(vec_cross(a, b));
     };
     double calc_inner_volume() const {
         d3 a = { v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2] };
         d3 b = { v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2] };
-        return a_dot(cross(b, a), v1) / 6.;
+        return vec_dot(vec_cross(b, a), v1) / 6.;
     };
     d3 calc_center() const {
         return { (v1[0] + v2[0] + v3[0]) / 3., (v1[1] + v2[1] + v3[1]) / 3., (v1[2] + v2[2] + v3[2]) / 3. };

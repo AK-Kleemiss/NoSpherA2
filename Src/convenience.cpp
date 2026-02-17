@@ -172,7 +172,11 @@ void copy_file(std::filesystem::path& from, std::filesystem::path& to)
     dest.close();
 };
 
-d3 cross(const d3& a, const d3& b)
+d3 vec_diff(const d3& a, const d3& b) {
+    return { a[0] - b[0], a[1] - b[1], a[2] - b[2] };
+};
+
+d3 vec_cross(const d3& a, const d3& b)
 {
     return {
         a[1] * b[2] - a[2] * b[1],
@@ -180,7 +184,7 @@ d3 cross(const d3& a, const d3& b)
         a[0] * b[1] - a[1] * b[0] };
 }
 
-double a_dot(const d3& a, const d3& b)
+double vec_dot(const d3& a, const d3& b)
 {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 };
@@ -1841,8 +1845,9 @@ void options::digest_options()
             properties.eli = true;
         else if (temp == "-elf")
             properties.elf = true;
-        else if (temp == "-equi_bench") {
-            exit(0);
+        else if (temp == "-embis" || temp == "-EMBIS")
+        {
+            partition_type = PartitionType::EMBIS;
         }
         else if (temp == "-esp")
             properties.esp = true;

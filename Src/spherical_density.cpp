@@ -505,37 +505,17 @@ double Thakkar::get_interpolated_density(const double& dist) {
 
 MBIS_Atom::MBIS_Atom(const int g_atom_number, const vec& g_sig, const vec& g_pop)
 {
-    nex = NULL;
-    _first_ex = 0;
-    ns = NULL;
-    np = NULL;
-    nd = NULL;
-    nf = NULL;
-    occ = NULL;
-    n = NULL;
-    z = NULL;
-    c = NULL;
-    _prev_coef = 0;
     this->sig = g_sig;
     this->pop = g_pop;
     atomic_number = g_atom_number;
     charge = 0;
 };
-MBIS_Atom::MBIS_Atom() : Spherical_Atom()
+MBIS_Atom::MBIS_Atom()
 {
-    nex = NULL;
-    _first_ex = 0;
-    ns = NULL;
-    np = NULL;
-    nd = NULL;
-    nf = NULL;
-    occ = NULL;
-    n = NULL;
-    z = NULL;
-    c = NULL;
-    _prev_coef = 0;
     sig = {};
     pop = {};
+    atomic_number = 1;
+    charge = 0;
 };
 
 const double MBIS_Atom::get_radial_density(const double& dist)
@@ -574,6 +554,44 @@ double MBIS_Atom::get_interpolated_density(const double& dist) {
     if (result < 1E-16)
         return 0;
     return result;
+};
+
+EMBIS_Atom::EMBIS_Atom(const int g_atom_number, const vec2& g_alpha, const vec& g_pop)
+{
+    this->alpha = g_alpha;
+    this->pop = g_pop;
+    atomic_number = g_atom_number;
+    charge = 0;
+    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
+        sqrt_det.emplace_back(sqrt(alpha[m][0] * alpha[m][4] * alpha[m][8] -
+            alpha[m][0] * alpha[m][5] * alpha[m][5] -
+            alpha[m][4] * alpha[m][2] * alpha[m][2] -
+            alpha[m][8] * alpha[m][1] * alpha[m][1] +
+            2 * alpha[m][1] * alpha[m][2] * alpha[m][5]));
+
+};
+EMBIS_Atom::EMBIS_Atom()
+{
+    alpha = {};
+    pop = {};
+    sqrt_det = {};
+    atomic_number = 1;
+    charge = 0;
+};
+const double EMBIS_Atom::get_density(const d3& pos) const
+{
+    double Rho = 0.0, g = 0.0;
+    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
+    {
+        g = sqrt(alpha[m][0] * pos[0] * pos[0] +
+            alpha[m][4] * pos[1] * pos[1] +
+            alpha[m][8] * pos[2] * pos[2] +
+            2 * alpha[m][1] * pos[0] * pos[1] +
+            2 * alpha[m][2] * pos[0] * pos[2] +
+            2 * alpha[m][5] * pos[1] * pos[2]);
+        Rho += pop[m] * constants::INV_EIGHT_PI * sqrt_det[m] * exp(-g);
+    }
+    return Rho;
 };
 
 Thakkar_Anion::Thakkar_Anion(int g_atom_number) : Thakkar(g_atom_number)

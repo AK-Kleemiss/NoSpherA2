@@ -141,11 +141,13 @@ const double array_length(const array& in, const array& in2)
     return sqrt(sum);
 }
 
+d3 vec_diff(const d3& a, const d3& b);
+
 // Function to compute cross product
-d3 cross(const d3& a, const d3& b);
+d3 vec_cross(const d3& a, const d3& b);
 
 // Function to compute dot product
-double a_dot(const d3& a, const d3& b);
+double vec_dot(const d3& a, const d3& b);
 
 constexpr const std::complex<double> c_one(0, 1.0);
 
@@ -520,7 +522,7 @@ private:
     double exp, coefficient;
     double norm_const = -10;
     double exp_l_plus_3_2 = -10;
-	double normalized_coefficient = -10;
+    double normalized_coefficient = -10;
 
 public:
     void normalize()

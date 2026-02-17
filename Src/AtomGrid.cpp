@@ -732,8 +732,8 @@ std::pair<vec2, vec> get_shalpha_shpop(const int& atom_type) {
         break;
     case 1:
         shalpha[0][0] = pow(2.0 * atom_type, 2);
-		shalpha[0][4] = pow(2.0 * atom_type, 2);
-		shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shalpha[0][4] = pow(2.0 * atom_type, 2);
+        shalpha[0][8] = pow(2.0 * atom_type, 2);
         shpop[0] = atom_type;
         break;
     case 2:
@@ -820,7 +820,7 @@ std::pair<vec2, vec> get_shalpha_shpop(const int& atom_type) {
         shalpha[4][0] = pow(2 * pow(atom_type, 0.8), 2);
         shalpha[4][4] = pow(2 * pow(atom_type, 0.8), 2);
         shalpha[4][8] = pow(2 * pow(atom_type, 0.8), 2);
-		shpop[4] = 18;
+        shpop[4] = 18;
         shalpha[5][0] = 4.0;
         shalpha[5][4] = 4.0;
         shalpha[5][8] = 4.0;
@@ -842,7 +842,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     const ivec& num_grid_points,
     const bool debug)
 {
-	using sp_vec = std::vector<std::pair<vec, vec>>;
+    using sp_vec = std::vector<std::pair<vec, vec>>;
     auto atoms = wavy.get_atoms();
     vec charges(atoms.size(), 0.0);
     vec last_charges(atoms.size(), 0.0);
@@ -863,8 +863,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         for (int i = 0; i < wavy.get_ncen(); i++) {
             const int end = num_grid_points[i];
             //Assuming 3 is the quadrature weight and 7 is the electron density 
-			const double* b_weight = grid[i][5].data();
-			const double* dens = grid[i][7].data();
+            const double* b_weight = grid[i][5].data();
+            const double* dens = grid[i][7].data();
 
 #pragma omp parallel
             {
@@ -904,7 +904,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                         nshell = constants::MBIS_function[wavy.get_atom_charge(j)];
                         for (shell = 0; shell < nshell; shell++) {
                             r0s = rho0shell[j][shell];
-                            if (r0s == 0) 
+                            if (r0s == 0)
                                 continue;
                             temp_res = density * r0s / rho0;
                             local[j].first[shell] += temp_res * dists[j];
@@ -962,7 +962,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     const ivec& num_grid_points,
     const bool debug)
 {
-	using sp_vec = std::vector<std::pair<vec2, vec>>;
+    using sp_vec = std::vector<std::pair<vec2, vec>>;
     const double crit = 0.001;
     auto atoms = wavy.get_atoms();
     vec charges(atoms.size(), 0.0);
@@ -978,7 +978,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
             std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), vec(9, 0.0));
             std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
         }
-        it == 0 ? std::cout << "Starting MBIS iterations..." << std::endl : std::cout << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
+        it == 0 ? std::cout << "Starting EMBIS iterations..." << std::endl : std::cout << "EMBIS iteration: " << it << " max change: " << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
         for (int i = 0; i < wavy.get_ncen(); i++) {
             const int end = num_grid_points[i];
@@ -1004,7 +1004,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     for (j = 0; j < wavy.get_ncen(); j++) {
                         std::fill(rho0shell[j].begin(), rho0shell[j].end(), 0.0);
                         //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-                        dx[j] = {grid[i][0][point] - atoms[j].get_coordinate(0),
+                        dx[j] = { grid[i][0][point] - atoms[j].get_coordinate(0),
                             grid[i][1][point] - atoms[j].get_coordinate(1),
                             grid[i][2][point] - atoms[j].get_coordinate(2) };
                         dists.emplace_back(array_length(dx[j]));
@@ -1037,7 +1037,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                             r0s = rho0shell[j][shell];
                             if (r0s == 0)
                                 continue;
-                            g = 1.0/ sqrt(copy_of_input[j].first[shell][0] * dx[j][0] * dx[j][0] +
+                            g = 1.0 / sqrt(copy_of_input[j].first[shell][0] * dx[j][0] * dx[j][0] +
                                 copy_of_input[j].first[shell][4] * dx[j][1] * dx[j][1] +
                                 copy_of_input[j].first[shell][8] * dx[j][2] * dx[j][2] +
                                 2 * copy_of_input[j].first[shell][1] * dx[j][0] * dx[j][1] +
@@ -1064,7 +1064,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     for (shell = 0; shell < nshell; shell++) {
 #pragma omp critical
                         {
-							for (int n = 0; n < 9; n++) {
+                            for (int n = 0; n < 9; n++) {
                                 sig_pop_vector[j].first[shell][n] += local[j].first[shell][n];
                             }
                             sig_pop_vector[j].second[shell] += local[j].second[shell];
@@ -1077,14 +1077,14 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 
         for (int i = 0; i < wavy.get_ncen(); i++) {
             for (int shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(i)]; shell++) {
-                double det = 1/(sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][8] -
+                double det = 1 / (sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][8] -
                     sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][5] * sig_pop_vector[i].first[shell][5] -
                     sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][2] -
                     sig_pop_vector[i].first[shell][8] * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][1] +
                     2 * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][5]);
-                if (det < 1E-14) 
+                if (det < 1E-14)
                     continue;
-				auto sigmas = sig_pop_vector[i].first[shell];
+                auto sigmas = sig_pop_vector[i].first[shell];
                 //                0   1   2   3   4   5   6   7   8
                 // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
                 sig_pop_vector[i].first[shell][0] = (sigmas[4] * sigmas[8] - sigmas[5] * sigmas[5]) * det;
@@ -1098,7 +1098,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                 sig_pop_vector[i].first[shell][7] = sig_pop_vector[i].first[shell][5];
 
                 if (sig_pop_vector[i].second[shell] != 0)
-					for (int n = 0; n < 9; n++)
+                    for (int n = 0; n < 9; n++)
                         sig_pop_vector[i].first[shell][n] *= sig_pop_vector[i].second[shell];
                 for (int n = 0; n < 9; n++)
                     varsig = std::max(varsig, std::abs(sig_pop_vector[i].first[shell][n] - copy_of_input[i].first[shell][n]));
@@ -1109,7 +1109,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                 std::cout << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
         }
         if (varmax < crit || varsig < crit) {
-            std::cout << "MBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
+            std::cout << "EMBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
             std::cout << "Promolecular charges:\n";
             for (int i = 0; i < wavy.get_ncen(); i++) {
                 std::cout << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
@@ -1120,7 +1120,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         last_charges = charges;
 
     }
-    std::cout << "MBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
+    std::cout << "EMBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
     return sig_pop_vector;
 }
 

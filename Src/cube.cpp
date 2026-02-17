@@ -636,7 +636,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     }
 
     // Compute volume of the unit cell
-    const d3 crossProduct = cross(cell_vectors[1], cell_vectors[2]);
+    const d3 crossProduct = vec_cross(cell_vectors[1], cell_vectors[2]);
     const double volume = fabs(dot_(cell_vectors[0], crossProduct));
     std::cout << "Volume: " << volume << std::endl;
     const int grid_points = size[0] * size[1] * size[2];
@@ -645,9 +645,9 @@ double cube::ewald_sum(const int kMax, const double conv) {
 
     // Compute reciprocal lattice vectors
     std::array<d3, 3> reciprocalLattice = {
-        cross(cell_vectors[1], cell_vectors[2]),
-        cross(cell_vectors[2], cell_vectors[0]),
-        cross(cell_vectors[0], cell_vectors[1])
+        vec_cross(cell_vectors[1], cell_vectors[2]),
+        vec_cross(cell_vectors[2], cell_vectors[0]),
+        vec_cross(cell_vectors[0], cell_vectors[1])
     };
     for (auto& vec : reciprocalLattice) {
         for (double& x : vec) x *= 2 * constants::PI / volume;

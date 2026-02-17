@@ -19,7 +19,7 @@ double make_sphericals(
     const double lincr = log(incr);
     vector<AtomType> sphericals; // sphericals is a vector that will store objects of type AtomType.
     dens.clear();
-	dist.clear();
+    dist.clear();
     for (int i = 0; i < atom_type_list.size(); i++) {
         //If we are AtomType == Thakkar, we jsut give the atomic number, if we are AtomType == MBIS_Atom, we give the atomic number and the pop and sig vectors for that atom
         if constexpr (std::is_same_v<AtomType, Thakkar>) {
@@ -240,12 +240,22 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
     }
 
     if (config_.partition_type == PartitionType::MBIS || config_.debug || config_.all_charges) {
-        // This could lead to trouble/problems if Hirshfeld and MBIS are calculated for all cahrges... be aware!
-        calculateNonSphericalDensities(wave, unit_cell);
-        addTimingPoint("WFN evaluation on grid");
+        if (!non_spherical_densities_calculated_) {
+            calculateNonSphericalDensities(wave, unit_cell);
+            addTimingPoint("WFN evaluation on grid");
+        }
 
         calculateMBISWeights(wave, unit_cell, atom_list);
         addTimingPoint("MBIS Weights");
+    }
+
+    if (config_.partition_type == PartitionType::EMBIS || config_.debug || config_.all_charges) {
+        if (!non_spherical_densities_calculated_) {
+            calculateNonSphericalDensities(wave, unit_cell);
+            addTimingPoint("WFN evaluation on grid");
+        }
+        calculateEMBISWeights(wave, unit_cell, atom_list);
+        addTimingPoint("EMBIS Weights");
     }
 
     // Prune grid based on cutoff criteria
@@ -806,7 +816,7 @@ void GridManager::calculateSphericalDensities(
         complete_type_list = identifyAtomTypes(wave, fake_needs_grid);
     else
         //
-        for(int i=0; i<wave.get_ncen(); i++)
+        for (int i = 0; i < wave.get_ncen(); i++)
             complete_type_list.emplace_back(wave.get_atom_charge(i));
 
     if (config_.debug) {
@@ -826,12 +836,12 @@ void GridManager::calculateSphericalDensities(
     if (sig_pop.size() == 0) {
         lincr_ = make_sphericals<Thakkar>(radial_density_, radial_distances_, complete_type_list,
             std::cout, sig_pop, config_.debug, 1.005, 1.0E-7, config_.accuracy);
-		start_dist_ = 1.0E-7;
+        start_dist_ = 1.0E-7;
     }
     else {
         lincr_ = make_sphericals<MBIS_Atom>(radial_density_, radial_distances_, complete_type_list,
             std::cout, sig_pop, config_.debug, 1.0025, 1.0E-8, config_.accuracy);
-		start_dist_ = 1.0E-8;  // MBIS_Atom can have very steep densities near the nucleus, so we need to start closer to zero
+        start_dist_ = 1.0E-8;  // MBIS_Atom can have very steep densities near the nucleus, so we need to start closer to zero
     }
     err_checkf(lincr_ != -1000, "error during creations of sphericals", std::cout);
 
@@ -1004,9 +1014,42 @@ void GridManager::calculateMBISWeights(const WFN& wave, const cell& unit_cell, c
 void GridManager::calculateEMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list) {
     vec2 single_spherical_density, combined_spherical_density;
     const std::vector<std::pair<vec2, vec>> sig_pop = make_EMBIS_tensors(wave, grid_data_.atomic_grids, grid_data_.num_points_per_atom);
-    //calculateSphericalDensities(wave, unit_cell, atom_list, single_spherical_density, combined_spherical_density, sig_pop);
 
-    //We will need to do the weights differently form here....
+    single_spherical_density.resize(grid_data_.atomic_grids.size());
+    combined_spherical_density.resize(grid_data_.atomic_grids.size());
+
+    for (int g = 0; g < grid_data_.atomic_grids.size(); g++) {
+        const int num_points = grid_data_.num_points_per_atom[g];
+        single_spherical_density[g].resize(num_points, 0.0);
+        combined_spherical_density[g].resize(num_points, 0.0);
+    }
+
+    // For each atom
+    for (int atom_idx = 0; atom_idx < wave.get_ncen(); atom_idx++) {
+        const d3 ax = wave.get_atom_pos(atom_idx);
+
+        EMBIS_Atom at(wave.get_atom_charge(atom_idx), sig_pop[atom_idx].first, sig_pop[atom_idx].second);
+        // Add this atom's promolecule density contribution to all grids
+        for (int g = 0; g < grid_data_.atomic_grids.size(); g++) {
+            int g_to_atom_idx = atom_list[g];
+            const int num_points = grid_data_.num_points_per_atom[g];
+
+#pragma omp parallel for
+            for (int p = 0; p < num_points; p++) {
+
+                const d3 dist = vec_diff(d3{ grid_data_.atomic_grids[g][GridData::GridIndex::X][p],
+                grid_data_.atomic_grids[g][GridData::GridIndex::Y][p],
+                grid_data_.atomic_grids[g][GridData::GridIndex::Z][p] }, ax);
+
+                const double density = at.get_density(dist);
+
+                if (atom_idx == g_to_atom_idx) {
+                    single_spherical_density[g][p] += density;
+                }
+                combined_spherical_density[g][p] += density;
+            }
+        }
+    }
 
     if (config_.debug) {
         std::cout << "GridManager: Spherical densities calculated, calculating Hirshfeld weights..." << std::endl;
@@ -1050,7 +1093,7 @@ void GridManager::calculateNonSphericalDensities(const WFN& wave, const cell& un
             }
         }
     }
-	non_spherical_densities_calculated_ = true;
+    non_spherical_densities_calculated_ = true;
 }
 
 vec GridManager::evaluateFunctionOnGrid(const vec2& grid_points, std::function<double(double, double, double)> func) const {
