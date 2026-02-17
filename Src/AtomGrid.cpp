@@ -721,23 +721,138 @@ std::pair<vec, vec> get_shsig_shpop(const int& atom_type) {
     return std::make_pair(shsig, shpop);
 }
 
+std::pair<vec2, vec> get_shalpha_shpop(const int& atom_type) {
+    // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
+    vec2 shalpha(constants::MBIS_function[atom_type], vec(9, 0.0));
+    vec shpop(constants::MBIS_function[atom_type], 0.0);
+
+    switch (constants::MBIS_function[atom_type]) {
+    case 0:
+        err_not_impl_f("MBIS does not work with ghost atoms. Please dont do that to me!", std::cout);
+        break;
+    case 1:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+		shalpha[0][4] = pow(2.0 * atom_type, 2);
+		shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shpop[0] = atom_type;
+        break;
+    case 2:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][4] = pow(2.0 * atom_type, 2);
+        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shpop[0] = 2;
+        shalpha[1][0] = 4.0;
+        shalpha[1][4] = 4.0;
+        shalpha[1][8] = 4.0;
+        shpop[1] = atom_type - 2;
+        break;
+    case 3:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][4] = pow(2.0 * atom_type, 2);
+        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shpop[0] = 2;
+        shalpha[1][0] = pow(2.0 * sqrt(atom_type), 2);
+        shalpha[1][4] = pow(2.0 * sqrt(atom_type), 2);
+        shalpha[1][8] = pow(2.0 * sqrt(atom_type), 2);
+        shpop[1] = 8;
+        shalpha[2][0] = 4.0;
+        shalpha[2][4] = 4.0;
+        shalpha[2][8] = 4.0;
+        shpop[2] = atom_type - 10;
+        break;
+    case 4:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][4] = pow(2.0 * atom_type, 2);
+        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shpop[0] = 2;
+        shalpha[1][0] = pow(2 * pow(atom_type, constants::c_23), 2);
+        shalpha[1][4] = pow(2 * pow(atom_type, constants::c_23), 2);
+        shalpha[1][8] = pow(2 * pow(atom_type, constants::c_23), 2);
+        shpop[1] = 8;
+        shalpha[2][0] = pow(2 * pow(atom_type, constants::c_13), 2);
+        shalpha[2][4] = pow(2 * pow(atom_type, constants::c_13), 2);
+        shalpha[2][8] = pow(2 * pow(atom_type, constants::c_13), 2);
+        shpop[2] = 8;
+        shalpha[3][0] = 4.0;
+        shalpha[3][4] = 4.0;
+        shalpha[3][8] = 4.0;
+        shpop[3] = atom_type - 18;
+        break;
+    case 5:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][4] = pow(2.0 * atom_type, 2);
+        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shpop[0] = 2;
+        shalpha[1][0] = pow(2 * pow(atom_type, 0.25), 2);
+        shalpha[1][4] = pow(2 * pow(atom_type, 0.25), 2);
+        shalpha[1][8] = pow(2 * pow(atom_type, 0.25), 2);
+        shpop[1] = 8;
+        shalpha[2][0] = pow(2 * pow(atom_type, 0.5), 2);
+        shalpha[2][4] = pow(2 * pow(atom_type, 0.5), 2);
+        shalpha[2][8] = pow(2 * pow(atom_type, 0.5), 2);
+        shpop[2] = 8;
+        shalpha[3][0] = pow(2 * pow(atom_type, 0.75), 2);
+        shalpha[3][4] = pow(2 * pow(atom_type, 0.75), 2);
+        shalpha[3][8] = pow(2 * pow(atom_type, 0.75), 2);
+        shpop[3] = 18;
+        shalpha[4][0] = 4.0;
+        shalpha[4][4] = 4.0;
+        shalpha[4][8] = 4.0;
+        shpop[4] = atom_type - 36;
+        break;
+    case 6:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][4] = pow(2.0 * atom_type, 2);
+        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shpop[0] = 2;
+        shalpha[1][0] = pow(2 * pow(atom_type, 0.2), 2);
+        shalpha[1][4] = pow(2 * pow(atom_type, 0.2), 2);
+        shalpha[1][8] = pow(2 * pow(atom_type, 0.2), 2);
+        shpop[1] = 8;
+        shalpha[2][0] = pow(2 * pow(atom_type, 0.4), 2);
+        shalpha[2][4] = pow(2 * pow(atom_type, 0.4), 2);
+        shalpha[2][8] = pow(2 * pow(atom_type, 0.4), 2);
+        shpop[2] = 8;
+        shalpha[3][0] = pow(2 * pow(atom_type, 0.6), 2);
+        shalpha[3][4] = pow(2 * pow(atom_type, 0.6), 2);
+        shalpha[3][8] = pow(2 * pow(atom_type, 0.6), 2);
+        shpop[3] = 18;
+        shalpha[4][0] = pow(2 * pow(atom_type, 0.8), 2);
+        shalpha[4][4] = pow(2 * pow(atom_type, 0.8), 2);
+        shalpha[4][8] = pow(2 * pow(atom_type, 0.8), 2);
+		shpop[4] = 18;
+        shalpha[5][0] = 4.0;
+        shalpha[5][4] = 4.0;
+        shalpha[5][8] = 4.0;
+        shpop[5] = atom_type - 54;
+        break;
+    default:
+        err_not_impl_f("MBIS does not work with more than 6 shells. Please dont do that to me!", std::cout);
+        break;
+    }
+
+    return std::make_pair(shalpha, shpop);
+}
+
 // grids here are the total_grid in the SF calculator functions, just as a not to myself and future me
+//Implemented according to the modified Multiwfn version by FJR and Anker
 std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     const WFN& wavy,
     const vec3& grid,
     const ivec& num_grid_points,
     const bool debug)
 {
+	using sp_vec = std::vector<std::pair<vec, vec>>;
     auto atoms = wavy.get_atoms();
     vec charges(atoms.size(), 0.0);
     vec last_charges(atoms.size(), 0.0);
-    std::vector<std::pair<vec, vec>> sig_pop_vector;
+    sp_vec sig_pop_vector;
     for (auto& atom : atoms) {
         sig_pop_vector.emplace_back(get_shsig_shpop(atom.get_charge()));
     }
     const double crit = 0.001;
-    std::vector<std::pair<vec, vec>> copy_of_input = sig_pop_vector;
-    double varmax = 0, rho0 = 0, varsig = 0;
+    sp_vec copy_of_input = sig_pop_vector;
+    double varmax = 0, varsig = 0;
     for (size_t it = 0; it < 2000; it++) {
         for (int j = 0; j < wavy.get_ncen(); j++) {
             std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
@@ -747,7 +862,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         varmax = 0.0, varsig = 0.0;
         for (int i = 0; i < wavy.get_ncen(); i++) {
             const int end = num_grid_points[i];
-            //Assuming 5 is the becke weight and 7 is the electron density 
+            //Assuming 3 is the quadrature weight and 7 is the electron density 
 			const double* b_weight = grid[i][5].data();
 			const double* dens = grid[i][7].data();
 
@@ -757,7 +872,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval;
                 int j, shell, nshell;
                 d3 dx;
-                std::vector<std::pair<vec, vec>> local = sig_pop_vector;
+                sp_vec local = sig_pop_vector;
                 for (j = 0; j < wavy.get_ncen(); j++) {
                     std::fill(local[j].first.begin(), local[j].first.end(), 0.0);
                     std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
@@ -798,9 +913,9 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                     }
                 }
 
-                for (int j = 0; j < wavy.get_ncen(); j++) {
+                for (j = 0; j < wavy.get_ncen(); j++) {
                     nshell = constants::MBIS_function[wavy.get_atom_charge(j)];
-                    for (int shell = 0; shell < nshell; shell++) {
+                    for (shell = 0; shell < nshell; shell++) {
 #pragma omp critical
                         {
                             sig_pop_vector[j].first[shell] += local[j].first[shell];
@@ -825,6 +940,180 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         }
         if (varmax < crit || varsig < crit) {
             std::cout << "MBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
+            std::cout << "Promolecular charges:\n";
+            for (int i = 0; i < wavy.get_ncen(); i++) {
+                std::cout << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
+            }
+            return sig_pop_vector;
+        }
+        copy_of_input = sig_pop_vector;
+        last_charges = charges;
+
+    }
+    std::cout << "MBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
+    return sig_pop_vector;
+}
+
+// grids here are the total_grid in the SF calculator functions, just as a not to myself and future me
+//Implemented according to the modified Multiwfn version by FJR and Anker
+std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
+    const WFN& wavy,
+    const vec3& grid,
+    const ivec& num_grid_points,
+    const bool debug)
+{
+	using sp_vec = std::vector<std::pair<vec2, vec>>;
+    const double crit = 0.001;
+    auto atoms = wavy.get_atoms();
+    vec charges(atoms.size(), 0.0);
+    vec last_charges(atoms.size(), 0.0);
+    double varmax = 0, varsig = 0;
+    sp_vec sig_pop_vector;
+    for (auto& atom : atoms) {
+        sig_pop_vector.emplace_back(get_shalpha_shpop(atom.get_charge()));
+    }
+    sp_vec copy_of_input = sig_pop_vector;
+    for (size_t it = 0; it < 2000; it++) {
+        for (int j = 0; j < wavy.get_ncen(); j++) {
+            std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), vec(9, 0.0));
+            std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
+        }
+        it == 0 ? std::cout << "Starting MBIS iterations..." << std::endl : std::cout << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
+        varmax = 0.0, varsig = 0.0;
+        for (int i = 0; i < wavy.get_ncen(); i++) {
+            const int end = num_grid_points[i];
+            //Assuming 5 is the becke weight and 7 is the electron density 
+            const double* b_weight = grid[i][5].data();
+            const double* dens = grid[i][7].data();
+
+#pragma omp parallel
+            {
+                vec2 rho0shell(wavy.get_ncen(), vec(6, 0.0));
+                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
+                int j, shell, nshell;
+                std::vector<d3> dx(wavy.get_ncen());
+                sp_vec local = sig_pop_vector;
+                for (j = 0; j < wavy.get_ncen(); j++) {
+                    std::fill(local[j].first.begin(), local[j].first.end(), vec(9, 0.0));
+                    std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
+                }
+#pragma omp for
+                for (int point = 0; point < end; point++) {
+                    rho0 = 0.0;
+                    vec dists;
+                    for (j = 0; j < wavy.get_ncen(); j++) {
+                        std::fill(rho0shell[j].begin(), rho0shell[j].end(), 0.0);
+                        //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
+                        dx[j] = {grid[i][0][point] - atoms[j].get_coordinate(0),
+                            grid[i][1][point] - atoms[j].get_coordinate(1),
+                            grid[i][2][point] - atoms[j].get_coordinate(2) };
+                        dists.emplace_back(array_length(dx[j]));
+                        if (dists[j] > constants::far_away)
+                            continue;
+                        for (shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(j)]; shell++) {
+                            // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
+                            det = sqrt(copy_of_input[j].first[shell][0] * copy_of_input[j].first[shell][4] * copy_of_input[j].first[shell][8] -
+                                copy_of_input[j].first[shell][0] * copy_of_input[j].first[shell][5] * copy_of_input[j].first[shell][5] -
+                                copy_of_input[j].first[shell][4] * copy_of_input[j].first[shell][2] * copy_of_input[j].first[shell][2] -
+                                copy_of_input[j].first[shell][8] * copy_of_input[j].first[shell][1] * copy_of_input[j].first[shell][1] +
+                                2 * copy_of_input[j].first[shell][1] * copy_of_input[j].first[shell][2] * copy_of_input[j].first[shell][5]);
+                            g = sqrt(copy_of_input[j].first[shell][0] * dx[j][0] * dx[j][0] +
+                                copy_of_input[j].first[shell][4] * dx[j][1] * dx[j][1] +
+                                copy_of_input[j].first[shell][8] * dx[j][2] * dx[j][2] +
+                                2 * copy_of_input[j].first[shell][1] * dx[j][0] * dx[j][1] +
+                                2 * copy_of_input[j].first[shell][2] * dx[j][0] * dx[j][2] +
+                                2 * copy_of_input[j].first[shell][5] * dx[j][1] * dx[j][2]);
+                            tmp = copy_of_input[j].second[shell] * constants::INV_EIGHT_PI * det * exp(-g);
+                            if (abs(tmp) < 1e-20)
+                                continue;
+                            rho0shell[j][shell] = tmp;
+                            rho0 += tmp;
+                        }
+                    }
+                    density = b_weight[point] * dens[point];
+                    for (j = 0; j < wavy.get_ncen(); j++) {
+                        nshell = constants::MBIS_function[wavy.get_atom_charge(j)];
+                        for (shell = 0; shell < nshell; shell++) {
+                            r0s = rho0shell[j][shell];
+                            if (r0s == 0)
+                                continue;
+                            g = 1.0/ sqrt(copy_of_input[j].first[shell][0] * dx[j][0] * dx[j][0] +
+                                copy_of_input[j].first[shell][4] * dx[j][1] * dx[j][1] +
+                                copy_of_input[j].first[shell][8] * dx[j][2] * dx[j][2] +
+                                2 * copy_of_input[j].first[shell][1] * dx[j][0] * dx[j][1] +
+                                2 * copy_of_input[j].first[shell][2] * dx[j][0] * dx[j][2] +
+                                2 * copy_of_input[j].first[shell][5] * dx[j][1] * dx[j][2]);
+                            temp_res = density * r0s / rho0;
+                            // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
+                            local[j].first[shell][0] += temp_res * dx[j][0] * dx[j][0] * g;
+                            local[j].first[shell][4] += temp_res * dx[j][1] * dx[j][1] * g;
+                            local[j].first[shell][8] += temp_res * dx[j][2] * dx[j][2] * g;
+                            local[j].first[shell][1] += temp_res * dx[j][0] * dx[j][1] * g;
+                            local[j].first[shell][2] += temp_res * dx[j][0] * dx[j][2] * g;
+                            local[j].first[shell][5] += temp_res * dx[j][1] * dx[j][2] * g;
+                            local[j].first[shell][3] = local[j].first[shell][1];
+                            local[j].first[shell][6] = local[j].first[shell][2];
+                            local[j].first[shell][7] = local[j].first[shell][5];
+                            local[j].second[shell] += temp_res;
+                        }
+                    }
+                }
+
+                for (j = 0; j < wavy.get_ncen(); j++) {
+                    nshell = constants::MBIS_function[wavy.get_atom_charge(j)];
+                    for (shell = 0; shell < nshell; shell++) {
+#pragma omp critical
+                        {
+							for (int n = 0; n < 9; n++) {
+                                sig_pop_vector[j].first[shell][n] += local[j].first[shell][n];
+                            }
+                            sig_pop_vector[j].second[shell] += local[j].second[shell];
+                        }
+                    }
+                }
+            }
+        }
+        //back to the cycle main loop, we updated sig and pop based on information loss :)
+
+        for (int i = 0; i < wavy.get_ncen(); i++) {
+            for (int shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(i)]; shell++) {
+                double det = 1/(sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][8] -
+                    sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][5] * sig_pop_vector[i].first[shell][5] -
+                    sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][2] -
+                    sig_pop_vector[i].first[shell][8] * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][1] +
+                    2 * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][5]);
+                if (det < 1E-14) 
+                    continue;
+				auto sigmas = sig_pop_vector[i].first[shell];
+                //                0   1   2   3   4   5   6   7   8
+                // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
+                sig_pop_vector[i].first[shell][0] = (sigmas[4] * sigmas[8] - sigmas[5] * sigmas[5]) * det;
+                sig_pop_vector[i].first[shell][4] = (sigmas[0] * sigmas[8] - sigmas[2] * sigmas[2]) * det;
+                sig_pop_vector[i].first[shell][8] = (sigmas[0] * sigmas[4] - sigmas[3] * sigmas[3]) * det;
+                sig_pop_vector[i].first[shell][1] = (sigmas[2] * sigmas[5] - sigmas[3] * sigmas[8]) * det;
+                sig_pop_vector[i].first[shell][2] = (sigmas[1] * sigmas[5] - sigmas[2] * sigmas[4]) * det;
+                sig_pop_vector[i].first[shell][5] = (sigmas[2] * sigmas[1] - sigmas[0] * sigmas[5]) * det;
+                sig_pop_vector[i].first[shell][3] = sig_pop_vector[i].first[shell][1];
+                sig_pop_vector[i].first[shell][6] = sig_pop_vector[i].first[shell][2];
+                sig_pop_vector[i].first[shell][7] = sig_pop_vector[i].first[shell][5];
+
+                if (sig_pop_vector[i].second[shell] != 0)
+					for (int n = 0; n < 9; n++)
+                        sig_pop_vector[i].first[shell][n] *= sig_pop_vector[i].second[shell];
+                for (int n = 0; n < 9; n++)
+                    varsig = std::max(varsig, std::abs(sig_pop_vector[i].first[shell][n] - copy_of_input[i].first[shell][n]));
+            }
+            charges[i] = wavy.get_atom_charge(i) - vec_sum(sig_pop_vector[i].second) + wavy.get_atom_ECP_electrons(i);
+            varmax = std::max(varmax, std::abs(charges[i] - last_charges[i]));
+            if (debug)
+                std::cout << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
+        }
+        if (varmax < crit || varsig < crit) {
+            std::cout << "MBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
+            std::cout << "Promolecular charges:\n";
+            for (int i = 0; i < wavy.get_ncen(); i++) {
+                std::cout << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
+            }
             return sig_pop_vector;
         }
         copy_of_input = sig_pop_vector;

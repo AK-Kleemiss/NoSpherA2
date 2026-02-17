@@ -92,3 +92,9 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     const vec3& grid,
     const ivec& num_grid_points,
     const bool debug = false);
+
+std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
+    const WFN& wavy,
+    const vec3& grid,
+    const ivec& num_grid_points,
+    const bool debug = false);

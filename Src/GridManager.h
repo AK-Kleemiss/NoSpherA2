@@ -70,6 +70,7 @@ private:
     double lincr_ = 0.0;
     double start_dist_ = 1E-7;
     std::vector<std::tuple<std::string, _time_point>> timing_points_;
+	bool non_spherical_densities_calculated_ = false;
 
     // Internal helper methods
     void setupPrototypeGrids(const WFN& wave, const ivec& atom_types);
@@ -83,6 +84,7 @@ private:
     void calculateSphericalDensities(const WFN& wave, const cell& unit_cell, const ivec& atom_list, vec2& single_spherical_density, vec2& combined_spherical_density, std::vector<std::pair<vec, vec>> sig_pop = {});
     void calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
     void calculateMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
+    void calculateEMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
     void pruneGrid();
 
     void addTimingPoint(const std::string& label) {
