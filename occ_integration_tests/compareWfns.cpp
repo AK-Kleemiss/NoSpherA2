@@ -69,8 +69,8 @@ bool compare_Atoms(const std::vector<atom>& atoms1, const std::vector<atom>& ato
             fmt::print("[Atoms] ECP electrons (occ) differ, [1]: {}, [1]: {}. \n", atoms1[i].get_ECP_electrons(), atoms2[i].get_ECP_electrons());
             return false;
         }
-        auto coords1 = atoms1[i].get_coords();
-        auto coords2 = atoms2[i].get_coords();
+        auto coords1 = atoms1[i].get_pos();
+        auto coords2 = atoms2[i].get_pos();
         if (!compare_vectors(std::vector(coords1.begin(), coords1.end()),
             std::vector(coords2.begin(), coords2.end()),
             fmt::format("Atoms", i), VecSize(), 1e-11,true, false))
