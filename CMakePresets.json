@@ -23,7 +23,7 @@
       "hidden": true,
       "inherits": "base-options",
       "cacheVariables": {
-        "OpenMP_ROOT": "$(brew --prefix)/opt/libomp"
+        "OpenMP_ROOT": "$env{HOMEBREW_PREFIX}/opt/libomp"
       }
     },
     {
@@ -58,5 +58,17 @@
         "CMAKE_BUILD_TYPE": "Release"
       }
     }
+  ],
+  "buildPresets": [
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-release"
+    },
+    {
+      "name": "macos-debug",
+      "configurePreset": "macos-debug"
+    }
   ]
 }
+
+
