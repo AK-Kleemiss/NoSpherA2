@@ -24,10 +24,9 @@ double make_sphericals(
             sphericals.emplace_back(atom_type_list[i]);
         }
         else if constexpr (std::is_same_v<AtomType, MBIS_Atom>) {
-            int atom_type = atom_type_list[i];
             vec sig = pop_sig[i].first;
             vec pop = pop_sig[i].second;
-            sphericals.emplace_back(atom_type, sig, pop);
+            sphericals.emplace_back(atom_type_list[i], sig, pop);
         }
         else {
             err_not_impl_f("Unsupported AtomType in make_sphericals!", file);
@@ -805,7 +804,8 @@ void GridManager::calculateSphericalDensities(
         complete_type_list = identifyAtomTypes(wave, fake_needs_grid);
     else
         //
-        complete_type_list = atom_list;
+        for(int i=0; i<wave.get_ncen(); i++)
+            complete_type_list.emplace_back(wave.get_atom_charge(i));
 
     if (config_.debug) {
         std::cout << "GridManager: Calculating spherical densities..." << std::endl;
