@@ -19,21 +19,41 @@
       }
     },
     {
+      "name": "macos-base",
+      "hidden": true,
+      "inherits": "base-options",
+      "cacheVariables": {
+        "OpenMP_ROOT": "$(brew --prefix)/opt/libomp"
+      }
+    },
+    {
+      "name": "macos-debug",
+      "inherits": "macos-base",
+      "displayName": "macOS Debug (Clang)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "macos-release",
+      "inherits": "macos-base",
+      "displayName": "macOS release (Clang)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
       "name": "Debug",
       "inherits": "base-options",
       "displayName": "Debug (GCC/ccache)",
-      "binaryDir": "${sourceDir}/cmake-build-debug-gcc",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
-        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+        "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
       "name": "Release",
       "inherits": "base-options",
       "displayName": "Release (GCC)",
-      "binaryDir": "${sourceDir}/cmake-build-release-gcc",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }

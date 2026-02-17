@@ -6,7 +6,7 @@
 	url = https://github.com/metatensor/featomic
 [submodule "libcint"]
 	path = libcint
-	url = https://github.com/RealUranar/libcint.git
+	url = https://github.com/MilitaoLucas/libcintUranar
 [submodule "occ"]
 	path = occ
 	url = https://github.com/MilitaoLucas/occ.git
