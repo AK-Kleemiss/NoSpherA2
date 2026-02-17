@@ -23,11 +23,8 @@
       "displayName": "Windows Clang-CL (sccache)",
       "description": "Release build for Windows using clang-cl and lld-link",
       "inherits": "base-options",
-      "generator": "Ninja",
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      },
+      "architecture": "x64",
+      "toolset": "host=x64",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "clang-cl.exe",
