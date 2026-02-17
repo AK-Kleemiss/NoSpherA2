@@ -67,6 +67,7 @@ namespace constants
     constexpr double TWO_PI = 2 * PI;
     constexpr double FOUR_PI = 4 * PI;
     constexpr double EIGHT_PI = 8 * PI;
+	constexpr double INV_EIGHT_PI = 1.0 / EIGHT_PI;
     constexpr double C0 = SQRT2 * FOUR_PI;
     const double sqr_pi = sqrt(PI);
     constexpr double PI2 = PI * PI;

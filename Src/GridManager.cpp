@@ -824,9 +824,11 @@ void GridManager::calculateSphericalDensities(
     if (sig_pop.size() == 0)
         lincr_ = make_sphericals<Thakkar>(radial_density_, radial_distances_, complete_type_list,
             std::cout, sig_pop, config_.debug, 1.005, 1.0E-7, config_.accuracy);
-    else
+    else {
         lincr_ = make_sphericals<MBIS_Atom>(radial_density_, radial_distances_, complete_type_list,
-            std::cout, sig_pop, config_.debug, 1.005, 1.0E-7, config_.accuracy);
+            std::cout, sig_pop, config_.debug, 1.0025, 1.0E-8, config_.accuracy);
+		start_dist_ = 1.0E-8;  // MBIS_Atom can have very steep densities near the nucleus, so we need to start closer to zero
+    }
     err_checkf(lincr_ != -1000, "error during creations of sphericals", std::cout);
 
     single_spherical_density.resize(grid_data_.atomic_grids.size());
@@ -876,7 +878,7 @@ void GridManager::calculateSphericalDensities(
                     radial_distances_[type_idx],
                     dist,
                     lincr_,
-                    1.0E-7);
+                    start_dist_);
 
                 if (atom_idx == g_to_atom_idx) {
                     single_spherical_density[g][p] += density;
@@ -943,7 +945,7 @@ void GridManager::calculateSphericalDensities(
                                     radial_distances_[type_idx],
                                     dist,
                                     lincr_,
-                                    1.0E-7);
+                                    start_dist_);
 
                                 // Only add to total density for PBC (not to atom-specific density)
                                 combined_spherical_density[g][p] += density;

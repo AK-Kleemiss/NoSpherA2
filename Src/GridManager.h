@@ -68,6 +68,7 @@ private:
     vec2 radial_distances_;
     ivec atom_type_list_;
     double lincr_ = 0.0;
+    double start_dist_ = 1E-7;
     std::vector<std::tuple<std::string, _time_point>> timing_points_;
 
     // Internal helper methods

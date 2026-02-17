@@ -747,11 +747,15 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         varmax = 0.0, varsig = 0.0;
         for (int i = 0; i < wavy.get_ncen(); i++) {
             const int end = num_grid_points[i];
+            //Assuming 5 is the becke weight and 7 is the electron density 
+			const double* b_weight = grid[i][5].data();
+			const double* dens = grid[i][7].data();
+
 #pragma omp parallel
             {
                 vec2 rho0shell(wavy.get_ncen(), vec(6, 0.0));
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval;
-                int j, shell;
+                int j, shell, nshell;
                 d3 dx;
                 std::vector<std::pair<vec, vec>> local = sig_pop_vector;
                 for (j = 0; j < wavy.get_ncen(); j++) {
@@ -772,20 +776,21 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                         if (dists[j] > constants::far_away)
                             continue;
                         for (shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(j)]; shell++) {
-                            sigval = copy_of_input[j].first[shell];
-                            tmp = copy_of_input[j].second[shell] / (pow(sigval, 3) * constants::EIGHT_PI) * exp(-dists[j] / sigval);
+                            sigval = pow(copy_of_input[j].first[shell], -1);
+                            tmp = copy_of_input[j].second[shell] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-dists[j] * sigval);
                             if (abs(tmp) < 1e-20)
                                 continue;
                             rho0shell[j][shell] = tmp;
                             rho0 += tmp;
                         }
                     }
-                    //Assuming 5 is the becke weight and 7 is the electron density 
-                    density = grid[i][5][point] * grid[i][7][point];
+                    density = b_weight[point] * dens[point];
                     for (j = 0; j < wavy.get_ncen(); j++) {
-                        for (shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(j)]; shell++) {
+                        nshell = constants::MBIS_function[wavy.get_atom_charge(j)];
+                        for (shell = 0; shell < nshell; shell++) {
                             r0s = rho0shell[j][shell];
-                            if (r0s == 0) continue;
+                            if (r0s == 0) 
+                                continue;
                             temp_res = density * r0s / rho0;
                             local[j].first[shell] += temp_res * dists[j];
                             local[j].second[shell] += temp_res;
@@ -794,7 +799,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                 }
 
                 for (int j = 0; j < wavy.get_ncen(); j++) {
-                    for (int shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(j)]; shell++) {
+                    nshell = constants::MBIS_function[wavy.get_atom_charge(j)];
+                    for (int shell = 0; shell < nshell; shell++) {
 #pragma omp critical
                         {
                             sig_pop_vector[j].first[shell] += local[j].first[shell];

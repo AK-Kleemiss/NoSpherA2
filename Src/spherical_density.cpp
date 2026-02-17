@@ -538,10 +538,11 @@ MBIS_Atom::MBIS_Atom() : Spherical_Atom()
 
 const double MBIS_Atom::get_radial_density(const double& dist)
 {
-    double Rho = 0.0;
+    double Rho = 0.0, sigval = 0.0;
     for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
     {
-        Rho += pop[m] / (constants::EIGHT_PI * pow(sig[m], 3)) * exp(-dist / sig[m]);
+        sigval = 1.0 / sig[m];
+        Rho += pop[m] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-dist * sigval);
     }
     return Rho;
 };
