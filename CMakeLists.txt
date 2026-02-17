@@ -46,17 +46,44 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     if (NOT CONDA_ENV STREQUAL "base")
         option(USE_CUSTOM_ENV "Use a user provided environment for conda." ON)
     endif ()
-    set(MICROMAMBA_ENV_PATH ${CMAKE_BINARY_DIR}/environments/mambaenv CACHE STRING "Set the environment path.")
 endif()
 if (MSVC AND NOT ("${OCC_BUILD_TYPE}" STREQUAL "${CMAKE_BUILD_TYPE}"))
     message(FATAL_ERROR "Building OCC in a different mode than NoSpherA2 is not supported because MSVC containers have
             different sizes between Release and Debug builds.")
 endif ()
+find_package(Git QUIET)
+if(GIT_FOUND)
+  message(STATUS "Git found: initializing/updating submodules...")
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    RESULT_VARIABLE _git_submodule_result
+    OUTPUT_QUIET ERROR_QUIET
+  )
+  if(NOT _git_submodule_result EQUAL 0)
+    message(WARNING "git submodule update --init --recursive failed with exit code ${_git_submodule_result}")
+  endif()
+else()
+  message(STATUS "Git not found; skipping automatic git submodule initialization")
+endif()
+
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake")
-CPMUsePackageLock(package-lock.cmake)
+#include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/NOSTEST.cmake")
 add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
+
+# external dependencieso
+set(USE_SYSTEM_LIBCINT "ON")
+add_subdirectory(occ)
+add_subdirectory(mdspan)
+set(FEATOMIC_FETCH_METATENSOR "ON")
+set(BUILD_SHARED_LIBS "OFF")
+set(FEATOMIC_INSTALL_BOTH_STATIC_SHARED "OFF")
+set(FEATOMIC_USE_STATIC_METATENSOR "ON")
+add_subdirectory(featomic/featomic)
+add_subdirectory(libcint)
+
+
 
 add_subdirectory(Src)
 enable_testing()
