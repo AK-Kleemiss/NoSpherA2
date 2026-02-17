@@ -985,13 +985,11 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
             //Assuming 5 is the becke weight and 7 is the electron density 
             const double* b_weight = grid[i][5].data();
             const double* dens = grid[i][7].data();
-            const double* gx = grid[i][0].data(), * gy = grid[i][1].data(), * gz = grid[i][2].data();
 
 #pragma omp parallel
             {
                 vec2 rho0shell(wavy.get_ncen(), vec(6, 0.0));
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
-                double* alpha;
                 int j, shell, nshell;
                 std::vector<d3> dx(wavy.get_ncen());
                 sp_vec local = sig_pop_vector;
@@ -1004,29 +1002,27 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     rho0 = 0.0;
                     vec dists;
                     for (j = 0; j < wavy.get_ncen(); j++) {
+                        std::fill(rho0shell[j].begin(), rho0shell[j].end(), 0.0);
                         //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-                        dx[j] = { gx[point] - atoms[j].get_coordinate(0),
-                            gy[point] - atoms[j].get_coordinate(1),
-                            gz[point] - atoms[j].get_coordinate(2) };
+                        dx[j] = { grid[i][0][point] - atoms[j].get_coordinate(0),
+                            grid[i][1][point] - atoms[j].get_coordinate(1),
+                            grid[i][2][point] - atoms[j].get_coordinate(2) };
                         dists.emplace_back(array_length(dx[j]));
                         if (dists[j] > constants::far_away)
                             continue;
-                        std::fill(rho0shell[j].begin(), rho0shell[j].end(), 0.0);
-                        nshell = constants::MBIS_function[wavy.get_atom_charge(j)];
-                        for (shell = 0; shell < nshell; shell++) {
-                            alpha = copy_of_input[j].first[shell].data();
+                        for (shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(j)]; shell++) {
                             // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
-                            det = sqrt(alpha[0] * alpha[4] * alpha[8] -
-                                alpha[0] * alpha[5] * alpha[5] -
-                                alpha[4] * alpha[2] * alpha[2] -
-                                alpha[8] * alpha[1] * alpha[1] +
-                                2 * alpha[1] * alpha[2] * alpha[5]);
-                            g = sqrt(alpha[0] * dx[j][0] * dx[j][0] +
-                                alpha[4] * dx[j][1] * dx[j][1] +
-                                alpha[8] * dx[j][2] * dx[j][2] +
-                                2 * alpha[1] * dx[j][0] * dx[j][1] +
-                                2 * alpha[2] * dx[j][0] * dx[j][2] +
-                                2 * alpha[5] * dx[j][1] * dx[j][2]);
+                            det = sqrt(copy_of_input[j].first[shell][0] * copy_of_input[j].first[shell][4] * copy_of_input[j].first[shell][8] -
+                                copy_of_input[j].first[shell][0] * copy_of_input[j].first[shell][5] * copy_of_input[j].first[shell][5] -
+                                copy_of_input[j].first[shell][4] * copy_of_input[j].first[shell][2] * copy_of_input[j].first[shell][2] -
+                                copy_of_input[j].first[shell][8] * copy_of_input[j].first[shell][1] * copy_of_input[j].first[shell][1] +
+                                2 * copy_of_input[j].first[shell][1] * copy_of_input[j].first[shell][2] * copy_of_input[j].first[shell][5]);
+                            g = sqrt(copy_of_input[j].first[shell][0] * dx[j][0] * dx[j][0] +
+                                copy_of_input[j].first[shell][4] * dx[j][1] * dx[j][1] +
+                                copy_of_input[j].first[shell][8] * dx[j][2] * dx[j][2] +
+                                2 * copy_of_input[j].first[shell][1] * dx[j][0] * dx[j][1] +
+                                2 * copy_of_input[j].first[shell][2] * dx[j][0] * dx[j][2] +
+                                2 * copy_of_input[j].first[shell][5] * dx[j][1] * dx[j][2]);
                             tmp = copy_of_input[j].second[shell] * constants::INV_EIGHT_PI * det * exp(-g);
                             if (abs(tmp) < 1e-20)
                                 continue;
@@ -1041,25 +1037,23 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                             r0s = rho0shell[j][shell];
                             if (r0s == 0)
                                 continue;
-                            alpha = copy_of_input[j].first[shell].data();
-                            g = 1.0 / sqrt(alpha[0] * dx[j][0] * dx[j][0] +
-                                alpha[4] * dx[j][1] * dx[j][1] +
-                                alpha[8] * dx[j][2] * dx[j][2] +
-                                2 * alpha[1] * dx[j][0] * dx[j][1] +
-                                2 * alpha[2] * dx[j][0] * dx[j][2] +
-                                2 * alpha[5] * dx[j][1] * dx[j][2]);
+                            g = 1.0 / sqrt(copy_of_input[j].first[shell][0] * dx[j][0] * dx[j][0] +
+                                copy_of_input[j].first[shell][4] * dx[j][1] * dx[j][1] +
+                                copy_of_input[j].first[shell][8] * dx[j][2] * dx[j][2] +
+                                2 * copy_of_input[j].first[shell][1] * dx[j][0] * dx[j][1] +
+                                2 * copy_of_input[j].first[shell][2] * dx[j][0] * dx[j][2] +
+                                2 * copy_of_input[j].first[shell][5] * dx[j][1] * dx[j][2]);
                             temp_res = density * r0s / rho0;
-                            alpha = local[j].first[shell].data();
                             // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
-                            alpha[0] += temp_res * dx[j][0] * dx[j][0] * g;
-                            alpha[1] += temp_res * dx[j][0] * dx[j][1] * g;
-                            alpha[2] += temp_res * dx[j][0] * dx[j][2] * g;
-                            alpha[3] = local[j].first[shell][1];
-                            alpha[4] += temp_res * dx[j][1] * dx[j][1] * g;
-                            alpha[5] += temp_res * dx[j][1] * dx[j][2] * g;
-                            alpha[6] = local[j].first[shell][2];
-                            alpha[7] = local[j].first[shell][5];
-                            alpha[8] += temp_res * dx[j][2] * dx[j][2] * g;
+                            local[j].first[shell][0] += temp_res * dx[j][0] * dx[j][0] * g;
+                            local[j].first[shell][4] += temp_res * dx[j][1] * dx[j][1] * g;
+                            local[j].first[shell][8] += temp_res * dx[j][2] * dx[j][2] * g;
+                            local[j].first[shell][1] += temp_res * dx[j][0] * dx[j][1] * g;
+                            local[j].first[shell][2] += temp_res * dx[j][0] * dx[j][2] * g;
+                            local[j].first[shell][5] += temp_res * dx[j][1] * dx[j][2] * g;
+                            local[j].first[shell][3] = local[j].first[shell][1];
+                            local[j].first[shell][6] = local[j].first[shell][2];
+                            local[j].first[shell][7] = local[j].first[shell][5];
                             local[j].second[shell] += temp_res;
                         }
                     }
