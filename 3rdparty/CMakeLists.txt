@@ -41,7 +41,6 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
         set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}")
     endif ()
     if (NOT "${_SAVED_ENV_HASH}" STREQUAL "${_ENV_HASH}")
-        set(ENV_PATH "${MICROMAMBA_ENV_PATH}")
         micromamba_environment(
             NAME mambaenv
             SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml

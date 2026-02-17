@@ -23,7 +23,7 @@ inline void wait_for_debugger() {
     }
 
     std::cout << "\n========================================" << std::endl;
-    std::cout << "   WAITING FOR DEBUGGER TO ATTACH" << std::endl;
+    std::cout << "   WAITING/home/lucas/CLionProjects/NoSpherA2/cmake/NOSTEST.cmake FOR DEBUGGER TO ATTACH" << std::endl;
     std::cout << "========================================" << std::endl;
 
 #ifdef _WIN32
@@ -47,6 +47,7 @@ inline void wait_for_debugger() {
     std::cout << "Action: " << std::endl;
     std::cout << "  1. Open your IDE (CLion/VS Code) and 'Attach to Process'" << std::endl;
     std::cout << "  2. Run command 'expr attached = true'" << std::endl;
+    std::cout << "  3. Can also set g_debug_attached to true'" << std::endl;
 
 
     while (!g_debug_attached) {

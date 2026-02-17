@@ -1,4 +1,5 @@
 include(CTest)
+
 if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     if (WIN32)
         set(Python3_EXECUTABLE ${MICROMAMBA_ENV_PATH}/python.exe)

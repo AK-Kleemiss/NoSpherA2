@@ -73,10 +73,12 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/NOSTEST.cmake")
 add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
 
 # external dependencieso
-set(USE_SYSTEM_LIBCINT "ON")
-set(BUILD_FPIC "ON")
-set(WITH_PYTHON_BINDINGS "ON")
+set(WITH_FORTRAN "OFF")
+set(WITH_CINT2_INTERFACE "OFF")
+set(ENABLE_STATIC "ON")
 set(BUILD_SHARED_LIBS "OFF")
+set(PYPZPX "ON")
+set(WITH_RANGE_COULOMB "ON")
 add_subdirectory(libcint)
 add_library(libcint::libcint INTERFACE IMPORTED GLOBAL)
 target_link_libraries(libcint::libcint INTERFACE cint)
@@ -85,6 +87,10 @@ target_include_directories(
     "${CMAKE_SOURCE_DIR}/libcint/include"
     "${CMAKE_SOURCE_DIR}/libcint/src"
 )
+set(USE_SYSTEM_LIBCINT "ON")
+set(BUILD_FPIC "ON")
+set(WITH_PYTHON_BINDINGS "ON")
+set(BUILD_SHARED_LIBS "OFF")
 add_subdirectory(occ)
 add_subdirectory(mdspan)
 set(FEATOMIC_FETCH_METATENSOR "ON")
