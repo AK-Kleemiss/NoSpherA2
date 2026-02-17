@@ -25,6 +25,7 @@
       "cacheVariables": {
         "OpenMP_ROOT": "$env{HOMEBREW_PREFIX}/opt/libomp"
       }
+
     },
     {
       "name": "macos-debug",
@@ -67,6 +68,23 @@
     {
       "name": "macos-debug",
       "configurePreset": "macos-debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-release",
+      "description": "Run all NoSpherA2 tests on macOS",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": false
+      },
+      "environment": {
+	"OCC_DATA_PATH": "${sourceDir}/occ/share"
+      }
     }
   ]
 }
