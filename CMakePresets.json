@@ -83,7 +83,7 @@
         "stopOnFailure": false
       },
       "environment": {
-	"OCC_DATA_PATH": "${sourceDir}/occ/share"
+        "OCC_DATA_PATH": "${sourceDir}/occ/share"
       }
     }
   ]
