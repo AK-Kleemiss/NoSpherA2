@@ -102,14 +102,30 @@ WFN::WFN(const std::filesystem::path& filename, const bool& debug)
     basis_set_name = " ";
     comment = "Test";
     basis_set = NULL;
-    origin = e_origin::NOT_YET_DEFINED;
     fill_pre();
     fill_Afac_pre();
+    read_known_wavefunction_format(filename, std::cout, debug);
 };
 
-WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug) : WFN(filename, debug) {
+WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug) {
+    ncen = 0;
+    nfunc = 0;
+    nmo = 0;
+    nex = 0;
     charge = g_charge;
     multi = g_mult;
+    ECP_m = 0;
+    total_energy = 0.0;
+    d_f_switch = false;
+    modified = false;
+    distance_switch = false;
+    has_ECPs = false;
+    basis_set_name = " ";
+    comment = "Test";
+    basis_set = NULL;
+    fill_pre();
+    fill_Afac_pre();
+    read_known_wavefunction_format(filename, std::cout, debug);
 };
 
 constexpr unsigned int sum_subshells(unsigned int l, bool cartesian=true) {

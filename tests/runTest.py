@@ -43,17 +43,17 @@ def main():
         sys.exit(1)
 
     with open(args.good, 'r') as f:
-        expected = f.readlines()
+        expected = [line.strip() + os.linesep for line in f.readlines() if line.strip()]
 
     with open(args_actual, 'r') as f:
-        actual = f.readlines()
+        actual = [line.strip() + os.linesep for line in f.readlines() if line.strip()]
 
     diff = list(difflib.unified_diff(
         expected,
         actual,
         fromfile='Expected',
         tofile='Actual',
-        lineterm=''
+        # lineterm='\n'
     ))
 
     if diff:

@@ -19,7 +19,6 @@ add_library(libnosphera2 STATIC
     "b2c.cpp"
     "basis_set.cpp"
     "bondwise_analysis.cpp"
-    "cart2sph.cpp"
     "cif.cpp"
     "constants.cpp"
     "convenience.cpp"
@@ -30,7 +29,7 @@ add_library(libnosphera2 STATIC
     "isosurface.cpp"
     "libCintKernels.cpp"
     "libCintMain.cpp"
-    "mat_nos_math.cpp"
+    #"mat_nos_math.cpp"
     "molecule.cpp"
     "nos_math.cpp"
     "pch.cpp"
@@ -39,7 +38,7 @@ add_library(libnosphera2 STATIC
     "scattering_factors.cpp"
     "sphere_lebedev_rule.cpp"
     "spherical_density.cpp"
-    "vec_nos_math.cpp"
+    #"vec_nos_math.cpp"
     "wfn_class.cpp"
 )
 add_dependencies(libnosphera2 generate_auxiliary_basis)
