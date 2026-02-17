@@ -10,4 +10,4 @@
 [submodule "occ"]
 	path = occ
 	url = https://github.com/MilitaoLucas/occ.git
-	branch = sharedLibs
+	branch = libs_rebase2
