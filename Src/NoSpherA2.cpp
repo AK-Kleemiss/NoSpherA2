@@ -377,7 +377,7 @@ int main(int argc, char** argv)
         return 0;
     }
     // This one has conversion to fchk and calculation of one single tsc file
-    if ((opt.wfn != "" || opt.occ != "") && !opt.calc && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
+    if (opt.wfn != "" && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
     {
         if (opt.occ != "")
         {

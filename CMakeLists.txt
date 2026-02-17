@@ -51,21 +51,21 @@ if (MSVC AND NOT ("${OCC_BUILD_TYPE}" STREQUAL "${CMAKE_BUILD_TYPE}"))
     message(FATAL_ERROR "Building OCC in a different mode than NoSpherA2 is not supported because MSVC containers have
             different sizes between Release and Debug builds.")
 endif ()
-find_package(Git QUIET)
-if(GIT_FOUND)
-  message(STATUS "Git found: initializing/updating submodules...")
-  execute_process(
-    COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    RESULT_VARIABLE _git_submodule_result
-    OUTPUT_QUIET ERROR_QUIET
-  )
-  if(NOT _git_submodule_result EQUAL 0)
-    message(WARNING "git submodule update --init --recursive failed with exit code ${_git_submodule_result}")
-  endif()
-else()
-  message(STATUS "Git not found; skipping automatic git submodule initialization")
-endif()
+#find_package(Git QUIET)
+#    if(GIT_FOUND)
+#      message(STATUS "Git found: initializing/updating submodules...")
+#      execute_process(
+#        COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
+#        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+#        RESULT_VARIABLE _git_submodule_result
+#        OUTPUT_QUIET ERROR_QUIET
+#      )
+#      if(NOT _git_submodule_result EQUAL 0)
+#        message(WARNING "git submodule update --init --recursive failed with exit code ${_git_submodule_result}")
+#      endif()
+#    else()
+#      message(STATUS "Git not found; skipping automatic git submodule initialization")
+#    endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 #include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake")

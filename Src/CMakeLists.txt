@@ -111,6 +111,7 @@ target_link_libraries(libnosphera2 PUBLIC
     $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>
     $<$<PLATFORM_ID:Windows>:occ::tbb>
     $<$<PLATFORM_ID:Darwin>:OpenMP::OpenMP_C OpenMP::OpenMP_CXX>
+    libcint::libcint
     occ::qm
     occ::main
     basis_set_helper
