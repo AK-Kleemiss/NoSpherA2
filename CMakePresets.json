@@ -1,0 +1,42 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base-options",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "cacheVariables": {
+        "WITH_CLANG_TIDY": "OFF",
+        "WITH_OCC": "ON",
+        "USE_CCACHE": "YES",
+        "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ENV_PATH": "${sourceDir}/mambaenv",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib",
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+      }
+    },
+    {
+      "name": "Debug",
+      "inherits": "base-options",
+      "displayName": "Debug (GCC/ccache)",
+      "binaryDir": "${sourceDir}/cmake-build-debug-gcc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+      }
+    },
+    {
+      "name": "Release",
+      "inherits": "base-options",
+      "displayName": "Release (GCC)",
+      "binaryDir": "${sourceDir}/cmake-build-release-gcc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ]
+}
