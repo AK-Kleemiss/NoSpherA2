@@ -765,9 +765,9 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                     for (j = 0; j < wavy.get_ncen(); j++) {
                         std::fill(rho0shell[j].begin(), rho0shell[j].end(), 0.0);
                         //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-                        dx = { grid[i][0][point] - wavy.get_atom_coordinate(j, 0),
-                            grid[i][1][point] - wavy.get_atom_coordinate(j, 1),
-                            grid[i][2][point] - wavy.get_atom_coordinate(j, 2) };
+                        dx = { grid[i][0][point] - atoms[j].get_coordinate(0),
+                            grid[i][1][point] - atoms[j].get_coordinate(1),
+                            grid[i][2][point] - atoms[j].get_coordinate(2) };
                         dists.emplace_back(array_length(dx));
                         if (dists[j] > constants::far_away)
                             continue;
