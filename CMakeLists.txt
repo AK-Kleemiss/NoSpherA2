@@ -74,6 +74,17 @@ add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
 
 # external dependencieso
 set(USE_SYSTEM_LIBCINT "ON")
+set(BUILD_FPIC "ON")
+set(WITH_PYTHON_BINDINGS "ON")
+set(BUILD_SHARED_LIBS "OFF")
+add_subdirectory(libcint)
+add_library(libcint::libcint INTERFACE IMPORTED GLOBAL)
+target_link_libraries(libcint::libcint INTERFACE cint)
+target_include_directories(
+    libcint::libcint INTERFACE
+    "${CMAKE_SOURCE_DIR}/libcint/include"
+    "${CMAKE_SOURCE_DIR}/libcint/src"
+)
 add_subdirectory(occ)
 add_subdirectory(mdspan)
 set(FEATOMIC_FETCH_METATENSOR "ON")
@@ -81,7 +92,6 @@ set(BUILD_SHARED_LIBS "OFF")
 set(FEATOMIC_INSTALL_BOTH_STATIC_SHARED "OFF")
 set(FEATOMIC_USE_STATIC_METATENSOR "ON")
 add_subdirectory(featomic/featomic)
-add_subdirectory(libcint)
 
 
 
