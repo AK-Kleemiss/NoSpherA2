@@ -355,7 +355,7 @@ void GridManager::getIntegrationGrid1D(const WFN& wave, const int atom_1, const 
     //Calculate Becke and TFVC weights
     vec pa_b(wave.get_ncen());
     vec pa_tv(wave.get_ncen());
-    vec2 chi = make_chi(wave, 40, true, config_.debug);
+    vec chi = make_chi(wave, 40, true, config_.debug);
     for (int g = 0; g < grid_data_.atomic_grids.size(); g++) {
         for (int p = 0; p < num_points; p++) {
             std::array<double, 2> result_weights = get_integration_weights(
@@ -488,7 +488,7 @@ void GridManager::generateIntegrationGrids(const WFN& wave, const cell& unit_cel
     }
 
     // Generate grids for each atom
-    vec2 chi_matrix;  // For TFVC partitioning
+    vec chi_matrix;  // For TFVC partitioning
     for (int i = 0; i < num_atoms_with_grids; i++) {
         const int atom_idx = atom_list[i];
         const int atom_type = wave.get_atom_charge(atom_idx);

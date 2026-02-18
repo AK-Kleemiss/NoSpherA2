@@ -3224,7 +3224,7 @@ bool WFN::read_gbw(const std::filesystem::path& filename, std::ostream& file, co
             for (unsigned int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
                 int type = basis[temp_bas_idx].get_type() - 1;
                 temp_bas_idx += _atom.get_shellcount(shell);
-                for (int m_idx = 0; m_idx < 2*type+1; m_idx++) {
+                for (int m_idx = 0; m_idx < 2 * type + 1; m_idx++) {
                     int offset = constants::orca_2_pySCF(type, m_idx).value();
 
                     auto coefs_2D_s1_slice = Kokkos::submdspan(coefs_2D_s1_span, index + m_idx, Kokkos::full_extent);
@@ -4267,7 +4267,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
     Int_Params int_params(*this);
 
     compute2C<Overlap2C_CRT>(int_params, OVLP_matrix);
-	//We have the overlap matrix, now write it to file
+    //We have the overlap matrix, now write it to file
 
     ofstream rf(fileName, ios::out);
     string line;
@@ -6699,22 +6699,20 @@ const double WFN::compute_dens_cartesian(
 {
     std::fill(phi.begin(), phi.end(), 0.0);
     double Rho = 0.0;
-    int iat, j, k;
-    int l[3];
-    double ex;
-    int mo;
+    int iat, j;
+    double ex, * d_;
 
     // precalculate some distances and powers of distances for faster computation
     for (iat = 0; iat < ncen; iat++)
     {
-        double* d_ = d[iat].data();
+        d_ = d[iat].data();
         d_[0] = Pos[0] - atoms[iat].get_coordinate(0);
         d_[1] = Pos[1] - atoms[iat].get_coordinate(1);
         d_[2] = Pos[2] - atoms[iat].get_coordinate(2);
-        d_[3] = d_[0] * d_[0] + d_[1] * d_[1] + d_[2] * d_[2];
         d_[4] = d_[0] * d_[0];
         d_[5] = d_[1] * d_[1];
         d_[6] = d_[2] * d_[2];
+        d_[3] = d_[4] + d_[5] + d_[6];
         d_[7] = d_[0] * d_[4];
         d_[8] = d_[1] * d_[5];
         d_[9] = d_[2] * d_[6];
@@ -6729,56 +6727,97 @@ const double WFN::compute_dens_cartesian(
     for (j = 0; j < nex; j++)
     {
         iat = centers[j] - 1;
-        double* d_ = d[iat].data();
-        constants::type2vector(types[j], l);
+        d_ = d[iat].data();
+        //constants::type2vector(types[j], l);
         ex = -exponents[j] * d_[3];
         if (ex < constants::exp_cutoff)
         { // corresponds to cutoff of maximum density contribution of 1E-5
             continue;
         }
         ex = exp(ex);
-        for (k = 0; k < 3; k++)
+        switch (types[j])
         {
-            switch (l[k])
-            {
-            case 0:
-                break;
-            case 1:
-                ex *= d_[k];
-                break;
-            case 2:
-                ex *= d_[k + 4];
-                break;
-            case 3:
-                ex *= d_[k + 7];
-                break;
-            case 4:
-                ex *= d_[k + 10];
-                break;
-            case 5:
-                ex *= d_[k + 13];
-                break;
-            default:
-                break;
-            }
+        case 0:  break;
+        case 1:  break;// 0, 0, 0,
+        case 2:  ex *= d_[0]; break;// 1, 0, 0,
+        case 3:  ex *= d_[1]; break;// 0, 1, 0,
+        case 4:  ex *= d_[2]; break;// 0, 0, 1,
+        case 5:  ex *= d_[4]; break;// 2, 0, 0,
+        case 6:  ex *= d_[5]; break;// 0, 2, 0,
+        case 7:  ex *= d_[6]; break;// 0, 0, 2,
+        case 8:  ex *= d_[0] * d_[1]; break;// 1, 1, 0,
+        case 9:  ex *= d_[0] * d_[2]; break;// 1, 0, 1,
+        case 10: ex *= d_[1] * d_[2]; break;// 0, 1, 1,
+        case 11: ex *= d_[7]; break;// 3, 0, 0,
+        case 12: ex *= d_[8]; break;// 0, 3, 0,
+        case 13: ex *= d_[9]; break;// 0, 0, 3,
+        case 14: ex *= d_[4] * d_[1]; break;// 2, 1, 0,
+        case 15: ex *= d_[4] * d_[2]; break;// 2, 0, 1,
+        case 16: ex *= d_[5] * d_[2]; break;// 0, 2, 1,
+        case 17: ex *= d_[0] * d_[5]; break;// 1, 2, 0,
+        case 18: ex *= d_[0] * d_[6]; break;// 1, 0, 2,
+        case 19: ex *= d_[1] * d_[6]; break;// 0, 1, 2,
+        case 20: ex *= d_[0] * d_[1] * d_[2]; break;// 1, 1, 1,
+        case 21: ex *= d_[12]; break;// 0, 0, 4,
+        case 22: ex *= d_[1] * d_[9]; break;// 0, 1, 3,
+        case 23: ex *= d_[5] * d_[6]; break;// 0, 2, 2,
+        case 24: ex *= d_[8] * d_[2]; break;// 0, 3, 1,
+        case 25: ex *= d_[11]; break;// 0, 4, 0,
+        case 26: ex *= d_[0] * d_[9]; break;// 1, 0, 3,
+        case 27: ex *= d_[0] * d_[1] * d_[6]; break;// 1, 1, 2,
+        case 28: ex *= d_[0] * d_[5] * d_[2]; break;// 1, 2, 1,
+        case 29: ex *= d_[0] * d_[8]; break;// 1, 3, 0,
+        case 30: ex *= d_[4] * d_[6]; break;// 2, 0, 2,
+        case 31: ex *= d_[4] * d_[1] * d_[2]; break;// 2, 1, 1,
+        case 32: ex *= d_[4] * d_[5]; break;// 2, 2, 0,
+        case 33: ex *= d_[7] * d_[2]; break;// 3, 0, 1,
+        case 34: ex *= d_[7] * d_[1]; break;// 3, 1, 0,
+        case 35: ex *= d_[10]; break;// 4, 0, 0,
+        case 36: ex *= d_[15]; break;// 0, 0, 5,
+        case 37: ex *= d_[1] * d_[12]; break;// 0, 1, 4,
+        case 38: ex *= d_[5] * d_[9]; break;// 0, 2, 3,
+        case 39: ex *= d_[8] * d_[6]; break;// 0, 3, 2,
+        case 40: ex *= d_[11] * d_[2]; break;// 0, 4, 1,
+        case 41: ex *= d_[14]; break;// 0, 5, 0,
+        case 42: ex *= d_[0] * d_[12]; break;// 1, 0, 4,
+        case 43: ex *= d_[0] * d_[1] * d_[9]; break;// 1, 1, 3,
+        case 44: ex *= d_[0] * d_[8] * d_[2]; break;// 1, 3, 1,
+        case 45: ex *= d_[0] * d_[11]; break;// 1, 4, 0,
+        case 46: ex *= d_[4] * d_[9]; break;// 2, 0, 3,
+        case 47: ex *= d_[4] * d_[1] * d_[6]; break;// 2, 1, 2,
+        case 48: ex *= d_[4] * d_[5] * d_[2]; break;// 2, 2, 1,
+        case 49: ex *= d_[4] * d_[8]; break;// 2, 3, 0,
+        case 50: ex *= d_[7] * d_[6]; break;// 3, 0, 2,
+        case 51: ex *= d_[7] * d_[1] * d_[2]; break;// 3, 1, 1,
+        case 52: ex *= d_[7] * d_[5]; break;// 3, 2, 0,
+        case 53: ex *= d_[10] * d_[2]; break;// 4, 0, 1,
+        case 54: ex *= d_[10] * d_[1]; break;// 4, 1, 0,
+        case 55: ex *= d_[13]; break;// 5, 0, 0 
+        default: break;
         }
-        double* run = phi.data();
-        const MO* run2 = MOs.data();
-        for (mo = 0; mo < nmo; mo++)
+
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        double* phi_ptr = phi.data();
+        const double* phi_end = phi_ptr + nmo;
+        const MO* mo_ptr = MOs.data();
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; phi_ptr != phi_end; ++phi_ptr, ++mo_ptr)
         {
-            *run += (*run2).get_coefficient_f(j) * ex; // build MO values at this point
-            //*run += *(coef_ptrs[mo]) * ex;
-            run2++, run++;
-            //(coef_ptrs[mo])++, run++;
+            *phi_ptr += mo_ptr->get_coefficient_f(j) * ex;
         }
     }
 
-    double* run = phi.data();
-    const MO* run2 = MOs.data();
-    for (mo = 0; mo < nmo; mo++)
+    // use pointer arithmetic and minimize overhead
+    const double* phi_ptr = phi.data();
+    const double* phi_end = phi_ptr + nmo;
+    const MO* mo_ptr = MOs.data();
+
+    for (; phi_ptr != phi_end; ++phi_ptr, ++mo_ptr)
     {
-        Rho += (*run2).get_occ() * pow(*run, 2);
-        run++, run2++;
+        const double phi_val = *phi_ptr;
+        Rho += mo_ptr->get_occ() * phi_val * phi_val;
     }
 
     return Rho;
@@ -8171,39 +8210,39 @@ bool WFN::read_ptb(const std::filesystem::path& filename, std::ostream& file, co
     vec Pmat((size_t)nmomax * (size_t)(nmomax + 1) / 2);
     err_checkf(read_block_from_fortran_binary(inFile, Pmat.data()), "Error reading density matrix!", std::cout);
 
-//  Add Basis set information to atoms
-//  This is a cartesian basis
-//  Exp and Contr are given in therms of the correponding functions, thus for p-type basis functions, we get 3-times the same block
-//  lao tells us what type of function we got (s,p,d...)  (s = 1, p = 2-4, d = 5-10, f = 11-20, g = 21-35)
-//  aoatcart is the corresponding atom which we have to assign everything to
-//  ipao tells us the shells for every basis function
-    //int shell = 0;
-    //for (int prim = 0; prim < nprims;) {
-    //    int function_type = 1;
-    //    if (lao[prim] == 1) function_type = 1;
-    //    else if (lao[prim] >= 2 && lao[prim] <= 4) function_type = 2;
-    //    else if (lao[prim] >= 5 && lao[prim] <= 10) function_type = 3;
-    //    else if (lao[prim] >= 11 && lao[prim] <= 20) function_type = 4;
-    //    else if (lao[prim] >= 21 && lao[prim] <= 35) function_type = 5;
-    //    else err_checkf(true, "Error interpreting basis function type in ptb file!", file);
-    //    const int n_prim_type = (function_type * (function_type + 1)) / 2;  //Number of cartesian functions per type
-    //    int prims_in_this_shell = 1;
-    //    while (ipao[prim] == ipao[prim + 1]) {
-    //        atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell);
-    //        prim++;
-    //        prims_in_this_shell++;
-    //    }
-    //    atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell); // One extra time to catch the last one
-    //    prim++;
-    //    shell++;
-    //    if (function_type != 1) { //Skip all the repetition
-    //        prim += prims_in_this_shell * (n_prim_type-1);
-    //    }
-    //    if (aoatcart[prim - 1] != aoatcart[prim]) { // Reste the shellcounter, if at the 
-    //        shell = 0;
-    //    }
-    //    
-    //}
+    //  Add Basis set information to atoms
+    //  This is a cartesian basis
+    //  Exp and Contr are given in therms of the correponding functions, thus for p-type basis functions, we get 3-times the same block
+    //  lao tells us what type of function we got (s,p,d...)  (s = 1, p = 2-4, d = 5-10, f = 11-20, g = 21-35)
+    //  aoatcart is the corresponding atom which we have to assign everything to
+    //  ipao tells us the shells for every basis function
+        //int shell = 0;
+        //for (int prim = 0; prim < nprims;) {
+        //    int function_type = 1;
+        //    if (lao[prim] == 1) function_type = 1;
+        //    else if (lao[prim] >= 2 && lao[prim] <= 4) function_type = 2;
+        //    else if (lao[prim] >= 5 && lao[prim] <= 10) function_type = 3;
+        //    else if (lao[prim] >= 11 && lao[prim] <= 20) function_type = 4;
+        //    else if (lao[prim] >= 21 && lao[prim] <= 35) function_type = 5;
+        //    else err_checkf(true, "Error interpreting basis function type in ptb file!", file);
+        //    const int n_prim_type = (function_type * (function_type + 1)) / 2;  //Number of cartesian functions per type
+        //    int prims_in_this_shell = 1;
+        //    while (ipao[prim] == ipao[prim + 1]) {
+        //        atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell);
+        //        prim++;
+        //        prims_in_this_shell++;
+        //    }
+        //    atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell); // One extra time to catch the last one
+        //    prim++;
+        //    shell++;
+        //    if (function_type != 1) { //Skip all the repetition
+        //        prim += prims_in_this_shell * (n_prim_type-1);
+        //    }
+        //    if (aoatcart[prim - 1] != aoatcart[prim]) { // Reste the shellcounter, if at the 
+        //        shell = 0;
+        //    }
+        //    
+        //}
 
     std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set("ptb-vdzp");
     set_basis_set_ptr(aux_basis->get_data());

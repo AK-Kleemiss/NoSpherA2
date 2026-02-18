@@ -33,7 +33,7 @@ public:
         double grid_becke_w[],
         double grid_TFVC_w[],
         const WFN& wfn,
-        vec2& chi,
+        vec& chi,
         bool debug = false) const;
 
     void get_radial_grid(double grid_r_bohr[], double grid_w[]) const;
@@ -63,7 +63,7 @@ private:
     vec radial_atom_grid_w_;
 };
 
-vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug = false);
+vec make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug = false);
 
 std::array<double, 2> get_integration_weights(const int& num_centers,
     const int* proton_charges,
@@ -76,7 +76,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
     const double& z,
     vec& pa_b,
     vec& pa_tv,
-    const vec2& chi);
+    const vec& chi);
 
 const double get_r_inner(const double& max_error, const double& alpha_inner);
 

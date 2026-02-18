@@ -582,7 +582,7 @@ void calc_partition_densities()
     double x = 0;
     vec pa_b(5);
     vec pa_tv(5);
-    vec2 chi;
+    vec chi;
     // #pragma omp for
     for (int i = 0; i < size; i++)
     {
@@ -1099,7 +1099,7 @@ void test_analytical_fourier(bool full)
         grid[i].resize(griddy.get_num_grid_points(), 0.0);
     }
 
-    vec2 empty(1, vec(1, 0.0));
+    vec empty(1, 0.0);
     griddy.get_grid(1, 0, pos, pos, pos, &charge, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data(), grid[5].data(), grid[6].data(), WFN(), empty);
 
     // Initialize the vectors sf_A and sf_N

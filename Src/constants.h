@@ -59,7 +59,7 @@ namespace constants
     constexpr int hardness = 3;
     constexpr double cutoff = 1.0e-20;
     constexpr double far_away = 10.0;
-	constexpr double far_away_sq = far_away * far_away;
+    constexpr double far_away_sq = far_away * far_away;
     constexpr double PI = 3.1415926535897932384626433832795028;
     constexpr double PI_4 = PI / 4.0;
     constexpr long double SQRTPI_4L = .8862269254527580136490837416705725913987747280611935641069038949264l;
@@ -68,7 +68,7 @@ namespace constants
     constexpr double TWO_PI = 2 * PI;
     constexpr double FOUR_PI = 4 * PI;
     constexpr double EIGHT_PI = 8 * PI;
-	constexpr double INV_EIGHT_PI = 1.0 / EIGHT_PI;
+    constexpr double INV_EIGHT_PI = 1.0 / EIGHT_PI;
     constexpr double C0 = SQRT2 * FOUR_PI;
     const double sqr_pi = sqrt(PI);
     constexpr double PI2 = PI * PI;
@@ -580,7 +580,7 @@ namespace constants
             -1;
     };
 
-    const int type_vector[168]{
+    constexpr int type_vector[168]{
     0, 0, 0,
     1, 0, 0,
     0, 1, 0,

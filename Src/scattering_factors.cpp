@@ -1252,8 +1252,8 @@ ivec make_integration_grids(
 {
     using namespace std;
     ivec num_points(cif2wfn_list.size(), 0);
-    vec2 chi_matrix;
-    chi_matrix.reserve(cif2wfn_list.size());
+    vec chi_matrix;
+    chi_matrix.reserve(cif2wfn_list.size() * cif2wfn_list.size());
     for (int i = 0; i < cif2wfn_list.size(); i++)
     {
         if (debug)
@@ -1534,26 +1534,32 @@ void calc_SF(const int& points,
     ProgressBar* progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
     long long int pmax;
     complex<double>* sf_local;
-    double work, rho, c, si, *dens_local;
+    double work, rho, c, si, * dens_local;
+
+    // Pre-fetch k_pt data pointers for better cache locality
+    const double* k1_data = k_pt[0].data();
+    const double* k2_data = k_pt[1].data();
+    const double* k3_data = k_pt[2].data();
+
     for (int i = 0; i < imax; i++)
     {
         pmax = static_cast<long long int>(dens[i].size());
-		dens_local = dens[i].data();
+        dens_local = dens[i].data();
         const double* d1_local = d1[i].data(),
             * d2_local = d2[i].data(),
             * d3_local = d3[i].data();
 #pragma omp parallel for private(work, rho, c, si)
         for (long long int s = 0; s < smax; s++)
         {
-			double re = 0.0, im = 0.0;
-			const double* k1_local = &(k_pt[0][s]);
-			const double* k2_local = &(k_pt[1][s]);
-			const double* k3_local = &(k_pt[2][s]);
+            double re = 0.0, im = 0.0;
+            const double& k1_local = k1_data[s];
+            const double& k2_local = k2_data[s];
+            const double& k3_local = k3_data[s];
             sf_local = sf[i].data();
-            for (long long int p = pmax - 1; p >= 0; p--)
+            for (long long int p = 0; p < pmax; p++)
             {
                 rho = dens_local[p];
-                work = *k1_local * d1_local[p] + *k2_local * d2_local[p] + *k3_local * d3_local[p];
+                work = k1_local * d1_local[p] + k2_local * d2_local[p] + k3_local * d3_local[p];
 #if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
                 sincos(work, &si, &c);
                 re += rho * c;
@@ -1573,7 +1579,7 @@ void calc_SF(const int& points,
 #endif
             }
             sf_local[s].real(re);
-			sf_local[s].imag(im);
+            sf_local[s].imag(im);
         }
         progress->update();
     }
@@ -2103,9 +2109,9 @@ tsc_block_type calculate_scattering_factors(
         }
     }
     else if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>) {
-        if (opt.partition_type == PartitionType::Hirshfeld || 
-            opt.partition_type == PartitionType::Becke || 
-            opt.partition_type == PartitionType::TFVC || 
+        if (opt.partition_type == PartitionType::Hirshfeld ||
+            opt.partition_type == PartitionType::Becke ||
+            opt.partition_type == PartitionType::TFVC ||
             opt.partition_type == PartitionType::MBIS ||
             opt.partition_type == PartitionType::EMBIS)
         {
@@ -2184,7 +2190,7 @@ tsc_block_type calculate_scattering_factors(
             time_descriptions.push_back("Fourier transform");
         }
         else {
-			std::cout << "Unknown Partition type, stopping here!" << std::endl;
+            std::cout << "Unknown Partition type, stopping here!" << std::endl;
         }
         if (wavy->get_has_ECPs())
         {

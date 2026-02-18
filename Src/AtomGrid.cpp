@@ -252,9 +252,10 @@ int AtomGrid::get_num_grid_points() const { return (int)atom_grid_x_bohr_.size()
 
 int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
-vec2 make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
-    vec2 chi(wfn.get_ncen(), vec(wfn.get_ncen(), 0.0));
-    std::vector<std::vector<bool>> neighbours(wfn.get_ncen(), bvec(wfn.get_ncen(), true));
+vec make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
+    const int ncen = wfn.get_ncen();
+    vec chi(ncen * ncen, 0.0);
+    std::vector<std::vector<bool>> neighbours(ncen, bvec(ncen, true));
     double rijx2, rijy2, rijz2, xdist, disth;
     for (int a = 0; a < wfn.get_ncen(); a++) {
         for (int b = a + 1; b < wfn.get_ncen(); b++) {
@@ -298,8 +299,8 @@ vec2 make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
                                  wfn.get_atom_coordinate(b, 1) - rijy2,
                                  wfn.get_atom_coordinate(b, 2) - rijz2 }) > constants::far_away) {
                     // If they are neighbours but far apart we will consider them equal radius
-                    chi[a][b] = 1.0;
-                    chi[b][a] = 1.0;
+                    chi[a * ncen + b] = 1.0;
+                    chi[b * ncen + a] = 1.0;
                 }
                 else {
                     // If they are neighbours and close enough we do the line search for topology evaluation!
@@ -355,27 +356,27 @@ vec2 make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
                             }
                             else {
                                 std::cout << "WARNING: Unexpected types of extrema found between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
-                                chi[a][b] = 1.0;
-                                chi[b][a] = 1.0;
+                                chi[a * ncen + b] = 1.0;
+                                chi[b * ncen + a] = 1.0;
                                 continue;
                             }
                         }
                         else {
                             std::cout << "WARNING: Unexpected number of extrema (" << extrema.size() << ") found between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
-                            chi[a][b] = 1.0;
-                            chi[b][a] = 1.0;
+                            chi[a * ncen + b] = 1.0;
+                            chi[b * ncen + a] = 1.0;
                             continue;
                         }
                     }
                     // And save the "chi" in the same matrix
                     if (extrema[use_extr].distB == 0.0) {
                         std::cout << "WARNING: Division by zero detected for chi between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
-                        chi[a][b] = 1.0;
-                        chi[b][a] = 1.0;
+                        chi[a * ncen + b] = 1.0;
+                        chi[b * ncen + a] = 1.0;
                     }
                     else {
-                        chi[a][b] = extrema[use_extr].distA / extrema[use_extr].distB;
-                        chi[b][a] = 1.0 / chi[a][b];
+                        chi[a * ncen + b] = extrema[use_extr].distA / extrema[use_extr].distB;
+                        chi[b * ncen + a] = 1.0 / chi[a * ncen + b];
                     }
                     // For if one have a very polarized bond (bcp super displaced towards one of the atoms
                     double ri = extrema[use_extr].distA / (extrema[use_extr].distA + extrema[use_extr].distB);
@@ -386,12 +387,12 @@ vec2 make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
                     // Some printing on the ratio between pair of atoms, for if strange results (or against chemical intuition) are obtained one can see if it is TFVC problem
                     // This is helpful to see if the "bcp" evaluation is broken, or one face a nasty scenario that is not yet included in the code...
                     if (debug)
-                        std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a][b] << std::endl;
+                        std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a * ncen + b] << std::endl;
                 }
             }
             else {
-                chi[a][b] = 1.0;
-                chi[b][a] = 1.0;
+                chi[a * ncen + b] = 1.0;
+                chi[b * ncen + a] = 1.0;
             }
         }
     }
@@ -412,7 +413,7 @@ void AtomGrid::get_grid(const int num_centers,
     double grid_becke_w[],
     double grid_TFVC_w[],
     const WFN& wfn,
-    vec2& chi,
+    vec& chi,
     bool debug) const
 {
 
@@ -536,7 +537,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
     const double& z,
     std::vector<double>& pa_b,
     std::vector<double>& pa_tv,
-    const vec2& chi)
+    const vec& chi)
 {
     double mu_ab, nu_ab, f, dist_ab;
     double dist_a, dist_b;
@@ -554,9 +555,12 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
         vz = z_coordinates_bohr[a] - z;
         dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
 
+        double& pa_b_a = pa_b[a];
+        double& pa_tv_a = pa_tv[a];
+
         if (dist_a > constants::far_away) {
-            pa_b[a] = 0.0;
-            pa_tv[a] = 0.0;
+            pa_b_a = 0.0;
+            pa_tv_a = 0.0;
             continue;
         }
 
@@ -578,20 +582,20 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             // JCP 88, 2547 (1988), eq. 11
             mu_ab = (dist_a - dist_b) / dist_ab;
 
-            nu_ab = (1.0 + mu_ab - chi[a][b] * (1.0 - mu_ab)) / (1.0 + mu_ab + chi[a][b] * (1.0 - mu_ab));
+            nu_ab = (1.0 + mu_ab - chi[a * num_centers + b] * (1.0 - mu_ab)) / (1.0 + mu_ab + chi[a * num_centers + b] * (1.0 - mu_ab));
 
-            f = f4(nu_ab);
+            f = 1.0 - f4(nu_ab);
 
-            if (std::abs(1.0 - f) < constants::cutoff)
-                pa_tv[a] = 0.0;
+            if (std::abs(f) < constants::cutoff)
+                pa_tv_a = 0.0;
             else {
                 //Reduce numerical jittering
-                if (pa_tv[a] > 1E-250 || pa_tv[a] < -1E-250)
-                    pa_tv[a] *= 0.5 * (1.0 - f);
+                if (pa_tv_a > 1E-250 || pa_tv_a < -1E-250)
+                    pa_tv_a *= 0.5 * f;
                 else
-                    pa_tv[a] = 0.0;
+                    pa_tv_a = 0.0;
                 if (pa_tv[b] > 1E-250 || pa_tv[b] < -1E-250)
-                    pa_tv[b] *= 0.5 * (1.0 + f);
+                    pa_tv[b] *= 0.5 * (2.0 - f);
                 else
                     pa_tv[b] = 0.0;
             }
@@ -613,17 +617,17 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             else
                 nu_ab = mu_ab;
 
-            f = f3(nu_ab);
+            f = 1.0 - f3(nu_ab);
 
-            if (std::abs(1.0 - f) < constants::cutoff)
-                pa_b[a] = 0.0;
+            if (std::abs(f) < constants::cutoff)
+                pa_b_a = 0.0;
             else {
-                if (pa_b[a] > 1E-250 || pa_b[a] < -1E-250)
-                    pa_b[a] *= 0.5 * (1.0 - f);
+                if (pa_b_a > 1E-250 || pa_b_a < -1E-250)
+                    pa_b_a *= 0.5 * f;
                 else
-                    pa_b[a] = 0.0;
+                    pa_b_a = 0.0;
                 if (pa_b[b] > 1E-250 || pa_b[b] < -1E-250)
-                    pa_b[b] *= 0.5 * (1.0 + f);
+                    pa_b[b] *= 0.5 * (2.0 - f);
                 else
                     pa_b[b] = 0.0;
             }
@@ -857,13 +861,13 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     double varmax = 0, varsig = 0;
     // Cache atom coordinates and charges to avoid repeated function calls
     const int ncen = wavy.get_ncen();
-    std::vector<d3> atom_coords(ncen);
+    vec atom_coords(ncen * 3);
     ivec atom_charges(ncen);
     ivec nshell_cache(ncen);
     for (int j = 0; j < ncen; j++) {
-        atom_coords[j] = { atoms[j].get_coordinate(0),
-                           atoms[j].get_coordinate(1),
-                           atoms[j].get_coordinate(2) };
+        atom_coords[j * 3 + 0] = atoms[j].get_coordinate(0);
+        atom_coords[j * 3 + 1] = atoms[j].get_coordinate(1);
+        atom_coords[j * 3 + 2] = atoms[j].get_coordinate(2);
         atom_charges[j] = wavy.get_atom_charge(j);
         nshell_cache[j] = constants::MBIS_function[atom_charges[j]];
     }
@@ -886,26 +890,26 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 
 #pragma omp parallel
             {
-                vec2 rho0shell(wavy.get_ncen(), vec(6, 0.0));
+                vec rho0shell(ncen * 6, 0.0);
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq;
                 int j, shell, nshell;
-                d3 dx;
+                double dx[3];
                 sp_vec local = sig_pop_vector;
                 for (j = 0; j < wavy.get_ncen(); j++) {
                     std::fill(local[j].first.begin(), local[j].first.end(), 0.0);
                     std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
                 }
 
-#pragma omp for
+#pragma omp for schedule(dynamic)
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     vec dists(ncen, 0.0);
-                    std::fill(rho0shell.begin(), rho0shell.end(), zeros_6);
+                    std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
                     for (j = 0; j < wavy.get_ncen(); j++) {
                         //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-                        dx[0] = gx[point] - atom_coords[j][0];
-                        dx[1] = gy[point] - atom_coords[j][1];
-                        dx[2] = gz[point] - atom_coords[j][2];
+                        dx[0] = gx[point] - atom_coords[j * 3 + 0];
+                        dx[1] = gy[point] - atom_coords[j * 3 + 1];
+                        dx[2] = gz[point] - atom_coords[j * 3 + 2];
                         // Check distance squared first to avoid sqrt for far away points
                         dist_sq = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
                         if (dist_sq > constants::far_away_sq)
@@ -915,19 +919,19 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                         nshell = nshell_cache[j];
 
                         for (shell = 0; shell < nshell; shell++) {
-                            sigval = pow(copy_of_input[j].first[shell], -1);
-                            tmp = copy_of_input[j].second[shell] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-dists[j] * sigval);
+                            sigval = copy_of_input[j].first[shell];
+                            tmp = copy_of_input[j].second[shell] * constants::INV_EIGHT_PI * pow(sigval, -3) * exp(-dists[j] / sigval);
                             if (abs(tmp) < 1e-20)
                                 continue;
-                            rho0shell[j][shell] = tmp;
+                            rho0shell[j * 6 + shell] = tmp;
                             rho0 += tmp;
                         }
                     }
                     density = b_weight[point] * dens[point];
                     for (j = 0; j < wavy.get_ncen(); j++) {
-                        nshell = nshell_cache[j];;
+                        nshell = nshell_cache[j];
                         for (shell = 0; shell < nshell; shell++) {
-                            r0s = rho0shell[j][shell];
+                            r0s = rho0shell[j * 6 + shell];
                             if (r0s == 0)
                                 continue;
                             temp_res = density * r0s / rho0;
@@ -941,9 +945,9 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                     nshell = nshell_cache[j];
                     for (shell = 0; shell < nshell; shell++) {
 #pragma omp atomic
-                            sig_pop_vector[j].first[shell] += local[j].first[shell];
+                        sig_pop_vector[j].first[shell] += local[j].first[shell];
 #pragma omp atomic
-                            sig_pop_vector[j].second[shell] += local[j].second[shell];
+                        sig_pop_vector[j].second[shell] += local[j].second[shell];
                     }
                 }
             }
@@ -992,21 +996,21 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     vec last_charges(atoms.size(), 0.0);
     double varmax = 0, varsig = 0;
     sp_vec sig_pop_vector;
-	vec zeros_9(9, 0.0);
-	vec zeros_6(6, 0.0);
+    vec zeros_9(9, 0.0);
+    vec zeros_6(6, 0.0);
     for (auto& atom : atoms) {
         sig_pop_vector.emplace_back(get_shalpha_shpop(atom.get_charge()));
     }
     sp_vec copy_of_input = sig_pop_vector;
 
     const int ncen = wavy.get_ncen();
-    std::vector<d3> atom_coords(ncen);
+    vec atom_coords(ncen * 3);
     ivec atom_charges(ncen);
     ivec nshell_cache(ncen);
     for (int j = 0; j < ncen; j++) {
-        atom_coords[j] = { atoms[j].get_coordinate(0),
-                           atoms[j].get_coordinate(1),
-                           atoms[j].get_coordinate(2) };
+        atom_coords[j * 3 + 0] = atoms[j].get_coordinate(0);
+        atom_coords[j * 3 + 1] = atoms[j].get_coordinate(1);
+        atom_coords[j * 3 + 2] = atoms[j].get_coordinate(2);
         atom_charges[j] = wavy.get_atom_charge(j);
         nshell_cache[j] = constants::MBIS_function[atom_charges[j]];
     }
@@ -1029,81 +1033,101 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
             const double* gz = grid[i][2].data();
 #pragma omp parallel
             {
-                vec2 rho0shell(ncen, zeros_6);
+                vec rho0shell(ncen * 6, 0.0);
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
-                int j, shell, nshell;
+                int j, shell, nshell, ind;
                 double* alpha;
-                std::vector<d3> dx(ncen);
+                vec dx(ncen * 3);
                 double* d_local;
                 sp_vec local = sig_pop_vector;
-                vec dists(ncen);
-                
+                vec g_cache(6 * ncen, 0.0);
+                double d_cache[6] = { 0.0 };
+
+                // Precompute determinants for all atoms and shells - they don't change per point
+                vec det_pop_cache(ncen * 6, 0.0);
+                for (int k = 0; k < ncen; k++) {
+                    nshell = nshell_cache[k];
+                    for (shell = 0; shell < nshell; shell++) {
+                        alpha = copy_of_input[k].first[shell].data();
+                        det = sqrt(alpha[0] * alpha[4] * alpha[8] -
+                            alpha[0] * alpha[5] * alpha[5] -
+                            alpha[4] * alpha[2] * alpha[2] -
+                            alpha[8] * alpha[1] * alpha[1] +
+                            2 * alpha[1] * alpha[2] * alpha[5]);
+                        det_pop_cache[k * 6 + shell] = copy_of_input[k].second[shell] * constants::INV_EIGHT_PI * det;
+                    }
+                }
+
                 for (j = 0; j < ncen; j++) {
                     std::fill(local[j].first.begin(), local[j].first.end(), zeros_9);
                     std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
                 }
-#pragma omp for
+#pragma omp for schedule(dynamic)
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
-                    std::fill(dists.begin(), dists.end(), 0.0);
-                    std::fill(rho0shell.begin(), rho0shell.end(), zeros_6);
-                    for (j = 0; j < ncen; j++) {
-                        d_local = dx[j].data();
-                        d_local[0] = gx[point] - atom_coords[j][0];
-                        d_local[1] = gy[point] - atom_coords[j][1];
-                        d_local[2] = gz[point] - atom_coords[j][2];
-                        // Check distance squared first to avoid sqrt for far away points
-                        const double dist_sq = d_local[0] * d_local[0] + d_local[1] * d_local[1] + d_local[2] * d_local[2];
-                        if (dist_sq > constants::far_away_sq)
-                            continue;
-
-                        dists[j] = std::sqrt(dist_sq);
-						nshell = constants::MBIS_function[wavy.get_atom_charge(j)];
-                        for (shell = 0; shell < nshell; shell++) {
-                            alpha = copy_of_input[j].first[shell].data();
-                            // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
-                            det = sqrt(alpha[0] * alpha[4] * alpha[8] -
-                                alpha[0] * alpha[5] * alpha[5] -
-                                alpha[4] * alpha[2] * alpha[2] -
-                                alpha[8] * alpha[1] * alpha[1] +
-                                2 * alpha[1] * alpha[2] * alpha[5]);
-                            g = sqrt(alpha[0] * d_local[0] * d_local[0] +
-                                alpha[4] * d_local[1] * d_local[1] +
-                                alpha[8] * d_local[2] * d_local[2] +
-                                2 * alpha[1] * d_local[0] * d_local[1] +
-                                2 * alpha[2] * d_local[0] * d_local[2] +
-                                2 * alpha[5] * d_local[1] * d_local[2]);
-                            tmp = copy_of_input[j].second[shell] * constants::INV_EIGHT_PI * det * exp(-g);
-                            if (abs(tmp) < 1e-20)
-                                continue;
-                            rho0shell[j][shell] = tmp;
-                            rho0 += tmp;
-                        }
-                    }
+                    std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
                     density = b_weight[point] * dens[point];
                     for (j = 0; j < ncen; j++) {
-                        d_local = dx[j].data();
-                        nshell = constants::MBIS_function[wavy.get_atom_charge(j)];
-                        for (shell = 0; shell < nshell; shell++) {
-                            r0s = rho0shell[j][shell];
-                            if (r0s == 0)
-                                continue;
+                        d_local = dx.data() + j * 3;
+                        d_local[0] = gx[point] - atom_coords[j * 3 + 0];
+                        d_local[1] = gy[point] - atom_coords[j * 3 + 1];
+                        d_local[2] = gz[point] - atom_coords[j * 3 + 2];
+                        d_cache[0] = d_local[0] * d_local[0];
+                        d_cache[3] = d_local[1] * d_local[1];
+                        d_cache[5] = d_local[2] * d_local[2];
+                        // Check distance squared first to avoid sqrt for far away points
+                        if (d_cache[0] + d_cache[3] + d_cache[5] > constants::far_away_sq)
+                            continue;
+
+                        d_cache[1] = d_local[0] * d_local[1];
+                        d_cache[2] = d_local[0] * d_local[2];
+                        d_cache[4] = d_local[1] * d_local[2];
+                        nshell = nshell_cache[j];
+                        ind = j * 6; // Cache index for the first shell of this atom
+                        for (shell = 0; shell < nshell; shell++, ind++) {
                             alpha = copy_of_input[j].first[shell].data();
-                            g = 1.0 / sqrt(alpha[0] * d_local[0] * d_local[0] +
-                                alpha[4] * d_local[1] * d_local[1] +
-                                alpha[8] * d_local[2] * d_local[2] +
-                                2 * alpha[1] * d_local[0] * d_local[1] +
-                                2 * alpha[2] * d_local[0] * d_local[2] +
-                                2 * alpha[5] * d_local[1] * d_local[2]);
+                            // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
+                            g = sqrt(alpha[0] * d_cache[0] +
+                                alpha[4] * d_cache[3] +
+                                alpha[8] * d_cache[5] +
+                                2 * alpha[1] * d_cache[1] +
+                                2 * alpha[2] * d_cache[2] +
+                                2 * alpha[5] * d_cache[4]);
+                            g_cache[ind] = g;
+                            if (g > 42) // avoid vanishingly small contributions due to exp(-g) and potential overflow in exp(g)
+                                continue;
+                            tmp = det_pop_cache[ind] * exp(-g);
+                            if (abs(tmp) < constants::cutoff)
+                                continue;
+                            rho0shell[ind] = tmp;
+                            rho0 += tmp;
+                        }
+                    } //We first need to finish building total rho0 before we can calculate the contributions to the sigmas and populations
+                    for (j = 0; j < ncen; j++) {
+                        d_local = dx.data() + j * 3;
+                        nshell = nshell_cache[j];
+                        d_cache[0] = d_local[0] * d_local[0];
+                        d_cache[1] = d_local[0] * d_local[1];
+                        d_cache[2] = d_local[0] * d_local[2];
+                        d_cache[3] = d_local[1] * d_local[1];
+                        d_cache[4] = d_local[1] * d_local[2];
+                        d_cache[5] = d_local[2] * d_local[2];
+                        ind = j * 6; // Cache index for the first shell of this atom
+                        for (shell = 0; shell < nshell; shell++, ind++) {
+                            r0s = rho0shell[ind];
+                            if (r0s <= constants::cutoff)
+                                continue;
+                            //alpha = copy_of_input[j].first[shell].data();
+                            g = 1.0 / g_cache[ind];
                             temp_res = density * r0s / rho0;
                             alpha = local[j].first[shell].data();
                             // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
-                            alpha[0] += temp_res * d_local[0] * d_local[0] * g;
-                            alpha[4] += temp_res * d_local[1] * d_local[1] * g;
-                            alpha[8] += temp_res * d_local[2] * d_local[2] * g;
-                            alpha[1] += temp_res * d_local[0] * d_local[1] * g;
-                            alpha[2] += temp_res * d_local[0] * d_local[2] * g;
-                            alpha[5] += temp_res * d_local[1] * d_local[2] * g;
+                            alpha[0] += temp_res * d_cache[0] * g;
+                            alpha[4] += temp_res * d_cache[3] * g;
+                            alpha[8] += temp_res * d_cache[5] * g;
+                            alpha[1] += temp_res * d_cache[1] * g;
+                            alpha[2] += temp_res * d_cache[2] * g;
+                            alpha[5] += temp_res * d_cache[4] * g;
                             alpha[3] = alpha[1];
                             alpha[6] = alpha[2];
                             alpha[7] = alpha[5];
@@ -1113,14 +1137,14 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                 }
 
                 for (j = 0; j < ncen; j++) {
-                    nshell = constants::MBIS_function[wavy.get_atom_charge(j)];
+                    nshell = nshell_cache[j];
                     for (shell = 0; shell < nshell; shell++) {
-                            for (int n = 0; n < 9; n++) {
+                        for (int n = 0; n < 9; n++) {
 #pragma omp atomic
-                                sig_pop_vector[j].first[shell][n] += local[j].first[shell][n];
-                            }
+                            sig_pop_vector[j].first[shell][n] += local[j].first[shell][n];
+                        }
 #pragma omp atomic
-                            sig_pop_vector[j].second[shell] += local[j].second[shell];
+                        sig_pop_vector[j].second[shell] += local[j].second[shell];
                     }
                 }
             }
