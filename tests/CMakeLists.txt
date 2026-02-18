@@ -1,12 +1,5 @@
 include(CTest)
 
-if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
-    if (WIN32)
-        set(Python3_EXECUTABLE ${MICROMAMBA_ENV_PATH}/python.exe)
-    else ()
-        set(Python3_EXECUTABLE ${MICROMAMBA_ENV_PATH}/bin/python)
-    endif ()
-endif ()
 find_package(Python3 COMPONENTS Interpreter)
 #message(FATAL_ERROR ${OCC_DATA_PATH})
 if (NOT OCC_DATA_PATH)
