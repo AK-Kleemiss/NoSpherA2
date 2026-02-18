@@ -2096,7 +2096,11 @@ tsc_block_type calculate_scattering_factors(
         }
     }
     else if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>) {
-        if (opt.partition_type == PartitionType::Hirshfeld || opt.partition_type == PartitionType::Becke || opt.partition_type == PartitionType::TFVC || opt.partition_type == PartitionType::MBIS)
+        if (opt.partition_type == PartitionType::Hirshfeld || 
+            opt.partition_type == PartitionType::Becke || 
+            opt.partition_type == PartitionType::TFVC || 
+            opt.partition_type == PartitionType::MBIS ||
+            opt.partition_type == PartitionType::EMBIS)
         {
             vec2 d1, d2, d3, dens;
             const int points = make_atomic_grids_wrapper(
@@ -2171,6 +2175,9 @@ tsc_block_type calculate_scattering_factors(
             file << setw(12 * 4 + 2) << "... done!" << endl;
             time_points.push_back(get_time());
             time_descriptions.push_back("Fourier transform");
+        }
+        else {
+			std::cout << "Unknown Partition type, stopping here!" << std::endl;
         }
         if (wavy->get_has_ECPs())
         {
