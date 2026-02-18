@@ -1041,19 +1041,21 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                 sp_vec local = sig_pop_vector;
                 vec g_cache(6 * ncen, 0.0);
                 double d_cache[6] = { 0.0 };
+                std::pair<vec2, vec>* coi;
 
                 // Precompute determinants for all atoms and shells - they don't change per point
                 vec det_pop_cache(ncen * 6, 0.0);
                 for (int k = 0; k < ncen; k++) {
                     nshell = nshell_cache[k];
+                    coi = &copy_of_input[k];
                     for (shell = 0; shell < nshell; shell++) {
-                        alpha = copy_of_input[k].first[shell].data();
+                        alpha = coi->first[shell].data();
                         det = sqrt(alpha[0] * alpha[3] * alpha[5] -
                             alpha[0] * alpha[4] * alpha[4] -
                             alpha[3] * alpha[2] * alpha[2] -
                             alpha[5] * alpha[1] * alpha[1] +
                             2 * alpha[1] * alpha[2] * alpha[4]);
-                        det_pop_cache[k * 6 + shell] = copy_of_input[k].second[shell] * constants::INV_EIGHT_PI * det;
+                        det_pop_cache[k * 6 + shell] = coi->second[shell] * constants::INV_EIGHT_PI * det;
                     }
                 }
 
@@ -1067,10 +1069,11 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
                     density = b_weight[point] * dens[point];
                     for (j = 0; j < ncen; j++) {
-                        d_local = dx.data() + j * 3;
-                        d_local[0] = gx[point] - atom_coords[j * 3 + 0];
-                        d_local[1] = gy[point] - atom_coords[j * 3 + 1];
-                        d_local[2] = gz[point] - atom_coords[j * 3 + 2];
+                        ind = j * 3;
+                        d_local = dx.data() + ind;
+                        d_local[0] = gx[point] - atom_coords[ind + 0];
+                        d_local[1] = gy[point] - atom_coords[ind + 1];
+                        d_local[2] = gz[point] - atom_coords[ind + 2];
                         d_cache[0] = d_local[0] * d_local[0];
                         d_cache[3] = d_local[1] * d_local[1];
                         d_cache[5] = d_local[2] * d_local[2];
@@ -1082,9 +1085,10 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         d_cache[2] = d_local[0] * d_local[2];
                         d_cache[4] = d_local[1] * d_local[2];
                         nshell = nshell_cache[j];
-                        ind = j * 6; // Cache index for the first shell of this atom
-                        for (shell = 0; shell < nshell; shell++, ind++) {
-                            alpha = copy_of_input[j].first[shell].data();
+                        coi = &copy_of_input[j];
+                        ind *= 2;
+                        for (shell = 0; shell < nshell; shell++) {
+                            alpha = coi->first[shell].data();
                             // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
                             g = sqrt(alpha[0] * d_cache[0] +
                                 alpha[3] * d_cache[3] +
@@ -1092,13 +1096,13 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                                 2 * alpha[1] * d_cache[1] +
                                 2 * alpha[2] * d_cache[2] +
                                 2 * alpha[4] * d_cache[4]);
-                            g_cache[ind] = g;
+                            g_cache[ind + shell] = g;
                             if (g > 42) // avoid vanishingly small contributions due to exp(-g) and potential overflow in exp(g)
                                 continue;
-                            tmp = det_pop_cache[ind] * exp(-g);
+                            tmp = det_pop_cache[ind + shell] * exp(-g);
                             if (abs(tmp) < constants::cutoff)
                                 continue;
-                            rho0shell[ind] = tmp;
+                            rho0shell[ind + shell] = tmp;
                             rho0 += tmp;
                         }
                     } //We first need to finish building total rho0 before we can calculate the contributions to the sigmas and populations
@@ -1111,15 +1115,16 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         d_cache[3] = d_local[1] * d_local[1];
                         d_cache[4] = d_local[1] * d_local[2];
                         d_cache[5] = d_local[2] * d_local[2];
-                        ind = j * 6; // Cache index for the first shell of this atom
-                        for (shell = 0; shell < nshell; shell++, ind++) {
-                            r0s = rho0shell[ind];
+                        coi = &local[j];
+                        ind = j * 6;
+                        for (shell = 0; shell < nshell; shell++) {
+                            r0s = rho0shell[ind + shell];
                             if (r0s <= constants::cutoff)
                                 continue;
                             //alpha = copy_of_input[j].first[shell].data();
-                            g = 1.0 / g_cache[ind];
+                            g = 1.0 / g_cache[ind + shell];
                             temp_res = density * r0s / rho0;
-                            alpha = local[j].first[shell].data();
+                            alpha = coi->first[shell].data();
                             // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
                             alpha[0] += temp_res * d_cache[0] * g;
                             alpha[1] += temp_res * d_cache[1] * g;
@@ -1127,7 +1132,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                             alpha[3] += temp_res * d_cache[3] * g;
                             alpha[4] += temp_res * d_cache[4] * g;
                             alpha[5] += temp_res * d_cache[5] * g;
-                            local[j].second[shell] += temp_res;
+                            coi->second[shell] += temp_res;
                         }
                     }
                 }
