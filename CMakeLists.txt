@@ -70,7 +70,9 @@ endif ()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 #include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/NOSTEST.cmake")
-add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
+if (NOT ONLY_OCC)
+    add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
+endif ()
 
 # external dependencieso
 set(WITH_FORTRAN "OFF")
@@ -79,7 +81,27 @@ set(ENABLE_STATIC "ON")
 set(BUILD_SHARED_LIBS "OFF")
 set(PYPZPX "ON")
 set(WITH_RANGE_COULOMB "ON")
-add_subdirectory(libcint)
+if (WIN32 AND ONLY_OCC)
+    set(libcint_IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/cint.lib")
+    if (EXISTS ${libcint_IMPORTED_LOCATION})
+        message(STATUS "Using precompiled libcint from ${libcint_IMPORTED_LOCATION}")
+    else ()
+        execute_process(
+                COMMAND powershell -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/Windows/Build_Dependencies/build_deps.ps1"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                RESULT_VARIABLE script_result
+                OUTPUT_VARIABLE script_output
+                ERROR_VARIABLE script_error
+        )
+    endif ()
+    add_library(cint STATIC IMPORTED)
+    set_target_properties(cint PROPERTIES
+        IMPORTED_LOCATION "${libcint_IMPORTED_LOCATION}"
+        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
+    )
+else()
+    add_subdirectory(libcint)
+endif ()
 add_library(libcint::libcint INTERFACE IMPORTED GLOBAL)
 target_link_libraries(libcint::libcint INTERFACE cint)
 target_include_directories(

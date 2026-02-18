@@ -37,12 +37,17 @@
         "TBB_BUILD_SHARED": "OFF",
         "GG_NO_PRAGMA": "ON",
         "CPACK_SYSTEM_NAME": "windows",
-        "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0"
+        "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc",
+        "CMAKE_C_FLAGS": "/EHsc"
       },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
+      },
+      "environment": {
+        "CXXFLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc",
+        "CFLAGS": "/EHsc"
       }
     },
     {
@@ -95,6 +100,11 @@
     {
       "name": "macos-debug",
       "configurePreset": "macos-debug"
+    },
+    {
+      "name": "windows-clang-cl",
+      "configurePreset": "windows-clang-cl",
+      "targets": "libocc"
     }
   ],
   "testPresets": [
