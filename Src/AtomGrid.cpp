@@ -728,7 +728,7 @@ std::pair<vec, vec> get_shsig_shpop(const int& atom_type) {
 
 std::pair<vec2, vec> get_shalpha_shpop(const int& atom_type) {
     // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
-    vec2 shalpha(constants::MBIS_function[atom_type], vec(9, 0.0));
+    vec2 shalpha(constants::MBIS_function[atom_type], vec(6, 0.0));
     vec shpop(constants::MBIS_function[atom_type], 0.0);
 
     switch (constants::MBIS_function[atom_type]) {
@@ -737,98 +737,98 @@ std::pair<vec2, vec> get_shalpha_shpop(const int& atom_type) {
         break;
     case 1:
         shalpha[0][0] = pow(2.0 * atom_type, 2);
-        shalpha[0][4] = pow(2.0 * atom_type, 2);
-        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
         shpop[0] = atom_type;
         break;
     case 2:
         shalpha[0][0] = pow(2.0 * atom_type, 2);
-        shalpha[0][4] = pow(2.0 * atom_type, 2);
-        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
         shpop[0] = 2;
         shalpha[1][0] = 4.0;
-        shalpha[1][4] = 4.0;
-        shalpha[1][8] = 4.0;
+        shalpha[1][3] = 4.0;
+        shalpha[1][5] = 4.0;
         shpop[1] = atom_type - 2;
         break;
     case 3:
         shalpha[0][0] = pow(2.0 * atom_type, 2);
-        shalpha[0][4] = pow(2.0 * atom_type, 2);
-        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
         shpop[0] = 2;
         shalpha[1][0] = pow(2.0 * sqrt(atom_type), 2);
-        shalpha[1][4] = pow(2.0 * sqrt(atom_type), 2);
-        shalpha[1][8] = pow(2.0 * sqrt(atom_type), 2);
+        shalpha[1][3] = pow(2.0 * sqrt(atom_type), 2);
+        shalpha[1][5] = pow(2.0 * sqrt(atom_type), 2);
         shpop[1] = 8;
         shalpha[2][0] = 4.0;
-        shalpha[2][4] = 4.0;
-        shalpha[2][8] = 4.0;
+        shalpha[2][3] = 4.0;
+        shalpha[2][5] = 4.0;
         shpop[2] = atom_type - 10;
         break;
     case 4:
         shalpha[0][0] = pow(2.0 * atom_type, 2);
-        shalpha[0][4] = pow(2.0 * atom_type, 2);
-        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
         shpop[0] = 2;
         shalpha[1][0] = pow(2 * pow(atom_type, constants::c_23), 2);
-        shalpha[1][4] = pow(2 * pow(atom_type, constants::c_23), 2);
-        shalpha[1][8] = pow(2 * pow(atom_type, constants::c_23), 2);
+        shalpha[1][3] = pow(2 * pow(atom_type, constants::c_23), 2);
+        shalpha[1][5] = pow(2 * pow(atom_type, constants::c_23), 2);
         shpop[1] = 8;
         shalpha[2][0] = pow(2 * pow(atom_type, constants::c_13), 2);
-        shalpha[2][4] = pow(2 * pow(atom_type, constants::c_13), 2);
-        shalpha[2][8] = pow(2 * pow(atom_type, constants::c_13), 2);
+        shalpha[2][3] = pow(2 * pow(atom_type, constants::c_13), 2);
+        shalpha[2][5] = pow(2 * pow(atom_type, constants::c_13), 2);
         shpop[2] = 8;
         shalpha[3][0] = 4.0;
-        shalpha[3][4] = 4.0;
-        shalpha[3][8] = 4.0;
+        shalpha[3][3] = 4.0;
+        shalpha[3][5] = 4.0;
         shpop[3] = atom_type - 18;
         break;
     case 5:
         shalpha[0][0] = pow(2.0 * atom_type, 2);
-        shalpha[0][4] = pow(2.0 * atom_type, 2);
-        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
         shpop[0] = 2;
         shalpha[1][0] = pow(2 * pow(atom_type, 0.25), 2);
-        shalpha[1][4] = pow(2 * pow(atom_type, 0.25), 2);
-        shalpha[1][8] = pow(2 * pow(atom_type, 0.25), 2);
+        shalpha[1][3] = pow(2 * pow(atom_type, 0.25), 2);
+        shalpha[1][5] = pow(2 * pow(atom_type, 0.25), 2);
         shpop[1] = 8;
         shalpha[2][0] = pow(2 * pow(atom_type, 0.5), 2);
-        shalpha[2][4] = pow(2 * pow(atom_type, 0.5), 2);
-        shalpha[2][8] = pow(2 * pow(atom_type, 0.5), 2);
+        shalpha[2][3] = pow(2 * pow(atom_type, 0.5), 2);
+        shalpha[2][5] = pow(2 * pow(atom_type, 0.5), 2);
         shpop[2] = 8;
         shalpha[3][0] = pow(2 * pow(atom_type, 0.75), 2);
-        shalpha[3][4] = pow(2 * pow(atom_type, 0.75), 2);
-        shalpha[3][8] = pow(2 * pow(atom_type, 0.75), 2);
+        shalpha[3][3] = pow(2 * pow(atom_type, 0.75), 2);
+        shalpha[3][5] = pow(2 * pow(atom_type, 0.75), 2);
         shpop[3] = 18;
         shalpha[4][0] = 4.0;
-        shalpha[4][4] = 4.0;
-        shalpha[4][8] = 4.0;
+        shalpha[4][3] = 4.0;
+        shalpha[4][5] = 4.0;
         shpop[4] = atom_type - 36;
         break;
     case 6:
         shalpha[0][0] = pow(2.0 * atom_type, 2);
-        shalpha[0][4] = pow(2.0 * atom_type, 2);
-        shalpha[0][8] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
         shpop[0] = 2;
         shalpha[1][0] = pow(2 * pow(atom_type, 0.2), 2);
-        shalpha[1][4] = pow(2 * pow(atom_type, 0.2), 2);
-        shalpha[1][8] = pow(2 * pow(atom_type, 0.2), 2);
+        shalpha[1][3] = pow(2 * pow(atom_type, 0.2), 2);
+        shalpha[1][5] = pow(2 * pow(atom_type, 0.2), 2);
         shpop[1] = 8;
         shalpha[2][0] = pow(2 * pow(atom_type, 0.4), 2);
-        shalpha[2][4] = pow(2 * pow(atom_type, 0.4), 2);
-        shalpha[2][8] = pow(2 * pow(atom_type, 0.4), 2);
+        shalpha[2][3] = pow(2 * pow(atom_type, 0.4), 2);
+        shalpha[2][5] = pow(2 * pow(atom_type, 0.4), 2);
         shpop[2] = 8;
         shalpha[3][0] = pow(2 * pow(atom_type, 0.6), 2);
-        shalpha[3][4] = pow(2 * pow(atom_type, 0.6), 2);
-        shalpha[3][8] = pow(2 * pow(atom_type, 0.6), 2);
+        shalpha[3][3] = pow(2 * pow(atom_type, 0.6), 2);
+        shalpha[3][5] = pow(2 * pow(atom_type, 0.6), 2);
         shpop[3] = 18;
         shalpha[4][0] = pow(2 * pow(atom_type, 0.8), 2);
-        shalpha[4][4] = pow(2 * pow(atom_type, 0.8), 2);
-        shalpha[4][8] = pow(2 * pow(atom_type, 0.8), 2);
+        shalpha[4][3] = pow(2 * pow(atom_type, 0.8), 2);
+        shalpha[4][5] = pow(2 * pow(atom_type, 0.8), 2);
         shpop[4] = 18;
         shalpha[5][0] = 4.0;
-        shalpha[5][4] = 4.0;
-        shalpha[5][8] = 4.0;
+        shalpha[5][3] = 4.0;
+        shalpha[5][5] = 4.0;
         shpop[5] = atom_type - 54;
         break;
     default:
@@ -996,7 +996,6 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     vec last_charges(atoms.size(), 0.0);
     double varmax = 0, varsig = 0;
     sp_vec sig_pop_vector;
-    vec zeros_9(9, 0.0);
     vec zeros_6(6, 0.0);
     for (auto& atom : atoms) {
         sig_pop_vector.emplace_back(get_shalpha_shpop(atom.get_charge()));
@@ -1017,7 +1016,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 
     for (size_t it = 0; it < 2000; it++) {
         for (int j = 0; j < ncen; j++) {
-            std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_9);
+            std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_6);
             std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
         }
         it == 0 ? std::cout << "Starting EMBIS iterations..." << std::endl : std::cout << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
@@ -1049,17 +1048,17 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     nshell = nshell_cache[k];
                     for (shell = 0; shell < nshell; shell++) {
                         alpha = copy_of_input[k].first[shell].data();
-                        det = sqrt(alpha[0] * alpha[4] * alpha[8] -
-                            alpha[0] * alpha[5] * alpha[5] -
-                            alpha[4] * alpha[2] * alpha[2] -
-                            alpha[8] * alpha[1] * alpha[1] +
-                            2 * alpha[1] * alpha[2] * alpha[5]);
+                        det = sqrt(alpha[0] * alpha[3] * alpha[5] -
+                            alpha[0] * alpha[4] * alpha[4] -
+                            alpha[3] * alpha[2] * alpha[2] -
+                            alpha[5] * alpha[1] * alpha[1] +
+                            2 * alpha[1] * alpha[2] * alpha[4]);
                         det_pop_cache[k * 6 + shell] = copy_of_input[k].second[shell] * constants::INV_EIGHT_PI * det;
                     }
                 }
 
                 for (j = 0; j < ncen; j++) {
-                    std::fill(local[j].first.begin(), local[j].first.end(), zeros_9);
+                    std::fill(local[j].first.begin(), local[j].first.end(), zeros_6);
                     std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
                 }
 #pragma omp for schedule(dynamic)
@@ -1088,11 +1087,11 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                             alpha = copy_of_input[j].first[shell].data();
                             // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
                             g = sqrt(alpha[0] * d_cache[0] +
-                                alpha[4] * d_cache[3] +
-                                alpha[8] * d_cache[5] +
+                                alpha[3] * d_cache[3] +
+                                alpha[5] * d_cache[5] +
                                 2 * alpha[1] * d_cache[1] +
                                 2 * alpha[2] * d_cache[2] +
-                                2 * alpha[5] * d_cache[4]);
+                                2 * alpha[4] * d_cache[4]);
                             g_cache[ind] = g;
                             if (g > 42) // avoid vanishingly small contributions due to exp(-g) and potential overflow in exp(g)
                                 continue;
@@ -1123,14 +1122,11 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                             alpha = local[j].first[shell].data();
                             // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
                             alpha[0] += temp_res * d_cache[0] * g;
-                            alpha[4] += temp_res * d_cache[3] * g;
-                            alpha[8] += temp_res * d_cache[5] * g;
                             alpha[1] += temp_res * d_cache[1] * g;
                             alpha[2] += temp_res * d_cache[2] * g;
-                            alpha[5] += temp_res * d_cache[4] * g;
-                            alpha[3] = alpha[1];
-                            alpha[6] = alpha[2];
-                            alpha[7] = alpha[5];
+                            alpha[3] += temp_res * d_cache[3] * g;
+                            alpha[4] += temp_res * d_cache[4] * g;
+                            alpha[5] += temp_res * d_cache[5] * g;
                             local[j].second[shell] += temp_res;
                         }
                     }
@@ -1139,7 +1135,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                 for (j = 0; j < ncen; j++) {
                     nshell = nshell_cache[j];
                     for (shell = 0; shell < nshell; shell++) {
-                        for (int n = 0; n < 9; n++) {
+                        for (int n = 0; n < 6; n++) {
 #pragma omp atomic
                             sig_pop_vector[j].first[shell][n] += local[j].first[shell][n];
                         }
@@ -1153,30 +1149,27 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 
         for (int i = 0; i < ncen; i++) {
             for (int shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(i)]; shell++) {
-                double det = 1 / (sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][8] -
-                    sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][5] * sig_pop_vector[i].first[shell][5] -
-                    sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][2] -
-                    sig_pop_vector[i].first[shell][8] * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][1] +
-                    2 * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][5]);
+                double det = 1 / (sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][3] * sig_pop_vector[i].first[shell][5] -
+                    sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][4] -
+                    sig_pop_vector[i].first[shell][3] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][2] -
+                    sig_pop_vector[i].first[shell][5] * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][1] +
+                    2 * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][4]);
                 if (det < 1E-14)
                     continue;
                 auto sigmas = sig_pop_vector[i].first[shell];
-                //                0   1   2   3   4   5   6   7   8
+                //                0   1   2   X   3   4   X   X   5
                 // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
-                sig_pop_vector[i].first[shell][0] = (sigmas[4] * sigmas[8] - sigmas[5] * sigmas[5]) * det;
-                sig_pop_vector[i].first[shell][4] = (sigmas[0] * sigmas[8] - sigmas[2] * sigmas[2]) * det;
-                sig_pop_vector[i].first[shell][8] = (sigmas[0] * sigmas[4] - sigmas[3] * sigmas[3]) * det;
-                sig_pop_vector[i].first[shell][1] = (sigmas[2] * sigmas[5] - sigmas[3] * sigmas[8]) * det;
-                sig_pop_vector[i].first[shell][2] = (sigmas[1] * sigmas[5] - sigmas[2] * sigmas[4]) * det;
-                sig_pop_vector[i].first[shell][5] = (sigmas[2] * sigmas[1] - sigmas[0] * sigmas[5]) * det;
-                sig_pop_vector[i].first[shell][3] = sig_pop_vector[i].first[shell][1];
-                sig_pop_vector[i].first[shell][6] = sig_pop_vector[i].first[shell][2];
-                sig_pop_vector[i].first[shell][7] = sig_pop_vector[i].first[shell][5];
+                sig_pop_vector[i].first[shell][0] = (sigmas[3] * sigmas[5] - sigmas[4] * sigmas[4]) * det;
+                sig_pop_vector[i].first[shell][1] = (sigmas[2] * sigmas[4] - sigmas[1] * sigmas[5]) * det;
+                sig_pop_vector[i].first[shell][2] = (sigmas[1] * sigmas[4] - sigmas[2] * sigmas[3]) * det;
+                sig_pop_vector[i].first[shell][3] = (sigmas[0] * sigmas[5] - sigmas[2] * sigmas[2]) * det;
+                sig_pop_vector[i].first[shell][4] = (sigmas[2] * sigmas[1] - sigmas[0] * sigmas[4]) * det;
+                sig_pop_vector[i].first[shell][5] = (sigmas[0] * sigmas[3] - sigmas[1] * sigmas[1]) * det;
 
                 if (sig_pop_vector[i].second[shell] != 0)
-                    for (int n = 0; n < 9; n++)
+                    for (int n = 0; n < 6; n++)
                         sig_pop_vector[i].first[shell][n] *= sig_pop_vector[i].second[shell];
-                for (int n = 0; n < 9; n++)
+                for (int n = 0; n < 6; n++)
                     varsig = std::max(varsig, std::abs(sig_pop_vector[i].first[shell][n] - copy_of_input[i].first[shell][n]));
             }
             charges[i] = wavy.get_atom_charge(i) - vec_sum(sig_pop_vector[i].second) + wavy.get_atom_ECP_electrons(i);

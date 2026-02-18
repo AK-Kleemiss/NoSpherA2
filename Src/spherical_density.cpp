@@ -563,12 +563,11 @@ EMBIS_Atom::EMBIS_Atom(const int g_atom_number, const vec2& g_alpha, const vec& 
     atomic_number = g_atom_number;
     charge = 0;
     for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
-        sqrt_det.emplace_back(sqrt(alpha[m][0] * alpha[m][4] * alpha[m][8] -
-            alpha[m][0] * alpha[m][5] * alpha[m][5] -
-            alpha[m][4] * alpha[m][2] * alpha[m][2] -
-            alpha[m][8] * alpha[m][1] * alpha[m][1] +
-            2 * alpha[m][1] * alpha[m][2] * alpha[m][5]));
-
+        sqrt_det.emplace_back(sqrt(alpha[m][0] * alpha[m][3] * alpha[m][5] -
+            alpha[m][0] * alpha[m][4] * alpha[m][4] -
+            alpha[m][3] * alpha[m][2] * alpha[m][2] -
+            alpha[m][5] * alpha[m][1] * alpha[m][1] +
+            2 * alpha[m][1] * alpha[m][2] * alpha[m][4]));
 };
 EMBIS_Atom::EMBIS_Atom()
 {
@@ -584,11 +583,11 @@ const double EMBIS_Atom::get_density(const d3& pos) const
     for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
     {
         g = sqrt(alpha[m][0] * pos[0] * pos[0] +
-            alpha[m][4] * pos[1] * pos[1] +
-            alpha[m][8] * pos[2] * pos[2] +
+            alpha[m][3] * pos[1] * pos[1] +
+            alpha[m][5] * pos[2] * pos[2] +
             2 * alpha[m][1] * pos[0] * pos[1] +
             2 * alpha[m][2] * pos[0] * pos[2] +
-            2 * alpha[m][5] * pos[1] * pos[2]);
+            2 * alpha[m][4] * pos[1] * pos[2]);
         Rho += pop[m] * constants::INV_EIGHT_PI * sqrt_det[m] * exp(-g);
     }
     return Rho;
