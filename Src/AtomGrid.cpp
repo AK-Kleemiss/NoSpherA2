@@ -419,6 +419,7 @@ void AtomGrid::get_grid(const int num_centers,
     if (num_centers > 1) {
         if (chi.size() == 0)
             chi = make_chi(wfn, 40, true, debug);
+        const int np = get_num_grid_points();
 #pragma omp parallel
         {
             vec pa_b(num_centers);
@@ -426,7 +427,7 @@ void AtomGrid::get_grid(const int num_centers,
             std::array<double, 2> result_weights;
             double temp;
 #pragma omp for
-            for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
+            for (int ipoint = 0; ipoint < np; ipoint++) {
                 grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
                 grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
                 grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
@@ -878,11 +879,15 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
             //Assuming 3 is the quadrature weight and 7 is the electron density 
             const double* b_weight = grid[i][5].data();
             const double* dens = grid[i][7].data();
+            //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
+            const double* gx = grid[i][0].data();
+            const double* gy = grid[i][1].data();
+            const double* gz = grid[i][2].data();
 
 #pragma omp parallel
             {
                 vec2 rho0shell(wavy.get_ncen(), vec(6, 0.0));
-                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval;
+                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq;
                 int j, shell, nshell;
                 d3 dx;
                 sp_vec local = sig_pop_vector;
@@ -894,15 +899,15 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 #pragma omp for
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
-                    vec dists(ncen);
+                    vec dists(ncen, 0.0);
                     std::fill(rho0shell.begin(), rho0shell.end(), zeros_6);
                     for (j = 0; j < wavy.get_ncen(); j++) {
                         //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-                        dx = { grid[i][0][point] - atom_coords[j][0],
-                               grid[i][1][point] - atom_coords[j][1],
-                               grid[i][2][point] - atom_coords[j][2] };
+                        dx[0] = gx[point] - atom_coords[j][0];
+                        dx[1] = gy[point] - atom_coords[j][1];
+                        dx[2] = gz[point] - atom_coords[j][2];
                         // Check distance squared first to avoid sqrt for far away points
-                        const double dist_sq = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+                        dist_sq = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
                         if (dist_sq > constants::far_away_sq)
                             continue;
 

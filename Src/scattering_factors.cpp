@@ -1533,40 +1533,47 @@ void calc_SF(const int& points,
 
     ProgressBar* progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
     long long int pmax;
-    double* dens_local, * d1_local, * d2_local, * d3_local;
     complex<double>* sf_local;
-    const double* k1_local = k_pt[0].data();
-    const double* k2_local = k_pt[1].data();
-    const double* k3_local = k_pt[2].data();
-    double work, rho, c, si;
+    double work, rho, c, si, *dens_local;
     for (int i = 0; i < imax; i++)
     {
         pmax = static_cast<long long int>(dens[i].size());
-        dens_local = dens[i].data();
-        d1_local = d1[i].data();
-        d2_local = d2[i].data();
-        d3_local = d3[i].data();
-        sf_local = sf[i].data();
+		dens_local = dens[i].data();
+        const double* d1_local = d1[i].data(),
+            * d2_local = d2[i].data(),
+            * d3_local = d3[i].data();
 #pragma omp parallel for private(work, rho, c, si)
         for (long long int s = 0; s < smax; s++)
         {
+			double re = 0.0, im = 0.0;
+			const double* k1_local = &(k_pt[0][s]);
+			const double* k2_local = &(k_pt[1][s]);
+			const double* k3_local = &(k_pt[2][s]);
+            sf_local = sf[i].data();
             for (long long int p = pmax - 1; p >= 0; p--)
             {
                 rho = dens_local[p];
-                work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+                work = *k1_local * d1_local[p] + *k2_local * d2_local[p] + *k3_local * d3_local[p];
 #if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
                 sincos(work, &si, &c);
-                sf_local[s] += cdouble(rho * c, rho * si);
+                re += rho * c;
+                im += rho * si;
+                //sf_local[s] += cdouble(rho * c, rho * si);
 #elif defined(__APPLE__)
                 __sincos(work, &si, &c);
-                sf_local[s] += cdouble(rho * c, rho * si);
+                re += rho * c;
+                im += rho * si;
+                //sf_local[s] += cdouble(rho * c, rho * si);
 #else
                 //MSVC likes this one slightly more than not storing intermediates, as it uses some sincos internally apparently
                 c = cos(work);
                 si = sin(work);
-                sf_local[s] += cdouble(rho * c, rho * si);
+                re += rho * c;
+                im += rho * si;
 #endif
             }
+            sf_local[s].real(re);
+			sf_local[s].imag(im);
         }
         progress->update();
     }
