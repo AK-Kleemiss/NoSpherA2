@@ -322,7 +322,7 @@ if (Test-Path $LibCintOut) {
 
   Push-Location $bld
   try {
-    cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX="..\..\Lib\LibCint" -DCMAKE_C_COMPILER=cl ..
+    cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX="..\..\Lib\LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" ..
     cmake --build . --config RELEASE
     cmake --install .
   } finally {

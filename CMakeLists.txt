@@ -89,7 +89,7 @@ if (WIN32 AND ONLY_OCC)
         if(NOT $ENV{MKLROOT})
             set(MKL_DIR ${CMAKE_SOURCE_DIR}/Windows/packages_mkl)
             execute_process(COMMAND nuget install intelmkl.static.win-x64 -OutputDirectory ${MKL_DIR} -ExcludeVersion)
-            set($ENV{MKLROOT} ${MKL_DIR}/intelmkl.static.win-x64/build/native)
+            set($ENV{MKLROOT} "${MKL_DIR}/intelmkl.static.win-x64/build/native")
         endif ()
         execute_process(
                 COMMAND powershell -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/Windows/Build_Dependencies/build_deps.ps1" ${CMAKE_CURRENT_SOURCE_DIR}
