@@ -89,7 +89,7 @@ target_include_directories(
 )
 set(USE_SYSTEM_LIBCINT "ON")
 set(BUILD_FPIC "ON")
-set(WITH_PYTHON_BINDINGS "ON")
+set(WITH_PYTHON_BINDINGS "OFF")
 set(BUILD_SHARED_LIBS "OFF")
 add_subdirectory(occ)
 add_subdirectory(mdspan)
