@@ -32,7 +32,7 @@
         "CMAKE_CXX_COMPILER_LAUNCHER": "sccache",
         "CMAKE_EXE_LINKER_FLAGS": "runtimeobject.lib",
         "CMAKE_SHARED_LINKER_FLAGS": "runtimeobject.lib",
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded",
+        //"CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded",
         "BUILD_SHARED_LIBS": "OFF",
         "TBB_BUILD_SHARED": "OFF",
         "GG_NO_PRAGMA": "ON",
