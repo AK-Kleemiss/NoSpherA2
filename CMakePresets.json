@@ -38,7 +38,8 @@
         "GG_NO_PRAGMA": "ON",
         "CPACK_SYSTEM_NAME": "windows",
         "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc",
-        "CMAKE_C_FLAGS": "/EHsc"
+        "CMAKE_C_FLAGS": "/EHsc",
+        "ONLY_OCC": "ON"
       },
       "condition": {
         "type": "equals",
