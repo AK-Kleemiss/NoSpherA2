@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.15)
 project(NoSpherA2 CXX C)
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 set(CMAKE_CXX_STANDARD 23)
@@ -86,8 +86,13 @@ if (WIN32 AND ONLY_OCC)
     if (EXISTS ${libcint_IMPORTED_LOCATION})
         message(STATUS "Using precompiled libcint from ${libcint_IMPORTED_LOCATION}")
     else ()
+        if(NOT $ENV{MKLROOT})
+            set(MKL_DIR ${CMAKE_SOURCE_DIR}/Windows/packages_mkl)
+            execute_process(COMMAND nuget install intelmkl.static.win-x64 -OutputDirectory ${MKL_DIR} -ExcludeVersion)
+            set($ENV{MKLROOT} ${MKL_DIR}/intelmkl.static.win-x64/build/native)
+        endif ()
         execute_process(
-                COMMAND powershell -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/Windows/Build_Dependencies/build_deps.ps1"
+                COMMAND powershell -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/Windows/Build_Dependencies/build_deps.ps1" ${CMAKE_CURRENT_SOURCE_DIR}
                 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
                 RESULT_VARIABLE script_result
                 OUTPUT_VARIABLE script_output
@@ -112,7 +117,7 @@ target_include_directories(
 set(USE_SYSTEM_LIBCINT "ON")
 set(BUILD_FPIC "ON")
 set(WITH_PYTHON_BINDINGS "OFF")
-set(BUILD_SHARED_LIBS "OFF")
+set(BUILD_SHARED_LIBS "FALSE")
 if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     if (WIN32)
         set(Python3_EXECUTABLE ${MICROMAMBA_ENV_PATH}/python.exe)
