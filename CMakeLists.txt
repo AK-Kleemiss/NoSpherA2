@@ -86,7 +86,7 @@ set(WITH_RANGE_COULOMB "ON")
      if (EXISTS ${libcint_IMPORTED_LOCATION})
          message(STATUS "Using precompiled libcint from ${libcint_IMPORTED_LOCATION}")
      else ()
-       message(FATAL_ERROR "Need to run '.\Windows\Build_Dependencies\build_deps.ps1 .'")
+       message(FATAL_ERROR "You beed to run '.\\Windows\\Build_Dependencies\\build_deps.ps1 .'")
      endif ()
      add_library(cint STATIC IMPORTED)
      set_target_properties(cint PROPERTIES
