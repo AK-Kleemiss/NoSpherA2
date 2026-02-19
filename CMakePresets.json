@@ -15,7 +15,8 @@
         "ENV_PATH": "${sourceDir}/mambaenv",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ",
         "CMAKE_C_COMPILER_LAUNCHER": "sccache",
-        "CMAKE_CXX_COMPILER_LAUNCHER": "sccache"
+        "CMAKE_CXX_COMPILER_LAUNCHER": "sccache",
+        "ONLY_OCC": "ON"
       }
     },
     {
@@ -38,8 +39,7 @@
         "GG_NO_PRAGMA": "ON",
         "CPACK_SYSTEM_NAME": "windows",
         "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MT",
-        "CMAKE_C_FLAGS": "/EHsc /MT",
-        "ONLY_OCC": "ON"
+        "CMAKE_C_FLAGS": "/EHsc /MT"
       },
       "condition": {
         "type": "equals",
@@ -128,8 +128,14 @@
   ],
   "buildPresets": [
     {
-      "name": "macos-release",
-      "configurePreset": "macos-release"
+      "name": "macos-release-arm64",
+      "configurePreset": "macos-release-arm64",
+      "targets": "occ"
+    },
+    {
+      "name": "macos-release-x86_64",
+      "configurePreset": "macos-release-x86_64",
+      "targets": "occ"
     },
     {
       "name": "macos-debug",
