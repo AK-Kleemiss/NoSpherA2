@@ -131,10 +131,10 @@ LibCint_x86_64:
 LibCint_arm64:
 	@$(MAKE) NATIVE_ARCH=arm64 LibCint
 
-occ_x86_64:
+occ_x86_64: LibCint_x86_64
 	@$(MAKE) NATIVE_ARCH=x86_64 occ
 
-occ_arm64:
+occ_arm64: LibCint_arm64
 	@$(MAKE) NATIVE_ARCH=arm64 occ
 endif
 
@@ -214,7 +214,7 @@ NoSpherA2_x86_64: IntelMKL featomic_x86_64 LibCint_x86_64 occ_x86_64
 	@rm -f NoSpherA2_x86_64
 	@cd Mac && rm -f NoSpherA2_x86_64 && make NoSpherA2_x86_64 -j && cp NoSpherA2_x86_64 ../NoSpherA2_x86_64
 
-NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint_arm64 LibCint_x86_64 LibCint_x86_64 occ_x86_64
+NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint_arm64 LibCint_x86_64 LibCint_x86_64 occ_x86_64 occ_arm64
 	@echo Start making Mac universal executable
 	@rm -f NoSpherA2
 	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j
