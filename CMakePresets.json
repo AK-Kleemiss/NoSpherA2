@@ -94,6 +94,22 @@
       }
     },
     {
+      "name": "macos-release-x86_64",
+      "inherits": "macos-release",
+      "displayName": "macOS release (Clang, x86_64)",
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "x86_64"
+      }
+    },
+    {
+        "name": "macos-release-arm64",
+        "inherits": "macos-release",
+        "displayName": "macOS release (Clang, arm64)",
+        "cacheVariables": {
+            "CMAKE_OSX_ARCHITECTURES": "arm64"
+        }
+    },
+    {
       "name": "Debug",
       "inherits": "base-options",
       "displayName": "Debug (GCC/ccache)",
@@ -171,6 +187,19 @@
         {
           "type": "build",
           "name": "linux-gcc"
+        }
+      ]
+    },
+    {
+      "name": "macos-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "macos-release"
+        },
+        {
+          "type": "build",
+          "name": "macos-release"
         }
       ]
     }

@@ -41,6 +41,8 @@ runs:
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         export PATH="$HOME/.cargo/bin:$PATH"
         make featomic_arm64 LibCint_arm64 occ -j
+        cmake --workflow --preset macos-release-arm64
+        cmake --install ./build-macos-release-arm64
 
     - name: Build deps (macOS x86_64)
       if: inputs.platform == 'Mac_x86_64'
@@ -49,6 +51,8 @@ runs:
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         export PATH="$HOME/.cargo/bin:$PATH"
         make featomic_x86_64 LibCint_x86_64 occ -j
+        cmake --workflow --preset macos-release-x86_64
+        cmake --install ./build-macos-release-x86_64
 
     - name: Build deps (Linux)
       if: inputs.platform == 'Linux'
@@ -58,6 +62,8 @@ runs:
         export PATH="$HOME/.cargo/bin:$PATH"
         make IntelMKL featomic LibCint occ -j
         echo "LD_LIBRARY_PATH=${{ github.workspace }}/Lib/MKL/compiler/2025.2/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        cmake --workflow --preset linux-gcc
+        cmake --install ./build-linux-gcc
 
     - name: Build dependencies (Windows)
       if: inputs.platform == 'Windows'
@@ -124,7 +130,7 @@ runs:
           Write-Host "OCC already built ($OccOut)"
         } else {
           Write-Host "Building LibCint..."
-          Push-Location $RepoRoot
+          Push-Location $env:GITHUB_WORKSPACE
           try {
             cmake --workflow --preset windows-clang-cl
             cmake --install .\build-windows-clang-cl
