@@ -542,7 +542,8 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
     double mu_ab, nu_ab, f, dist_ab;
     double dist_a, dist_b;
     double vx, vy, vz;
-    double R_a, R_b, chi_becke, u_ab;
+    double R_a, R_b, chi_becke, u_ab, chi_mod;
+    const double* chi_off;
 
     for (int a = 0; a < num_centers; a++) {
         pa_b[a] = 1.0;
@@ -565,8 +566,12 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
         }
 
         R_a = constants::bragg_angstrom[proton_charges[a]];
+        chi_off = chi.data() + a * num_centers;
 
         for (int b = a + 1; b < num_centers; b++) {
+            double& pa_b_b = pa_b[b];
+            double& pa_tv_b = pa_tv[b];
+
             vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
             vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
             vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
@@ -582,7 +587,11 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             // JCP 88, 2547 (1988), eq. 11
             mu_ab = (dist_a - dist_b) / dist_ab;
 
-            nu_ab = (1.0 + mu_ab - chi[a * num_centers + b] * (1.0 - mu_ab)) / (1.0 + mu_ab + chi[a * num_centers + b] * (1.0 - mu_ab));
+            chi_mod = *(chi_off + b) * (1.0 - mu_ab);
+
+            nu_ab = 1.0 + mu_ab;
+
+            nu_ab = (nu_ab - chi_mod) / (nu_ab + chi_mod);
 
             f = 1.0 - f4(nu_ab);
 
@@ -594,10 +603,10 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
                     pa_tv_a *= 0.5 * f;
                 else
                     pa_tv_a = 0.0;
-                if (pa_tv[b] > 1E-250 || pa_tv[b] < -1E-250)
-                    pa_tv[b] *= 0.5 * (2.0 - f);
+                if (pa_tv_b > 1E-250 || pa_tv_b < -1E-250)
+                    pa_tv_b *= 0.5 * (2.0 - f);
                 else
-                    pa_tv[b] = 0.0;
+                    pa_tv_b = 0.0;
             }
 
 
@@ -626,10 +635,10 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
                     pa_b_a *= 0.5 * f;
                 else
                     pa_b_a = 0.0;
-                if (pa_b[b] > 1E-250 || pa_b[b] < -1E-250)
-                    pa_b[b] *= 0.5 * (2.0 - f);
+                if (pa_b_b > 1E-250 || pa_b_b < -1E-250)
+                    pa_b_b *= 0.5 * (2.0 - f);
                 else
-                    pa_b[b] = 0.0;
+                    pa_b_b = 0.0;
             }
         }
     }
