@@ -10,7 +10,7 @@ double make_sphericals(
     vec2& dist,
     const ivec& atom_type_list,
     std::ostream& file,
-    std::vector<std::pair<vec, vec>>& pop_sig,
+    const std::vector<std::pair<vec, vec>>& pop_sig,
     bool debug = false,
     double incr_start = 1.005,
     double min_dist = 0.0000001,
@@ -81,10 +81,10 @@ private:
 
     void calculateNonSphericalDensities(const WFN& wave, const cell& unit_cell);
 
-    void calculateSphericalDensities(const WFN& wave, const cell& unit_cell, const ivec& atom_list, vec2& single_spherical_density, vec2& combined_spherical_density, std::vector<std::pair<vec, vec>> sig_pop = {});
+    void calculateSphericalDensities(const WFN& wave, const cell& unit_cell, const ivec& atom_list, vec2& single_spherical_density, vec2& combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
     void calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
-    void calculateMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
-    void calculateEMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
+    std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
+    void calculateEMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list, const std::vector<std::pair<vec, vec>>& MBIS_weights);
     void pruneGrid();
 
     void addTimingPoint(const std::string& label) {

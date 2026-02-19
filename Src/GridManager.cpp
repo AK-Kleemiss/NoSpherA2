@@ -8,7 +8,7 @@ double make_sphericals(
     vec2& dist,
     const ivec& atom_type_list,
     std::ostream& file,
-    std::vector<std::pair<vec, vec>>& pop_sig,
+    const std::vector<std::pair<vec, vec>>& pop_sig,
     bool debug,
     double incr_start,
     double min_dist,
@@ -239,13 +239,15 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
         addTimingPoint("Hirshfeld Weights");
     }
 
+	std::vector<std::pair<vec, vec>> sig_pop; // Dummy vector for now, will be used for MBIS if needed
+
     if (config_.partition_type == PartitionType::MBIS || config_.debug || config_.all_charges) {
         if (!non_spherical_densities_calculated_) {
             calculateNonSphericalDensities(wave, unit_cell);
             addTimingPoint("WFN evaluation on grid");
         }
 
-        calculateMBISWeights(wave, unit_cell, atom_list);
+        sig_pop = calculateMBISWeights(wave, unit_cell, atom_list);
         addTimingPoint("MBIS Weights");
     }
 
@@ -254,7 +256,11 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
             calculateNonSphericalDensities(wave, unit_cell);
             addTimingPoint("WFN evaluation on grid");
         }
-        calculateEMBISWeights(wave, unit_cell, atom_list);
+
+        //calculateEMBISWeights(wave, unit_cell, atom_list);
+		if (sig_pop.empty())
+            sig_pop = make_MBIS_vectors(wave, grid_data_.atomic_grids, grid_data_.num_points_per_atom, false);
+        calculateEMBISWeights(wave, unit_cell, atom_list, sig_pop);
         addTimingPoint("EMBIS Weights");
     }
 
@@ -808,7 +814,7 @@ void GridManager::calculateSphericalDensities(
     const ivec& atom_list,
     vec2& single_spherical_density,
     vec2& combined_spherical_density,
-    std::vector<std::pair<vec, vec>> sig_pop)
+    const std::vector<std::pair<vec, vec>> sig_pop)
 {
     bvec fake_needs_grid(wave.get_ncen(), true);
     ivec complete_type_list;
@@ -991,7 +997,7 @@ void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_ce
     }
 }
 
-void GridManager::calculateMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list) {
+std::vector<std::pair<vec, vec>> GridManager::calculateMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list) {
     vec2 single_spherical_density, combined_spherical_density;
     const std::vector<std::pair<vec, vec>> sig_pop = make_MBIS_vectors(wave, grid_data_.atomic_grids, grid_data_.num_points_per_atom);
     calculateSphericalDensities(wave, unit_cell, atom_list, single_spherical_density, combined_spherical_density, sig_pop);
@@ -1009,11 +1015,12 @@ void GridManager::calculateMBISWeights(const WFN& wave, const cell& unit_cell, c
                 (combined_ptr[p] != 0.0) ? (atom_grid[GridData::GridIndex::WEIGHT][p] * (single_ptr[p] / combined_ptr[p])) : 0.0;
         }
     }
+	return sig_pop;
 }
 
-void GridManager::calculateEMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list) {
+void GridManager::calculateEMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list, const std::vector<std::pair<vec, vec>>& MBIS_weights) {
     vec2 single_spherical_density, combined_spherical_density;
-    const std::vector<std::pair<vec2, vec>> sig_pop = make_EMBIS_tensors(wave, grid_data_.atomic_grids, grid_data_.num_points_per_atom);
+    const std::vector<std::pair<vec2, vec>> sig_pop = make_EMBIS_tensors(wave, grid_data_.atomic_grids, grid_data_.num_points_per_atom, false, MBIS_weights);
 
     single_spherical_density.resize(grid_data_.atomic_grids.size());
     combined_spherical_density.resize(grid_data_.atomic_grids.size());

@@ -848,6 +848,19 @@ std::pair<vec2, vec> get_shalpha_shpop(const int& atom_type) {
     return std::make_pair(shalpha, shpop);
 }
 
+vec2 sigma_to_alpha(const std::pair<vec, vec>&sigma) {
+    // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
+    vec2 shalpha(sigma.first.size(), vec(6, 0.0));
+
+    for (int i = 0; i < sigma.first.size(); i++) {
+        shalpha[i][0] = pow(sigma.first[i], -2);
+        shalpha[i][3] = pow(sigma.first[i], -2);
+        shalpha[i][5] = pow(sigma.first[i], -2);
+    }
+
+    return shalpha;
+}
+
 // grids here are the total_grid in the SF calculator functions, just as a not to myself and future me
 //Implemented according to the modified Multiwfn version by FJR and Anker
 std::vector<std::pair<vec, vec>> make_MBIS_vectors(
@@ -899,22 +912,24 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 
 #pragma omp parallel
             {
-                vec rho0shell(ncen * 6, 0.0);
+                vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0);
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq;
                 int j, shell, nshell;
                 double dx[3];
                 sp_vec local = sig_pop_vector;
-                for (j = 0; j < wavy.get_ncen(); j++) {
+                for (j = 0; j < ncen; j++) {
                     std::fill(local[j].first.begin(), local[j].first.end(), 0.0);
                     std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
                 }
+                std::pair<vec, vec>* coi;
 
 #pragma omp for schedule(dynamic)
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
-                    vec dists(ncen, 0.0);
+                    std::fill(dists.begin(), dists.end(), 0.0);
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
-                    for (j = 0; j < wavy.get_ncen(); j++) {
+                    density = b_weight[point] * dens[point];
+                    for (j = 0; j < ncen; j++) {
                         //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
                         dx[0] = gx[point] - atom_coords[j * 3 + 0];
                         dx[1] = gy[point] - atom_coords[j * 3 + 1];
@@ -926,17 +941,17 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 
                         dists[j] = std::sqrt(dist_sq);
                         nshell = nshell_cache[j];
+                        coi = &copy_of_input[j];
 
                         for (shell = 0; shell < nshell; shell++) {
-                            sigval = copy_of_input[j].first[shell];
-                            tmp = copy_of_input[j].second[shell] * constants::INV_EIGHT_PI * pow(sigval, -3) * exp(-dists[j] / sigval);
+                            sigval = coi->first[shell];
+                            tmp = coi->second[shell] * constants::INV_EIGHT_PI * pow(sigval, -3) * exp(-dists[j] / sigval);
                             if (abs(tmp) < 1e-20)
                                 continue;
                             rho0shell[j * 6 + shell] = tmp;
                             rho0 += tmp;
                         }
                     }
-                    density = b_weight[point] * dens[point];
                     for (j = 0; j < wavy.get_ncen(); j++) {
                         nshell = nshell_cache[j];
                         for (shell = 0; shell < nshell; shell++) {
@@ -950,7 +965,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                     }
                 }
 
-                for (j = 0; j < wavy.get_ncen(); j++) {
+                for (j = 0; j < ncen; j++) {
                     nshell = nshell_cache[j];
                     for (shell = 0; shell < nshell; shell++) {
 #pragma omp atomic
@@ -963,8 +978,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         }
         //back to the cycle main loop, we updated sig and pop based on information loss :)
 
-        for (int i = 0; i < wavy.get_ncen(); i++) {
-            for (int shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(i)]; shell++) {
+        for (int i = 0; i < ncen; i++) {
+            for (int shell = 0; shell < nshell_cache[i]; shell++) {
                 if (sig_pop_vector[i].second[shell] != 0)
                     sig_pop_vector[i].first[shell] /= 3.0 * sig_pop_vector[i].second[shell];
                 varsig = std::max(varsig, std::abs(sig_pop_vector[i].first[shell] - copy_of_input[i].first[shell]));
@@ -996,7 +1011,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     const WFN& wavy,
     const vec3& grid,
     const ivec& num_grid_points,
-    const bool debug)
+    const bool debug, 
+    const std::vector<std::pair<vec, vec>> MBIS_vectors )
 {
     using sp_vec = std::vector<std::pair<vec2, vec>>;
     const double crit = 0.001;
@@ -1006,8 +1022,20 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     double varmax = 0, varsig = 0;
     sp_vec sig_pop_vector;
     vec zeros_6(6, 0.0);
-    for (auto& atom : atoms) {
-        sig_pop_vector.emplace_back(get_shalpha_shpop(atom.get_charge()));
+    sp_vec tens1, tens2;
+    if (MBIS_vectors.size() == 0) {
+        for (auto& atom : atoms) {
+            sig_pop_vector.emplace_back(get_shalpha_shpop(atom.get_charge()));
+        }
+    }
+    else {
+        for (auto& vector : MBIS_vectors) {
+            //tens1.emplace_back(std::make_pair(sigma_to_alpha(vector), vector.second));
+            sig_pop_vector.emplace_back(std::make_pair(sigma_to_alpha(vector), vector.second));
+        }
+        //for (auto& atom : atoms) {
+        //    tens2.emplace_back(get_shalpha_shpop(atom.get_charge()));
+        //}
     }
     sp_vec copy_of_input = sig_pop_vector;
 
