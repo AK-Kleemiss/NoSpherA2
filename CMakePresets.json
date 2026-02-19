@@ -13,7 +13,7 @@
         "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "ENV_PATH": "${sourceDir}/mambaenv",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ",
         "CMAKE_C_COMPILER_LAUNCHER": "ccache",
         "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
       }
@@ -32,13 +32,13 @@
         "CMAKE_CXX_COMPILER_LAUNCHER": "sccache",
         "CMAKE_EXE_LINKER_FLAGS": "runtimeobject.lib",
         "CMAKE_SHARED_LINKER_FLAGS": "runtimeobject.lib",
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
         "BUILD_SHARED_LIBS": "OFF",
         "TBB_BUILD_SHARED": "OFF",
         "GG_NO_PRAGMA": "ON",
         "CPACK_SYSTEM_NAME": "windows",
-        "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc",
-        "CMAKE_C_FLAGS": "/EHsc",
+        "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MT",
+        "CMAKE_C_FLAGS": "/EHsc /MT",
         "ONLY_OCC": "ON"
       },
       "condition": {
@@ -49,6 +49,10 @@
       "environment": {
         "CXXFLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc",
         "CFLAGS": "/EHsc"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
       }
     },
     {

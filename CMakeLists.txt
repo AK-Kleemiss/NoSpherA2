@@ -81,32 +81,24 @@ set(ENABLE_STATIC "ON")
 set(BUILD_SHARED_LIBS "OFF")
 set(PYPZPX "ON")
 set(WITH_RANGE_COULOMB "ON")
-if (WIN32 AND ONLY_OCC)
-    set(libcint_IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/cint.lib")
-    if (EXISTS ${libcint_IMPORTED_LOCATION})
-        message(STATUS "Using precompiled libcint from ${libcint_IMPORTED_LOCATION}")
-    else ()
-        if(NOT $ENV{MKLROOT})
-            set(MKL_DIR ${CMAKE_SOURCE_DIR}/Windows/packages_mkl)
-            execute_process(COMMAND nuget install intelmkl.static.win-x64 -OutputDirectory ${MKL_DIR} -ExcludeVersion)
-            set($ENV{MKLROOT} "${MKL_DIR}/intelmkl.static.win-x64/build/native")
-        endif ()
-        execute_process(
-                COMMAND powershell -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/Windows/Build_Dependencies/build_deps.ps1" ${CMAKE_CURRENT_SOURCE_DIR}
-                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-                RESULT_VARIABLE script_result
-                OUTPUT_VARIABLE script_output
-                ERROR_VARIABLE script_error
-        )
-    endif ()
-    add_library(cint STATIC IMPORTED)
-    set_target_properties(cint PROPERTIES
-        IMPORTED_LOCATION "${libcint_IMPORTED_LOCATION}"
-        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
-    )
-else()
-    add_subdirectory(libcint)
-endif ()
+ if (WIN32 AND ONLY_OCC)
+     set(libcint_IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/cint.lib")
+     if (EXISTS ${libcint_IMPORTED_LOCATION})
+         message(STATUS "Using precompiled libcint from ${libcint_IMPORTED_LOCATION}")
+     else ()
+       message(FATAL_ERROR "Need to run '.\Windows\Build_Dependencies\build_deps.ps1 .'")
+     endif ()
+     add_library(cint STATIC IMPORTED)
+     set_target_properties(cint PROPERTIES
+         IMPORTED_LOCATION "${libcint_IMPORTED_LOCATION}"
+         INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
+     )
+ else()
+     add_subdirectory(libcint)
+
+ endif ()
+
+#add_subdirectory(libcint)
 add_library(libcint::libcint INTERFACE IMPORTED GLOBAL)
 target_link_libraries(libcint::libcint INTERFACE cint)
 target_include_directories(
