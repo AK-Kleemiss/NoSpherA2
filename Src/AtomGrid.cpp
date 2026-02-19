@@ -496,7 +496,7 @@ void AtomGrid::get_radial_distances_omp(double grid_r_bohr[]) const
 }
 
 // JCP 88, 2547 (1988), eq. 20
-constexpr double f3(const double& x)
+inline constexpr double f3(const double& x)
 {
     double f = x;
     f *= (1.5 - 0.5 * f * f); // First iteration
@@ -506,7 +506,7 @@ constexpr double f3(const double& x)
 }
 
 // JCP 88, 2547 (1988), eq. 20
-constexpr double f4(const double& x)
+inline constexpr double f4(const double& x)
 {
     double f = x;
     f *= (1.5 - 0.5 * f * f); // First iteration
@@ -543,7 +543,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
     double dist_a, dist_b;
     double vx, vy, vz;
     double R_a, R_b, chi_becke, u_ab, chi_mod;
-    const double* chi_off, *bragg = constants::bragg_angstrom;
+    const double* chi_off, * bragg = constants::bragg_angstrom;
     double* R_v = new double[num_centers];
     const double& cut = constants::cutoff;
     for (int a = 0; a < num_centers; a++) {
@@ -551,7 +551,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
         pa_tv[a] = 1.0;
         R_v[a] = bragg[proton_charges[a]];
     }
-    
+
 
     for (int a = 0; a < num_centers; a++) {
         vx = x_coordinates_bohr[a] - x;
@@ -645,6 +645,8 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             }
         }
     }
+
+    free(R_v);
 
     double w_becke = 0.0, w_tfvc = 0.0;
     for (int a = 0; a < num_centers; a++) {
@@ -851,7 +853,7 @@ std::pair<vec2, vec> get_shalpha_shpop(const int& atom_type) {
     return std::make_pair(shalpha, shpop);
 }
 
-vec2 sigma_to_alpha(const std::pair<vec, vec>&sigma) {
+vec2 sigma_to_alpha(const std::pair<vec, vec>& sigma) {
     // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
     vec2 shalpha(sigma.first.size(), vec(6, 0.0));
 
@@ -918,13 +920,14 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                 vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0);
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq;
                 int j, shell, nshell;
-                double dx[3];
+                double dx[3], * dist_j;
                 sp_vec local = sig_pop_vector;
                 for (j = 0; j < ncen; j++) {
                     std::fill(local[j].first.begin(), local[j].first.end(), 0.0);
                     std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
                 }
                 std::pair<vec, vec>* coi;
+                double* pop, * si;
 
 #pragma omp for schedule(dynamic)
                 for (int point = 0; point < end; point++) {
@@ -945,25 +948,30 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                         dists[j] = std::sqrt(dist_sq);
                         nshell = nshell_cache[j];
                         coi = &copy_of_input[j];
-
+                        pop = coi->second.data();
+                        si = coi->first.data();
+                        dist_j = &dists[j];
                         for (shell = 0; shell < nshell; shell++) {
-                            sigval = coi->first[shell];
-                            tmp = coi->second[shell] * constants::INV_EIGHT_PI * pow(sigval, -3) * exp(-dists[j] / sigval);
+                            sigval = 1.0 / si[shell];
+                            tmp = pop[shell] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-*dist_j * sigval);
                             if (abs(tmp) < 1e-20)
                                 continue;
                             rho0shell[j * 6 + shell] = tmp;
                             rho0 += tmp;
                         }
                     }
-                    for (j = 0; j < wavy.get_ncen(); j++) {
+                    for (j = 0; j < ncen; j++) {
                         nshell = nshell_cache[j];
+                        dist_j = &dists[j];
+                        pop = local[j].second.data();
+                        si = local[j].first.data();
                         for (shell = 0; shell < nshell; shell++) {
                             r0s = rho0shell[j * 6 + shell];
                             if (r0s == 0)
                                 continue;
                             temp_res = density * r0s / rho0;
-                            local[j].first[shell] += temp_res * dists[j];
-                            local[j].second[shell] += temp_res;
+                            si[shell] += temp_res * (*dist_j);
+                            pop[shell] += temp_res;
                         }
                     }
                 }
@@ -1014,8 +1022,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     const WFN& wavy,
     const vec3& grid,
     const ivec& num_grid_points,
-    const bool debug, 
-    const std::vector<std::pair<vec, vec>> MBIS_vectors )
+    const bool debug,
+    const std::vector<std::pair<vec, vec>> MBIS_vectors)
 {
     using sp_vec = std::vector<std::pair<vec2, vec>>;
     const double crit = 0.001;

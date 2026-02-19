@@ -1778,10 +1778,10 @@ void options::digest_options()
         }
         else if (temp == "-convert_to_47") {
             err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
-            std::filesystem::path wfn = arguments[i + 1];
+            std::filesystem::path _wfn = arguments[i + 1];
             WFN wavy(e_origin::NOT_YET_DEFINED);
-            wavy.read_known_wavefunction_format(wfn, std::cout, debug);
-            wavy.write_nbo(wfn.replace_extension(".47"), debug);
+            wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
+            wavy.write_nbo(_wfn.replace_extension(".47"), debug);
             exit(0);
         }
         else if (temp == "-convert_XCW")
@@ -2150,9 +2150,9 @@ void options::digest_options()
             filesystem::path salted_model_path = SP.get_salted_filename();
             log_file << "Using " << salted_model_path << " for the prediction" << endl;
             if (!SP.basis_set_loaded()) {
-                string df_basis_name = SP.get_dfbasis_name();
-                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
-                load_basis_into_WFN(SP.wavy, aux_basis);
+                df_basis_name = SP.get_dfbasis_name();
+                std::shared_ptr<BasisSet> _aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                load_basis_into_WFN(SP.wavy, _aux_basis);
             }
             vec coefs = SP.gen_SALTED_densities();
             npy::npy_data<double> np_coeffs;

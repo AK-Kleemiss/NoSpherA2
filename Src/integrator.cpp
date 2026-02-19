@@ -626,8 +626,8 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
         std::cout << out << std::endl;
     }
 
-    const double radius = 3.0;
-    const double increment = 0.1;
+    //const double radius = 3.0;
+    //const double increment = 0.1;
 
     //std::vector<vec> all_coeffs = { coeff_unrestrained , coeff_enhanced, coeff_hybrid};
     //WFN dummy = wavy;

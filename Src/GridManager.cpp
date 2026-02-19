@@ -96,8 +96,8 @@ double make_sphericals(
     }
     return lincr;
 }
-template double make_sphericals<Thakkar>(vec2& dens, vec2& dist, const ivec& atom_type_list, std::ostream& file, std::vector<std::pair<vec, vec>>& pop_sig, bool debug, double incr_start, double min_dist, int accuracy);
-template double make_sphericals<MBIS_Atom>(vec2& dens, vec2& dist, const ivec& atom_type_list, std::ostream& file, std::vector<std::pair<vec, vec>>& pop_sig, bool debug, double incr_start, double min_dist, int accuracy);
+//template double make_sphericals<Thakkar>(vec2& dens, vec2& dist, const ivec& atom_type_list, std::ostream& file, std::vector<std::pair<vec, vec>>& pop_sig, bool debug, double incr_start, double min_dist, int accuracy);
+//template double make_sphericals<MBIS_Atom>(vec2& dens, vec2& dist, const ivec& atom_type_list, std::ostream& file, std::vector<std::pair<vec, vec>>& pop_sig, bool debug, double incr_start, double min_dist, int accuracy);
 
 
 // Add this constexpr function before the GridManager class methods
@@ -237,7 +237,7 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
         addTimingPoint("Hirshfeld Weights");
     }
 
-	std::vector<std::pair<vec, vec>> sig_pop; // Dummy vector for now, will be used for MBIS if needed
+    std::vector<std::pair<vec, vec>> sig_pop; // Dummy vector for now, will be used for MBIS if needed
 
     if (config_.partition_type == PartitionType::MBIS || config_.debug || config_.all_charges) {
         if (!non_spherical_densities_calculated_) {
@@ -256,7 +256,7 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
         }
 
         //calculateEMBISWeights(wave, unit_cell, atom_list);
-		if (sig_pop.empty())
+        if (sig_pop.empty())
             sig_pop = make_MBIS_vectors(wave, grid_data_.atomic_grids, grid_data_.num_points_per_atom, false);
         calculateEMBISWeights(wave, unit_cell, atom_list, sig_pop);
         addTimingPoint("EMBIS Weights");
@@ -1013,7 +1013,7 @@ std::vector<std::pair<vec, vec>> GridManager::calculateMBISWeights(const WFN& wa
                 (combined_ptr[p] != 0.0) ? (atom_grid[GridData::GridIndex::WEIGHT][p] * (single_ptr[p] / combined_ptr[p])) : 0.0;
         }
     }
-	return sig_pop;
+    return sig_pop;
 }
 
 void GridManager::calculateEMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list, const std::vector<std::pair<vec, vec>>& MBIS_weights) {

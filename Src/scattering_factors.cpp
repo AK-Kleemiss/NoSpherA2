@@ -1532,9 +1532,9 @@ void calc_SF(const int& points,
     }
 
     ProgressBar* progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
-    long long int pmax;
+    long long int pmax, p, s;
     complex<double>* sf_local;
-    double work, rho, c, si, * dens_local;
+    double work, rho, c, si, * dens_local, re, im, * d1_local, * d2_local, * d3_local;
 
     // Pre-fetch k_pt data pointers for better cache locality
     const double* k1_data = k_pt[0].data();
@@ -1545,18 +1545,71 @@ void calc_SF(const int& points,
     {
         pmax = static_cast<long long int>(dens[i].size());
         dens_local = dens[i].data();
-        const double* d1_local = d1[i].data(),
-            * d2_local = d2[i].data(),
-            * d3_local = d3[i].data();
-#pragma omp parallel for private(work, rho, c, si)
-        for (long long int s = 0; s < smax; s++)
+        d1_local = d1[i].data();
+        d2_local = d2[i].data();
+        d3_local = d3[i].data();
+
+#pragma omp parallel for private(work, rho, c, si, re, im, s, p)
+        for (s = 0; s < smax; s++)
         {
-            double re = 0.0, im = 0.0;
+            re = 0.0, im = 0.0;
             const double& k1_local = k1_data[s];
             const double& k2_local = k2_data[s];
             const double& k3_local = k3_data[s];
             sf_local = sf[i].data();
-            for (long long int p = 0; p < pmax; p++)
+            // Process loop in blocks of 4 for better instruction-level parallelism
+            const long long int pmax_vec = (pmax / 4) * 4;
+
+            // Vectorized main loop processing 4 elements at a time
+            for (p = 0; p < pmax_vec; p += 4)
+            {
+                // Load 4 density values
+                const double rho0 = dens_local[p];
+                const double rho1 = dens_local[p + 1];
+                const double rho2 = dens_local[p + 2];
+                const double rho3 = dens_local[p + 3];
+
+                // Calculate work values for 4 points using FMA pattern
+                const double work0 = k1_local * d1_local[p] + k2_local * d2_local[p] + k3_local * d3_local[p];
+                const double work1 = k1_local * d1_local[p + 1] + k2_local * d2_local[p + 1] + k3_local * d3_local[p + 1];
+                const double work2 = k1_local * d1_local[p + 2] + k2_local * d2_local[p + 2] + k3_local * d3_local[p + 2];
+                const double work3 = k1_local * d1_local[p + 3] + k2_local * d2_local[p + 3] + k3_local * d3_local[p + 3];
+
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
+                double si0, c0, si1, c1, si2, c2, si3, c3;
+                sincos(work0, &si0, &c0);
+                sincos(work1, &si1, &c1);
+                sincos(work2, &si2, &c2);
+                sincos(work3, &si3, &c3);
+
+                re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
+                im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
+#elif defined(__APPLE__)
+                double si0, c0, si1, c1, si2, c2, si3, c3;
+                __sincos(work0, &si0, &c0);
+                __sincos(work1, &si1, &c1);
+                __sincos(work2, &si2, &c2);
+                __sincos(work3, &si3, &c3);
+
+                re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
+                im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
+#else
+                const double c0 = cos(work0);
+                const double si0 = sin(work0);
+                const double c1 = cos(work1);
+                const double si1 = sin(work1);
+                const double c2 = cos(work2);
+                const double si2 = sin(work2);
+                const double c3 = cos(work3);
+                const double si3 = sin(work3);
+
+                re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
+                im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
+#endif
+            }
+
+            // Handle remaining elements
+            for (p = pmax_vec; p < pmax; p++)
             {
                 rho = dens_local[p];
                 work = k1_local * d1_local[p] + k2_local * d2_local[p] + k3_local * d3_local[p];
@@ -1564,14 +1617,11 @@ void calc_SF(const int& points,
                 sincos(work, &si, &c);
                 re += rho * c;
                 im += rho * si;
-                //sf_local[s] += cdouble(rho * c, rho * si);
 #elif defined(__APPLE__)
                 __sincos(work, &si, &c);
                 re += rho * c;
                 im += rho * si;
-                //sf_local[s] += cdouble(rho * c, rho * si);
 #else
-                //MSVC likes this one slightly more than not storing intermediates, as it uses some sincos internally apparently
                 c = cos(work);
                 si = sin(work);
                 re += rho * c;
