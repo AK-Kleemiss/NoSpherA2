@@ -14,8 +14,8 @@
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "ENV_PATH": "${sourceDir}/mambaenv",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ",
-        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
-        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+        "CMAKE_C_COMPILER_LAUNCHER": "sccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "sccache"
       }
     },
     {

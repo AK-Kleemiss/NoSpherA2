@@ -18,6 +18,9 @@ permissions:
 
 env:
     FEATOMIC_CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF"
+    OCC_DATA_PATH: "${{ github.workspace }}/occ/share"
+    SCCACHE_GHA_ENABLED: "true"
+    RUSTC_WRAPPER: "sccache"
 
 jobs:
   # Build matrix for all platforms

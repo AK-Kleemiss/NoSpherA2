@@ -8,6 +8,9 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Run sccache-cache
+      uses: mozilla-actions/sccache-action@v0.0.9
+
     - name: Cache Dependencys (Linux)
       if: inputs.platform == 'Linux'
       uses: actions/cache@v4.2.4
