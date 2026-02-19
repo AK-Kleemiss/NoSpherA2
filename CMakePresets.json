@@ -191,15 +191,28 @@
       ]
     },
     {
-      "name": "macos-release",
+      "name": "macos-release-arm64",
       "steps": [
         {
           "type": "configure",
-          "name": "macos-release"
+          "name": "macos-release-arm64"
         },
         {
           "type": "build",
-          "name": "macos-release"
+          "name": "macos-release-arm64"
+        }
+      ]
+    },
+    {
+      "name": "macos-release-x86_64",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "macos-release-x86_64"
+        },
+        {
+          "type": "build",
+          "name": "macos-release-x86_64"
         }
       ]
     }
