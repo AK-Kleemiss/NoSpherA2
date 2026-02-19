@@ -1093,7 +1093,7 @@ void GridManager::calculateNonSphericalDensities(const WFN& wave, const cell& un
             vec2& atom_grid = grid_data_.atomic_grids[g];
             double* x_ptr = atom_grid[GridData::GridIndex::X].data(); double* y_ptr = atom_grid[GridData::GridIndex::Y].data(); double* z_ptr = atom_grid[GridData::GridIndex::Z].data();
             double* densy_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
-#pragma omp for
+#pragma omp for schedule(dynamic, 4)
             for (int p = 0; p < num_points; p++) {
                 // Calculate WFN density at this point
                 densy_ptr[p] = wave.compute_dens({ x_ptr[p], y_ptr[p], z_ptr[p] }, d_temp, phi_temp);
