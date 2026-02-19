@@ -125,7 +125,7 @@ runs:
         else {
           Write-Host "Skipping LibCint build, $outDir already exists"
         }
-        $OccOut = Join-Path $env:GITHUB_WORKSPACE "occ\lib\occ_main.lib"
+        $OccOut = Join-Path $env:GITHUB_WORKSPACE "Lib\occ\lib\occ_main.lib"
         if (Test-Path $OccOut) {
           Write-Host "OCC already built ($OccOut)"
         } else {
