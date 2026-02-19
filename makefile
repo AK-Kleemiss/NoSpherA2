@@ -116,7 +116,7 @@ LibCint:
 		echo 'Skipping LibCint build, Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a already exists'; \
 	fi
 
-occ:
+occ: LibCint
 	@if [ ! -f Lib/occ_$(NATIVE_ARCH)/lib/libocc.a ]; then \
 		echo 'Building OCC for $(NATIVE_ARCH), since Lib/occ_$(NATIVE_ARCH)/lib/libocc.a doesnt exist'; \
         cmake --workflow --preset macos-release-$(NATIVE_ARCH) && \
@@ -199,7 +199,7 @@ clean:
 endif
 
 ifeq ($(NAME),MAC)
-NoSpherA2: IntelMKL featomic LibCint
+NoSpherA2: IntelMKL featomic LibCint occ
 	@echo Start making Mac $(NATIVE_ARCH) executable
 	@rm -f NoSpherA2_$(NATIVE_ARCH)
 	@cd Mac && rm -f NoSpherA2_$(NATIVE_ARCH) && make NoSpherA2_$(NATIVE_ARCH) -j && cp NoSpherA2_$(NATIVE_ARCH) ../NoSpherA2
