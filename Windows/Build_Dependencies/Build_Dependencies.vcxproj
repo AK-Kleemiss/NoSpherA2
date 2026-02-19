@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <VCProjectVersion>18.0</VCProjectVersion>
+    <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{62dd6dd0-a478-46c8-b693-f18d7c34366a}</ProjectGuid>
     <RootNamespace>BuildDependencies</RootNamespace>

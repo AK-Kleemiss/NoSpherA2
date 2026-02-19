@@ -119,3 +119,18 @@ runs:
         else {
           Write-Host "Skipping LibCint build, $outDir already exists"
         }
+        $OccOut = Join-Path $LibDir "occ\lib\occ_main.lib"
+        if (Test-Path $OccOut) {
+          Write-Host "OCC already built ($OccOut)"
+        } else {
+          Write-Host "Building LibCint..."
+          Push-Location $RepoRoot
+          try {
+            cmake --workflow --preset windows-clang-cl
+            cmake --install .\build-windows-clang-clf
+          } finally {
+            Pop-Location
+          }
+          if (-not (Test-Path $OccOut)) { Fail "OCC build finished but output not found: $OccOut" }
+            Write-Host "LibCint OK"
+        }
