@@ -505,8 +505,8 @@ double Thakkar::get_interpolated_density(const double& dist) {
 
 MBIS_Atom::MBIS_Atom(const int g_atom_number, const vec& g_sig, const vec& g_pop)
 {
-    this->sig = g_sig;
-    this->pop = g_pop;
+    sig = g_sig;
+    pop = g_pop;
     atomic_number = g_atom_number;
     charge = 0;
 };

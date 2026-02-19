@@ -26,9 +26,7 @@ double make_sphericals(
             sphericals.emplace_back(atom_type_list[i]);
         }
         else if constexpr (std::is_same_v<AtomType, MBIS_Atom>) {
-            vec sig = pop_sig[i].first;
-            vec pop = pop_sig[i].second;
-            sphericals.emplace_back(atom_type_list[i], sig, pop);
+            sphericals.emplace_back(atom_type_list[i], pop_sig[i].first, pop_sig[i].second);
         }
         else {
             err_not_impl_f("Unsupported AtomType in make_sphericals!", file);
