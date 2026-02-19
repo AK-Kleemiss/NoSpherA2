@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 6,
   "configurePresets": [
     {
       "name": "base-options",
@@ -127,6 +127,21 @@
       "environment": {
         "OCC_DATA_PATH": "${sourceDir}/occ/share"
       }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "windows-clang-cl",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "windows-clang-cl"
+        },
+        {
+          "type": "build",
+          "name": "windows-clang-cl"
+        }
+      ]
     }
   ]
 }

@@ -335,25 +335,19 @@ if (Test-Path $LibCintOut) {
 # -----------------------------
 # 4) Build OCC (if needed)
 # -----------------------------
-$LibCintOut = Join-Path $LibDir "LibCint\lib\cint.lib"
-if (Test-Path $LibCintOut) {
-  Info "LibCint already built ($LibCintOut)"
+$OccOut = Join-Path $LibDir "occ\lib\occ_main.lib"
+if (Test-Path $OccOut) {
+  Info "OCC already built ($OccOut)"
 } else {
   Info "Building LibCint..."
-  $src = Join-Path $RepoRoot "libcint"
-  $bld = Join-Path $src "build"
-  if (-not (Test-Path $bld)) { New-Item -ItemType Directory $bld | Out-Null }
-
-  Push-Location $bld
+  Push-Location $RepoRoot
   try {
-    cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX="..\..\Lib\LibCint" -DCMAKE_C_COMPILER=cl ..
-    cmake --build . --config RELEASE
-    cmake --install .
+    cmake --workflow --preset windows-clang-cl
+    cmake --install .\build-windows-clang-clf
   } finally {
     Pop-Location
   }
-
-  if (-not (Test-Path $LibCintOut)) { Fail "LibCint build finished but output not found: $LibCintOut" }
+  if (-not (Test-Path $OccOut)) { Fail "OCC build finished but output not found: $OccOut" }
   Info "LibCint OK"
 }
 $stamp = Join-Path $RepoRoot "Windows\Build_Dependencies\deps.stamp"
