@@ -27,12 +27,12 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "clang-cl.exe",
         "CMAKE_CXX_COMPILER": "clang-cl.exe",
-        "CMAKE_LINKER": "lld-link.exe",
         "CMAKE_C_COMPILER_LAUNCHER": "sccache",
         "CMAKE_CXX_COMPILER_LAUNCHER": "sccache",
+        "CMAKE_LINKER": "lld-link.exe",
         "CMAKE_EXE_LINKER_FLAGS": "runtimeobject.lib",
         "CMAKE_SHARED_LINKER_FLAGS": "runtimeobject.lib",
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded",
         "BUILD_SHARED_LIBS": "OFF",
         "TBB_BUILD_SHARED": "OFF",
         "GG_NO_PRAGMA": "ON",
@@ -47,8 +47,8 @@
         "rhs": "Windows"
       },
       "environment": {
-        "CXXFLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc",
-        "CFLAGS": "/EHsc"
+        "CXXFLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MT",
+        "CFLAGS": "/EHsc /MT"
       },
       "architecture": {
         "value": "x64",
