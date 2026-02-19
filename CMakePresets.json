@@ -65,7 +65,6 @@
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_SHARED_LIBS": "OFF",
         "TBB_BUILD_SHARED": "OFF",
-        "GG_NO_PRAGMA": "ON",
         "ONLY_OCC": "ON"
       }
     },

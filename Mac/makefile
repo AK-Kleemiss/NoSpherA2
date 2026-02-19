@@ -10,7 +10,8 @@ ARCHS := arm64 x86_64
 
 # Source & include roots
 SRC_DIR := ../Src
-INC_DIRS := ../Src ../Lib ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint_arm64/include ../Lib/LibCint_x86_64/include
+INC_DIRS := ../Src ../Lib ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint_arm64/include ../Lib/LibCint_x86_64/include ../Lib/occ/include
+LIB_OCC := ../Lib/occ/lib/libocc.a
 
 # Local static libs (adjust as needed)
 EXTRA_LIBS_ARM := ../Lib/featomic_install_arm64/lib/libfeatomic.a \
