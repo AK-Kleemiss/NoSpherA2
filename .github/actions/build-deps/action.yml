@@ -60,10 +60,10 @@ runs:
       run: |
         source ~/.cargo/env || true
         export PATH="$HOME/.cargo/bin:$PATH"
-        make IntelMKL featomic LibCint occ -j
-        echo "LD_LIBRARY_PATH=${{ github.workspace }}/Lib/MKL/compiler/2025.2/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
         cmake --workflow --preset linux-gcc
         cmake --install ./build-linux-gcc
+        make IntelMKL featomic LibCint occ -j
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/Lib/MKL/compiler/2025.2/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
     - name: Build dependencies (Windows)
       if: inputs.platform == 'Windows'
