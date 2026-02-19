@@ -71,10 +71,15 @@ featomic: check_rust
 		mkdir -p build && \
 		cd build && \
 		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
-		make install; \
+		make install && cd $(MAKEFILE_DIR)/ && \
+		if [ -f Lib/featomic_install/lib64/libmetatensor.a ]; then \
+			echo "Copying lib64/libmetatensor.a to lib/"; \
+		    cp Lib/featomic_install/lib64/libmetatensor.a Lib/featomic_install/lib; \
+		fi; \
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
 	fi
+
 endif
 
 
@@ -125,9 +130,25 @@ LibCint:
 	@if [ ! -f Lib/LibCint/lib/libcint.a ]; then \
 		cd libcint && mkdir -p build && cd build && \
 		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint .. && \
-		make install; \
+		make install && cd $(MAKEFILE_DIR)/ && \
+		if [ -f Lib/LibCint/lib64/libcint.a ]; then \
+			echo "Copying lib64/libcint.a to lib/"; \
+			mkdir -p Lib/LibCint/lib && \
+		    cp Lib/LibCint/lib64/libcint.a Lib/LibCint/lib; \
+		fi; \
 	else \
 		echo 'Skipping LibCint build, Lib/LibCint/lib/libcint.a already exists'; \
+	fi
+
+occ: LibCint
+	@if [ ! -f Lib/occ/lib/libocc_main.a ]; then \
+		echo 'Building OCC, since Lib/occ/lib/libocc_main.a doesnt exist'; \
+		cmake --workflow --preset linux-gcc && \
+		cmake --install build-linux-gcc && \
+	  	cd build-linux-gcc && ar M < libocc.ar && cd .. && \
+		cp build-linux-gcc/liblibocc.a Lib/occ/lib/libocc.a; \
+	else \
+		echo 'Skipping OCC build, Lib/occ/lib/libocc_main.a already exists'; \
 	fi
 endif
 
@@ -148,12 +169,12 @@ clean:
 endif
 
 ifeq ($(NAME),LINUX)
-NoSpherA2: IntelMKL featomic LibCint
+NoSpherA2: IntelMKL featomic LibCint occ
 	@echo Start making Linux executable
 	@rm -f NoSpherA2
 	@cd Linux && rm -f NoSpherA2 && make all -j
 
-NoSpherA2_Debug: IntelMKL featomic LibCint
+NoSpherA2_Debug: IntelMKL featomic LibCint occ
 	@echo Building NoSpherA2_Debug for $(NAME)
 	@rm -f NoSpherA2_Debug
 	@cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j

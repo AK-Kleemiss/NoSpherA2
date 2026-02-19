@@ -12,9 +12,9 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#endif
 #include <commdlg.h>
 #include <cderr.h>
+#endif
 
 std::string help_message =
 ("\n----------------------------------------------------------------------------\n"

@@ -56,6 +56,19 @@
       }
     },
     {
+      "name": "linux-gcc",
+      "displayName": "linux-gcc (ccache)",
+      "description": "Release build for Linux using GCC and ccache",
+      "inherits": "base-options",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF",
+        "TBB_BUILD_SHARED": "OFF",
+        "GG_NO_PRAGMA": "ON",
+        "ONLY_OCC": "ON"
+      }
+    },
+    {
       "name": "macos-base",
       "hidden": true,
       "inherits": "base-options",
@@ -110,6 +123,11 @@
       "name": "windows-clang-cl",
       "configurePreset": "windows-clang-cl",
       "targets": "occ"
+    },
+    {
+      "name": "linux-gcc",
+      "configurePreset": "linux-gcc",
+      "targets": "occ"
     }
   ],
   "testPresets": [
@@ -140,6 +158,19 @@
         {
           "type": "build",
           "name": "windows-clang-cl"
+        }
+      ]
+    },
+    {
+      "name": "linux-gcc",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "linux-gcc"
+        },
+        {
+          "type": "build",
+          "name": "linux-gcc"
         }
       ]
     }

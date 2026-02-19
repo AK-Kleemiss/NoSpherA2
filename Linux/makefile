@@ -15,8 +15,8 @@ MKL_THREADING ?= INTEL     # INTEL | SEQ  (INTEL = mkl_intel_thread + libiomp5)
 
 # Source & include roots
 SRC_DIR := ../Src
-INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include ../Lib/LibCint/include
-
+INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include ../Lib/LibCint/include ../Lib/occ/include
+LIB_OCC := $(wildcard ../Lib/occ/lib/*.a)
 #LibCint local libs
 LIBCINT		   := ../Lib/LibCint/lib/libcint.a
 
@@ -83,10 +83,10 @@ basis_set_converter:
 
 # ---- Precompiled headers ----
 pch.h.gch: ../Src/pch.h
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} -x c++-header -o "$@" "$<"
+	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} $(INCLUDES) -x c++-header -o "$@" "$<"
 
 pch.h.gch_d: ../Src/pch.h
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} -x c++-header -o "$@" "$<"
+	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} $(INCLUDES) -x c++-header -o "$@" "$<"
 
 # ---- auxiliary_basis depends on converter ----
 auxiliary_basis.o: basis_set_converter
@@ -117,14 +117,14 @@ auxiliary_basis.o_d: basis_set_converter
 # ---- Link ----
 NoSpherA2: ${OBJS}
 	@echo 'Building target: $@'
-	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ${LIBS}
+	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2 ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d}
 	@echo 'Building target: $@'
-	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ${LIBS}
+	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2_Debug ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
 	@echo 'Done building Debug version of NoSpherA2'
