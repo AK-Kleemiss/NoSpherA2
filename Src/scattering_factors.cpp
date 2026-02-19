@@ -1935,6 +1935,9 @@ tsc_block_type calculate_scattering_factors(
     if (opt.debug)
         file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
 
+    time_points.push_back(get_time());
+    time_descriptions.push_back("cif reading");
+
     vec2 k_pt;
     hkl_list hkl;
     if (opt.m_hkl_list.size() != 0)
