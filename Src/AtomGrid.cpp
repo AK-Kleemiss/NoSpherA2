@@ -543,12 +543,15 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
     double dist_a, dist_b;
     double vx, vy, vz;
     double R_a, R_b, chi_becke, u_ab, chi_mod;
-    const double* chi_off;
-
+    const double* chi_off, *bragg = constants::bragg_angstrom;
+    double* R_v = new double[num_centers];
+    const double& cut = constants::cutoff;
     for (int a = 0; a < num_centers; a++) {
         pa_b[a] = 1.0;
         pa_tv[a] = 1.0;
+        R_v[a] = bragg[proton_charges[a]];
     }
+    
 
     for (int a = 0; a < num_centers; a++) {
         vx = x_coordinates_bohr[a] - x;
@@ -565,7 +568,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             continue;
         }
 
-        R_a = constants::bragg_angstrom[proton_charges[a]];
+        R_a = R_v[a];
         chi_off = chi.data() + a * num_centers;
 
         for (int b = a + 1; b < num_centers; b++) {
@@ -581,7 +584,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             vy = y_coordinates_bohr[b] - y;
             vz = z_coordinates_bohr[b] - z;
             dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
-            R_b = constants::bragg_angstrom[proton_charges[b]];
+            R_b = R_v[b];
 
             // JCP 139, 071103 (2013), eq. 7
             // JCP 88, 2547 (1988), eq. 11
@@ -595,7 +598,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
             f = 1.0 - f4(nu_ab);
 
-            if (std::abs(f) < constants::cutoff)
+            if (std::abs(f) < cut)
                 pa_tv_a = 0.0;
             else {
                 //Reduce numerical jittering
@@ -610,7 +613,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             }
 
 
-            if (std::abs(R_a - R_b) > constants::cutoff) {
+            if (std::abs(R_a - R_b) > cut) {
                 chi_becke = R_a / R_b;
                 u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
                 u_ab = u_ab / (u_ab * u_ab - 1.0);
@@ -628,7 +631,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
             f = 1.0 - f3(nu_ab);
 
-            if (std::abs(f) < constants::cutoff)
+            if (std::abs(f) < cut)
                 pa_b_a = 0.0;
             else {
                 if (pa_b_a > 1E-250 || pa_b_a < -1E-250)
@@ -649,7 +652,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
         w_tfvc += pa_tv[a];
     }
 
-    return { std::abs(w_becke) > constants::cutoff ? pa_b[center_index] / w_becke : 1.0, std::abs(w_tfvc) > constants::cutoff ? pa_tv[center_index] / w_tfvc : 1.0 };
+    return { std::abs(w_becke) > cut ? pa_b[center_index] / w_becke : 1.0, std::abs(w_tfvc) > cut ? pa_tv[center_index] / w_tfvc : 1.0 };
 }
 
 // TCA 106, 178 (2001), eq. 25
@@ -1140,7 +1143,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     } //We first need to finish building total rho0 before we can calculate the contributions to the sigmas and populations
                     const double rho0_inv = 1.0 / rho0;
                     for (j = 0; j < ncen; j++) {
-                        d_local = dx.data() + j * 3;
+                        d_local = dx.data() + (j * 3);
                         nshell = nshell_cache[j];
                         d_cache[0] = d_local[0] * d_local[0];
                         d_cache[1] = d_local[0] * d_local[1];
