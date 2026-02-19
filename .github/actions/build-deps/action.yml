@@ -137,6 +137,6 @@ runs:
           } finally {
             Pop-Location
           }
-          if (-not (Test-Path $OccOut)) { Fail "OCC build finished but output not found: $OccOut" }
+          if (-not (Test-Path $OccOut)) { Write-Error "OCC build finished but output not found: $OccOut" }
             Write-Host "LibCint OK"
         }
