@@ -6699,16 +6699,17 @@ const double WFN::compute_dens_cartesian(
 {
     std::fill(phi.begin(), phi.end(), 0.0);
     double Rho = 0.0;
-    int iat, j;
+    int j;
     double ex, * d_;
 
     // precalculate some distances and powers of distances for faster computation
-    for (iat = 0; iat < ncen; iat++)
+    for (j = 0; j < ncen; j++)
     {
-        d_ = d[iat].data();
-        d_[0] = Pos[0] - atoms[iat].get_coordinate(0);
-        d_[1] = Pos[1] - atoms[iat].get_coordinate(1);
-        d_[2] = Pos[2] - atoms[iat].get_coordinate(2);
+		const atom& a = atoms[j];
+        d_ = d[j].data();
+        d_[0] = Pos[0] - a.get_coordinate(0);
+        d_[1] = Pos[1] - a.get_coordinate(1);
+        d_[2] = Pos[2] - a.get_coordinate(2);
         d_[4] = d_[0] * d_[0];
         d_[5] = d_[1] * d_[1];
         d_[6] = d_[2] * d_[2];
@@ -6724,18 +6725,29 @@ const double WFN::compute_dens_cartesian(
         d_[15] = d_[2] * d_[12];
     }
 
+    // Pre-cache frequently accessed data
+    const int* centers_data = centers.data();
+    const int* types_data = types.data();
+    const double* exponents_data = exponents.data();
+    const MO* MOs_data = MOs.data();
+    double* phi_data = phi.data();
+    const double exp_cutoff = constants::exp_cutoff;
+	const double** MO_coefs_data = new const double* [nmo];
+    for (int i = 0; i < nmo; i++) {
+        MO_coefs_data[i] = MOs_data[i].get_coefficient_ptr();
+	}
+	const double*** start_MO_coefs_data = &MO_coefs_data;
+
     for (j = 0; j < nex; j++)
     {
-        iat = centers[j] - 1;
-        d_ = d[iat].data();
-        //constants::type2vector(types[j], l);
-        ex = -exponents[j] * d_[3];
-        if (ex < constants::exp_cutoff)
+        d_ = d[centers_data[j] - 1].data();
+        ex = -exponents_data[j] * d_[3];
+        if (ex < exp_cutoff)
         { // corresponds to cutoff of maximum density contribution of 1E-5
             continue;
         }
         ex = exp(ex);
-        switch (types[j])
+        switch (types_data[j])
         {
         case 0:  break;
         case 1:  break;// 0, 0, 0,
@@ -6798,25 +6810,25 @@ const double WFN::compute_dens_cartesian(
 
         // use pointer arithmetic and cache coefficient pointer
         // This avoids repeated virtual function calls to get_coefficient_f
-        double* phi_ptr = phi.data();
+        double* phi_ptr = phi_data;
         const double* phi_end = phi_ptr + nmo;
-        const MO* mo_ptr = MOs.data();
+		const double** mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
 
         // Cache the coefficient pointer for this primitive across all MOs
-        for (; phi_ptr != phi_end; ++phi_ptr, ++mo_ptr)
+        for (; phi_ptr != phi_end; ++phi_ptr, ++mo_coef_ptr)
         {
-            *phi_ptr += mo_ptr->get_coefficient_f(j) * ex;
+            *phi_ptr += (*mo_coef_ptr)[j] * ex;
         }
     }
 
     // use pointer arithmetic and minimize overhead
-    const double* phi_ptr = phi.data();
+    const double* phi_ptr = phi_data;
     const double* phi_end = phi_ptr + nmo;
-    const MO* mo_ptr = MOs.data();
+    const MO* mo_ptr = MOs_data;
 
     for (; phi_ptr != phi_end; ++phi_ptr, ++mo_ptr)
     {
-        const double phi_val = *phi_ptr;
+        const double& phi_val = *phi_ptr;
         Rho += mo_ptr->get_occ() * phi_val * phi_val;
     }
 
