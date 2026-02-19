@@ -127,7 +127,7 @@ runs:
           Push-Location $RepoRoot
           try {
             cmake --workflow --preset windows-clang-cl
-            cmake --install .\build-windows-clang-clf
+            cmake --install .\build-windows-clang-cl
           } finally {
             Pop-Location
           }
