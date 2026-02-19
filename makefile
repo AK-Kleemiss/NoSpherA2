@@ -116,12 +116,26 @@ LibCint:
 		echo 'Skipping LibCint build, Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a already exists'; \
 	fi
 
+occ:
+	@if [ ! -f Lib/occ_$(NATIVE_ARCH)/lib/libocc.a ]; then \
+		echo 'Building OCC for $(NATIVE_ARCH), since Lib/occ_$(NATIVE_ARCH)/lib/libocc.a doesnt exist'; \
+        cmake --workflow --preset macos-release-$(NATIVE_ARCH) && \
+        cmake --install ./build-macos-release-$(NATIVE_ARCH);\
+	else \
+		echo 'Skipping occ build, Lib/occ_$(NATIVE_ARCH)/lib/libocc.a already exists'; \
+	fi
 
 LibCint_x86_64:
 	@$(MAKE) NATIVE_ARCH=x86_64 LibCint
 
 LibCint_arm64:
 	@$(MAKE) NATIVE_ARCH=arm64 LibCint
+
+occ_x86_64:
+	@$(MAKE) NATIVE_ARCH=x86_64 occ
+
+occ_arm64:
+	@$(MAKE) NATIVE_ARCH=arm64 occ
 endif
 
 
@@ -190,17 +204,17 @@ NoSpherA2: IntelMKL featomic LibCint
 	@rm -f NoSpherA2_$(NATIVE_ARCH)
 	@cd Mac && rm -f NoSpherA2_$(NATIVE_ARCH) && make NoSpherA2_$(NATIVE_ARCH) -j && cp NoSpherA2_$(NATIVE_ARCH) ../NoSpherA2
 
-NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint_arm64
+NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint_arm64 occ_arm64
 	@echo Start making Mac arm64 executable
 	@rm -f NoSpherA2_arm64
 	@cd Mac && rm -f NoSpherA2_arm64 && make NoSpherA2_arm64 -j && cp NoSpherA2_arm64 ../NoSpherA2
 
-NoSpherA2_x86_64: IntelMKL featomic_x86_64 LibCint_x86_64
+NoSpherA2_x86_64: IntelMKL featomic_x86_64 LibCint_x86_64 occ_x86_64
 	@echo Start making Mac x86_64 executable
 	@rm -f NoSpherA2_x86_64
 	@cd Mac && rm -f NoSpherA2_x86_64 && make NoSpherA2_x86_64 -j && cp NoSpherA2_x86_64 ../NoSpherA2_x86_64
 
-NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint_arm64 LibCint_x86_64
+NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint_arm64 LibCint_x86_64 LibCint_x86_64 occ_x86_64
 	@echo Start making Mac universal executable
 	@rm -f NoSpherA2
 	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j

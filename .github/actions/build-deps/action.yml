@@ -51,8 +51,7 @@ runs:
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         export PATH="$HOME/.cargo/bin:$PATH"
         make featomic_x86_64 LibCint_x86_64 occ -j
-        cmake --workflow --preset macos-release-x86_64
-        cmake --install ./build-macos-release-x86_64
+
 
     - name: Build deps (Linux)
       if: inputs.platform == 'Linux'
