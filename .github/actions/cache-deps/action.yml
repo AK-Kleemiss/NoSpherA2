@@ -15,7 +15,7 @@ runs:
       uses: actions/cache@v4.2.4
       with:
         path: Lib/occ
-        key: ${{ inputs.platform }}-occ-${{ hashFiles('occ/**', 'makefile') }}
+        key: ${{ inputs.platform }}-occ-${{ hashFiles('occ/**', 'CMakePresets.json') }}
 
     - name: Cache featomic (Linux / Windows)
       if: inputs.platform == 'Linux' || inputs.platform == 'Windows'
