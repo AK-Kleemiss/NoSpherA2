@@ -16,7 +16,6 @@ runs:
       with:
         path: Lib/occ
         key: ${{ inputs.platform }}-occ-${{ hashFiles('occ/**', 'makefile') }}
-        restore-keys: ${{ inputs.platform }}-occ-
 
     - name: Cache featomic (Linux / Windows)
       if: inputs.platform == 'Linux' || inputs.platform == 'Windows'
@@ -24,7 +23,6 @@ runs:
       with:
         path: Lib/featomic_install
         key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**', 'makefile') }}
-        restore-keys: ${{ inputs.platform }}-featomic-
 
     - name: Cache featomic (macOS ARM64)
       if: inputs.platform == 'Mac_ARM64'
@@ -32,7 +30,6 @@ runs:
       with:
         path: Lib/featomic_install_arm64
         key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**', 'makefile') }}
-        restore-keys: ${{ inputs.platform }}-featomic-
 
     - name: Cache featomic (macOS x86_64)
       if: inputs.platform == 'Mac_x86_64'
@@ -40,7 +37,6 @@ runs:
       with:
         path: Lib/featomic_install_x86_64
         key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**', 'makefile') }}
-        restore-keys: ${{ inputs.platform }}-featomic-
 
     - name: Cache LibCint (Linux / Windows)
       if: inputs.platform == 'Linux' || inputs.platform == 'Windows'
@@ -48,7 +44,6 @@ runs:
       with:
         path: Lib/LibCint
         key: ${{ inputs.platform }}-libcint-${{ hashFiles('libcint/**', 'makefile') }}
-        restore-keys: ${{ inputs.platform }}-libcint-
 
     - name: Cache LibCint (macOS ARM64)
       if: inputs.platform == 'Mac_ARM64'
@@ -56,7 +51,6 @@ runs:
       with:
         path: Lib/LibCint_arm64
         key: ${{ inputs.platform }}-libcint-${{ hashFiles('libcint/**', 'makefile') }}
-        restore-keys: ${{ inputs.platform }}-libcint-
 
     - name: Cache LibCint (macOS x86_64)
       if: inputs.platform == 'Mac_x86_64'
@@ -64,7 +58,6 @@ runs:
       with:
         path: Lib/LibCint_x86_64
         key: ${{ inputs.platform }}-libcint-${{ hashFiles('libcint/**', 'makefile') }}
-        restore-keys: ${{ inputs.platform }}-libcint-
 
     - name: Cache MKL (Linux)
       if: inputs.platform == 'Linux'
