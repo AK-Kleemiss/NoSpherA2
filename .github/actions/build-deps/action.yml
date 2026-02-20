@@ -40,9 +40,7 @@ runs:
       run: |
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         export PATH="$HOME/.cargo/bin:$PATH"
-        make featomic_arm64 LibCint_arm64 occ -j
-        cmake --workflow --preset macos-release-arm64
-        cmake --install ./build-macos-release-arm64
+        make featomic_arm64 LibCint_arm64 occ_arm64 -j
 
     - name: Build deps (macOS x86_64)
       if: inputs.platform == 'Mac_x86_64'
@@ -50,7 +48,7 @@ runs:
       run: |
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         export PATH="$HOME/.cargo/bin:$PATH"
-        make featomic_x86_64 LibCint_x86_64 occ -j
+        make featomic_x86_64 LibCint_x86_64 occ_x86_64 -j
 
 
     - name: Build deps (Linux)
