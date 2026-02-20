@@ -27,9 +27,11 @@ LIBRASCALINE_I := ../Lib/featomic_install/include
 
 # ---- Compiler flags (no -fopenmp at link time; only at compile time) ----
 GCC_OPTS       := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP \
-                  -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math
+                  -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math \
+                  -include pch.h
 GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP \
-                  -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math
+                  -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math \
+                  -include pch.h
 
 # Include directories
 INCLUDES := $(addprefix -I,$(INC_DIRS))
@@ -88,34 +90,49 @@ $(SRC_DIR)/auxiliary_basis.cpp: ../BasisSetConverter
 	@./../BasisSetConverter ../Src/basis_set_helper ../Src
 	@echo "auxiliary_basis.cpp generated"
 
-# ---- Precompiled headers ----
-pch.h.gch: ../Src/pch.h
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} $(INCLUDES) -x c++-header -o "$@" "$<"
+# Flags without -include pch.h for compiling the PCH itself
+GCC_OPTS_NO_PCH       := $(filter-out -include pch.h,$(GCC_OPTS))
+GCC_OPTS_DEBUG_NO_PCH := $(filter-out -include pch.h,$(GCC_OPTS_DEBUG))
 
-pch.h.gch_d: ../Src/pch.h
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} $(INCLUDES) -x c++-header -o "$@" "$<"
+# ---- Precompiled headers ----
+# GCC with -include pch.h searches include paths for pch.h, then checks for pch.h.gch alongside it.
+# If pch.h.gch is a directory, GCC searches inside it for a valid PCH matching the current flags.
+# We output the .gch next to the source header so GCC auto-discovers it.
+PCH_DIR   := $(SRC_DIR)/pch.h.gch
+PCH_GCH   := $(PCH_DIR)/release.gch
+PCH_GCH_D := $(PCH_DIR)/debug.gch
+
+$(PCH_GCH): ../Src/pch.h
+	@mkdir -p $(PCH_DIR)
+	@echo 'Building precompiled header (release)...'
+	@$(WITH_ONEAPI) ${COMP} $(GCC_OPTS_NO_PCH) -I"$$MKLROOT/include" $(INCLUDES) -x c++-header -o "$@" "$<"
+
+$(PCH_GCH_D): ../Src/pch.h
+	@mkdir -p $(PCH_DIR)
+	@echo 'Building precompiled header (debug)...'
+	@$(WITH_ONEAPI) ${COMP} $(GCC_OPTS_DEBUG_NO_PCH) -I"$$MKLROOT/include" $(INCLUDES) -x c++-header -o "$@" "$<"
 
 # ---- auxiliary_basis depends on converter ----
-auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp
+auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp $(PCH_GCH)
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
 	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} -I"$$MKLROOT/include" $(INCLUDES) \
 	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -O0 -o "$@" ../Src/auxiliary_basis.cpp
 	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
 
-auxiliary_basis.o_d: $(SRC_DIR)/auxiliary_basis.cpp
+auxiliary_basis.o_d: $(SRC_DIR)/auxiliary_basis.cpp $(PCH_GCH_D)
 	@echo 'Compiling auxiliary_basis.o_d after BasisSetConverter finishes'
 	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} -I"$$MKLROOT/include" $(INCLUDES) \
 	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -O0 -o "$@" ../Src/auxiliary_basis.cpp
 	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
 
 # ---- Pattern rules ----
-%.o: ../Src/%.cpp pch.h.gch
+%.o: ../Src/%.cpp $(PCH_GCH)
 	@echo 'Building file: $<'
 	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} -I"$$MKLROOT/include" $(INCLUDES) \
 	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-%.o_d: ../Src/%.cpp pch.h.gch_d
+%.o_d: ../Src/%.cpp $(PCH_GCH_D)
 	@echo 'Building file (debug): $<'
 	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} -I"$$MKLROOT/include" $(INCLUDES) \
 	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
@@ -138,7 +155,15 @@ NoSpherA2_Debug: ${OBJS_d}
 
 clean:
 	-${RM} NoSpherA2 ../NoSpherA2 NoSpherA2_Debug ../NoSpherA2_Debug ../BasisSetConverter ${OBJS} ${OBJS_d} $(OBJ_NAMES:=.d)
+	-${RM} -r $(PCH_DIR)
+	-${RM} pch.h.gch pch.h.gch_d pch.h.d pch.d
 	-@echo ' '
 
 .PHONY: all clean
 .SECONDARY:
+
+# Include generated dependency files for correct incremental rebuilds.
+# Only include .d files for our own objects — avoid stale/corrupt .d files
+# from sub-builds (e.g. BasisSetConverter.d, basis_set_helper.d).
+-include $(wildcard $(addsuffix .d,$(OBJ_NAMES)))
+

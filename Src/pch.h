@@ -1,3 +1,6 @@
+#ifndef NOSPHERA2_PCH_H
+#define NOSPHERA2_PCH_H
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -82,3 +85,6 @@
 #include <termios.h>
 #include <cstring>
 #endif
+
+#endif // NOSPHERA2_PCH_H
+
