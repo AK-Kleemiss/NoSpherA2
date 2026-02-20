@@ -81,7 +81,7 @@ set(ENABLE_STATIC "ON")
 set(BUILD_SHARED_LIBS "OFF")
 set(PYPZPX "ON")
 set(WITH_RANGE_COULOMB "ON")
- if (WIN32 AND ONLY_OCC)
+if (WIN32 AND ONLY_OCC)
      set(libcint_IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/cint.lib")
      if (EXISTS ${libcint_IMPORTED_LOCATION})
          message(STATUS "Using precompiled libcint from ${libcint_IMPORTED_LOCATION}")
@@ -93,10 +93,15 @@ set(WITH_RANGE_COULOMB "ON")
          IMPORTED_LOCATION "${libcint_IMPORTED_LOCATION}"
          INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
      )
- else()
-     add_subdirectory(libcint)
-
- endif ()
+else()
+     #add_subdirectory(libcint)
+     add_library(cint STATIC IMPORTED)
+     set_target_properties(cint PROPERTIES
+         IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/libcint.a"
+         INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
+     )
+    target_link_libraries(cint INTERFACE -lquadmath)
+endif ()
 
 #add_subdirectory(libcint)
 add_library(libcint::libcint INTERFACE IMPORTED GLOBAL)

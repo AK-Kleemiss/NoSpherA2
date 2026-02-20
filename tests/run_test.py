@@ -1,8 +1,11 @@
+import glob
 import os
 import shutil
 import platform
 import subprocess
 import difflib
+from pathlib import Path
+
 import pytest
 
 class NosTest:
@@ -99,6 +102,11 @@ def test_nos(test, exe_path, tmp_path):
 
     good_path = os.path.join(work_dir, test.good)
     actual_gen = os.path.join(work_dir, test.actual)
+    extra_logs = work_dir.glob("*.log")
+    failed_dir = Path(os.path.dirname(os.path.abspath(__file__))) / "failed_logs" / test.name
+    failed_dir.mkdir(parents=True, exist_ok=True)
+    for log in extra_logs:
+        log.copy(failed_dir / log.name)
 
     if test.actual == "NoSpherA2.log":
         actual_path = os.path.join(work_dir, test.good.replace("good", "log"))
@@ -109,6 +117,7 @@ def test_nos(test, exe_path, tmp_path):
 
     if not os.path.exists(actual_path):
         pytest.fail(f"Log {actual_path} missing.", pytrace=False)
+
     if not os.path.exists(good_path):
         pytest.fail(f"Expected log {good_path} missing.", pytrace=False)
 

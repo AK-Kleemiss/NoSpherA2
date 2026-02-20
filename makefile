@@ -110,7 +110,9 @@ LibCint:
 	@if [ ! -f Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a ]; then \
 		echo 'Building LibCint for $(NATIVE_ARCH), since Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a doesnt exist'; \
 		cd libcint && mkdir -p build_$(NATIVE_ARCH) && cd build_$(NATIVE_ARCH) &&\
-		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint_$(NATIVE_ARCH) -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && \
+		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint_$(NATIVE_ARCH) \
+			-DENABLE_STATIC="ON" -DWITH_CINT2_INTERFACE="OFF" -DBUILD_SHARED_LIBS="OFF" -DPYPZPX="ON" \
+			-DWITH_RANGE_COULOMB="ON" -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && \
 		make install; \
 	else \
 		echo 'Skipping LibCint build, Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a already exists'; \
@@ -145,7 +147,9 @@ ifeq ($(NAME),LINUX)
 LibCint:
 	@if [ ! -f Lib/LibCint/lib/libcint.a ]; then \
 		cd libcint && mkdir -p build && cd build && \
-		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint .. && \
+		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE \
+			-DENABLE_STATIC="ON" -DWITH_CINT2_INTERFACE="OFF" -DBUILD_SHARED_LIBS="OFF" -DPYPZPX="ON" \
+            -DWITH_RANGE_COULOMB="ON" -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint .. && \
 		make install && cd $(MAKEFILE_DIR)/ && \
 		if [ -f Lib/LibCint/lib64/libcint.a ]; then \
 			echo "Copying lib64/libcint.a to lib/"; \
