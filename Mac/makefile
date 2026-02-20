@@ -136,9 +136,9 @@ debug: LDFLAGS_COMMON  := $(SYSROOT) $(DEPLOYMENT_TARGET) -framework Accelerate
 debug: clean NoSpherA2_arm64
 
 clean:
- -$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2 BasisSetConverter
- -@$(MAKE) -f makefile_basis_set_converter clean
- @echo "Cleaned."
+	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2 BasisSetConverter
+	-@$(MAKE) -f makefile_basis_set_converter clean
+	@echo "Cleaned."
 
 .PHONY: all clean debug NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64
 
