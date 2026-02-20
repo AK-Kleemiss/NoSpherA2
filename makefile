@@ -121,7 +121,7 @@ occ: LibCint
 		echo 'Building OCC for $(NATIVE_ARCH), since Lib/occ_$(NATIVE_ARCH)/lib/libocc.a doesnt exist'; \
         cmake --workflow --preset macos-release-$(NATIVE_ARCH) && \
         cmake --install ./build-macos-release-$(NATIVE_ARCH) && \
-		libtool -static -o Lib/occ_$(NATIVE_ARCH)/lib/libocc.a Lib/occ_$(NATIVE_ARCH)/lib/libocc_*.a; \
+		libtool -static -o Lib/occ_$(NATIVE_ARCH)/lib/libocc.a Lib/occ_$(NATIVE_ARCH)/lib/*.a; \
 	else \
 		echo 'Skipping occ build, Lib/occ_$(NATIVE_ARCH)/lib/libocc.a already exists'; \
 	fi
