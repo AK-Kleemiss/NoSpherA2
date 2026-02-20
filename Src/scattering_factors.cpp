@@ -2407,7 +2407,7 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
     }
 
     // below is a strip of Calc_SF without the file IO or progress bar
-    vector<vector<complex<double>>> sf;
+    cvec2 sf;
 
     const long long int imax = static_cast<long long int>(dens.size());
     const long long int smax = static_cast<long long int>(k_pt[0].size());
@@ -2437,10 +2437,14 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
 #pragma omp parallel for private(work, rho)
         for (long long int s = 0; s < smax; s++)
         {
+            double re = 0.0, im = 0.0, si, c;
+            const double &_k1_local = k1_local[s];
+            const double &_k2_local = k2_local[s];
+            const double &_k3_local = k3_local[s];
             for (long long int p = pmax - 1; p >= 0; p--)
             {
                 rho = dens_local[p];
-                work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+                work = _k1_local * d1_local[p] + _k2_local * d2_local[p] + _k3_local * d3_local[p];
 #ifdef __APPLE__
 #if TARGET_OS_MAC
                 if (rho < 0)
@@ -2450,8 +2454,13 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
                 }
 #endif
 #endif
-                sf_local[s] += polar(rho, work);
+                c = cos(work);
+                si = sin(work);
+                re += rho * c;
+                im += rho * si;
             }
+            sf_local[s].real(re);
+            sf_local[s].imag(im);
             progress->update();
         }
     }
