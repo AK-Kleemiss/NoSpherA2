@@ -8,7 +8,7 @@ x86_64: basis_set_converter_x86
 arm64: basis_set_converter
 
 # Define the two separate lists with appropriate endings
-GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0
+GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0 -MMD -MP
 
 GCC_OPTS_a := ${GCC_OPTS} -mcpu=apple-m1
 GCC_OPTS_x := ${GCC_OPTS} -march=x86-64
