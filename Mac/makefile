@@ -127,13 +127,13 @@ $(SRC_DIR)/auxiliary_basis.cpp: build/BasisSetConverter
 	@./../BasisSetConverter ../Src/basis_set_helper ../Src
 	@echo "auxiliary_basis.cpp generated"
 
-build/arm64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp $(PCH_arm64) | build/arm64
+build/arm64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/arm64
 	@echo "Compiling auxiliary_basis.o (arm64)"
-	@$(COMP) $(CXXFLAGS_arm64) -O0 -c $< -o $@
+	@$(COMP) $(CXXFLAGS_arm64_NO_PCH) -O0 -c $< -o $@
 
-build/x86_64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp $(PCH_x86_64) | build/x86_64
+build/x86_64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/x86_64
 	@echo "Compiling auxiliary_basis.o (x86_64)"
-	@$(COMP) $(CXXFLAGS_x86_64) -O0 -c $< -o $@
+	@$(COMP) $(CXXFLAGS_x86_64_NO_PCH) -O0 -c $< -o $@
 
 
 # Pattern rules

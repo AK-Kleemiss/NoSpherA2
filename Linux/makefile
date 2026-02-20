@@ -113,15 +113,16 @@ $(PCH_GCH_D): ../Src/pch.h
 	@$(WITH_ONEAPI) ${COMP} $(GCC_OPTS_DEBUG_NO_PCH) -I"$$MKLROOT/include" $(INCLUDES) -x c++-header -o "$@" "$<"
 
 # ---- auxiliary_basis depends on converter ----
-auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp $(PCH_GCH)
+# auxiliary_basis is compiled with -O0 (mismatches PCH's -O3), so skip PCH for it.
+auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} -I"$$MKLROOT/include" $(INCLUDES) \
+	@$(WITH_ONEAPI) ${COMP} $(GCC_OPTS_NO_PCH) -I"$$MKLROOT/include" $(INCLUDES) \
 	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -O0 -o "$@" ../Src/auxiliary_basis.cpp
 	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
 
-auxiliary_basis.o_d: $(SRC_DIR)/auxiliary_basis.cpp $(PCH_GCH_D)
+auxiliary_basis.o_d: $(SRC_DIR)/auxiliary_basis.cpp
 	@echo 'Compiling auxiliary_basis.o_d after BasisSetConverter finishes'
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} -I"$$MKLROOT/include" $(INCLUDES) \
+	@$(WITH_ONEAPI) ${COMP} $(GCC_OPTS_DEBUG_NO_PCH) -I"$$MKLROOT/include" $(INCLUDES) \
 	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -O0 -o "$@" ../Src/auxiliary_basis.cpp
 	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
 
