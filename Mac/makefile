@@ -76,7 +76,6 @@ LDFLAGS_x86_64  := $(LDFLAGS_COMMON)   -arch x86_64 $(OMPLIBS_x86_64)
 
 # Default target is universal binary
 all: NoSpherA2
-occ:
 
 # Universal binary (both architectures)
 NoSpherA2: NoSpherA2_arm64 NoSpherA2_x86_64
@@ -99,16 +98,13 @@ NoSpherA2_x86_64: $(OBJS_x86_64)
 	@$(COMP) $^ $(EXTRA_LIBS_x86) $(LDFLAGS_x86_64) -o $@
 
 # Architecture-specific basis set converter
-
-# Generate auxiliary_basis.cpp when needed
-$(SRC_DIR)/auxiliary_basis.cpp: BasisSetConverter
-	@echo "Generating auxiliary_basis.cpp..."
-	@./BasisSetConverter
-	@echo "auxiliary_basis.cpp generated"
-
-BasisSetConverter:
+basis_set_converter:
 	@echo "Building basis set converter for current architecture: $(shell uname -m)"
 	@$(MAKE) -f makefile_basis_set_converter $(shell uname -m)
+
+# Generate auxiliary_basis.cpp when needed
+$(SRC_DIR)/auxiliary_basis.cpp: basis_set_converter
+	@echo "auxiliary_basis.cpp generated"
 
 # Special rule for auxiliary_basis.o - fix the source file reference
 build/arm64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/arm64
@@ -142,4 +138,4 @@ clean:
 	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2 BasisSetConverter
 	@echo "Cleaned."
 
-.PHONY: all clean debug NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64
+.PHONY: all clean debug basis_set_converter NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64
