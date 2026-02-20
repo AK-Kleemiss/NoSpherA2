@@ -9,8 +9,22 @@
       "cacheVariables": {
         "WITH_CLANG_TIDY": "OFF",
         "WITH_OCC": "ON",
-        "USE_CCACHE": "YES",
         "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ENV_PATH": "${sourceDir}/mambaenv",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ",
+        "USE_SYSTEM_LIBCINT": "ON",
+        "ONLY_OCC": "ON"
+      }
+    },
+    {
+      "name": "only-occ-options",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "cacheVariables": {
+        "WITH_CLANG_TIDY": "OFF",
+        "WITH_OCC": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "ENV_PATH": "${sourceDir}/mambaenv",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ",
@@ -24,7 +38,7 @@
       "name": "windows-clang-cl",
       "displayName": "Windows Clang-CL (sccache)",
       "description": "Release build for Windows using clang-cl and lld-link",
-      "inherits": "base-options",
+      "inherits": "only-occ-options",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "clang-cl.exe",
@@ -65,13 +79,29 @@
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_SHARED_LIBS": "OFF",
         "TBB_BUILD_SHARED": "OFF",
-        "ONLY_OCC": "ON"
+        "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store",
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+      }
+    },
+    {
+      "name": "linux-occ-gcc",
+      "displayName": "linux-occ-gcc (Only Build OCC)",
+      "description": "Release build of OCC for Linux using GCC and ccache",
+      "inherits": "only-occ-options",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF",
+        "TBB_BUILD_SHARED": "OFF",
+        "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store",
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
       }
     },
     {
       "name": "macos-base",
       "hidden": true,
-      "inherits": "base-options",
+      "inherits": "only-occ-options",
       "cacheVariables": {
         "OpenMP_ROOT": "$env{HOMEBREW_PREFIX}/opt/libomp"
       }
@@ -150,7 +180,11 @@
     },
     {
       "name": "linux-gcc",
-      "configurePreset": "linux-gcc",
+      "configurePreset": "linux-gcc"
+    },
+    {
+      "name": "linux-occ-gcc",
+      "configurePreset": "linux-occ-gcc",
       "targets": "occ"
     }
   ],
@@ -195,6 +229,19 @@
         {
           "type": "build",
           "name": "linux-gcc"
+        }
+      ]
+    },
+    {
+      "name": "linux-occ-gcc",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "linux-occ-gcc"
+        },
+        {
+          "type": "build",
+          "name": "linux-occ-gcc"
         }
       ]
     },

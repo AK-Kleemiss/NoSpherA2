@@ -74,36 +74,38 @@ if (NOT ONLY_OCC)
     add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
 endif ()
 
-# external dependencies #TODO write a cmakepreset to fix this instead of putting it here.
+# external dependencies
 set(WITH_FORTRAN "OFF")
 set(WITH_CINT2_INTERFACE "OFF")
 set(ENABLE_STATIC "ON")
 set(BUILD_SHARED_LIBS "OFF")
 set(PYPZPX "ON")
 set(WITH_RANGE_COULOMB "ON")
-if (WIN32 AND ONLY_OCC)
-     set(libcint_IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/cint.lib")
-     if (EXISTS ${libcint_IMPORTED_LOCATION})
-         message(STATUS "Using precompiled libcint from ${libcint_IMPORTED_LOCATION}")
-     else ()
-       message(FATAL_ERROR "You beed to run '.\\Windows\\Build_Dependencies\\build_deps.ps1 .'")
-     endif ()
-     add_library(cint STATIC IMPORTED)
-     set_target_properties(cint PROPERTIES
-         IMPORTED_LOCATION "${libcint_IMPORTED_LOCATION}"
-         INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
-     )
-else()
-     #add_subdirectory(libcint)
-     add_library(cint STATIC IMPORTED)
-     set_target_properties(cint PROPERTIES
-         IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/libcint.a"
-         INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
-     )
-    target_link_libraries(cint INTERFACE -lquadmath)
+if (ONLY_OCC)
+    if(WIN32)
+        set(libcint_IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/cint.lib")
+        if (EXISTS ${libcint_IMPORTED_LOCATION})
+            message(STATUS "Using precompiled libcint from ${libcint_IMPORTED_LOCATION}")
+        else ()
+            message(FATAL_ERROR "You beed to run '.\\Windows\\Build_Dependencies\\build_deps.ps1 .'")
+        endif ()
+        add_library(cint STATIC IMPORTED)
+        set_target_properties(cint PROPERTIES
+                IMPORTED_LOCATION "${libcint_IMPORTED_LOCATION}"
+                INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
+        )
+    else ()
+        add_library(cint STATIC IMPORTED)
+        set_target_properties(cint PROPERTIES
+                IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/libcint.a"
+                INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
+        )
+        target_link_libraries(cint INTERFACE -lquadmath)
+    endif ()
+else ()
+    add_subdirectory(libcint)
 endif ()
 
-#add_subdirectory(libcint)
 add_library(libcint::libcint INTERFACE IMPORTED GLOBAL)
 target_link_libraries(libcint::libcint INTERFACE cint)
 target_include_directories(

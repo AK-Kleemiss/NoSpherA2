@@ -31,13 +31,13 @@ jobs:
         include:
           - os: macos-latest  # Apple Silicon (ARM64)
             name: Mac_ARM64
-            build-script: "make NoSpherA2_arm64 -j"
+            build-script: "make NoSpherA2_arm64 -j && cp Mac/NoSpherA2_arm64 ./"
             artifact-name: executable_MacOS_ARM64
             artifact-path: Mac/NoSpherA2_arm64
 
           - os: macos-15-intel  # Intel x86_64
             name: Mac_x86_64
-            build-script: "make NoSpherA2_x86_64 -j"
+            build-script: "make NoSpherA2_x86_64 -j && cp Mac/NoSpherA2_x86_64 ./"
             artifact-name: executable_MacOS_x86_64
             artifact-path: Mac/NoSpherA2_x86_64
 
@@ -163,10 +163,43 @@ jobs:
         name: executable_MacOS_Universal
         path: ./universal/NoSpherA2_Mac
 
-  # Separate testing job
   test:
     needs: build
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest  # Apple Silicon (ARM64)
+            name: Mac_ARM64
+            artifact-name: executable_MacOS_ARM64
+            artifact-path: Mac
+            executable-name: NoSpherA2_arm64
+
+          - os: macos-15-intel  # Intel x86_64
+            name: Mac_x86_64
+            artifact-name: executable_MacOS_x86_64
+            artifact-path: Mac
+            executable-name: NoSpherA2_x86_64
+
+          - os: ubuntu-latest
+            name: Linux
+            artifact-name: executable_Linux
+            artifact-path: |
+              NoSpherA2
+              libiomp5.so
+            executable-name: NoSpherA2
+
+          - os: windows-2022
+            name: Windows
+            artifact-name: executable_Windows
+            artifact-path: |
+              Windows/x64/Release/NoSpherA2.exe
+              Windows/x64/Release/libiomp5md.dll
+            executable-name: Windows/x64/Release/NoSpherA2.exe
+
+    runs-on: ${{ matrix.os }}
+    name: Test ${{ matrix.name }}
+
     steps:
     - name: Harden Runner
       uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
@@ -175,27 +208,49 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      with:
-        submodules: recursive
-        fetch-depth: 1
 
-    - name: Download Linux Executable
-      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+    - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
-        name: executable_Linux
+        name: ${{ matrix.artifact-name }}
+        path: ${{ github.workspace }}
 
-    - name: Run Tests
+    - name: Set executable path
+      id: set-exe
+      shell: bash
       run: |
-        chmod +x NoSpherA2
-        cd tests
-        export LD_LIBRARY_PATH=../:$LD_LIBRARY_PATH
-        make all -k
+        echo "NOS_EXE=${{ github.workspace }}/${{ matrix.executable-name }}" >> $GITHUB_ENV
+
+    - name: "Set up Python"
+      uses: actions/setup-python@v6
+      with:
+        python-version-file: "pyproject.toml"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+
+    - name: Install the project
+      run: uv sync --locked --all-extras --dev
+
+    - name: Run tests
+      run: uv run pytest
+
+    - name: Check for failed logs
+      id: check-failed-logs
+      if: always()
+      shell: bash
+      run: |
+        if [ -d "${{ github.workspace }}/tests/failed_logs" ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
 
     - name: Upload Artifacts
+      if: always() && steps.check-failed-logs.outputs.exists == 'true'
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
-        name: differences in tests
-        path: tests/*.diff
+        name: Failed Tests - ${{ matrix.name }}
+        path: ${{github.workspace}}/tests/failed_logs
 
   # Combine all artifacts
   combine_all:
