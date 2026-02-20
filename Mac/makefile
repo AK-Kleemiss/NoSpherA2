@@ -10,17 +10,17 @@ ARCHS := arm64 x86_64
 
 # Source & include roots
 SRC_DIR := ../Src
-INC_DIRS := ../Src ../Lib ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint_arm64/include ../Lib/LibCint_x86_64/include ../Lib/occ/include
+INC_DIRS := ../Src ../Lib ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint_arm64/include ../Lib/LibCint_x86_64/include ../Lib/occ_x86_64/include ../Lib/occ_arm64/include
 LIB_OCC := ../Lib/occ/lib/libocc.a
 
 # Local static libs (adjust as needed)
 EXTRA_LIBS_ARM := ../Lib/featomic_install_arm64/lib/libfeatomic.a \
 			  ../Lib/featomic_install_arm64/lib/libmetatensor.a \
-			  ../Lib/LibCint_arm64/lib/libcint.a
+			  ../Lib/LibCint_arm64/lib/libcint.a ..Lib/occ_arm64/lib/libocc.a
 
 EXTRA_LIBS_x86 := ../Lib/featomic_install_x86_64/lib/libfeatomic.a \
 				../Lib/featomic_install_x86_64/lib/libmetatensor.a \
-				../Lib/LibCint_x86_64/lib/libcint.a
+				../Lib/LibCint_x86_64/lib/libcint.a ..Lib/occ_x86_64/lib/libocc.a
 
 # Sources - automatically discover all .cpp files in SRC_DIR
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
