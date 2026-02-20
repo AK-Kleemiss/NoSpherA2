@@ -1,5 +1,5 @@
 #Makefile for basis_set_converter on MAC
-RM := rm
+RM := rm -f
 
 COMP := g++
 
@@ -20,48 +20,50 @@ BASIS_OBJS_arm64  := $(BASIS_OBJ_NAMES:=.o_arm64_basis)
 BASIS_OBJS_x86    := $(BASIS_OBJ_NAMES:=.o_x86_basis)
 BASIS_OBJS_native := $(BASIS_OBJ_NAMES:=.o_native_basis)
 
+# --- Pattern rules with corrected dependency generation ---
+# The previous syntax $(@:%.o=%.d) failed because the target ends in .o_arm64_basis, not .o
 
 %.o_arm64_basis: ../Src/basis_set_helper/%.cpp
-	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" ${TARGET_FLAG_a}
+	@echo 'Building file (arm64): $<'
+	@${COMP} ${GCC_OPTS_a} -MF"$(@:.o_arm64_basis=.d)" -MT"$@" -o "$@" "$<" ${TARGET_FLAG_a}
 	@echo 'Finished building: $<'
 
 %.o_native_basis: ../Src/basis_set_helper/%.cpp
-	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	@echo 'Building file (native): $<'
+	@${COMP} ${GCC_OPTS} -MF"$(@:.o_native_basis=.d)" -MT"$@" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 %.o_x86_basis: ../Src/basis_set_helper/%.cpp
-	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_x} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" ${TARGET_FLAG_x}
+	@echo 'Building file (x86): $<'
+	@${COMP} ${GCC_OPTS_x} -MF"$(@:.o_x86_basis=.d)" -MT"$@" -o "$@" "$<" ${TARGET_FLAG_x}
 	@echo 'Finished building: $<'
 
-#Basis set converter
+# --- Link Targets ---
+
 basis_set_converter: ${BASIS_OBJS_arm64}
+	@echo 'Linking BasisSetConverter (arm64)'
 	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_arm64} ${TARGET_FLAG_a}
 	@mv BasisSetConverter ../
-	./../BasisSetConverter ../Src/basis_set_helper ../Src
-	@echo 'Done building basis_set_helper'
+	@echo 'Done building basis_set_converter (arm64)'
 
 basis_set_converter_x86: ${BASIS_OBJS_x86}
+	@echo 'Linking BasisSetConverter (x86_64)'
 	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_x86} ${TARGET_FLAG_x}
 	@mv BasisSetConverter ../
-	./../BasisSetConverter ../Src/basis_set_helper ../Src
-	@echo 'Done building basis_set_helper'
+	@echo 'Done building basis_set_converter (x86_64)'
 
 basis_set_converter_native: ${BASIS_OBJS_native}
+	@echo 'Linking BasisSetConverter (native)'
 	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_native}
 	@mv BasisSetConverter ../
-	./../BasisSetConverter ../Src/basis_set_helper ../Src
-	@echo 'Done building basis_set_helper'
+	@echo 'Done building basis_set_converter (native)'
 
 clean:
-	@echo "Cleaning up"
-	@${RM} $(BASIS_OBJS_arm64) $(BASIS_OBJS_x86) ../BasisSetConverter ../Src/auxiliary_basis.cpp ../Src/checkpoint.txt
+	@echo "Cleaning up basis set converter objects"
+	@${RM} $(BASIS_OBJS_arm64) $(BASIS_OBJS_x86) $(BASIS_OBJS_native)
+	@${RM} $(BASIS_OBJS_arm64:.o_arm64_basis=.d) $(BASIS_OBJS_x86:.o_x86_basis=.d) $(BASIS_OBJS_native:.o_native_basis=.d)
+	@${RM} ../BasisSetConverter ../Src/auxiliary_basis.cpp ../Src/checkpoint.txt
 	@echo "Cleaned up"
 
-
-.PHONY: all clean basis_set_converter
+.PHONY: all clean basis_set_converter x86_64 arm64
 .SECONDARY:
-
-

@@ -31,19 +31,19 @@ jobs:
         include:
           - os: macos-latest  # Apple Silicon (ARM64)
             name: Mac_ARM64
-            build-script: "make NoSpherA2_arm64 && cp Mac/NoSpherA2_arm64 ./"
+            build-script: "make NoSpherA2_arm64 -j && cp Mac/NoSpherA2_arm64 ./"
             artifact-name: executable_MacOS_ARM64
             artifact-path: Mac/NoSpherA2_arm64
 
           - os: macos-15-intel  # Intel x86_64
             name: Mac_x86_64
-            build-script: "make NoSpherA2_x86_64 && cp Mac/NoSpherA2_x86_64 ./"
+            build-script: "make NoSpherA2_x86_64 -j && cp Mac/NoSpherA2_x86_64 ./"
             artifact-name: executable_MacOS_x86_64
             artifact-path: Mac/NoSpherA2_x86_64
 
           - os: ubuntu-latest
             name: Linux
-            build-script: "cd Linux && make && cp NoSpherA2 ../"
+            build-script: "cd Linux && make -j && cp NoSpherA2 ../"
             artifact-name: executable_Linux
             artifact-path: |
               NoSpherA2

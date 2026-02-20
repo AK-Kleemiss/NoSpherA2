@@ -78,8 +78,15 @@ OBJS_d := $(OBJ_NAMES:=.o_d)
 all: NoSpherA2
 
 # ---- Basis set converter (kept) ----
-basis_set_converter:
+../BasisSetConverter: makefile_basis_set_converter
+	@echo "Building basis set converter"
 	@$(MAKE) -f makefile_basis_set_converter
+
+# Actually run the converter to generate the file
+$(SRC_DIR)/auxiliary_basis.cpp: ../BasisSetConverter
+	@echo "Running BasisSetConverter..."
+	@./../BasisSetConverter ../Src/basis_set_helper ../Src
+	@echo "auxiliary_basis.cpp generated"
 
 # ---- Precompiled headers ----
 pch.h.gch: ../Src/pch.h
@@ -89,13 +96,13 @@ pch.h.gch_d: ../Src/pch.h
 	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} $(INCLUDES) -x c++-header -o "$@" "$<"
 
 # ---- auxiliary_basis depends on converter ----
-auxiliary_basis.o: basis_set_converter
+auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
 	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} -I"$$MKLROOT/include" $(INCLUDES) \
 	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
 	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
 
-auxiliary_basis.o_d: basis_set_converter
+auxiliary_basis.o_d: $(SRC_DIR)/auxiliary_basis.cpp
 	@echo 'Compiling auxiliary_basis.o_d after BasisSetConverter finishes'
 	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} -I"$$MKLROOT/include" $(INCLUDES) \
 	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
@@ -133,5 +140,5 @@ clean:
 	-${RM} NoSpherA2 ../NoSpherA2 NoSpherA2_Debug ../NoSpherA2_Debug ../BasisSetConverter ${OBJS} ${OBJS_d} $(OBJ_NAMES:=.d)
 	-@echo ' '
 
-.PHONY: all clean basis_set_converter
+.PHONY: all clean
 .SECONDARY:
