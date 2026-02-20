@@ -98,7 +98,8 @@
       "inherits": "macos-release",
       "displayName": "macOS release (Clang, x86_64)",
       "cacheVariables": {
-        "CMAKE_OSX_ARCHITECTURES": "x86_64"
+        "CMAKE_OSX_ARCHITECTURES": "x86_64",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_x86_64"
       }
     },
     {
@@ -106,7 +107,8 @@
         "inherits": "macos-release",
         "displayName": "macOS release (Clang, arm64)",
         "cacheVariables": {
-            "CMAKE_OSX_ARCHITECTURES": "arm64"
+            "CMAKE_OSX_ARCHITECTURES": "arm64",
+          "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_arm64"
         }
     },
     {

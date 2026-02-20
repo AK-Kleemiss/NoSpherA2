@@ -76,6 +76,7 @@ LDFLAGS_x86_64  := $(LDFLAGS_COMMON)   -arch x86_64 $(OMPLIBS_x86_64)
 
 # Default target is universal binary
 all: NoSpherA2
+occ:
 
 # Universal binary (both architectures)
 NoSpherA2: NoSpherA2_arm64 NoSpherA2_x86_64
