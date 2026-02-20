@@ -17,10 +17,17 @@ double make_sphericals(
     using namespace std;
     const double incr = pow(incr_start, max(1, accuracy - 1));
     const double lincr = log(incr);
+    const int atlsize = atom_type_list.size();
     vector<AtomType> sphericals; // sphericals is a vector that will store objects of type AtomType.
     dens.clear();
     dist.clear();
-    for (int i = 0; i < atom_type_list.size(); i++) {
+    dens.resize(atlsize);
+    dist.resize(atlsize);
+    for (int i = 0; i < atlsize; i++) {
+        radial_density_[i].reserve(2000);
+        radial_distances_[i].reserve(2000);
+    }
+    for (int i = 0; i < atlsize; i++) {
         //If we are AtomType == Thakkar, we jsut give the atomic number, if we are AtomType == MBIS_Atom, we give the atomic number and the pop and sig vectors for that atom
         if constexpr (std::is_same_v<AtomType, Thakkar>) {
             sphericals.emplace_back(atom_type_list[i]);
@@ -35,8 +42,8 @@ double make_sphericals(
     // Make radial grids
     if (debug)
     {
-        file << "\nSize of atom_type_list:" << setw(5) << atom_type_list.size() << endl;
-        for (int i = 0; i < atom_type_list.size(); i++)
+        file << "\nSize of atom_type_list:" << setw(5) << atlsize << endl;
+        for (int i = 0; i < atlsize; i++)
         {
             file << "\nCalculating for atomic number " << atom_type_list[i] << endl;
             double current = 1;
@@ -67,7 +74,7 @@ double make_sphericals(
     else
     {
 #pragma omp parallel for
-        for (int i = 0; i < atom_type_list.size(); i++)
+        for (int i = 0; i < atlsize; i++)
         {
             double current = 1;
             double _dist = min_dist;
@@ -824,15 +831,6 @@ void GridManager::calculateSphericalDensities(
 
     if (config_.debug) {
         std::cout << "GridManager: Calculating spherical densities..." << std::endl;
-    }
-
-    // Setup spherical density calculation
-    radial_density_.resize(complete_type_list.size());
-    radial_distances_.resize(complete_type_list.size());
-
-    for (int i = 0; i < complete_type_list.size(); i++) {
-        radial_density_[i].reserve(2000);
-        radial_distances_[i].reserve(2000);
     }
 
     // Calculate radial densities using Thakkar spherical atoms
