@@ -95,7 +95,7 @@ if (ONLY_OCC)
                 INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
         )
     else ()
-        if (${CNAME_SYSTEM_NAME} STREQUAL "Darwin")
+        if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
             set(libcint_DIR ${CMAKE_SOURCE_DIR}/Lib/LibCint_${CMAKE_SYSTEM_PROCESSOR})
         else ()
             set(libcint_DIR ${CMAKE_SOURCE_DIR}/Lib/LibCint)
