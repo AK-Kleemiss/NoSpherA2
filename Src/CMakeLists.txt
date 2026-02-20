@@ -9,7 +9,6 @@ add_library(libnosphera2 STATIC
     "ECPs_corrections.cpp"
     "GridManager.cpp"
     "JKFit.cpp"
-    "NoSpherA2.cpp"
     "SALTED_equicomb.cpp"
     "SALTED_io.cpp"
     "SALTED_predictor.cpp"
