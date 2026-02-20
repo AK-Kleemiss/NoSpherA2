@@ -53,6 +53,7 @@ struct GridData {
 struct PartitionResults {
     vec2 atom_charges;           // [atom][partition type]
     vec overall_charges;      // Total charges by partition type
+    enum CHARGE_ORDER { S_BECKE = 0, S_TFVC = 1, S_HIRSH = 2, S_MBIS = 3, S_EMBIS = 4 };
     double nrmsd = 0.0;
     double r_value = 0.0;
 
@@ -79,8 +80,6 @@ private:
         const ivec& atom_list);
     void getIntegrationGrid1D(const WFN& wave, const int atom_1, const int atom_2, const int num_points, const double padding);
 
-    void calculateNonSphericalDensities(const WFN& wave, const cell& unit_cell);
-
     void calculateSphericalDensities(const WFN& wave, const cell& unit_cell, const ivec& atom_list, vec2& single_spherical_density, vec2& combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
     void calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
     std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
@@ -100,6 +99,8 @@ public:
 
     void setup1DGridsForMolecule(const WFN& wave, const int atom_1, const int atom_2, const int gridpoints, const double padding);
 
+    void calculateNonSphericalDensities(const WFN& wave, const cell& unit_cell);
+
     PartitionResults calculatePartitionedCharges(const WFN& wave, const cell& unit_cell = cell());
 
     void getDensityVectors(const WFN& wave, const ivec& atom_list, vec2& d1, vec2& d2, vec2& d3, vec2& dens);
@@ -109,6 +110,7 @@ public:
     const GridConfiguration& getConfiguration() const { return config_; }
     const GridData& getGridData() const { return grid_data_; }
     int getTotalGridPoints() const { return grid_data_.total_points; }
+	int getNumPointsForAtom(const int& atom_index) const { return grid_data_.num_points_per_atom[atom_index]; }
 
     // Utility methods
     static ivec identifyAtomTypes(const WFN& wave, const bvec& needs_grid);

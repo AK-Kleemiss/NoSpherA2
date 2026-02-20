@@ -63,6 +63,52 @@ public:
             }
         }
     };
+	cell(double a, double b, double c, double alpha, double beta, double gamma)
+    {
+        this->a = a;
+        this->b = b;
+        this->c = c;
+        this->alpha = alpha;
+        this->beta = beta;
+        this->gamma = gamma;
+        set_system();
+        ca = cos(constants::PI_180 * alpha);
+        cb = cos(constants::PI_180 * beta);
+        cg = cos(constants::PI_180 * gamma);
+        sa = sin(constants::PI_180 * alpha);
+        sb = sin(constants::PI_180 * beta);
+        sg = sin(constants::PI_180 * gamma);
+        V = a * b * c * sqrt(1 + 2 * ca * cb * cg - ca * ca - cb * cb - cg * cg);
+        as = b * c * sa / V;
+        bs = a * c * sb / V;
+        cs = a * b * sg / V;
+
+        cm[0][0] = a;
+        cm[0][1] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+        cm[0][2] = sqrt(abs(a * c * cb)) * pow(-1, 1 + (cb > 0));
+
+        cm[1][0] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+        cm[1][1] = b;
+        cm[1][2] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+
+        cm[2][0] = sqrt(abs(a * c * cg)) * pow(-1, 1 + (cg > 0));
+        cm[2][1] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+        cm[2][2] = c;
+
+        rcm[0][0] = constants::TWO_PI / a;
+        rcm[0][1] = 0;
+        rcm[0][2] = 0;
+
+        rcm[1][0] = constants::TWO_PI * -cg / (a * sg);
+        rcm[1][1] = constants::TWO_PI * 1 / (b * sg);
+        rcm[1][2] = 0;
+
+        rcm[2][0] = constants::TWO_PI * b * c * (ca * cg - cb) / V / sg;
+        rcm[2][1] = constants::TWO_PI * a * c * (cb * cg - ca) / V / sg;
+        rcm[2][2] = constants::TWO_PI * a * b * sg / V;
+
+        upper = 1 - pow(ca, 2) - pow(cb, 2) - pow(cg, 2) + 2 * ca * cb * cg;
+    };
     double get_as() const { return as; };
     double get_bs() const { return bs; };
     double get_cs() const { return cs; };

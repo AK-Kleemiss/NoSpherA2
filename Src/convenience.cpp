@@ -9,6 +9,7 @@
 #include "atoms.h"
 #include "JKFit.h"
 #include "fchk.h"
+#include "bondwise_analysis.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1660,6 +1661,58 @@ void options::digest_options()
                 std::cout << endl;
             }
             spherically_averaged_density(*this, val_MOs, val_MOs_beta);
+            exit(0);
+        }
+        else if (temp == "-atom_sfac")
+        {
+            std::cout << NoSpherA2_message() << endl;
+            wfn = arguments[i + 1];
+			string wfn2 = arguments[i + 2];
+            err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
+            WFN wavy(e_origin::NOT_YET_DEFINED);
+            wavy.read_known_wavefunction_format(wfn, std::cout, debug);
+            wavy.delete_unoccupied_MOs();
+
+			WFN wavy2(e_origin::NOT_YET_DEFINED);
+			wavy2.read_known_wavefunction_format(wfn2, std::cout, debug);
+            wavy2.delete_unoccupied_MOs();
+
+			bvec needs_grid(wavy.get_ncen(), false);
+			needs_grid[0] = true;
+            GridConfiguration conf;
+            conf.partition_type = PartitionType::Hirshfeld;
+            conf.accuracy = 4;
+			GridManager grid(conf);
+            vec2 d1, d2, d3, dens;
+			vec2 d1_2, d2_2, d3_2, dens_2;
+
+			cell unit_cell(10.0,10.0,10.0, 90, 90, 90);
+            ivec asym_atom_list(1, 0);
+            // Setup grids for the molecule
+            auto grid2 = grid;
+            grid.setup3DGridsForMolecule(wavy, needs_grid, asym_atom_list, unit_cell);
+            grid.getDensityVectors(wavy, asym_atom_list, d1, d2, d3, dens);
+            grid2.setup3DGridsForMolecule(wavy2, needs_grid, asym_atom_list, unit_cell);
+            grid2.getDensityVectors(wavy2, asym_atom_list, d1_2, d2_2, d3_2, dens_2);
+
+            for (int i = 0; i < d1.size(); i++)
+            {
+				for (int p = 0; p < d1[0].size(); p++)
+                {
+                    dens[i][p] -= dens_2[i][p];
+                }
+			}
+
+            // Calculate partitioned charges
+            PartitionResults results = grid.calculatePartitionedCharges(wavy, unit_cell);
+
+			results.printChargeTable({"Fe"}, wavy, asym_atom_list, std::cout);
+
+            const int points = grid.getTotalGridPoints();
+            for (double k = 0.001; k < 10; k += 0.002) {
+                cdouble res = calc_spherically_averaged_at_k(d1, d2, d3, dens, k);
+				std::cout << "k: " << k << " sfac: " << setprecision(9) << setw(16) << scientific << res.real() << " " << setprecision(9) << setw(16) << scientific << res.imag() << endl;
+            }
             exit(0);
         }
         else if (temp == "-b")

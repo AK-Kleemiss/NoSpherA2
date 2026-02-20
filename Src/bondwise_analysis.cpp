@@ -1401,5 +1401,60 @@ Roby_information::Roby_information(WFN& wavy) {
     }
     std::cout << "--------------------------------------------------------------------------------------------\n";
 
-    double null = 0;
+}
+
+void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
+{
+    char cwd[1024];
+#ifdef _WIN32
+    if (_getcwd(cwd, sizeof(cwd)) != NULL)
+#else
+    if (getcwd(cwd, sizeof(cwd)) != NULL)
+#endif
+        std::cout << "Current working dir: " << cwd << std::endl;
+    WFN wavy(wfn_name);
+
+    err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
+
+    int points = 1001;
+
+    for (int i = 0; i < wavy.get_ncen(); i++)
+    {
+        for (int j = i + 1; j < wavy.get_ncen(); j++)
+        {
+            std::filesystem::path path = cwd;
+            double distance = sqrt(pow(wavy.get_atom_coordinate(i, 0) - wavy.get_atom_coordinate(j, 0), 2) + pow(wavy.get_atom_coordinate(i, 1) - wavy.get_atom_coordinate(j, 1), 2) + pow(wavy.get_atom_coordinate(i, 2) - wavy.get_atom_coordinate(j, 2), 2));
+            double svdW = constants::ang2bohr(constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)]);
+            if (distance < 1.35 * svdW)
+            {
+                std::cout << "Bond between " << i << " (" << wavy.get_atom_charge(i) << ") and " << j << " (" << wavy.get_atom_charge(j) << ") with distance " << distance << " and svdW " << svdW << std::endl;
+                const vec bond_vec = {(wavy.get_atom_coordinate(j, 0) - wavy.get_atom_coordinate(i, 0)) / points, (wavy.get_atom_coordinate(j, 1) - wavy.get_atom_coordinate(i, 1)) / points, (wavy.get_atom_coordinate(j, 2) - wavy.get_atom_coordinate(i, 2)) / points};
+                double dr = distance / points;
+                vec lapl(points, 0.0);
+                const vec pos = {wavy.get_atom_coordinate(i, 0), wavy.get_atom_coordinate(i, 1), wavy.get_atom_coordinate(i, 2)};
+#pragma omp parallel for
+                for (int k = 0; k < points; k++)
+                {
+                    d3 t_pos = {pos[0], pos[1], pos[2]};
+                    t_pos[0] += k * bond_vec[0];
+                    t_pos[1] += k * bond_vec[1];
+                    t_pos[2] += k * bond_vec[2];
+                    lapl[k] = wavy.computeLap(t_pos);
+                }
+                std::filesystem::path outname(wfn_name.string() + "_bondwise_laplacian_" + std::to_string(i) + "_" + std::to_string(j) + ".dat");
+                path = path / std::filesystem::path(outname);
+                std::ofstream result(path, std::ios::out);
+                for (int k = 0; k < points; k++)
+                {
+                    result << std::setw(10) << std::scientific << std::setprecision(6) << dr * k << " " << std::setw(10) << std::scientific << std::setprecision(6) << lapl[k] << std::endl;
+                }
+                result.flush();
+                result.close();
+            }
+            else
+            {
+                std::cout << "No bond between " << i << " and " << j << " with distance " << distance << " and svdW " << svdW << std::endl;
+            }
+        }
+    }
 }
