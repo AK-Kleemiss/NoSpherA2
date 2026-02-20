@@ -95,10 +95,15 @@ if (ONLY_OCC)
                 INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
         )
     else ()
+        if (CNAME_SYSTEM_NAME STREQUAL "Darwin")
+            set(libcint_DIR ${CMAKE_SOURCE_DIR}/Lib/LibCint_${CMAKE_SYSTEM_PROCESSOR})
+        else ()
+            set(libcint_DIR ${CMAKE_SOURCE_DIR}/Lib/LibCint)
+        endif ()
         add_library(cint STATIC IMPORTED)
         set_target_properties(cint PROPERTIES
-                IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/libcint.a"
-                INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
+                IMPORTED_LOCATION "${libcint_dir}/lib/libcint.a"
+                INTERFACE_INCLUDE_DIRECTORIES "${Libcint_dir}/include"
         )
         target_link_libraries(cint INTERFACE -lquadmath)
     endif ()
