@@ -24,8 +24,8 @@ double make_sphericals(
     dens.resize(atlsize);
     dist.resize(atlsize);
     for (int i = 0; i < atlsize; i++) {
-        radial_density_[i].reserve(2000);
-        radial_distances_[i].reserve(2000);
+        dens[i].reserve(2000);
+        dist[i].reserve(2000);
     }
     for (int i = 0; i < atlsize; i++) {
         //If we are AtomType == Thakkar, we jsut give the atomic number, if we are AtomType == MBIS_Atom, we give the atomic number and the pop and sig vectors for that atom
