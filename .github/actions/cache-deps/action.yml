@@ -22,21 +22,21 @@ runs:
       uses: actions/cache@v4.2.4
       with:
         path: Lib/featomic_install
-        key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**', 'makefile') }}
+        key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**') }}
 
     - name: Cache featomic (macOS ARM64)
       if: inputs.platform == 'Mac_ARM64'
       uses: actions/cache@v4.2.4
       with:
         path: Lib/featomic_install_arm64
-        key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**', 'makefile') }}
+        key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**') }}
 
     - name: Cache featomic (macOS x86_64)
       if: inputs.platform == 'Mac_x86_64'
       uses: actions/cache@v4.2.4
       with:
         path: Lib/featomic_install_x86_64
-        key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**', 'makefile') }}
+        key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**') }}
 
     - name: Cache LibCint (Linux / Windows)
       if: inputs.platform == 'Linux' || inputs.platform == 'Windows'
