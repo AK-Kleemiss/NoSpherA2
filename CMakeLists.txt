@@ -74,7 +74,7 @@ if (NOT ONLY_OCC)
     add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
 endif ()
 
-# external dependencieso
+# external dependencies #TODO write a cmakepreset to fix this instead of putting it here.
 set(WITH_FORTRAN "OFF")
 set(WITH_CINT2_INTERFACE "OFF")
 set(ENABLE_STATIC "ON")
