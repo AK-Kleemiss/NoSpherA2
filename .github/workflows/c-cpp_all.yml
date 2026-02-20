@@ -43,7 +43,7 @@ jobs:
 
           - os: ubuntu-latest
             name: Linux
-            build-script: "cd Linux && make -j1 && cp NoSpherA2 ../"
+            build-script: "cd Linux && make -j && cp NoSpherA2 ../"
             artifact-name: executable_Linux
             artifact-path: |
               NoSpherA2
