@@ -231,6 +231,10 @@ jobs:
     - name: Install the project
       run: uv sync --locked --all-extras --dev
 
+    - name: Make executable
+      if: runner.os == 'macOS' || runner.os == 'Linux'
+      run: chmod +x ${{ env.NOS_EXE }}
+
     - name: Run tests
       run: uv run pytest
 
