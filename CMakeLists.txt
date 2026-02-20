@@ -103,7 +103,7 @@ if (ONLY_OCC)
         add_library(cint STATIC IMPORTED)
         set_target_properties(cint PROPERTIES
                 IMPORTED_LOCATION "${libcint_dir}/lib/libcint.a"
-                INTERFACE_INCLUDE_DIRECTORIES "${Libcint_dir}/include"
+                INTERFACE_INCLUDE_DIRECTORIES "${libcint_dir}/include"
         )
         target_link_libraries(cint INTERFACE -lquadmath)
     endif ()
