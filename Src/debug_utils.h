@@ -16,7 +16,7 @@
     #include <chrono>
 #endif
 
-volatile bool g_debug_attached = false;
+inline volatile bool g_debug_attached = false;
 inline void wait_for_debugger() {
     if (!std::getenv("DEBUG_WAIT")) {
         return;
