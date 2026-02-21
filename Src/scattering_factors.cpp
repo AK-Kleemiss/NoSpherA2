@@ -2007,7 +2007,7 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
     const double* k2_local = k_pt[1].data();
     const double* k3_local = k_pt[2].data();
     double work, rho;
-    ProgressBar* progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
+    ProgressBar* progress = new ProgressBar(imax*smax, 60, "=", " ", "Calculating Scattering Factors");
     for (long long int i = 0; i < imax; i++)
     {
         pmax = static_cast<long long int>(dens[i].size());
