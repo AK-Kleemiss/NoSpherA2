@@ -146,7 +146,7 @@ endif()
 if (MSVC)
     target_compile_options(NoSpherA2 PRIVATE $<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
 endif()
-if (LINUX)
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     get_target_property(MKL_LIBRARIES MKL::MKL IMPORTED_LOCATION)
 endif ()
 
