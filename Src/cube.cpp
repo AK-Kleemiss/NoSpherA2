@@ -2,6 +2,7 @@
 #include "cube.h"
 #include "convenience.h"
 #include "constants.h"
+
 cube::cube()
 {
     loaded = false;
@@ -847,6 +848,7 @@ cube cube::operator-(const cube& right) const
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
                 res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) - right.get_value(x, y, z));
+
     return (res_cube);
 };
 
