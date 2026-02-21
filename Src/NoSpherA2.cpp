@@ -380,7 +380,7 @@ int main(int argc, char** argv)
     if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
     {
       if (opt.occ != "") {
-        log_file << "Calculating WFN from input file: " << setw(44) << opt.wfn << flush;
+        log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
         if (opt.occ.ends_with(".toml")) {
           auto config = occ::io::read_occ_input_file(opt.occ);
           occ::log::set_log_file("NoSpherA2_OCC.log");
