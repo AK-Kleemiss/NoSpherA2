@@ -423,16 +423,19 @@ double Thakkar::calc_type(
             i_j_distance++;
     for (int m = lower_m + min; m < lower_m + max; m++)
     {
-        if (occ[offset + m] == 0)
+        const int offset_m = offset + m;
+        if (occ[offset_m] == 0)
             continue;
+		const int coef_n = nr_coef + m - lower_m;
         for (int i = 0; i < l_n; i++)
         {
+			const int nr_ex_i = nr_ex + i;
             for (int j = 0; j < l_n - i; j++)
             {
-                temp = func(occ[offset + m],
-                    c[nr_coef + m - lower_m + i * i_j_distance] * c[nr_coef + m - lower_m + (i + j) * i_j_distance],
-                    z[nr_ex + i] + z[nr_ex + i + j],
-                    n[nr_ex + i] + n[nr_ex + i + j] - 1,
+                temp = func(occ[offset_m],
+                    c[coef_n + i * i_j_distance] * c[coef_n + (i + j) * i_j_distance],
+                    z[nr_ex_i] + z[nr_ex_i + j],
+                    n[nr_ex_i] + n[nr_ex_i + j] - 1,
                     k_vector);
                 if (j != 0)
                     result += 2 * temp;
