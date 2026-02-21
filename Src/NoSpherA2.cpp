@@ -15,7 +15,9 @@ int QCT(options& opt, std::vector<WFN>& wavy);
 
 int main(int argc, char** argv)
 {
+#ifdef __INSECURELY_AWAIT_FOR_ENV
     wait_for_debugger(); // This is for debugging during tests. It just returns if the env variable DEBUG_WAIT is not set.
+#endif
     using namespace std;
     char cwd[1024];
 #ifdef _WIN32
