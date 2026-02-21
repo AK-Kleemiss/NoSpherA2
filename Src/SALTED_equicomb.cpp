@@ -55,8 +55,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
                         l2 = llvec[1][il];
                         limit_l1 = 2 * l1 + 1;
 
-                        const cvec *v1_ptr = (cvec *)&v1[iat][n1][l1];
-                        const cvec *v2_ptr = (cvec *)&v2[iat][n2][l2];
+                        const cdouble *v1_ptr = v1[iat][n1][l1].data();
+                        const cdouble *v2_ptr = v2[iat][n2][l2].data();
 
                         // Zero out real and imaginary parts separately
                         std::memset(pcmplx_real.data(), 0, l21 * sizeof(double));
@@ -74,10 +74,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
                                 if (abs(m2) <= l2)
                                 {
                                     im2 = m2 + l2;
-                                    // Since wigner is real: wigner * (v1.real * v2.real - v1.imag * v2.imag, v1.real * v2.imag + v1.imag * v2.real)
                                     const double wigner_val = *wigner_ptr;
-                                    const cdouble &v1_val = (*v1_ptr)[im1];
-                                    const cdouble &v2_val = (*v2_ptr)[im2];
+                                    const cdouble &v1_val = v1_ptr[im1];
+                                    const cdouble &v2_val = v2_ptr[im2];
 
                                     const double& v1_r = v1_val.real();
                                     const double& v1_i = v1_val.imag();
@@ -91,7 +90,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
                             }
                             pcmplx_real[imu] = acc_real;
                             pcmplx_imag[imu] = acc_imag;
-
                         }
                         //const cdouble* cvec_ptr;
                         for (i = 0; i < l21; ++i)
