@@ -22,7 +22,7 @@ class NosTest:
     def build_cmd(self, exe_path):
         cmd = [exe_path]
         for k, v in self.cli_args.items():
-            flag = f"-{k.replace('_', '-')}"
+            flag = f"-{k}"
             if isinstance(v, bool):
                 if v: cmd.append(flag)
             elif isinstance(v, (list, tuple)):
@@ -94,7 +94,7 @@ def test_nos(test, exe_path, tmp_path):
         pytest.fail(f"Source directory missing: {src_dir}", pytrace=False)
 
     cmd_args = test.build_cmd(exe_path)
-
+    print(" ".join(cmd_args))
     try:
         subprocess.run(cmd_args, cwd=work_dir, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
