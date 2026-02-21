@@ -25,7 +25,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     const int llmax = (int)llvec[0].size();
 
     // Initialize p with zeros
-    p.assign((size_t)natoms * l21 * nfps, 0.0);
+    std::memset(p.data(), 0, natoms * l21 * nfps * sizeof(double));
     const vec f_vec(featsize, 0.0);
 
     // Declare variables at the beginning
@@ -34,12 +34,12 @@ void equicomb(int natoms, int nrad1, int nrad2,
     ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
 #pragma omp parallel 
     {
-        vec2 ptemp(l21, f_vec);
+        vec ptemp(l21 * featsize, 0.0);
         vec pcmplx_real(l21);
         vec pcmplx_imag(l21);
         const double *wigner_ptr = NULL;
         int limit_l1 = 0;
-#pragma omp for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m2, inner, normfact, preal)
+#pragma omp for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m2, inner, normfact, preal) schedule(dynamic, 1)
         for (iat = 0; iat < natoms; ++iat)
         {
             inner = 0.0;
@@ -57,10 +57,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
 
                         const cdouble *v1_ptr = v1[iat][n1][l1].data();
                         const cdouble *v2_ptr = v2[iat][n2][l2].data();
-
-                        // Zero out real and imaginary parts separately
-                        std::memset(pcmplx_real.data(), 0, l21 * sizeof(double));
-                        std::memset(pcmplx_imag.data(), 0, l21 * sizeof(double));
 
                         for (imu = 0; imu < l21; imu++)
                         {
@@ -91,7 +87,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
                             pcmplx_real[imu] = acc_real;
                             pcmplx_imag[imu] = acc_imag;
                         }
-                        //const cdouble* cvec_ptr;
+                        //recycling this variable
+                        limit_l1 = l21 * ifeat;
                         for (i = 0; i < l21; ++i)
                         {
                             preal = 0.0;
@@ -101,27 +98,29 @@ void equicomb(int natoms, int nrad1, int nrad2,
 #pragma ivdep
                             for (j = 0; j < l21; ++j)
                             {
-                                preal += cvec_ptr[j].real() * pvec_real_ptr[j] - cvec_ptr[j].imag() * pvec_imag_ptr[j];
+                                const cdouble &c2r_ih = cvec_ptr[j];
+                                preal += c2r_ih.real() * pvec_real_ptr[j] - c2r_ih.imag() * pvec_imag_ptr[j];
                             }
                             inner += preal * preal;
-                            ptemp[i][ifeat] = preal;
+                            ptemp[i + limit_l1] = preal;
                         }
                         ifeat++;
                     }
                 }
             }
 
-            normfact = sqrt(inner);
-            int offset = iat * l21 * nfps;
-            for (int n = 0; n < nfps; ++n)
+            normfact = 1.0 / sqrt(inner);
+            const int offset = iat * l21 * nfps;
+            for (i = 0; i < nfps; ++i)
             {
+                const int off_i = i + offset;
+                const int feat_i = vfps[i] * l21;
                 for (imu = 0; imu < l21; ++imu)
                 {
-                    p[offset + (imu * nfps)] = ptemp[imu][vfps[n]] / normfact;
+                    p[off_i + (imu * nfps)] = ptemp[imu + feat_i] * normfact;
                 }
-                offset++;
             }
-            pb.update(std::cout);
+            //pb.update(std::cout);
         }
     }
 }
