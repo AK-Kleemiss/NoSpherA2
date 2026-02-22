@@ -27,30 +27,71 @@ Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 1770 grid points.
+Starting MBIS iterations...
+MBIS iteration: 1 max change: 0.508445
+MBIS iteration: 2 max change: 0.607778
+MBIS iteration: 3 max change: 0.36473
+MBIS iteration: 4 max change: 0.210957
+MBIS iteration: 5 max change: 0.126991
+MBIS iteration: 6 max change: 0.0809171
+MBIS iteration: 7 max change: 0.0546058
+MBIS iteration: 8 max change: 0.0387971
+MBIS iteration: 9 max change: 0.0308325
+MBIS iteration: 10 max change: 0.0270306
+MBIS iteration: 11 max change: 0.0236573
+MBIS iteration: 12 max change: 0.0206912
+MBIS iteration: 13 max change: 0.0180934
+MBIS iteration: 14 max change: 0.0158214
+MBIS iteration: 15 max change: 0.0138352
+MBIS iteration: 16 max change: 0.0120988
+MBIS iteration: 17 max change: 0.0105807
+MBIS iteration: 18 max change: 0.00925306
+MBIS iteration: 19 max change: 0.00809193
+MBIS converged after 19 iterations with max charge change: 0.0070763 and max sig change: 0.000951274
+Promolecular charges:
+Atom   0: 2.00716
+Atom   1: -0.817115
+Atom   2: -0.469129
+Atom   3: -0.706875
+Atom   4: -0.145054
+Atom   5: -0.0315493
+Atom   6: -1.24875
+Atom   7: 0.405584
+Atom   8: 0.435403
+Atom   9: 0.192029
+Atom  10: -0.631568
+Atom  11: 0.295892
+Atom  12: 0.249785
+Atom  13: 0.0368043
+Atom  14: 0.258385
+Atom  15: 0.0364991
+Atom  16: -0.137481
+Atom  17: 0.206311
 Table of Charges in electrons
-    Atom       Becke   Hirshfeld   TFVC
-      Cu01    -1.535     0.899     1.635
-      Cl02    -0.053    -0.483    -0.642
-      S003     0.110    -0.265     0.485
-      Cl04    -0.024    -0.387    -0.446
-      S005    -0.330     0.113     0.593
-      N006     0.144     0.035    -1.140
-      N007     0.535     0.025    -0.455
-      H00a     0.194     0.156     0.371
-      H00b     0.161     0.155     0.305
-      C008     0.201     0.115     0.083
-      C009    -0.161     0.047    -0.354
-      H00c     0.152     0.064     0.025
-      H00d     0.112     0.075    -0.006
-      H00e     0.125     0.072     0.004
-      C00A     0.030    -0.083     0.821
-      H00f     0.099     0.039    -0.112
-      H00g     0.109     0.048    -0.093
-      H00h     0.066     0.065    -0.178
+    Atom       Becke   Hirshfeld   TFVC      MBIS 
+      Cu01    -1.535     0.899     1.635     2.007
+      Cl02    -0.053    -0.483    -0.642    -1.036
+      S003     0.110    -0.265     0.485    -0.603
+      Cl04    -0.024    -0.387    -0.446    -0.529
+      S005    -0.330     0.113     0.593     0.042
+      N006     0.144     0.035    -1.140    -0.024
+      N007     0.535     0.025    -0.455    -0.595
+      H00a     0.194     0.156     0.371     0.389
+      H00b     0.161     0.155     0.305     0.452
+      C008     0.201     0.115     0.083     0.355
+      C009    -0.161     0.047    -0.354    -0.346
+      H00c     0.152     0.064     0.025     0.244
+      H00d     0.112     0.075    -0.006     0.242
+      H00e     0.125     0.072     0.004     0.113
+      C00A     0.030    -0.083     0.821     0.175
+      H00f     0.099     0.039    -0.112     0.020
+      H00g     0.109     0.048    -0.093    -0.098
+      H00h     0.066     0.065    -0.178     0.213
 Total number of electrons:
  Becke:     135.063889
  Hirshfeld: 134.310349
  TVFC:      134.105550
+ MBIS:      133.976960
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!
