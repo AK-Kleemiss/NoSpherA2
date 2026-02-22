@@ -1235,14 +1235,14 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 
         for (int i = 0; i < ncen; i++) {
             for (int shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(i)]; shell++) {
-                double det = 1 / (sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][3] * sig_pop_vector[i].first[shell][5] -
+                const double det = 1 / (sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][3] * sig_pop_vector[i].first[shell][5] -
                     sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][4] -
                     sig_pop_vector[i].first[shell][3] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][2] -
                     sig_pop_vector[i].first[shell][5] * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][1] +
                     2 * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][4]);
                 if (det < 1E-14)
                     continue;
-                auto sigmas = sig_pop_vector[i].first[shell];
+                const vec sigmas = sig_pop_vector[i].first[shell];
                 //                0   1   2   X   3   4   X   X   5
                 // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
                 sig_pop_vector[i].first[shell][0] = (sigmas[3] * sigmas[5] - sigmas[4] * sigmas[4]) * det;
