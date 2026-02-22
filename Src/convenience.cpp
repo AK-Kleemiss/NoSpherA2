@@ -110,7 +110,7 @@ std::string NoSpherA2_message(bool no_date)
 
 std::string build_date = ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
 
-bool is_similar_rel(const double& first, const double& second, const double& tolerance)
+bool is_similar_rel(const double &first, const double &second, const double &tolerance)
 {
     double diff = abs(first - second);
     if (diff > abs((first + second + 0.01) * tolerance / 2))
@@ -119,7 +119,7 @@ bool is_similar_rel(const double& first, const double& second, const double& tol
         return true;
 };
 
-bool is_similar(const double& first, const double& second, const double& tolerance)
+bool is_similar(const double &first, const double &second, const double &tolerance)
 {
     double diff = abs(first - second);
     if (diff > pow(10, tolerance))
@@ -128,7 +128,7 @@ bool is_similar(const double& first, const double& second, const double& toleran
         return true;
 };
 
-bool is_similar_abs(const double& first, const double& second, const double& tolerance)
+bool is_similar_abs(const double &first, const double &second, const double &tolerance)
 {
     double diff = abs(first - second);
     if (diff > abs(tolerance))
@@ -162,7 +162,7 @@ double cosinus_annaeherung::calculate_error_at(double x) const
     return cos(x) - get(x);
 }
 */
-void copy_file(std::filesystem::path& from, std::filesystem::path& to)
+void copy_file(std::filesystem::path &from, std::filesystem::path &to)
 {
     std::ifstream source(from.c_str(), std::ios::binary);
     std::ofstream dest(to.c_str(), std::ios::binary);
@@ -173,11 +173,11 @@ void copy_file(std::filesystem::path& from, std::filesystem::path& to)
     dest.close();
 };
 
-d3 vec_diff(const d3& a, const d3& b) {
+d3 vec_diff(const d3 &a, const d3 &b) {
     return { a[0] - b[0], a[1] - b[1], a[2] - b[2] };
 };
 
-d3 vec_cross(const d3& a, const d3& b)
+d3 vec_cross(const d3 &a, const d3 &b)
 {
     return {
         a[1] * b[2] - a[2] * b[1],
@@ -185,7 +185,7 @@ d3 vec_cross(const d3& a, const d3& b)
         a[0] * b[1] - a[1] * b[0] };
 }
 
-double vec_dot(const d3& a, const d3& b)
+double vec_dot(const d3 &a, const d3 &b)
 {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 };
@@ -195,7 +195,7 @@ double vec_dot(const d3& a, const d3& b)
 std::filesystem::path get_home_path(void)
 {
 #ifdef _WIN32
-    char* homeDrive = nullptr;
+    char *homeDrive = nullptr;
     size_t len = 0;
     std::string temp1, temp2;
 
@@ -220,7 +220,7 @@ std::filesystem::path get_home_path(void)
     temp1.append(temp2);
     return temp1;
 #else
-    const char* home_env = getenv("HOME");
+    const char *home_env = getenv("HOME");
     if (home_env == nullptr) {
         std::cerr << "Warning: HOME environment variable not set." << std::endl;
         return std::filesystem::path("/tmp"); // Fallback to /tmp
@@ -237,7 +237,7 @@ std::filesystem::path get_home_path(void)
 #endif
 }
 
-bool check_bohr(WFN& wave, bool debug)
+bool check_bohr(WFN &wave, bool debug)
 {
     double min_length = 300.0;
     for (int i = 0; i < wave.get_ncen(); i++)
@@ -263,7 +263,7 @@ bool check_bohr(WFN& wave, bool debug)
     return (!(min_length < 2));
 };
 
-std::string go_get_string(std::ifstream& file, std::string search, bool rewind)
+std::string go_get_string(std::ifstream &file, std::string search, bool rewind)
 {
     if (rewind)
     {
@@ -279,7 +279,7 @@ std::string go_get_string(std::ifstream& file, std::string search, bool rewind)
         return line;
 }
 
-std::string shrink_string(std::string& input)
+std::string shrink_string(std::string &input)
 {
     while (input.find(" ") != -1)
     {
@@ -336,7 +336,7 @@ std::string shrink_string(std::string& input)
     return input;
 };
 
-std::string shrink_string_to_atom(std::string& input, const int& atom_number)
+std::string shrink_string_to_atom(std::string &input, const int &atom_number)
 {
     while (input.find(" ") != -1)
     {
@@ -400,12 +400,12 @@ std::string shrink_string_to_atom(std::string& input, const int& atom_number)
     return input;
 };
 
-bool read_block_from_fortran_binary(std::ifstream& file, void* Target)
+bool read_block_from_fortran_binary(std::ifstream &file, void *Target)
 {
     int size_begin = 0, size_end = 0;
-    file.read(reinterpret_cast<char*>(&size_begin), sizeof(int));
-    file.read(reinterpret_cast<char*>(Target), size_begin);
-    file.read(reinterpret_cast<char*>(&size_end), sizeof(int));
+    file.read(reinterpret_cast<char *>(&size_begin), sizeof(int));
+    file.read(reinterpret_cast<char *>(Target), size_begin);
+    file.read(reinterpret_cast<char *>(&size_end), sizeof(int));
     if (size_begin != size_end)
     {
         std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
@@ -414,13 +414,13 @@ bool read_block_from_fortran_binary(std::ifstream& file, void* Target)
     return true;
 }
 template<typename T>
-bool read_block_from_fortran_binary(std::ifstream& file, std::vector<T>& Target)
+bool read_block_from_fortran_binary(std::ifstream &file, std::vector<T> &Target)
 {
     int size_begin = 0, size_end = 0;
-    file.read(reinterpret_cast<char*>(&size_begin), sizeof(int));
+    file.read(reinterpret_cast<char *>(&size_begin), sizeof(int));
     Target.resize(size_begin / sizeof(T));
-    file.read(reinterpret_cast<char*>(Target.data()), size_begin);
-    file.read(reinterpret_cast<char*>(&size_end), sizeof(int));
+    file.read(reinterpret_cast<char *>(Target.data()), size_begin);
+    file.read(reinterpret_cast<char *>(&size_end), sizeof(int));
     if (size_begin != size_end)
     {
         std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
@@ -428,10 +428,10 @@ bool read_block_from_fortran_binary(std::ifstream& file, std::vector<T>& Target)
     }
     return true;
 }
-template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<double>& Target);
-template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<int>& Target);
-template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<float>& Target);
-template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<char>& Target);
+template bool read_block_from_fortran_binary(std::ifstream &file, std::vector<double> &Target);
+template bool read_block_from_fortran_binary(std::ifstream &file, std::vector<int> &Target);
+template bool read_block_from_fortran_binary(std::ifstream &file, std::vector<float> &Target);
+template bool read_block_from_fortran_binary(std::ifstream &file, std::vector<char> &Target);
 
 primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
 {
@@ -442,7 +442,7 @@ primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), 
     normalized_coefficient = coefficient * norm_const;
 };
 
-primitive::primitive(const SimplePrimitive& other) : center(other.center), type(other.type), exp(other.exp), coefficient(other.coefficient)
+primitive::primitive(const SimplePrimitive &other) : center(other.center), type(other.type), exp(other.exp), coefficient(other.coefficient)
 {
     exp_l_plus_3_2 = pow(other.exp, type + 1.5);
     norm_const = pow(
@@ -451,7 +451,7 @@ primitive::primitive(const SimplePrimitive& other) : center(other.center), type(
     normalized_coefficient = coefficient * norm_const;
 };
 
-void select_cubes(std::vector<std::vector<unsigned int>>& selection, std::vector<WFN>& wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
+void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
 {
     // asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
     // Returns values in selection[0][i] for iths selection of wavefunction and
@@ -563,7 +563,7 @@ void select_cubes(std::vector<std::vector<unsigned int>>& selection, std::vector
     } while (true);
 };
 
-bool unsaved_files(std::vector<WFN>& wavy)
+bool unsaved_files(std::vector<WFN> &wavy)
 {
     for (int w = 0; w < wavy.size(); w++)
         for (int c = 0; c < wavy[w].get_cube_count(); c++)
@@ -573,8 +573,8 @@ bool unsaved_files(std::vector<WFN>& wavy)
 };
 
 void readxyzMinMax_fromWFN(
-    WFN& wavy,
-    properties_options& opts,
+    WFN &wavy,
+    properties_options &opts,
     bool no_bohr)
 {
     vec2 PosAtoms;
@@ -618,8 +618,8 @@ void readxyzMinMax_fromWFN(
 
 void readxyzMinMax_fromCIF(
     std::filesystem::path cif,
-    properties_options& opts,
-    vec2& cm)
+    properties_options &opts,
+    vec2 &cm)
 {
     using namespace std;
     cell cell(cif);
@@ -648,7 +648,7 @@ void readxyzMinMax_fromCIF(
             cm[i][j] /= opts.NbSteps[j];
 }
 
-bool generate_sph2cart_mat(vec2& p, vec2& d, vec2& f, vec2& g)
+bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
 {
     //
     // From 3P: P0 P1 P2
@@ -776,7 +776,7 @@ bool generate_sph2cart_mat(vec2& p, vec2& d, vec2& f, vec2& g)
     g[14][4] = 3.0 / sqrt(7);
     return true;
 }
-bool generate_cart2sph_mat(vec2& d, vec2& f, vec2& g, vec2& h)
+bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
 {
     //
     // From 5D: D 0, D + 1, D - 1, D + 2, D - 2
@@ -960,7 +960,7 @@ bool generate_cart2sph_mat(vec2& d, vec2& f, vec2& g, vec2& h)
     return true;
 }
 
-bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug)
+bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
 {
     using namespace std;
     vec2 Uij, Cijk, Dijkl;
@@ -1276,7 +1276,7 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_
     return true;
 };
 
-void swap_sort(ivec order, cvec& v)
+void swap_sort(ivec order, cvec &v)
 {
     int i = 0;
     while (i < v.size() - 1)
@@ -1299,7 +1299,7 @@ void swap_sort(ivec order, cvec& v)
     }
 }
 
-void swap_sort_multi(ivec order, std::vector<ivec>& v)
+void swap_sort_multi(ivec order, std::vector<ivec> &v)
 {
     int i = 0;
     ivec temp;
@@ -1329,7 +1329,7 @@ void swap_sort_multi(ivec order, std::vector<ivec>& v)
     }
 }
 
-double get_lambda_1(double* a)
+double get_lambda_1(double *a)
 {
     vec bw, zw;
     // int run = 0;
@@ -1387,7 +1387,7 @@ double get_lambda_1(double* a)
     }
 };
 
-const double gaussian_radial(const primitive& p, const double& r)
+const double gaussian_radial(const primitive &p, const double &r)
 {
     return pow(r, p.get_type()) * std::exp(-p.get_exp() * r * r) * p.normalization_constant();
 }
@@ -1539,7 +1539,7 @@ double bessel_first_kind(const int l, const double x)
 }
 
 
-double get_decimal_precision_from_CIF_number(std::string& given_string)
+double get_decimal_precision_from_CIF_number(std::string &given_string)
 {
     int len = (int)given_string.length();
     int open_bracket = -1;
@@ -1686,7 +1686,7 @@ void options::digest_options()
             vec2 d1, d2, d3, dens;
             vec2 d1_2, d2_2, d3_2, dens_2;
 
-            cell unit_cell(10.0,10.0,10.0, 90, 90, 90);
+            cell unit_cell(10.0, 10.0, 10.0, 90, 90, 90);
             ivec asym_atom_list(1, 0);
             // Setup grids for the molecule
             auto grid2 = grid;
@@ -1706,7 +1706,7 @@ void options::digest_options()
             // Calculate partitioned charges
             PartitionResults results = grid.calculatePartitionedCharges(wavy, unit_cell);
 
-            results.printChargeTable({"Fe"}, wavy, asym_atom_list, std::cout);
+            results.printChargeTable({ "Fe" }, wavy, asym_atom_list, std::cout);
 
             const int points = grid.getTotalGridPoints();
             for (double k = 0.001; k < 10; k += 0.002) {
@@ -1907,7 +1907,7 @@ void options::digest_options()
         else if (temp == "-ewal_sum")
         {
             // bool read, WFN& wave, std::ostream& file,
-            WFN* temp_w = new WFN(e_origin::cub);
+            WFN *temp_w = new WFN(e_origin::cub);
             cube residual(arguments[i + 1], true, *temp_w, std::cout);
             if (argc >= i + 3)
             {
@@ -2231,10 +2231,12 @@ void options::digest_options()
             save_k_pts = true;
         else if (temp == "-sfac_diffuse")
         {
-            sfac_diffuse = fromString<double>(arguments[i + 1]);
-            cif = arguments[i + 2];
-            wfn = arguments[i + 3];
-            dmin = fromString<double>(arguments[i + 4]);
+            sfac_diffuse[0] = fromString<double>(arguments[i + 1]);
+            sfac_diffuse[1] = fromString<double>(arguments[i + 2]);
+            sfac_diffuse[2] = fromString<double>(arguments[i + 3]);
+            cif = arguments[i + 4];
+            wfn = arguments[i + 5];
+            dmin = fromString<double>(arguments[i + 6]);
             calc_sfac_diffuse(*this, std::cout);
         }
         else if (temp == "-atom_dens_diff")
@@ -2249,8 +2251,8 @@ void options::digest_options()
         {
             filesystem::path wfn1_name = arguments[i + 1];
             filesystem::path wfn2_name = arguments[i + 2];
-            WFN* wavy1 = new WFN(wfn1_name);
-            WFN* wavy2 = new WFN(wfn2_name);
+            WFN *wavy1 = new WFN(wfn1_name);
+            WFN *wavy2 = new WFN(wfn2_name);
             ofstream outputFile("fukui_averaged_density_wfn.dat");
             for (double r = 0.001; r < 10.0; r += 0.001)
             {
@@ -2268,7 +2270,7 @@ void options::digest_options()
         {
             string wfn_name = arguments[i + 1];
             std::cout << "Reading wavefunction: " << wfn_name << endl;
-            WFN* wavy = new WFN(wfn_name);
+            WFN *wavy = new WFN(wfn_name);
             std::cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy->set_has_ECPs(true);
@@ -2411,7 +2413,7 @@ void options::digest_options()
     }
 };
 
-void options::look_for_debug(int& argc, char** argv)
+void options::look_for_debug(int &argc, char **argv)
 {
     // This loop figures out command line options
     for (int i = 0; i < argc; i++)
@@ -2430,24 +2432,24 @@ void options::look_for_debug(int& argc, char** argv)
     }
 };
 
-bool is_nan(const double& in)
+bool is_nan(const double &in)
 {
     return in != in;
 };
-bool is_nan(const float& in)
+bool is_nan(const float &in)
 {
     return in != in;
 };
-bool is_nan(const long double& in)
+bool is_nan(const long double &in)
 {
     return in != in;
 };
-bool is_nan(const cdouble& in)
+bool is_nan(const cdouble &in)
 {
     return in != in;
 };
 
-bool ends_with(const std::string& str, const std::string& suffix)
+bool ends_with(const std::string &str, const std::string &suffix)
 {
     if (str.length() >= suffix.length())
     {
@@ -2498,7 +2500,7 @@ double double_from_string_with_esd(std::string in)
         return stod(in.substr(0, in.find('(')));
 }
 
-std::string trim(const std::string& s)
+std::string trim(const std::string &s)
 {
     if (s == "")
         return "";
@@ -2517,7 +2519,7 @@ std::string trim(const std::string& s)
     return std::string(start, end + 1);
 }
 
-int CountWords(const char* str)
+int CountWords(const char *str)
 {
     if (str == NULL)
         return -1;
@@ -2543,7 +2545,7 @@ int CountWords(const char* str)
     return numWords;
 };
 
-void print_duration(std::ostream& file, const std::string& description, const std::chrono::microseconds& duration, std::optional<std::chrono::microseconds> total_duration = std::nullopt)
+void print_duration(std::ostream &file, const std::string &description, const std::chrono::microseconds &duration, std::optional<std::chrono::microseconds> total_duration = std::nullopt)
 {
     auto mins = std::chrono::duration_cast<std::chrono::minutes>(duration);
     auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration) % 60;
@@ -2563,7 +2565,7 @@ void print_duration(std::ostream& file, const std::string& description, const st
     file << std::setfill(' ');
 }
 
-void write_timing_to_file(std::ostream& file,
+void write_timing_to_file(std::ostream &file,
     std::vector<_time_point> time_points,
     std::vector<std::string> descriptions)
 {
@@ -2588,7 +2590,7 @@ void write_timing_to_file(std::ostream& file,
     file << "---------------------------------------------------------------------------" << endl;
 }
 
-void remove_empty_elements(svec& input, const std::string& empty)
+void remove_empty_elements(svec &input, const std::string &empty)
 {
     for (int i = (int)input.size() - 1; i >= 0; i--)
         if (input[i] == empty || input[i] == "")
@@ -2623,7 +2625,7 @@ long long int get_sec(std::chrono::high_resolution_clock::time_point start, std:
     return sec.count();
 }
 
-const int shell2function(const int& type, const int& prim)
+const int shell2function(const int &type, const int &prim)
 {
     switch (type)
     {
@@ -2675,7 +2677,7 @@ const int shell2function(const int& type, const int& prim)
     return 0;
 }
 
-bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std::string> filter, const std::string& current_path) {
+bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std::string> filter, const std::string &current_path) {
 #ifdef _WIN32
     char filename[1024];
 
@@ -2731,7 +2733,7 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
         command = "zenity --file-selection --title=\"Select a file to load\" --filename=\"";
         command += current_path;
         command += "/\"";
-        for (const auto& f : filter) {
+        for (const auto &f : filter) {
             command += " --file-filter='";
             command += f;
             command += "'";
@@ -2744,7 +2746,7 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
             command = "kdialog --getopenfilename \"";
             command += current_path;
             command += "/\" '";
-            for (const auto& f : filter) {
+            for (const auto &f : filter) {
                 command += f;
                 command += " ";
             }
@@ -2782,7 +2784,7 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
         std::cout << "Executing command: " << command << std::endl;
     }
 
-    FILE* f = popen(command.c_str(), "r");
+    FILE *f = popen(command.c_str(), "r");
     if (!f) {
         std::cerr << "Error: Failed to execute file dialog command." << std::endl;
         return false;
@@ -2821,7 +2823,7 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
 #endif
 };
 
-bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector<std::string>& endings, const std::string& filename_given, const std::string& current_path) {
+bool save_file_dialog(std::filesystem::path &path, bool debug, const std::vector<std::string> &endings, const std::string &filename_given, const std::string &current_path) {
 #ifdef _WIN32
     constexpr size_t MAX_FILENAME_SIZE = 4096;
     std::vector<char> filename_buf(MAX_FILENAME_SIZE);
@@ -2892,7 +2894,7 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
     command += "/\" --save --confirm-overwrite 2> /dev/null";
     bool end = false;
     while (!end) {
-        FILE* f = popen(command.c_str(), "r");
+        FILE *f = popen(command.c_str(), "r");
         if (!f) {
             std::cout << "ERROR" << std::endl;
             return false;
@@ -2923,7 +2925,7 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
     return true;
 };
 
-const int sht2nbas(const int& type)
+const int sht2nbas(const int &type)
 {
     const int st2bas[9]{ 1, 3, 6, 10, 15, 21, 28, 36 };
     const int nst2bas[9]{ 17,15,13,11, 9, 7, 5, 4, 1 };
@@ -2940,7 +2942,7 @@ char asciitolower(char in)
     return in;
 }
 
-int vec_sum(const bvec& in)
+int vec_sum(const bvec &in)
 {
     int sum = 0;
     for (bool val : in)
@@ -2950,7 +2952,7 @@ int vec_sum(const bvec& in)
     return sum;
 }
 
-int vec_sum(const ivec& in)
+int vec_sum(const ivec &in)
 {
     int sum = 0;
     for (int val : in)
@@ -2960,7 +2962,7 @@ int vec_sum(const ivec& in)
     return sum;
 }
 
-double vec_sum(const vec& in)
+double vec_sum(const vec &in)
 {
     double sum = 0.0;
     for (double val : in)
@@ -2970,7 +2972,7 @@ double vec_sum(const vec& in)
     return sum;
 }
 
-cdouble vec_sum(const cvec& in)
+cdouble vec_sum(const cvec &in)
 {
     cdouble res = 0.0;
     for (int i = 0; i < in.size(); i++)
@@ -2978,7 +2980,7 @@ cdouble vec_sum(const cvec& in)
     return res;
 }
 
-double vec_length(const vec& in)
+double vec_length(const vec &in)
 {
     double sum = 0.0;
     for (double val : in)
@@ -2988,7 +2990,7 @@ double vec_length(const vec& in)
     return sqrt(sum);
 }
 
-void error_check(const bool condition, const std::source_location loc, const std::string& error_message, std::ostream& log_file)
+void error_check(const bool condition, const std::source_location loc, const std::string &error_message, std::ostream &log_file)
 {
     if (!condition)
     {
@@ -2999,7 +3001,7 @@ void error_check(const bool condition, const std::source_location loc, const std
         exit(-1);
     }
 };
-void not_implemented(const std::source_location loc, const std::string& error_message, std::ostream& log_file)
+void not_implemented(const std::source_location loc, const std::string &error_message, std::ostream &log_file)
 {
     log_file << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << " not yet implemented!" << std::endl;
     log_file.flush();
@@ -3058,7 +3060,7 @@ void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
 }
 
 // SHA-256 update function
-void sha::sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t* data, size_t len, uint64_t& bitlen)
+void sha::sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t *data, size_t len, uint64_t &bitlen)
 {
     for (size_t i = 0; i < len; i++)
     {
@@ -3129,7 +3131,7 @@ void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, u
 }
 
 // Function to calculate SHA-256 hash
-std::string sha::sha256(const std::string& input)
+std::string sha::sha256(const std::string &input)
 {
     uint32_t state[8] = {
         0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
@@ -3139,7 +3141,7 @@ std::string sha::sha256(const std::string& input)
     uint8_t hash[32];
     uint64_t bitlen = 0;
 
-    sha256_update(state, buffer, reinterpret_cast<const uint8_t*>(input.c_str()), input.length(), bitlen);
+    sha256_update(state, buffer, reinterpret_cast<const uint8_t *>(input.c_str()), input.length(), bitlen);
     sha256_final(state, buffer, bitlen, hash);
 
     std::stringstream ss;
@@ -3179,7 +3181,7 @@ ProgressBar::~ProgressBar()
 #endif
 }
 
-void ProgressBar::write_progress(std::ostream& os)
+void ProgressBar::write_progress(std::ostream &os)
 {
     // No need to write once progress is 100%
     if (progress_ > 100.0f)
@@ -3187,7 +3189,7 @@ void ProgressBar::write_progress(std::ostream& os)
 
     // Move cursor to the first position on the same line
     // Check if os is a file stream
-    if (dynamic_cast<std::filebuf*>(std::cout.rdbuf()))
+    if (dynamic_cast<std::filebuf *>(std::cout.rdbuf()))
     {
         os.seekp(linestart); // Is a file stream
     }
@@ -3244,7 +3246,7 @@ void ProgressBar::initialize_taskbar_progress()
 }
 #endif
 
-void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt) {
+void convert_tonto_XCW_lambda_steps(const std::string &str, const std::string &lambda_step, bool debug, options &opt) {
     double lambda = 0.0;
     const double ls = stod(lambda_step);
     std::string jobname, line;
@@ -3301,7 +3303,7 @@ void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& l
             svec ka;
             int nr = 0;
             opt.groups[0] = { 0 };
-            tsc_block<int, cdouble> result = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, std::cout, ka, nr);
+            tsc_block<int, cdouble> result = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, wavy, std::cout, ka, nr);
             result.write_tscb_file(opt.cif, basename.string() + ".tscb");
         }
 

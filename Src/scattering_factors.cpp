@@ -41,14 +41,14 @@
   *
   * @throws runtime_error If the file does not exist or cannot be read.
   */
-void read_k_points(vec2& k_pt, hkl_list& hkl, std::ostream& file)
+void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
 {
     err_checkf(std::filesystem::exists("kpts.dat"), "k-points file does not exist!", file);
     file << "Reading:                                    kpts.dat" << std::flush;
     std::ifstream k_points_file("kpts.dat", std::ios::binary);
     err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
     int nr[1]{ 0 };
-    k_points_file.read((char*)&nr, sizeof(nr));
+    k_points_file.read((char *)&nr, sizeof(nr));
     file << " expecting " << nr[0] << " k points... " << std::flush;
     double temp[1]{ 0.0 };
     int i3emp[1]{ 0 };
@@ -62,10 +62,10 @@ void read_k_points(vec2& k_pt, hkl_list& hkl, std::ostream& file)
     {
         for (int i = 0; i < 3; i++)
         {
-            k_points_file.read((char*)&temp, sizeof(temp));
+            k_points_file.read((char *)&temp, sizeof(temp));
             err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
             k_pt[i].emplace_back(temp[0]);
-            k_points_file.read((char*)&i3emp, sizeof(i3emp));
+            k_points_file.read((char *)&i3emp, sizeof(i3emp));
             err_checkf(!k_points_file.bad(), "Error reading hkl values from k-points file!", file);
             hkl_[i] = i3emp[0];
         }
@@ -87,11 +87,11 @@ void read_k_points(vec2& k_pt, hkl_list& hkl, std::ostream& file)
  * @param k_pt A vector of vectors containing the k-points.
  * @param hkl A list containing the hkl values corresponding to the k-points.
  */
-void save_k_points(vec2& k_pt, hkl_list& hkl)
+void save_k_points(vec2 &k_pt, hkl_list &hkl)
 {
     std::ofstream k_points_file("kpts.dat", std::ios::out | std::ios::binary | std::ios::trunc);
     int nr[1] = { (int)k_pt[0].size() };
-    k_points_file.write((char*)&nr, sizeof(nr));
+    k_points_file.write((char *)&nr, sizeof(nr));
     double temp[1]{ 0.0 };
     int i3emp[1]{ 0 };
     hkl_list_it hkl_ = hkl.begin();
@@ -100,9 +100,9 @@ void save_k_points(vec2& k_pt, hkl_list& hkl)
         for (int i = 0; i < 3; i++)
         {
             temp[0] = k_pt[i][run];
-            k_points_file.write((char*)&temp, sizeof(temp));
+            k_points_file.write((char *)&temp, sizeof(temp));
             i3emp[0] = (*hkl_)[i];
-            k_points_file.write((char*)&i3emp, sizeof(i3emp));
+            k_points_file.write((char *)&i3emp, sizeof(i3emp));
         }
         hkl_ = next(hkl_);
     }
@@ -122,12 +122,12 @@ void save_k_points(vec2& k_pt, hkl_list& hkl)
  * @param file The output stream to write the generated k-points.
  * @param debug Flag indicating whether to enable debug mode.
  */
-void make_k_pts(const bool& read_k_pts,
-    const bool& save_k_pts,
-    const cell& unit_cell,
-    hkl_list& hkl,
-    vec2& k_pt,
-    std::ostream& file,
+void make_k_pts(const bool &read_k_pts,
+    const bool &save_k_pts,
+    const cell &unit_cell,
+    hkl_list &hkl,
+    vec2 &k_pt,
+    std::ostream &file,
     bool debug = false)
 {
     using namespace std;
@@ -177,11 +177,11 @@ void make_k_pts(const bool& read_k_pts,
  * @param file The output stream to write debug information to.
  * @param debug Flag indicating whether debug information should be printed.
  */
-void read_hkl(const std::filesystem::path& hkl_filename,
-    hkl_list& hkl,
-    const vec2& twin_law,
-    cell& unit_cell,
-    std::ostream& file,
+void read_hkl(const std::filesystem::path &hkl_filename,
+    hkl_list &hkl,
+    const vec2 &twin_law,
+    cell &unit_cell,
+    std::ostream &file,
     bool debug = false)
 {
     file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
@@ -226,7 +226,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
         file << "Number of reflections before twin: " << hkl.size() << std::endl;
     if (twin_law.size() > 0)
     {
-        for (const i3& hkl__ : hkl)
+        for (const i3 &hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
                 hkl.emplace(i3{
                     static_cast<int>(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
@@ -268,7 +268,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
         {
             continue;
         }
-        for (const i3& hkl__ : hkl)
+        for (const i3 &hkl__ : hkl)
         {
             tempv = { 0, 0, 0 };
             for (int h = 0; h < 3; h++)
@@ -280,7 +280,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
         }
     }
 
-    for (const i3& hkl__ : hkl_enlarged)
+    for (const i3 &hkl__ : hkl_enlarged)
     {
         tempv = hkl__;
         tempv[0] *= -1;
@@ -308,11 +308,11 @@ void read_hkl(const std::filesystem::path& hkl_filename,
  * @param file The output stream to write the generated hkl values.
  * @param debug A flag indicating whether to enable debug mode.
  */
-void generate_hkl(const double& dmin,
-    hkl_list& hkl,
-    const vec2& twin_law,
-    cell& unit_cell,
-    std::ostream& file,
+void generate_hkl(const double &dmin,
+    hkl_list &hkl,
+    const vec2 &twin_law,
+    cell &unit_cell,
+    std::ostream &file,
     bool debug)
 {
     using namespace std;
@@ -342,7 +342,7 @@ void generate_hkl(const double& dmin,
         file << "Number of reflections before twin: " << hkl.size() << endl;
     if (twin_law.size() > 0)
     {
-        for (const i3& hkl__ : hkl)
+        for (const i3 &hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
                 hkl.emplace(i3{
                     int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
@@ -384,7 +384,7 @@ void generate_hkl(const double& dmin,
         {
             continue;
         }
-        for (const i3& hkl__ : hkl)
+        for (const i3 &hkl__ : hkl)
         {
             tempv = { 0, 0, 0 };
             for (int h = 0; h < 3; h++)
@@ -399,7 +399,7 @@ void generate_hkl(const double& dmin,
     if (debug)
         file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
 
-    for (const i3& hkl__ : hkl_enlarged)
+    for (const i3 &hkl__ : hkl_enlarged)
     {
         if (hkl.find(hkl__) != hkl.end())
             continue;
@@ -418,11 +418,11 @@ void generate_hkl(const double& dmin,
     file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
-void generate_hkl(const ivec2& hkl_min_max,
-    hkl_list& hkl,
-    const vec2& twin_law,
-    cell& unit_cell,
-    std::ostream& file,
+void generate_hkl(const ivec2 &hkl_min_max,
+    hkl_list &hkl,
+    const vec2 &twin_law,
+    cell &unit_cell,
+    std::ostream &file,
     bool debug,
     bool ED)
 {
@@ -456,7 +456,7 @@ void generate_hkl(const ivec2& hkl_min_max,
         file << "Number of reflections before twin: " << hkl.size() << endl;
     if (twin_law.size() > 0)
     {
-        for (const i3& hkl__ : hkl)
+        for (const i3 &hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
                 hkl.emplace(i3{
                     int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
@@ -498,7 +498,7 @@ void generate_hkl(const ivec2& hkl_min_max,
         {
             continue;
         }
-        for (const i3& hkl__ : hkl)
+        for (const i3 &hkl__ : hkl)
         {
             tempv = { 0, 0, 0 };
             for (int h = 0; h < 3; h++)
@@ -513,7 +513,7 @@ void generate_hkl(const ivec2& hkl_min_max,
     if (debug)
         file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
 
-    for (const i3& hkl__ : hkl_enlarged)
+    for (const i3 &hkl__ : hkl_enlarged)
     {
         if (hkl.find(hkl__) != hkl.end())
             continue;
@@ -543,12 +543,12 @@ void generate_hkl(const ivec2& hkl_min_max,
  * @param stepsize The step size for generating hkl values.
  * @param debug Flag indicating whether to enable debug mode.
  */
-void generate_fractional_hkl(const double& dmin,
-    hkl_list_d& hkl,
-    const vec2& twin_law,
-    cell& unit_cell,
-    std::ostream& file,
-    double stepsize,
+void generate_fractional_hkl(const double &dmin,
+    hkl_list_d &hkl,
+    const vec2 &twin_law,
+    cell &unit_cell,
+    std::ostream &file,
+    const d3 &stepsize,
     bool debug)
 {
     using namespace std;
@@ -557,17 +557,17 @@ void generate_fractional_hkl(const double& dmin,
     string line, temp;
     const int extreme = 201;
     double dmin_l = 0.9 * dmin;
-    const int lim = static_cast<int>(extreme / stepsize);
+    const int lim = static_cast<int>(extreme / stepsize[0]);
 #pragma omp parallel for private(hkl_)
     for (int h = -lim; h < lim; h++)
     {
-        double _h = h * stepsize;
-        for (double k = -extreme; k < extreme; k += stepsize)
+        const double _h = h * stepsize[0];
+        for (double k = -extreme; k < extreme; k += stepsize[1])
         {
             // only need 0 to extreme, since we have no DISP signal
             for (int l = 0; l < lim; l++)
             {
-                hkl_ = { _h, k, l * stepsize };
+                hkl_ = { _h, k, l * stepsize[2] };
                 if (unit_cell.get_d_of_hkl(hkl_) >= dmin_l)
                 {
 #pragma omp critical
@@ -584,7 +584,7 @@ void generate_fractional_hkl(const double& dmin,
         file << "Number of reflections before twin: " << hkl.size() << endl;
     if (twin_law.size() > 0)
     {
-        for (const d3& hkl__ : hkl)
+        for (const d3 &hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
                 hkl.emplace(d3{
                     (twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
@@ -612,17 +612,17 @@ void generate_fractional_hkl(const double& dmin,
  * @param file The output stream for the file.
  * @param debug A boolean indicating whether to enable debug mode.
  */
-svec read_atoms_from_CIF(std::ifstream& cif_input,
-    const ivec& input_groups,
-    const cell& unit_cell,
-    const WFN& wave,
-    const svec& known_atoms,
-    ivec& atom_type_list,
-    ivec& asym_atom_to_type_list,
-    ivec& asym_atom_list,
-    bvec& needs_grid,
-    std::ostream& file,
-    bvec& constant_atoms,
+svec read_atoms_from_CIF(std::ifstream &cif_input,
+    const ivec &input_groups,
+    const cell &unit_cell,
+    const WFN &wave,
+    const svec &known_atoms,
+    ivec &atom_type_list,
+    ivec &asym_atom_to_type_list,
+    ivec &asym_atom_list,
+    bvec &needs_grid,
+    std::ostream &file,
+    bvec &constant_atoms,
     const bool SALTED,
     const bool debug)
 {
@@ -930,7 +930,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
     return labels2;
 }
 
-constexpr double cutoff(const int& accuracy)
+constexpr double cutoff(const int &accuracy)
 {
     if (accuracy < 3)
         return 1E-10;
@@ -942,18 +942,18 @@ constexpr double cutoff(const int& accuracy)
 
 // This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759), assuming that H = 2 \pi S
 double fourier_bessel_integral(
-    const primitive& p,
-    const double& H,
-    const int& l)
+    const primitive &p,
+    const double &H,
+    const int &l)
 {
     const double b = p.get_exp();
     return (pow(H, l) * exp(-H * H / (4.0 * b))) / (constants::pow_2[l] * p.get_exp_l_plus_3_2());
 }
 
 cdouble sfac_bessel(
-    const primitive& p,
-    const double* k_point,
-    const double* coefs)
+    const primitive &p,
+    const double *k_point,
+    const double *coefs)
 {
     const int l = p.get_type();
     switch (l % 4) {
@@ -972,11 +972,11 @@ cdouble sfac_bessel(
 }
 
 //TODO�: This breaks if the aux_basis is contracted... Need to fix that!
-void calc_SF_SALTED(const vec2& k_pt,
-    const vec& coefs,
-    const std::vector<atom>& atom_list,
-    const ivec& asym_atom_list,
-    cvec2& sf)
+void calc_SF_SALTED(const vec2 &k_pt,
+    const vec &coefs,
+    const std::vector<atom> &atom_list,
+    const ivec &asym_atom_list,
+    cvec2 &sf)
 {
     const int num_atoms = (int)atom_list.size();
     const int num_asym_atoms = (int)asym_atom_list.size();
@@ -989,7 +989,7 @@ void calc_SF_SALTED(const vec2& k_pt,
 
 #pragma omp parallel for
     for (int iat = 0; iat < num_atoms; ++iat) {
-        const atom& a = atom_list[iat];
+        const atom &a = atom_list[iat];
 
         int prim = 0;
         int n_this = 0;
@@ -1043,17 +1043,17 @@ void calc_SF_SALTED(const vec2& k_pt,
 
             for (int ia = 0; ia < num_asym_atoms; ++ia)
             {
-                const atom& a = atom_list[asym_atom_list[ia]];
+                const atom &a = atom_list[asym_atom_list[ia]];
 
-                const basis_set_entry* basis_ptr = &a.get_basis_set_entry(0);
+                const basis_set_entry *basis_ptr = &a.get_basis_set_entry(0);
                 const int lim = (int)a.get_basis_set_size();
 
-                const double* coef_slice_ptr = coefs.data() + coef_offsets[ia];
+                const double *coef_slice_ptr = coefs.data() + coef_offsets[ia];
 
                 for (int i_basis = 0; i_basis < lim; ++i_basis, ++basis_ptr)
                 {
                     // IMPORTANT: make basis local, not shared between threads
-                    const primitive& basis = basis_ptr->get_primitive();
+                    const primitive &basis = basis_ptr->get_primitive();
                     sf[ia][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
                     coef_slice_ptr += 2 * basis.get_type() + 1;
                 }
@@ -1078,16 +1078,16 @@ void calc_SF_SALTED(const vec2& k_pt,
  * @param debug Flag indicating whether to enable debug mode.
  * @param no_date Flag indicating whether to exclude the date in the output.
  */
-void calc_SF(const int& points,
-    vec2& k_pt,
-    vec2& d1,
-    vec2& d2,
-    vec2& d3,
-    vec2& dens,
-    cvec2& sf,
-    std::ostream& file,
-    _time_point& start,
-    _time_point& end1,
+void calc_SF(const int &points,
+    vec2 &k_pt,
+    vec2 &d1,
+    vec2 &d2,
+    vec2 &d3,
+    vec2 &dens,
+    cvec2 &sf,
+    std::ostream &file,
+    _time_point &start,
+    _time_point &end1,
     bool debug,
     bool no_date)
 {
@@ -1113,15 +1113,15 @@ void calc_SF(const int& points,
             file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
     }
 
-    ProgressBar* progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
+    ProgressBar *progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
     long long int pmax, p, s;
-    complex<double>* sf_local;
-    double work, rho, c, si, * dens_local, re, im, * d1_local, * d2_local, * d3_local;
+    complex<double> *sf_local;
+    double work, rho, c, si, *dens_local, re, im, *d1_local, *d2_local, *d3_local;
 
     // Pre-fetch k_pt data pointers for better cache locality
-    const double* k1_data = k_pt[0].data();
-    const double* k2_data = k_pt[1].data();
-    const double* k3_data = k_pt[2].data();
+    const double *k1_data = k_pt[0].data();
+    const double *k2_data = k_pt[1].data();
+    const double *k3_data = k_pt[2].data();
 
     for (int i = 0; i < imax; i++)
     {
@@ -1135,9 +1135,9 @@ void calc_SF(const int& points,
         for (s = 0; s < smax; s++)
         {
             re = 0.0, im = 0.0;
-            const double& k1_local = k1_data[s];
-            const double& k2_local = k2_data[s];
-            const double& k3_local = k3_data[s];
+            const double &k1_local = k1_data[s];
+            const double &k2_local = k2_data[s];
+            const double &k3_local = k3_data[s];
             sf_local = sf[i].data();
             // Process loop in blocks of 4 for better instruction-level parallelism
             const long long int pmax_vec = (pmax / 4) * 4;
@@ -1218,16 +1218,16 @@ void calc_SF(const int& points,
     delete (progress);
 }
 
-void calc_SF_CUDA(const int& points,
-    vec2& k_pt,
-    vec2& d1,
-    vec2& d2,
-    vec2& d3,
-    vec2& dens,
-    cvec2& sf,
-    std::ostream& file,
-    _time_point& start,
-    _time_point& end1,
+void calc_SF_CUDA(const int &points,
+    vec2 &k_pt,
+    vec2 &d1,
+    vec2 &d2,
+    vec2 &d3,
+    vec2 &dens,
+    cvec2 &sf,
+    std::ostream &file,
+    _time_point &start,
+    _time_point &end1,
     bool debug,
     bool no_date) {
     const long long int imax = static_cast<long long int>(dens.size());
@@ -1254,9 +1254,9 @@ void calc_SF_CUDA(const int& points,
             << endl;
     }
 #ifdef __CUDACC__
-    double** gpu_k_pt = NULL,
-        ** gpu_sf_r = NULL,
-        ** gpu_sf_i = NULL;
+    double **gpu_k_pt = NULL,
+        **gpu_sf_r = NULL,
+        **gpu_sf_i = NULL;
     vector<double> long_kpt;
     long_kpt.resize(3 * k_pt_unique[0].size());
     for (int i = 0; i < k_pt_unique[0].size(); i++)
@@ -1265,12 +1265,12 @@ void calc_SF_CUDA(const int& points,
         long_kpt[3 * i + 1] = k_pt_unique[1][i];
         long_kpt[3 * i + 2] = k_pt_unique[2][i];
     }
-    gpu_k_pt = (double**)malloc(sizeof(double*));
-    gpu_sf_r = (double**)malloc(sizeof(double*));
-    gpu_sf_i = (double**)malloc(sizeof(double*));
-    cudaMalloc((void**)&gpu_k_pt[0], sizeof(double) * k_pt_unique[0].size() * 3);
-    cudaMalloc((void**)&gpu_sf_r[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
-    cudaMalloc((void**)&gpu_sf_i[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
+    gpu_k_pt = (double **)malloc(sizeof(double *));
+    gpu_sf_r = (double **)malloc(sizeof(double *));
+    gpu_sf_i = (double **)malloc(sizeof(double *));
+    cudaMalloc((void **)&gpu_k_pt[0], sizeof(double) * k_pt_unique[0].size() * 3);
+    cudaMalloc((void **)&gpu_sf_r[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
+    cudaMalloc((void **)&gpu_sf_i[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
     cudaMemcpy(gpu_k_pt[0], long_kpt.data(), sizeof(double) * k_pt_unique[0].size() * 3, cudaMemcpyHostToDevice);
 
     dim3 blocks(asym_atom_list.size(), k_pt_unique[0].size());
@@ -1295,13 +1295,13 @@ void calc_SF_CUDA(const int& points,
  * @param mode The mode of operation. 0 = Gaussian tight core function, 1,2,3 = Thakkar core density based on the ECP type used
  * @param debug Flag indicating whether to enable debug mode.
  */
-static void add_ECP_contribution(const ivec& asym_atom_list,
-    const WFN& wave,
-    cvec2& sf,
-    const cell& cell,
-    hkl_list& hkl,
-    std::ostream& file,
-    const int& mode,
+static void add_ECP_contribution(const ivec &asym_atom_list,
+    const WFN &wave,
+    cvec2 &sf,
+    const cell &cell,
+    hkl_list &hkl,
+    std::ostream &file,
+    const int &mode,
     const bool debug)
 {
     using namespace std;
@@ -1403,11 +1403,11 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
  * @param unit_cell The unit cell.
  * @param hkl The hkl list.
  */
-void convert_to_ED(const ivec& asym_atom_list,
-    const WFN& wave,
-    cvec2& sf,
-    const cell& unit_cell,
-    const hkl_list& hkl)
+void convert_to_ED(const ivec &asym_atom_list,
+    const WFN &wave,
+    cvec2 &sf,
+    const cell &unit_cell,
+    const hkl_list &hkl)
 {
     double h2 = 0.0;
     const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
@@ -1423,9 +1423,9 @@ void convert_to_ED(const ivec& asym_atom_list,
 
 
 int make_atomic_grids_wrapper(
-    const WFN& wave, const bvec& needs_grid, const ivec& asym_atom_list, const cell& unit_cell, const svec& labels, //
-    std::vector<_time_point>& time_points, svec& time_descriptions, vec2& d1, vec2& d2, vec2& d3, vec2& dens,
-    const options& opt) {
+    const WFN &wave, const bvec &needs_grid, const ivec &asym_atom_list, const cell &unit_cell, const svec &labels, //
+    std::vector<_time_point> &time_points, svec &time_descriptions, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens,
+    const options &opt) {
 
     int atoms_with_grids = vec_sum(needs_grid);
     err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", std::cout);
@@ -1487,16 +1487,16 @@ int make_atomic_grids_wrapper(
  */
 template <typename tsc_block_type, typename calculator_type>
 tsc_block_type calculate_scattering_factors(
-    options& opt,
+    options &opt,
     calculator_type calculator,
-    std::ostream& file,
-    svec& known_atoms,
-    const int& nr,
-    vec2* kpts
+    std::ostream &file,
+    svec &known_atoms,
+    const int &nr,
+    vec2 *kpts
 ) {
     using namespace std;
     int nat = 0;
-    WFN* wavy = NULL;
+    WFN *wavy = NULL;
     if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>) {
         wavy = &calculator[nr];
         wavy->delete_Qs();
@@ -1522,7 +1522,7 @@ tsc_block_type calculate_scattering_factors(
             file << "Working with: " << wavy->get_path() << endl;
         nat = wavy->get_ncen();
     }
-    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor&>) {
+    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor &>) {
         wavy = &calculator.wavy;
         nat = wavy->get_ncen();
     }
@@ -1647,7 +1647,7 @@ tsc_block_type calculate_scattering_factors(
             }
         }
     }
-    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor&>)
+    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor &>)
     {
         // Remove all unneccecary atoms from wavy
         int current_index = 0;
@@ -1865,7 +1865,7 @@ tsc_block_type calculate_scattering_factors(
         tempy.emplace_back(opt.wfn);
         opt.m_hkl_list = hkl;
         opt.iam_switch = true;
-        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, tempy, file, labels, 0);
+        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, 0);
         opt.iam_switch = false;
         blocky.append(std::move(blocky_thakkar), file);
         time_points.push_back(get_time());
@@ -1885,18 +1885,18 @@ tsc_block_type calculate_scattering_factors(
 
     return blocky;
 }
-template itsc_block calculate_scattering_factors(options& opt,
-    std::vector<WFN>& calculator,
-    std::ostream& file,
-    svec& known_atoms,
-    const int& nr,
-    vec2* kpts);
-template itsc_block calculate_scattering_factors(options& opt,
-    SALTEDPredictor& calculator,
-    std::ostream& file,
-    svec& known_atoms,
-    const int& nr,
-    vec2* kpts);
+template itsc_block calculate_scattering_factors(options &opt,
+    std::vector<WFN> &calculator,
+    std::ostream &file,
+    svec &known_atoms,
+    const int &nr,
+    vec2 *kpts);
+template itsc_block calculate_scattering_factors(options &opt,
+    SALTEDPredictor &calculator,
+    std::ostream &file,
+    svec &known_atoms,
+    const int &nr,
+    vec2 *kpts);
 
 
 /**
@@ -1905,7 +1905,7 @@ template itsc_block calculate_scattering_factors(options& opt,
  * @param opt The options for calculating the diffuse scattering factors.
  * @param log_file The output stream for logging the calculation process.
  */
-void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
+void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
 {
     using namespace std;
     std::vector<WFN> wavy;
@@ -1978,7 +1978,7 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
         log_file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
     }
     int i_ = 0;
-    for (const d3& hkl_ : hkl)
+    for (const d3 &hkl_ : hkl)
     {
         for (int x = 0; x < 3; x++)
         {
@@ -2003,13 +2003,13 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
 #pragma omp parallel for
     for (int i = 0; i < imax; i++)
         sf[i].resize(smax);
-    double* dens_local, * d1_local, * d2_local, * d3_local;
-    complex<double>* sf_local;
-    const double* k1_local = k_pt[0].data();
-    const double* k2_local = k_pt[1].data();
-    const double* k3_local = k_pt[2].data();
+    double *dens_local, *d1_local, *d2_local, *d3_local;
+    complex<double> *sf_local;
+    const double *k1_local = k_pt[0].data();
+    const double *k2_local = k_pt[1].data();
+    const double *k3_local = k_pt[2].data();
     double work, rho;
-    ProgressBar* progress = new ProgressBar(imax*smax, 60, "=", " ", "Calculating Scattering Factors");
+    ProgressBar *progress = new ProgressBar(imax * smax, 60, "=", " ", "Calculating Scattering Factors");
     for (long long int i = 0; i < imax; i++)
     {
         pmax = static_cast<long long int>(dens[i].size());

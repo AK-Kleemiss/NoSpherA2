@@ -894,6 +894,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     ivec nshell_cache(ncen);
     ivec ECP_els(ncen);
     std::vector<Thakkar> ECP_electron_helper;
+    std::vector<Spherical_Gaussian_Density> ECP_correction_helper;
     for (int j = 0; j < ncen; j++) {
         atom_coords[j * 3 + 0] = atoms[j].get_coordinate(0);
         atom_coords[j * 3 + 1] = atoms[j].get_coordinate(1);
@@ -901,6 +902,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         const int c = atoms[j].get_charge();
         nshell_cache[j] = constants::MBIS_function[c];
         ECP_electron_helper.emplace_back(c);
+        ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_els[j] = atoms[j].get_ECP_electrons();
     }
     for (size_t it = 0; it < 2000; it++) {
@@ -958,8 +960,9 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                         dist_j = &dists[j];
                         *dist_j = std::sqrt(dist_sq);
                         ECP_els_j = &ECP_els[j];
-                        if (atoms[j].get_ECP_electrons() > 0)
-                            density += ECP_electron_helper[j].get_core_density(*dist_j, *ECP_els_j) * b_weight[point];
+                        if (atoms[j].get_ECP_electrons() > 0) {
+                            density += (ECP_electron_helper[j].get_core_density(*dist_j, *ECP_els_j) + ECP_correction_helper[j].get_radial_density(*dist_j)) * b_weight[point];
+                        }
 
                         nshell = nshell_cache[j];
                         coi = &copy_of_input[j];
@@ -1074,6 +1077,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     ivec nshell_cache(ncen);
     ivec ECP_els(ncen);
     std::vector<Thakkar> ECP_electron_helper;
+    std::vector<Spherical_Gaussian_Density> ECP_correction_helper;
     for (int j = 0; j < ncen; j++) {
         atom_coords[j * 3 + 0] = atoms[j].get_coordinate(0);
         atom_coords[j * 3 + 1] = atoms[j].get_coordinate(1);
@@ -1081,6 +1085,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         const int c = atoms[j].get_charge();
         nshell_cache[j] = constants::MBIS_function[c];
         ECP_electron_helper.emplace_back(c);
+        ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_els[j] = atoms[j].get_ECP_electrons();
     }
 
@@ -1158,8 +1163,10 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         d_cache[2] = d_local[0] * d_local[2];
                         d_cache[4] = d_local[1] * d_local[2];
                         ECP_els_j = &ECP_els[j];
-                        if (atoms[j].get_ECP_electrons() > 0)
-                            density += ECP_electron_helper[j].get_core_density(std::sqrt(d_cache[0] + d_cache[3] + d_cache[5]), *ECP_els_j) * b_weight[point];
+                        if (atoms[j].get_ECP_electrons() > 0) {
+                            const double dist = std::sqrt(d_cache[0] + d_cache[3] + d_cache[5]);
+                            density += (ECP_electron_helper[j].get_core_density(dist, *ECP_els_j) + ECP_correction_helper[j].get_radial_density(dist)) * b_weight[point];
+                        }
 
                         nshell = nshell_cache[j];
                         coi = &copy_of_input[j];
