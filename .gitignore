@@ -113,3 +113,6 @@ Windows/MKL.auto.props
 Lib\LibCint\include\cint.h
 Lib\LibCint\include\cint_config.h
 Lib\LibCint\include\cint_funcs.h
+nul
+pch.h.gch_d
+intel-onemkl*.sh*

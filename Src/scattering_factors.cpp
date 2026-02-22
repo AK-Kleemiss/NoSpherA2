@@ -1457,7 +1457,7 @@ int make_atomic_grids_wrapper(
 
     // Calculate partitioned charges
     PartitionResults results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
-    results.printChargeTable(labels, temp, asym_atom_list, std::cout);
+    grid_manager.printChargeTable(labels, temp, asym_atom_list, std::cout, results);
     time_points.push_back(get_time());
     time_descriptions.push_back("calculate charges");
 

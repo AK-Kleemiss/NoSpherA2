@@ -56,8 +56,6 @@ struct PartitionResults {
     enum CHARGE_ORDER { S_BECKE = 0, S_TFVC = 1, S_HIRSH = 2, S_MBIS = 3, S_EMBIS = 4 };
     double nrmsd = 0.0;
     double r_value = 0.0;
-
-    void printChargeTable(const svec &labels, const WFN &wave, const ivec atom_list, std::ostream &file) const;
 };
 
 class GridManager {
@@ -125,4 +123,6 @@ public:
     void writeSimpleGrid(const std::filesystem::path &filename, const vec2 &grid_points, std::vector<std::pair<std::string, vec>> data) const;
 
     vec evaluateFunctionOnGrid(const vec2 &grid_points, std::function<double(double, double, double)> func) const;
+
+    void printChargeTable(const svec &labels, const WFN &wave, const ivec atom_list, std::ostream &file, const PartitionResults& results) const;
 };

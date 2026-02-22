@@ -1706,7 +1706,7 @@ void options::digest_options()
             // Calculate partitioned charges
             PartitionResults results = grid.calculatePartitionedCharges(wavy, unit_cell);
 
-            results.printChargeTable({ "Fe" }, wavy, asym_atom_list, std::cout);
+            grid.printChargeTable({ "Fe" }, wavy, asym_atom_list, std::cout, results);
 
             const int points = grid.getTotalGridPoints();
             for (double k = 0.001; k < 10; k += 0.002) {

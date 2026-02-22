@@ -783,32 +783,44 @@ ivec GridManager::identifyAtomTypes(const WFN& wave, const bvec& needs_grid) {
     return ivec(unique_types.begin(), unique_types.end());
 }
 
-void PartitionResults::printChargeTable(const svec& labels, const WFN& wave, const ivec atom_list, std::ostream& file) const {
+void GridManager::printChargeTable(const svec& labels, const WFN& wave, const ivec atom_list, std::ostream& file, const PartitionResults& results) const {
     file << "Table of Charges in electrons\n"
-        << "    Atom       Becke   Hirshfeld   TFVC      MBIS      EMBIS\n";
+        << std::setw(10) << "Atom";
+        if (config_.partition_type==PartitionType::Becke || config_.all_charges || config_.debug) file << std::setw(10) << "Becke";
+        if (config_.partition_type==PartitionType::Hirshfeld || config_.all_charges || config_.debug) file << std::setw(10) << "Hirshfeld";
+        if (config_.partition_type==PartitionType::TFVC || config_.all_charges || config_.debug) file << std::setw(10) << "TFVC";
+        if (config_.partition_type==PartitionType::MBIS || config_.all_charges || config_.debug) file << std::setw(10) << "MBIS";
+        if (config_.partition_type==PartitionType::EMBIS || config_.all_charges || config_.debug) file << std::setw(10) << "EMBIS";
+        file << "\n";
 
     for (int i = 0; i < atom_list.size(); i++) {
         const int atom_idx = atom_list[i];
-        file << std::setw(10) << labels[i]
-            << std::fixed << std::setw(10) << std::setprecision(3)
-            << wave.get_atom_charge(atom_idx) - atom_charges[0][i]  // Becke
-            << std::fixed << std::setw(10) << std::setprecision(3)
-            << wave.get_atom_charge(atom_idx) - atom_charges[2][i]  // Hirshfeld
-            << std::fixed << std::setw(10) << std::setprecision(3)
-            << wave.get_atom_charge(atom_idx) - atom_charges[1][i]  // TFVC
-            << std::fixed << std::setw(10) << std::setprecision(3)
-            << wave.get_atom_charge(atom_idx) - atom_charges[3][i]  // MBIS
-            << std::fixed << std::setw(10) << std::setprecision(3)
-            << wave.get_atom_charge(atom_idx) - atom_charges[4][i]  // EMBIS
-            << std::endl;
+        file << std::setw(10) << labels[i];
+            
+            if (config_.partition_type==PartitionType::Becke || config_.all_charges || config_.debug)
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[0][i];  // Becke
+            if (config_.partition_type==PartitionType::Hirshfeld || config_.all_charges || config_.debug)
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[2][i];  // Hirshfeld
+            if (config_.partition_type==PartitionType::TFVC || config_.all_charges || config_.debug)
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[1][i];  // TFVC
+            if (config_.partition_type==PartitionType::MBIS || config_.all_charges || config_.debug)
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[3][i];  // MBIS
+            if (config_.partition_type==PartitionType::EMBIS || config_.all_charges || config_.debug)
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[4][i];  // EMBIS
+            file << std::endl;
     }
 
-    file << "Total number of electrons:\n"
-        << " Becke:     " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[0] << "\n"
-        << " Hirshfeld: " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[2] << "\n"
-        << " TVFC:      " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[1] << "\n"
-        << " MBIS:      " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[3] << "\n"
-        << " EMBIS:     " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[4] << std::endl;
+    file << "Total number of electrons:\n";
+    if (config_.partition_type==PartitionType::EMBIS || config_.all_charges || config_.debug)
+        file << " Becke:     " << std::fixed << std::setw(10) << std::setprecision(6) << results.overall_charges[0] << "\n";
+    if (config_.partition_type==PartitionType::Hirshfeld || config_.all_charges || config_.debug)
+        file << " Hirshfeld: " << std::fixed << std::setw(10) << std::setprecision(6) << results.overall_charges[2] << "\n";
+    if (config_.partition_type==PartitionType::TFVC || config_.all_charges || config_.debug)
+        file << " TVFC:      " << std::fixed << std::setw(10) << std::setprecision(6) << results.overall_charges[1] << "\n";
+    if (config_.partition_type==PartitionType::MBIS || config_.all_charges || config_.debug)
+        file << " MBIS:      " << std::fixed << std::setw(10) << std::setprecision(6) << results.overall_charges[3] << "\n";
+    if (config_.partition_type==PartitionType::EMBIS || config_.all_charges || config_.debug)
+        file << " EMBIS:     " << std::fixed << std::setw(10) << std::setprecision(6) << results.overall_charges[4] << std::endl;
 }
 
 void GridManager::calculateSphericalDensities(
