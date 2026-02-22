@@ -338,15 +338,17 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
         config.partition_type = type;
         config.pbc = 0;
         config.debug = false;
+        const int ncen = wavy.get_ncen();
 
         cell unit_cell = cell();
-        ivec asym_atom_list(wavy.get_ncen());
-        for (int atom_nr = 0; atom_nr < wavy.get_ncen(); atom_nr++) {
+        ivec asym_atom_list(ncen);
+        for (int atom_nr = 0; atom_nr < ncen; atom_nr++) {
             asym_atom_list[atom_nr] = atom_nr;
         }
-        svec labels(wavy.get_ncen());
-        for (int i = 0; i < wavy.get_ncen(); i++) {
-            labels[i] = wavy.get_atoms()[i].get_label();
+        svec labels(ncen);
+        const auto atoms = wavy.get_atoms();
+        for (int i = 0; i < ncen; i++) {
+            labels[i] = atoms[i].get_label();
         }
 
         GridManager grid_manager(config);
