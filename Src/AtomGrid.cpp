@@ -978,6 +978,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                             rho0 += tmp;
                         }
                     }
+                    if (rho0 == 0.0)
+                        continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
                     for (j = 0; j < ncen; j++) {
                         nshell = nshell_cache[j];
                         dist_j = &dists[j];
@@ -1008,8 +1010,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         //back to the cycle main loop, we updated sig and pop based on information loss :)
 
         for (int i = 0; i < ncen; i++) {
-            //if (!needs_grid[i])
-            //    continue; // If the atom does not need a grid, skip to the next one
+            if (!needs_grid[i])
+                continue; // If the atom does not need a grid, skip to the next one
             for (int shell = 0; shell < nshell_cache[i]; shell++) {
                 if (sig_pop_vector[i].second[shell] != 0)
                     sig_pop_vector[i].first[shell] /= 3.0 * sig_pop_vector[i].second[shell];
@@ -1062,12 +1064,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     }
     else {
         for (auto &vector : MBIS_vectors) {
-            //tens1.emplace_back(std::make_pair(sigma_to_alpha(vector), vector.second));
             sig_pop_vector.emplace_back(std::make_pair(sigma_to_alpha(vector), vector.second));
         }
-        //for (auto& atom : atoms) {
-        //    tens2.emplace_back(get_shalpha_shpop(atom.get_charge()));
-        //}
     }
     sp_vec copy_of_input = sig_pop_vector;
 
@@ -1120,7 +1118,6 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                 vec dx(ncen * 3);
                 vec alpha_local(ncen * 36, 0.0);
                 vec pop_local(ncen * 6, 0.0);
-                //sp_vec local = sig_pop_vector;
                 vec g_cache(6 * ncen, 0.0);
                 double d_cache[6] = { 0.0 };
                 std::pair<vec2, vec> *coi;
@@ -1188,8 +1185,12 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                             rho0 += tmp;
                         }
                     } //We first need to finish building total rho0 before we can calculate the contributions to the sigmas and populations
+                    if (rho0 == 0.0)
+                        continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
                     const double rho0_inv = 1.0 / rho0;
                     for (j = 0; j < ncen; j++) {
+                        if(!needs_grid[j])
+                            continue; // If the atom does not need a grid, skip to the next one
                         d_local = dx.data() + (j * 3);
                         nshell = nshell_cache[j];
                         d_cache[0] = d_local[0] * d_local[0];
@@ -1234,6 +1235,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         //back to the cycle main loop, we updated sig and pop based on information loss :)
 
         for (int i = 0; i < ncen; i++) {
+            if (!needs_grid[i])
+                continue; // If the atom does not need a grid, skip to the next one
             for (int shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(i)]; shell++) {
                 const double det = 1 / (sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][3] * sig_pop_vector[i].first[shell][5] -
                     sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][4] -
