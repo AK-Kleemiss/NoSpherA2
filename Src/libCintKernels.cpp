@@ -17,13 +17,6 @@ extern "C" {
 #endif
 
 #define BLKSIZE 8
-
-// namespace {
-//     struct POrderingInit {
-//         POrderingInit() { CINTset_p_ordering_pxpypz(); }
-//     };
-//     static POrderingInit g_p_ordering_init;
-// }
 /*
  * out[naoi,naoj,naok,comp] in F-order
  */
@@ -32,6 +25,7 @@ void GTOnr3c_fill_s1(
     double* out, double* buf, int comp, int jobid, int* shls_slice, int* ao_loc, CINTOpt* cintopt,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
+    CINTset_p_ordering_pxpypz();
     const int ish0 = shls_slice[0];
     const int ish1 = shls_slice[1];
     const int jsh0 = shls_slice[2];
@@ -77,6 +71,7 @@ void GTOnr3c_fill_s1(
 
 int GTOmax_shell_dim(const int* ao_loc, const int* shls_slice, int ncenter)
 {
+    CINTset_p_ordering_pxpypz();
     int i;
     int i0 = shls_slice[0];
     int i1 = shls_slice[1];
@@ -98,6 +93,7 @@ size_t GTOmax_cache_size(
     int* shls_slice, int ncenter,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
+    CINTset_p_ordering_pxpypz();
     int i;
     int i0 = shls_slice[0];
     int i1 = shls_slice[1];
@@ -129,6 +125,7 @@ void GTOnr3c_drv(
     double* eri, int comp, int* shls_slice, int* ao_loc, CINTOpt* cintopt,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
+    CINTset_p_ordering_pxpypz();
     const int ish0 = shls_slice[0];
     const int ish1 = shls_slice[1];
     const int jsh0 = shls_slice[2];
@@ -165,6 +162,7 @@ void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, C
     int* shls_slice, int* ao_loc, CINTOpt* opt,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
+    CINTset_p_ordering_pxpypz();
     const int ish0 = shls_slice[0];
     const int ish1 = shls_slice[1];
     const int jsh0 = shls_slice[2];
