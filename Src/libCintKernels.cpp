@@ -17,6 +17,13 @@ extern "C" {
 #endif
 
 #define BLKSIZE 8
+
+// namespace {
+//     struct POrderingInit {
+//         POrderingInit() { CINTset_p_ordering_pxpypz(); }
+//     };
+//     static POrderingInit g_p_ordering_init;
+// }
 /*
  * out[naoi,naoj,naok,comp] in F-order
  */
