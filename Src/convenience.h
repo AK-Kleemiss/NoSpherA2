@@ -518,6 +518,8 @@ private:
     int center, type;
     double exp, coefficient;
     double norm_const = -10;
+    double exp_l_plus_3_2 = -10;
+	double normalized_coefficient = -10;
 
 public:
     void normalize()
@@ -541,7 +543,8 @@ public:
         return center == other.center &&
             type == other.type &&
             exp == other.exp &&
-            coefficient == other.coefficient;
+            coefficient == other.coefficient &&
+            exp_l_plus_3_2 == other.exp_l_plus_3_2;
     };
     int get_center() const
     {
@@ -550,6 +553,14 @@ public:
     int get_type() const
     {
         return type;
+    };
+    double get_exp_l_plus_3_2() const
+    {
+        return exp_l_plus_3_2;
+    };
+    double get_normalized_coefficient() const
+    {
+        return normalized_coefficient;
     };
     double get_exp() const
     {
