@@ -2672,21 +2672,21 @@ tsc_block_type calculate_scattering_factors(
     }
     else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor&>)
     {
-        // Remove all unneccecary atoms from wavy
-        int current_index = 0;
-        for (int i = 0; i < needs_grid.size(); i++)
-        {
-            if (opt.debug)
-                std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
+        //// Remove all unneccecary atoms from wavy
+        //int current_index = 0;
+        //for (int i = 0; i < needs_grid.size(); i++)
+        //{
+        //    if (opt.debug)
+        //        std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
 
-            if (!needs_grid[i])
-            {
-                wavy->erase_atom(current_index);
-                constant_atoms.erase(constant_atoms.begin() + current_index, constant_atoms.begin() + current_index + 1);
-                current_index--;
-            }
-            current_index++;
-        }
+        //    if (!needs_grid[i])
+        //    {
+        //        wavy->erase_atom(current_index);
+        //        constant_atoms.erase(constant_atoms.begin() + current_index, constant_atoms.begin() + current_index + 1);
+        //        current_index--;
+        //    }
+        //    current_index++;
+        //}
 
         // Generation of SALTED density coefficients
         file << "\nGenerating densities... " << endl;
@@ -2728,13 +2728,13 @@ tsc_block_type calculate_scattering_factors(
         file << "Table of Charges in electrons\n"
             << "       Atom      ML" << endl;
 
-        for (int i = 0; i < wavy->get_ncen(); i++)
+        for (int i = 0; i < asym_atom_list.size(); i++)
         {
 
             file << setw(10) << labels[i]
-                << fixed << setw(10) << setprecision(3) << wavy->get_atom_charge(i) - atom_elecs[i];
+                << fixed << setw(10) << setprecision(3) << wavy->get_atom_charge(i) - atom_elecs[asym_atom_list[i]];
             if (opt.debug)
-                file << " " << setw(4) << wavy->get_atom_charge(i) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+                file << " " << setw(4) << wavy->get_atom_charge(i) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[asym_atom_list[i]];
             file << endl;
         }
         auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);

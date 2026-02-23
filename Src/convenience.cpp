@@ -2145,11 +2145,7 @@ void options::digest_options()
             salted_model_dir = arguments[i + 1];
 
             //Check that wfn is not empty
-            if (wfn.empty())
-            {
-                std::cout << "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction." << std::endl;
-                exit(1);
-            }
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
 
             WFN wavy(wfn);
             SALTEDPredictor SP(wavy, *this);
@@ -2340,8 +2336,28 @@ void options::digest_options()
         else if (temp == "-lukas_test")
         {
             //Check that wfn is not empty
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option to specify a wavefunction.", std::cout);
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+            err_chkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED option BEVORE -lukas_test to specify a model directory.", std::cout);
 
+            WFN wavy(wfn);
+            SALTEDPredictor SP(wavy, *this);
+            string df_basis_name = SP.get_dfbasis_name();
+            filesystem::path salted_model_path = SP.get_salted_filename();
+            log_file << "Using " << salted_model_path << " for the prediction" << endl;
+            if (!SP.basis_set_loaded()) {
+                string df_basis_name = SP.get_dfbasis_name();
+                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                load_basis_into_WFN(SP.wavy, aux_basis);
+            }
+            vec coefs = SP.gen_SALTED_densities();
+
+            cube atom_cube = calc_cube_ML(coefs, SP.wavy);
+            atom_cube.write_file("DBA_total.cube");
+
+            for (int atm_idx = 0; atm_idx < wavy.get_ncen(); atm_idx++) {
+                atom_cube = calc_cube_ML(coefs, SP.wavy, atm_idx);
+                atom_cube.write_file("DBA_atom_" + std::to_string(atm_idx) + ".cube");
+            }
         }
         else if (temp == "-calc_dens_1D")
         {
