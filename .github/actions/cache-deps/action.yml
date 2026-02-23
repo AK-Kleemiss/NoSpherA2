@@ -12,9 +12,24 @@ runs:
       uses: mozilla-actions/sccache-action@v0.0.9
 
     - name: Cache occ
+      if: inputs.platform != 'Mac_ARM64' || inputs.platform != 'Mac_x86_64'
       uses: actions/cache@v4.2.4
       with:
         path: Lib/occ
+        key: ${{ inputs.platform }}-occ-${{ hashFiles('occ/**', 'CMakePresets.json') }}
+
+    - name: Cache occ
+      if: inputs.platform == 'Mac_ARM64'
+      uses: actions/cache@v4.2.4
+      with:
+        path: Lib/occ_arm64
+        key: ${{ inputs.platform }}-occ-${{ hashFiles('occ/**', 'CMakePresets.json') }}
+
+    - name: Cache occ
+      if: inputs.platform == 'Mac_x86_64'
+      uses: actions/cache@v4.2.4
+      with:
+        path: Lib/occ_x86_64
         key: ${{ inputs.platform }}-occ-${{ hashFiles('occ/**', 'CMakePresets.json') }}
 
     - name: Cache featomic (Linux / Windows)
