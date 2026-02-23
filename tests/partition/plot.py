@@ -6,9 +6,9 @@ from pathlib import Path
 # Determine the path to the data file relative to this script
 data_path = Path(__file__).resolve().parent / "densities.dat"
 
-# Load the data using the explicit path
-data = pd.read_table(data_path, sep="\s+", header=None)
-data.columns = ["x", "HF", "DFT", "C_dens", "H_dens", "total_dens", "B_weight_C", "B_weight_H"]
+# Load the data using the explicit path, has a header row with column names
+data = pd.read_table(data_path, sep="\s+", header=1)
+data.columns = ["x", "HF", "DFT", "C_dens", "H_dens", "total_dens", "B_weight_C", "B_weight_H", "TFVC_weight_C", "TFVC_weight_H", "TFVC_weight_C_DFT", "TFVC_weight_H_DFT"]
 
 # calculate weights for each
 weight_C = data["C_dens"] / data["total_dens"]
@@ -35,7 +35,8 @@ axs[0][1].set_xlim(-offset, xmax)
 
 axs[1][0].axhline(0, color="gray", linestyle="--")
 axs[1][0].plot(data["x"], weight_C * diff, label="Hirshfeld")
-axs[1][0].plot(data["x"], data["B_weight_C"] * diff, label="Becke")
+# axs[1][0].plot(data["x"], data["B_weight_C"] * diff, label="Becke")
+axs[1][0].plot(data["x"], data["TFVC_weight_C"] * diff, label="TFVC")
 # axs[1][0].plot(data["x"], weight_C * data["HF"], label="C (HF)")
 axs[1][0].set_xlabel("d(C) /a.u.")
 axs[1][0].set_ylabel(r"$\omega_{C} \cdot \Delta \rho$ /a.u.")
@@ -44,7 +45,8 @@ axs[1][0].set_xlim(-offset, xmax)
 
 axs[1][1].axhline(0, color="gray", linestyle="--")
 axs[1][1].plot(data["x"], weight_H * diff, label="Hirshfeld")
-axs[1][1].plot(data["x"], data["B_weight_H"] * diff, label="Becke")
+# axs[1][1].plot(data["x"], data["B_weight_H"] * diff, label="Becke")
+axs[1][1].plot(data["x"], data["TFVC_weight_H"] * diff, label="TFVC")
 # axs[1][1].plot(data["x"], weight_H * data["HF"], label="H (HF)")
 axs[1][1].set_xlabel("d(C) /a.u.")
 axs[1][1].set_ylabel(r"$\omega_{H} \cdot \Delta \rho$ /a.u.")

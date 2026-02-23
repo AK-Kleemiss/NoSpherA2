@@ -30,79 +30,6 @@ std::vector<T> geomspace(T start, T stop, int num)
     return result;
 }
 
-double calc_spherically_averaged_at_r(const WFN& wavy,
-    const double& r,
-    const double rel_precision = 1E-4,
-    const double start_angle = 5.0,
-    const bool print = false)
-{
-    double old_result = 1E100;
-    double new_result = 0.9E100;
-    double angle = start_angle;
-    double ratio = abs(old_result / new_result - 1.0);
-    vec2 d;
-    vec _phi(wavy.get_nmo(), 0.0);
-    d.resize(1);
-    for (int i = 0; i < 1; i++)
-        d[i].resize(16, 0.0);
-
-    while (ratio > rel_precision)
-    {
-        const double da = constants::PI / angle;
-        const double da2 = da * da;
-        // Make angular grids
-        double x0, y0, z0, st0;
-        double v = 0;
-        for (double phi = 0; phi <= constants::TWO_PI; phi += da)
-        {
-            const double cp = cos(phi);
-            const double sp = sin(phi);
-            for (double theta = da; theta <= constants::PI; theta += da)
-            {
-                const double st = sin(theta);
-                st0 = st * da2;
-                x0 = st * cp, y0 = st * sp, z0 = cos(theta);
-                v += wavy.compute_dens({ r * x0, r * y0, r * z0 }, d, _phi) * st0;
-            }
-        }
-        if (v != 0.0)
-        {
-            old_result = new_result;
-            new_result = v / constants::FOUR_PI;
-            ratio = abs(old_result / new_result - 1.0);
-            if ((new_result < 1E-15 && angle > 36))
-            {
-#pragma omp critical
-                std::cout << "Aborted due to too small density at r = " << r << " and angle = " << angle << std::endl;
-                break;
-            }
-            if (new_result > 1E90)
-            {
-#pragma omp critical
-                std::cout << "Aborted due too large density value at r = " << r << std::endl;
-                break;
-            }
-            if (angle > 360)
-            {
-#pragma omp critical
-                std::cout << "Aborted due to too large angle = " << angle << std::endl;
-                break;
-            }
-        }
-        else
-        {
-            new_result = 0.0;
-#pragma omp critical
-            std::cout << "ZERO result at r = " << r << std::endl;
-            break;
-        }
-        angle *= 1.2;
-    }
-    if (print)
-        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << " " << (ratio > rel_precision) << std::setw(14) << angle << std::endl;
-    return new_result;
-}
-
 double calc_grid_averaged_at_r(const WFN& wavy,
     const double& r,
     const int& min_angular = 60,
@@ -167,6 +94,7 @@ double calc_grid_averaged_at_r(const WFN& wavy,
     //     std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
     return dens;
 }
+
 /// not like above //////////////////////////////////////////////////////////////////////////-spherical_aver_hirsh in convience.cpp////////
 double calc_hirsh_grid_averaged_at_r(const WFN& wavy,
     const int i, /// now counts for several atoms
@@ -480,6 +408,8 @@ void calc_partition_densities()
     using namespace std;
     WFN Hartree_Fock("HF.gbw");
     WFN DFT("DFT.gbw");
+    Hartree_Fock.delete_unoccupied_MOs();
+    DFT.delete_unoccupied_MOs();
 
     vec Pos_C = { Hartree_Fock.get_atom_coordinate(0, 0), Hartree_Fock.get_atom_coordinate(0, 1), Hartree_Fock.get_atom_coordinate(0, 2) };
     vec Pos_H1 = { Hartree_Fock.get_atom_coordinate(1, 0), Hartree_Fock.get_atom_coordinate(1, 1), Hartree_Fock.get_atom_coordinate(1, 2) };
@@ -512,44 +442,79 @@ void calc_partition_densities()
     vec HF_densities(size, 0.0);
     vec DFT_densities(size, 0.0);
     vec B_weights_C(size, 0.0), B_weights_H(size, 0.0);
+    vec TFVC_weights_C(size, 0.0), TFVC_weights_H(size, 0.0);
+    vec TFVC_weights_C_DFT(size, 0.0), TFVC_weights_H_DFT(size, 0.0);
     Thakkar C(6);
     Thakkar H(1);
 
-    ofstream result("densities.dat", ios::out);
-    ProgressBar pb(size, 100, "=", "", "Calculating densities");
-    // #pragma omp parallel
-    //     {
-    vec2 d(DFT.get_ncen());
-    for (int i = 0; i < DFT.get_ncen(); i++)
-        d[i].resize(16);
-    vec phi(DFT.get_nmo(), 0.0);
-    double x = 0;
-    vec pa_b(5);
-    vec pa_tv(5);
-    vec chi;
-    // #pragma omp for
-    for (int i = 0; i < size; i++)
+    ProgressBar* pb = new ProgressBar(size, 100, "=", "", "Calculating densities");
+
+#pragma omp parallel 
     {
-        x = (i + min) * fac;
-        HF_densities[i] = Hartree_Fock.compute_dens({ x, 0, 0 }, d, phi);
-        DFT_densities[i] = DFT.compute_dens({ x, 0, 0 }, d, phi);
-        double temp = abs(x - Pos_C[0]);
-        C_dens[i] = C.get_radial_density(temp);
-        total_dens[i] = C_dens[i];
-        temp = abs(x - Pos_H1[0]);
-        H_dens[i] = H.get_radial_density(temp);
-        total_dens[i] += H_dens[i];
-        temp = sqrt(pow(x - Pos_H2[0], 2) + pow(Pos_H2[1], 2) + pow(Pos_H2[2], 2));
-        total_dens[i] += H.get_radial_density(temp);
-        temp = sqrt(pow(x - Pos_H3[0], 2) + pow(Pos_H3[1], 2) + pow(Pos_H3[2], 2));
-        total_dens[i] += H.get_radial_density(temp);
-        temp = sqrt(pow(x - Pos_H4[0], 2) + pow(Pos_H4[1], 2) + pow(Pos_H4[2], 2));
-        total_dens[i] += H.get_radial_density(temp);
-        B_weights_C[i] = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa_b, pa_tv, chi)[0];
-        B_weights_H[i] = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa_b, pa_tv, chi)[0];
-        pb.update();
+        vec2 d(DFT.get_ncen());
+        for (int i = 0; i < DFT.get_ncen(); i++)
+            d[i].resize(16);
+        vec phi(DFT.get_nmo(), 0.0);
+        vec pa_b(5);
+        vec pa_tv(5);
+        vec chi_HF = make_chi(Hartree_Fock, 200);
+        vec chi_DFT = make_chi(DFT, 200);
+        double null = 0;
+#pragma omp for
+        for (int i = 0; i < size; i++)
+        {
+            const double x = (i + min) * fac;
+            HF_densities[i] = Hartree_Fock.compute_dens({x, 0, 0}, d, phi);
+            DFT_densities[i] = DFT.compute_dens({x, 0, 0}, d, phi);
+            double temp = abs(x - Pos_C[0]);
+            C_dens[i] = C.get_radial_density(temp);
+            total_dens[i] = C_dens[i];
+            temp = abs(x - Pos_H1[0]);
+            H_dens[i] = H.get_radial_density(temp);
+            total_dens[i] += H_dens[i];
+            temp = sqrt(pow(x - Pos_H2[0], 2) + pow(Pos_H2[1], 2) + pow(Pos_H2[2], 2));
+            total_dens[i] += H.get_radial_density(temp);
+            temp = sqrt(pow(x - Pos_H3[0], 2) + pow(Pos_H3[1], 2) + pow(Pos_H3[2], 2));
+            total_dens[i] += H.get_radial_density(temp);
+            temp = sqrt(pow(x - Pos_H4[0], 2) + pow(Pos_H4[1], 2) + pow(Pos_H4[2], 2));
+            total_dens[i] += H.get_radial_density(temp);
+            auto res = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa_b, pa_tv, chi_HF);
+            B_weights_C[i] = res[0];
+            TFVC_weights_C[i] = res[1];
+            res = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa_b, pa_tv, chi_HF);
+            B_weights_H[i] = res[0];
+            TFVC_weights_H[i] = res[1];
+            res = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa_b, pa_tv, chi_DFT);
+            TFVC_weights_C_DFT[i] = res[1];
+            res = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa_b, pa_tv, chi_DFT);
+            TFVC_weights_H_DFT[i] = res[1];
+            pb->update();
+        }
     }
-    //    }
+    free(pb);
+
+    GridConfiguration config;
+    config.all_charges = true;
+    GridManager grid_HF(config);
+    GridManager grid_DFT(config);
+    
+    grid_HF.setup3DGridsForMolecule(Hartree_Fock, {0, 1, 2, 3, 4});
+    auto res_HF = grid_HF.calculatePartitionedCharges(Hartree_Fock);
+
+    grid_DFT.setup3DGridsForMolecule(DFT, {0, 1, 2, 3, 4});
+    auto res_DFT = grid_DFT.calculatePartitionedCharges(DFT);
+
+    std::cout << "\n\nHartree fock charges: " << std::endl;
+    grid_HF.printChargeTable({"C1", "H1", "H2", "H3", "H4"}, Hartree_Fock, {0, 1, 2, 3, 4}, std::cout, res_HF);
+    std::cout << "\n\n\nDFT charges: " << std::endl;
+    grid_DFT.printChargeTable({"C1", "H1", "H2", "H3", "H4"}, DFT, {0, 1, 2, 3, 4}, std::cout, res_DFT);
+
+    ofstream result("densities.dat", ios::out);
+    result << setw(10) << "x" << setw(16) << "HF_density" << setw(16) << "DFT_density" << setw(16) << "C_density" << setw(16) << "H_density" << setw(16) << "total_density"
+        << setw(16) << "B_weight_C" << setw(16) << "B_weight_H" 
+        << setw(16) << "TFVC_weight_C_HF" << setw(16) << "TFVC_weight_H_HF"
+        << setw(16) << "TFVC_weight_C_DFT" << setw(16) << "TFVC_weight_H_DFT"
+        << endl;
     for (int i = 0; i < size; i++)
     {
         result << setw(10) << setprecision(4) << scientific << (i + min) * fac
@@ -559,7 +524,12 @@ void calc_partition_densities()
             << setw(16) << setprecision(8) << scientific << H_dens[i]
             << setw(16) << setprecision(8) << scientific << total_dens[i]
             << setw(16) << setprecision(8) << scientific << B_weights_C[i]
-            << setw(16) << setprecision(8) << scientific << B_weights_H[i] << endl;
+            << setw(16) << setprecision(8) << scientific << B_weights_H[i] 
+            << setw(16) << setprecision(8) << scientific << TFVC_weights_C[i]
+            << setw(16) << setprecision(8) << scientific << TFVC_weights_H[i]
+            << setw(16) << setprecision(8) << scientific << TFVC_weights_C_DFT[i]
+            << setw(16) << setprecision(8) << scientific << TFVC_weights_H_DFT[i]
+            << endl;
     }
     result.flush();
     result.close();
@@ -681,31 +651,6 @@ void spherically_averaged_density(options& opt, const ivec val_els_alpha, const 
         out << setw(24) << scientific << setprecision(15) << i * dr << setw(24) << scientific << setprecision(16) << radial_dens2[i] / constants::FOUR_PI << "\n";
     out.flush();
     out.close();
-}
-
-void add_ECP_contribution_test(const ivec& asym_atom_list,
-    const WFN& wave,
-    cvec2& sf,
-    vec2& k_pt)
-{
-    double k = 1.0;
-    // Using a Thakkar core density
-    std::vector<Thakkar> temp;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-    {
-        temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i])));
-    }
-
-#pragma omp parallel for private(k)
-    for (int s = 0; s < sf[0].size(); s++)
-    {
-        k = k_pt[3][s];
-        for (int i = 0; i < asym_atom_list.size(); i++)
-        {
-            if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
-                sf[i][s] += temp[i].get_core_form_factor(k, wave.get_atom_ECP_electrons(asym_atom_list[i]));
-        }
-    }
 }
 
 void spherical_harmonic_test()
@@ -853,46 +798,6 @@ void cube_from_coef_npy(std::string& coef_fn, std::string& xyzfile)
     res.write_file(true);
     // for (int i = 0; i < dummy.get_ncen(); i++)
     //     calc_cube_ML(data, dummy, i);
-}
-
-void test_xtb_molden(options& opt, std::ostream& log_file)
-{
-    using namespace std;
-    for (int i = 0; i < 1; i++)
-    {
-        std::vector<WFN> wavy;
-        wavy.emplace_back("Co2.molden");
-        opt.cif = "Co2.cif";
-        opt.dmin = 0.5;
-        std::cout << "STARTING CALC" << endl;
-        svec empty = {};
-        calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
-            opt,
-            wavy,
-            log_file,
-            empty,
-            0);
-    }
-}
-
-double calc_pot_by_integral(vec3& grid, const double& r, const double& cube_dist, const double& dr)
-{
-    double res = 0;
-    const double dr3 = dr * dr * dr;
-    double d = 0;
-    for (double x = -cube_dist / dr; x <= cube_dist / dr; x++)
-    {
-        for (double y = -cube_dist / dr; y <= cube_dist / dr; y++)
-        {
-            for (double z = -cube_dist / dr; z <= cube_dist / dr; z++)
-            {
-                d = sqrt((x - r) * (x - r) + y * y + z * z);
-                int offset = static_cast<int>(cube_dist / dr);
-                res += grid[static_cast<int>(x) + offset][static_cast<int>(y) + offset][static_cast<int>(z) + offset] / d * dr3;
-            }
-        }
-    }
-    return res / constants::FOUR_PI;
 }
 
 void test_openblas()
@@ -1251,9 +1156,8 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options* opt)
     GridManager grid(conf);
     vec2 d1, d2, d3, dens;
 
-    cell unit_cell(10.0, 10.0, 10.0, 90, 90, 90);
     ivec asym_atom_list(1, 0);
-    grid.setup3DGridsForMolecule(wavy, needs_grid, asym_atom_list, unit_cell);
+    grid.setup3DGridsForMolecule(wavy, asym_atom_list, needs_grid);
     grid.getDensityVectors(wavy, asym_atom_list, d1, d2, d3, dens);
     vec2 ML_grid(wavy.get_ncen());
     auto grid_data = grid.getGridData();

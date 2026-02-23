@@ -215,12 +215,18 @@ GridManager::GridManager(const GridConfiguration& config)
     : config_(config) {
 }
 
-void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_grid,
-    const ivec& atom_list, const cell& unit_cell) {
+void GridManager::setup3DGridsForMolecule(const WFN& wave, const ivec &atom_list,
+                                          const bvec& needs_grid, const cell& unit_cell) {
     if (config_.debug) {
         std::cout << "GridManager: Setting up grids for " << atom_list.size()
             << " atoms with " << config_.getPartitionName() << " partitioning" << std::endl;
     }
+
+    bvec ng_local;
+    if(needs_grid.empty())
+        ng_local = GridManager::determineAtomsNeedingGrids(wave, atom_list);
+    else
+        ng_local = needs_grid;
 
     // Clear previous data
     grid_data_.clear();
@@ -228,7 +234,7 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
     atom_type_list_.clear();
 
     // Identify unique atom types
-    atom_type_list_ = identifyAtomTypes(wave, needs_grid);
+    atom_type_list_ = identifyAtomTypes(wave, ng_local);
 
     // Setup prototype grids for each atom type
     setupPrototypeGrids(wave, atom_type_list_);
@@ -252,7 +258,7 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
             addTimingPoint("WFN evaluation on grid");
         }
 
-        sig_pop = calculateMBISWeights(wave, unit_cell, atom_list, needs_grid);
+        sig_pop = calculateMBISWeights(wave, unit_cell, atom_list, ng_local);
         addTimingPoint("MBIS Weights");
     }
 
@@ -263,8 +269,8 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
         }
 
         if (sig_pop.empty())
-            sig_pop = make_MBIS_vectors(wave, grid_data_.atomic_grids, grid_data_.num_points_per_atom, needs_grid, false);
-        calculateEMBISWeights(wave, unit_cell, atom_list, sig_pop, needs_grid);
+            sig_pop = make_MBIS_vectors(wave, grid_data_.atomic_grids, grid_data_.num_points_per_atom, ng_local, false);
+        calculateEMBISWeights(wave, unit_cell, atom_list, sig_pop, ng_local);
         addTimingPoint("EMBIS Weights");
     }
 

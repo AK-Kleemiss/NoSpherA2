@@ -340,7 +340,6 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
         config.debug = false;
         const int ncen = wavy.get_ncen();
 
-        cell unit_cell = cell();
         ivec asym_atom_list(ncen);
         for (int atom_nr = 0; atom_nr < ncen; atom_nr++) {
             asym_atom_list[atom_nr] = atom_nr;
@@ -356,12 +355,11 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
         WFN temp = wavy;
         temp.delete_unoccupied_MOs();
         // Setup grids for the molecule
-        bvec needs_grid = GridManager::determineAtomsNeedingGrids(temp, asym_atom_list);
-        grid_manager.setup3DGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+        grid_manager.setup3DGridsForMolecule(temp, asym_atom_list);
 
 
         // Calculate partitioned charges
-        auto results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
+        auto results = grid_manager.calculatePartitionedCharges(temp);
         //results.printChargeTable(labels, temp, std::cout);
         for (int i = 0; i < temp.get_ncen(); i++) {
             expected_populations[i] = results.atom_charges[static_cast<int>(type)][i];
@@ -489,7 +487,6 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
     config.all_charges = true;
     const int weight_index = GridData::HIRSH_WEIGHT;
 
-    cell unit_cell = cell();
     ivec asym_atom_list(wavy.get_ncen());
     for (int atom_nr = 0; atom_nr < wavy.get_ncen(); atom_nr++) {
         asym_atom_list[atom_nr] = atom_nr;
@@ -500,8 +497,7 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
 
     temp.delete_unoccupied_MOs();
     // Setup grids for the molecule
-    bvec needs_grid = GridManager::determineAtomsNeedingGrids(temp, asym_atom_list);
-    grid_manager.setup3DGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+    grid_manager.setup3DGridsForMolecule(temp, asym_atom_list);
     GridData grid_data = grid_manager.getGridData();
 
     enum DiffDensityIndex { DIFF_UNRESTRAINED = 0, DIFF_ENHANCED = 1, DIFF_HYBRID = 2 };

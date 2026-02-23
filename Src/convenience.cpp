@@ -1667,7 +1667,7 @@ void options::digest_options()
         {
             std::cout << NoSpherA2_message() << endl;
             wfn = arguments[i + 1];
-            string wfn2 = arguments[i + 2];
+            wfn2 = arguments[i + 2];
             err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
             WFN wavy(e_origin::NOT_YET_DEFINED);
             wavy.read_known_wavefunction_format(wfn, std::cout, debug);
@@ -1690,16 +1690,16 @@ void options::digest_options()
             ivec asym_atom_list(1, 0);
             // Setup grids for the molecule
             auto grid2 = grid;
-            grid.setup3DGridsForMolecule(wavy, needs_grid, asym_atom_list, unit_cell);
+            grid.setup3DGridsForMolecule(wavy, asym_atom_list, needs_grid, unit_cell);
             grid.getDensityVectors(wavy, asym_atom_list, d1, d2, d3, dens);
-            grid2.setup3DGridsForMolecule(wavy2, needs_grid, asym_atom_list, unit_cell);
+            grid2.setup3DGridsForMolecule(wavy2, asym_atom_list, needs_grid, unit_cell);
             grid2.getDensityVectors(wavy2, asym_atom_list, d1_2, d2_2, d3_2, dens_2);
 
-            for (int i = 0; i < d1.size(); i++)
+            for (int j = 0; j < d1.size(); j++)
             {
                 for (int p = 0; p < d1[0].size(); p++)
                 {
-                    dens[i][p] -= dens_2[i][p];
+                    dens[j][p] -= dens_2[j][p];
                 }
             }
 
@@ -2363,11 +2363,6 @@ void options::digest_options()
         else if (temp == "-wfn_cif")
         {
             write_CIF = true;
-        }
-        else if (temp == "-xtb_test")
-        {
-            test_xtb_molden(*this, log_file);
-            exit(0);
         }
         else if (temp == "-xyz")
         {

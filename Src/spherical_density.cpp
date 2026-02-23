@@ -41,7 +41,7 @@ Thakkar::Thakkar() : Spherical_Atom()
         _prev_coef = previous_element_coef();
 };
 
-const int Spherical_Atom::first_ex()
+const int Spherical_Atom::first_ex() const
 {
     if (atomic_number == 1)
         return 0;
@@ -53,7 +53,7 @@ const int Spherical_Atom::first_ex()
     return ex;
 };
 
-const int Spherical_Atom::previous_element_coef()
+const int Spherical_Atom::previous_element_coef() const
 {
     if (atomic_number <= 2)
         return 0;
@@ -84,7 +84,7 @@ void Thakkar::calc_orbs(
     const int* n_vector,
     const int lower_m,
     const int upper_m,
-    double* Orb)
+    double* Orb) const
 {
     double exponent;
     for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++)
@@ -117,7 +117,7 @@ void Thakkar::calc_custom_orbs(
     const int upper_m,
     const int& max,
     const int& min,
-    double* Orb)
+    double* Orb) const
 {
     double exponent;
     for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++)
@@ -143,7 +143,7 @@ void Thakkar::calc_custom_orbs(
     }
 }
 
-const double Thakkar::get_radial_density(const double& dist)
+const double Thakkar::get_radial_density(const double& dist) const
 {
     // Speedup things for H
     if (atomic_number == 1)
@@ -179,7 +179,7 @@ const double Thakkar::get_radial_custom_density(const double& dist,
     const int& min_s,
     const int& min_p,
     const int& min_d,
-    const int& min_f)
+    const int& min_f) const
 {
     // Speedup things for H
     if (atomic_number == 1)
@@ -227,7 +227,7 @@ constexpr double cosinus_integral(const int N, const double z, const double k)
         return N / (z * z + k * k) * (z * cosinus_integral(N - 1, z, k) - k * sinus_integral(N - 1, z, k));
 };
 
-const double Thakkar::get_form_factor(const double& k_vector)
+const double Thakkar::get_form_factor(const double& k_vector) const
 {
     return get_custom_form_factor(k_vector, 7, 6, 4, 2, 0, 0, 0, 0);
 };
@@ -374,7 +374,7 @@ void set_core_counts(int* max_s, int* max_p, int* max_d, int* max_f, const int& 
     }
 };
 
-const double Thakkar::get_core_form_factor(const double& k_vector, const int& core_els)
+const double Thakkar::get_core_form_factor(const double& k_vector, const int& core_els) const
 {
     int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
     set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els, ECP_mode);
@@ -407,7 +407,7 @@ double Thakkar::calc_type(
     const int lower_m,
     const int upper_m,
     const int& max,
-    const int& min)
+    const int& min) const
 {
 
     std::function<double(const int&, const double&, const double&, const int&, const double&)> func;
@@ -458,7 +458,7 @@ const double Thakkar::get_custom_form_factor(
     const int& min_s,
     const int& min_p,
     const int& min_d,
-    const int& min_f)
+    const int& min_f) const
 {
 
     double result(0.0);
@@ -493,7 +493,7 @@ void Thakkar::make_interpolator(const double& incr, const double& min_dist) {
     }
 };
 
-double Thakkar::get_interpolated_density(const double& dist) {
+double Thakkar::get_interpolated_density(const double& dist) const {
     double result = 0;
     if (dist > radial_dist.back())
         return 0;
@@ -521,7 +521,7 @@ MBIS_Atom::MBIS_Atom()
     charge = 0;
 };
 
-const double MBIS_Atom::get_radial_density(const double& dist)
+const double MBIS_Atom::get_radial_density(const double& dist) const
 {
     double Rho = 0.0;
     for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
@@ -546,7 +546,7 @@ void MBIS_Atom::make_interpolator(const double& incr, const double& min_dist) {
     }
 };
 
-double MBIS_Atom::get_interpolated_density(const double& dist) {
+double MBIS_Atom::get_interpolated_density(const double& dist) const {
     double result = 0;
     if (dist > radial_dist.back())
         return 0;
@@ -767,7 +767,7 @@ double Gaussian_Atom::calc_type(
     const int lower_m,
     const int upper_m,
     const int& max,
-    const int& min)
+    const int& min) const
 {
 
     std::function<double(const int&, const double&, const double&, const int&, const double&)> func;
@@ -815,7 +815,7 @@ const double Gaussian_Atom::get_custom_form_factor(
     const int& min_s,
     const int& min_p,
     const int& min_d,
-    const int& min_f)
+    const int& min_f) const
 {
     err_not_impl_SA();
     (void)k_vector;
@@ -842,7 +842,7 @@ const double Gaussian_Atom::get_custom_form_factor(
     const int& min_d,
     const int& min_f,
     const int& min_g,
-    const int& min_h)
+    const int& min_h) const
 {
 
     if (k_vector != 0)
@@ -867,12 +867,12 @@ const double Gaussian_Atom::get_custom_form_factor(
         return this->get_custom_form_factor(1E-12, max_s, max_p, max_d, max_f, max_g, max_h, min_s, min_p, min_d, min_f, min_g, min_h);
 };
 
-const double Gaussian_Atom::get_form_factor(const double& k_vector)
+const double Gaussian_Atom::get_form_factor(const double& k_vector) const
 {
     return get_custom_form_factor(k_vector, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0);
 };
 
-const double Gaussian_Atom::get_core_form_factor(const double& k_vector, const int& core_els)
+const double Gaussian_Atom::get_core_form_factor(const double& k_vector, const int& core_els) const
 {
     int max_s = 0, max_p = 1, max_d = 1, max_f = 1, max_h = 1, max_g = 1;
     return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, max_g, max_h, 0, 0, 0, 0, 0, 0);
@@ -887,7 +887,7 @@ void Gaussian_Atom::calc_orbs(
     const int* n_vector,
     const int lower_m,
     const int upper_m,
-    double* Orb)
+    double* Orb) const
 {
     double exponent;
     for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++)
@@ -910,7 +910,7 @@ void Gaussian_Atom::calc_orbs(
     }
 }
 
-const int Gaussian_Atom::previous_element_coef()
+const int Gaussian_Atom::previous_element_coef() const
 {
     if (atomic_number <= first_atomic_number)
         return 0;
@@ -933,7 +933,7 @@ const int Gaussian_Atom::previous_element_coef()
     return counter;
 };
 
-const double Gaussian_Atom::get_radial_density(const double& dist)
+const double Gaussian_Atom::get_radial_density(const double& dist) const
 {
     double Rho = 0.0;
     if (_first_ex == 200000000)
@@ -959,7 +959,7 @@ const double Gaussian_Atom::get_radial_density(const double& dist)
     return Rho / (constants::FOUR_PI); // 4pi is the angular function
 };
 
-const double Spherical_Gaussian_Density::get_radial_density(const double& dist)
+const double Spherical_Gaussian_Density::get_radial_density(const double& dist) const
 {
     double res = 0;
     double d2 = dist * dist;
@@ -970,7 +970,7 @@ const double Spherical_Gaussian_Density::get_radial_density(const double& dist)
     return res;
 }
 
-const double Spherical_Gaussian_Density::get_form_factor(const double& k_vector)
+const double Spherical_Gaussian_Density::get_form_factor(const double& k_vector) const
 {
     std::function<double(const int&, const double&, const double&, const int&, const double&)> func;
     if (k_vector == 0)

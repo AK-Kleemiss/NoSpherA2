@@ -92,8 +92,8 @@ public:
     ~GridManager() = default;
 
     // Main interface methods
-    void setup3DGridsForMolecule(const WFN &wave, const bvec &needs_grid,
-        const ivec &atom_list, const cell &unit_cell = cell());
+    void setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list = {},
+                                 const bvec &needs_grid = {}, const cell &unit_cell = cell());
 
     void setup1DGridsForMolecule(const WFN &wave, const int atom_1, const int atom_2, const int gridpoints, const double padding);
 

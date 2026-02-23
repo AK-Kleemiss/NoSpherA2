@@ -1452,7 +1452,7 @@ int make_atomic_grids_wrapper(
     temp.delete_unoccupied_MOs();
 
     // Setup grids for the molecule
-    grid_manager.setup3DGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+    grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell);
     grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
 
     // Calculate partitioned charges
