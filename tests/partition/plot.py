@@ -72,12 +72,13 @@ x = np.arange(len(bond_types))
 width = 0.25
 
 fig, ax = plt.subplots(figsize=(10, 6))
+#use colours #0a6167 for neutron, #f89c0e for HAR, and #5b215f for TFVC
 ax.bar(x - width, bonds_neutron, width, yerr=uncertainties,
-         label="Neutron", color="blue", capsize=5)
+         label="Neutron", color="#0a6167", capsize=5)
 ax.bar(x, bonds_HAR, width, yerr=uncertainties_HAR,
-         label="HAR", color="orange", capsize=5)
+         label="HAR", color="#f89c0e", capsize=5)
 ax.bar(x + width, bonds_TFVC, width, yerr=uncertainties_TFVC,
-            label="TFVC", color="green", capsize=5)
+            label="TFVC", color="#5b215f", capsize=5)
 ax.set_xlabel("Bond")
 ax.set_ylabel("Bond Length (Å)")
 ax.set_ylim(0.95, 1.15)
