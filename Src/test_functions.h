@@ -412,31 +412,26 @@ void calc_partition_densities()
     DFT.delete_unoccupied_MOs();
 
     vec Pos_C = { Hartree_Fock.get_atom_coordinate(0, 0), Hartree_Fock.get_atom_coordinate(0, 1), Hartree_Fock.get_atom_coordinate(0, 2) };
-    vec Pos_H1 = { Hartree_Fock.get_atom_coordinate(1, 0), Hartree_Fock.get_atom_coordinate(1, 1), Hartree_Fock.get_atom_coordinate(1, 2) };
-    vec Pos_H2 = { Hartree_Fock.get_atom_coordinate(2, 0), Hartree_Fock.get_atom_coordinate(2, 1), Hartree_Fock.get_atom_coordinate(2, 2) };
-    vec Pos_H3 = { Hartree_Fock.get_atom_coordinate(3, 0), Hartree_Fock.get_atom_coordinate(3, 1), Hartree_Fock.get_atom_coordinate(3, 2) };
-    vec Pos_H4 = { Hartree_Fock.get_atom_coordinate(4, 0), Hartree_Fock.get_atom_coordinate(4, 1), Hartree_Fock.get_atom_coordinate(4, 2) };
+    vec Pos_O1 = { Hartree_Fock.get_atom_coordinate(1, 0), Hartree_Fock.get_atom_coordinate(1, 1), Hartree_Fock.get_atom_coordinate(1, 2) };
+    vec Pos_H1 = { Hartree_Fock.get_atom_coordinate(2, 0), Hartree_Fock.get_atom_coordinate(2, 1), Hartree_Fock.get_atom_coordinate(2, 2) };
+    vec Pos_O3 = { Hartree_Fock.get_atom_coordinate(3, 0), Hartree_Fock.get_atom_coordinate(3, 1), Hartree_Fock.get_atom_coordinate(3, 2) };
     vec x_coords = {
         Hartree_Fock.get_atom_coordinate(0, 0),
         Hartree_Fock.get_atom_coordinate(1, 0),
         Hartree_Fock.get_atom_coordinate(2, 0),
-        Hartree_Fock.get_atom_coordinate(3, 0),
-        Hartree_Fock.get_atom_coordinate(4, 0) };
+        Hartree_Fock.get_atom_coordinate(3, 0) };
     vec y_coords = {
         Hartree_Fock.get_atom_coordinate(0, 1),
         Hartree_Fock.get_atom_coordinate(1, 1),
         Hartree_Fock.get_atom_coordinate(2, 1),
-        Hartree_Fock.get_atom_coordinate(3, 1),
-        Hartree_Fock.get_atom_coordinate(4, 1) };
+        Hartree_Fock.get_atom_coordinate(3, 1) };
     vec z_coords = {
         Hartree_Fock.get_atom_coordinate(0, 2),
         Hartree_Fock.get_atom_coordinate(1, 2),
         Hartree_Fock.get_atom_coordinate(2, 2),
-        Hartree_Fock.get_atom_coordinate(3, 2),
-        Hartree_Fock.get_atom_coordinate(4, 2) };
-    ivec charges{ 6, 1, 1, 1, 1 };
-    const double fac = 0.01;
-    const int min = -100, max = 500;
+        Hartree_Fock.get_atom_coordinate(3, 2) };
+    ivec charges{ 6, 8, 1, 8 };
+    const int min = -250, max = 700;
     const int size = -min + max + 1;
     vec C_dens(size, 0.0), H_dens(size, 0.0), total_dens(size, 0.0);
     vec HF_densities(size, 0.0);
@@ -446,6 +441,16 @@ void calc_partition_densities()
     vec TFVC_weights_C_DFT(size, 0.0), TFVC_weights_H_DFT(size, 0.0);
     Thakkar C(6);
     Thakkar H(1);
+    Thakkar O(8);
+    const double dx = (Hartree_Fock.get_atom_coordinate(2, 0) - Hartree_Fock.get_atom_coordinate(0, 0)) / (min + max);
+    const double dy = (Hartree_Fock.get_atom_coordinate(2, 1) - Hartree_Fock.get_atom_coordinate(0, 1)) / (min + max);
+    const double dz = (Hartree_Fock.get_atom_coordinate(2, 2) - Hartree_Fock.get_atom_coordinate(0, 2)) / (min + max);
+
+    std::cout << "Positions:\nH:" << Hartree_Fock.get_atom_coordinate(2, 0) << " " << Hartree_Fock.get_atom_coordinate(2, 1) << " " << Hartree_Fock.get_atom_coordinate(2, 2) << "\n";
+    std::cout << "C:" << Hartree_Fock.get_atom_coordinate(0, 0) << " " << Hartree_Fock.get_atom_coordinate(0, 1) << " " << Hartree_Fock.get_atom_coordinate(0, 2) << "\n";
+    std::cout << "dr:" << dx << " " << dy << " " << dz << "\n";
+
+
 
     ProgressBar* pb = new ProgressBar(size, 100, "=", "", "Calculating densities");
 
@@ -459,34 +464,33 @@ void calc_partition_densities()
         vec pa_tv(5);
         vec chi_HF = make_chi(Hartree_Fock, 200);
         vec chi_DFT = make_chi(DFT, 200);
-        double null = 0;
 #pragma omp for
         for (int i = 0; i < size; i++)
         {
-            const double x = (i + min) * fac;
-            HF_densities[i] = Hartree_Fock.compute_dens({x, 0, 0}, d, phi);
-            DFT_densities[i] = DFT.compute_dens({x, 0, 0}, d, phi);
+            const double x = Hartree_Fock.get_atom_coordinate(0, 0) + (i + min) * dx;
+            const double y = Hartree_Fock.get_atom_coordinate(0, 1) + (i + min) * dy;
+            const double z = Hartree_Fock.get_atom_coordinate(0, 2) + (i + min) * dz;
+            HF_densities[i] = Hartree_Fock.compute_dens({ x, y, z }, d, phi);
+            DFT_densities[i] = DFT.compute_dens({ x, y, z }, d, phi);
             double temp = abs(x - Pos_C[0]);
             C_dens[i] = C.get_radial_density(temp);
             total_dens[i] = C_dens[i];
             temp = abs(x - Pos_H1[0]);
             H_dens[i] = H.get_radial_density(temp);
             total_dens[i] += H_dens[i];
-            temp = sqrt(pow(x - Pos_H2[0], 2) + pow(Pos_H2[1], 2) + pow(Pos_H2[2], 2));
-            total_dens[i] += H.get_radial_density(temp);
-            temp = sqrt(pow(x - Pos_H3[0], 2) + pow(Pos_H3[1], 2) + pow(Pos_H3[2], 2));
-            total_dens[i] += H.get_radial_density(temp);
-            temp = sqrt(pow(x - Pos_H4[0], 2) + pow(Pos_H4[1], 2) + pow(Pos_H4[2], 2));
-            total_dens[i] += H.get_radial_density(temp);
-            auto res = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa_b, pa_tv, chi_HF);
+            temp = sqrt(pow(x - Pos_O1[0], 2) + pow(y - Pos_O1[1], 2) + pow(z - Pos_O1[2], 2));
+            total_dens[i] += O.get_radial_density(temp);
+            temp = sqrt(pow(x - Pos_O3[0], 2) + pow(y - Pos_O3[1], 2) + pow(z - Pos_O3[2], 2));
+            total_dens[i] += O.get_radial_density(temp);
+            auto res = get_integration_weights(4, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, y, z, pa_b, pa_tv, chi_HF);
             B_weights_C[i] = res[0];
             TFVC_weights_C[i] = res[1];
-            res = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa_b, pa_tv, chi_HF);
+            res = get_integration_weights(4, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 2, x, y, z, pa_b, pa_tv, chi_HF);
             B_weights_H[i] = res[0];
             TFVC_weights_H[i] = res[1];
-            res = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa_b, pa_tv, chi_DFT);
+            res = get_integration_weights(4, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, y, z, pa_b, pa_tv, chi_DFT);
             TFVC_weights_C_DFT[i] = res[1];
-            res = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa_b, pa_tv, chi_DFT);
+            res = get_integration_weights(4, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 2, x, y, z, pa_b, pa_tv, chi_DFT);
             TFVC_weights_H_DFT[i] = res[1];
             pb->update();
         }
@@ -497,34 +501,34 @@ void calc_partition_densities()
     config.all_charges = true;
     GridManager grid_HF(config);
     GridManager grid_DFT(config);
-    
-    grid_HF.setup3DGridsForMolecule(Hartree_Fock, {0, 1, 2, 3, 4});
+
+    grid_HF.setup3DGridsForMolecule(Hartree_Fock, { 0, 1, 2, 3 });
     auto res_HF = grid_HF.calculatePartitionedCharges(Hartree_Fock);
 
-    grid_DFT.setup3DGridsForMolecule(DFT, {0, 1, 2, 3, 4});
+    grid_DFT.setup3DGridsForMolecule(DFT, { 0, 1, 2, 3 });
     auto res_DFT = grid_DFT.calculatePartitionedCharges(DFT);
 
     std::cout << "\n\nHartree fock charges: " << std::endl;
-    grid_HF.printChargeTable({"C1", "H1", "H2", "H3", "H4"}, Hartree_Fock, {0, 1, 2, 3, 4}, std::cout, res_HF);
+    grid_HF.printChargeTable({ "C1", "O1", "H1", "O3" }, Hartree_Fock, { 0, 1, 2, 3 }, std::cout, res_HF);
     std::cout << "\n\n\nDFT charges: " << std::endl;
-    grid_DFT.printChargeTable({"C1", "H1", "H2", "H3", "H4"}, DFT, {0, 1, 2, 3, 4}, std::cout, res_DFT);
+    grid_DFT.printChargeTable({ "C1", "O1", "H1", "O3" }, DFT, { 0, 1, 2, 3 }, std::cout, res_DFT);
 
     ofstream result("densities.dat", ios::out);
     result << setw(10) << "x" << setw(16) << "HF_density" << setw(16) << "DFT_density" << setw(16) << "C_density" << setw(16) << "H_density" << setw(16) << "total_density"
-        << setw(16) << "B_weight_C" << setw(16) << "B_weight_H" 
+        << setw(16) << "B_weight_C" << setw(16) << "B_weight_H"
         << setw(16) << "TFVC_weight_C_HF" << setw(16) << "TFVC_weight_H_HF"
         << setw(16) << "TFVC_weight_C_DFT" << setw(16) << "TFVC_weight_H_DFT"
         << endl;
     for (int i = 0; i < size; i++)
     {
-        result << setw(10) << setprecision(4) << scientific << (i + min) * fac
+        result << setw(10) << setprecision(4) << scientific << (i + min) * dx
             << setw(16) << setprecision(8) << scientific << HF_densities[i]
             << setw(16) << setprecision(8) << scientific << DFT_densities[i]
             << setw(16) << setprecision(8) << scientific << C_dens[i]
             << setw(16) << setprecision(8) << scientific << H_dens[i]
             << setw(16) << setprecision(8) << scientific << total_dens[i]
             << setw(16) << setprecision(8) << scientific << B_weights_C[i]
-            << setw(16) << setprecision(8) << scientific << B_weights_H[i] 
+            << setw(16) << setprecision(8) << scientific << B_weights_H[i]
             << setw(16) << setprecision(8) << scientific << TFVC_weights_C[i]
             << setw(16) << setprecision(8) << scientific << TFVC_weights_H[i]
             << setw(16) << setprecision(8) << scientific << TFVC_weights_C_DFT[i]
@@ -560,14 +564,14 @@ cdouble calc_spherically_averaged_at_k(vec2& d1, vec2& d2, vec2& d3, vec2& dens,
     d1_local = d1[0].data();
     d2_local = d2[0].data();
     d3_local = d3[0].data();
-	const int dsize = dens[0].size();
+    const int dsize = dens[0].size();
     double re = 0, im = 0, c, si, k1, k2, k3;
 #pragma omp parallel for reduction(+ : re, im)
     for (int p = 0; p < num_angular; p++)
     {
-		k1 = k * angular_x[p];
-		k2 = k * angular_y[p];
-		k3 = k * angular_z[p];
+        k1 = k * angular_x[p];
+        k2 = k * angular_y[p];
+        k3 = k * angular_z[p];
         for (int d = 0; d < dsize; d++) {
             rho = dens_local[d];
             work = k1 * d1_local[d] + k2 * d2_local[d] + k3 * d3_local[d];
