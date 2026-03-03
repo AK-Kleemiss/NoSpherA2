@@ -27,7 +27,7 @@ struct DensityExtremum
 // detects zero-crossings of the first derivative, with optional quadratic
 // interpolation refinement around the detected extremum.
 static std::vector<DensityExtremum> find_line_density_extrema(
-    const WFN &wfn,
+    const WFN& wfn,
     int atomA,
     int atomB,
     int samples = 400,
@@ -57,10 +57,10 @@ static std::vector<DensityExtremum> find_line_density_extrema(
 
     vec dens(samples);
     vec ts(samples);
-    Thakkar *spherical_temp1 = NULL;
-    Thakkar *spherical_temp2 = NULL;
-    Spherical_Gaussian_Density *a1 = NULL;
-    Spherical_Gaussian_Density *a2 = NULL;
+    Thakkar* spherical_temp1 = NULL;
+    Thakkar* spherical_temp2 = NULL;
+    Spherical_Gaussian_Density* a1 = NULL;
+    Spherical_Gaussian_Density* a2 = NULL;
     if (wfn.get_ECP_mode() != 0) {
         spherical_temp1 = new Thakkar(wfn.get_atom_charge(atomA), wfn.get_ECP_mode());
         spherical_temp2 = new Thakkar(wfn.get_atom_charge(atomB), wfn.get_ECP_mode());
@@ -144,7 +144,7 @@ AtomGrid::AtomGrid(const double radial_precision,
     const double alpha_max,
     const int max_l_quantum_number,
     const double alpha_min[],
-    std::ostream &file)
+    std::ostream& file)
 {
     using namespace std;
     const int min_num_angular_points_closest =
@@ -252,7 +252,7 @@ int AtomGrid::get_num_grid_points() const { return (int)atom_grid_x_bohr_.size()
 
 int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
-vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
+vec make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
     const int ncen = wfn.get_ncen();
     vec chi(ncen * ncen, 0.0);
     std::vector<std::vector<bool>> neighbours(ncen, bvec(ncen, true));
@@ -402,18 +402,18 @@ vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
 
 void AtomGrid::get_grid(const int num_centers,
     const int center_index,
-    const double *x_coordinates_bohr,
-    const double *y_coordinates_bohr,
-    const double *z_coordinates_bohr,
-    const int *proton_charges,
+    const double* x_coordinates_bohr,
+    const double* y_coordinates_bohr,
+    const double* z_coordinates_bohr,
+    const int* proton_charges,
     double grid_x_bohr[],
     double grid_y_bohr[],
     double grid_z_bohr[],
     double grid_aw[],
     double grid_becke_w[],
     double grid_TFVC_w[],
-    const WFN &wfn,
-    vec &chi,
+    const WFN& wfn,
+    vec& chi,
     bool debug) const
 {
 
@@ -496,7 +496,7 @@ void AtomGrid::get_radial_distances_omp(double grid_r_bohr[]) const
 }
 
 // JCP 88, 2547 (1988), eq. 20
-inline constexpr double f3(const double &x)
+inline constexpr double f3(const double& x)
 {
     double f = x;
     f *= (1.5 - 0.5 * f * f); // First iteration
@@ -506,7 +506,7 @@ inline constexpr double f3(const double &x)
 }
 
 // JCP 88, 2547 (1988), eq. 20
-inline constexpr double f4(const double &x)
+inline constexpr double f4(const double& x)
 {
     double f = x;
     f *= (1.5 - 0.5 * f * f); // First iteration
@@ -516,7 +516,7 @@ inline constexpr double f4(const double &x)
     return f;
 }
 
-constexpr double f(const double &x)
+constexpr double f(const double& x)
 {
     double f = x;
     for (int i = 0; i < constants::hardness; i++)
@@ -526,26 +526,26 @@ constexpr double f(const double &x)
 
 // JCP 139, 071103 (2013) for TFVC
 // JCP 88, 2547 (1988) for Becke
-std::array<double, 2> get_integration_weights(const int &num_centers,
-    const int *proton_charges,
-    const double *x_coordinates_bohr,
-    const double *y_coordinates_bohr,
-    const double *z_coordinates_bohr,
-    const int &center_index,
-    const double &x,
-    const double &y,
-    const double &z,
-    std::vector<double> &pa_b,
-    std::vector<double> &pa_tv,
-    const vec &chi)
+std::array<double, 2> get_integration_weights(const int& num_centers,
+    const int* proton_charges,
+    const double* x_coordinates_bohr,
+    const double* y_coordinates_bohr,
+    const double* z_coordinates_bohr,
+    const int& center_index,
+    const double& x,
+    const double& y,
+    const double& z,
+    std::vector<double>& pa_b,
+    std::vector<double>& pa_tv,
+    const vec& chi)
 {
     double mu_ab, nu_ab, f, dist_ab;
     double dist_a, dist_b;
     double vx, vy, vz;
     double R_a, R_b, chi_becke, u_ab, chi_mod;
-    const double *chi_off, *bragg = constants::bragg_angstrom;
-    double *R_v = new double[num_centers];
-    const double &cut = constants::cutoff;
+    const double* chi_off, * bragg = constants::bragg_angstrom;
+    double* R_v = new double[num_centers];
+    const double& cut = constants::cutoff;
     for (int a = 0; a < num_centers; a++) {
         pa_b[a] = 1.0;
         pa_tv[a] = 1.0;
@@ -559,8 +559,8 @@ std::array<double, 2> get_integration_weights(const int &num_centers,
         vz = z_coordinates_bohr[a] - z;
         dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
 
-        double &pa_b_a = pa_b[a];
-        double &pa_tv_a = pa_tv[a];
+        double& pa_b_a = pa_b[a];
+        double& pa_tv_a = pa_tv[a];
 
         if (dist_a > constants::far_away) {
             pa_b_a = 0.0;
@@ -572,8 +572,8 @@ std::array<double, 2> get_integration_weights(const int &num_centers,
         chi_off = chi.data() + a * num_centers;
 
         for (int b = a + 1; b < num_centers; b++) {
-            double &pa_b_b = pa_b[b];
-            double &pa_tv_b = pa_tv[b];
+            double& pa_b_b = pa_b[b];
+            double& pa_tv_b = pa_tv[b];
 
             vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
             vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
@@ -659,7 +659,7 @@ std::array<double, 2> get_integration_weights(const int &num_centers,
 
 // TCA 106, 178 (2001), eq. 25
 // we evaluate r_inner for s functions
-const double get_r_inner(const double &max_error, const double &alpha_inner)
+const double get_r_inner(const double& max_error, const double& alpha_inner)
 {
     double d = 1.9;
 
@@ -670,7 +670,7 @@ const double get_r_inner(const double &max_error, const double &alpha_inner)
     return r;
 }
 
-std::pair<vec, vec> get_shsig_shpop(const int &atom_type) {
+std::pair<vec, vec> get_shsig_shpop(const int& atom_type) {
     vec shsig(constants::MBIS_function[atom_type], 0.0);
     vec shpop(constants::MBIS_function[atom_type], 0.0);
 
@@ -740,7 +740,7 @@ std::pair<vec, vec> get_shsig_shpop(const int &atom_type) {
     return std::make_pair(shsig, shpop);
 }
 
-std::pair<vec2, vec> get_shalpha_shpop(const int &atom_type) {
+std::pair<vec2, vec> get_shalpha_shpop(const int& atom_type) {
     // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
     vec2 shalpha(constants::MBIS_function[atom_type], vec(6, 0.0));
     vec shpop(constants::MBIS_function[atom_type], 0.0);
@@ -853,7 +853,7 @@ std::pair<vec2, vec> get_shalpha_shpop(const int &atom_type) {
     return std::make_pair(shalpha, shpop);
 }
 
-vec2 sigma_to_alpha(const std::pair<vec, vec> &sigma) {
+vec2 sigma_to_alpha(const std::pair<vec, vec>& sigma) {
     // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
     vec2 shalpha(sigma.first.size(), vec(6, 0.0));
 
@@ -869,10 +869,10 @@ vec2 sigma_to_alpha(const std::pair<vec, vec> &sigma) {
 // grids here are the total_grid in the SF calculator functions, just as a not to myself and future me
 //Implemented according to the modified Multiwfn version by FJR and Anker
 std::vector<std::pair<vec, vec>> make_MBIS_vectors(
-    const WFN &wavy,
-    const vec3 &grid,
-    const ivec &num_grid_points,
-    const bvec &needs_grid,
+    const WFN& wavy,
+    const vec3& grid,
+    const ivec& num_grid_points,
+    const bvec& needs_grid,
     const bool debug)
 {
     using sp_vec = std::vector<std::pair<vec, vec>>;
@@ -881,7 +881,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     vec last_charges(atoms.size(), 0.0);
     vec zeros_6(6, 0.0);
     sp_vec sig_pop_vector;
-    for (const auto &atom : atoms) {
+    for (const auto& atom : atoms) {
         sig_pop_vector.emplace_back(get_shsig_shpop(atom.get_charge()));
     }
     const double crit = 0.001;
@@ -907,13 +907,15 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     }
     for (size_t it = 0; it < 2000; it++) {
         for (int j = 0; j < ncen; j++) {
-            std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
-            std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
+            if (needs_grid[j]) {
+                std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
+                std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
+            }
         }
         it == 0 ? std::cout << "Starting MBIS iterations..." << std::endl : std::cout << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
         for (int i = 0, grid_index = 0; i < ncen; i++) {
-            const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
+            const double* b_weight = NULL, * dens = NULL, * gx = NULL, * gy = NULL, * gz = NULL;
             const int end = num_grid_points[grid_index];
             if (needs_grid[i]) {
                 //Assuming 3 is the quadrature weight and 7 is the electron density 
@@ -931,15 +933,15 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
             {
                 vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0);
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq;
-                int j, shell, nshell, *ECP_els_j;
-                double dx[3], *dist_j;
+                int j, shell, nshell, * ECP_els_j;
+                double dx[3], * dist_j;
                 sp_vec local = sig_pop_vector;
                 for (j = 0; j < ncen; j++) {
                     std::fill(local[j].first.begin(), local[j].first.end(), 0.0);
                     std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
                 }
-                std::pair<vec, vec> *coi;
-                double *pop, *si;
+                std::pair<vec, vec>* coi;
+                double* pop, * si;
 
 #pragma omp for schedule(dynamic)
                 for (int point = 0; point < end; point++) {
@@ -1041,10 +1043,10 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 // grids here are the total_grid in the SF calculator functions, just as a not to myself and future me
 //Implemented according to the modified Multiwfn version by FJR and Anker
 std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
-    const WFN &wavy,
-    const vec3 &grid,
-    const ivec &num_grid_points,
-    const bvec &needs_grid,
+    const WFN& wavy,
+    const vec3& grid,
+    const ivec& num_grid_points,
+    const bvec& needs_grid,
     const bool debug,
     const std::vector<std::pair<vec, vec>> MBIS_vectors)
 {
@@ -1058,12 +1060,12 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     vec zeros_6(6, 0.0);
     sp_vec tens1, tens2;
     if (MBIS_vectors.size() == 0) {
-        for (auto &atom : atoms) {
+        for (auto& atom : atoms) {
             sig_pop_vector.emplace_back(get_shalpha_shpop(atom.get_charge()));
         }
     }
     else {
-        for (auto &vector : MBIS_vectors) {
+        for (auto& vector : MBIS_vectors) {
             sig_pop_vector.emplace_back(std::make_pair(sigma_to_alpha(vector), vector.second));
         }
     }
@@ -1095,7 +1097,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         it == 0 ? std::cout << "Starting EMBIS iterations..." << std::endl : std::cout << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
         for (int i = 0, grid_index = 0; i < ncen; i++) {
-            const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
+            const double* b_weight = NULL, * dens = NULL, * gx = NULL, * gy = NULL, * gz = NULL;
             const int end = num_grid_points[grid_index];
             if (needs_grid[i]) {
                 //Assuming 3 is the quadrature weight and 7 is the electron density 
@@ -1113,14 +1115,14 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
             {
                 vec rho0shell(ncen * 6, 0.0);
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
-                int j, shell, nshell, ind, *ECP_els_j;
-                double *alpha, *d_local, *pop_p;
+                int j, shell, nshell, ind, * ECP_els_j;
+                double* alpha, * d_local, * pop_p;
                 vec dx(ncen * 3);
                 vec alpha_local(ncen * 36, 0.0);
                 vec pop_local(ncen * 6, 0.0);
                 vec g_cache(6 * ncen, 0.0);
                 double d_cache[6] = { 0.0 };
-                std::pair<vec2, vec> *coi;
+                std::pair<vec2, vec>* coi;
 
                 // Precompute determinants for all atoms and shells - they don't change per point
                 vec det_pop_cache(ncen * 6, 0.0);
@@ -1189,7 +1191,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
                     const double rho0_inv = 1.0 / rho0;
                     for (j = 0; j < ncen; j++) {
-                        if(!needs_grid[j])
+                        if (!needs_grid[j])
                             continue; // If the atom does not need a grid, skip to the next one
                         d_local = dx.data() + (j * 3);
                         nshell = nshell_cache[j];
@@ -1284,10 +1286,10 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 
 #pragma GCC optimize("-fno-fast-math") //gcc fails to converge in this function when using fast math, so not use it
 // TCA 106, 178 (2001), eq. 19
-double get_r_outer(const double &max_error,
-    const double &alpha_outer,
-    const int &l,
-    const double &guess)
+double get_r_outer(const double& max_error,
+    const double& alpha_outer,
+    const int& l,
+    const double& guess)
 {
     const int m = 2 * l;
     double r = guess;
@@ -1321,7 +1323,7 @@ double get_r_outer(const double &max_error,
 }
 
 // TCA 106, 178 (2001), eqs. 17 and 18
-double get_h(const double &max_error, const int &l, const double &guess)
+double get_h(const double& max_error, const int& l, const double& guess)
 {
     const int m = 2 * l;
     double h = guess;

@@ -78,7 +78,7 @@ private:
         const ivec &atom_list);
     void getIntegrationGrid1D(const WFN &wave, const int atom_1, const int atom_2, const int num_points, const double padding);
 
-    void calculateSphericalDensities(const WFN &wave, const cell &unit_cell, const ivec &atom_list, vec2 &single_spherical_density, vec2 &combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
+    void calculateSphericalDensities(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid, vec2 &single_spherical_density, vec2 &combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
     void calculateHirshfeldWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list);
     std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid);
     void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid);
@@ -93,7 +93,7 @@ public:
 
     // Main interface methods
     void setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list = {},
-                                 const bvec &needs_grid = {}, const cell &unit_cell = cell());
+        const bvec &needs_grid = {}, const cell &unit_cell = cell());
 
     void setup1DGridsForMolecule(const WFN &wave, const int atom_1, const int atom_2, const int gridpoints, const double padding);
 
@@ -111,7 +111,7 @@ public:
     int getNumPointsForAtom(const int &atom_index) const { return grid_data_.num_points_per_atom[atom_index]; }
 
     // Utility methods
-    static ivec identifyAtomTypes(const WFN &wave, const bvec &needs_grid);
+    static ivec identifyAtomTypes(const WFN &wave);
     static bvec determineAtomsNeedingGrids(const WFN &wave, const ivec &asym_atom_list);
 
     void addTimingInfoToVecs(std::vector<_time_point> &time_points, svec &time_descriptions) {
@@ -124,5 +124,5 @@ public:
 
     vec evaluateFunctionOnGrid(const vec2 &grid_points, std::function<double(double, double, double)> func) const;
 
-    void printChargeTable(const svec &labels, const WFN &wave, const ivec atom_list, std::ostream &file, const PartitionResults& results) const;
+    void printChargeTable(const svec &labels, const WFN &wave, const ivec atom_list, std::ostream &file, const PartitionResults &results) const;
 };

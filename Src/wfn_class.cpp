@@ -6705,7 +6705,7 @@ const double WFN::compute_dens_cartesian(
     // precalculate some distances and powers of distances for faster computation
     for (j = 0; j < ncen; j++)
     {
-		const atom& a = atoms[j];
+        const atom& a = atoms[j];
         d_ = d[j].data();
         d_[0] = Pos[0] - a.get_coordinate(0);
         d_[1] = Pos[1] - a.get_coordinate(1);
@@ -6732,11 +6732,11 @@ const double WFN::compute_dens_cartesian(
     const MO* MOs_data = MOs.data();
     double* phi_data = phi.data();
     const double exp_cutoff = constants::exp_cutoff;
-	const double** MO_coefs_data = new const double* [nmo];
-    for (int i = 0; i < nmo; i++) {
-        MO_coefs_data[i] = MOs_data[i].get_coefficient_ptr();
-	}
-	const double*** start_MO_coefs_data = &MO_coefs_data;
+    const double** MO_coefs_data = new const double* [nmo];
+    for (j = 0; j < nmo; j++) {
+        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
+    }
+    const double*** start_MO_coefs_data = &MO_coefs_data;
 
     for (j = 0; j < nex; j++)
     {
@@ -6812,7 +6812,7 @@ const double WFN::compute_dens_cartesian(
         // This avoids repeated virtual function calls to get_coefficient_f
         double* phi_ptr = phi_data;
         const double* phi_end = phi_ptr + nmo;
-		const double** mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
+        const double** mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
 
         // Cache the coefficient pointer for this primitive across all MOs
         for (; phi_ptr != phi_end; ++phi_ptr, ++mo_coef_ptr)
