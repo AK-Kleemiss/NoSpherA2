@@ -508,6 +508,9 @@ void Calc_Rho(
     const int high_j = wrap ? 2 * CubeRho.get_size(1) : CubeRho.get_size(1);
     const int low_k = wrap ? -CubeRho.get_size(2) : 0;
     const int high_k = wrap ? 2 * CubeRho.get_size(2) : CubeRho.get_size(2);
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> atoms = wavy.get_atoms();
+    const int ncen = wavy.get_ncen();
 
 #pragma omp parallel for schedule(dynamic)
     for (int i = low_i; i < high_i; i++)
@@ -519,9 +522,11 @@ void Calc_Rho(
                 const d3 PosGrid = CubeRho.get_pos(i, j, k);
 
                 bool skip = true;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (array_length(PosGrid, wavy.get_atom_pos(a)) < constants::ang2bohr(radius))
+                for (int a = 0; a < ncen; a++)
+                    if (array_length(PosGrid, atoms[a].get_pos()) < radius_bohr) {
                         skip = false;
+                        break;
+                    }
                 if (skip)
                     continue;
 
@@ -695,6 +700,8 @@ void Calc_Prop(
     const int high_j = wrap ? 2 * Cubes[cube_type::Rho].get_size(1) : Cubes[cube_type::Rho].get_size(1);
     const int low_k = wrap ? -Cubes[cube_type::Rho].get_size(2) : 0;
     const int high_k = wrap ? 2 * Cubes[cube_type::Rho].get_size(2) : Cubes[cube_type::Rho].get_size(2);
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> atoms = wavy.get_atoms();
 
 #pragma omp parallel for schedule(dynamic)
     for (int i = low_i; i < high_i; i++)
@@ -712,8 +719,10 @@ void Calc_Prop(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (array_length(PosGrid, wavy.get_atom_pos(a)) < constants::ang2bohr(radius))
+                    if (array_length(PosGrid, atoms[a].get_pos()) < radius_bohr) {
                         skip = false;
+                        break;
+                    }
                 if (skip)
                     continue;
 
@@ -951,6 +960,7 @@ void Calc_MO(
     const int high_j = wrap ? 2 * CubeMO.get_size(1) : CubeMO.get_size(1);
     const int low_k = wrap ? -CubeMO.get_size(2) : 0;
     const int high_k = wrap ? 2 * CubeMO.get_size(2) : CubeMO.get_size(2);
+    const double radius_bohr = constants::ang2bohr(radius);
 
 #pragma omp parallel for schedule(dynamic)
     for (int i = low_i; i < high_i; i++)
@@ -964,7 +974,7 @@ void Calc_MO(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (array_length(PosGrid, wavy.get_atom_pos(a)) < constants::ang2bohr(radius))
+                    if (array_length(PosGrid, wavy.get_atom_pos(a)) < radius_bohr)
                         skip = false;
                 if (skip)
                     continue;

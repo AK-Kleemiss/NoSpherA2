@@ -8014,8 +8014,13 @@ const void WFN::computeLapELI(
         for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
         {
             const double c = (*mo_coef_ptr)[j];
-            for (k = 0; k < 7; k++)
-                phi_ptr[k] += c * chi[k];
+            phi_ptr[0] += c * chi[0];
+            phi_ptr[1] += c * chi[1];
+            phi_ptr[2] += c * chi[2];
+            phi_ptr[3] += c * chi[3];
+            phi_ptr[4] += c * chi[4];
+            phi_ptr[5] += c * chi[5];
+            phi_ptr[6] += c * chi[6];
         }
     }
 
