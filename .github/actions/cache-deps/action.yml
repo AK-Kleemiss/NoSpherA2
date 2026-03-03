@@ -9,7 +9,11 @@ runs:
   using: 'composite'
   steps:
     - name: Run sccache-cache
-      uses: mozilla-actions/sccache-action@v0.0.9
+      uses: hendrikmuhs/ccache-action@1.2.20
+      with:
+        max-size: "1GB"
+        variant: "sccache"
+
 
     - name: Cache occ
       if: inputs.platform != 'Mac_ARM64' && inputs.platform != 'Mac_x86_64'
