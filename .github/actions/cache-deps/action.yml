@@ -12,7 +12,7 @@ runs:
       uses: mozilla-actions/sccache-action@v0.0.9
 
     - name: Cache occ
-      if: inputs.platform != 'Mac_ARM64' || inputs.platform != 'Mac_x86_64'
+      if: inputs.platform != 'Mac_ARM64' && inputs.platform != 'Mac_x86_64'
       uses: actions/cache@v4.2.4
       with:
         path: Lib/occ
