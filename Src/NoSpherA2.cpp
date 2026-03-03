@@ -394,12 +394,10 @@ int main(int argc, char** argv)
           auto wfn = occ::main::run_scf_external(config, true);
           auto wfn_from_occ = WFN(wfn);
           wavy.emplace_back(wfn_from_occ);
-          constants::exp_cutoff = std::log(constants::density_accuracy / wfn_from_occ.get_maximum_MO_coefficient());
         } else {
           occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);
           auto wfn_from_occ = WFN(wfn, true);
           wavy.emplace_back(wfn_from_occ);
-          constants::exp_cutoff = std::log(constants::density_accuracy / wfn_from_occ.get_maximum_MO_coefficient());
         }
 
         wavy[0].set_method(opt.method);
