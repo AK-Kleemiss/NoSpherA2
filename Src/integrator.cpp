@@ -161,7 +161,7 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
     //    std::cout << std::fixed << std::setprecision(6) << rho[i] << ", ";
     //}
     //std::cout << "\n";
-    rho = reorder_p(rho, wavy_aux);
+    //rho = reorder_p(rho, wavy_aux);
 
 
 

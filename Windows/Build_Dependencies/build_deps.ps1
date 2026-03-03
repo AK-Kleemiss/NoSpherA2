@@ -322,7 +322,7 @@ if (Test-Path $LibCintOut) {
 
   Push-Location $bld
   try {
-    cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX="..\..\Lib\LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" ..
+    cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DPYPZPX="ON" -DCMAKE_INSTALL_PREFIX="..\..\Lib\LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" ..
     cmake --build . --config RELEASE
     cmake --install .
   } finally {
@@ -339,16 +339,16 @@ $OccOut = Join-Path $LibDir "occ\lib\occ_main.lib"
 if (Test-Path $OccOut) {
   Info "OCC already built ($OccOut)"
 } else {
-  Info "Building LibCint..."
+  Info "Building OCC..."
   Push-Location $RepoRoot
   try {
     cmake --workflow --preset windows-clang-cl
-    cmake --install .\build-windows-clang-clf
+    cmake --install .\build-windows-clang-cl
   } finally {
     Pop-Location
   }
   if (-not (Test-Path $OccOut)) { Fail "OCC build finished but output not found: $OccOut" }
-  Info "LibCint OK"
+  Info "OCC OK"
 }
 $stamp = Join-Path $RepoRoot "Windows\Build_Dependencies\deps.stamp"
 New-Item -ItemType Directory -Force (Split-Path $stamp) | Out-Null
