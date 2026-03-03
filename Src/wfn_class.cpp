@@ -6179,7 +6179,6 @@ void WFN::delete_unoccupied_MOs()
     }
 };
 void WFN::delete_Qs() {
-    const int old_ncen = ncen;
     for (int i = static_cast<int>(atoms.size()) - 1; i >= 0; i--) {
         if (atoms[i].get_charge() == 119) {
             atoms.erase(atoms.begin() + i);
@@ -6841,83 +6840,135 @@ const double WFN::compute_spin_dens_cartesian(
     vec& phi) const
 {
     std::fill(phi.begin(), phi.end(), 0.0);
-    double alpha = 0.0, beta = 0.0;
-    int iat, j, k;
-    int l[3];
-    double ex;
-    int mo;
+    double alpha = 0.0, beta = 0.0, ex, *d_;
+    int j;
 
-    for (iat = 0; iat < ncen; iat++)
+    for (j = 0; j < ncen; j++)
     {
-        d[iat][0] = Pos[0] - atoms[iat].get_coordinate(0);
-        d[iat][1] = Pos[1] - atoms[iat].get_coordinate(1);
-        d[iat][2] = Pos[2] - atoms[iat].get_coordinate(2);
-        d[iat][3] = d[iat][0] * d[iat][0] + d[iat][1] * d[iat][1] + d[iat][2] * d[iat][2];
-        d[iat][4] = d[iat][0] * d[iat][0];
-        d[iat][5] = d[iat][1] * d[iat][1];
-        d[iat][6] = d[iat][2] * d[iat][2];
-        d[iat][7] = d[iat][0] * d[iat][4];
-        d[iat][8] = d[iat][1] * d[iat][5];
-        d[iat][9] = d[iat][2] * d[iat][6];
-        d[iat][10] = d[iat][0] * d[iat][7];
-        d[iat][11] = d[iat][1] * d[iat][8];
-        d[iat][12] = d[iat][2] * d[iat][9];
-        d[iat][13] = d[iat][0] * d[iat][10];
-        d[iat][14] = d[iat][1] * d[iat][11];
-        d[iat][15] = d[iat][2] * d[iat][12];
+        d_ = d[j].data();
+        d_[0] = Pos[0] - atoms[j].get_coordinate(0);
+        d_[1] = Pos[1] - atoms[j].get_coordinate(1);
+        d_[2] = Pos[2] - atoms[j].get_coordinate(2);
+        d_[4] = d_[0] * d_[0];
+        d_[5] = d_[1] * d_[1];
+        d_[6] = d_[2] * d_[2];
+        d_[3] = d_[4] + d_[5] + d_[6];
+        d_[7] = d_[0] * d_[4];
+        d_[8] = d_[1] * d_[5];
+        d_[9] = d_[2] * d_[6];
+        d_[10] = d_[0] * d_[7];
+        d_[11] = d_[1] * d_[8];
+        d_[12] = d_[2] * d_[9];
+        d_[13] = d_[0] * d_[10];
+        d_[14] = d_[1] * d_[11];
+        d_[15] = d_[2] * d_[12];
     }
+
+    const int *centers_data = centers.data();
+    const int *types_data = types.data();
+    const double *exponents_data = exponents.data();
+    const MO *MOs_data = MOs.data();
+    double *phi_data = phi.data();
+    const double **MO_coefs_data = new const double *[nmo];
+    for (j = 0; j < nmo; j++) {
+        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
+    }
+    const double ***start_MO_coefs_data = &MO_coefs_data;
 
     for (j = 0; j < nex; j++)
     {
-        iat = centers[j] - 1;
-        constants::type2vector(types[j], l);
-        ex = -exponents[j] * d[3][iat];
+        d_ = d[centers_data[j] - 1].data();
+        ex = -exponents_data[j] * d_[3];
         if (ex < constants::exp_cutoff)
         { // corresponds to cutoff of ex ~< 1E-20
             continue;
         }
         ex = exp(ex);
-        for (k = 0; k < 3; k++)
+        switch (types_data[j])
         {
-            switch (l[k])
-            {
-            case 0:
-                break;
-            case 1:
-                ex *= d[iat][k];
-                break;
-            case 2:
-                ex *= d[iat][k + 4];
-                break;
-            case 3:
-                ex *= d[iat][k + 7];
-                break;
-            case 4:
-                ex *= d[iat][k + 10];
-                break;
-            case 5:
-                ex *= d[iat][k + 13];
-                break;
-            }
+            case 0:  break;
+            case 1:  break;// 0, 0, 0,
+            case 2:  ex *= d_[0]; break;// 1, 0, 0,
+            case 3:  ex *= d_[1]; break;// 0, 1, 0,
+            case 4:  ex *= d_[2]; break;// 0, 0, 1,
+            case 5:  ex *= d_[4]; break;// 2, 0, 0,
+            case 6:  ex *= d_[5]; break;// 0, 2, 0,
+            case 7:  ex *= d_[6]; break;// 0, 0, 2,
+            case 8:  ex *= d_[0] * d_[1]; break;// 1, 1, 0,
+            case 9:  ex *= d_[0] * d_[2]; break;// 1, 0, 1,
+            case 10: ex *= d_[1] * d_[2]; break;// 0, 1, 1,
+            case 11: ex *= d_[7]; break;// 3, 0, 0,
+            case 12: ex *= d_[8]; break;// 0, 3, 0,
+            case 13: ex *= d_[9]; break;// 0, 0, 3,
+            case 14: ex *= d_[4] * d_[1]; break;// 2, 1, 0,
+            case 15: ex *= d_[4] * d_[2]; break;// 2, 0, 1,
+            case 16: ex *= d_[5] * d_[2]; break;// 0, 2, 1,
+            case 17: ex *= d_[0] * d_[5]; break;// 1, 2, 0,
+            case 18: ex *= d_[0] * d_[6]; break;// 1, 0, 2,
+            case 19: ex *= d_[1] * d_[6]; break;// 0, 1, 2,
+            case 20: ex *= d_[0] * d_[1] * d_[2]; break;// 1, 1, 1,
+            case 21: ex *= d_[12]; break;// 0, 0, 4,
+            case 22: ex *= d_[1] * d_[9]; break;// 0, 1, 3,
+            case 23: ex *= d_[5] * d_[6]; break;// 0, 2, 2,
+            case 24: ex *= d_[8] * d_[2]; break;// 0, 3, 1,
+            case 25: ex *= d_[11]; break;// 0, 4, 0,
+            case 26: ex *= d_[0] * d_[9]; break;// 1, 0, 3,
+            case 27: ex *= d_[0] * d_[1] * d_[6]; break;// 1, 1, 2,
+            case 28: ex *= d_[0] * d_[5] * d_[2]; break;// 1, 2, 1,
+            case 29: ex *= d_[0] * d_[8]; break;// 1, 3, 0,
+            case 30: ex *= d_[4] * d_[6]; break;// 2, 0, 2,
+            case 31: ex *= d_[4] * d_[1] * d_[2]; break;// 2, 1, 1,
+            case 32: ex *= d_[4] * d_[5]; break;// 2, 2, 0,
+            case 33: ex *= d_[7] * d_[2]; break;// 3, 0, 1,
+            case 34: ex *= d_[7] * d_[1]; break;// 3, 1, 0,
+            case 35: ex *= d_[10]; break;// 4, 0, 0,
+            case 36: ex *= d_[15]; break;// 0, 0, 5,
+            case 37: ex *= d_[1] * d_[12]; break;// 0, 1, 4,
+            case 38: ex *= d_[5] * d_[9]; break;// 0, 2, 3,
+            case 39: ex *= d_[8] * d_[6]; break;// 0, 3, 2,
+            case 40: ex *= d_[11] * d_[2]; break;// 0, 4, 1,
+            case 41: ex *= d_[14]; break;// 0, 5, 0,
+            case 42: ex *= d_[0] * d_[12]; break;// 1, 0, 4,
+            case 43: ex *= d_[0] * d_[1] * d_[9]; break;// 1, 1, 3,
+            case 44: ex *= d_[0] * d_[8] * d_[2]; break;// 1, 3, 1,
+            case 45: ex *= d_[0] * d_[11]; break;// 1, 4, 0,
+            case 46: ex *= d_[4] * d_[9]; break;// 2, 0, 3,
+            case 47: ex *= d_[4] * d_[1] * d_[6]; break;// 2, 1, 2,
+            case 48: ex *= d_[4] * d_[5] * d_[2]; break;// 2, 2, 1,
+            case 49: ex *= d_[4] * d_[8]; break;// 2, 3, 0,
+            case 50: ex *= d_[7] * d_[6]; break;// 3, 0, 2,
+            case 51: ex *= d_[7] * d_[1] * d_[2]; break;// 3, 1, 1,
+            case 52: ex *= d_[7] * d_[5]; break;// 3, 2, 0,
+            case 53: ex *= d_[10] * d_[2]; break;// 4, 0, 1,
+            case 54: ex *= d_[10] * d_[1]; break;// 4, 1, 0,
+            case 55: ex *= d_[13]; break;// 5, 0, 0 
+            default: break;
         }
-        double* run = phi.data();
-        const MO* run2 = MOs.data();
-        for (mo = 0; mo < nmo; mo++)
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        double *phi_ptr = phi_data;
+        const double *phi_end = phi_ptr + nmo;
+        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; phi_ptr != phi_end; ++phi_ptr, ++mo_coef_ptr)
         {
-            *run += (*run2).get_coefficient_f(j) * ex; // build MO values at this point
-            run2++, run++;
+            *phi_ptr += (*mo_coef_ptr)[j] * ex;
         }
     }
 
-    double* run = phi.data();
-    const MO* run2 = MOs.data();
-    for (mo = 0; mo < nmo; mo++)
+    // use pointer arithmetic and minimize overhead
+    const double *phi_ptr = phi_data;
+    const double *phi_end = phi_ptr + nmo;
+    const MO *mo_ptr = MOs_data;
+
+    for (; phi_ptr != phi_end; ++phi_ptr, ++mo_ptr)
     {
-        if ((*run2).get_op())
-            beta += (*run2).get_occ() * pow(*run, 2);
+        const double &phi_val = *phi_ptr;
+        if (mo_ptr->get_op())
+            beta += mo_ptr->get_occ() * phi_val * phi_val;
         else
-            alpha += (*run2).get_occ() * pow(*run, 2);
-        run++, run2++;
+            alpha += mo_ptr->get_occ() * phi_val * phi_val;
     }
 
     return alpha - beta;
@@ -7261,7 +7312,7 @@ const void WFN::computeValues(
     double* phi_temp;
     double chi[10]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     double d[4]{ 0, 0, 0, 0 };
-    int iat = 0;
+    int iat = 0, k, j;
     int l[3]{ 0, 0, 0 };
     double ex = 0;
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
@@ -7277,7 +7328,14 @@ const void WFN::computeValues(
     Hess[4] = 0;
     Hess[5] = 0;
 
-    for (int j = 0; j < nex; j++)
+    const MO *MOs_data = MOs.data();
+    const double **MO_coefs_data = new const double *[_nmo];
+    for (j = 0; j < _nmo; j++) {
+        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
+    }
+    const double ***start_MO_coefs_data = &MO_coefs_data;
+
+    for (j = 0; j < nex; j++)
     {
         iat = get_center(j) - 1;
 
@@ -7290,7 +7348,7 @@ const void WFN::computeValues(
         if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
-        for (int k = 0; k < 3; k++)
+        for (k = 0; k < 3; k++)
         {
             if (l[k] == 0)
             {
@@ -7341,12 +7399,19 @@ const void WFN::computeValues(
         chi[7] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[2][0] * ex;
         chi[8] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[1][0] * ex;
         chi[9] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * ex;
-        for (int mo = 0; mo < _nmo; mo++)
+
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
+        const double **mo_end = *start_MO_coefs_data + nmo;
+        double *phi_ptr = phi.data();
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 10)
         {
-            phi_temp = &phi[mo * 10];
-            for (int i = 0; i < 10; i++)
-                //                if( abs(chi[i]) * coefficients[nprim*maxc[j]+j] > pow(10.0,-10) )
-                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
+            const double c = (*mo_coef_ptr)[j];
+            for (k = 0; k < 10; k++)
+                phi_ptr[k] += c * chi[k];
         }
     }
 
@@ -7394,14 +7459,21 @@ const void WFN::computeELIELF(
     double* phi_temp;
     double chi[4]{ 0, 0, 0, 0 };
     double d[3]{ 0, 0, 0 };
-    int iat = 0;
+    int iat = 0, k, j;
     int l[3]{ 0, 0, 0 };
     double ex = 0;
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
-    for (int j = 0; j < nex; j++)
+    const MO *MOs_data = MOs.data();
+    const double **MO_coefs_data = new const double *[_nmo];
+    for (j = 0; j < _nmo; j++) {
+        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
+    }
+    const double ***start_MO_coefs_data = &MO_coefs_data;
+
+    for (j = 0; j < nex; j++)
     {
-        iat = get_center(j) - 1;
+        iat = centers[j] - 1;
 
         constants::type2vector(get_type(j), l);
         d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
@@ -7455,12 +7527,19 @@ const void WFN::computeELIELF(
         chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
         chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
         chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
-        for (int mo = 0; mo < _nmo; mo++)
+
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
+        const double **mo_end = *start_MO_coefs_data + nmo;
+        double *phi_ptr = phi.data();
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
         {
-            phi_temp = &phi[mo * 4];
-            for (int i = 0; i < 4; i++)
-                //                if( abs(chi[i]) * coefficients[nprim*maxc[j]+j] > pow(10.0,-10) )
-                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
+            const double c = (*mo_coef_ptr)[j];
+            for (k = 0; k < 4; k++)
+                phi_ptr[k] += c * chi[k];
         }
     }
 
@@ -7498,20 +7577,27 @@ const double WFN::computeELI(
     double* phi_temp;
     double chi[4]{ 0, 0, 0, 0 };
     double d[3]{ 0, 0, 0 };
-    int iat = 0;
+    int iat = 0, k, j;
     int l[3]{ 0, 0, 0 };
     double ex = 0;
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
-    for (int j = 0; j < nex; j++)
-    {
-        iat = get_center(j) - 1;
+    const MO *MOs_data = MOs.data();
+    const double **MO_coefs_data = new const double *[_nmo];
+    for (j = 0; j < _nmo; j++) {
+        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
+    }
+    const double ***start_MO_coefs_data = &MO_coefs_data;
 
-        constants::type2vector(get_type(j), l);
+    for (j = 0; j < nex; j++)
+    {
+        iat = centers[j] - 1;
+
+        constants::type2vector(types[j], l);
         d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
         d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
         d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        double temp = -exponents[j] * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
@@ -7559,12 +7645,19 @@ const double WFN::computeELI(
         chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
         chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
         chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
-        for (int mo = 0; mo < _nmo; mo++)
+
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
+        const double **mo_end = *start_MO_coefs_data + nmo;
+        double *phi_ptr = phi.data();
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
         {
-            phi_temp = &phi[mo * 4];
-            for (int i = 0; i < 4; i++)
-                //                if( abs(chi[i]) * coefficients[nprim*maxc[j]+j] > pow(10.0,-10) )
-                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
+            const double c = (*mo_coef_ptr)[j];
+            for (k = 0; k < 4; k++)
+                phi_ptr[k] += c * chi[k];
         }
     }
 
@@ -7701,20 +7794,27 @@ const void WFN::computeLapELIELF(
     double* phi_temp;
     double chi[7]{ 0, 0, 0, 0, 0, 0, 0 };
     double d[3]{ 0, 0, 0 };
-    int iat = 0;
+    int iat = 0, k, j;
     int l[3]{ 0, 0, 0 };
     double ex = 0;
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
-    for (int j = 0; j < nex; j++)
-    {
-        iat = get_center(j) - 1;
+    const MO *MOs_data = MOs.data();
+    const double **MO_coefs_data = new const double *[_nmo];
+    for (j = 0; j < _nmo; j++) {
+        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
+    }
+    const double ***start_MO_coefs_data = &MO_coefs_data;
 
-        constants::type2vector(get_type(j), l);
+    for (j = 0; j < nex; j++)
+    {
+        iat = centers[j] - 1;
+
+        constants::type2vector(types[j], l);
         d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
         d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
         d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        double temp = -exponents[j] * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
@@ -7766,12 +7866,19 @@ const void WFN::computeLapELIELF(
         chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + temp_ex * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
         chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
         chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
-        for (int mo = 0; mo < _nmo; mo++)
+
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
+        const double **mo_end = *start_MO_coefs_data + nmo;
+        double *phi_ptr = phi.data();
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
         {
-            phi_temp = &phi[mo * 7];
-            for (int i = 0; i < 7; i++)
-                //                if( abs(chi[i]) * coefficients[nprim*maxc[j]+j] > pow(10.0,-10) )
-                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
+            const double c = (*mo_coef_ptr)[j];
+            for (k = 0; k < 7; k++)
+                phi_ptr[k] += c * chi[k];
         }
     }
 
@@ -7815,20 +7922,28 @@ const void WFN::computeLapELI(
     double* phi_temp;
     double chi[7]{ 0, 0, 0, 0, 0, 0, 0 };
     double d[3]{ 0, 0, 0 };
-    int iat = 0;
+    int k, j;
     int l[3]{ 0, 0, 0 };
     double ex = 0;
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
-    for (int j = 0; j < nex; j++)
+    const MO *MOs_data = MOs.data();
+    double *phi_data = phi.data();
+    const double **MO_coefs_data = new const double *[_nmo];
+    for (j = 0; j < _nmo; j++) {
+        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
+    }
+    const double ***start_MO_coefs_data = &MO_coefs_data;
+
+    for (j = 0; j < nex; j++)
     {
-        iat = get_center(j) - 1;
+        k = centers[j] - 1;
 
         constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
-        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
-        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        d[0] = PosGrid[0] - atoms[k].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[k].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[k].get_coordinate(2);
+        const double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
@@ -7879,21 +7994,28 @@ const void WFN::computeLapELI(
             }
             }
         }
-        double ex2 = 2 * get_exponent(j);
+        const double ex2 = 2 * get_exponent(j);
         chi[0] = xl[0][0] * xl[1][0] * xl[2][0] * ex;
         chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
         chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
         chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
-        double temp_ex = pow(ex2, 2);
+        const double temp_ex = pow(ex2, 2);
         chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + temp_ex * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
         chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
         chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
-        for (int mo = 0; mo < _nmo; mo++)
+
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
+        const double **mo_end = *start_MO_coefs_data + nmo;
+        double *phi_ptr = phi.data();
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
         {
-            phi_temp = &phi[mo * 7];
-            for (int i = 0; i < 7; i++)
-                //                if( abs(chi[i]) * coefficients[nprim*maxc[j]+j] > pow(10.0,-10) )
-                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
+            const double c = (*mo_coef_ptr)[j];
+            for (k = 0; k < 7; k++)
+                phi_ptr[k] += c * chi[k];
         }
     }
 
@@ -7929,27 +8051,33 @@ const double WFN::computeLap(
 {
     const int _nmo = get_nmo(false);
     vec phi(7 * _nmo, 0.0);
-    double* phi_temp;
     double chi[7]{ 0, 0, 0, 0, 0, 0, 0 };
     double d[3]{ 0, 0, 0 };
-    int iat = 0;
+    int iat = 0, j, k;
     int l[3]{ 0, 0, 0 };
     double ex = 0;
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
-    for (int j = 0; j < nex; j++)
+    const MO *MOs_data = MOs.data();
+    const double **MO_coefs_data = new const double *[_nmo];
+    for (j = 0; j < _nmo; j++) {
+        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
+    }
+    const double ***start_MO_coefs_data = &MO_coefs_data;
+
+    for (j = 0; j < nex; j++)
     {
-        iat = get_center(j) - 1;
+        k = centers[j] - 1;
 
         constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
-        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
-        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        d[0] = PosGrid[0] - atoms[k].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[k].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[k].get_coordinate(2);
+        const double temp = -exponents[j] * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
-        for (int k = 0; k < 3; k++)
+        for (k = 0; k < 3; k++)
         {
             switch (l[k])
             {
@@ -7976,7 +8104,7 @@ const double WFN::computeLap(
             }
             case 3:
             {
-                double d2 = d[k] * d[k];
+                const double d2 = d[k] * d[k];
                 xl[k][0] = d2 * d[k];
                 xl[k][1] = 3 * d2;
                 xl[k][2] = 6 * d[k];
@@ -7984,7 +8112,7 @@ const double WFN::computeLap(
             }
             case 4:
             {
-                double d2 = d[k] * d[k];
+                const double d2 = d[k] * d[k];
                 xl[k][0] = d2 * d2;
                 xl[k][1] = 4 * d2 * d[k];
                 xl[k][2] = 12 * d2;
@@ -7997,22 +8125,32 @@ const double WFN::computeLap(
             }
             }
         }
-        double ex2 = 2 * get_exponent(j);
+        const double ex2 = 2 * exponents[j];
         chi[0] = xl[0][0] * xl[1][0] * xl[2][0] * ex;
         chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
         chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
         chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
-        double temp_ex = pow(ex2, 2);
-        chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + temp_ex * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
-        chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
-        chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
-        for (int mo = 0; mo < _nmo; mo++)
+        const double ex4 = ex2 * ex2;
+        chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + ex4 * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
+        chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + ex4 * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
+        chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + ex4 * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
+        const double **mo_end = *start_MO_coefs_data + nmo;
+        double *phi_ptr = phi.data();
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
         {
-            phi_temp = &phi[mo * 7];
-            for (int i = 0; i < 7; i++)
-                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
+            const double c = (*mo_coef_ptr)[j];
+            for (k = 0; k < 7; k++)
+                phi_ptr[k] += c * chi[k];
         }
+
     }
+
+    free(MO_coefs_data);
 
     double Hess[3]{ 0, 0, 0 };
 
@@ -8022,7 +8160,7 @@ const double WFN::computeLap(
         const double docc = 2 * occ;
         if (occ != 0)
         {
-            phi_temp = &phi[mo * 7];
+            const double* phi_temp = &phi[mo * 7];
             Hess[0] += docc * (*phi_temp * phi_temp[4] + pow(phi_temp[1], 2));
             Hess[1] += docc * (*phi_temp * phi_temp[5] + pow(phi_temp[2], 2));
             Hess[2] += docc * (*phi_temp * phi_temp[6] + pow(phi_temp[3], 2));

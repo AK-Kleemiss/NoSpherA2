@@ -1413,6 +1413,8 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
 #endif
         std::cout << "Current working dir: " << cwd << std::endl;
     WFN wavy(wfn_name);
+    wavy.delete_unoccupied_MOs();
+    std::cout << NoSpherA2_message(false) << std::endl << build_date << std::endl;
 
     err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 
@@ -1429,10 +1431,10 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
             {
                 std::cout << "Bond between " << i << " (" << wavy.get_atom_charge(i) << ") and " << j << " (" << wavy.get_atom_charge(j) << ") with distance " << distance << " and svdW " << svdW << std::endl;
                 const vec bond_vec = {(wavy.get_atom_coordinate(j, 0) - wavy.get_atom_coordinate(i, 0)) / points, (wavy.get_atom_coordinate(j, 1) - wavy.get_atom_coordinate(i, 1)) / points, (wavy.get_atom_coordinate(j, 2) - wavy.get_atom_coordinate(i, 2)) / points};
-                double dr = distance / points;
+                const double dr = distance / points;
                 vec lapl(points, 0.0);
                 const vec pos = {wavy.get_atom_coordinate(i, 0), wavy.get_atom_coordinate(i, 1), wavy.get_atom_coordinate(i, 2)};
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic)
                 for (int k = 0; k < points; k++)
                 {
                     d3 t_pos = {pos[0], pos[1], pos[2]};
@@ -1446,7 +1448,7 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
                 std::ofstream result(path, std::ios::out);
                 for (int k = 0; k < points; k++)
                 {
-                    result << std::setw(10) << std::scientific << std::setprecision(6) << dr * k << " " << std::setw(10) << std::scientific << std::setprecision(6) << lapl[k] << std::endl;
+                    result << std::setw(10) << std::scientific << std::setprecision(6) << dr * k << " " << std::setw(10) << std::scientific << std::setprecision(6) << lapl[k] << "\n";
                 }
                 result.flush();
                 result.close();
