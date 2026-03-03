@@ -20,3 +20,15 @@ index 8d20e24e..8a784ddf 100644
      )
  
      if (CMAKE_VERSION VERSION_GREATER 3.18)
+diff --git a/scripts/git-version-info.py b/scripts/git-version-info.py
+index 88db8033..cf3a293d 100755
+--- a/scripts/git-version-info.py
++++ b/scripts/git-version-info.py
+@@ -80,6 +80,7 @@ def git_hash_all_code():
+         ["git", "diff-index", "--quiet", "HEAD", "--"],
+         capture_output=True,
+     )
++    return 0
+ 
+     if output.returncode not in [0, 1]:
+         raise Exception(
