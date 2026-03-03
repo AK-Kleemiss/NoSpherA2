@@ -2613,17 +2613,17 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -2655,14 +2655,14 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -2766,14 +2766,14 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -2845,14 +2845,14 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -2920,14 +2920,14 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -2995,14 +2995,14 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3070,14 +3070,14 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3145,14 +3145,14 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3220,14 +3220,14 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3299,15 +3299,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3384,15 +3384,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3469,15 +3469,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3624,15 +3624,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3709,15 +3709,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3794,15 +3794,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3879,15 +3879,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3964,15 +3964,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4049,15 +4049,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4134,15 +4134,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4219,15 +4219,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4304,15 +4304,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4389,15 +4389,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4474,15 +4474,15 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4559,16 +4559,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4646,16 +4646,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4733,16 +4733,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4901,16 +4901,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>true</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -4986,16 +4986,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>true</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -5071,16 +5071,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>true</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -5156,16 +5156,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>true</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -5201,16 +5201,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>true</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -5326,15 +5326,15 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>true</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -5409,16 +5409,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>true</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -5494,16 +5494,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>true</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -5579,17 +5579,17 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>true</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -5667,16 +5667,16 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -5750,15 +5750,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -5788,15 +5788,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PreBuildEvent>
@@ -5961,15 +5961,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6038,15 +6038,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6115,15 +6115,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6192,15 +6192,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6269,15 +6269,15 @@
       <SupportJustMyCode>true</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6346,15 +6346,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6423,15 +6423,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6500,15 +6500,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6577,15 +6577,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6654,15 +6654,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6731,15 +6731,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6808,15 +6808,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6883,17 +6883,17 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <SupportJustMyCode>false</SupportJustMyCode>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -6963,15 +6963,15 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -7024,7 +7024,7 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level2</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -7059,7 +7059,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/occ/lib/tbb12.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -7146,21 +7146,21 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <IntelJCCErratum>true</IntelJCCErratum>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>false</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -7237,14 +7237,14 @@
       </OpenMPSupport>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -7252,7 +7252,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PostBuildEvent>
@@ -7328,15 +7328,15 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -7386,38 +7386,50 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_OH_rad|x64'">
     <Link>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
     </Link>
     <ClCompile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdclatest</LanguageStandard_C>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_OH_rad_tonto|x64'">
     <Link>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
     </Link>
     <ClCompile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdclatest</LanguageStandard_C>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_OpShell_tonto|x64'">
     <Link>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
     </Link>
     <ClCompile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdclatest</LanguageStandard_C>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_radical_tonto|x64'">
     <Link>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
     </Link>
     <ClCompile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include</AdditionalIncludeDirectories>
-      <AdditionalOptions>-openmp:experimental </AdditionalOptions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
+      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdclatest</LanguageStandard_C>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

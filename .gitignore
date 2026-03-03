@@ -115,3 +115,5 @@ Lib\LibCint\include\cint_config.h
 Lib\LibCint\include\cint_funcs.h
 *.gch
 pch.h.gch/
+/build-windows-clang-cl
+/Lib/occ
