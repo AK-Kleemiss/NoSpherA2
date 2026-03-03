@@ -91,6 +91,12 @@ jobs:
       with:
         platform: ${{ matrix.name }}
 
+    - name: Apply Patches
+      run: |
+        cd featomic
+        git apply ../patches/featomic.patch
+        cd -
+
     - name: Build Dependencies
       uses: ./.github/actions/build-deps
       with:
