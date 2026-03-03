@@ -11,6 +11,7 @@ runs:
     - name: Run sccache-cache
       uses: hendrikmuhs/ccache-action@v1.2.20
       with:
+        key: ${{ inputs.platform }}-sccache }}
         max-size: "1GB"
         variant: "sccache"
 
