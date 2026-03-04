@@ -190,7 +190,8 @@ namespace constants
     constexpr std::optional<std::size_t> orca_2_pySCF(unsigned int l, int m_idx) {
         switch (l) {
         case 0: { constexpr std::array<std::size_t, 1>  map = { 0 }; return map[m_idx]; }
-        case 1: { constexpr std::array<std::size_t, 3>  map = { 2,0,1 }; return map[m_idx]; }
+        //case 1: { constexpr std::array<std::size_t, 3>  map = { 2,0,1 }; return map[m_idx]; }  //For LibCint without -DPYPZPX="ON"
+        case 1: { constexpr std::array<std::size_t, 3>  map = { 1,2,0 }; return map[m_idx]; }
         case 2: { constexpr std::array<std::size_t, 5>  map = { 2,3,1,4,0 }; return map[m_idx]; }
         case 3: { constexpr std::array<std::size_t, 7>  map = { 3,4,2,5,1,6,0 }; return map[m_idx]; }
         case 4: { constexpr std::array<std::size_t, 9>  map = { 4,5,3,6,2,7,1,8,0 }; return map[m_idx]; }

@@ -1,6 +1,6 @@
 RM := rm
 
-ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS ri_fit fourier_transform reading_SALTED SALTED alanine_occ TFVC_ECP TFVC
+ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS ri_fit fourier_transform reading_SALTED SALTED alanine_occ TFVC_ECP TFVC alanine_integrated_occ
 
 # Convert the path to an OS-specific format if necessary
 # For Unix-like systems, this will be a no-op
@@ -31,7 +31,7 @@ else
   define TIME_START
     start_time=$$(date +%s.%N)
   endef
-  
+
   define TIME_END
     end_time=$$(date +%s.%N); \
     elapsed=$$(echo "$$end_time - $$start_time" | bc); \
@@ -64,6 +64,15 @@ alanine_occ:
 		-cif alanine.cif \
 		-dmin 0.5 \
 		-wfn alanine.owf.fchk \
+		-acc 1 \
+		-no-date)
+
+
+alanine_integrated_occ:
+	$(call RUN_TEST,$@,alanine_integrated_occ, \
+		-cif alanine.cif \
+		-dmin 0.5 \
+		-occ alanine.toml \
 		-acc 1 \
 		-no-date)
 

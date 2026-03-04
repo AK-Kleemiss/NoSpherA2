@@ -1255,7 +1255,7 @@ double cube::jaccard(const cube& right) const {
 };
 
 auto fast_clamp = [](int v, int lo, int hi) {
-    //assume lo <= hi 
+    //assume lo <= hi
     if (v < lo) return lo;
     if (v > hi) return hi;
     return v;

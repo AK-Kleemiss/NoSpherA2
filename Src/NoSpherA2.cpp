@@ -8,12 +8,20 @@
 #include "properties.h"
 #include "isosurface.h"
 #include "cif.h"
+#include "debug_utils.h"
 #include "bondwise_analysis.h"
+extern "C" {
+#include "cint_funcs.h"
+}
 
 int QCT(options& opt, std::vector<WFN>& wavy);
 
+
 int main(int argc, char** argv)
 {
+#ifdef __INSECURELY_AWAIT_FOR_ENV
+    wait_for_debugger(); // This is for debugging during tests. It just returns if the env variable DEBUG_WAIT is not set.
+#endif
     using namespace std;
     char cwd[1024];
 #ifdef _WIN32
@@ -375,13 +383,33 @@ int main(int argc, char** argv)
         return 0;
     }
     // This one has conversion to fchk and calculation of one single tsc file
-    if (opt.wfn != "" && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
+    if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
     {
+      if (opt.occ != "") {
+        log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
+        if (opt.occ.ends_with(".toml")) {
+          auto config = occ::io::read_occ_input_file(opt.occ);
+          occ::log::set_log_file("NoSpherA2_OCC.log");
+          occ::parallel::set_num_threads(config.runtime.threads);
+          auto wfn = occ::main::run_scf_external(config, true);
+          auto wfn_from_occ = WFN(wfn);
+          wavy.emplace_back(wfn_from_occ);
+        } else {
+          occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);
+          auto wfn_from_occ = WFN(wfn, true);
+          wavy.emplace_back(wfn_from_occ);
+        }
+
+        wavy[0].set_method(opt.method);
+        wavy[0].set_multi(opt.mult);
+        wavy[0].set_charge(opt.charge);
+      } else {
         log_file << "Reading: " << setw(44) << opt.wfn << flush;
         wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
         wavy[0].set_method(opt.method);
         wavy[0].set_multi(opt.mult);
         wavy[0].set_charge(opt.charge);
+      }
         if (opt.debug)
             log_file << "method/mult/charge: " << opt.method << " " << opt.mult << " " << opt.charge << endl;
 

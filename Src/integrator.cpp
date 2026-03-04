@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "integrator.h"
 #include "libCintMain.h"
+#undef I // I had to include complex.h, so I have to undefine I for it to work in Linux.
 #include "JKFit.h"
 #include "nos_math.h"
 #include "GridManager.h"
@@ -160,7 +161,7 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
     //    std::cout << std::fixed << std::setprecision(6) << rho[i] << ", ";
     //}
     //std::cout << "\n";
-    rho = reorder_p(rho, wavy_aux);
+    //rho = reorder_p(rho, wavy_aux);
 
 
 

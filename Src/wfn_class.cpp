@@ -7,10 +7,19 @@
 #include "fchk.h"
 #include "basis_set.h"
 #include "nos_math.h"
+#include <cmath>
+#include <cstdio>
+#include <numeric>
+#include <ostream>
+#include <ranges>
+#include <vector>
 #include "libCintMain.h"
 #include "JKFit.h"
 
-void WFN::fill_pre()
+#include "occ/OrbitalDefs.h"
+long long int WFN::pre[9][5][5][9] = {};
+long long int WFN::Afac_pre[9][5][9] = {};
+constexpr void WFN::fill_pre()
 {
     for (int j = 0; j < 9; j++)
         for (int l = 0; l < 5; l++)
@@ -23,7 +32,7 @@ void WFN::fill_pre()
             }
 }
 
-void WFN::fill_Afac_pre()
+constexpr void WFN::fill_Afac_pre()
 {
     for (int l = 0; l < 9; l++)
         for (int r = 0; r <= l / 2; r++)
@@ -118,6 +127,136 @@ WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_
     fill_Afac_pre();
     read_known_wavefunction_format(filename, std::cout, debug);
 };
+
+constexpr unsigned int sum_subshells(unsigned int l, bool cartesian=true) {
+    if (cartesian)
+        return l*(l+1)*(l+2)/6;
+    return l*(2*l+1);
+}
+WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
+{
+    // Only works with restricted WFNs for now
+    using namespace Eigen;
+    using occ::gto::num_subshells;
+    origin = e_origin::NOT_YET_DEFINED;
+    // total_energy = occ_WF.energy.total;
+    // virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
+    basis_set_name = occ_WF.basis.name();
+    has_ECPs = occ_WF.basis.have_ecps();
+    charge = occ_WF.charge();
+    ncen = occ_WF.atoms.size();
+    atoms.resize(ncen);
+    const occ::Mat3N atom_positions = occ_WF.positions();
+    for (long i = 0; i < ncen; i++) {
+        atoms[i].set_label(constants::atnr2letter(occ_WF.atoms[i].atomic_number));
+        atoms[i].set_charge(static_cast<int>(occ_WF.nuclear_charges()(i)));
+        atoms[i].set_coordinate(0, atom_positions(0, i));
+        atoms[i].set_coordinate(1, atom_positions(1, i));
+        atoms[i].set_coordinate(2, atom_positions(2, i));
+    }
+    auto &shells = occ_WF.basis.shells();
+
+    auto &mo = occ_WF.mo;
+    if (mo.kind!=occ::qm::Restricted) throw std::runtime_error("This constructor only supports Restricted for now.");
+    auto shell2atom  = occ_WF.basis.shell_to_atom();
+    vec con_coefs;
+    VectorXd shellType(shells.size()+1);
+    nex = 0;
+    for (const auto shell : shells)
+    {
+        int l = shell.l;
+        int n_cart = (l+1)*(l+2)/2;
+        nex += n_cart * shell.exponents.size();
+    }
+    auto mo_go = occ::io::conversion::orb::to_gaussian_order(occ_WF.basis, occ_WF.mo);
+    Vector<int, 10> d_orbital_corr {0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
+    auto atom2shell = occ_WF.basis.atom_to_shell();
+
+    unsigned int nprim;
+    unsigned int n_cart;
+    unsigned int sum_ncart;
+    int atom;
+    int l;
+    for (int i=0; i<shells.size(); i++)
+    {
+        const auto& shell = shells[i];
+        l = shell.l;
+        shellType(i) = l;
+        nprim = shell.num_primitives();
+        n_cart = num_subshells(true, l);
+        sum_ncart = sum_subshells(l);
+        occ::Vec occ_exp = shell.exponents.replicate(n_cart, 1);
+        insert_into_exponents(occ_vec_span(occ_exp));
+        atom = shell2atom[i];
+        // insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
+        auto repeated = std::views::iota(0u, n_cart*nprim) | std::views::transform([&](auto) { return atom+1; });
+        insert_into_centers(repeated);
+
+        VectorXi typesVec = ArrayXi::LinSpaced(n_cart, sum_ncart + 1, sum_ncart + n_cart)
+                        .matrix().transpose().replicate(nprim, 1).reshaped();
+        insert_into_types(typesVec);
+        // if (l==3) {
+        //     Vector<int, 10> reordered = typesVec(d_orbital_corr);
+        //     insert_into_types(typesVec);
+        // }
+        // else
+        //     insert_into_types(typesVec);
+    }
+
+    // This could also be calculated in the loop above and I tried it, but I noticed when looking at the data that
+    // a vector was inserted into coefficients for each MO. I think that probably that would result in more work for the
+    // CPU due to cache misses, but I didn't benchmark it.
+    unsigned int chunk_size;
+    unsigned int n_sph;
+    unsigned int n_prim;
+    double occ;
+    double* coeffs_ptr;
+    unsigned int basis_offset;
+    unsigned int write_cursor;
+    double p;
+    double scalar;
+
+    // confac = pow(8 * pow(exp[exp_run], 3) / constants::PI3, 0.25);
+    for (int n=0; n<occ_WF.nbf; ++n)
+    {
+        basis_offset = 0;
+        write_cursor = 0;
+        occ = n < occ_WF.n_alpha() ? 2 : 0;
+        push_back_MO(n+1, occ, mo.energies[n]);
+        MOs[n].assign_coefficients_size(nex);
+        coeffs_ptr = MOs[n].get_coefficient_ptr();
+        for (const auto & shell : shells){
+            l = shell.l;
+            p = (2.0*l+3.0)/4.0;
+            scalar = std::pow(2.0, 0.5 * l)/std::pow(constants::PI3, 0.25);
+            const auto& A = MappedMatrices[l];
+            n_sph = A.cols();
+            n_prim = shell.num_primitives();
+            n_cart = A.rows();
+            chunk_size = n_cart * n_prim;
+            const auto& exp_arr = shell.exponents.array();
+            // volatile int coeffsize = MOs[n].get_coefficients().size();
+            // normalizing the contraction_coeffs
+            ArrayXd CC = shell.u_coefficients.array();
+            if (!from_file)
+                CC = VectorXd::NullaryExpr(CC.size(), [shell](const Index i){
+                    return shell.coeff_normalized(0, i);
+                });
+            // return contraction_coefficients(coeff_idx, contr_idx) /
+                 // gto_norm(static_cast<int>(l), exponents(coeff_idx));
+            const VectorXd& contraction_coeffs = scalar*(2*exp_arr).pow(p)*CC;
+            const auto& MOc = mo_go.C.block(basis_offset, n, n_sph, 1);
+            Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);
+            // Map<const VectorXd> contraction(contraction_coeffs.data(), n_prim);
+            // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
+            dest_block = contraction_coeffs*(A * MOc).transpose();
+
+            write_cursor += chunk_size;
+            basis_offset += n_sph;
+        }
+    }
+    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+}
 
 bool WFN::push_back_atom(const std::string& label, const double& x, const double& y, const double& z, const int& _charge, const std::string& ID)
 {
@@ -6488,7 +6627,6 @@ bool WFN::read_fchk(const std::filesystem::path& filename, std::ostream& log, co
         {
             //to-do: Have to calcualte confac for higher l
         }
-
     }
     vec2 p_pure_2_cart;
     vec2 d_pure_2_cart;
@@ -8373,39 +8511,39 @@ bool WFN::read_ptb(const std::filesystem::path& filename, std::ostream& file, co
     vec Pmat((size_t)nmomax * (size_t)(nmomax + 1) / 2);
     err_checkf(read_block_from_fortran_binary(inFile, Pmat.data()), "Error reading density matrix!", std::cout);
 
-    //  Add Basis set information to atoms
-    //  This is a cartesian basis
-    //  Exp and Contr are given in therms of the correponding functions, thus for p-type basis functions, we get 3-times the same block
-    //  lao tells us what type of function we got (s,p,d...)  (s = 1, p = 2-4, d = 5-10, f = 11-20, g = 21-35)
-    //  aoatcart is the corresponding atom which we have to assign everything to
-    //  ipao tells us the shells for every basis function
-        //int shell = 0;
-        //for (int prim = 0; prim < nprims;) {
-        //    int function_type = 1;
-        //    if (lao[prim] == 1) function_type = 1;
-        //    else if (lao[prim] >= 2 && lao[prim] <= 4) function_type = 2;
-        //    else if (lao[prim] >= 5 && lao[prim] <= 10) function_type = 3;
-        //    else if (lao[prim] >= 11 && lao[prim] <= 20) function_type = 4;
-        //    else if (lao[prim] >= 21 && lao[prim] <= 35) function_type = 5;
-        //    else err_checkf(true, "Error interpreting basis function type in ptb file!", file);
-        //    const int n_prim_type = (function_type * (function_type + 1)) / 2;  //Number of cartesian functions per type
-        //    int prims_in_this_shell = 1;
-        //    while (ipao[prim] == ipao[prim + 1]) {
-        //        atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell);
-        //        prim++;
-        //        prims_in_this_shell++;
-        //    }
-        //    atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell); // One extra time to catch the last one
-        //    prim++;
-        //    shell++;
-        //    if (function_type != 1) { //Skip all the repetition
-        //        prim += prims_in_this_shell * (n_prim_type-1);
-        //    }
-        //    if (aoatcart[prim - 1] != aoatcart[prim]) { // Reste the shellcounter, if at the 
-        //        shell = 0;
-        //    }
-        //    
-        //}
+//  Add Basis set information to atoms
+//  This is a cartesian basis
+//  Exp and Contr are given in therms of the correponding functions, thus for p-type basis functions, we get 3-times the same block
+//  lao tells us what type of function we got (s,p,d...)  (s = 1, p = 2-4, d = 5-10, f = 11-20, g = 21-35)
+//  aoatcart is the corresponding atom which we have to assign everything to
+//  ipao tells us the shells for every basis function
+    //int shell = 0;
+    //for (int prim = 0; prim < nprims;) {
+    //    int function_type = 1;
+    //    if (lao[prim] == 1) function_type = 1;
+    //    else if (lao[prim] >= 2 && lao[prim] <= 4) function_type = 2;
+    //    else if (lao[prim] >= 5 && lao[prim] <= 10) function_type = 3;
+    //    else if (lao[prim] >= 11 && lao[prim] <= 20) function_type = 4;
+    //    else if (lao[prim] >= 21 && lao[prim] <= 35) function_type = 5;
+    //    else err_checkf(true, "Error interpreting basis function type in ptb file!", file);
+    //    const int n_prim_type = (function_type * (function_type + 1)) / 2;  //Number of cartesian functions per type
+    //    int prims_in_this_shell = 1;
+    //    while (ipao[prim] == ipao[prim + 1]) {
+    //        atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell);
+    //        prim++;
+    //        prims_in_this_shell++;
+    //    }
+    //    atoms[aoatcart[prim] - 1].push_back_basis_set(exps[prim], contr[prim], function_type, shell); // One extra time to catch the last one
+    //    prim++;
+    //    shell++;
+    //    if (function_type != 1) { //Skip all the repetition
+    //        prim += prims_in_this_shell * (n_prim_type-1);
+    //    }
+    //    if (aoatcart[prim - 1] != aoatcart[prim]) { // Reste the shellcounter, if at the
+    //        shell = 0;
+    //    }
+    //
+    //}
 
     std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set("ptb-vdzp");
     set_basis_set_ptr(aux_basis->get_data());

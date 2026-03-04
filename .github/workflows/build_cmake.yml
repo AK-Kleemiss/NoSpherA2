@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+      uses: step-security/harden-runner@a90bcbc6539c36a85cdfeb73f7e2f433735f215b # v2.15.0
       with:
         egress-policy: audit
 
@@ -22,7 +22,7 @@ jobs:
 
     # Cache IntelMKL
     - name: Cache IntelMKL Build
-      uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       id: cache-intelmkl-linux
       with:
         path: Lib/MKL
@@ -37,7 +37,7 @@ jobs:
           sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=/home/runner/work/NoSpherA2/NoSpherA2/Lib/MKL --eula accept
 
     - name: Cache featomic Build
-      uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       id: cache-featomic-linux
       with:
         path: build/_deps  # Adjust if featomic installs elsewhere
@@ -113,7 +113,7 @@ jobs:
         cmake --build . --config Release --parallel 
 
     - name: Upload Universal Binary
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
         name: windowsExec
         path: |

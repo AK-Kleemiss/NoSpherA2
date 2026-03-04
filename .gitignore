@@ -116,3 +116,7 @@ Lib\LibCint\include\cint_funcs.h
 nul
 pch.h.gch_d
 intel-onemkl*.sh*
+*.gch
+pch.h.gch/
+/build-windows-clang-cl
+/Lib/occ

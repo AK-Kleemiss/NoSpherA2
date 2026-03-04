@@ -652,6 +652,8 @@ struct options
     std::filesystem::path gaussian_path;
     std::filesystem::path turbomole_path;
     std::filesystem::path basis_set_path;
+    std::string occ;
+    std::filesystem::path occ_toml_path;
     std::filesystem::path cwd;
     properties_options properties;
     bool debug = false;

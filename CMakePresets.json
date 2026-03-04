@@ -1,0 +1,275 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base-options",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "cacheVariables": {
+        "WITH_CLANG_TIDY": "OFF",
+        "WITH_OCC": "ON",
+        "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ENV_PATH": "${sourceDir}/mambaenv",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ",
+        "USE_SYSTEM_LIBCINT": "ON",
+        "ONLY_OCC": "ON"
+      }
+    },
+    {
+      "name": "only-occ-options",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "cacheVariables": {
+        "WITH_CLANG_TIDY": "OFF",
+        "WITH_OCC": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ENV_PATH": "${sourceDir}/mambaenv",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ",
+        "CMAKE_C_COMPILER_LAUNCHER": "sccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "sccache",
+        "USE_SYSTEM_LIBCINT": "ON",
+        "ONLY_OCC": "ON"
+      }
+    },
+    {
+      "name": "windows-clang-cl",
+      "displayName": "Windows Clang-CL (sccache)",
+      "description": "Release build for Windows using clang-cl and lld-link",
+      "inherits": "only-occ-options",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "clang-cl.exe",
+        "CMAKE_CXX_COMPILER": "clang-cl.exe",
+        "CMAKE_C_COMPILER_LAUNCHER": "sccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "sccache",
+        "CMAKE_LINKER": "lld-link.exe",
+        "CMAKE_EXE_LINKER_FLAGS": "runtimeobject.lib",
+        "CMAKE_SHARED_LINKER_FLAGS": "runtimeobject.lib",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded",
+        "BUILD_SHARED_LIBS": "OFF",
+        "TBB_BUILD_SHARED": "OFF",
+        "GG_NO_PRAGMA": "ON",
+        "CPACK_SYSTEM_NAME": "windows",
+        "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MT",
+        "CMAKE_C_FLAGS": "/EHsc /MT"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "environment": {
+        "CXXFLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MT",
+        "CFLAGS": "/EHsc /MT"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      }
+    },
+    {
+      "name": "linux-gcc",
+      "displayName": "linux-gcc (ccache)",
+      "description": "Release build for Linux using GCC and ccache",
+      "inherits": "base-options",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF",
+        "TBB_BUILD_SHARED": "OFF",
+        "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store",
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+      }
+    },
+    {
+      "name": "linux-occ-gcc",
+      "displayName": "linux-occ-gcc (Only Build OCC)",
+      "description": "Release build of OCC for Linux using GCC and ccache",
+      "inherits": "only-occ-options",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF",
+        "TBB_BUILD_SHARED": "OFF",
+        "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store"
+      }
+    },
+    {
+      "name": "macos-base",
+      "hidden": true,
+      "inherits": "only-occ-options",
+      "cacheVariables": {
+        "OpenMP_ROOT": "$env{HOMEBREW_PREFIX}/opt/libomp"
+      }
+
+    },
+    {
+      "name": "macos-debug",
+      "inherits": "macos-base",
+      "displayName": "macOS Debug (Clang)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "macos-release",
+      "inherits": "macos-base",
+      "displayName": "macOS release (Clang)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "macos-release-x86_64",
+      "inherits": "macos-release",
+      "displayName": "macOS release (Clang, x86_64)",
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "x86_64",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_x86_64"
+      }
+    },
+    {
+        "name": "macos-release-arm64",
+        "inherits": "macos-release",
+        "displayName": "macOS release (Clang, arm64)",
+        "cacheVariables": {
+            "CMAKE_OSX_ARCHITECTURES": "arm64",
+          "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_arm64"
+        }
+    },
+    {
+      "name": "Debug",
+      "inherits": "base-options",
+      "displayName": "Debug (GCC/ccache)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "Release",
+      "inherits": "base-options",
+      "displayName": "Release (GCC)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "macos-release-arm64",
+      "configurePreset": "macos-release-arm64",
+      "targets": "occ"
+    },
+    {
+      "name": "macos-release-x86_64",
+      "configurePreset": "macos-release-x86_64",
+      "targets": "occ"
+    },
+    {
+      "name": "macos-debug",
+      "configurePreset": "macos-debug"
+    },
+    {
+      "name": "windows-clang-cl",
+      "configurePreset": "windows-clang-cl",
+      "targets": "occ"
+    },
+    {
+      "name": "linux-gcc",
+      "configurePreset": "linux-gcc"
+    },
+    {
+      "name": "linux-occ-gcc",
+      "configurePreset": "linux-occ-gcc",
+      "targets": "occ"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-release",
+      "description": "Run all NoSpherA2 tests on macOS",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": false
+      },
+      "environment": {
+        "OCC_DATA_PATH": "${sourceDir}/occ/share"
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "windows-clang-cl",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "windows-clang-cl"
+        },
+        {
+          "type": "build",
+          "name": "windows-clang-cl"
+        }
+      ]
+    },
+    {
+      "name": "linux-gcc",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "linux-gcc"
+        },
+        {
+          "type": "build",
+          "name": "linux-gcc"
+        }
+      ]
+    },
+    {
+      "name": "linux-occ-gcc",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "linux-occ-gcc"
+        },
+        {
+          "type": "build",
+          "name": "linux-occ-gcc"
+        }
+      ]
+    },
+    {
+      "name": "macos-release-arm64",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "macos-release-arm64"
+        },
+        {
+          "type": "build",
+          "name": "macos-release-arm64"
+        }
+      ]
+    },
+    {
+      "name": "macos-release-x86_64",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "macos-release-x86_64"
+        },
+        {
+          "type": "build",
+          "name": "macos-release-x86_64"
+        }
+      ]
+    }
+  ]
+}
+
+
