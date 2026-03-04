@@ -27,7 +27,7 @@ Int_Params::Int_Params(const Int_Params &first, const Int_Params &second)
     atoms.clear();
     atoms.shrink_to_fit();
     basis_sets.clear();
-    
+
     _atm.resize(first._atm.size() + second._atm.size(), 0);
     _bas.resize(first._bas.size() + second._bas.size(), 0);
     _env.resize(first._env.size() + second._env.size(), 0);
@@ -339,3 +339,15 @@ void Int_Params::print_data(std::string name) {
     file.close();
 }
 
+double NOS_CINTcommon_fac_sp(int l)
+{
+    switch (l)
+    {
+    case 0:
+        return 0.282094791773878143;
+    case 1:
+        return 0.488602511902919921;
+    default:
+        return 1;
+    }
+}

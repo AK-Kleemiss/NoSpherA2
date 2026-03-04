@@ -1,3 +1,4 @@
+#include "cube.h"
 #include "pch.h"
 #include "convenience.h"
 #include "fchk.h"

@@ -1,3 +1,6 @@
+#ifndef NOSPHERA2_PCH_H
+#define NOSPHERA2_PCH_H
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -12,7 +15,12 @@
 #include <iomanip>
 #include <iostream>
 #include <numeric>
-
+#include <occ/main/occ_scf.h>
+#include <occ/gto/gto.h>
+#include <occ/core/parallel.h>
+#include <occ/io/conversion.h>
+#include <occ/io/occ_input.h>
+#include <occ/qm/wavefunction.h>
 #if defined(__APPLE__)
 // On macOS we are using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>
@@ -77,3 +85,6 @@
 #include <termios.h>
 #include <cstring>
 #endif
+
+#endif // NOSPHERA2_PCH_H
+

@@ -1255,7 +1255,7 @@ double cube::jaccard(const cube& right) const {
 };
 
 auto fast_clamp = [](int v, int lo, int hi) {
-    //assume lo <= hi 
+    //assume lo <= hi
     if (v < lo) return lo;
     if (v > hi) return hi;
     return v;
@@ -1371,12 +1371,12 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
 #pragma omp parallel for reduction(+:count_computed) schedule(dynamic)
         for (int i = 0; i < new_size[0]; ++i) {
             const double old_i = double(i) / fac;
-            int i0 = static_cast<int>(old_i); 
-            if (size[0] > 1) { 
-                i0 = fast_clamp(i0, 0, size[0] - 2); 
+            int i0 = static_cast<int>(old_i);
+            if (size[0] > 1) {
+                i0 = fast_clamp(i0, 0, size[0] - 2);
             }
-            else { 
-                i0 = 0; 
+            else {
+                i0 = 0;
             }
             //const int i0 = size[0] > 1 ? std::clamp((int)std::floor(old_i), 0, size[0] - 2) : 0;
             for (int j = 0; j < new_size[1]; ++j) {

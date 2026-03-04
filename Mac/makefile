@@ -10,16 +10,17 @@ ARCHS := arm64 x86_64
 
 # Source & include roots
 SRC_DIR := ../Src
-INC_DIRS := ../Src ../Lib ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint_arm64/include ../Lib/LibCint_x86_64/include
+INC_DIRS := ../Src ../Lib ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint_arm64/include ../Lib/LibCint_x86_64/include ../Lib/occ_x86_64/include ../Lib/occ_arm64/include
+LIB_OCC := ../Lib/occ/lib/libocc.a
 
 # Local static libs (adjust as needed)
 EXTRA_LIBS_ARM := ../Lib/featomic_install_arm64/lib/libfeatomic.a \
-			  ../Lib/featomic_install_arm64/lib/libmetatensor.a \
-			  ../Lib/LibCint_arm64/lib/libcint.a
+     ../Lib/featomic_install_arm64/lib/libmetatensor.a \
+     ../Lib/LibCint_arm64/lib/libcint.a ../Lib/occ_arm64/lib/libocc.a
 
 EXTRA_LIBS_x86 := ../Lib/featomic_install_x86_64/lib/libfeatomic.a \
-				../Lib/featomic_install_x86_64/lib/libmetatensor.a \
-				../Lib/LibCint_x86_64/lib/libcint.a
+    ../Lib/featomic_install_x86_64/lib/libmetatensor.a \
+    ../Lib/LibCint_x86_64/lib/libcint.a ../Lib/occ_x86_64/lib/libocc.a
 
 # Sources - automatically discover all .cpp files in SRC_DIR
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
@@ -38,6 +39,7 @@ OBJS_x86_64 := $(patsubst $(SRC_DIR)/%.cpp, build/x86_64/%.o, $(SRCS))
 CXXSTD    := -std=c++20 -DACCELERATE_NEW_LAPACK
 OPTFLAGS  := -O3 -fvisibility=hidden
 WARNFLAGS := -fmessage-length=0
+DEPFLAGS  := -MMD -MP
 INCLUDES  := $(addprefix -I,$(INC_DIRS))
 
 # macOS SDK and deployment target
@@ -60,12 +62,20 @@ OMPLIBS_arm64   := -L$(LIBOMP_PREFIX_arm64)/lib   -Wl,-rpath,$(LIBOMP_PREFIX_arm
 OMPLIBS_x86_64  := -L$(LIBOMP_PREFIX_x86_64)/lib  -Wl,-rpath,$(LIBOMP_PREFIX_x86_64)/lib  -lomp
 
 # Common flags
-CXXFLAGS_COMMON := $(CXXSTD) $(OPTFLAGS) $(WARNFLAGS) $(INCLUDES) $(SYSROOT) $(DEPLOYMENT_TARGET)
+CXXFLAGS_COMMON := $(CXXSTD) $(OPTFLAGS) $(WARNFLAGS) $(DEPFLAGS) $(INCLUDES) $(SYSROOT) $(DEPLOYMENT_TARGET)
 LDFLAGS_COMMON  := $(SYSROOT) $(DEPLOYMENT_TARGET) -framework Accelerate
 
-# Per-arch final flags
-CXXFLAGS_arm64  := $(CXXFLAGS_COMMON)  -arch arm64  $(OMPFLAGS_arm64)
-CXXFLAGS_x86_64 := $(CXXFLAGS_COMMON)  -arch x86_64 $(OMPFLAGS_x86_64)
+# ---- Precompiled headers ----
+# Clang uses -include-pch to explicitly load a precompiled header.
+PCH_arm64  := build/arm64/pch.h.pch
+PCH_x86_64 := build/x86_64/pch.h.pch
+
+# Per-arch final flags (PCH flags added after PCH is built, referenced in pattern rules)
+CXXFLAGS_arm64  := $(CXXFLAGS_COMMON)  -arch arm64  $(OMPFLAGS_arm64)  -include-pch $(PCH_arm64)
+CXXFLAGS_x86_64 := $(CXXFLAGS_COMMON)  -arch x86_64 $(OMPFLAGS_x86_64) -include-pch $(PCH_x86_64)
+# Flags without PCH for compiling the PCH itself
+CXXFLAGS_arm64_NO_PCH  := $(CXXFLAGS_COMMON)  -arch arm64  $(OMPFLAGS_arm64)
+CXXFLAGS_x86_64_NO_PCH := $(CXXFLAGS_COMMON)  -arch x86_64 $(OMPFLAGS_x86_64)
 LDFLAGS_arm64   := $(LDFLAGS_COMMON)   -arch arm64  $(OMPLIBS_arm64)
 LDFLAGS_x86_64  := $(LDFLAGS_COMMON)   -arch x86_64 $(OMPLIBS_x86_64)
 
@@ -96,32 +106,42 @@ NoSpherA2_x86_64: $(OBJS_x86_64)
 	@echo "Link (x86_64)…"
 	@$(COMP) $^ $(EXTRA_LIBS_x86) $(LDFLAGS_x86_64) -o $@
 
+# ---- Precompiled header build rules ----
+$(PCH_arm64): $(SRC_DIR)/pch.h | build/arm64
+	@echo "Building precompiled header (arm64)..."
+	@$(COMP) $(CXXFLAGS_arm64_NO_PCH) -x c++-header -o "$@" "$<"
+
+$(PCH_x86_64): $(SRC_DIR)/pch.h | build/x86_64
+	@echo "Building precompiled header (x86_64)..."
+	@$(COMP) $(CXXFLAGS_x86_64_NO_PCH) -x c++-header -o "$@" "$<"
+
 # Architecture-specific basis set converter
-basis_set_converter:
+build/BasisSetConverter: makefile_basis_set_converter | build/arm64 build/x86_64
 	@echo "Building basis set converter for current architecture: $(shell uname -m)"
 	@$(MAKE) -f makefile_basis_set_converter $(shell uname -m)
+	@touch build/BasisSetConverter
 
-# Generate auxiliary_basis.cpp when needed
-$(SRC_DIR)/auxiliary_basis.cpp: basis_set_converter
+# Actually run the converter to generate the file
+$(SRC_DIR)/auxiliary_basis.cpp: build/BasisSetConverter
+	@echo "Running BasisSetConverter..."
+	@./../BasisSetConverter ../Src/basis_set_helper ../Src
 	@echo "auxiliary_basis.cpp generated"
 
-# Special rule for auxiliary_basis.o - fix the source file reference
 build/arm64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/arm64
-	@echo "Compiling auxiliary_basis.o (arm64) after BasisSetConverter finishes"
-	@$(COMP) $(CXXFLAGS_arm64) -c $< -o $@
-	@echo "Finished building: auxiliary_basis.cpp (arm64)"
+	@echo "Compiling auxiliary_basis.o (arm64)"
+	@$(COMP) $(CXXFLAGS_arm64_NO_PCH) -O0 -c $< -o $@
 
 build/x86_64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/x86_64
-	@echo "Compiling auxiliary_basis.o (x86_64) after BasisSetConverter finishes"
-	@$(COMP) $(CXXFLAGS_x86_64) -c $< -o $@
-	@echo "Finished building: auxiliary_basis.cpp (x86_64)"
+	@echo "Compiling auxiliary_basis.o (x86_64)"
+	@$(COMP) $(CXXFLAGS_x86_64_NO_PCH) -O0 -c $< -o $@
+
 
 # Pattern rules
-build/arm64/%.o: $(SRC_DIR)/%.cpp | build/arm64
+build/arm64/%.o: $(SRC_DIR)/%.cpp $(PCH_arm64) | build/arm64
 	@echo "Compiling (arm64): $<"
 	@$(COMP) $(CXXFLAGS_arm64) -c $< -o $@
 
-build/x86_64/%.o: $(SRC_DIR)/%.cpp | build/x86_64
+build/x86_64/%.o: $(SRC_DIR)/%.cpp $(PCH_x86_64) | build/x86_64
 	@echo "Compiling (x86_64): $<"
 	@$(COMP) $(CXXFLAGS_x86_64) -c $< -o $@
 
@@ -129,12 +149,16 @@ build/arm64  build/x86_64:
 	@mkdir -p $@
 
 # Debug variant
-debug: CXXFLAGS_COMMON := -std=c++20 -O0 -g $(WARNFLAGS) $(INCLUDES) $(SYSROOT) $(DEPLOYMENT_TARGET)
-debug: LDFLAGS_COMMON  := $(SYSROOT) $(DEPLOYMENT_TARGET) -framework Accelerate
+debug: OPTFLAGS := -O0 -g
 debug: clean NoSpherA2_arm64
 
 clean:
 	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2 BasisSetConverter
+	-@$(MAKE) -f makefile_basis_set_converter clean
 	@echo "Cleaned."
 
-.PHONY: all clean debug basis_set_converter NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64
+.PHONY: all clean debug NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64
+
+# Include generated dependency files for correct incremental rebuilds
+-include $(wildcard build/arm64/*.d) $(wildcard build/x86_64/*.d)
+
