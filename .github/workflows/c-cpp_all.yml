@@ -114,7 +114,7 @@ jobs:
         install_name_tool -change "$LIBOMP" "@executable_path/libomp.dylib" "$BINARY"
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
         name: ${{ matrix.artifact-name }}
         path: ${{ matrix.artifact-path }}
@@ -179,7 +179,7 @@ jobs:
         chmod +x ./universal/NoSpherA2_Mac
 
     - name: Upload Universal Binary
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
         name: executable_MacOS_Universal
         path: ./universal/NoSpherA2_Mac
@@ -274,7 +274,7 @@ jobs:
 
     - name: Upload Artifacts
       if: always() && steps.check-failed-logs.outputs.exists == 'true'
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
         name: Failed Tests - ${{ matrix.name }}
         path: ${{github.workspace}}/tests/failed_logs
@@ -307,7 +307,7 @@ jobs:
         name: executable_Windows
 
     - name: Archive all executables
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
         name: executables
         path: |
