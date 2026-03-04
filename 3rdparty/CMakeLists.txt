@@ -18,7 +18,6 @@ else ()
 endif ()
 
 include(CMakePrintHelpers)
-include(${CMAKE_SOURCE_DIR}/cmake/get_all_properties.cmake)
 
 # featomic - from submodule
 set(featomic_SOURCE_DIR ${CMAKE_SOURCE_DIR}/featomic)
