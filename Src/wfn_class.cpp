@@ -8064,7 +8064,7 @@ const double WFN::computeLap(
     int j, k;
     int l[3]{ 0, 0, 0 };
     double ex = 0;
-    double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
+    double xl[9]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     const MO *MOs_data = MOs.data();
     const double **MO_coefs_data = new const double *[_nmo];
@@ -8091,39 +8091,39 @@ const double WFN::computeLap(
             {
             case 0:
             {
-                xl[k][0] = 1.0;
-                xl[k][1] = 0.0;
-                xl[k][2] = 0.0;
+                xl[3*k+0] = 1.0;
+                xl[3*k+1] = 0.0;
+                xl[3*k+2] = 0.0;
                 break;
             }
             case 1:
             {
-                xl[k][0] = d[k];
-                xl[k][1] = 1.0;
-                xl[k][2] = 0.0;
+                xl[3*k+0] = d[k];
+                xl[3*k+1] = 1.0;
+                xl[3*k+2] = 0.0;
                 break;
             }
             case 2:
             {
-                xl[k][0] = d[k] * d[k];
-                xl[k][1] = 2 * d[k];
-                xl[k][2] = 2;
+                xl[3*k+0] = d[k] * d[k];
+                xl[3*k+1] = 2 * d[k];
+                xl[3*k+2] = 2;
                 break;
             }
             case 3:
             {
                 const double d2 = d[k] * d[k];
-                xl[k][0] = d2 * d[k];
-                xl[k][1] = 3 * d2;
-                xl[k][2] = 6 * d[k];
+                xl[3*k+0] = d2 * d[k];
+                xl[3*k+1] = 3 * d2;
+                xl[3*k+2] = 6 * d[k];
                 break;
             }
             case 4:
             {
                 const double d2 = d[k] * d[k];
-                xl[k][0] = d2 * d2;
-                xl[k][1] = 4 * d2 * d[k];
-                xl[k][2] = 12 * d2;
+                xl[3*k+0] = d2 * d2;
+                xl[3*k+1] = 4 * d2 * d[k];
+                xl[3*k+2] = 12 * d2;
                 break;
             }
             default:
@@ -8134,14 +8134,14 @@ const double WFN::computeLap(
             }
         }
         const double ex2 = 2 * exponents[j];
-        chi[0] = xl[0][0] * xl[1][0] * xl[2][0] * ex;
-        chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
-        chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
-        chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
+        chi[0] = xl[0] * xl[3] * xl[6] * ex;
+        chi[1] = (xl[1] - ex2 * pow(d[0], l[0] + 1)) * xl[3] * xl[6] * ex;
+        chi[2] = (xl[4] - ex2 * pow(d[1], l[1] + 1)) * xl[0] * xl[6] * ex;
+        chi[3] = (xl[7] - ex2 * pow(d[2], l[2] + 1)) * xl[0] * xl[3] * ex;
         const double ex4 = ex2 * ex2;
-        chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + ex4 * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
-        chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + ex4 * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
-        chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + ex4 * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
+        chi[4] = (xl[2] - ex2 * (2 * l[0] + 1) * xl[0] + ex4 * pow(d[0], l[0] + 2)) * xl[3] * xl[6] * ex;
+        chi[5] = (xl[5] - ex2 * (2 * l[1] + 1) * xl[3] + ex4 * pow(d[1], l[1] + 2)) * xl[6] * xl[0] * ex;
+        chi[6] = (xl[8] - ex2 * (2 * l[2] + 1) * xl[6] + ex4 * pow(d[2], l[2] + 2)) * xl[0] * xl[3] * ex;
         // use pointer arithmetic and cache coefficient pointer
         // This avoids repeated virtual function calls to get_coefficient_f
         const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
@@ -8152,13 +8152,18 @@ const double WFN::computeLap(
         for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
         {
             const double c = (*mo_coef_ptr)[j];
-            for (k = 0; k < 7; k++)
-                phi_ptr[k] += c * chi[k];
+            phi_ptr[0] += c * chi[0];
+            phi_ptr[1] += c * chi[1];
+            phi_ptr[2] += c * chi[2];
+            phi_ptr[3] += c * chi[3];
+            phi_ptr[4] += c * chi[4];
+            phi_ptr[5] += c * chi[5];
+            phi_ptr[6] += c * chi[6];
         }
 
     }
 
-    free(MO_coefs_data);
+    delete[] MO_coefs_data;
 
     double Hess[3]{ 0, 0, 0 };
 
