@@ -1,0 +1,51 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Calculating WFN from input file:                                           "" done!
+Number of atoms in Wavefunction file: 13 Number of MOs: 228
+Number of protons: 48
+Number of electrons: 48.000000
+Reading:                                "alanine.cif" done!
+Generating hkl indices up to d=:              0.50... done!
+Nr of reflections generated:                 40700
+Number of symmetry operations:                   4
+Nr of reflections to be used:                28738
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 28738
+There are:
+  13 atoms read from the wavefunction, of which 
+  13 are identified as asymmetric unit atoms!
+
+Selected accuracy: 1
+Making Integration Grids...
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 30130 grid points.
+Table of Charges in electrons
+    Atom       Becke   Hirshfeld   TFVC
+        C1    -0.155     0.003     0.441
+        H1     0.119     0.064    -0.049
+        C2    -0.271     0.080     1.950
+        O3    -0.250    -0.385    -1.292
+        O4    -0.232    -0.372    -1.216
+        N5     0.158     0.067    -1.078
+        C6    -0.146    -0.102     0.184
+       H6b     0.060     0.036    -0.091
+       H6a     0.117     0.078     0.015
+       H6c     0.086     0.051    -0.062
+       H5a     0.201     0.180     0.451
+       H5b     0.205     0.192     0.433
+       H5c     0.172     0.171     0.393
+Total number of electrons:
+ Becke:      47.937754
+ Hirshfeld:  47.937700
+ TVFC:       47.922327
+[                Calculating Scattering Factors               ]
+[=============================================================] 100% 
+Writing tsc file...  ... done!

@@ -12,6 +12,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <commdlg.h>
+#include <cderr.h>
 #endif
 
 std::string help_message =
@@ -2093,7 +2095,7 @@ void options::digest_options()
                     aux_basis.push_back(std::make_shared<BasisSet>());
                     break;
                 }
-                err_chkf(BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set]), 
+                err_chkf(BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set]),
                     "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
                 aux_basis.push_back(BasisSetLibrary().get_basis_set(arguments[next_basis_set]));
                 next_basis_set++;
@@ -2336,6 +2338,12 @@ void options::digest_options()
         else if (temp == "-partitioning_test")
         {
             calc_partition_densities();
+        }
+        else if (temp == "-occ")
+        {
+            occ = arguments[i + 1];
+            err_checkf(std::filesystem::exists(occ), "OCC input doesn't exist!",std::cout);
+
         }
         else if (temp == "-lukas_test")
         {
