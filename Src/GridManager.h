@@ -44,10 +44,12 @@ struct GridData {
     enum GridIndex { X = 0, Y = 1, Z = 2, WEIGHT = 3, HIRSH_WEIGHT = 4, BECKE_WEIGHT = 5, TFVC_WEIGHT = 6, WFN_DENSITY = 7, MBIS_WEIGHT = 8, EMBIS_WEIGHT = 9 };
     vec3 atomic_grids;           // [atom][coord_type][point]
     ivec num_points_per_atom;    // Number of points for each atom
+    vec3 helper_grids;           // [atom][coord_type][point] - Used for intermediate calculations (e.g. on grown stuff)
+    ivec helper_num_points_per_atom; // Number of points for each atom in the helper grids
     int total_points = 0;
 
     void clear();
-    void resizeForAtoms(int num_atoms);
+    void resizeForAtoms(int num_atoms, bool helper = false);
 };
 
 struct PartitionResults {
@@ -70,6 +72,7 @@ private:
     double start_dist_ = 1E-7;
     std::vector<std::tuple<std::string, _time_point>> timing_points_;
     bool non_spherical_densities_calculated_ = false;
+    bool needs_helper_grids_ = false;
 
     // Internal helper methods
     void setupPrototypeGrids(const WFN &wave, const ivec &atom_types);
@@ -78,7 +81,7 @@ private:
         const ivec &atom_list);
     void getIntegrationGrid1D(const WFN &wave, const int atom_1, const int atom_2, const int num_points, const double padding);
 
-    void calculateSphericalDensities(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid, vec2 &single_spherical_density, vec2 &combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
+    void calculateSphericalDensities(const WFN &wave, const cell &unit_cell, const ivec &atom_list, vec2 &single_spherical_density, vec2 &combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
     void calculateHirshfeldWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list);
     std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid);
     void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid);
