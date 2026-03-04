@@ -758,6 +758,8 @@ void Calc_Prop(
                         PosGrid,
                         Eli,
                         Lap);
+                else if (!Cubes[cube_type::Elf].get_loaded() && !Cubes[cube_type::Eli].get_loaded() && Cubes[cube_type::Lap].get_loaded() && !Cubes[cube_type::RDG].get_loaded())
+                    Lap = wavy.computeLap(PosGrid);
                 else
                     wavy.computeValues(
                         PosGrid,

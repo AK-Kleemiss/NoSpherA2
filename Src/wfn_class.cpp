@@ -8050,6 +8050,9 @@ const void WFN::computeLapELI(
     Lap = Hess[0] + Hess[1] + Hess[2];
 };
 
+//WTF?! Not having this leads to undefined behaviour on Roky apparently but not Ubuntu/Windows?!
+#pragma GCC push_options
+#pragma GCC optimize ("O3")
 const double WFN::computeLap(
     const d3& PosGrid // [3] vector with current position on te grid
 ) const
@@ -8058,7 +8061,7 @@ const double WFN::computeLap(
     vec phi(7 * _nmo, 0.0);
     double chi[7]{ 0, 0, 0, 0, 0, 0, 0 };
     double d[3]{ 0, 0, 0 };
-    int iat = 0, j, k;
+    int j, k;
     int l[3]{ 0, 0, 0 };
     double ex = 0;
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
@@ -8161,18 +8164,18 @@ const double WFN::computeLap(
 
     for (int mo = 0; mo < _nmo; mo++)
     {
-        const double occ = get_MO_occ(mo);
-        const double docc = 2 * occ;
+        const double occ = 2 * get_MO_occ(mo);
         if (occ != 0)
         {
             const double* phi_temp = &phi[mo * 7];
-            Hess[0] += docc * (*phi_temp * phi_temp[4] + pow(phi_temp[1], 2));
-            Hess[1] += docc * (*phi_temp * phi_temp[5] + pow(phi_temp[2], 2));
-            Hess[2] += docc * (*phi_temp * phi_temp[6] + pow(phi_temp[3], 2));
+            Hess[0] += occ * (*phi_temp * phi_temp[4] + pow(phi_temp[1], 2));
+            Hess[1] += occ * (*phi_temp * phi_temp[5] + pow(phi_temp[2], 2));
+            Hess[2] += occ * (*phi_temp * phi_temp[6] + pow(phi_temp[3], 2));
         }
     }
     return Hess[0] + Hess[1] + Hess[2];
 };
+#pragma GCC pop_options
 
 const double WFN::computeMO(
     const d3& PosGrid, // [3] array with current position on the grid
