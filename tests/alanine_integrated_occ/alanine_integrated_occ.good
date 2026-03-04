@@ -7,17 +7,17 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Calculating WFN from input file:                                           "" done!
+Calculating WFN from input file:                                  alanine.toml done!
 Number of atoms in Wavefunction file: 13 Number of MOs: 228
 Number of protons: 48
 Number of electrons: 48.000000
 Reading:                                "alanine.cif" done!
 Generating hkl indices up to d=:              0.50... done!
-Nr of reflections generated:                 40700
+Nr of reflections generated:                 26400
 Number of symmetry operations:                   4
-Nr of reflections to be used:                28738
+Nr of reflections to be used:                14662
 Generating k-points...                            ... done!
-Number of k-points to evaluate: 28738
+Number of k-points to evaluate: 14662
 There are:
   13 atoms read from the wavefunction, of which 
   13 are identified as asymmetric unit atoms!
