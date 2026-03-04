@@ -14,7 +14,7 @@ runs:
         key: ${{ inputs.platform }}-sccache }}
         max-size: "1GB"
         variant: "sccache"
-
+        evict-old-files: "1d" # Removes files older than 1 day that weren't used in the build
 
     - name: Cache occ
       if: inputs.platform != 'Mac_ARM64' && inputs.platform != 'Mac_x86_64'
