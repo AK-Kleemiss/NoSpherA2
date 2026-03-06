@@ -55,96 +55,6 @@ void BasisSet::operator+=(const BasisSet& other) {
     _primitives = _ownedPrimitives.data();
 }
 
-long double primitve_normalization(const double exp, const int l) {
-    long double numerator = std::pow(2 * (long double) exp / constants::PI, 3.0 / 2.0) * std::pow(4 * (long double) exp, l);
-    long double denominator = ((l == 0) ? 1 : constants::double_ft[2 * l - 1]);
-    return std::sqrt(numerator / denominator);
-}
-
-
-//https://pubs.acs.org/doi/10.1021/acs.jctc.6b01041
-//From https://pyscf.org/_modules/pyscf/df/addons.html
-//void BasisSet::gen_etb_aux(const WFN& orbital_wfn) {
-//    if (_ownedPrimitives.size() != 0) {
-//        std::cout << "Basis set already generated! Using this one!" << std::endl;
-//        return;
-//    }
-//    _name = "aux-etb-basis";
-//
-//    ivec seen_elements;
-//    for (const atom& atm : orbital_wfn.get_atoms()) {
-//        const int nuc_charge = atm.get_charge();
-//        //Check if the element is already in the seen_elements vector
-//        if (std::find(seen_elements.begin(), seen_elements.end(), nuc_charge) != seen_elements.end()) continue;
-//        err_chekf(atm.get_basis_set().size() != 0, "Can not generate auto-aux! Orbital Basis for Element: " + std::to_string(nuc_charge) + " is not defined!", std::cout);
-//        seen_elements.emplace_back(nuc_charge);
-//
-//        std::unordered_map<int, std::pair<double, double>> angular_momentum_exponents;  //Min, Max exponents per angular momentum
-//
-//        int l_max = 0;
-//
-//        for (const basis_set_entry& p : atm.get_basis_set()) {
-//            int l = p.get_type() - 1;
-//            l_max = std::max(l_max, l);
-//
-//            double exp = p.get_exponent();
-//            double coef = p.get_coefficient() / primitve_normalization(exp, l);
-//
-//            if (std::abs(coef) < 1e-3) continue;
-//
-//            auto& [min_exp, max_exp] = angular_momentum_exponents[l];
-//            if (min_exp == 0.0 && max_exp == 0.0) min_exp = max_exp = exp;
-//            else {
-//                min_exp = std::min(min_exp, exp);
-//                max_exp = std::max(max_exp, exp);
-//            }
-//        }
-//
-//        std::array<int, 4> configuration = constants::GROUND_STATE_CONFIGURATION[nuc_charge];
-//        int max_shells = 4 - std::count(configuration.begin(), configuration.end(), 0);
-//        int l_max_aux = std::min(l_max, max_shells) * 2;
-//
-//        // Traverse upper triangle of matrix of exponents in a sideways fashion to determine the lowest and highest exponent per angular momentum
-//        // Example:
-//        // l=0: 1 2 3 4
-//        // l=1:   5 6 7
-//        // l=2:     8 9
-//        // l=3:       10
-//        // Then the algorithm will traverse the matrix like this:
-//        // 1, 2, 35, 46, 78, 9, 10
-//        ivec n_functions(l_max_aux + 1);
-//        std::unordered_map<int, std::pair<double, double>> angular_exponent_ranges;  //ranges to produce the auxiliary function from
-//        for (int ll = 0; ll <= l_max_aux; ll++) {
-//            int i = (ll <= l_max) ? 0 : ll - l_max;
-//            int j = (ll <= l_max) ? ll : l_max;
-//
-//            auto& [min_exp, max_exp] = angular_exponent_ranges[ll];
-//            min_exp = std::numeric_limits<double>::max(), max_exp = std::numeric_limits<double>::min();
-//            while (i <= j) {
-//                min_exp = std::min(min_exp, (angular_momentum_exponents[i].first + angular_momentum_exponents[j].first));
-//                max_exp = std::max(max_exp, (angular_momentum_exponents[i].second + angular_momentum_exponents[j].second));
-//                i++, j--;
-//            }
-//
-//            //Calculate number of neccecary exponents in aux basis
-//            n_functions[ll] = std::ceil(std::log((min_exp + max_exp) / min_exp) / std::log(_beta));
-//        }
-//
-//        //Set index of new basis set
-//        set_count_for_element(nuc_charge - 1, std::accumulate(n_functions.begin(), n_functions.end(), 0));
-//
-//        std::cout << "-Element: " << nuc_charge << " Max_Lam: " << l_max << " Max_aux_lam: " << l_max_aux << " Max_shells: " << max_shells << std::endl;
-//        //Generate exponents following:
-//        //e = e_min * \beta^{i-1} for i = 1 .. n
-//        int shell = 0;
-//        for (int lam = 0; lam < n_functions.size(); lam++) {
-//            for (int i = n_functions[lam] - 1; i >= 0; i--, shell++) {
-//                add_owned_primitive({ 0, lam, angular_exponent_ranges[lam].first * std::pow(_beta, i), 1.0, shell });
-//            }
-//            std::cout << "Element: " << atm.get_charge() << " Shell: " << shell << " Angular Momentum: " << lam << " Exponents: " << n_functions[lam] << std::endl;
-//        }
-//    }
-//}
 
 //https://pyscf.org/_modules/pyscf/df/autoaux.html
 //The AutoAux algorithm by ORCA
@@ -182,6 +92,143 @@ void BasisSet::gen_auto_aux(const WFN& orbital_wfn) {
 
     }
     //SVD_prune_aux_basis(orbital_wfn);
+}
+
+/// Deduplicate candidates within tolerance on same atom
+std::vector<double> dedup_exponents(std::vector<double> exps, double tol = 0.1) {
+    std::sort(exps.begin(), exps.end(), std::greater<double>());
+    std::vector<double> out;
+    for (double e : exps) {
+        bool dup = false;
+        for (double x : out) {
+            if (std::abs(e - x) / std::max(e, x) < tol) {
+                dup = true;
+                break;
+            }
+        }
+        if (!dup) out.push_back(e);
+    }
+    return out;
+}
+
+/// Pivoted Cholesky decomposition for selecting linearly independent functions
+std::vector<int> pivoted_cholesky(dMatrix2& A, double threshold) {
+    const int n = A.extent(0);
+    std::vector<int> pivot_idx;
+    vec diag(n);
+    for (int i = 0; i < n; ++i) {
+        diag[i] = A(i, i);
+    }
+    dMatrix2 L = dMatrix2(n, n);
+    std::vector<int> perm(n);
+    std::iota(perm.begin(), perm.end(), 0);
+
+    for (int k = 0; k < n; ++k) {
+        int max_idx = k;
+        double max_val = diag[k];
+        for (int i = k + 1; i < n; ++i) {
+            if (diag[i] > max_val) {
+                max_val = diag[i];
+                max_idx = i;
+            }
+        }
+
+        if (max_val < threshold)
+            break;
+
+        if (max_idx != k) {
+            std::swap(perm[k], perm[max_idx]);
+            std::swap(diag[k], diag[max_idx]);
+            for (int j = 0; j < k; ++j) {
+                std::swap(L(k, j), L(max_idx, j));
+            }
+        }
+
+        pivot_idx.push_back(perm[k]);
+        L(k, k) = std::sqrt(max_val);
+
+        for (int i = k + 1; i < n; ++i) {
+            int orig_i = perm[i];
+            int orig_k = perm[k];
+            double sum = 0.0;
+            for (int j = 0; j < k; ++j) {
+                sum += L(i, j) * L(k, j);
+            }
+            L(i, k) = (A(orig_i, orig_k) - sum) / L(k, k);
+
+            double diag_sum = 0.0;
+            for (int j = 0; j <= k; ++j) {
+                diag_sum += L(i, j) * L(i, j);
+            }
+            diag[i] = std::max(0.0, A(orig_i, orig_i) - diag_sum);
+        }
+    }
+
+    return pivot_idx;
+}
+
+std::vector<double> prune_element_candidates_for_L(
+    int L,
+    const std::vector<double>& exponents,
+    double threshold)
+{
+    if (exponents.empty()) return {};
+
+    std::vector<double> unique_exps = dedup_exponents(exponents, 0.1);
+    const int n = static_cast<int>(unique_exps.size());
+    if (n <= 1) return unique_exps;
+
+    atom tmp_atom(std::to_string('H'), std::to_string('H'), 1, 0.0, 0.0, 0.0, 1);
+    for (double e : unique_exps) {
+        tmp_atom.push_back_basis_set(e, 1.0, L, 0);
+    }
+    WFN tmp_wfn(e_origin::NOT_YET_DEFINED);
+    tmp_wfn.push_back_atom(tmp_atom);
+
+    Int_Params tmp_params(tmp_wfn);
+    vec res;
+    compute2C<Coulomb2C_SPH>(tmp_params, res);
+    dMatrixRef2 V(res.data(), res.size() / 2, res.size() / 2);
+
+    const int funcs_per_shell = 2 * L + 1;
+    dMatrix2 V_shell(n, n);
+
+    for (int i = 0; i < n; ++i) {
+        int i0 = i * funcs_per_shell;
+        for (int j = 0; j < n; ++j) {
+            int j0 = j * funcs_per_shell;
+            double acc = 0.0;
+            for (int m = 0; m < funcs_per_shell; ++m) {
+                acc += V(i0 + m, j0 + m);
+            }
+            V_shell(i, j) = acc / funcs_per_shell;
+        }
+    }
+
+    vec d(n);
+    for (int i = 0; i < n; i++) {
+        d[i] = V_shell(i, i);
+    }
+
+    for (int i = 0; i < n; ++i) {
+        d[i] = std::sqrt(std::max(d[i], 1e-16));
+    }
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            V_shell(i, j) /= d[i] * d[j];
+        }
+    }
+
+    auto keep = pivoted_cholesky(V_shell, threshold);
+
+    std::vector<double> pruned;
+    pruned.reserve(keep.size());
+    for (int idx : keep) {
+        pruned.push_back(unique_exps[idx]);
+    }
+
+    std::sort(pruned.begin(), pruned.end(), std::greater<double>());
+    return pruned;
 }
 
 void BasisSet::gen_auto_aux_for_element(const atom& atm) {
@@ -295,21 +342,31 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
     for (int l = 0; l <= l_max_aux; l++) {
         beta = (l < l_occ_max * 2 + 1) ? auto_aux_constants::BETA_SMALL : auto_aux_constants::BETA_BIG[l];
         ns = std::log(a_max_adjusted[l] / a_min_by_l_aux[l]) / std::log(beta);
-
-        if (l > 0 && Z == 1) {
-            a_min_by_l_aux[l] *= 0.6;
-        }
-
         n_funcs = static_cast<int>(std::ceil(ns)) + 1;
-        std::cout << "Beta for Element " << Z << " and l " << l << " : " << beta << " with " << n_funcs << " Functions." << std::endl;
-        if (n_funcs <= 0) continue;
-        for (int i = n_funcs - 1; i >= 0; --i, ++added_functions, shell++) {
-            double exp = a_min_by_l_aux[l] * std::pow(beta, i);
-            add_owned_primitive({ 0, l,
-                exp,
-                1.0, shell
-                });
+
+        vec candidate_exps(n_funcs);
+        for (int i = n_funcs - 1; i >= 0; --i) {
+            candidate_exps[i] = a_min_by_l_aux[l] * std::pow(beta, i);
         }
+        auto kept = prune_element_candidates_for_L(l, candidate_exps, 1e-6);
+        std::cout << "Element " << Z << ", L = " << l << " with beta = " << beta << ": Generated " << n_funcs << " candidates, kept " << kept.size() << " after pruning." << std::endl;
+        n_funcs = static_cast<int>(kept.size());
+        if (n_funcs <= 0) continue;
+        for (double exp : kept) {
+            add_owned_primitive({ 0, l, exp, 1.0, shell });
+            ++shell;
+            ++added_functions;
+        }
+
+        //std::cout << "Beta for Element " << Z << " and l " << l << " : " << beta << " with " << n_funcs << " Functions." << std::endl;
+        //if (n_funcs <= 0) continue;
+        //for (int i = n_funcs - 1; i >= 0; --i, ++added_functions, shell++) {
+        //    double exp = a_min_by_l_aux[l] * std::pow(beta, i);
+        //    add_owned_primitive({ 0, l,
+        //        exp,
+        //        1.0, shell
+        //        });
+        //}
     }
     set_count_for_element(Z - 1, added_functions);
     _elementOffsets[Z - 1] -= added_functions; //Small hack to set the correct offset
