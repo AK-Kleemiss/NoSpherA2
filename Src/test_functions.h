@@ -1394,7 +1394,11 @@ double calc_pot_by_integral(vec3& grid, const double& r, const double& cube_dist
 
 void test_openblas()
 {
+#ifdef __APPLE__
+    omp_set_num_threads(4);
+#else
     MKL_Set_Num_Threads(4);
+#endif
 #ifdef _OPENMP
     omp_set_num_threads(4);
 #endif
