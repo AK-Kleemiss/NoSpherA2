@@ -224,7 +224,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
         occ = n < occ_WF.n_alpha() ? 2 : 0;
         push_back_MO(n+1, occ, mo.energies[n]);
         MOs[n].assign_coefficients_size(nex);
-        coeffs_ptr = MOs[n].get_coefficient_ptr();
+        coeffs_ptr = const_cast<double*>(MOs[n].get_coefficient_ptr());  //Casting away const-ness is bad practice, but in this case we know that the data will be modified and we need a non-const pointer to write into it.
         for (const auto & shell : shells){
             l = shell.l;
             p = (2.0*l+3.0)/4.0;
