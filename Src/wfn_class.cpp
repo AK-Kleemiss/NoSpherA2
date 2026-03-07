@@ -7,12 +7,6 @@
 #include "fchk.h"
 #include "basis_set.h"
 #include "nos_math.h"
-#include <cmath>
-#include <cstdio>
-#include <numeric>
-#include <ostream>
-#include <ranges>
-#include <vector>
 #include "libCintMain.h"
 #include "JKFit.h"
 
@@ -85,7 +79,7 @@ WFN::WFN(e_origin given_origin)
     fill_Afac_pre();
 };
 
-WFN::WFN(const std::filesystem::path& filename, const bool& debug)
+WFN::WFN(const std::filesystem::path &filename, const bool &debug)
 {
     ncen = 0;
     nfunc = 0;
@@ -107,7 +101,7 @@ WFN::WFN(const std::filesystem::path& filename, const bool& debug)
     read_known_wavefunction_format(filename, std::cout, debug);
 };
 
-WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug) {
+WFN::WFN(const std::filesystem::path &filename, const int g_charge, const int g_mult, const bool &debug) {
     ncen = 0;
     nfunc = 0;
     nmo = 0;
@@ -128,10 +122,10 @@ WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_
     read_known_wavefunction_format(filename, std::cout, debug);
 };
 
-constexpr unsigned int sum_subshells(unsigned int l, bool cartesian=true) {
+constexpr unsigned int sum_subshells(unsigned int l, bool cartesian = true) {
     if (cartesian)
-        return l*(l+1)*(l+2)/6;
-    return l*(2*l+1);
+        return l * (l + 1) * (l + 2) / 6;
+    return l * (2 * l + 1);
 }
 WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
 {
@@ -210,46 +204,46 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
     unsigned int n_sph;
     unsigned int n_prim;
     double occ;
-    double* coeffs_ptr;
+    double *coeffs_ptr;
     unsigned int basis_offset;
     unsigned int write_cursor;
     double p;
     double scalar;
 
     // confac = pow(8 * pow(exp[exp_run], 3) / constants::PI3, 0.25);
-    for (int n=0; n<occ_WF.nbf; ++n)
+    for (int n = 0; n < occ_WF.nbf; ++n)
     {
         basis_offset = 0;
         write_cursor = 0;
         occ = n < occ_WF.n_alpha() ? 2 : 0;
-        push_back_MO(n+1, occ, mo.energies[n]);
+        push_back_MO(n + 1, occ, mo.energies[n]);
         MOs[n].assign_coefficients_size(nex);
-        coeffs_ptr = const_cast<double*>(MOs[n].get_coefficient_ptr());  //Casting away const-ness is bad practice, but in this case we know that the data will be modified and we need a non-const pointer to write into it.
-        for (const auto & shell : shells){
+        coeffs_ptr = const_cast<double *>(MOs[n].get_coefficient_ptr());  //Casting away const-ness is bad practice, but in this case we know that the data will be modified and we need a non-const pointer to write into it.
+        for (const auto &shell : shells) {
             l = shell.l;
-            p = (2.0*l+3.0)/4.0;
-            scalar = std::pow(2.0, 0.5 * l)/std::pow(constants::PI3, 0.25);
-            const auto& A = MappedMatrices[l];
+            p = (2.0 * l + 3.0) / 4.0;
+            scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25);
+            const auto &A = MappedMatrices[l];
             n_sph = A.cols();
             n_prim = shell.num_primitives();
             n_cart = A.rows();
             chunk_size = n_cart * n_prim;
-            const auto& exp_arr = shell.exponents.array();
+            const auto &exp_arr = shell.exponents.array();
             // volatile int coeffsize = MOs[n].get_coefficients().size();
             // normalizing the contraction_coeffs
             ArrayXd CC = shell.u_coefficients.array();
             if (!from_file)
-                CC = VectorXd::NullaryExpr(CC.size(), [shell](const Index i){
-                    return shell.coeff_normalized(0, i);
-                });
+                CC = VectorXd::NullaryExpr(CC.size(), [shell](const Index i) {
+                return shell.coeff_normalized(0, i);
+                    });
             // return contraction_coefficients(coeff_idx, contr_idx) /
                  // gto_norm(static_cast<int>(l), exponents(coeff_idx));
-            const VectorXd& contraction_coeffs = scalar*(2*exp_arr).pow(p)*CC;
-            const auto& MOc = mo_go.C.block(basis_offset, n, n_sph, 1);
+            const VectorXd &contraction_coeffs = scalar * (2 * exp_arr).pow(p) * CC;
+            const auto &MOc = mo_go.C.block(basis_offset, n, n_sph, 1);
             Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);
             // Map<const VectorXd> contraction(contraction_coeffs.data(), n_prim);
             // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
-            dest_block = contraction_coeffs*(A * MOc).transpose();
+            dest_block = contraction_coeffs * (A * MOc).transpose();
 
             write_cursor += chunk_size;
             basis_offset += n_sph;
@@ -271,14 +265,14 @@ bool WFN::push_back_atom(const std::string& label, const double& x, const double
     return true;
 };
 
-bool WFN::push_back_atom(const atom& given)
+bool WFN::push_back_atom(const atom &given)
 {
     ncen++;
     atoms.push_back(given);
     return true;
 };
 
-bool WFN::erase_atom(const int& nr)
+bool WFN::erase_atom(const int &nr)
 {
     err_checkf(nr < ncen, "unreasonable atom number", std::cout);
     removeElement(atoms, atoms[nr]);
@@ -286,7 +280,7 @@ bool WFN::erase_atom(const int& nr)
     return true;
 };
 
-bool WFN::push_back_MO(const int& nr, const double& occ, const double& ener)
+bool WFN::push_back_MO(const int &nr, const double &occ, const double &ener)
 {
     nmo++;
     err_checkf(nr <= nmo, "unreasonable MO number", std::cout);
@@ -294,33 +288,33 @@ bool WFN::push_back_MO(const int& nr, const double& occ, const double& ener)
     return true;
 };
 
-bool WFN::push_back_MO(const int& nr, const double& occ, const double& ener, const int& oper)
+bool WFN::push_back_MO(const int &nr, const double &occ, const double &ener, const int &oper)
 {
     nmo++;
     MOs.push_back(MO(nr, occ, ener, oper));
     return true;
 };
 
-bool WFN::push_back_MO(const MO& given)
+bool WFN::push_back_MO(const MO &given)
 {
     nmo++;
     MOs.push_back(given);
     return true;
 };
 
-void WFN::push_back_MO_coef(const int& nr, const double& value)
+void WFN::push_back_MO_coef(const int &nr, const double &value)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs[nr].push_back_coef(value);
 };
 
-void WFN::assign_MO_coefs(const int& nr, vec& values)
+void WFN::assign_MO_coefs(const int &nr, vec &values)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs[nr].assign_coefs(values);
 };
 
-const double& WFN::get_MO_energy(const int& mo) const
+const double &WFN::get_MO_energy(const int &mo) const
 {
     err_checkf(mo < nmo, "not enough MOs", std::cout);
     return MOs[mo].get_energy();
@@ -333,7 +327,7 @@ const void WFN::clear_MOs()
     nmo = 0;
 }
 
-bool WFN::push_back_center(const int& cent)
+bool WFN::push_back_center(const int &cent)
 {
     if (cent <= ncen && cent > 0)
         centers.push_back(cent);
@@ -342,13 +336,13 @@ bool WFN::push_back_center(const int& cent)
     return true;
 };
 
-bool WFN::erase_center(const int& g_nr)
+bool WFN::erase_center(const int &g_nr)
 {
     centers.erase(centers.begin() + g_nr - 1);
     return true;
 };
 
-const std::string WFN::get_centers(const bool& bohr) const
+const std::string WFN::get_centers(const bool &bohr) const
 {
     std::string temp;
     for (int i = 0; i < ncen; i++)
@@ -384,7 +378,7 @@ const void WFN::list_centers() const
     }
 };
 
-const MO& WFN::get_MO(const int& n) const
+const MO &WFN::get_MO(const int &n) const
 {
     if (n < nmo)
         return MOs[n];
@@ -394,7 +388,7 @@ const MO& WFN::get_MO(const int& n) const
         return MOs[0];
     }
 }
-const int WFN::get_MO_op_count(const int& op) const
+const int WFN::get_MO_op_count(const int &op) const
 {
     int count = 0;
 #pragma omp parallel for reduction(+ : count)
@@ -404,33 +398,33 @@ const int WFN::get_MO_op_count(const int& op) const
     return count;
 };
 
-void WFN::delete_MO(const int& nr)
+void WFN::delete_MO(const int &nr)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs.erase(MOs.begin() + nr);
     nmo--;
 };
 
-bool WFN::push_back_type(const int& type)
+bool WFN::push_back_type(const int &type)
 {
     types.push_back(type);
     return true;
 };
 
-bool WFN::erase_type(const int& nr)
+bool WFN::erase_type(const int &nr)
 {
     err_checkf(nr >= 1, "Wrong type to erase!", std::cout);
     types.erase(types.begin() + nr - 1);
     return true;
 };
 
-bool WFN::push_back_exponent(const double& e)
+bool WFN::push_back_exponent(const double &e)
 {
     exponents.push_back(e);
     return true;
 };
 
-bool WFN::erase_exponent(const int& nr)
+bool WFN::erase_exponent(const int &nr)
 {
     if (nr < 1)
         return false;
@@ -438,7 +432,7 @@ bool WFN::erase_exponent(const int& nr)
     return true;
 };
 
-bool WFN::remove_primitive(const int& nr)
+bool WFN::remove_primitive(const int &nr)
 {
     nex--;
     if (erase_center(nr) && erase_exponent(nr) && erase_type(nr))
@@ -451,7 +445,7 @@ bool WFN::remove_primitive(const int& nr)
         return false;
 };
 
-bool WFN::add_primitive(const int& cent, const int& type, const double& e, double* values)
+bool WFN::add_primitive(const int &cent, const int &type, const double &e, double *values)
 {
     nex++;
     if (push_back_center(cent) && push_back_type(type) && push_back_exponent(e))
@@ -462,7 +456,7 @@ bool WFN::add_primitive(const int& cent, const int& type, const double& e, doubl
     return true;
 };
 
-void WFN::change_type(const int& nr)
+void WFN::change_type(const int &nr)
 {
     err_checkf(nr < nex, "Wrong input", std::cout);
     bool end = false;
@@ -482,7 +476,7 @@ void WFN::change_type(const int& nr)
     }
 };
 
-void WFN::change_exponent(const int& nr)
+void WFN::change_exponent(const int &nr)
 {
     err_checkf(nr < nex, "Wrong input", std::cout);
     bool end = false;
@@ -502,7 +496,7 @@ void WFN::change_exponent(const int& nr)
     }
 };
 
-void WFN::change_center(const int& nr)
+void WFN::change_center(const int &nr)
 {
     bool end = false;
     while (!end)
@@ -521,7 +515,7 @@ void WFN::change_center(const int& nr)
     }
 };
 
-bool WFN::set_MO_coef(const int& nr_mo, const int& nr_primitive, const double& value)
+bool WFN::set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value)
 {
     err_checkf(nr_mo <= MOs.size(), "MO doesn't exist!", std::cout);
     return MOs[nr_mo].set_coefficient(nr_primitive, value);
@@ -535,7 +529,7 @@ const void WFN::list_primitives() const
     }
 };
 
-bool WFN::remove_center(const int& nr)
+bool WFN::remove_center(const int &nr)
 {
     erase_center(nr);
     try
@@ -553,7 +547,7 @@ bool WFN::remove_center(const int& nr)
     return true;
 }
 
-bool WFN::add_exp(const int& cent, const int& type, const double& e)
+bool WFN::add_exp(const int &cent, const int &type, const double &e)
 {
     nex++;
     if (!push_back_center(cent) || !push_back_type(type) || !push_back_exponent(e))
@@ -562,31 +556,31 @@ bool WFN::add_exp(const int& cent, const int& type, const double& e)
         return true;
 };
 
-const double& WFN::get_MO_coef(const int& nr_mo, const int& nr_primitive) const
+const double &WFN::get_MO_coef(const int &nr_mo, const int &nr_primitive) const
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_coefficient(nr_primitive);
 };
 
-const double& WFN::get_MO_coef_f(const int& nr_mo, const int& nr_primitive) const
+const double &WFN::get_MO_coef_f(const int &nr_mo, const int &nr_primitive) const
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_coefficient_f(nr_primitive);
 };
 
-const double* WFN::get_MO_coef_ptr(const int& nr_mo)
+const double *WFN::get_MO_coef_ptr(const int &nr_mo)
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_coefficient_ptr();
 };
 
-const int WFN::get_MO_primitive_count(const int& nr_mo) const
+const int WFN::get_MO_primitive_count(const int &nr_mo) const
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_primitive_count();
 };
 
-const std::string WFN::hdr(const bool& occupied) const
+const std::string WFN::hdr(const bool &occupied) const
 {
     std::string temp = "GAUSSIAN            ";
     if (!occupied)
@@ -658,7 +652,7 @@ const std::string WFN::hdr(const bool& occupied) const
     return temp;
 };
 
-void WFN::read_known_wavefunction_format(const std::filesystem::path& fileName, std::ostream& file, const bool debug)
+void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, std::ostream &file, const bool debug)
 {
     if (fileName.extension() == ".wfn")
         err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
@@ -686,7 +680,7 @@ void WFN::read_known_wavefunction_format(const std::filesystem::path& fileName, 
         err_checkf(false, "Unknown filetype!", file);
 };
 
-bool WFN::read_wfn(const std::filesystem::path& fileName, const bool& debug, std::ostream& file)
+bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
 {
     using namespace std;
     if (ncen > 0)
@@ -1078,7 +1072,7 @@ bool WFN::read_wfn(const std::filesystem::path& fileName, const bool& debug, std
     return true;
 };
 
-bool WFN::read_xyz(const std::filesystem::path& filename, std::ostream& file, const bool debug)
+bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
     using namespace std;
     err_checkf(filesystem::exists(filename), "Couldn't open or find " + filename.string() + ", leaving", file);
@@ -1142,7 +1136,7 @@ bool WFN::read_xyz(const std::filesystem::path& filename, std::ostream& file, co
     return true;
 };
 
-bool WFN::read_wfx(const std::filesystem::path& fileName, const bool& debug, std::ostream& file)
+bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
 {
     origin = e_origin::wfx;
     d_f_switch = true;
@@ -1485,7 +1479,7 @@ const double WFN::get_maximum_MO_coefficient(bool occu) const {
     return max_coef;
 };
 
-bool WFN::read_molden(const std::filesystem::path& filename, std::ostream& file, const bool debug)
+bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
     using namespace std;
     err_checkf(std::filesystem::exists(filename), "couldn't open or find " + filename.string() + ", leaving", file);
@@ -2209,7 +2203,7 @@ bool WFN::read_molden(const std::filesystem::path& filename, std::ostream& file,
     return true;
 };
 
-bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, const bool debug, const std::filesystem::path& energies_filename, const std::filesystem::path& orbitals_filename)
+bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, const bool debug, const std::filesystem::path &energies_filename, const std::filesystem::path &orbitals_filename)
 {
     using namespace std;
     d_f_switch = true;
@@ -2558,7 +2552,7 @@ __________________________________
     //Now assign the basis set data to the atoms
     for (int a = 0; a < ncen; a++)
     {
-        for (const auto& [atom_type, atom_template] : basis_set_data)
+        for (const auto &[atom_type, atom_template] : basis_set_data)
         {
             if (atom_type == constants::atnr2letter(atoms[a].get_charge()))
             {
@@ -2858,7 +2852,7 @@ __________________________________
 };
 
 template<typename T>
-void move_columns(T& matrix, int dimension, int from_col, int num_cols, int to_col) {
+void move_columns(T &matrix, int dimension, int from_col, int num_cols, int to_col) {
     if (from_col == to_col || num_cols == 0) return;
 
     int block_size = num_cols * dimension;
@@ -2893,7 +2887,7 @@ void move_columns(T& matrix, int dimension, int from_col, int num_cols, int to_c
 }
 
 
-bool WFN::read_gbw(const std::filesystem::path& filename, std::ostream& file, const bool debug, const bool _has_ECPs)
+bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, const bool debug, const bool _has_ECPs)
 {
     using namespace std;
     // Details form https://orcaforum.kofo.mpg.de/viewtopic.php?f=8&t=3299&start=20
@@ -2916,7 +2910,7 @@ bool WFN::read_gbw(const std::filesystem::path& filename, std::ostream& file, co
     {
         rf.seekg(0, ios::beg);
         int64_t magic = 0;
-        rf.read((char*)&magic, sizeof(magic));
+        rf.read((char *)&magic, sizeof(magic));
         if (magic == -1) {
             geo_start_bit += 24;
             basis_start_bit += 24;
@@ -2927,25 +2921,25 @@ bool WFN::read_gbw(const std::filesystem::path& filename, std::ostream& file, co
         // Reading geometry
         rf.seekg(geo_start_bit, ios::beg);
         int64_t geo_start = 0;
-        rf.read((char*)&geo_start, sizeof(geo_start));
+        rf.read((char *)&geo_start, sizeof(geo_start));
         err_checkf(geo_start != 0, "Could not read geometry information location from GBW file!", file);
         if (debug)
             file << "I read the pointer of geometry successfully" << endl;
         rf.seekg(geo_start, ios::beg);
         int at = 0;
-        rf.read((char*)&at, constants::soi);
+        rf.read((char *)&at, constants::soi);
         double geo_vals[6]{ 0, 0, 0, 0, 0, 0 }; // x,y,z, ch, exp_fin_nuc, mass
         int geo_ints[5]{ 0, 0, 0, 0, 0 };
         for (int a = 0; a < at; a++)
         {
             for (int i = 0; i < 6; i++)
             {
-                rf.read((char*)&(geo_vals[i]), constants::sod);
+                rf.read((char *)&(geo_vals[i]), constants::sod);
                 err_checkf(rf.good(), "Error reading geo_val", file);
             }
             for (int i = 0; i < geo_int_lim; i++)
             {
-                rf.read((char*)&(geo_ints[i]), soi);
+                rf.read((char *)&(geo_ints[i]), soi);
                 err_checkf(rf.good(), "Error reading geo_int", file);
             }
             string temp = constants::atnr2letter(geo_ints[0]);
@@ -2962,46 +2956,46 @@ bool WFN::read_gbw(const std::filesystem::path& filename, std::ostream& file, co
 
         rf.seekg(basis_start_bit, ios::beg);
         int64_t basis_start = 0;
-        rf.read((char*)&basis_start, constants::soli);
+        rf.read((char *)&basis_start, constants::soli);
         err_checkf(basis_start != 0, "Could not read beasis information location from GBW file!", file);
         if (debug)
             file << "I read the pointer of basis set successfully" << endl;
         rf.seekg(basis_start, ios::beg);
         int atoms2 = 0, temp = 0;
-        rf.read((char*)&temp, constants::soi);
-        rf.read((char*)&atoms2, constants::soi);
+        rf.read((char *)&temp, constants::soi);
+        rf.read((char *)&atoms2, constants::soi);
         // long unsigned int atoms_with_basis = 0;
         vec exp(37, 0);
         vec con(37, 0);
         for (int a = 0; a < atoms2; a++)
         {
             int atom_based = 0, nr_shells = 0;
-            rf.read((char*)&atom_based, constants::soi);
+            rf.read((char *)&atom_based, constants::soi);
             err_checkf(rf.good(), "Error reading atom_based", file);
-            rf.read((char*)&nr_shells, constants::soi);
+            rf.read((char *)&nr_shells, constants::soi);
             err_checkf(rf.good(), "Error reading nr_shells", file);
             int shell = 0;
             for (int p = 0; p < nr_shells; p++)
             {
                 int ang_mom = 0, coeff_ind = 0, nr_funct = 0, center = 0;
-                rf.read((char*)&ang_mom, constants::soi);
+                rf.read((char *)&ang_mom, constants::soi);
                 err_checkf(rf.good(), "Error reading ang_mom", file);
                 if (ang_mom >= 5)
                     err_not_impl_f("Higher angular momentum basis functions than G", file);
-                rf.read((char*)&coeff_ind, constants::soi);
+                rf.read((char *)&coeff_ind, constants::soi);
                 err_checkf(rf.good(), "Error reading ceof_ind", file);
-                rf.read((char*)&nr_funct, constants::soi);
+                rf.read((char *)&nr_funct, constants::soi);
                 err_checkf(rf.good(), "Error reading nr_func", file);
-                rf.read((char*)&center, constants::soi);
+                rf.read((char *)&center, constants::soi);
                 err_checkf(rf.good(), "Error reading center", file);
                 for (int b = 0; b < 37; b++)
                 {
-                    rf.read((char*)&(exp[b]), constants::sod);
+                    rf.read((char *)&(exp[b]), constants::sod);
                     err_checkf(rf.good(), "Error reading exp", file);
                 }
                 for (int b = 0; b < 37; b++)
                 {
-                    rf.read((char*)&(con[b]), constants::sod);
+                    rf.read((char *)&(con[b]), constants::sod);
                     err_checkf(rf.good(), "Error reading con", file);
                     if (exp[b] != 0 && con[b] != 0)
                     {

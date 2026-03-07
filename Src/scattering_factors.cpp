@@ -1427,7 +1427,7 @@ int make_atomic_grids_wrapper(
     std::vector<_time_point> &time_points, svec &time_descriptions, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens,
     const options &opt) {
 
-    int atoms_with_grids = vec_sum(needs_grid);
+    const int atoms_with_grids = vec_sum(needs_grid);
     err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", std::cout);
     err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", std::cout);
     err_checkf(atoms_with_grids == asym_atom_list.size(), "Number of atoms with grids does not match the number of atoms in the CIF file!", std::cout);

@@ -693,20 +693,25 @@ void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2
 
     const int atoms_needing_grids = atom_list.size();
     d1.resize(atoms_needing_grids); d2.resize(atoms_needing_grids); d3.resize(atoms_needing_grids); dens.resize(atoms_needing_grids);
-#pragma omp parallel for schedule(dynamic, 1)
+    //#pragma omp parallel for schedule(dynamic, 1)
     for (int g = 0; g < grid->size(); g++) {
         vec2 &atomic_grid = (*grid)[g];
         const int n_points = (*num_points_per_atom)[g];
 
         int final_atoms = -1;
-        for (int i = 0; i < atom_list.size(); i++) {
-            if (atom_list[i] == g) {
-                final_atoms = i;
-                break;
+        if (needs_helper_grids_) {
+            for (int i = 0; i < atom_list.size(); i++) {
+                if (atom_list[i] == g) {
+                    final_atoms = i;
+                    break;
+                }
+            }
+            if (final_atoms == -1) {
+                continue; // Skip this grid if no matching atom is found, we do not need this one
             }
         }
-        if (final_atoms == -1) {
-            continue; // Skip this grid if no matching atom is found, we do not need this one
+        else {
+            final_atoms = g;
         }
         dens[final_atoms].resize(n_points); d1[final_atoms].resize(n_points); d2[final_atoms].resize(n_points); d3[final_atoms].resize(n_points);
 
@@ -830,19 +835,23 @@ void GridManager::printChargeTable(const svec &labels, const WFN &wave, const iv
     file << "\n";
 
     for (int i = 0; i < atom_list.size(); i++) {
-        const int atom_idx = atom_list[i];
+        int atom_idx;
+        if (needs_helper_grids_)
+            atom_idx = i;
+        else
+            atom_idx = atom_list[i];
         file << std::setw(10) << labels[i];
 
         if (config_.partition_type == PartitionType::Becke || config_.all_charges || config_.debug)
-            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[0][atom_idx];  // Becke
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[0][i];  // Becke
         if (config_.partition_type == PartitionType::Hirshfeld || config_.all_charges || config_.debug)
-            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[2][atom_idx];  // Hirshfeld
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[2][i];  // Hirshfeld
         if (config_.partition_type == PartitionType::TFVC || config_.all_charges || config_.debug)
-            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[1][atom_idx];  // TFVC
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[1][i];  // TFVC
         if (config_.partition_type == PartitionType::MBIS || config_.all_charges || config_.debug)
-            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[3][atom_idx];  // MBIS
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[3][i];  // MBIS
         if (config_.partition_type == PartitionType::EMBIS || config_.all_charges || config_.debug)
-            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[4][atom_idx];  // EMBIS
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[4][i];  // EMBIS
         file << std::endl;
     }
 
@@ -1214,6 +1223,7 @@ void GridManager::pruneGrid() {
         bvec &kept_local = point_is_kept[g]; // For easier access in lambda;
 
         const int n = (*num_points)[g];
+        int p;
         const auto &_grid = (*grid)[g];
         if (config_.debug || config_.all_charges) {
             const double *w_Becke = _grid[GridData::GridIndex::BECKE_WEIGHT].data();
@@ -1222,7 +1232,7 @@ void GridManager::pruneGrid() {
             const double *w_MBIS = _grid[GridData::GridIndex::MBIS_WEIGHT].data();
             const double *w_EMBIS = _grid[GridData::GridIndex::EMBIS_WEIGHT].data();
 #pragma omp simd
-            for (int p = 0; p < n; p++) {
+            for (p = 0; p < n; p++) {
                 // OR-reduce comparisons; branchless.
                 bool keep = fabs(w_Becke[p]) > cutoff;
                 keep |= fabs(w_TFVC[p]) > cutoff;
@@ -1236,7 +1246,7 @@ void GridManager::pruneGrid() {
         else {
             const double *weights = _grid[weight_index].data();
 #pragma omp simd
-            for (int p = 0; p < n; p++) {
+            for (p = 0; p < n; p++) {
                 kept_local[p] = (fabs(weights[p]) > cutoff);//keep;
             }
         }

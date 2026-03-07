@@ -14,10 +14,10 @@ extern "C" {
 #include "cint_funcs.h"
 }
 
-int QCT(options& opt, std::vector<WFN>& wavy);
+int QCT(options &opt, std::vector<WFN> &wavy);
 
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
 #ifdef __INSECURELY_AWAIT_FOR_ENV
     wait_for_debugger(); // This is for debugging during tests. It just returns if the env variable DEBUG_WAIT is not set.
@@ -308,7 +308,7 @@ int main(int argc, char** argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
+                result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
                     opt,
                     *temp_pred,
                     log_file,
@@ -366,7 +366,7 @@ int main(int argc, char** argv)
         svec empty({});
         //use atoms of group 0
         opt.groups[0].push_back(0);
-        itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, log_file, empty, 0);
+        itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, wavy, log_file, empty, 0);
         log_file << "Writing tsc file... " << flush;
         if (opt.binary_tsc)
             res.write_tscb_file();
@@ -466,7 +466,7 @@ int main(int argc, char** argv)
                     log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
                 if (wavy[0].get_origin() == 7)
                     opt.iam_switch = true;
-                res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+                res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
                     opt,
                     wavy,
                     log_file,
@@ -478,7 +478,7 @@ int main(int argc, char** argv)
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
 
-                SALTEDPredictor* temp_pred = new SALTEDPredictor(wavy[0], opt);
+                SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[0], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
@@ -487,7 +487,7 @@ int main(int argc, char** argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                res = calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
+                res = calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
                     opt,
                     *temp_pred,
                     log_file,
