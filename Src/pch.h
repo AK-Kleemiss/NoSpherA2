@@ -15,12 +15,12 @@
 #include <iomanip>
 #include <iostream>
 #include <numeric>
-#include <occ/main/occ_scf.h>
-#include <occ/gto/gto.h>
-#include <occ/core/parallel.h>
-#include <occ/io/conversion.h>
-#include <occ/io/occ_input.h>
-#include <occ/qm/wavefunction.h>
+//#include <occ/main/occ_scf.h>
+//#include <occ/gto/gto.h>
+//#include <occ/core/parallel.h>
+//#include <occ/io/conversion.h>
+//#include <occ/io/occ_input.h>
+//#include <occ/qm/wavefunction.h>
 #if defined(__APPLE__)
 // On macOS we are using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>
@@ -52,6 +52,8 @@
 #include <memory>
 #include <cstddef>
 #include <limits>
+#include <cstdio>
+#include <ranges>
 #ifdef __SSE2__
 #include <emmintrin.h>
 #endif
