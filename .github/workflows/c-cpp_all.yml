@@ -8,6 +8,15 @@ on:
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
+    inputs:
+      upload_libs:
+        description:  >
+          This was created so it is easier to upload libs from actions.
+          It is optional because the bundle has 78.9 Mb and that would 
+          eventually start filling the 10 Gb quota.
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: build-${{ github.ref }}
@@ -63,7 +72,6 @@ jobs:
               msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64 -p:SkipBuildDependencies=true
             artifact-name: executable_Windows
             artifact-path: |
-              Lib/
               Windows/x64/Release/NoSpherA2.exe
               Windows/x64/Release/libiomp5md.dll
 
@@ -113,6 +121,13 @@ jobs:
         BINARY=${{ matrix.executable-path }}
         cp "$LIBOMP" "$(dirname $BINARY)/libomp.dylib"
         install_name_tool -change "$LIBOMP" "@executable_path/libomp.dylib" "$BINARY"
+
+    - name: Upload Lib directory
+      if: ${{ inputs.upload_libs == true }}
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      with:
+        name: ${{ matrix.name }}
+        path: Lib/
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
