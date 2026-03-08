@@ -63,6 +63,7 @@ jobs:
               msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64 -p:SkipBuildDependencies=true
             artifact-name: executable_Windows
             artifact-path: |
+              Lib/
               Windows/x64/Release/NoSpherA2.exe
               Windows/x64/Release/libiomp5md.dll
 
