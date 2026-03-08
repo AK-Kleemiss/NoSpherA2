@@ -35,7 +35,15 @@
     "files.associations": {
         "functional": "cpp",
         "vector": "cpp",
-        "iostream": "cpp"
     },
     "C_Cpp.default.cppStandard": "c++20",
+    "makefile.configureOnOpen": true,
+    "C_Cpp.default.cStandard": "c23",
+    "C_Cpp.default.includePath": [
+        "Windows\\packages\\**",
+        "${default}"
+    ],
+    "C_Cpp.inlayHints.autoDeclarationTypes.enabled": true,
+    "C_Cpp.inlayHints.autoDeclarationTypes.showOnLeft": true,
+    "C_Cpp.inlayHints.parameterNames.enabled": true,
 }
