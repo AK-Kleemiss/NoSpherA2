@@ -11,9 +11,10 @@ on:
     inputs:
       upload_libs:
         description:  >
-          This was created so it is easier to upload libs from actions.
+          Upload Libs?
+          (This was created so it is easier to upload libs from actions.
           It is optional because the bundle has 78.9 Mb and that would 
-          eventually start filling the 10 Gb quota.
+          eventually start filling the 10 Gb quota).
         required: false
         type: boolean
         default: false
