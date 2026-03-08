@@ -10,7 +10,7 @@
 #include "libCintMain.h"
 #include "JKFit.h"
 
-//#include "occ/OrbitalDefs.h"
+#include "occ/OrbitalDefs.h"
 long long int WFN::pre[9][5][5][9] = {};
 long long int WFN::Afac_pre[9][5][9] = {};
 constexpr void WFN::fill_pre()
@@ -127,7 +127,8 @@ constexpr unsigned int sum_subshells(unsigned int l, bool cartesian = true) {
         return l * (l + 1) * (l + 2) / 6;
     return l * (2 * l + 1);
 }
-WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
+
+WFN::WFN(occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 {
     // Only works with restricted WFNs for now
     using namespace Eigen;
@@ -252,7 +253,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
 }
 
-bool WFN::push_back_atom(const std::string& label, const double& x, const double& y, const double& z, const int& _charge, const std::string& ID)
+bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string &ID)
 {
     ncen++;
     if (_charge >= 1)
