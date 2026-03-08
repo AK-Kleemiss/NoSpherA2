@@ -8,7 +8,7 @@
 // When you are using pre-compiled headers, this source file is necessary for compilation to succeed.
 // This is the only source file that includes pch_dll.h
 
-std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(const std::filesystem::path& fn1, const std::filesystem::path& fn2, double resolution, double radius) {
+std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(const std::filesystem::path &fn1, const std::filesystem::path &fn2, double resolution, double radius) {
 
     if (radius < 2.5)
     {
@@ -18,22 +18,23 @@ std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(const std::filesyste
     std::cout << "Calculating Hirshfeld Surface for " << fn1 << " and " << fn2 << std::endl;
     WFN wfn1("D:\\git\\NoSpherA2\\tests\\isosurface\\asu.xyz", true);
     WFN wfn2("D:\\git\\NoSpherA2\\tests\\isosurface\\pack.xyz", true);
-    double MinMax[6];
-    int NbSteps[3];
-    readxyzMinMax_fromWFN(wfn1, MinMax, NbSteps, radius, resolution, false);
-    cube Hirshfeld_grid(NbSteps[0], NbSteps[1], NbSteps[2], wfn1.get_ncen(), true);
-    cube Hirshfeld_grid2(NbSteps[0], NbSteps[1], NbSteps[2], wfn2.get_ncen(), true);
+    properties_options opts;
+    opts.radius = radius;
+    opts.resolution = resolution;
+    readxyzMinMax_fromWFN(wfn1, opts, false);
+    cube Hirshfeld_grid(opts.NbSteps, wfn1.get_ncen(), true);
+    cube Hirshfeld_grid2(opts.NbSteps, wfn2.get_ncen(), true);
     Hirshfeld_grid.give_parent_wfn(wfn1);
     Hirshfeld_grid2.give_parent_wfn(wfn2);
     double len[3]{ 0, 0, 0 };
     for (int i = 0; i < 3; i++)
     {
-        len[i] = (MinMax[3 + i] - MinMax[i]) / NbSteps[i];
+        len[i] = (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i];
     }
     for (int i = 0; i < 3; i++)
     {
-        Hirshfeld_grid.set_origin(i, MinMax[i]);
-        Hirshfeld_grid2.set_origin(i, MinMax[i]);
+        Hirshfeld_grid.set_origin(i, opts.MinMax[i]);
+        Hirshfeld_grid2.set_origin(i, opts.MinMax[i]);
         Hirshfeld_grid.set_vector(i, i, len[i]);
         Hirshfeld_grid2.set_vector(i, i, len[i]);
     }
