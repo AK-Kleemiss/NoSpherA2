@@ -144,9 +144,9 @@ runs:
         rm -rf "$stage_dir"
         mkdir -p "$stage_dir"
 
-        cp -a Lib/featomic_install "$stage_dir/featomic_install_${{ inputs.platform }}"
-        cp -a Lib/occ "$stage_dir/occ_${{ inputs.platform }}"
-        cp -a Lib/LibCint "$stage_dir/LibCint_${{ inputs.platform }}"
+        cp -a Lib/featomic_install* "$stage_dir/featomic_install_${{ inputs.platform }}"
+        cp -a Lib/occ* "$stage_dir/occ_${{ inputs.platform }}"
+        cp -a Lib/LibCint* "$stage_dir/LibCint_${{ inputs.platform }}"
 
     - name: Prepare library archive layout (Windows)
       if: inputs.platform == 'Windows'
