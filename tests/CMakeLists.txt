@@ -33,5 +33,5 @@ if (RUN_FULL_TEST)
     add_nos_test(fchk_conversion "-b dev2-TZVP -d ./ -wfn in.ffn -no-date" GOOD_LOG "good.fchk" DIRECTORY "NiP3_fchk") # This is disabled on the actions, it seems to be missing a config file
     add_nos_test(fourier_transform_full "-test_analytical full -no-date" DIRECTORY "SALTED")
     # This doesn't seem to have a .good file
-#    add_nos_test(rubredoxin_cmtc_full "-hkl 1yk4_h_full.hkl -acc 0 -cmtc residues/1.gbw residues/1.cif 0 residues/2.gbw residues/2.cif 0.1 residues/3.gbw residues/3.cif 0.2 residues/4.gbw residues/4.cif 0 -mtc_mult 1 1 1 1 -mtc_charge 0 0 0 0 -mtc_ECP 0 0 0 0 -cpus 24 -no-date" DIRECTORY "rubredoxin_cmtc")
+#    add_nos_test(rubredoxin_cmtc_full "-hkl 1yk4_h_full.hkl -acc 1 -cmtc residues/1.gbw residues/1.cif 0 residues/2.gbw residues/2.cif 0.1 residues/3.gbw residues/3.cif 0.2 residues/4.gbw residues/4.cif 0 -mtc_mult 1 1 1 1 -mtc_charge 0 0 0 0 -mtc_ECP 0 0 0 0 -cpus 24 -no-date" DIRECTORY "rubredoxin_cmtc")
 endif ()
