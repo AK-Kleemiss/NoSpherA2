@@ -69,7 +69,6 @@ endif ()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 #include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake")
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/NOSTEST.cmake")
 if (NOT ONLY_OCC)
     add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
 endif ()
