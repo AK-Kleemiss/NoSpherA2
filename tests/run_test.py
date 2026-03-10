@@ -88,15 +88,8 @@ def exe_path():
         )
     return os.path.abspath(exe)
 
-
-@pytest.fixture(autouse=True)
-def setup_env():
-    if "OCC_DATA_PATH" not in os.environ:
-        os.environ["OCC_DATA_PATH"] = str(Path(__file__).parent.parent / "occ" / "share")
-
-
 @pytest.mark.parametrize("nos_test", TESTS, ids=lambda t: t.name)
-def test(nos_test, exe_path, tmp_path):
+def test(nos_test, exe_path, tmp_path, request):
     if nos_test.full and not os.environ.get("RUN_FULL_TEST"):
         pytest.skip("RUN_FULL_TEST not set")
     if nos_test.skip_mac and platform.system() == "Darwin":
@@ -113,9 +106,10 @@ def test(nos_test, exe_path, tmp_path):
 
     cmd_args = nos_test.build_cmd(exe_path)
     print(" ".join(cmd_args))
+    OCC_DATA_PATH = str(request.config.rootpath / "occ" / "share")
     try:
         subprocess.run(
-            cmd_args, cwd=work_dir, check=True, capture_output=True, text=True
+            cmd_args, cwd=work_dir, check=True, capture_output=True, text=True,env={"OCC_DATA_PATH":OCC_DATA_PATH}
         )
     except subprocess.CalledProcessError as e:
         pytest.fail(f"Execution failed.\nStderr: {e.stderr}", pytrace=False)

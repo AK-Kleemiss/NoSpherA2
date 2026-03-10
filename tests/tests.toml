@@ -1,0 +1,220 @@
+[defaults]
+# Parameters that are added to every test by default
+all_charges = ""
+no_date = ""
+
+[alanine]
+directory = "alanine_occ"
+
+[alanine.args]
+cif = "alanine.cif"
+dmin = 0.5
+wfn = "alanine.owf.fchk"
+acc = 1
+
+[alanine_integrated_occ]
+directory = "alanine_integrated_occ"
+
+[alanine_integrated_occ.args]
+occ = "alanine.toml"
+cif = "alanine.cif"
+dmin = 0.5
+acc = 1
+
+[disorder_THPP]
+directory = "disorder"
+good = "disorder_THPP.good"
+
+[disorder_THPP.args]
+cif = "thpp.cif"
+hkl = "thpp.hkl"
+acc = 0
+
+mtc = [
+  "olex2/Wfn_job/Part_1/thpp.wfx",
+  0.1,
+  "olex2/Wfn_job/Part_2/thpp.wfx",
+  0.2
+]
+mtc_mult = [1, 1]
+mtc_ECP = [0, 0]
+mtc_charge = [0, 0]
+
+[fourier_transform]
+directory = "SALTED"
+
+[fourier_transform.args]
+test_analytical = true
+
+[fractal]
+directory = "sucrose_fchk_SF"
+good = "fractal.good"
+actual = "sucrose_diff.cube_fractal_plot"
+
+[fractal.args]
+fractal = "sucrose_diff.cube"
+
+[grown_water]
+directory = "grown"
+
+[grown_water.args]
+cif = "water.cif"
+hkl = "water.hkl"
+wfn = "water.wfx"
+acc = 0
+
+[Hybrid_mode]
+directory = "Hybrid"
+
+[Hybrid_mode.args]
+cif = "ZP2.cif"
+dmin = 0.9
+acc = 0
+
+mtc = ["ZP2_part1.gbw", 0.1, "ZP2_part2.gbw", 0.2]
+mtc_mult = [1, 1]
+mtc_charge = [0, 0]
+mtc_ECP = [0, 0]
+
+[malbac_SF_ECP]
+directory = "ECP_SF"
+
+[malbac_SF_ECP.args]
+cif = "malbac.cif"
+hkl = "malbac.hkl"
+wfn = "malbac.gbw"
+acc = 0
+ECP = 1
+
+[openBLAS]
+directory = "OpenBLAS"
+
+[openBLAS.args]
+blastest = true
+
+[properties]
+directory = "sucrose_fchk_SF"
+
+[properties.args]
+wfn = "olex2/Wfn_job/sucrose.wfx"
+cif = "sucrose.cif"
+lap = true
+eli = true
+resolution = 0.5
+
+[reading_SALTED]
+directory = "SALTED"
+
+[reading_SALTED.args]
+test_reading_SALTED_binary = true
+
+[ri_fit]
+directory = "epoxide_gbw"
+good = "ri_fit.good"
+skip_mac = true
+
+[ri_fit.args]
+wfn = "epoxide.gbw"
+cif = "epoxide.cif"
+dmin = 0.4
+ri_fit = "combo_basis_fit"
+
+[rubredoxin_cmtc]
+directory = "rubredoxin_cmtc"
+
+[rubredoxin_cmtc.args]
+hkl = "1yk4_h.hkl"
+acc = 0
+
+cmtc = [
+  "residues/1.gbw",
+  "residues/1.cif",
+  0,
+  "residues/2.gbw",
+  "residues/2.cif",
+  0.1,
+  "residues/3.gbw",
+  "residues/3.cif",
+  0.2,
+  "residues/4.gbw",
+  "residues/4.cif",
+  0
+]
+mtc_mult = [1, 1, 1, 1]
+mtc_charge = [0, 0, 0, 0]
+mtc_ECP = [0, 0, 0, 0]
+
+[SALTED]
+directory = "SALTED"
+
+[SALTED.args]
+SALTED = "Model"
+cif = "test_cysteine.cif"
+wfn = "test_cysteine.xyz"
+dmin = 0.73
+
+[sucrose_IAM]
+directory = "sucrose_IAM_SF"
+
+[sucrose_IAM.args]
+cif = "sucrose.cif"
+hkl = "sucrose.hkl"
+xyz = "sucrose.xyz"
+IAM = true
+
+[sucrose_ptb]
+directory = "sucrose_IAM_SF"
+
+[sucrose_ptb.args]
+cif = "sucrose.cif"
+dmin = 0.8
+wfn = "wfn.xtb"
+mult = 0
+charge = 0
+acc = 0
+ECP = 3
+
+[sucrose_SF]
+directory = "sucrose_fchk_SF"
+
+[sucrose_SF.args]
+cif = "sucrose.cif"
+hkl = "olex2/Wfn_job/sucrose.hkl"
+wfn = "olex2/Wfn_job/sucrose.wfx"
+acc = 0
+
+[sucrose_twin]
+directory = "sucrose_fchk_SF"
+
+[sucrose_twin.args]
+cif = "sucrose.cif"
+hkl = "olex2/Wfn_job/sucrose.hkl"
+wfn = "olex2/Wfn_job/sucrose.wfx"
+acc = 0
+twin = [1, 0, 0, 0, -1, 0, 0, 1, -2]
+
+[wfn_reading]
+directory = "wfn_reading"
+
+[wfn_reading.args]
+hkl = "test.hkl"
+acc = 0
+cif = "test.cif"
+wfn = "test.wfn"
+
+[fchk_conversion]
+directory = "NiP3_fchk"
+good = "good.fchk"
+full = true
+
+[fchk_conversion.args]
+b = "dev2-TZVP"
+d = "./"
+wfn = "in.ffn"
+
+[fourier_transform_full]
+directory = "SALTED"
+full = true
+
+[fourier_transform_full.args]
+test_analytical = "full"
