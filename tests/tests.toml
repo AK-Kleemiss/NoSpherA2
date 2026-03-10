@@ -3,10 +3,10 @@
 all_charges = ""
 no_date = ""
 
-[alanine]
+[alanine_occ]
 directory = "alanine_occ"
 
-[alanine.args]
+[alanine_occ.args]
 cif = "alanine.cif"
 dmin = 0.5
 wfn = "alanine.owf.fchk"
