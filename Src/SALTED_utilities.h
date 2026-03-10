@@ -33,7 +33,7 @@ public:
     double cutoff_width = 0.1;
 
     cvec4 calculate_expansion_coeffs();
-
+    metatensor::TensorMap calculate_SOAP_Powerspectrum(const bool use_dummy);
 private:
     int nspe;
 

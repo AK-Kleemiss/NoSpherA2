@@ -167,11 +167,10 @@ Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path& filepa
     this->nspe = (int)neighspe.size();
 }
 
-// FEATOMIC1
-metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
+inline featomic::SimpleSystem gen_featomic_system(const std::filesystem::path& filepath)
 {
     featomic::SimpleSystem featomic_system;
-    WFN wfn = WFN(this->filepath.c_str());
+    WFN wfn = WFN(filepath.c_str());
     for (const atom& a : *wfn.get_atoms_ptr())
     {
         d3 xyz = { constants::bohr2ang(a.get_coordinate(0)),
@@ -179,6 +178,13 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
                                       constants::bohr2ang(a.get_coordinate(2)) };
         featomic_system.add_atom(a.get_charge(), xyz);
     }
+    return featomic_system;
+}
+
+// FEATOMIC1
+metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
+{
+    featomic::SimpleSystem featomic_system = gen_featomic_system(this->filepath);
     // Construct the parameters for the calculator from the inputs given
     std::string temp_p = gen_parameters();
     const char* parameters = temp_p.c_str();
@@ -269,6 +275,61 @@ cvec4 Rascaline_Descriptors::calculate_expansion_coeffs()
     metatensor::TensorMap descriptor = get_feats_projs();
     std::vector<uint8_t> descriptor_buffer = descriptor.save_buffer();
     return get_expansion_coeffs(descriptor_buffer);
+}
+
+//FEATOMIC POWER Spectrum
+metatensor::TensorMap Rascaline_Descriptors::calculate_SOAP_Powerspectrum(const bool use_dummy) {
+    // Construct the parameters for the calculator from the inputs given
+    std::string temp_p = gen_parameters();
+    const char* parameters = temp_p.c_str();
+
+    // create the calculator with its name and parameters
+    auto calculator = featomic::Calculator("soap_power_spectrum", parameters);
+
+    WFN wfn = WFN(filepath.c_str());
+    int spe_2_start = 0;
+    std::vector<std::vector<int32_t>> keys_array;
+    for (const std::string& center_type : this->species)
+    {
+        spe_2_start = 0;
+        for (const std::string& speneigh1 : this->neighspe)
+        {
+            for (int spe_2_idx = spe_2_start; spe_2_idx < this->neighspe.size(); spe_2_idx++)
+            {
+                // Directly emplace back initializer_lists into keys_array
+                keys_array.emplace_back(std::vector<int32_t>{constants::get_Z_from_label(center_type.c_str()) + 1, constants::get_Z_from_label(speneigh1.c_str()) + 1, constants::get_Z_from_label(this->neighspe[spe_2_idx].c_str()) + 1  });
+            }
+            spe_2_start++;
+        }
+    }
+
+    // Assuming metatensor::Labels expects a flat sequence of integers for each label
+    std::vector<int32_t> flattened_keys;
+    for (const auto& subVector : keys_array)
+    {
+        flattened_keys.insert(flattened_keys.end(), subVector.begin(), subVector.end());
+    }
+
+    // Convert keys_array to rascaline::Labels
+    std::vector<std::string> names = {"center_type", "neighbor_1_type", "neighbor_2_type"};
+    metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
+
+
+    featomic::SimpleSystem featomic_system = gen_featomic_system(this->filepath);
+    featomic::CalculationOptions calc_opts;
+    calc_opts.use_native_system = true;
+    calc_opts.selected_keys = keys_selection;
+    // run the calculation
+    // Initialize descriptor directly from computation result
+    metatensor::TensorMap descriptor = calculator.compute(featomic_system, calc_opts);
+
+    // The descriptor is a metatensor `TensorMap`, containing multiple blocks.
+    // We can transform it to a single block containing a dense representation,
+    // with one sample for each atom-centered environment.
+    descriptor = descriptor.keys_to_samples("center_type");
+    descriptor = descriptor.keys_to_properties(svec{ "neighbor_1_type" , "neighbor_2_type" });
+
+    return descriptor;
 }
 
 

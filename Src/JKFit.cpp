@@ -119,7 +119,7 @@ std::vector<int> pivoted_cholesky(dMatrix2& A, double threshold) {
     for (int i = 0; i < n; ++i) {
         diag[i] = A(i, i);
     }
-    dMatrix2 L = dMatrix2(n, n);
+    dMatrix2 L(n, n);
     std::vector<int> perm(n);
     std::iota(perm.begin(), perm.end(), 0);
 
@@ -179,8 +179,8 @@ std::vector<double> prune_element_candidates_for_L(
     if (n <= 1) return unique_exps;
 
     atom tmp_atom(std::to_string('H'), std::to_string('H'), 1, 0.0, 0.0, 0.0, 1);
-    for (double e : unique_exps) {
-        tmp_atom.push_back_basis_set(e, 1.0, L, 0);
+    for (int i = 0; i < unique_exps.size(); i++) {
+        tmp_atom.push_back_basis_set(unique_exps[i], 1.0, L, i);
     }
     WFN tmp_wfn(e_origin::NOT_YET_DEFINED);
     tmp_wfn.push_back_atom(tmp_atom);
@@ -188,7 +188,7 @@ std::vector<double> prune_element_candidates_for_L(
     Int_Params tmp_params(tmp_wfn);
     vec res;
     compute2C<Coulomb2C_SPH>(tmp_params, res);
-    dMatrixRef2 V(res.data(), res.size() / 2, res.size() / 2);
+    dMatrixRef2 V(res.data(), tmp_params.get_nao(), tmp_params.get_nao());
 
     const int funcs_per_shell = 2 * L + 1;
     dMatrix2 V_shell(n, n);
@@ -348,7 +348,7 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
         for (int i = n_funcs - 1; i >= 0; --i) {
             candidate_exps[i] = a_min_by_l_aux[l] * std::pow(beta, i);
         }
-        auto kept = prune_element_candidates_for_L(l, candidate_exps, 1e-6);
+        auto kept = prune_element_candidates_for_L(l, candidate_exps, 5e-5);
         std::cout << "Element " << Z << ", L = " << l << " with beta = " << beta << ": Generated " << n_funcs << " candidates, kept " << kept.size() << " after pruning." << std::endl;
         n_funcs = static_cast<int>(kept.size());
         if (n_funcs <= 0) continue;

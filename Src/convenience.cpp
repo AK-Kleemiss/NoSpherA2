@@ -1882,6 +1882,37 @@ void options::digest_options()
             delete (temp_w);
             exit(0);
         }
+        else if (temp == "-calc_featomic_descriptor") {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE --calc_featomic_descriptor to specify a molecule.", std::cout);
+            const bool use_dummy = false; 
+            WFN wavy;
+            wavy.read_known_wavefunction_format(wfn, std::cout, false);
+            std::vector<std::string> species{"B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I"};
+            metatensor::TensorMap descriptor = Rascaline_Descriptors(
+                wfn,
+                4+1,
+                9,
+                0.15,
+                2.5,
+                wavy.get_ncen(),
+                species,
+                species,
+                1.0, 1E-6, 0.5).calculate_SOAP_Powerspectrum(use_dummy);
+
+            metatensor::TensorBlock temp_block = descriptor.block_by_id(0);
+            metatensor::NDArray<double> temp_values = temp_block.values();
+            std::vector<size_t> sizes = temp_block.values_shape();
+            vec data(sizes[0] * sizes[1]);
+            std::copy(temp_values.data(), temp_values.data() + data.size(), data.data());
+
+            npy::npy_data<double> np_descr;
+            np_descr.data = data;
+            np_descr.fortran_order = false;
+            np_descr.shape = { static_cast<unsigned long>(sizes[0]), static_cast<unsigned long>(sizes[1]) };
+            npy::write_npy("descriptor.npy", np_descr);
+            
+            exit(0);
+        }
         else if (temp == "-fchk")
             fchk = arguments[i + 1];
         else if (temp == "-fractal")
