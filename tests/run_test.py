@@ -88,6 +88,7 @@ def exe_path():
         )
     return os.path.abspath(exe)
 
+
 @pytest.mark.parametrize("nos_test", TESTS, ids=lambda t: t.name)
 def test(nos_test, exe_path, tmp_path, request):
     if nos_test.full and not os.environ.get("RUN_FULL_TEST"):
@@ -109,7 +110,12 @@ def test(nos_test, exe_path, tmp_path, request):
     OCC_DATA_PATH = str(request.config.rootpath / "occ" / "share")
     try:
         subprocess.run(
-            cmd_args, cwd=work_dir, check=True, capture_output=True, text=True,env={"OCC_DATA_PATH":OCC_DATA_PATH}
+            cmd_args,
+            cwd=work_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+            env={"OCC_DATA_PATH": OCC_DATA_PATH},
         )
     except subprocess.CalledProcessError as e:
         pytest.fail(f"Execution failed.\nStderr: {e.stderr}", pytrace=False)
@@ -122,7 +128,7 @@ def test(nos_test, exe_path, tmp_path, request):
     )
     failed_dir.mkdir(parents=True, exist_ok=True)
     for log in extra_logs:
-        log.copy(failed_dir / log.name)
+        shutil.copy2(log, failed_dir / log.name)
 
     if nos_test.actual == "NoSpherA2.log":
         actual_path = os.path.join(work_dir, nos_test.good.replace("good", "log"))
