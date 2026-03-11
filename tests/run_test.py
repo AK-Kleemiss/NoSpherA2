@@ -115,7 +115,7 @@ def test(nos_test, exe_path, tmp_path, request):
             check=True,
             capture_output=True,
             text=True,
-            env={"OCC_DATA_PATH": OCC_DATA_PATH},
+            env=os.environ.copy() | {"OCC_DATA_PATH": OCC_DATA_PATH},
         )
     except subprocess.CalledProcessError as e:
         pytest.fail(f"Execution failed.\nStderr: {e.stderr}", pytrace=False)
