@@ -1884,20 +1884,21 @@ void options::digest_options()
         }
         else if (temp == "-calc_featomic_descriptor") {
             err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE --calc_featomic_descriptor to specify a molecule.", std::cout);
-            const bool use_dummy = false; 
-            WFN wavy;
-            wavy.read_known_wavefunction_format(wfn, std::cout, false);
+
             std::vector<std::string> species{"B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I"};
-            metatensor::TensorMap descriptor = Rascaline_Descriptors(
-                wfn,
-                4+1,
-                9,
-                0.15,
-                2.5,
-                wavy.get_ncen(),
-                species,
-                species,
-                1.0, 1E-6, 0.5).calculate_SOAP_Powerspectrum(use_dummy);
+            SALTED_Utils::FeatomicHyperParameters hyperparams{
+                .cutoff_radius = 2.5,
+                .max_radial = 4,
+                .max_angular = 9,
+                .atomic_gaussian_width = 0.15,
+                .center_atom_weight = 1.0,
+                .species = species,
+                .neighspe = species,
+                .radial_basis = {.type = "Gto", .spline_accuracy = 1E-6 },
+                .cutoff_function = { .type = "ShiftedCosine", .width = 0.1 }
+            };
+
+            metatensor::TensorMap descriptor = SALTED_Utils::calculate_SOAP_Powerspectrum(SALTED_Utils::gen_featomic_system(wfn), hyperparams);
 
             metatensor::TensorBlock temp_block = descriptor.block_by_id(0);
             metatensor::NDArray<double> temp_values = temp_block.values();

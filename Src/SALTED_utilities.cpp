@@ -118,87 +118,39 @@ std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::str
     return filtered_symbols;
 }
 
-std::string Rascaline_Descriptors::to_json(const HyperParametersDensity& params)
+std::string SALTED_Utils::FeatomicHyperParameters::to_json() const
 {
     std::ostringstream oss;
     oss << "{\n"
         << "  \"cutoff\": {  \
-                    \"radius\": " << params.cutoff << " , \"smoothing\": \
-                                  {\"type\": \"" << params.cutoff_function.type << "\", \"width\": " << params.cutoff_function.width << "} }, \n"
+                    \"radius\": " << this->cutoff_radius << " , \"smoothing\": \
+                                  {\"type\": \"" << this->cutoff_function.type << "\", \"width\": " << this->cutoff_function.width << "} }, \n"
         << "  \"density\": { \
-                    \"type\": \"Gaussian\", \"width\": " << params.atomic_gaussian_width << ", \"center_atom_weight\": " << params.center_atom_weight << "},\n"
+                    \"type\": \"Gaussian\", \"width\": " << this->atomic_gaussian_width << ", \"center_atom_weight\": " << this->center_atom_weight << "},\n"
         << "  \"basis\": { \
-                    \"type\": \"TensorProduct\", \"max_angular\": " << params.max_angular << ", \"radial\": {\"type\":  \"" << params.radial_basis.type << "\", \"max_radial\": " << params.max_radial << "} , \"spline_accuracy\": " << params.radial_basis.spline_accuracy << "}\n"
+                    \"type\": \"TensorProduct\", \"max_angular\": " << this->max_angular << ", \"radial\": {\"type\":  \"" << this->radial_basis.type << "\", \"max_radial\": " << this->max_radial << "} , \"spline_accuracy\": " << this->radial_basis.spline_accuracy << "}\n"
         << "}";
     return oss.str();
 }
 
-std::string Rascaline_Descriptors::gen_parameters()
-{
-    HyperParametersDensity hyper_parameters_density = {
-        this->rcut,                           // cutoff
-        this->nrad - 1,                        // max_radial    //DO NOT ASK ME WHY 1-
-        this->nang,                           // max_angular
-        this->atomic_gaussian_width,          // atomic_gaussian_width
-        this->center_atom_weight,             // center_atom_weight
-        {"Gto", this->spline_accuracy},       // radial_basis
-        {"ShiftedCosine", this->cutoff_width} // cutoff_function
-    };
-    std::string json_string = to_json(hyper_parameters_density);
-    return json_string;
-}
 
-// How about this?
-Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path& filepath, const int& nrad, const int& nang, const double& atomic_gaussian_width,
-    const double& rcut, const int& n_atoms, const std::vector<std::string>& neighspe, const std::vector<std::string>& species,
-    const double& center_atom_weight, const double& spline_accuracy, const double& cutoff_width)
+// Used to generate metatensor::TensorMap and save the buffer location into the descriptor_buffer
+metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
-    this->filepath = filepath;
-    this->nrad = nrad;
-    this->nang = nang;
-    this->atomic_gaussian_width = atomic_gaussian_width;
-    this->rcut = rcut;
-    this->n_atoms = n_atoms;
-    this->neighspe = neighspe;
-    this->species = species;
-    this->center_atom_weight = center_atom_weight;
-    this->spline_accuracy = spline_accuracy;
-    this->cutoff_width = cutoff_width;
-    this->nspe = (int)neighspe.size();
-}
-
-inline featomic::SimpleSystem gen_featomic_system(const std::filesystem::path& filepath)
-{
-    featomic::SimpleSystem featomic_system;
-    WFN wfn = WFN(filepath.c_str());
-    for (const atom& a : *wfn.get_atoms_ptr())
-    {
-        d3 xyz = { constants::bohr2ang(a.get_coordinate(0)),
-                                      constants::bohr2ang(a.get_coordinate(1)),
-                                      constants::bohr2ang(a.get_coordinate(2)) };
-        featomic_system.add_atom(a.get_charge(), xyz);
-    }
-    return featomic_system;
-}
-
-// FEATOMIC1
-metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
-{
-    featomic::SimpleSystem featomic_system = gen_featomic_system(this->filepath);
-    // Construct the parameters for the calculator from the inputs given
-    std::string temp_p = gen_parameters();
-    const char* parameters = temp_p.c_str();
-
     // size_t nspe1 = neighspe.size();
-    std::vector<std::vector<int32_t>> keys_array;
-    for (int l = 0; l < this->nang + 1; ++l)
+    std::vector<std::array<int32_t, 4>> keys_array;
+    keys_array.reserve((parameters.max_angular + 1) * parameters.species.size() * parameters.neighspe.size());
+
+    for (int l = 0; l < parameters.max_angular + 1; ++l)
     {
-        for (const std::string& specen : this->species)
+        for (const std::string& center_spe : parameters.species)
         {
-            for (const std::string& speneigh : this->neighspe)
+            int32_t center_z = constants::get_Z_from_label(center_spe.c_str()) + 1;
+            for (const std::string& neigh_spe : parameters.neighspe)
             {
+                int32_t neigh_z = constants::get_Z_from_label(neigh_spe.c_str()) + 1;
                 // Directly emplace back initializer_lists into keys_array
-                keys_array.emplace_back(std::vector<int32_t>{ l, 1, constants::get_Z_from_label(specen.c_str()) + 1, constants::get_Z_from_label(speneigh.c_str()) + 1 });
+                keys_array.push_back({ l, 1, center_z, neigh_z});
             }
         }
     }
@@ -214,8 +166,13 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     std::vector<std::string> names = { "o3_lambda", "o3_sigma", "center_type", "neighbor_type" };
     metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
 
+
     // create the calculator with its name and parameters
-    auto calculator = featomic::Calculator("spherical_expansion", parameters);
+    //Do not ask me, why Featomic expects the max_radial to be one less than the actual number of radial basis functions, but it does, so here we are
+    SALTED_Utils::FeatomicHyperParameters&  modif_param = const_cast<SALTED_Utils::FeatomicHyperParameters&>(parameters);
+    modif_param.max_radial -= 1;
+    auto calculator = featomic::Calculator("spherical_expansion", modif_param.to_json().c_str());
+    modif_param.max_radial += 1;
 
     featomic::CalculationOptions calc_opts;
     calc_opts.selected_keys = keys_selection;
@@ -233,25 +190,26 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     return descriptor;
 }
 
-// FEATOMIC2
-cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer)
+// Reads the descriptor buffer and fills the expansion coefficients vector
+cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
-
+    int n_atoms = (int)featomic_system.size();
+    int nspe = (int)parameters.species.size();
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
     // cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
-    cvec4 omega(this->n_atoms, std::vector<cvec2>((size_t)this->nspe * this->nrad, cvec2((size_t)this->nang + 1, cvec((size_t)2 * this->nang + 1, { 0.0, 0.0 }))));
-    for (int l = 0; l < nang + 1; ++l)
+    cvec4 omega(n_atoms, std::vector<cvec2>((size_t)nspe * parameters.max_radial, cvec2((size_t)parameters.max_angular + 1, cvec((size_t)2 * parameters.max_angular + 1, { 0.0, 0.0 }))));
+    for (int l = 0; l < parameters.max_angular + 1; ++l)
     {
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ (2 * l) + 1 })[0];
         metatensor::TensorBlock descriptor_block = descriptor.block_by_id(l);
         metatensor::NDArray<double> descriptor_values = descriptor_block.values();
 
         // Perform the matrix multiplication and assignment
-        for (int a = 0; a < this->n_atoms; ++a)
+        for (int a = 0; a < n_atoms; ++a)
         {
             for (int c = 0; c < 2 * l + 1; ++c)
             {
-                for (int d = 0; d < this->nspe * this->nrad; ++d)
+                for (int d = 0; d < nspe * parameters.max_radial; ++d)
                 {
                     // omega[l][a][c][d] = 0.0;
                     omega[a][d][l][c] = 0.0;
@@ -269,37 +227,36 @@ cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descripto
     return omega;
 }
 
-cvec4 Rascaline_Descriptors::calculate_expansion_coeffs()
-{
 
-    metatensor::TensorMap descriptor = get_feats_projs();
+cvec4 SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+{
+    metatensor::TensorMap descriptor = get_feats_projs(featomic_system, parameters);
     std::vector<uint8_t> descriptor_buffer = descriptor.save_buffer();
-    return get_expansion_coeffs(descriptor_buffer);
+    return get_expansion_coeffs(descriptor_buffer, featomic_system, parameters);
 }
 
+
 //FEATOMIC POWER Spectrum
-metatensor::TensorMap Rascaline_Descriptors::calculate_SOAP_Powerspectrum(const bool use_dummy) {
-    // Construct the parameters for the calculator from the inputs given
-    std::string temp_p = gen_parameters();
-    const char* parameters = temp_p.c_str();
-
+metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters) {
     // create the calculator with its name and parameters
-    auto calculator = featomic::Calculator("soap_power_spectrum", parameters);
+    auto calculator = featomic::Calculator("soap_power_spectrum", parameters.to_json().c_str());
 
-    WFN wfn = WFN(filepath.c_str());
     int spe_2_start = 0;
-    std::vector<std::vector<int32_t>> keys_array;
-    for (const std::string& center_type : this->species)
+    std::vector<std::array<int32_t,3>> keys_array;
+    for (const std::string& center_type : parameters.species)
     {
-        spe_2_start = 0;
-        for (const std::string& speneigh1 : this->neighspe)
+        int32_t z_center = constants::get_Z_from_label(center_type.c_str()) + 1;
+
+        for (size_t i = 0; i < parameters.neighspe.size(); ++i)
         {
-            for (int spe_2_idx = spe_2_start; spe_2_idx < this->neighspe.size(); spe_2_idx++)
+            int32_t z1 = constants::get_Z_from_label(parameters.neighspe[i].c_str()) + 1;
+
+            for (size_t j = i; j < parameters.neighspe.size(); ++j)
             {
-                // Directly emplace back initializer_lists into keys_array
-                keys_array.emplace_back(std::vector<int32_t>{constants::get_Z_from_label(center_type.c_str()) + 1, constants::get_Z_from_label(speneigh1.c_str()) + 1, constants::get_Z_from_label(this->neighspe[spe_2_idx].c_str()) + 1  });
+                int32_t z2 = constants::get_Z_from_label(parameters.neighspe[j].c_str()) + 1;
+
+                keys_array.push_back({ z_center, z1, z2 });
             }
-            spe_2_start++;
         }
     }
 
@@ -314,8 +271,6 @@ metatensor::TensorMap Rascaline_Descriptors::calculate_SOAP_Powerspectrum(const 
     std::vector<std::string> names = {"center_type", "neighbor_1_type", "neighbor_2_type"};
     metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
 
-
-    featomic::SimpleSystem featomic_system = gen_featomic_system(this->filepath);
     featomic::CalculationOptions calc_opts;
     calc_opts.use_native_system = true;
     calc_opts.selected_keys = keys_selection;
