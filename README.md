@@ -123,6 +123,6 @@ make
    ```
 5. Command line arguments are always passed in the block <testname>.args.
 6. **Run `pytest` or make test** to ensure your test runs.
-7. **Document your test** if needed, and mention it in your Pull Request.
+7. **Document your test** if needed and mention it in your Pull Request.
 
 ---
