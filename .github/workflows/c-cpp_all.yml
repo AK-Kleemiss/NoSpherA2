@@ -8,6 +8,13 @@ on:
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
+    inputs:
+      upload_libs:
+        description:  >
+          Uploads the created libs as artifacts. If not, saves space on CI runs, but can be useful for debugging. Only applies to the dependencies job.
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: build-${{ github.ref }}
@@ -101,6 +108,7 @@ jobs:
       uses: ./.github/actions/build-deps
       with:
         platform: ${{ matrix.name }}
+        upload_libs: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.upload_libs || 'false' }}
 
     - name: Build NoSpherA2
       run: ${{ matrix.build-script }}
