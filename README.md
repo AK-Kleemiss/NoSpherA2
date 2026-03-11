@@ -100,31 +100,29 @@ make
     - Open the `tests.toml` in the test subdirectory.
     - Add your test executable or call to the list of tests, as appropriate.
     - Example (a test calcualting a tsc file for sucrose reading in an hkl file wnd wfn):
-```toml
-[sucrose_SF]
-directory = "sucrose_fchk_SF"
+    ```toml
+    [sucrose_SF]
+    directory = "sucrose_fchk_SF"
 
-[sucrose_SF.args]
-cif = "sucrose.cif"
-hkl = "olex2/Wfn_job/sucrose.hkl"
-wfn = "olex2/Wfn_job/sucrose.wfx"
-acc = 0
-```
+    [sucrose_SF.args]
+    cif = "sucrose.cif"
+    hkl = "olex2/Wfn_job/sucrose.hkl"
+    wfn = "olex2/Wfn_job/sucrose.wfx"
+    acc = 0
+    ```
 4. If your test requires a different output file from the test name, you can add the good parameter:
-```toml
-[disorder_THPP]
-directory = "disorder"
-good = "disorder_THPP.good"
+   ```toml
+   [disorder_THPP]
+   directory = "disorder"
+   good = "disorder_THPP.good"
 
-[disorder_THPP.args]
-cif = "thpp.cif"
-hkl = "thpp.hkl"
-acc = 0
-```
+   [disorder_THPP.args]
+   cif = "thpp.cif"
+   hkl = "thpp.hkl"
+   acc = 0
+   ```
 5. Command line arguments are always passed in the block <testname>.args.
 6. **Run `pytest` or make test** to ensure your test runs.
 7. **Document your test** if needed, and mention it in your Pull Request.
 
 ---
-
-
