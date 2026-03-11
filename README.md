@@ -99,7 +99,7 @@ make
 3. **Register your test in the tests.toml file:**
     - Open the `tests.toml` in the test subdirectory.
     - Add your test executable or call to the list of tests, as appropriate.
-    - Example (a test calcualting a tsc file for sucrose reading in an hkl file wnd wfn):
+    - Example (a test calculating a tsc file for sucrose reading in an hkl file and wfn):
     ```toml
     [sucrose_SF]
     directory = "sucrose_fchk_SF"
