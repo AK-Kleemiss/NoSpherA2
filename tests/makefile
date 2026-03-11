@@ -14,7 +14,7 @@ endif
 define PYTEST_RUNNER
 $(shell \
     if $(PYTEST_CHECK); then \
-        echo python3 -m pytest; \
+        echo python -m pytest; \
     elif command -v uv >/dev/null 2>&1; then \
         echo uv run pytest; \
     elif [ -x "$(UV_EXE)" ]; then \
