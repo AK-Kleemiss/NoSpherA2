@@ -117,3 +117,6 @@ Lib\LibCint\include\cint_funcs.h
 pch.h.gch/
 /build-windows-clang-cl
 /Lib/occ
+/build-*
+/mambaenv
+/.direnv/bin
