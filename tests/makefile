@@ -31,8 +31,16 @@ PYTEST_ARGS ?= -v
 
 .PHONY: all all_tests
 
+ifeq ($(OS),Windows_NT)
+all:
+	set "NOS_EXE=$(NOS_EXE)" && $(PYTEST) run_test.py $(PYTEST_ARGS)
+
+all_tests:
+	set "NOS_EXE=$(NOS_EXE)" && set "RUN_FULL_TEST=1" && $(PYTEST) run_test.py $(PYTEST_ARGS)
+else
 all:
 	NOS_EXE=$(NOS_EXE) $(PYTEST) run_test.py $(PYTEST_ARGS)
 
 all_tests:
 	NOS_EXE=$(NOS_EXE) RUN_FULL_TEST=1 $(PYTEST) run_test.py $(PYTEST_ARGS)
+endif
