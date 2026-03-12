@@ -2575,7 +2575,8 @@
     <LinkIncremental>true</LinkIncremental>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
-    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <linkage-MKL-static-win-x64>
+    </linkage-MKL-static-win-x64>
     <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
     <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
   </PropertyGroup>
@@ -13753,6 +13754,7 @@
   <PropertyGroup>
     <!-- Candidate paths (absolute or relative) -->
     <tbbDllCandidate1>$(MKLROOT)\..\..\tbb\latest\bin\tbb12.dll</tbbDllCandidate1>
+    <tbbDllCandidate2>$(MKLROOT)\inteltbb.redist.win\runtimes\win-x64\native\tbb12.dll</tbbDllCandidate2>
   </PropertyGroup>
   <!-- First match wins -->
   <PropertyGroup Condition="Exists('$(IompDllCandidate1)')">
@@ -13763,6 +13765,9 @@
   </PropertyGroup>
   <PropertyGroup Condition="Exists('$(tbbDllCandidate1)')">
     <TbbDll>$(tbbDllCandidate1)</TbbDll>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TbbDll)'=='' and Exists('$(tbbDllCandidate2)')">
+    <TbbDll>$(tbbDllCandidate2)</TbbDll>
   </PropertyGroup>
   <Target Name="CopyIntelOpenMP" AfterTargets="Build">
     <!-- Copy if it exists -->
