@@ -2632,7 +2632,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2671,7 +2671,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2707,7 +2707,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2743,7 +2743,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2782,7 +2782,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Pregenerates the basis sets</Message>
@@ -2820,7 +2820,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Pregenerates the basis sets</Message>
@@ -2861,7 +2861,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2897,7 +2897,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2936,7 +2936,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2972,7 +2972,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3011,7 +3011,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3047,7 +3047,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3086,7 +3086,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3122,7 +3122,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3161,7 +3161,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3197,7 +3197,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3236,7 +3236,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3272,7 +3272,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3316,7 +3316,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3357,7 +3357,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3401,7 +3401,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3442,7 +3442,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3486,7 +3486,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3527,7 +3527,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3641,7 +3641,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3682,7 +3682,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3726,7 +3726,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3767,7 +3767,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3811,7 +3811,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3852,7 +3852,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3896,7 +3896,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3937,7 +3937,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3981,7 +3981,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4022,7 +4022,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4066,7 +4066,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4107,7 +4107,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4151,7 +4151,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4192,7 +4192,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4236,7 +4236,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4277,7 +4277,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4321,7 +4321,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4362,7 +4362,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4406,7 +4406,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4447,7 +4447,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4491,7 +4491,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4532,7 +4532,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4577,7 +4577,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4619,7 +4619,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4664,7 +4664,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4706,7 +4706,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4751,7 +4751,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4793,7 +4793,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4834,7 +4834,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4875,7 +4875,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4919,7 +4919,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4960,7 +4960,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5004,7 +5004,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5045,7 +5045,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5089,7 +5089,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5130,7 +5130,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5175,7 +5175,7 @@
       <AdditionalOptions>/VERBOSE:lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5218,7 +5218,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5259,7 +5259,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5300,7 +5300,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5343,7 +5343,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5383,7 +5383,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5427,7 +5427,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5468,7 +5468,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5512,7 +5512,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5553,7 +5553,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5598,7 +5598,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5640,7 +5640,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5685,7 +5685,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5727,7 +5727,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5765,7 +5765,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5802,7 +5802,7 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5837,7 +5837,7 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5872,7 +5872,7 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5978,7 +5978,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6015,7 +6015,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6055,7 +6055,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6092,7 +6092,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6132,7 +6132,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6169,7 +6169,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6209,7 +6209,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6246,7 +6246,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6286,7 +6286,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6323,7 +6323,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6363,7 +6363,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6400,7 +6400,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6440,7 +6440,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6477,7 +6477,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6517,7 +6517,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6554,7 +6554,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6594,7 +6594,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6631,7 +6631,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6671,7 +6671,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6708,7 +6708,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6748,7 +6748,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6785,7 +6785,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6825,7 +6825,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6862,7 +6862,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6902,7 +6902,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6939,7 +6939,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6980,7 +6980,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7018,7 +7018,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7070,7 +7070,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7120,7 +7120,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7170,7 +7170,7 @@
       <Command>copy "$(OutputPath)NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7217,7 +7217,7 @@
       <Command>copy "$(OutputPath)NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7262,7 +7262,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7305,7 +7305,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7345,7 +7345,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7382,7 +7382,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>

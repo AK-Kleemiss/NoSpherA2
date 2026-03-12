@@ -1,4 +1,4 @@
-add_executable(BasisSetConverter
+add_executable(BasisSetConverter EXCLUDE_FROM_ALL
     "${CMAKE_CURRENT_SOURCE_DIR}/basis_set_helper.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/BasisSetConverter.cpp"
 )
@@ -13,15 +13,14 @@ add_library(basis_set_helper STATIC
 target_include_directories(basis_set_helper PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
-if (WIN32)
-    set(BSC_EXE "${CMAKE_CURRENT_BINARY_DIR}/BasisSetConverter.exe")
-else ()
-    set(BSC_EXE "${CMAKE_CURRENT_BINARY_DIR}/BasisSetConverter")
-endif ()
+file(GLOB BASIS_SET_CSVS CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/basis_sets/*.csv"
+)
+
 add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/Src/auxiliary_basis.cpp
     COMMAND $<TARGET_FILE:BasisSetConverter> ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}/Src
-    DEPENDS BasisSetConverter
+    DEPENDS BasisSetConverter ${BASIS_SET_CSVS}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Generating auxiliary_basis.cpp using BasisSetConverter"
     VERBATIM

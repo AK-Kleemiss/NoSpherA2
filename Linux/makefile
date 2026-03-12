@@ -84,8 +84,10 @@ all: NoSpherA2
 	@echo "Building basis set converter"
 	@$(MAKE) -f makefile_basis_set_converter
 
+BASIS_SET_CSVS := $(wildcard $(SRC_DIR)/basis_set_helper/basis_sets/*.csv)
+
 # Actually run the converter to generate the file
-$(SRC_DIR)/auxiliary_basis.cpp: ../BasisSetConverter
+$(SRC_DIR)/auxiliary_basis.cpp: ../BasisSetConverter $(BASIS_SET_CSVS)
 	@echo "Running BasisSetConverter..."
 	@./../BasisSetConverter ../Src/basis_set_helper ../Src
 	@echo "auxiliary_basis.cpp generated"
