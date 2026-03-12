@@ -4,6 +4,12 @@ inputs:
   platform:
     description: 'Target platform'
     required: true
+  upload_libs:
+    description:  >
+      This was created to make available the built libraries as artifacts.
+    required: false
+    type: boolean
+    default: false
 
 runs:
   using: 'composite'
@@ -135,3 +141,36 @@ runs:
           if (-not (Test-Path $OccOut)) { Write-Error "OCC build finished but output not found: $OccOut" }
             Write-Host "LibCint OK"
         }
+    - name: Prepare library archive layout (Unix)
+      if: fromJSON(inputs.upload_libs) && inputs.platform != 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        stage_dir="libraries_${{ inputs.platform }}"
+        rm -rf "$stage_dir"
+        mkdir -p "$stage_dir"
+
+        cp -a Lib/featomic_install* "$stage_dir/featomic_install_${{ inputs.platform }}"
+        cp -a Lib/occ* "$stage_dir/occ_${{ inputs.platform }}"
+        cp -a Lib/LibCint* "$stage_dir/LibCint_${{ inputs.platform }}"
+
+    - name: Prepare library archive layout (Windows)
+      if: fromJSON(inputs.upload_libs) && inputs.platform == 'Windows'
+      shell: powershell
+      run: |
+        $stageDir = "libraries_${{ inputs.platform }}"
+        if (Test-Path $stageDir) {
+          Remove-Item -Recurse -Force $stageDir
+        }
+        New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+
+        Copy-Item -Recurse -Force "Lib/featomic_install" (Join-Path $stageDir "featomic_install_${{ inputs.platform }}")
+        Copy-Item -Recurse -Force "Lib/occ" (Join-Path $stageDir "occ_${{ inputs.platform }}")
+        Copy-Item -Recurse -Force "Lib/LibCint" (Join-Path $stageDir "LibCint_${{ inputs.platform }}")
+
+    - name: Archive libraries
+      if: fromJSON(inputs.upload_libs)
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      with:
+        name: libraries_${{ inputs.platform }}
+        path: libraries_${{ inputs.platform }}

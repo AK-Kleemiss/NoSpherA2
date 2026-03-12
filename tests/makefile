@@ -85,7 +85,7 @@ disorder_THPP:
 		-mtc_mult 1 1 \
 		-mtc_charge 0 0 \
 		-mtc_ECP 0 0 \
-		-acc 0 \
+		-acc 1 \
 		-no-date)
 
 fchk_conversion:
@@ -105,21 +105,21 @@ fractal:
 	$(call RUN_TEST,$@,sucrose_fchk_SF, \
 		-fractal sucrose_diff.cube \
 		-no_date \
-		&& ${RM} NoSpherA2.log && ${MV} sucrose_diff.cube_fractal_plot $@.log)
+		&& ${RM} NoSpherA2.log && ${MV} sucrose_diff.cube_fractal_plot NoSpherA2.log)
 
 grown_water:
 	$(call RUN_TEST,$@,grown, \
 		-cif water.cif \
 		-hkl water.hkl \
 		-wfn water.wfx \
-		-acc 0 \
+		-acc 1 \
 		-no-date)
 
 Hybrid_mode:
 	$(call RUN_TEST,$@,Hybrid, \
 		-cif ZP2.cif \
 		-dmin 0.9 \
-		-acc 0 \
+		-acc 1 \
 		-mtc ZP2_part1.gbw 0.1 ZP2_part2.gbw 0.2 \
 		-mtc_mult 1 1 \
 		-mtc_charge 0 0 \
@@ -131,7 +131,7 @@ malbac_SF_ECP:
 		-cif malbac.cif \
 		-hkl malbac.hkl \
 		-wfn malbac.gbw \
-		-acc 0 \
+		-acc 1 \
 		-ECP 1 \
 		-no-date)
 
@@ -162,7 +162,7 @@ ri_fit:
 
 rubredoxin_cmtc:
 	$(call RUN_TEST,$@,rubredoxin_cmtc, \
-		-hkl 1yk4_h.hkl -acc 0 \
+		-hkl 1yk4_h.hkl -acc 1 \
 		-cmtc residues/1.gbw residues/1.cif 0 \
 		residues/2.gbw residues/2.cif 0.1 \
 		residues/3.gbw residues/3.cif 0.2 \
@@ -174,7 +174,7 @@ rubredoxin_cmtc:
 
 rubredoxin_cmtc_full:
 	$(call RUN_TEST,$@,rubredoxin_cmtc, \
-		-hkl 1yk4_h_full.hkl -acc 0 \
+		-hkl 1yk4_h_full.hkl -acc 1 \
 		-cmtc residues/1.gbw residues/1.cif 0 \
 		residues/2.gbw residues/2.cif 0.1 \
 		residues/3.gbw residues/3.cif 0.2 \
@@ -207,7 +207,7 @@ sucrose_ptb:
 		-wfn wfn.xtb \
 		-mult 0 \
 		-charge 0 \
-		-acc 0 \
+		-acc 1 \
 		-ECP 3 \
 		-no-date)
 
@@ -216,7 +216,7 @@ sucrose_SF:
 		-cif sucrose.cif \
 		-hkl olex2/Wfn_job/sucrose.hkl \
 		-wfn olex2/Wfn_job/sucrose.wfx \
-		-acc 0 \
+		-acc 1 \
 		-no-date)
 
 sucrose_twin:
@@ -224,13 +224,13 @@ sucrose_twin:
 		-cif sucrose.cif \
 		-hkl olex2/Wfn_job/sucrose.hkl \
 		-wfn olex2/Wfn_job/sucrose.wfx \
-		-acc 0 \
+		-acc 1 \
 		-twin 1 0 0 0 -1 0 0 1 -2 \
 		-no-date)
 
 wfn_reading:
 	$(call RUN_TEST,$@,wfn_reading, \
-		-hkl test.hkl -acc 0 \
+		-hkl test.hkl -acc 1 \
 		-cif test.cif -wfn test.wfn \
 		-no-date)
 
@@ -239,7 +239,7 @@ TFVC_ECP:
 		-cif Rh.cif \
 		-dmin 0.84 \
 		-wfn Rh.gbw \
-		-acc 0 \
+		-acc 1 \
 		-ECP 1 \
 		-no-date)
 
@@ -248,7 +248,7 @@ TFVC:
 		-cif water.cif \
 		-dmin 0.84 \
 		-wfn water.gbw \
-		-acc 0 \
+		-acc 1 \
 		-no-date)
 
 .PHONY: all clean dependents SALTED reading_SALTED $(ALL_TARGETS)

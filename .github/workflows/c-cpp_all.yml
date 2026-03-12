@@ -8,6 +8,13 @@ on:
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
+    inputs:
+      upload_libs:
+        description:  >
+          Uploads the created libs as artifacts. If not, saves space on CI runs, but can be useful for debugging. Only applies to the dependencies job.
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: build-${{ github.ref }}
@@ -101,6 +108,7 @@ jobs:
       uses: ./.github/actions/build-deps
       with:
         platform: ${{ matrix.name }}
+        upload_libs: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.upload_libs == 'true' }}
 
     - name: Build NoSpherA2
       run: ${{ matrix.build-script }}
@@ -208,6 +216,7 @@ jobs:
             artifact-path: |
               NoSpherA2
               libiomp5.so
+              tbb12.so
             executable-name: NoSpherA2
 
           - os: windows-2022
@@ -216,6 +225,7 @@ jobs:
             artifact-path: |
               Windows/x64/Release/NoSpherA2.exe
               Windows/x64/Release/libiomp5md.dll
+              Windows/x64/Release/tbb12.dll
             executable-name: NoSpherA2.exe
 
     runs-on: ${{ matrix.os }}
@@ -317,7 +327,6 @@ jobs:
 
   # Security analysis jobs
   CodeQL:
-    if: false
     name: Analyze
     runs-on: ubuntu-latest
     needs: build
@@ -350,45 +359,27 @@ jobs:
         languages: ${{ matrix.language }}
         source-root: Src
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential
-
-    # Cache IntelMKL
-    - name: Cache IntelMKL Build
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-      id: cache-intelmkl-linux
+    - name: Setup Build Environment
+      uses: ./.github/actions/setup-build-env
       with:
-        path: Lib/MKL
-        key: intelmkl-linux-${{ runner.os }}-${{ hashFiles('Lib/MKL/**') }}
-        restore-keys: |
-          intelmkl-linux-${{ runner.os }}-
+        platform: Linux
 
-    - name: Build IntelMKL
-      if: steps.cache-intelmkl-linux.outputs.cache-hit != 'true'
-      run: |
-          wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/6a17080f-f0de-41b9-b587-52f92512c59a/intel-onemkl-2025.3.1.11_offline.sh
-          sh intel-onemkl-2025.3.1.11_offline.sh -a -s --install-dir=Lib/MKL --eula accept
-
-    # Cache featomic
-    - name: Cache featomic Build
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-      id: cache-featomic-linux
+    - name: Cache Dependencies
+      uses: ./.github/actions/cache-deps
       with:
-        path: Lib/featomic_install
-        key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
-        restore-keys: |
-          featomic-linux-${{ runner.os }}-
+        platform: Linux
 
-    - name: Build featomic
-      if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
+    - name: Apply Patches
       run: |
-          cd featomic/featomic 
-          mkdir -p build
-          cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
-          make install
+        cd featomic
+        git apply ../patches/featomic.patch
+        cd -
+
+    - name: Build Dependencies
+      uses: ./.github/actions/build-deps
+      with:
+        platform: Linux
+        upload_libs: false
 
     - name: Build project
       run: cd Linux && make -j1

@@ -534,7 +534,7 @@ public:
             err_checkf(tsc_file.good(), "Problem with tsc file writing nr_hkl", std::cout);
 
             // Safely get scatterer size
-            const int scat_size = scatterer_size();
+            const size_t scat_size = scatterer_size();
             //std::cerr << "Scatterer size: " << scat_size << std::endl;
 
             int64_t sc_sf = sf.size();
@@ -567,7 +567,7 @@ public:
                     }
                 }
 
-                for (int i = 0; i < scat_size; i++)
+                for (size_t i = 0; i < scat_size; i++)
                 {
                     if (i < sf.size() && run < sf[i].size()) {  // Bounds check
                         tsc_file.write((char*)&(sf[i][run]), sizeof(std::complex<double>));

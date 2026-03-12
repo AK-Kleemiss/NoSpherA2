@@ -67,7 +67,7 @@ public:
   const double& get_coefficient_f(const int& _nr) const {
     return coefficients[_nr];
   };
-  double* get_coefficient_ptr() {
+  const double* get_coefficient_ptr() const {
     return coefficients.data();
   };
   const bool set_coefficient(const int& _nr, const double& value) {

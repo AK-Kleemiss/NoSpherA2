@@ -22,21 +22,59 @@ There are:
    4 atoms read from the wavefunction, of which 
    4 are identified as asymmetric unit atoms!
 
-Selected accuracy: 0
+Selected accuracy: 1
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 730 grid points.
+GridManager: Generated total of 8398 grid points.
+Starting MBIS iterations...
+MBIS iteration: 1 max change: 0.452051
+MBIS iteration: 2 max change: 0.126148
+MBIS iteration: 3 max change: 0.0707344
+MBIS iteration: 4 max change: 0.0482405
+MBIS iteration: 5 max change: 0.0339622
+MBIS iteration: 6 max change: 0.0241724
+MBIS iteration: 7 max change: 0.0173694
+MBIS iteration: 8 max change: 0.0126059
+MBIS iteration: 9 max change: 0.00923908
+MBIS iteration: 10 max change: 0.00683367
+MBIS converged after 10 iterations with max charge change: 0.00509588 and max sig change: 0.000862377
+Promolecular charges:
+Atom   0: -0.806453
+Atom   1: 0.403417
+Atom   2: 0.403412
+Atom   3: -6.17551e-05
+Starting EMBIS iterations...
+EMBIS iteration:    1 max charge/alpha change: 3.20158/0.81028
+EMBIS iteration:    2 max charge/alpha change: 1.25135/0.00947169
+EMBIS iteration:    3 max charge/alpha change: 0.550683/0.00867625
+EMBIS iteration:    4 max charge/alpha change: 0.235477/0.00639601
+EMBIS iteration:    5 max charge/alpha change: 0.148697/0.00462874
+EMBIS iteration:    6 max charge/alpha change: 0.130947/0.00344081
+EMBIS iteration:    7 max charge/alpha change: 0.122064/0.00264991
+EMBIS iteration:    8 max charge/alpha change: 0.115841/0.00210765
+EMBIS iteration:    9 max charge/alpha change: 0.1097/0.00172021
+EMBIS iteration:   10 max charge/alpha change: 0.102886/0.00143161
+EMBIS iteration:   11 max charge/alpha change: 0.0978939/0.0012085
+EMBIS iteration:   12 max charge/alpha change: 0.091712/0.00103065
+EMBIS converged after 12 iterations with max charge change: 0.000885416 and max sig change: 0.0843574
+Promolecular charges:
+Atom   0: -0.766632
+Atom   1: 0.383507
+Atom   2: 0.383501
+Atom   3: -6.18727e-05
 Table of Charges in electrons
-    Atom       Becke   Hirshfeld   TFVC
-        O1    -0.165    -0.299    -1.310
-        H1     0.076     0.146     0.558
-        H2     0.076     0.146     0.558
-        He     0.000     0.000     0.000
+      Atom     Becke Hirshfeld      TFVC      MBIS     EMBIS
+        O1    -0.165    -0.299    -1.105    -0.809    -0.766
+        H1     0.083     0.149     0.551     0.405     0.383
+        H2     0.083     0.149     0.551     0.405     0.383
+        He     0.000     0.000     0.000     0.000     0.000
 Total number of electrons:
- Becke:      12.013428
- Hirshfeld:  12.006169
- TVFC:       12.193653
+ Becke:      11.999686
+ Hirshfeld:  11.999977
+ TVFC:       12.002302
+ MBIS:       11.999490
+ EMBIS:      11.999551
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!

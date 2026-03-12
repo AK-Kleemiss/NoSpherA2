@@ -47,7 +47,7 @@ bool needs_rewrite(const std::filesystem::path& basis_path, const std::vector<st
     }
 
     std::filesystem::path basis_sets_loc = basis_path / "basis_set_helper" / "basis_sets";
-    for (int i = 0; i < nr_files; ++i) {
+    for (int i = 0; i < nr_files; i++) {
         if (!std::getline(checkpoint_file, line)) {
             log_file << "Unexpected end of checkpoint.txt.\n";
             return true;
@@ -77,7 +77,7 @@ bool needs_rewrite(const std::filesystem::path& basis_path, const std::vector<st
 
 void write_checkpoint_file(std::filesystem::path basis_path, std::vector<std::filesystem::path> files) {
     std::ofstream checkpoint_file(basis_path / "checkpoint.txt");
-    checkpoint_file << "Nr Files:"<< files.size() << "\n";
+    checkpoint_file << "Nr Files:" << files.size() << "\n";
     for (const auto& file : files)
     {
         checkpoint_file << file.filename().generic_string() << ":" << std::filesystem::file_size(file) << "\n";
@@ -139,7 +139,7 @@ int main(int argc, char** argv)
     aux_file << "constexpr std::array<int, 118> compute_prefix_sum(const std::array<int, 118>& counts) {\n";
     aux_file << "    std::array<int, 118> offsets{};\n";
     aux_file << "    int sum = 0;\n";
-    aux_file << "    for (int i = 0; i < 118; ++i) {\n";
+    aux_file << "    for (int i = 0; i < 118; i++) {\n";
     aux_file << "        offsets[i] = (counts[i] == 0) ? -1 : sum;\n";
     aux_file << "        sum += counts[i];\n";
     aux_file << "    }\n";
