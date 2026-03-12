@@ -9,7 +9,7 @@ runs:
   using: 'composite'
   steps:
     - name: Run sccache-cache
-      uses: hendrikmuhs/ccache-action@v1.2.20
+      uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
       with:
         key: ${{ inputs.platform }}-sccache }}
         max-size: "1GB"
@@ -18,70 +18,70 @@ runs:
 
     - name: Cache occ
       if: inputs.platform != 'Mac_ARM64' && inputs.platform != 'Mac_x86_64'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: Lib/occ
         key: ${{ inputs.platform }}-occ-${{ hashFiles('occ/**', 'CMakePresets.json') }}
 
     - name: Cache occ
       if: inputs.platform == 'Mac_ARM64'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: Lib/occ_arm64
         key: ${{ inputs.platform }}-occ-${{ hashFiles('occ/**', 'CMakePresets.json') }}
 
     - name: Cache occ
       if: inputs.platform == 'Mac_x86_64'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: Lib/occ_x86_64
         key: ${{ inputs.platform }}-occ-${{ hashFiles('occ/**', 'CMakePresets.json') }}
 
     - name: Cache featomic (Linux / Windows)
       if: inputs.platform == 'Linux' || inputs.platform == 'Windows'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: Lib/featomic_install
         key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**') }}
 
     - name: Cache featomic (macOS ARM64)
       if: inputs.platform == 'Mac_ARM64'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: Lib/featomic_install_arm64
         key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**') }}
 
     - name: Cache featomic (macOS x86_64)
       if: inputs.platform == 'Mac_x86_64'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: Lib/featomic_install_x86_64
         key: ${{ inputs.platform }}-featomic-${{ hashFiles('featomic/**') }}
 
     - name: Cache LibCint (Linux / Windows)
       if: inputs.platform == 'Linux' || inputs.platform == 'Windows'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: Lib/LibCint
         key: ${{ inputs.platform }}-libcint-${{ hashFiles('libcint/**', 'makefile') }}
 
     - name: Cache LibCint (macOS ARM64)
       if: inputs.platform == 'Mac_ARM64'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: Lib/LibCint_arm64
         key: ${{ inputs.platform }}-libcint-${{ hashFiles('libcint/**', 'makefile') }}
 
     - name: Cache LibCint (macOS x86_64)
       if: inputs.platform == 'Mac_x86_64'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: Lib/LibCint_x86_64
         key: ${{ inputs.platform }}-libcint-${{ hashFiles('libcint/**', 'makefile') }}
 
     - name: Cache MKL (Linux)
       if: inputs.platform == 'Linux'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: Lib/MKL
         key: ${{ inputs.platform }}-mkl-${{ hashFiles('Lib/MKL/**') }}
@@ -89,7 +89,7 @@ runs:
 
     - name: Cache MKL (Windows)
       if: inputs.platform == 'Windows'
-      uses: actions/cache@v4.2.4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       with:
         path: |
           Windows\MKL.auto.props

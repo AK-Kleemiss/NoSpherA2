@@ -27,7 +27,7 @@ struct DensityExtremum
 // detects zero-crossings of the first derivative, with optional quadratic
 // interpolation refinement around the detected extremum.
 static std::vector<DensityExtremum> find_line_density_extrema(
-    const WFN& wfn,
+    const WFN &wfn,
     int atomA,
     int atomB,
     int samples = 400,
@@ -57,10 +57,10 @@ static std::vector<DensityExtremum> find_line_density_extrema(
 
     vec dens(samples);
     vec ts(samples);
-    Thakkar* spherical_temp1 = NULL;
-    Thakkar* spherical_temp2 = NULL;
-    Spherical_Gaussian_Density* a1 = NULL;
-    Spherical_Gaussian_Density* a2 = NULL;
+    Thakkar *spherical_temp1 = NULL;
+    Thakkar *spherical_temp2 = NULL;
+    Spherical_Gaussian_Density *a1 = NULL;
+    Spherical_Gaussian_Density *a2 = NULL;
     if (wfn.get_ECP_mode() != 0) {
         spherical_temp1 = new Thakkar(wfn.get_atom_charge(atomA), wfn.get_ECP_mode());
         spherical_temp2 = new Thakkar(wfn.get_atom_charge(atomB), wfn.get_ECP_mode());
@@ -68,7 +68,7 @@ static std::vector<DensityExtremum> find_line_density_extrema(
         a2 = new Spherical_Gaussian_Density(wfn.get_atom_charge(atomB), wfn.get_ECP_mode());
     }
 #pragma omp parallel for
-    for (int i = 0; i < samples; ++i) {
+    for (int i = 0; i < samples; i++) {
         const double t = t0 + i * dt;
         ts[i] = t;
         const d3 Pos = { pos_a[0] + dx[0] * t,
@@ -91,7 +91,7 @@ static std::vector<DensityExtremum> find_line_density_extrema(
     }
 
     // Detect extrema via sign changes of the discrete derivative
-    for (int i = 1; i < samples - 1; ++i) {
+    for (int i = 1; i < samples - 1; i++) {
         const double d1 = dens[i] - dens[i - 1];
         const double d2 = dens[i + 1] - dens[i];
         if (d1 == 0 && d2 == 0) continue; // flat region
@@ -144,7 +144,7 @@ AtomGrid::AtomGrid(const double radial_precision,
     const double alpha_max,
     const int max_l_quantum_number,
     const double alpha_min[],
-    std::ostream& file)
+    std::ostream &file)
 {
     using namespace std;
     const int min_num_angular_points_closest =
@@ -252,9 +252,10 @@ int AtomGrid::get_num_grid_points() const { return (int)atom_grid_x_bohr_.size()
 
 int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
-vec2 make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
-    vec2 chi(wfn.get_ncen(), vec(wfn.get_ncen(), 0.0));
-    std::vector<std::vector<bool>> neighbours(wfn.get_ncen(), bvec(wfn.get_ncen(), true));
+vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
+    const int ncen = wfn.get_ncen();
+    vec chi(ncen * ncen, 0.0);
+    std::vector<std::vector<bool>> neighbours(ncen, bvec(ncen, true));
     double rijx2, rijy2, rijz2, xdist, disth;
     for (int a = 0; a < wfn.get_ncen(); a++) {
         for (int b = a + 1; b < wfn.get_ncen(); b++) {
@@ -298,8 +299,8 @@ vec2 make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
                                  wfn.get_atom_coordinate(b, 1) - rijy2,
                                  wfn.get_atom_coordinate(b, 2) - rijz2 }) > constants::far_away) {
                     // If they are neighbours but far apart we will consider them equal radius
-                    chi[a][b] = 1.0;
-                    chi[b][a] = 1.0;
+                    chi[a * ncen + b] = 1.0;
+                    chi[b * ncen + a] = 1.0;
                 }
                 else {
                     // If they are neighbours and close enough we do the line search for topology evaluation!
@@ -355,27 +356,27 @@ vec2 make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
                             }
                             else {
                                 std::cout << "WARNING: Unexpected types of extrema found between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
-                                chi[a][b] = 1.0;
-                                chi[b][a] = 1.0;
+                                chi[a * ncen + b] = 1.0;
+                                chi[b * ncen + a] = 1.0;
                                 continue;
                             }
                         }
                         else {
                             std::cout << "WARNING: Unexpected number of extrema (" << extrema.size() << ") found between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
-                            chi[a][b] = 1.0;
-                            chi[b][a] = 1.0;
+                            chi[a * ncen + b] = 1.0;
+                            chi[b * ncen + a] = 1.0;
                             continue;
                         }
                     }
                     // And save the "chi" in the same matrix
                     if (extrema[use_extr].distB == 0.0) {
                         std::cout << "WARNING: Division by zero detected for chi between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
-                        chi[a][b] = 1.0;
-                        chi[b][a] = 1.0;
+                        chi[a * ncen + b] = 1.0;
+                        chi[b * ncen + a] = 1.0;
                     }
                     else {
-                        chi[a][b] = extrema[use_extr].distA / extrema[use_extr].distB;
-                        chi[b][a] = 1.0 / chi[a][b];
+                        chi[a * ncen + b] = extrema[use_extr].distA / extrema[use_extr].distB;
+                        chi[b * ncen + a] = 1.0 / chi[a * ncen + b];
                     }
                     // For if one have a very polarized bond (bcp super displaced towards one of the atoms
                     double ri = extrema[use_extr].distA / (extrema[use_extr].distA + extrema[use_extr].distB);
@@ -386,12 +387,12 @@ vec2 make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
                     // Some printing on the ratio between pair of atoms, for if strange results (or against chemical intuition) are obtained one can see if it is TFVC problem
                     // This is helpful to see if the "bcp" evaluation is broken, or one face a nasty scenario that is not yet included in the code...
                     if (debug)
-                        std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a][b] << std::endl;
+                        std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a * ncen + b] << std::endl;
                 }
             }
             else {
-                chi[a][b] = 1.0;
-                chi[b][a] = 1.0;
+                chi[a * ncen + b] = 1.0;
+                chi[b * ncen + a] = 1.0;
             }
         }
     }
@@ -401,24 +402,25 @@ vec2 make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
 
 void AtomGrid::get_grid(const int num_centers,
     const int center_index,
-    const double* x_coordinates_bohr,
-    const double* y_coordinates_bohr,
-    const double* z_coordinates_bohr,
-    const int* proton_charges,
+    const double *x_coordinates_bohr,
+    const double *y_coordinates_bohr,
+    const double *z_coordinates_bohr,
+    const int *proton_charges,
     double grid_x_bohr[],
     double grid_y_bohr[],
     double grid_z_bohr[],
     double grid_aw[],
     double grid_becke_w[],
     double grid_TFVC_w[],
-    const WFN& wfn,
-    vec2& chi,
+    const WFN &wfn,
+    vec &chi,
     bool debug) const
 {
 
     if (num_centers > 1) {
         if (chi.size() == 0)
             chi = make_chi(wfn, 40, true, debug);
+        const int np = get_num_grid_points();
 #pragma omp parallel
         {
             vec pa_b(num_centers);
@@ -426,7 +428,7 @@ void AtomGrid::get_grid(const int num_centers,
             std::array<double, 2> result_weights;
             double temp;
 #pragma omp for
-            for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
+            for (int ipoint = 0; ipoint < np; ipoint++) {
                 grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
                 grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
                 grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
@@ -494,7 +496,7 @@ void AtomGrid::get_radial_distances_omp(double grid_r_bohr[]) const
 }
 
 // JCP 88, 2547 (1988), eq. 20
-constexpr double f3(const double& x)
+inline constexpr double f3(const double &x)
 {
     double f = x;
     f *= (1.5 - 0.5 * f * f); // First iteration
@@ -504,7 +506,7 @@ constexpr double f3(const double& x)
 }
 
 // JCP 88, 2547 (1988), eq. 20
-constexpr double f4(const double& x)
+inline constexpr double f4(const double &x)
 {
     double f = x;
     f *= (1.5 - 0.5 * f * f); // First iteration
@@ -514,7 +516,7 @@ constexpr double f4(const double& x)
     return f;
 }
 
-constexpr double f(const double& x)
+constexpr double f(const double &x)
 {
     double f = x;
     for (int i = 0; i < constants::hardness; i++)
@@ -524,28 +526,32 @@ constexpr double f(const double& x)
 
 // JCP 139, 071103 (2013) for TFVC
 // JCP 88, 2547 (1988) for Becke
-std::array<double, 2> get_integration_weights(const int& num_centers,
-    const int* proton_charges,
-    const double* x_coordinates_bohr,
-    const double* y_coordinates_bohr,
-    const double* z_coordinates_bohr,
-    const int& center_index,
-    const double& x,
-    const double& y,
-    const double& z,
-    std::vector<double>& pa_b,
-    std::vector<double>& pa_tv,
-    const vec2& chi)
+std::array<double, 2> get_integration_weights(const int &num_centers,
+    const int *proton_charges,
+    const double *x_coordinates_bohr,
+    const double *y_coordinates_bohr,
+    const double *z_coordinates_bohr,
+    const int &center_index,
+    const double &x,
+    const double &y,
+    const double &z,
+    std::vector<double> &pa_b,
+    std::vector<double> &pa_tv,
+    const vec &chi)
 {
     double mu_ab, nu_ab, f, dist_ab;
     double dist_a, dist_b;
     double vx, vy, vz;
-    double R_a, R_b, chi_becke, u_ab;
-
+    double R_a, R_b, chi_becke, u_ab, chi_mod;
+    const double *chi_off, *bragg = constants::bragg_angstrom;
+    double *R_v = new double[num_centers];
+    const double &cut = constants::cutoff;
     for (int a = 0; a < num_centers; a++) {
         pa_b[a] = 1.0;
         pa_tv[a] = 1.0;
+        R_v[a] = bragg[proton_charges[a]];
     }
+
 
     for (int a = 0; a < num_centers; a++) {
         vx = x_coordinates_bohr[a] - x;
@@ -553,15 +559,22 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
         vz = z_coordinates_bohr[a] - z;
         dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
 
+        double &pa_b_a = pa_b[a];
+        double &pa_tv_a = pa_tv[a];
+
         if (dist_a > constants::far_away) {
-            pa_b[a] = 0.0;
-            pa_tv[a] = 0.0;
+            pa_b_a = 0.0;
+            pa_tv_a = 0.0;
             continue;
         }
 
-        R_a = constants::bragg_angstrom[proton_charges[a]];
+        R_a = R_v[a];
+        chi_off = chi.data() + a * num_centers;
 
         for (int b = a + 1; b < num_centers; b++) {
+            double &pa_b_b = pa_b[b];
+            double &pa_tv_b = pa_tv[b];
+
             vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
             vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
             vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
@@ -571,32 +584,36 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             vy = y_coordinates_bohr[b] - y;
             vz = z_coordinates_bohr[b] - z;
             dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
-            R_b = constants::bragg_angstrom[proton_charges[b]];
+            R_b = R_v[b];
 
             // JCP 139, 071103 (2013), eq. 7
             // JCP 88, 2547 (1988), eq. 11
             mu_ab = (dist_a - dist_b) / dist_ab;
 
-            nu_ab = (1.0 + mu_ab - chi[a][b] * (1.0 - mu_ab)) / (1.0 + mu_ab + chi[a][b] * (1.0 - mu_ab));
+            chi_mod = *(chi_off + b) * (1.0 - mu_ab);
 
-            f = f4(nu_ab);
+            nu_ab = 1.0 + mu_ab;
 
-            if (std::abs(1.0 - f) < constants::cutoff)
-                pa_tv[a] = 0.0;
+            nu_ab = (nu_ab - chi_mod) / (nu_ab + chi_mod);
+
+            f = 1.0 - f4(nu_ab);
+
+            if (std::abs(f) < cut)
+                pa_tv_a = 0.0;
             else {
                 //Reduce numerical jittering
-                if (pa_tv[a] > 1E-250 || pa_tv[a] < -1E-250)
-                    pa_tv[a] *= 0.5 * (1.0 - f);
+                if (pa_tv_a > 1E-250 || pa_tv_a < -1E-250)
+                    pa_tv_a *= 0.5 * f;
                 else
-                    pa_tv[a] = 0.0;
-                if (pa_tv[b] > 1E-250 || pa_tv[b] < -1E-250)
-                    pa_tv[b] *= 0.5 * (1.0 + f);
+                    pa_tv_a = 0.0;
+                if (pa_tv_b > 1E-250 || pa_tv_b < -1E-250)
+                    pa_tv_b *= 0.5 * (2.0 - f);
                 else
-                    pa_tv[b] = 0.0;
+                    pa_tv_b = 0.0;
             }
 
 
-            if (std::abs(R_a - R_b) > constants::cutoff) {
+            if (std::abs(R_a - R_b) > cut) {
                 chi_becke = R_a / R_b;
                 u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
                 u_ab = u_ab / (u_ab * u_ab - 1.0);
@@ -612,22 +629,24 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             else
                 nu_ab = mu_ab;
 
-            f = f3(nu_ab);
+            f = 1.0 - f3(nu_ab);
 
-            if (std::abs(1.0 - f) < constants::cutoff)
-                pa_b[a] = 0.0;
+            if (std::abs(f) < cut)
+                pa_b_a = 0.0;
             else {
-                if (pa_b[a] > 1E-250 || pa_b[a] < -1E-250)
-                    pa_b[a] *= 0.5 * (1.0 - f);
+                if (pa_b_a > 1E-250 || pa_b_a < -1E-250)
+                    pa_b_a *= 0.5 * f;
                 else
-                    pa_b[a] = 0.0;
-                if (pa_b[b] > 1E-250 || pa_b[b] < -1E-250)
-                    pa_b[b] *= 0.5 * (1.0 + f);
+                    pa_b_a = 0.0;
+                if (pa_b_b > 1E-250 || pa_b_b < -1E-250)
+                    pa_b_b *= 0.5 * (2.0 - f);
                 else
-                    pa_b[b] = 0.0;
+                    pa_b_b = 0.0;
             }
         }
     }
+
+    free(R_v);
 
     double w_becke = 0.0, w_tfvc = 0.0;
     for (int a = 0; a < num_centers; a++) {
@@ -635,12 +654,12 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
         w_tfvc += pa_tv[a];
     }
 
-    return { std::abs(w_becke) > constants::cutoff ? pa_b[center_index] / w_becke : 1.0, std::abs(w_tfvc) > constants::cutoff ? pa_tv[center_index] / w_tfvc : 1.0 };
+    return { std::abs(w_becke) > cut ? pa_b[center_index] / w_becke : 1.0, std::abs(w_tfvc) > cut ? pa_tv[center_index] / w_tfvc : 1.0 };
 }
 
 // TCA 106, 178 (2001), eq. 25
 // we evaluate r_inner for s functions
-const double get_r_inner(const double& max_error, const double& alpha_inner)
+const double get_r_inner(const double &max_error, const double &alpha_inner)
 {
     double d = 1.9;
 
@@ -651,12 +670,611 @@ const double get_r_inner(const double& max_error, const double& alpha_inner)
     return r;
 }
 
+std::pair<vec, vec> get_shsig_shpop(const int &atom_type) {
+    vec shsig(constants::MBIS_function[atom_type], 0.0);
+    vec shpop(constants::MBIS_function[atom_type], 0.0);
+
+    switch (constants::MBIS_function[atom_type]) {
+    case 0:
+        err_not_impl_f("MBIS does not work with ghost atoms. Please dont do that to me!", std::cout);
+        break;
+    case 1:
+        shsig[0] = 1.0 / (2 * atom_type);
+        shpop[0] = atom_type;
+        break;
+    case 2:
+        shsig[0] = 1.0 / (2 * atom_type);
+        shpop[0] = 2;
+        shsig[1] = 0.5;
+        shpop[1] = atom_type - 2;
+        break;
+    case 3:
+        shsig[0] = 1.0 / (2 * atom_type);
+        shpop[0] = 2;
+        shsig[1] = 1.0 / (2 * pow(atom_type, 0.5));
+        shpop[1] = 8;
+        shsig[2] = 0.5;
+        shpop[2] = atom_type - 10;
+        break;
+    case 4:
+        shsig[0] = 1.0 / (2 * atom_type);
+        shpop[0] = 2;
+        shsig[1] = 1.0 / (2 * pow(atom_type, constants::c_23));
+        shpop[1] = 8;
+        shsig[2] = 1.0 / (2 * pow(atom_type, constants::c_13));
+        shpop[2] = 8;
+        shsig[3] = 0.5;
+        shpop[3] = atom_type - 18;
+        break;
+    case 5:
+        shsig[0] = 1.0 / (2 * atom_type);
+        shpop[0] = 2;
+        shsig[1] = 1.0 / (2 * pow(atom_type, 0.25));
+        shpop[1] = 8;
+        shsig[2] = 1.0 / (2 * pow(atom_type, 0.5));
+        shpop[2] = 8;
+        shsig[3] = 1.0 / (2 * pow(atom_type, 0.75));
+        shpop[3] = 18;
+        shsig[4] = 0.5;
+        shpop[4] = atom_type - 36;
+        break;
+    case 6:
+        shsig[0] = 1.0 / (2 * atom_type);
+        shpop[0] = 2;
+        shsig[1] = 1.0 / (2 * pow(atom_type, 0.2));
+        shpop[1] = 8;
+        shsig[2] = 1.0 / (2 * pow(atom_type, 0.4));
+        shpop[2] = 8;
+        shsig[3] = 1.0 / (2 * pow(atom_type, 0.6));
+        shpop[3] = 18;
+        shsig[4] = 1.0 / (2 * pow(atom_type, 0.8));
+        shpop[4] = 18;
+        shsig[5] = 0.5;
+        shpop[5] = atom_type - 54;
+        break;
+    default:
+        err_not_impl_f("MBIS does not work with more than 6 shells. Please dont do that to me!", std::cout);
+        break;
+    }
+
+    return std::make_pair(shsig, shpop);
+}
+
+std::pair<vec2, vec> get_shalpha_shpop(const int &atom_type) {
+    // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
+    vec2 shalpha(constants::MBIS_function[atom_type], vec(6, 0.0));
+    vec shpop(constants::MBIS_function[atom_type], 0.0);
+
+    switch (constants::MBIS_function[atom_type]) {
+    case 0:
+        err_not_impl_f("MBIS does not work with ghost atoms. Please dont do that to me!", std::cout);
+        break;
+    case 1:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
+        shpop[0] = atom_type;
+        break;
+    case 2:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
+        shpop[0] = 2;
+        shalpha[1][0] = 4.0;
+        shalpha[1][3] = 4.0;
+        shalpha[1][5] = 4.0;
+        shpop[1] = atom_type - 2;
+        break;
+    case 3:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
+        shpop[0] = 2;
+        shalpha[1][0] = pow(2.0 * sqrt(atom_type), 2);
+        shalpha[1][3] = pow(2.0 * sqrt(atom_type), 2);
+        shalpha[1][5] = pow(2.0 * sqrt(atom_type), 2);
+        shpop[1] = 8;
+        shalpha[2][0] = 4.0;
+        shalpha[2][3] = 4.0;
+        shalpha[2][5] = 4.0;
+        shpop[2] = atom_type - 10;
+        break;
+    case 4:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
+        shpop[0] = 2;
+        shalpha[1][0] = pow(2 * pow(atom_type, constants::c_23), 2);
+        shalpha[1][3] = pow(2 * pow(atom_type, constants::c_23), 2);
+        shalpha[1][5] = pow(2 * pow(atom_type, constants::c_23), 2);
+        shpop[1] = 8;
+        shalpha[2][0] = pow(2 * pow(atom_type, constants::c_13), 2);
+        shalpha[2][3] = pow(2 * pow(atom_type, constants::c_13), 2);
+        shalpha[2][5] = pow(2 * pow(atom_type, constants::c_13), 2);
+        shpop[2] = 8;
+        shalpha[3][0] = 4.0;
+        shalpha[3][3] = 4.0;
+        shalpha[3][5] = 4.0;
+        shpop[3] = atom_type - 18;
+        break;
+    case 5:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
+        shpop[0] = 2;
+        shalpha[1][0] = pow(2 * pow(atom_type, 0.25), 2);
+        shalpha[1][3] = pow(2 * pow(atom_type, 0.25), 2);
+        shalpha[1][5] = pow(2 * pow(atom_type, 0.25), 2);
+        shpop[1] = 8;
+        shalpha[2][0] = pow(2 * pow(atom_type, 0.5), 2);
+        shalpha[2][3] = pow(2 * pow(atom_type, 0.5), 2);
+        shalpha[2][5] = pow(2 * pow(atom_type, 0.5), 2);
+        shpop[2] = 8;
+        shalpha[3][0] = pow(2 * pow(atom_type, 0.75), 2);
+        shalpha[3][3] = pow(2 * pow(atom_type, 0.75), 2);
+        shalpha[3][5] = pow(2 * pow(atom_type, 0.75), 2);
+        shpop[3] = 18;
+        shalpha[4][0] = 4.0;
+        shalpha[4][3] = 4.0;
+        shalpha[4][5] = 4.0;
+        shpop[4] = atom_type - 36;
+        break;
+    case 6:
+        shalpha[0][0] = pow(2.0 * atom_type, 2);
+        shalpha[0][3] = pow(2.0 * atom_type, 2);
+        shalpha[0][5] = pow(2.0 * atom_type, 2);
+        shpop[0] = 2;
+        shalpha[1][0] = pow(2 * pow(atom_type, 0.2), 2);
+        shalpha[1][3] = pow(2 * pow(atom_type, 0.2), 2);
+        shalpha[1][5] = pow(2 * pow(atom_type, 0.2), 2);
+        shpop[1] = 8;
+        shalpha[2][0] = pow(2 * pow(atom_type, 0.4), 2);
+        shalpha[2][3] = pow(2 * pow(atom_type, 0.4), 2);
+        shalpha[2][5] = pow(2 * pow(atom_type, 0.4), 2);
+        shpop[2] = 8;
+        shalpha[3][0] = pow(2 * pow(atom_type, 0.6), 2);
+        shalpha[3][3] = pow(2 * pow(atom_type, 0.6), 2);
+        shalpha[3][5] = pow(2 * pow(atom_type, 0.6), 2);
+        shpop[3] = 18;
+        shalpha[4][0] = pow(2 * pow(atom_type, 0.8), 2);
+        shalpha[4][3] = pow(2 * pow(atom_type, 0.8), 2);
+        shalpha[4][5] = pow(2 * pow(atom_type, 0.8), 2);
+        shpop[4] = 18;
+        shalpha[5][0] = 4.0;
+        shalpha[5][3] = 4.0;
+        shalpha[5][5] = 4.0;
+        shpop[5] = atom_type - 54;
+        break;
+    default:
+        err_not_impl_f("MBIS does not work with more than 6 shells. Please dont do that to me!", std::cout);
+        break;
+    }
+
+    return std::make_pair(shalpha, shpop);
+}
+
+vec2 sigma_to_alpha(const std::pair<vec, vec> &sigma) {
+    // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
+    vec2 shalpha(sigma.first.size(), vec(6, 0.0));
+
+    for (int i = 0; i < sigma.first.size(); i++) {
+        shalpha[i][0] = pow(sigma.first[i], -2);
+        shalpha[i][3] = pow(sigma.first[i], -2);
+        shalpha[i][5] = pow(sigma.first[i], -2);
+    }
+
+    return shalpha;
+}
+
+// grids here are the total_grid in the SF calculator functions, just as a not to myself and future me
+//Implemented according to the modified Multiwfn version by FJR and Anker
+std::vector<std::pair<vec, vec>> make_MBIS_vectors(
+    const WFN &wavy,
+    const vec3 &grid,
+    const ivec &num_grid_points,
+    const bool debug)
+{
+    using sp_vec = std::vector<std::pair<vec, vec>>;
+    const auto atoms = wavy.get_atoms();
+    vec charges(atoms.size(), 0.0);
+    vec last_charges(atoms.size(), 0.0);
+    vec zeros_6(6, 0.0);
+    sp_vec sig_pop_vector;
+    for (const auto &atom : atoms) {
+        sig_pop_vector.emplace_back(get_shsig_shpop(atom.get_charge()));
+    }
+    const double crit = 0.001;
+    sp_vec copy_of_input = sig_pop_vector;
+    double varmax = 0, varsig = 0;
+    // Cache atom coordinates and charges to avoid repeated function calls
+    const int ncen = wavy.get_ncen();
+    vec atom_coords(ncen * 3);
+    ivec nshell_cache(ncen);
+    ivec ECP_els(ncen);
+    std::vector<Thakkar> ECP_electron_helper;
+    std::vector<Spherical_Gaussian_Density> ECP_correction_helper;
+    for (int j = 0; j < ncen; j++) {
+        atom_coords[j * 3 + 0] = atoms[j].get_coordinate(0);
+        atom_coords[j * 3 + 1] = atoms[j].get_coordinate(1);
+        atom_coords[j * 3 + 2] = atoms[j].get_coordinate(2);
+        const int c = atoms[j].get_charge();
+        nshell_cache[j] = constants::MBIS_function[c];
+        ECP_electron_helper.emplace_back(c);
+        ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
+        ECP_els[j] = atoms[j].get_ECP_electrons();
+    }
+    for (size_t it = 0; it < 2000; it++) {
+        for (int j = 0; j < ncen; j++) {
+            std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
+            std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
+        }
+        it == 0 ? std::cout << "Starting MBIS iterations..." << std::endl : std::cout << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
+        varmax = 0.0, varsig = 0.0;
+        for (int i = 0; i < ncen; i++) {
+            const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
+            const int end = num_grid_points[i];
+            //Assuming 3 is the quadrature weight and 7 is the electron density 
+            b_weight = grid[i][5].data();
+            dens = grid[i][7].data();
+            //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
+            gx = grid[i][0].data();
+            gy = grid[i][1].data();
+            gz = grid[i][2].data();
+
+#pragma omp parallel
+            {
+                vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0);
+                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq, bw, _x, _y, _z;
+                int j, shell, nshell, *ECP_els_j;
+                double dx[3], *dist_j, *pop, *si;
+                sp_vec local = sig_pop_vector;
+                for (j = 0; j < ncen; j++) {
+                    std::fill(local[j].first.begin(), local[j].first.end(), 0.0);
+                    std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
+                }
+                std::pair<vec, vec> *coi;
+
+#pragma omp for schedule(dynamic)
+                for (int point = 0; point < end; point++) {
+                    rho0 = 0.0;
+                    std::fill(dists.begin(), dists.end(), 0.0);
+                    std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
+                    bw = b_weight[point];
+                    density = bw * dens[point];
+                    _x = gx[point];
+                    _y = gy[point];
+                    _z = gz[point];
+                    for (j = 0; j < ncen; j++) {
+                        //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
+                        dx[0] = _x - atom_coords[j * 3 + 0];
+                        dx[1] = _y - atom_coords[j * 3 + 1];
+                        dx[2] = _z - atom_coords[j * 3 + 2];
+                        // Check distance squared first to avoid sqrt for far away points
+                        dist_sq = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+                        if (dist_sq > constants::far_away_sq)
+                            continue;
+
+                        dist_j = &dists[j];
+                        *dist_j = std::sqrt(dist_sq);
+                        ECP_els_j = &ECP_els[j];
+                        if (atoms[j].get_ECP_electrons() > 0) {
+                            density += (ECP_electron_helper[j].get_core_density(*dist_j, *ECP_els_j) + ECP_correction_helper[j].get_radial_density(*dist_j)) * bw;
+                        }
+
+                        nshell = nshell_cache[j];
+                        coi = &copy_of_input[j];
+                        pop = coi->second.data();
+                        si = coi->first.data();
+
+                        for (shell = 0; shell < nshell; shell++) {
+                            sigval = 1.0 / si[shell];
+                            tmp = pop[shell] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-*dist_j * sigval);
+                            if (abs(tmp) < 1e-20)
+                                continue;
+                            rho0shell[j * 6 + shell] = tmp;
+                            rho0 += tmp;
+                        }
+                    }
+                    if (rho0 == 0.0)
+                        continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
+                    for (j = 0; j < ncen; j++) {
+                        nshell = nshell_cache[j];
+                        dist_j = &dists[j];
+                        pop = local[j].second.data();
+                        si = local[j].first.data();
+                        for (shell = 0; shell < nshell; shell++) {
+                            r0s = rho0shell[j * 6 + shell];
+                            if (r0s == 0)
+                                continue;
+                            temp_res = density * r0s / rho0;
+                            si[shell] += temp_res * (*dist_j);
+                            pop[shell] += temp_res;
+                        }
+                    }
+                }
+
+                for (j = 0; j < ncen; j++) {
+                    nshell = nshell_cache[j];
+                    for (shell = 0; shell < nshell; shell++) {
+#pragma omp atomic
+                        sig_pop_vector[j].first[shell] += local[j].first[shell];
+#pragma omp atomic
+                        sig_pop_vector[j].second[shell] += local[j].second[shell];
+                    }
+                }
+            }
+        }
+        //back to the cycle main loop, we updated sig and pop based on information loss :)
+
+        for (int i = 0; i < ncen; i++) {
+            for (int shell = 0; shell < nshell_cache[i]; shell++) {
+                if (sig_pop_vector[i].second[shell] != 0)
+                    sig_pop_vector[i].first[shell] /= 3.0 * sig_pop_vector[i].second[shell];
+                varsig = std::max(varsig, std::abs(sig_pop_vector[i].first[shell] - copy_of_input[i].first[shell]));
+            }
+            charges[i] = wavy.get_atom_charge(i) - vec_sum(sig_pop_vector[i].second) + wavy.get_atom_ECP_electrons(i);
+            varmax = std::max(varmax, std::abs(charges[i] - last_charges[i]));
+            if (debug)
+                std::cout << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
+        }
+        if (varmax < crit || varsig < crit) {
+            std::cout << "MBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
+            std::cout << "Promolecular charges:\n";
+            for (int i = 0; i < wavy.get_ncen(); i++) {
+                std::cout << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
+            }
+            return sig_pop_vector;
+        }
+        copy_of_input = sig_pop_vector;
+        last_charges = charges;
+
+    }
+    std::cout << "MBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
+    return sig_pop_vector;
+}
+
+// grids here are the total_grid in the SF calculator functions, just as a not to myself and future me
+//Implemented according to the modified Multiwfn version by FJR and Anker
+std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
+    const WFN &wavy,
+    const vec3 &grid,
+    const ivec &num_grid_points,
+    const bool debug,
+    const std::vector<std::pair<vec, vec>> MBIS_vectors)
+{
+    using sp_vec = std::vector<std::pair<vec2, vec>>;
+    const double crit = 0.001;
+    auto atoms = wavy.get_atoms();
+    vec charges(atoms.size(), 0.0);
+    vec last_charges(atoms.size(), 0.0);
+    double varmax = 0, varsig = 0;
+    sp_vec sig_pop_vector;
+    vec zeros_6(6, 0.0);
+    sp_vec tens1, tens2;
+    if (MBIS_vectors.size() == 0) {
+        for (auto &atom : atoms) {
+            sig_pop_vector.emplace_back(get_shalpha_shpop(atom.get_charge()));
+        }
+    }
+    else {
+        for (auto &vector : MBIS_vectors) {
+            sig_pop_vector.emplace_back(std::make_pair(sigma_to_alpha(vector), vector.second));
+        }
+    }
+    sp_vec copy_of_input = sig_pop_vector;
+
+    const int ncen = wavy.get_ncen();
+    int grid_inex = 0;
+    vec atom_coords(ncen * 3);
+    ivec nshell_cache(ncen);
+    ivec ECP_els(ncen);
+    std::vector<Thakkar> ECP_electron_helper;
+    std::vector<Spherical_Gaussian_Density> ECP_correction_helper;
+    for (int j = 0; j < ncen; j++) {
+        atom_coords[j * 3 + 0] = atoms[j].get_coordinate(0);
+        atom_coords[j * 3 + 1] = atoms[j].get_coordinate(1);
+        atom_coords[j * 3 + 2] = atoms[j].get_coordinate(2);
+        const int c = atoms[j].get_charge();
+        nshell_cache[j] = constants::MBIS_function[c];
+        ECP_electron_helper.emplace_back(c);
+        ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
+        ECP_els[j] = atoms[j].get_ECP_electrons();
+    }
+
+    for (size_t it = 0; it < 2000; it++) {
+        for (int j = 0; j < ncen; j++) {
+            std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_6);
+            std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
+        }
+        it == 0 ? std::cout << "Starting EMBIS iterations..." << std::endl : std::cout << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
+        varmax = 0.0, varsig = 0.0;
+        for (int i = 0, grid_index = 0; i < ncen; i++) {
+            const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
+            const int end = num_grid_points[grid_index];
+            //Assuming 3 is the quadrature weight and 7 is the electron density 
+            b_weight = grid[grid_index][5].data();
+            dens = grid[grid_index][7].data();
+            //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
+            gx = grid[grid_index][0].data();
+            gy = grid[grid_index][1].data();
+            gz = grid[grid_index][2].data();
+            grid_index++;
+
+#pragma omp parallel
+            {
+                vec rho0shell(ncen * 6, 0.0);
+                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
+                int j, shell, nshell, ind, *ECP_els_j;
+                double *alpha, *d_local, *pop_p;
+                vec dx(ncen * 3);
+                vec alpha_local(ncen * 36, 0.0);
+                vec pop_local(ncen * 6, 0.0);
+                vec g_cache(6 * ncen, 0.0);
+                double d_cache[6] = { 0.0 };
+                std::pair<vec2, vec> *coi;
+
+                // Precompute determinants for all atoms and shells - they don't change per point
+                vec det_pop_cache(ncen * 6, 0.0);
+                for (int k = 0; k < ncen; k++) {
+                    nshell = nshell_cache[k];
+                    coi = &copy_of_input[k];
+                    for (shell = 0; shell < nshell; shell++) {
+                        alpha = coi->first[shell].data();
+                        det = sqrt(alpha[0] * alpha[3] * alpha[5] -
+                            alpha[0] * alpha[4] * alpha[4] -
+                            alpha[3] * alpha[2] * alpha[2] -
+                            alpha[5] * alpha[1] * alpha[1] +
+                            2 * alpha[1] * alpha[2] * alpha[4]);
+                        det_pop_cache[k * 6 + shell] = coi->second[shell] * constants::INV_EIGHT_PI * det;
+                    }
+                }
+
+#pragma omp for schedule(dynamic)
+                for (int point = 0; point < end; point++) {
+                    rho0 = 0.0;
+                    std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
+                    density = b_weight[point] * dens[point];
+                    for (j = 0; j < ncen; j++) {
+                        ind = j * 3;
+                        d_local = dx.data() + ind;
+                        d_local[0] = gx[point] - atom_coords[ind + 0];
+                        d_local[1] = gy[point] - atom_coords[ind + 1];
+                        d_local[2] = gz[point] - atom_coords[ind + 2];
+                        d_cache[0] = d_local[0] * d_local[0];
+                        d_cache[3] = d_local[1] * d_local[1];
+                        d_cache[5] = d_local[2] * d_local[2];
+                        // Check distance squared first to avoid sqrt for far away points
+                        if (d_cache[0] + d_cache[3] + d_cache[5] > constants::far_away_sq)
+                            continue;
+
+                        d_cache[1] = d_local[0] * d_local[1];
+                        d_cache[2] = d_local[0] * d_local[2];
+                        d_cache[4] = d_local[1] * d_local[2];
+                        ECP_els_j = &ECP_els[j];
+                        if (atoms[j].get_ECP_electrons() > 0) {
+                            const double dist = std::sqrt(d_cache[0] + d_cache[3] + d_cache[5]);
+                            density += (ECP_electron_helper[j].get_core_density(dist, *ECP_els_j) + ECP_correction_helper[j].get_radial_density(dist)) * b_weight[point];
+                        }
+
+                        nshell = nshell_cache[j];
+                        coi = &copy_of_input[j];
+                        ind *= 2;
+                        for (shell = 0; shell < nshell; shell++) {
+                            alpha = coi->first[shell].data();
+                            // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
+                            g = sqrt(alpha[0] * d_cache[0] +
+                                alpha[3] * d_cache[3] +
+                                alpha[5] * d_cache[5] +
+                                2 * (alpha[1] * d_cache[1] + alpha[2] * d_cache[2] + alpha[4] * d_cache[4]));
+                            g_cache[ind + shell] = g;
+                            if (g > 42) // avoid vanishingly small contributions due to exp(-g) and potential overflow in exp(g)
+                                continue;
+                            tmp = det_pop_cache[ind + shell] * exp(-g);
+                            if (abs(tmp) < constants::cutoff)
+                                continue;
+                            rho0shell[ind + shell] = tmp;
+                            rho0 += tmp;
+                        }
+                    } //We first need to finish building total rho0 before we can calculate the contributions to the sigmas and populations
+                    if (rho0 == 0.0)
+                        continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
+                    const double rho0_inv = 1.0 / rho0;
+                    for (j = 0; j < ncen; j++) {
+                        d_local = dx.data() + (j * 3);
+                        nshell = nshell_cache[j];
+                        d_cache[0] = d_local[0] * d_local[0];
+                        d_cache[1] = d_local[0] * d_local[1];
+                        d_cache[2] = d_local[0] * d_local[2];
+                        d_cache[3] = d_local[1] * d_local[1];
+                        d_cache[4] = d_local[1] * d_local[2];
+                        d_cache[5] = d_local[2] * d_local[2];
+                        ind = j * 6;
+                        pop_p = pop_local.data() + ind;
+                        for (shell = 0; shell < nshell; shell++) {
+                            r0s = rho0shell[ind + shell];
+                            if (r0s <= constants::cutoff)
+                                continue;
+                            g = 1.0 / g_cache[ind + shell];
+                            temp_res = density * r0s * rho0_inv;
+                            alpha = alpha_local.data() + (ind * 6 + shell * 6);
+                            alpha[0] += temp_res * d_cache[0] * g;
+                            alpha[1] += temp_res * d_cache[1] * g;
+                            alpha[2] += temp_res * d_cache[2] * g;
+                            alpha[3] += temp_res * d_cache[3] * g;
+                            alpha[4] += temp_res * d_cache[4] * g;
+                            alpha[5] += temp_res * d_cache[5] * g;
+                            pop_p[shell] += temp_res;
+                        }
+                    }
+                }
+
+                for (j = 0; j < ncen; j++) {
+                    nshell = nshell_cache[j];
+                    for (shell = 0; shell < nshell; shell++) {
+                        for (int n = 0; n < 6; n++) {
+#pragma omp atomic
+                            sig_pop_vector[j].first[shell][n] += alpha_local[j * 36 + shell * 6 + n];
+                        }
+#pragma omp atomic
+                        sig_pop_vector[j].second[shell] += pop_local[j * 6 + shell];
+                    }
+                }
+            }
+        }
+        //back to the cycle main loop, we updated sig and pop based on information loss :)
+
+        for (int i = 0; i < ncen; i++) {
+            for (int shell = 0; shell < constants::MBIS_function[wavy.get_atom_charge(i)]; shell++) {
+                const double det = 1 / (sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][3] * sig_pop_vector[i].first[shell][5] -
+                    sig_pop_vector[i].first[shell][0] * sig_pop_vector[i].first[shell][4] * sig_pop_vector[i].first[shell][4] -
+                    sig_pop_vector[i].first[shell][3] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][2] -
+                    sig_pop_vector[i].first[shell][5] * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][1] +
+                    2 * sig_pop_vector[i].first[shell][1] * sig_pop_vector[i].first[shell][2] * sig_pop_vector[i].first[shell][4]);
+                if (det < 1E-14)
+                    continue;
+                const vec sigmas = sig_pop_vector[i].first[shell];
+                //                0   1   2   X   3   4   X   X   5
+                // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
+                sig_pop_vector[i].first[shell][0] = (sigmas[3] * sigmas[5] - sigmas[4] * sigmas[4]) * det;
+                sig_pop_vector[i].first[shell][1] = (sigmas[2] * sigmas[4] - sigmas[1] * sigmas[5]) * det;
+                sig_pop_vector[i].first[shell][2] = (sigmas[1] * sigmas[4] - sigmas[2] * sigmas[3]) * det;
+                sig_pop_vector[i].first[shell][3] = (sigmas[0] * sigmas[5] - sigmas[2] * sigmas[2]) * det;
+                sig_pop_vector[i].first[shell][4] = (sigmas[2] * sigmas[1] - sigmas[0] * sigmas[4]) * det;
+                sig_pop_vector[i].first[shell][5] = (sigmas[0] * sigmas[3] - sigmas[1] * sigmas[1]) * det;
+
+                if (sig_pop_vector[i].second[shell] != 0)
+                    for (int n = 0; n < 6; n++)
+                        sig_pop_vector[i].first[shell][n] *= sig_pop_vector[i].second[shell];
+                for (int n = 0; n < 6; n++)
+                    varsig = std::max(varsig, std::abs(sig_pop_vector[i].first[shell][n] - copy_of_input[i].first[shell][n]));
+            }
+            charges[i] = wavy.get_atom_charge(i) - vec_sum(sig_pop_vector[i].second) + wavy.get_atom_ECP_electrons(i);
+            varmax = std::max(varmax, std::abs(charges[i] - last_charges[i]));
+            if (debug)
+                std::cout << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
+        }
+        if (varmax < crit || varsig < crit) {
+            std::cout << "EMBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
+            std::cout << "Promolecular charges:\n";
+            for (int i = 0; i < wavy.get_ncen(); i++) {
+                std::cout << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
+            }
+            return sig_pop_vector;
+        }
+        copy_of_input = sig_pop_vector;
+        last_charges = charges;
+
+    }
+    std::cout << "EMBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
+    return sig_pop_vector;
+}
+
 #pragma GCC optimize("-fno-fast-math") //gcc fails to converge in this function when using fast math, so not use it
 // TCA 106, 178 (2001), eq. 19
-double get_r_outer(const double& max_error,
-    const double& alpha_outer,
-    const int& l,
-    const double& guess)
+double get_r_outer(const double &max_error,
+    const double &alpha_outer,
+    const int &l,
+    const double &guess)
 {
     const int m = 2 * l;
     double r = guess;
@@ -690,7 +1308,7 @@ double get_r_outer(const double& max_error,
 }
 
 // TCA 106, 178 (2001), eqs. 17 and 18
-double get_h(const double& max_error, const int& l, const double& guess)
+double get_h(const double &max_error, const int &l, const double &guess)
 {
     const int m = 2 * l;
     double h = guess;

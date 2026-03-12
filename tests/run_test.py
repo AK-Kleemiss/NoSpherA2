@@ -1,9 +1,9 @@
-import glob
 import os
 import shutil
 import platform
 import subprocess
 import difflib
+import re
 from pathlib import Path
 
 try:
@@ -89,9 +89,79 @@ def exe_path():
     return os.path.abspath(exe)
 
 
-@pytest.mark.parametrize("nos_test", TESTS, ids=lambda t: t.name)
-def test(nos_test, exe_path, tmp_path, request):
-    if nos_test.full and not os.environ.get("RUN_FULL_TEST"):
+
+def print_color_diff(diff):
+    colored_diff = []
+    for line in diff:
+        if line.startswith('+') and not line.startswith('+++'):
+            colored_diff.append(f"\033[92m{line}\033[0m") # Green
+        elif line.startswith('-') and not line.startswith('---'):
+            colored_diff.append(f"\033[91m{line}\033[0m") # Red
+        else:
+            colored_diff.append(line)
+    pytest.fail("Output Mismatch!\n" + "\n".join(colored_diff), pytrace=False)
+    
+def check_approximately_equal(diff, threshold=1e-7):
+    actual_values = []
+    expected_values = []
+    number_pattern = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
+
+    def extract_floats(text):
+        return [float(token) for token in number_pattern.findall(text)]
+
+    for line in diff:
+        if line.startswith('+') and not line.startswith('+++'):
+            actual_values.extend(extract_floats(line[1:].strip()))
+
+        elif line.startswith('-') and not line.startswith('---'):
+            expected_values.extend(extract_floats(line[1:].strip()))
+    
+    if len(actual_values) != len(expected_values):
+        return False
+    
+    for a, e in zip(actual_values, expected_values):
+        if abs(a - e) > threshold:
+            return False
+
+    return True
+
+def check_differences(good_path, actual_path):
+    with open(good_path, 'r') as fg, open(actual_path, 'r') as fa:
+        expected = [line.strip() for line in fg if line.strip()]
+        actual = [line.strip() for line in fa if line.strip()]
+    
+    if expected != actual:
+        diff = list(difflib.unified_diff(
+            expected, actual,
+            fromfile=f'Expected ({os.path.basename(good_path)})',
+            tofile=f'Actual ({os.path.basename(actual_path)})',
+            lineterm=''
+        ))
+
+        print_color_diff(diff)
+            
+def check_differences_cubes(good_path, actual_path):
+    with open(good_path, 'r') as fg, open(actual_path, 'r') as fa:
+        expected = [line.strip() for line in fg if line.strip()]
+        actual = [line.strip() for line in fa if line.strip()]
+    
+    if expected != actual:
+        diff = list(difflib.unified_diff(
+            expected, actual,
+            fromfile=f'Expected ({os.path.basename(good_path)})',
+            tofile=f'Actual ({os.path.basename(actual_path)})',
+            lineterm=''
+        ))
+
+        try:
+            if not check_approximately_equal(diff, threshold=1e-5):
+                print_color_diff(diff)   
+        except:
+            print_color_diff(diff)
+
+@pytest.mark.parametrize("test", TESTS, ids=lambda t: t.name)
+def test_nos(test, exe_path, tmp_path):
+    if test.full and not os.environ.get("RUN_FULL_TEST"):
         pytest.skip("RUN_FULL_TEST not set")
     if nos_test.skip_mac and platform.system() == "Darwin":
         pytest.skip("Skipped on macOS")
@@ -143,28 +213,24 @@ def test(nos_test, exe_path, tmp_path, request):
     if not os.path.exists(good_path):
         pytest.fail(f"Expected log {good_path} missing.", pytrace=False)
 
-    with open(good_path, "r") as fg, open(actual_path, "r") as fa:
-        expected = [line.strip() for line in fg if line.strip()]
-        actual = [line.strip() for line in fa if line.strip()]
 
-    if expected != actual:
-        diff = list(
-            difflib.unified_diff(
-                expected,
-                actual,
-                fromfile=f"Expected ({nos_test.good})",
-                tofile=f"Actual ({os.path.basename(actual_path)})",
-                lineterm="",
-            )
-        )
+    check_differences(good_path, actual_path)
+    
+    #Check the extra cubefiles generated from properties calculation
+    if test.name != "properties":
+        return
+    
+    cube_dir = os.path.join(work_dir, "olex2", "Wfn_job")
+    cubes = ["sucrose_def.cube", "sucrose_eli.cube", "sucrose_lap.cube", "sucrose_rdg.cube", "sucrose_rho.cube", "sucrose_signed_rho.cube"]
+    for cube in cubes:
+        good_cube = os.path.join(cube_dir, f"{cube}.good")
+        actual_cube = os.path.join(cube_dir, f"{cube}")
+        
+        if not os.path.exists(actual_cube):
+            pytest.fail(f"Log {actual_cube} missing.", pytrace=False)
 
-        colored_diff = []
-        for line in diff:
-            if line.startswith("+") and not line.startswith("+++"):
-                colored_diff.append(f"\033[92m{line}\033[0m")  # Green
-            elif line.startswith("-") and not line.startswith("---"):
-                colored_diff.append(f"\033[91m{line}\033[0m")  # Red
-            else:
-                colored_diff.append(line)
-
-        pytest.fail("Output Mismatch!\n" + "\n".join(colored_diff), pytrace=False)
+        if not os.path.exists(good_cube):
+            pytest.fail(f"Expected log {good_cube} missing.", pytrace=False)
+        
+        check_differences_cubes(good_cube, actual_cube)
+    

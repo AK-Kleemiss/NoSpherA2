@@ -1971,7 +1971,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LinkIncremental>false</LinkIncremental>
+    <LinkIncremental>
+    </LinkIncremental>
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
     <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
     <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
@@ -2574,7 +2575,8 @@
     <LinkIncremental>true</LinkIncremental>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
-    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <linkage-MKL-static-win-x64>
+    </linkage-MKL-static-win-x64>
     <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
     <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
   </PropertyGroup>
@@ -2597,9 +2599,9 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <Optimization>Disabled</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;NONSA2DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -2618,7 +2620,7 @@
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8  /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -2630,7 +2632,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2657,7 +2659,7 @@
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -2669,7 +2671,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2705,7 +2707,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2741,7 +2743,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2768,7 +2770,7 @@
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -2780,7 +2782,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Pregenerates the basis sets</Message>
@@ -2818,7 +2820,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Pregenerates the basis sets</Message>
@@ -2847,7 +2849,7 @@
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -2859,7 +2861,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2895,7 +2897,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2922,7 +2924,7 @@
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -2934,7 +2936,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2970,7 +2972,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2997,7 +2999,7 @@
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3009,7 +3011,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3045,7 +3047,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3072,7 +3074,7 @@
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3084,7 +3086,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3120,7 +3122,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3147,7 +3149,7 @@
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3159,7 +3161,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3195,7 +3197,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3222,7 +3224,7 @@
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3234,7 +3236,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3270,7 +3272,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3302,7 +3304,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3314,7 +3316,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3355,7 +3357,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3387,7 +3389,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3399,7 +3401,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3440,7 +3442,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3472,7 +3474,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3484,7 +3486,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3525,7 +3527,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3627,7 +3629,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3639,7 +3641,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3680,7 +3682,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3712,7 +3714,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3724,7 +3726,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3765,7 +3767,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3797,7 +3799,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3809,7 +3811,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3850,7 +3852,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3882,7 +3884,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3894,7 +3896,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3935,7 +3937,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3967,7 +3969,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -3979,7 +3981,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4020,7 +4022,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4052,7 +4054,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -4064,7 +4066,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4105,7 +4107,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4137,7 +4139,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -4149,7 +4151,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4190,7 +4192,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4222,7 +4224,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -4234,7 +4236,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4275,7 +4277,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4307,7 +4309,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -4319,7 +4321,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4360,7 +4362,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4392,7 +4394,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -4404,7 +4406,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4445,7 +4447,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4477,7 +4479,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -4489,7 +4491,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4530,7 +4532,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4563,7 +4565,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -4575,7 +4577,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4617,7 +4619,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4650,7 +4652,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -4662,7 +4664,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4704,7 +4706,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4737,7 +4739,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -4749,7 +4751,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4791,7 +4793,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4832,7 +4834,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4873,7 +4875,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4905,7 +4907,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -4917,7 +4919,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4958,7 +4960,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -4990,7 +4992,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5002,7 +5004,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5043,7 +5045,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5075,7 +5077,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5087,7 +5089,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5128,7 +5130,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5160,7 +5162,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5173,7 +5175,7 @@
       <AdditionalOptions>/VERBOSE:lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5205,7 +5207,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5216,7 +5218,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5257,7 +5259,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5298,7 +5300,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5329,7 +5331,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5341,7 +5343,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5381,7 +5383,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5413,7 +5415,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5425,7 +5427,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5466,7 +5468,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5498,7 +5500,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5510,7 +5512,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5551,7 +5553,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5584,7 +5586,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5596,7 +5598,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5638,7 +5640,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5671,7 +5673,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5683,7 +5685,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5725,7 +5727,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5734,7 +5736,7 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level1</WarningLevel>
-      <Optimization>Disabled</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
@@ -5753,7 +5755,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5763,7 +5765,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5791,7 +5793,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5800,7 +5802,7 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5835,7 +5837,7 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5870,7 +5872,7 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5964,7 +5966,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5976,7 +5978,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6013,7 +6015,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6041,7 +6043,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6053,7 +6055,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6090,7 +6092,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6118,7 +6120,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6130,7 +6132,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6167,7 +6169,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6195,7 +6197,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6207,7 +6209,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6244,7 +6246,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6272,7 +6274,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6284,7 +6286,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6321,7 +6323,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6349,7 +6351,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6361,7 +6363,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6398,7 +6400,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6426,7 +6428,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6438,7 +6440,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6475,7 +6477,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6503,7 +6505,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6515,7 +6517,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6552,7 +6554,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6580,7 +6582,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6592,7 +6594,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6629,7 +6631,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6657,7 +6659,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6669,7 +6671,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6706,7 +6708,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6734,7 +6736,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6746,7 +6748,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6783,7 +6785,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6811,7 +6813,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6823,7 +6825,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6860,7 +6862,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6888,7 +6890,7 @@
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6900,7 +6902,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6937,7 +6939,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -6966,7 +6968,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -6978,7 +6980,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7016,7 +7018,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7038,7 +7040,7 @@
       </OpenMPSupport>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7068,7 +7070,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7118,7 +7120,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7154,7 +7156,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -7168,7 +7170,7 @@
       <Command>copy "$(OutputPath)NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7215,7 +7217,7 @@
       <Command>copy "$(OutputPath)NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7237,7 +7239,7 @@
       </OpenMPSupport>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7260,7 +7262,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7303,7 +7305,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7331,7 +7333,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -7343,7 +7345,7 @@
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7380,7 +7382,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)"</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -7390,7 +7392,7 @@
     </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -7402,7 +7404,7 @@
     </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -7414,7 +7416,7 @@
     </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -7426,7 +7428,7 @@
     </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
-      <AdditionalOptions>-openmp:experimental /utf-8</AdditionalOptions>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -13679,7 +13681,6 @@
     <ClCompile Include="..\Src\SALTED_io.cpp" />
     <ClCompile Include="..\Src\SALTED_predictor.cpp" />
     <ClCompile Include="..\Src\SALTED_utilities.cpp" />
-    <ClCompile Include="..\Src\vec_nos_math.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h" />
@@ -13750,6 +13751,11 @@
     <IompDllCandidate1>$(MKLROOT)\..\..\compiler\latest\bin\libiomp5md.dll</IompDllCandidate1>
     <IompDllCandidate2>$(MKLROOT)\intelopenmp.redist.win\runtimes\win-x64\native\libiomp5md.dll</IompDllCandidate2>
   </PropertyGroup>
+  <PropertyGroup>
+    <!-- Candidate paths (absolute or relative) -->
+    <tbbDllCandidate1>$(MKLROOT)\..\..\tbb\latest\bin\tbb12.dll</tbbDllCandidate1>
+    <tbbDllCandidate2>$(MKLROOT)\inteltbb.redist.win\runtimes\win-x64\native\tbb12.dll</tbbDllCandidate2>
+  </PropertyGroup>
   <!-- First match wins -->
   <PropertyGroup Condition="Exists('$(IompDllCandidate1)')">
     <IompDll>$(IompDllCandidate1)</IompDll>
@@ -13757,11 +13763,20 @@
   <PropertyGroup Condition="'$(IompDll)'=='' and Exists('$(IompDllCandidate2)')">
     <IompDll>$(IompDllCandidate2)</IompDll>
   </PropertyGroup>
+  <PropertyGroup Condition="Exists('$(tbbDllCandidate1)')">
+    <TbbDll>$(tbbDllCandidate1)</TbbDll>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TbbDll)'=='' and Exists('$(tbbDllCandidate2)')">
+    <TbbDll>$(tbbDllCandidate2)</TbbDll>
+  </PropertyGroup>
   <Target Name="CopyIntelOpenMP" AfterTargets="Build">
     <!-- Copy if it exists -->
     <Message Text="Copying Intel OpenMP runtime: $(IompDll) -&gt; $(TargetDir)" Importance="High" Condition="Exists('$(IompDll)')" />
     <Copy SourceFiles="$(IompDll)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(IompDll)')" />
     <!-- If missing, fail with a clear message (optional but recommended) -->
     <Error Condition="!Exists('$(IompDll)')" Text="Could not find libiomp5.dll at $(IompDll). Check MKLROOT or oneAPI compiler install." />
+    <Message Text="Copying Intel Tbb runtime: $(TbbDll) -&gt; $(TargetDir)" Importance="High" Condition="Exists('$(TbbDll)')" />
+    <Copy SourceFiles="$(TbbDll)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(TbbDll)')" />
+    <Error Condition="!Exists('$(TbbDll)')" Text="Could not find tbb12.dll at $(TbbDll). Check MKLROOT or oneAPI compiler install." />
   </Target>
 </Project>

@@ -2,11 +2,13 @@
 #include "GridManager.h"
 #include "spherical_density.h"
 
+template<typename AtomType>
 double make_sphericals(
-    vec2& dens,
-    vec2& dist,
-    const ivec& atom_type_list,
-    std::ostream& file,
+    vec2 &dens,
+    vec2 &dist,
+    const ivec &atom_type_list,
+    std::ostream &file,
+    const std::vector<std::pair<vec, vec>> &pop_sig,
     bool debug,
     double incr_start,
     double min_dist,
@@ -15,14 +17,33 @@ double make_sphericals(
     using namespace std;
     const double incr = pow(incr_start, max(1, accuracy - 1));
     const double lincr = log(incr);
-    vector<Thakkar> sphericals; // sphericals is a vector that will store objects of type Thakkar.
-    for (int i = 0; i < atom_type_list.size(); i++)
-        sphericals.emplace_back(atom_type_list[i]); // push_back is like a copy without making a copy
+    const int atlsize = atom_type_list.size();
+    vector<AtomType> sphericals; // sphericals is a vector that will store objects of type AtomType.
+    dens.clear();
+    dist.clear();
+    dens.resize(atlsize);
+    dist.resize(atlsize);
+    for (int i = 0; i < atlsize; i++) {
+        dens[i].reserve(10000);
+        dist[i].reserve(10000);
+    }
+    for (int i = 0; i < atlsize; i++) {
+        //If we are AtomType == Thakkar, we jsut give the atomic number, if we are AtomType == MBIS_Atom, we give the atomic number and the pop and sig vectors for that atom
+        if constexpr (std::is_same_v<AtomType, Thakkar>) {
+            sphericals.emplace_back(atom_type_list[i]);
+        }
+        else if constexpr (std::is_same_v<AtomType, MBIS_Atom>) {
+            sphericals.emplace_back(atom_type_list[i], pop_sig[i].first, pop_sig[i].second);
+        }
+        else {
+            err_not_impl_f("Unsupported AtomType in make_sphericals!", file);
+        }
+    }
     // Make radial grids
     if (debug)
     {
-        file << "\nSize of atom_type_list:" << setw(5) << atom_type_list.size() << endl;
-        for (int i = 0; i < atom_type_list.size(); i++)
+        file << "\nSize of atom_type_list:" << setw(5) << atlsize << endl;
+        for (int i = 0; i < atlsize; i++)
         {
             file << "\nCalculating for atomic number " << atom_type_list[i] << endl;
             double current = 1;
@@ -43,7 +64,7 @@ double make_sphericals(
                     dist[i].push_back(_dist);
                     current = sphericals[i].get_radial_density(_dist);
                     if (current == -20)
-                        return false;
+                        return -10000;
                     dens[i].push_back(current);
                     _dist *= incr;
                 }
@@ -53,7 +74,7 @@ double make_sphericals(
     else
     {
 #pragma omp parallel for
-        for (int i = 0; i < atom_type_list.size(); i++)
+        for (int i = 0; i < atlsize; i++)
         {
             double current = 1;
             double _dist = min_dist;
@@ -82,6 +103,9 @@ double make_sphericals(
     }
     return lincr;
 }
+//template double make_sphericals<Thakkar>(vec2& dens, vec2& dist, const ivec& atom_type_list, std::ostream& file, std::vector<std::pair<vec, vec>>& pop_sig, bool debug, double incr_start, double min_dist, int accuracy);
+//template double make_sphericals<MBIS_Atom>(vec2& dens, vec2& dist, const ivec& atom_type_list, std::ostream& file, std::vector<std::pair<vec, vec>>& pop_sig, bool debug, double incr_start, double min_dist, int accuracy);
+
 
 // Add this constexpr function before the GridManager class methods
 constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, int max_l_temp) {
@@ -187,16 +211,22 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
     }
 }
 
-GridManager::GridManager(const GridConfiguration& config)
+GridManager::GridManager(const GridConfiguration &config)
     : config_(config) {
 }
 
-void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_grid, 
-                                        const ivec& atom_list, const cell& unit_cell) {
+void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list,
+    const bvec &needs_grid, const cell &unit_cell) {
     if (config_.debug) {
         std::cout << "GridManager: Setting up grids for " << atom_list.size()
             << " atoms with " << config_.getPartitionName() << " partitioning" << std::endl;
     }
+
+    bvec ng_local;
+    if (needs_grid.empty())
+        ng_local = GridManager::determineAtomsNeedingGrids(wave, atom_list);
+    else
+        ng_local = needs_grid;
 
     // Clear previous data
     grid_data_.clear();
@@ -204,7 +234,10 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
     atom_type_list_.clear();
 
     // Identify unique atom types
-    atom_type_list_ = identifyAtomTypes(wave, needs_grid);
+    atom_type_list_ = identifyAtomTypes(wave);
+
+    if (config_.partition_type == PartitionType::EMBIS || config_.partition_type == PartitionType::MBIS || config_.debug || config_.all_charges)
+        needs_helper_grids_ = true;
 
     // Setup prototype grids for each atom type
     setupPrototypeGrids(wave, atom_type_list_);
@@ -220,6 +253,22 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
         addTimingPoint("Hirshfeld Weights");
     }
 
+    std::vector<std::pair<vec, vec>> sig_pop; // Dummy vector for now, will be used for MBIS if needed
+
+    if (config_.partition_type == PartitionType::MBIS || config_.debug || config_.all_charges) {
+        sig_pop = calculateMBISWeights(wave, unit_cell, atom_list, ng_local);
+        addTimingPoint("MBIS Weights");
+    }
+
+    if (config_.partition_type == PartitionType::EMBIS || config_.debug || config_.all_charges) {
+        if (sig_pop.empty()) {
+            sig_pop = calculateMBISWeights(wave, unit_cell, atom_list, ng_local);
+            addTimingPoint("MBIS Weights");
+        }
+        calculateEMBISWeights(wave, unit_cell, atom_list, sig_pop, ng_local);
+        addTimingPoint("EMBIS Weights");
+    }
+
     // Prune grid based on cutoff criteria
     pruneGrid();
     addTimingPoint("Grid Pruning");
@@ -228,10 +277,12 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
     if (config_.debug) {
         std::cout << std::endl
             << "Using " << wave.get_nmo() << " MOs in temporary wavefunction" << std::endl;
-        wave.write_wfn("temp_wavefunction.wfn", false, true);
+        //wave.write_wfn("temp_wavefunction.wfn", false, true);
     }
-    calculateNonSphericalDensities(wave, unit_cell);
-    addTimingPoint("WFN evaluation on grid");
+    if (!non_spherical_densities_calculated_) {
+        calculateNonSphericalDensities(wave, unit_cell);
+        addTimingPoint("WFN evaluation on grid");
+    }
 
     if (config_.debug) {
         std::cout << "GridManager: Setup complete. Total grid points: "
@@ -240,7 +291,7 @@ void GridManager::setup3DGridsForMolecule(const WFN& wave, const bvec& needs_gri
 }
 
 
-void GridManager::setup1DGridsForMolecule(const WFN& wave, const int atom_1, const int atom_2, const int gridpoints, const double padding) {
+void GridManager::setup1DGridsForMolecule(const WFN &wave, const int atom_1, const int atom_2, const int gridpoints, const double padding) {
     // Clear previous data
     grid_data_.clear();
     prototype_grids_.clear();
@@ -249,10 +300,10 @@ void GridManager::setup1DGridsForMolecule(const WFN& wave, const int atom_1, con
     WFN temp = wave;
     temp.delete_unoccupied_MOs();
     grid_data_.resizeForAtoms(2);  //Atom1, Atom2
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < 2; i++) {
         grid_data_.num_points_per_atom[i] = gridpoints;
         // Resize grid arrays for this atom
-        for (int coord = 0; coord < 8; ++coord) {
+        for (int coord = 0; coord < 8; coord++) {
             grid_data_.atomic_grids[i][coord].resize(gridpoints);
         }
 
@@ -264,23 +315,23 @@ void GridManager::setup1DGridsForMolecule(const WFN& wave, const int atom_1, con
     calculateNonSphericalDensities(temp, cell());
 }
 
-void GridManager::getIntegrationGrid1D(const WFN& wave, const int atom_1, const int atom_2,const int num_points, const double padding) {
+void GridManager::getIntegrationGrid1D(const WFN &wave, const int atom_1, const int atom_2, const int num_points, const double padding) {
     std::cout << "GridManager: Setting up 1D grid between atoms " << atom_1 << " and " << atom_2 << "..." << std::endl;
 
     //First calculate the vector along which the grid will be placed
     vec pos1(3), pos2(3), bond(3);
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; i++) {
         pos1[i] = wave.get_atom_coordinate(atom_1, i);
         pos2[i] = wave.get_atom_coordinate(atom_2, i);
         bond[i] = pos2[i] - pos1[i];
     }
     double distance = sqrt(pow(pos2[0] - pos1[0], 2) + pow(pos2[1] - pos1[1], 2) + pow(pos2[2] - pos1[2], 2));
     err_chkf(distance > 1e-8, "Error: Atoms are at the same position!", std::cout);
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; i++) {
         pos1[i] -= padding * (bond[i] / distance);
         pos2[i] += padding * (bond[i] / distance);
     }
-    for (int p = 0; p < num_points; ++p) {
+    for (int p = 0; p < num_points; p++) {
         double t = static_cast<double>(p) / (num_points - 1);
         double x = pos1[0] + t * (pos2[0] - pos1[0]);
         double y = pos1[1] + t * (pos2[1] - pos1[1]);
@@ -291,7 +342,7 @@ void GridManager::getIntegrationGrid1D(const WFN& wave, const int atom_1, const 
     }
     grid_data_.atomic_grids[0][GridData::WEIGHT] = vec(num_points, 1.0);
 
-// Copy the grid points to the second atom's grid so i can reuse all the existing code
+    // Copy the grid points to the second atom's grid so i can reuse all the existing code
     for (int g = 1; g < grid_data_.atomic_grids.size(); g++) {
         std::copy(grid_data_.atomic_grids[0][GridData::X].begin(), grid_data_.atomic_grids[0][GridData::X].end(),
             grid_data_.atomic_grids[g][GridData::X].begin());
@@ -306,7 +357,7 @@ void GridManager::getIntegrationGrid1D(const WFN& wave, const int atom_1, const 
     ivec atom_indices = { atom_1, atom_2 };
     ivec proton_charges(wave.get_ncen());
     vec x_coords(wave.get_ncen()), y_coords(wave.get_ncen()), z_coords(wave.get_ncen());
-    for (int atom_idx = 0; atom_idx < wave.get_ncen(); ++atom_idx) {
+    for (int atom_idx = 0; atom_idx < wave.get_ncen(); atom_idx++) {
         proton_charges[atom_idx] = wave.get_atom_charge(atom_idx);
         x_coords[atom_idx] = wave.get_atom_coordinate(atom_idx, 0);
         y_coords[atom_idx] = wave.get_atom_coordinate(atom_idx, 1);
@@ -315,9 +366,9 @@ void GridManager::getIntegrationGrid1D(const WFN& wave, const int atom_1, const 
     //Calculate Becke and TFVC weights
     vec pa_b(wave.get_ncen());
     vec pa_tv(wave.get_ncen());
-    vec2 chi = make_chi(wave, 40, true, config_.debug);
+    vec chi = make_chi(wave, 40, true, config_.debug);
     for (int g = 0; g < grid_data_.atomic_grids.size(); g++) {
-        for (int p = 0; p < num_points; ++p) {
+        for (int p = 0; p < num_points; p++) {
             std::array<double, 2> result_weights = get_integration_weights(
                 wave.get_ncen(),
                 proton_charges.data(),
@@ -337,7 +388,7 @@ void GridManager::getIntegrationGrid1D(const WFN& wave, const int atom_1, const 
     }
 }
 
-void GridManager::setupPrototypeGrids(const WFN& wave, const ivec& atom_types) {
+void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
     std::cout << "GridManager: Setting up prototype grids for atom types..." << std::endl;
     prototype_grids_.clear();
     prototype_grids_.reserve(atom_types.size());
@@ -348,10 +399,10 @@ void GridManager::setupPrototypeGrids(const WFN& wave, const ivec& atom_types) {
         int max_l = 0;
         vec alpha_min(6, 1e8);  // Support up to f functions
 
-        for (int i = 0; i < wave.get_ncen(); ++i) {
+        for (int i = 0; i < wave.get_ncen(); i++) {
             if (wave.get_atom_charge(i) != atom_type) continue;
 
-            for (int b = 0; b < wave.get_nex(); ++b) {
+            for (int b = 0; b < wave.get_nex(); b++) {
                 if (wave.get_center(b) != i + 1) continue;
 
                 alpha_max = std::max(alpha_max, wave.get_exponent(b));
@@ -373,7 +424,7 @@ void GridManager::setupPrototypeGrids(const WFN& wave, const ivec& atom_types) {
         if (config_.debug) {
             std::cout << "Atom Type: " << atom_type << std::endl;
             std::cout << "max_l: " << max_l_temp << " alpha_max: " << std::scientific << alpha_max << " alpha_min: ";
-            for (int l = 0; l <= max_l_temp; ++l) {
+            for (int l = 0; l <= max_l_temp; l++) {
                 std::cout << std::setw(14) << std::scientific << alpha_min[l];
             }
             std::cout << " accuracy: " << config_.accuracy << std::endl;
@@ -402,21 +453,22 @@ void GridManager::setupPrototypeGrids(const WFN& wave, const ivec& atom_types) {
     }
 }
 
-void GridManager::generateIntegrationGrids(const WFN& wave, const cell& unit_cell,
-                                            const ivec& atom_list) {
+void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cell,
+    const ivec &atom_list) {
     std::cout << "GridManager: Generating integration grids for atoms..." << std::endl;
-    const int num_atoms_with_grids = atom_list.size();
-    grid_data_.resizeForAtoms(num_atoms_with_grids);
+    const int ncen = wave.get_ncen();
+    const int num_atoms_with_grids = needs_helper_grids_ ? ncen : atom_list.size();
+    grid_data_.resizeForAtoms(num_atoms_with_grids, needs_helper_grids_);
 
     // Setup coordinate arrays for all atoms (including PBC images)
-    const int total_atoms = wave.get_ncen() * static_cast<int>(std::pow(config_.pbc * 2 + 1, 3));
+    const int pbc = config_.pbc;
+    const int total_atoms = ncen * static_cast<int>(std::pow(pbc * 2 + 1, 3));
     vec x_coords(total_atoms), y_coords(total_atoms), z_coords(total_atoms);
     ivec charges(total_atoms);
 
     // Fill coordinate arrays
-    const int pbc = config_.pbc;
 #pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); ++i) {
+    for (int i = 0; i < ncen; i++) {
         charges[i] = wave.get_atom_charge(i);
         x_coords[i] = wave.get_atom_coordinate(i, 0);
         y_coords[i] = wave.get_atom_coordinate(i, 1);
@@ -448,14 +500,14 @@ void GridManager::generateIntegrationGrids(const WFN& wave, const cell& unit_cel
     }
 
     // Generate grids for each atom
-    vec2 chi_matrix;  // For TFVC partitioning
-    for (int i = 0; i < num_atoms_with_grids; ++i) {
-        const int atom_idx = atom_list[i];
+    vec chi_matrix;  // For TFVC partitioning
+    for (int i = 0; i < num_atoms_with_grids; i++) {
+        int atom_idx = needs_helper_grids_ ? i : atom_list[i];
         const int atom_type = wave.get_atom_charge(atom_idx);
 
         // Find corresponding prototype grid
         int prototype_idx = 0;
-        for (int j = 0; j < atom_type_list_.size(); ++j) {
+        for (int j = 0; j < atom_type_list_.size(); j++) {
             if (atom_type_list_[j] == atom_type) {
                 prototype_idx = j;
                 break;
@@ -463,11 +515,19 @@ void GridManager::generateIntegrationGrids(const WFN& wave, const cell& unit_cel
         }
 
         const int num_points = prototype_grids_[prototype_idx].get_num_grid_points();
-        grid_data_.num_points_per_atom[i] = num_points;
+        vec3 *grid;
+        if (needs_helper_grids_) {
+            grid_data_.helper_num_points_per_atom[i] = num_points;
+            grid = &grid_data_.helper_grids;
+        }
+        else {
+            grid_data_.num_points_per_atom[i] = num_points;
+            grid = &grid_data_.atomic_grids;
+        }
 
         // Resize grid arrays for this atom
-        for (int coord = 0; coord < 8; ++coord) {
-            grid_data_.atomic_grids[i][coord].resize(num_points);
+        for (int coord = 0; coord < 10; coord++) {
+            (*grid)[i][coord].resize(num_points, 0.0);
         }
 
         // Generate the actual grid
@@ -478,12 +538,12 @@ void GridManager::generateIntegrationGrids(const WFN& wave, const cell& unit_cel
             y_coords.data(),
             z_coords.data(),
             charges.data(),
-            grid_data_.atomic_grids[i][GridData::GridIndex::X].data(),
-            grid_data_.atomic_grids[i][GridData::GridIndex::Y].data(),
-            grid_data_.atomic_grids[i][GridData::GridIndex::Z].data(),
-            grid_data_.atomic_grids[i][GridData::GridIndex::WEIGHT].data(),
-            grid_data_.atomic_grids[i][GridData::GridIndex::BECKE_WEIGHT].data(),
-            grid_data_.atomic_grids[i][GridData::GridIndex::TFVC_WEIGHT].data(),
+            (*grid)[i][GridData::GridIndex::X].data(),
+            (*grid)[i][GridData::GridIndex::Y].data(),
+            (*grid)[i][GridData::GridIndex::Z].data(),
+            (*grid)[i][GridData::GridIndex::WEIGHT].data(),
+            (*grid)[i][GridData::GridIndex::BECKE_WEIGHT].data(),
+            (*grid)[i][GridData::GridIndex::TFVC_WEIGHT].data(),
             wave,
             chi_matrix,
             config_.debug
@@ -491,26 +551,28 @@ void GridManager::generateIntegrationGrids(const WFN& wave, const cell& unit_cel
         if (config_.debug) std::cout << "Generated grid for atom " << i + 1 << "/" << num_atoms_with_grids
             << " (Type " << atom_type << ") with " << num_points << " points." << std::endl;
     }
-
-    grid_data_.total_points = std::accumulate(grid_data_.num_points_per_atom.begin(),
-        grid_data_.num_points_per_atom.end(), 0);
+    if (needs_helper_grids_)
+        grid_data_.total_points = std::accumulate(grid_data_.helper_num_points_per_atom.begin(), grid_data_.helper_num_points_per_atom.end(), 0);
+    else
+        grid_data_.total_points = std::accumulate(grid_data_.num_points_per_atom.begin(), grid_data_.num_points_per_atom.end(), 0);
     std::cout << "GridManager: Generated total of " << grid_data_.total_points << " grid points." << std::endl;
 }
 
-PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const cell& unit_cell) {
+PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const cell &unit_cell) {
     if (config_.debug) {
         std::string scheme_name = (config_.debug || config_.all_charges) ? "every" : config_.getPartitionName();
         std::cout << "GridManager: Calculating partitioned charges using "
             << scheme_name << " scheme..." << std::endl;
     }
-    enum CHARGE_ORDER { S_BECKE = 0, S_TFVC = 1, S_HIRSH = 2 };
 
     PartitionResults results;
 
+    vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids; // Use helper grids if needed
+
     // Initialize charge arrays
-    const int num_atoms = grid_data_.atomic_grids.size();
-    results.atom_charges.resize(3);  // Becke, Hirshfeld, TFVC
-    for (int i = 0; i < 3; ++i) {
+    const int num_atoms = grid->size();
+    results.atom_charges.resize(5);  // Becke, Hirshfeld, TFVC, MBIS, EMBIS
+    for (int i = 0; i < 5; i++) {
         results.atom_charges[i].resize(num_atoms, 0.0);
     }
 
@@ -520,49 +582,59 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const
     case PartitionType::Becke:     weight_index = GridData::GridIndex::BECKE_WEIGHT;  break;
     case PartitionType::TFVC:      weight_index = GridData::GridIndex::TFVC_WEIGHT;   break;
     case PartitionType::Hirshfeld: weight_index = GridData::GridIndex::HIRSH_WEIGHT;  break;
+    case PartitionType::MBIS:      weight_index = GridData::GridIndex::MBIS_WEIGHT;   break;
+    case PartitionType::EMBIS:     weight_index = GridData::GridIndex::EMBIS_WEIGHT;  break;
     default:                       weight_index = GridData::GridIndex::BECKE_WEIGHT;  break;
     }
 
     const double cutoff = config_.getCutoff();
 #pragma omp parallel for schedule(static)
-    for (int atom = 0; atom < num_atoms; ++atom) {
-        vec2& atomic_grid = grid_data_.atomic_grids[atom];
-        const int n_points = grid_data_.num_points_per_atom[atom];
+    for (int atom = 0; atom < num_atoms; atom++) {
+        vec2 &atomic_grid = (*grid)[atom];
+        const int n_points = needs_helper_grids_ ? grid_data_.helper_num_points_per_atom[atom] : grid_data_.num_points_per_atom[atom];
 
-        const double* rho = atomic_grid[GridData::GridIndex::WFN_DENSITY].data();
-        const double* wB = atomic_grid[GridData::GridIndex::BECKE_WEIGHT].data();
-        const double* wH = atomic_grid[GridData::GridIndex::HIRSH_WEIGHT].data();
-        const double* wT = atomic_grid[GridData::GridIndex::TFVC_WEIGHT].data();
+        const double *rho = atomic_grid[GridData::GridIndex::WFN_DENSITY].data();
+        const double *wB = atomic_grid[GridData::GridIndex::BECKE_WEIGHT].data();
+        const double *wH = atomic_grid[GridData::GridIndex::HIRSH_WEIGHT].data();
+        const double *wT = atomic_grid[GridData::GridIndex::TFVC_WEIGHT].data();
+        const double *wM = atomic_grid[GridData::GridIndex::MBIS_WEIGHT].data();
+        const double *wE = atomic_grid[GridData::GridIndex::EMBIS_WEIGHT].data();
 
         if (config_.debug || config_.all_charges) {
-            double accB = 0.0, accH = 0.0, accT = 0.0;
+            double accB = 0.0, accH = 0.0, accT = 0.0, accM = 0.0, accE = 0.0;
             // Vectorizable inner loop; no shared writes.
-#pragma omp simd reduction(+:accB, accH, accT)
-            for (int p = 0; p < n_points; ++p) {
+#pragma omp simd reduction(+:accB, accH, accT, accM, accE)
+            for (int p = 0; p < n_points; p++) {
                 const double r = rho[p];
                 accB += r * wB[p];
                 accH += r * wH[p];
                 accT += r * wT[p];
+                accM += r * wM[p];
+                accE += r * wE[p];
             }
 
-            results.atom_charges[CHARGE_ORDER::S_BECKE][atom] = accB;
-            results.atom_charges[CHARGE_ORDER::S_HIRSH][atom] = accH;
-            results.atom_charges[CHARGE_ORDER::S_TFVC][atom] = accT;
+            results.atom_charges[PartitionResults::CHARGE_ORDER::S_BECKE][atom] = accB;
+            results.atom_charges[PartitionResults::CHARGE_ORDER::S_HIRSH][atom] = accH;
+            results.atom_charges[PartitionResults::CHARGE_ORDER::S_TFVC][atom] = accT;
+            results.atom_charges[PartitionResults::CHARGE_ORDER::S_MBIS][atom] = accM;
+            results.atom_charges[PartitionResults::CHARGE_ORDER::S_EMBIS][atom] = accE;
         }
         else {
-            const double* w = atomic_grid[weight_index].data();
+            const double *w = atomic_grid[weight_index].data();
             double acc = 0.0;
 
 #pragma omp simd reduction(+:acc)
-            for (int p = 0; p < n_points; ++p) {
+            for (int p = 0; p < n_points; p++) {
                 acc += rho[p] * w[p];
             }
 
             // Store only into the active scheme
             switch (config_.partition_type) {
-            case PartitionType::Becke:     results.atom_charges[CHARGE_ORDER::S_BECKE][atom] = acc;  break;
-            case PartitionType::TFVC:      results.atom_charges[CHARGE_ORDER::S_TFVC][atom] = acc;  break;
-            case PartitionType::Hirshfeld: results.atom_charges[CHARGE_ORDER::S_HIRSH][atom] = acc;  break;
+            case PartitionType::Becke:     results.atom_charges[PartitionResults::CHARGE_ORDER::S_BECKE][atom] = acc;  break;
+            case PartitionType::TFVC:      results.atom_charges[PartitionResults::CHARGE_ORDER::S_TFVC][atom] = acc;   break;
+            case PartitionType::Hirshfeld: results.atom_charges[PartitionResults::CHARGE_ORDER::S_HIRSH][atom] = acc;  break;
+            case PartitionType::MBIS:      results.atom_charges[PartitionResults::CHARGE_ORDER::S_MBIS][atom] = acc;   break;
+            case PartitionType::EMBIS:     results.atom_charges[PartitionResults::CHARGE_ORDER::S_EMBIS][atom] = acc;  break;
             }
         }
 
@@ -570,23 +642,27 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const
         if (wave.get_has_ECPs()) {
             const int ecp_e = wave.get_atom_ECP_electrons(atom); // map atom->basis if needed
             if (config_.debug || config_.all_charges) {
-                results.atom_charges[S_BECKE][atom] += ecp_e;
-                results.atom_charges[S_HIRSH][atom] += ecp_e;
-                results.atom_charges[S_TFVC][atom] += ecp_e;
+                results.atom_charges[PartitionResults::S_BECKE][atom] += ecp_e;
+                results.atom_charges[PartitionResults::S_HIRSH][atom] += ecp_e;
+                results.atom_charges[PartitionResults::S_TFVC][atom] += ecp_e;
+                results.atom_charges[PartitionResults::S_MBIS][atom] += ecp_e;
+                results.atom_charges[PartitionResults::S_EMBIS][atom] += ecp_e;
             }
             else {
                 switch (config_.partition_type) {
-                case PartitionType::Becke:     results.atom_charges[S_BECKE][atom] += ecp_e; break;
-                case PartitionType::TFVC:      results.atom_charges[S_TFVC][atom] += ecp_e; break;
-                case PartitionType::Hirshfeld: results.atom_charges[S_HIRSH][atom] += ecp_e; break;
+                case PartitionType::Becke:     results.atom_charges[PartitionResults::S_BECKE][atom] += ecp_e; break;
+                case PartitionType::TFVC:      results.atom_charges[PartitionResults::S_TFVC][atom] += ecp_e; break;
+                case PartitionType::MBIS:      results.atom_charges[PartitionResults::S_MBIS][atom] += ecp_e; break;
+                case PartitionType::EMBIS:     results.atom_charges[PartitionResults::S_EMBIS][atom] += ecp_e; break;
+                case PartitionType::Hirshfeld: results.atom_charges[PartitionResults::S_HIRSH][atom] += ecp_e; break;
                 }
             }
         }
     }
 
     // Calculate total charges
-    results.overall_charges.resize(3, 0.0);
-    for (int scheme = 0; scheme < 3; ++scheme) {
+    results.overall_charges.resize(5, 0.0);
+    for (int scheme = 0; scheme < 5; scheme++) {
         results.overall_charges[scheme] = std::accumulate(
             results.atom_charges[scheme].begin(),
             results.atom_charges[scheme].end(), 0.0);
@@ -595,11 +671,14 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const
     return results;
 }
 
-void GridManager::getDensityVectors(const WFN& wave, const ivec& atom_list, vec2& d1, vec2& d2, vec2& d3, vec2& dens) {
+void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens) {
     if (config_.debug) {
         std::cout << "GridManager: Generating density vectors..." << std::endl;
     }
-    const int n_atoms = grid_data_.atomic_grids.size();
+
+    vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids; // Use helper grids if needed
+    ivec *num_points_per_atom = needs_helper_grids_ ? &grid_data_.helper_num_points_per_atom : &grid_data_.num_points_per_atom;
+
     const double cutoff = config_.getCutoff();
     //Choose grids to consider for charge calculation
     GridData::GridIndex idx_single; // default
@@ -607,34 +686,51 @@ void GridManager::getDensityVectors(const WFN& wave, const ivec& atom_list, vec2
     case PartitionType::Becke:     idx_single = GridData::GridIndex::BECKE_WEIGHT;  break;
     case PartitionType::TFVC:      idx_single = GridData::GridIndex::TFVC_WEIGHT;   break;
     case PartitionType::Hirshfeld: idx_single = GridData::GridIndex::HIRSH_WEIGHT;  break;
+    case PartitionType::MBIS:      idx_single = GridData::GridIndex::MBIS_WEIGHT;   break;
+    case PartitionType::EMBIS:     idx_single = GridData::GridIndex::EMBIS_WEIGHT;  break;
     default:                        std::cout << "GridManager: Unknown partition type for density vectors!" << std::endl; exit(1); return;
     }
 
-    d1.resize(n_atoms); d2.resize(n_atoms); d3.resize(n_atoms); dens.resize(n_atoms);
-#pragma omp parallel for schedule(dynamic, 1)
-    for (int g = 0; g < grid_data_.atomic_grids.size(); ++g) {
-        vec2& atomic_grid = grid_data_.atomic_grids[g];
-        const int n_points = grid_data_.num_points_per_atom[g];
-        dens[g].resize(n_points); d1[g].resize(n_points); d2[g].resize(n_points); d3[g].resize(n_points);
+    const int atoms_needing_grids = atom_list.size();
+    d1.resize(atoms_needing_grids); d2.resize(atoms_needing_grids); d3.resize(atoms_needing_grids); dens.resize(atoms_needing_grids);
+    //#pragma omp parallel for schedule(dynamic, 1)
+    for (int g = 0; g < grid->size(); g++) {
+        vec2 &atomic_grid = (*grid)[g];
+        const int n_points = (*num_points_per_atom)[g];
 
+        int final_atoms = -1;
+        if (needs_helper_grids_) {
+            for (int i = 0; i < atom_list.size(); i++) {
+                if (atom_list[i] == g) {
+                    final_atoms = i;
+                    break;
+                }
+            }
+            if (final_atoms == -1) {
+                continue; // Skip this grid if no matching atom is found, we do not need this one
+            }
+        }
+        else {
+            final_atoms = g;
+        }
+        dens[final_atoms].resize(n_points); d1[final_atoms].resize(n_points); d2[final_atoms].resize(n_points); d3[final_atoms].resize(n_points);
 
-        const double* rho = atomic_grid[GridData::GridIndex::WFN_DENSITY].data();
-        const double* w = atomic_grid[idx_single].data();
-        double* res = dens[g].data();
+        const double *rho = atomic_grid[GridData::GridIndex::WFN_DENSITY].data();
+        const double *w = atomic_grid[idx_single].data();
+        double *res = dens[final_atoms].data();
 
-
-        double* d1_ptr = d1[g].data();
-        double* d2_ptr = d2[g].data();
-        double* d3_ptr = d3[g].data();
-        const double* x = atomic_grid[GridData::GridIndex::X].data();
-        const double* y = atomic_grid[GridData::GridIndex::Y].data();
-        const double* z = atomic_grid[GridData::GridIndex::Z].data();
-        const double x0 = wave.get_atom_coordinate(atom_list[g], 0);
-        const double y0 = wave.get_atom_coordinate(atom_list[g], 1);
-        const double z0 = wave.get_atom_coordinate(atom_list[g], 2);
+        double *d1_ptr = d1[final_atoms].data();
+        double *d2_ptr = d2[final_atoms].data();
+        double *d3_ptr = d3[final_atoms].data();
+        const double *x = atomic_grid[GridData::GridIndex::X].data();
+        const double *y = atomic_grid[GridData::GridIndex::Y].data();
+        const double *z = atomic_grid[GridData::GridIndex::Z].data();
+        const double x0 = wave.get_atom_coordinate(atom_list[final_atoms], 0);
+        const double y0 = wave.get_atom_coordinate(atom_list[final_atoms], 1);
+        const double z0 = wave.get_atom_coordinate(atom_list[final_atoms], 2);
 
         size_t accepted_points = 0;
-        for (int p = 0; p < n_points; ++p) {
+        for (int p = 0; p < n_points; p++) {
             const double t = rho[p] * w[p];
             const int keep = std::fabs(t) >= cutoff;  // 0/1
             res[accepted_points] = t;
@@ -644,10 +740,10 @@ void GridManager::getDensityVectors(const WFN& wave, const ivec& atom_list, vec2
 
         //I really like this one... but it seems to be slightly slower than the above version
         //#pragma omp simd
-        //        for (int p = 0; p < n_points; ++p) {
+        //        for (int p = 0; p < n_points; p++) {
         //            res[p] = rho[p] * w[p];
         //        }
-        //        for (int p = 0; p < n_points; ++p) {
+        //        for (int p = 0; p < n_points; p++) {
         //            const int keep = std::fabs(res[p]) > cutoff;
         //            const int idx = accepted_points;
         //            
@@ -658,15 +754,14 @@ void GridManager::getDensityVectors(const WFN& wave, const ivec& atom_list, vec2
         //            accepted_points += keep;
         //        }
 
-        grid_data_.num_points_per_atom[g] = accepted_points;
-        d1[g].resize(accepted_points);
-        d2[g].resize(accepted_points);
-        d3[g].resize(accepted_points);
-        dens[g].resize(accepted_points);
+        (*num_points_per_atom)[g] = accepted_points;
+        d1[final_atoms].resize(accepted_points);
+        d2[final_atoms].resize(accepted_points);
+        d3[final_atoms].resize(accepted_points);
+        dens[final_atoms].resize(accepted_points);
     }
     //Calculate final point count
-    grid_data_.total_points = std::accumulate(grid_data_.num_points_per_atom.begin(),
-        grid_data_.num_points_per_atom.end(), 0);
+    grid_data_.total_points = std::accumulate(num_points_per_atom->begin(), num_points_per_atom->end(), 0);
 }
 
 // Implementation of other methods...
@@ -682,6 +777,8 @@ std::string GridConfiguration::getPartitionName() const {
     case PartitionType::Hirshfeld: return "Hirshfeld";
     case PartitionType::Becke: return "Becke";
     case PartitionType::TFVC: return "TFVC";
+    case PartitionType::MBIS: return "MBIS";
+    case PartitionType::EMBIS: return "EMBIS";
     case PartitionType::RI: return "RI";
     default: return "Unknown";
     }
@@ -693,119 +790,165 @@ void GridData::clear() {
     total_points = 0;
 }
 
-void GridData::resizeForAtoms(int num_atoms) {
-    atomic_grids.resize(num_atoms);
-    num_points_per_atom.resize(num_atoms);
-
-    for (int i = 0; i < num_atoms; ++i) {
-        atomic_grids[i].resize(8);  // x, y, z, weight, hirsh_w, becke_w, tfvc_w, wfn_density
+void GridData::resizeForAtoms(int num_atoms, bool helpers) {
+    if (helpers) {
+        helper_grids.clear();
+        helper_num_points_per_atom.clear();
+        helper_grids.resize(num_atoms);
+        helper_num_points_per_atom.resize(num_atoms);
+        for (int i = 0; i < num_atoms; i++) {
+            helper_grids[i].resize(grid_data_size);  // x, y, z, weight, hirsh_w, becke_w, tfvc_w, wfn_density, MBIS_w, EMBIS_w
+        }
+    }
+    else {
+        atomic_grids.clear();
+        atomic_grids.resize(num_atoms);
+        num_points_per_atom.clear();
+        num_points_per_atom.resize(num_atoms);
+        for (int i = 0; i < num_atoms; i++) {
+            atomic_grids[i].resize(grid_data_size);  // x, y, z, weight, hirsh_w, becke_w, tfvc_w, wfn_density, MBIS_w, EMBIS_w
+        }
     }
 }
 
-ivec GridManager::identifyAtomTypes(const WFN& wave, const bvec& needs_grid) {
+ivec GridManager::identifyAtomTypes(const WFN &wave) {
     std::set<int> unique_types;
 
-    for (int i = 0; i < wave.get_ncen(); ++i) {
-        if (i < needs_grid.size() && (needs_grid[i])) {
-            const int charge = wave.get_atom_charge(i);
-            if (charge != 119) {  // Skip dummy atoms
-                unique_types.insert(charge);
-            }
+    for (int i = 0; i < wave.get_ncen(); i++) {
+        const int charge = wave.get_atom_charge(i);
+        if (charge != 119) {  // Skip dummy atoms
+            unique_types.insert(charge);
         }
     }
 
     return ivec(unique_types.begin(), unique_types.end());
 }
 
-void PartitionResults::printChargeTable(const svec& labels, const WFN& wave, const ivec atom_list, std::ostream& file) const {
+void GridManager::printChargeTable(const svec &labels, const WFN &wave, const ivec atom_list, std::ostream &file, const PartitionResults &results) const {
     file << "Table of Charges in electrons\n"
-        << "    Atom       Becke   Hirshfeld   TFVC\n";
+        << std::setw(10) << "Atom";
+    if (config_.partition_type == PartitionType::Becke || config_.all_charges || config_.debug) file << std::setw(10) << "Becke";
+    if (config_.partition_type == PartitionType::Hirshfeld || config_.all_charges || config_.debug) file << std::setw(10) << "Hirshfeld";
+    if (config_.partition_type == PartitionType::TFVC || config_.all_charges || config_.debug) file << std::setw(10) << "TFVC";
+    if (config_.partition_type == PartitionType::MBIS || config_.all_charges || config_.debug) file << std::setw(10) << "MBIS";
+    if (config_.partition_type == PartitionType::EMBIS || config_.all_charges || config_.debug) file << std::setw(10) << "EMBIS";
+    file << "\n";
 
-    for (int i = 0; i < atom_list.size(); ++i) {
-        const int atom_idx = atom_list[i];
-        file << std::setw(10) << labels[i]
-            << std::fixed << std::setw(10) << std::setprecision(3)
-            << wave.get_atom_charge(atom_idx) - atom_charges[0][i]  // Becke
-            << std::fixed << std::setw(10) << std::setprecision(3)
-            << wave.get_atom_charge(atom_idx) - atom_charges[2][i]  // Hirshfeld
-            << std::fixed << std::setw(10) << std::setprecision(3)
-            << wave.get_atom_charge(atom_idx) - atom_charges[1][i]  // TFVC
-            << std::endl;
+    for (int i = 0; i < atom_list.size(); i++) {
+        int atom_idx;
+        if (needs_helper_grids_)
+            atom_idx = i;
+        else
+            atom_idx = atom_list[i];
+        file << std::setw(10) << labels[i];
+
+        if (config_.partition_type == PartitionType::Becke || config_.all_charges || config_.debug)
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[0][i];  // Becke
+        if (config_.partition_type == PartitionType::Hirshfeld || config_.all_charges || config_.debug)
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[2][i];  // Hirshfeld
+        if (config_.partition_type == PartitionType::TFVC || config_.all_charges || config_.debug)
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[1][i];  // TFVC
+        if (config_.partition_type == PartitionType::MBIS || config_.all_charges || config_.debug)
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[3][i];  // MBIS
+        if (config_.partition_type == PartitionType::EMBIS || config_.all_charges || config_.debug)
+            file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[4][i];  // EMBIS
+        file << std::endl;
     }
 
-    file << "Total number of electrons:\n"
-        << " Becke:     " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[0] << "\n"
-        << " Hirshfeld: " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[2] << "\n"
-        << " TVFC:      " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[1] << std::endl;
+    file << "Total number of electrons:\n";
+    if (config_.partition_type == PartitionType::Becke || config_.all_charges || config_.debug)
+        file << " Becke:     " << std::fixed << std::setw(10) << std::setprecision(6) << results.overall_charges[0] << "\n";
+    if (config_.partition_type == PartitionType::Hirshfeld || config_.all_charges || config_.debug)
+        file << " Hirshfeld: " << std::fixed << std::setw(10) << std::setprecision(6) << results.overall_charges[2] << "\n";
+    if (config_.partition_type == PartitionType::TFVC || config_.all_charges || config_.debug)
+        file << " TVFC:      " << std::fixed << std::setw(10) << std::setprecision(6) << results.overall_charges[1] << "\n";
+    if (config_.partition_type == PartitionType::MBIS || config_.all_charges || config_.debug)
+        file << " MBIS:      " << std::fixed << std::setw(10) << std::setprecision(6) << results.overall_charges[3] << "\n";
+    if (config_.partition_type == PartitionType::EMBIS || config_.all_charges || config_.debug)
+        file << " EMBIS:     " << std::fixed << std::setw(10) << std::setprecision(6) << results.overall_charges[4] << std::endl;
 }
 
-void GridManager::calculateSphericalDensities(const WFN& wave, const cell& unit_cell, const ivec& atom_list, vec2& single_spherical_density, vec2& combined_spherical_density) {
-    bvec fake_needs_grid(wave.get_ncen(), true);
-    ivec complete_type_list = identifyAtomTypes(wave, fake_needs_grid);
+void GridManager::calculateSphericalDensities(
+    const WFN &wave,
+    const cell &unit_cell,
+    const ivec &atom_list,
+    vec2 &single_spherical_density,
+    vec2 &combined_spherical_density,
+    const std::vector<std::pair<vec, vec>> sig_pop)
+{
+    ivec complete_type_list;
+    const int ncen = wave.get_ncen();
 
     if (config_.debug) {
         std::cout << "GridManager: Calculating spherical densities..." << std::endl;
     }
 
-    // Setup spherical density calculation
-    radial_density_.resize(complete_type_list.size());
-    radial_distances_.resize(complete_type_list.size());
-
-    for (int i = 0; i < complete_type_list.size(); ++i) {
-        radial_density_[i].reserve(1000);
-        radial_distances_[i].reserve(1000);
-    }
-
     // Calculate radial densities using Thakkar spherical atoms
-    lincr_ = make_sphericals(radial_density_, radial_distances_, complete_type_list,
-        std::cout, config_.debug, 1.005, 1.0E-7, config_.accuracy);
+    if (sig_pop.size() == 0) {
+        complete_type_list = identifyAtomTypes(wave);
+        lincr_ = make_sphericals<Thakkar>(radial_density_, radial_distances_, complete_type_list,
+            std::cout, sig_pop, config_.debug, 1.005, 1.0E-7, config_.accuracy);
+        start_dist_ = 1.0E-7;
+    }
+    else {
+        for (int i = 0; i < ncen; i++)
+            complete_type_list.emplace_back(wave.get_atom_charge(i));
+        lincr_ = make_sphericals<MBIS_Atom>(radial_density_, radial_distances_, complete_type_list,
+            std::cout, sig_pop, config_.debug, 1.0025, 1.0E-8, config_.accuracy);
+        start_dist_ = 1.0E-8;  // MBIS_Atom can have very steep densities near the nucleus, so we need to start closer to zero
+    }
     err_checkf(lincr_ != -1000, "error during creations of sphericals", std::cout);
 
-    single_spherical_density.resize(grid_data_.atomic_grids.size());
-    combined_spherical_density.resize(grid_data_.atomic_grids.size());
+    vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids; // Use helper grids if needed
 
-    for (int g = 0; g < grid_data_.atomic_grids.size(); ++g) {
-        const int num_points = grid_data_.num_points_per_atom[g];
+    for (int g = 0; g < grid->size(); g++) {
+        const int num_points = needs_helper_grids_ ? grid_data_.helper_num_points_per_atom[g] : grid_data_.num_points_per_atom[g];
         single_spherical_density[g].resize(num_points, 0.0);
         combined_spherical_density[g].resize(num_points, 0.0);
     }
 
-
+    int type_idx = -1;
     // For each atom
-    for (int atom_idx = 0; atom_idx < wave.get_ncen(); atom_idx++) {
-        // Find the type index for this atom
-        int type_idx = -1;
-        for (int j = 0; j < complete_type_list.size(); ++j) {
-            if (wave.get_atom_charge(atom_idx) == complete_type_list[j]) {
-                type_idx = j;
-                break;
+    for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
+        type_idx = -1;
+        if (sig_pop.size() == 0) {
+            // Find the type index for this atom
+            for (int j = 0; j < complete_type_list.size(); j++) {
+                if (wave.get_atom_charge(atom_idx) == complete_type_list[j]) {
+                    type_idx = j;
+                    break;
+                }
             }
-        }
 
-        if (type_idx == -1) continue; // Skip if atom type not found
+            if (type_idx == -1)
+                continue; // Skip if atom type not found
+        }
+        else {
+            type_idx = atom_idx;
+        }
 
         const d3 ax = wave.get_atom_pos(atom_idx);
 
         // Add this atom's spherical density contribution to all grids
-        for (int g = 0; g < grid_data_.atomic_grids.size(); ++g) {
-            int g_to_atom_idx = atom_list[g];
-            const int num_points = grid_data_.num_points_per_atom[g];
+        for (int g = 0; g < grid->size(); g++) {
+            const int num_points = needs_helper_grids_ ? grid_data_.helper_num_points_per_atom[g] : grid_data_.num_points_per_atom[g];
+            const int comparator = needs_helper_grids_ ? g : atom_list[g];
 
 #pragma omp parallel for
-            for (int p = 0; p < num_points; ++p) {
+            for (int p = 0; p < num_points; p++) {
 
-                const double dist = array_length(d3{ grid_data_.atomic_grids[g][GridData::GridIndex::X][p],
-                grid_data_.atomic_grids[g][GridData::GridIndex::Y][p],
-                grid_data_.atomic_grids[g][GridData::GridIndex::Z][p] }, ax);
+                const double dist = array_length(d3{ (*grid)[g][GridData::GridIndex::X][p],
+                (*grid)[g][GridData::GridIndex::Y][p],
+                (*grid)[g][GridData::GridIndex::Z][p] }, ax);
 
                 const double density = linear_interpolate_spherical_density(
                     radial_density_[type_idx],
                     radial_distances_[type_idx],
                     dist,
                     lincr_,
-                    1.0E-7);
+                    start_dist_);
 
-                if (atom_idx == g_to_atom_idx) {
+                if (atom_idx == comparator) {
                     single_spherical_density[g][p] += density;
                 }
                 combined_spherical_density[g][p] += density;
@@ -819,17 +962,17 @@ void GridManager::calculateSphericalDensities(const WFN& wave, const cell& unit_
             std::cout << "GridManager: Adding PBC contributions (pbc=" << config_.pbc << ")" << std::endl;
         }
 
-        for (int pbc_x = -config_.pbc; pbc_x <= config_.pbc; ++pbc_x) {
-            for (int pbc_y = -config_.pbc; pbc_y <= config_.pbc; ++pbc_y) {
-                for (int pbc_z = -config_.pbc; pbc_z <= config_.pbc; ++pbc_z) {
+        for (int pbc_x = -config_.pbc; pbc_x <= config_.pbc; pbc_x++) {
+            for (int pbc_y = -config_.pbc; pbc_y <= config_.pbc; pbc_y++) {
+                for (int pbc_z = -config_.pbc; pbc_z <= config_.pbc; pbc_z++) {
                     // Skip the original unit cell (already processed above)
                     if (pbc_x == 0 && pbc_y == 0 && pbc_z == 0) continue;
 
                     // For each atom in the original unit cell
-                    for (int atom_idx = 0; atom_idx < wave.get_ncen(); ++atom_idx) {
+                    for (int atom_idx = 0; atom_idx < wave.get_ncen(); atom_idx++) {
                         // Find the type index for this atom
                         int type_idx = -1;
-                        for (int j = 0; j < complete_type_list.size(); ++j) {
+                        for (int j = 0; j < complete_type_list.size(); j++) {
                             if (wave.get_atom_charge(atom_idx) == complete_type_list[j]) {
                                 type_idx = j;
                                 break;
@@ -853,11 +996,11 @@ void GridManager::calculateSphericalDensities(const WFN& wave, const cell& unit_
                             pbc_z * unit_cell.get_cm(2, 2) };
 
                         // Add contributions to all grids
-                        for (int g = 0; g < grid_data_.atomic_grids.size(); ++g) {
+                        for (int g = 0; g < grid_data_.atomic_grids.size(); g++) {
                             const int num_points = grid_data_.num_points_per_atom[g];
 
 #pragma omp parallel for
-                            for (int p = 0; p < num_points; ++p) {
+                            for (int p = 0; p < num_points; p++) {
                                 const d3 g_pos = { grid_data_.atomic_grids[g][0][p],
                                  grid_data_.atomic_grids[g][1][p],
                                  grid_data_.atomic_grids[g][2][p] };
@@ -870,7 +1013,7 @@ void GridManager::calculateSphericalDensities(const WFN& wave, const cell& unit_
                                     radial_distances_[type_idx],
                                     dist,
                                     lincr_,
-                                    1.0E-7);
+                                    start_dist_);
 
                                 // Only add to total density for PBC (not to atom-specific density)
                                 combined_spherical_density[g][p] += density;
@@ -883,31 +1026,128 @@ void GridManager::calculateSphericalDensities(const WFN& wave, const cell& unit_
     }
 }
 
-void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list) {
-    vec2 single_spherical_density, combined_spherical_density;
+void GridManager::calculateHirshfeldWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list) {
+    vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids; // Use helper grids if needed
+    ivec *num_points = needs_helper_grids_ ? &grid_data_.helper_num_points_per_atom : &grid_data_.num_points_per_atom; // Use helper grids if needed
+    const int s = grid->size();
+    vec2 single_spherical_density(s), combined_spherical_density(s);
     calculateSphericalDensities(wave, unit_cell, atom_list, single_spherical_density, combined_spherical_density);
 
     if (config_.debug) {
         std::cout << "GridManager: Spherical densities calculated, calculating Hirshfeld weights..." << std::endl;
     }
     //Calculate hirshfeld weights
-    for (int g = 0; g < grid_data_.atomic_grids.size(); ++g) {
-        double* combined_ptr = combined_spherical_density[g].data();
-        double* single_ptr = single_spherical_density[g].data();
-        vec2& atom_grid = grid_data_.atomic_grids[g];
-        for (int p = 0; p < grid_data_.num_points_per_atom[g]; ++p) {
+    for (int g = 0; g < s; g++) {
+        const double *combined_ptr = combined_spherical_density[g].data();
+        const double *single_ptr = single_spherical_density[g].data();
+        vec2 &atom_grid = (*grid)[g];
+        for (int p = 0; p < (*num_points)[g]; p++) {
             atom_grid[GridData::GridIndex::HIRSH_WEIGHT][p] =
                 (combined_ptr[p] != 0.0) ? (atom_grid[GridData::GridIndex::WEIGHT][p] * (single_ptr[p] / combined_ptr[p])) : 0.0;
         }
     }
 }
 
-void GridManager::calculateNonSphericalDensities(const WFN& wave, const cell& unit_cell) {
+std::vector<std::pair<vec, vec>> GridManager::calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid) {
+    if (!non_spherical_densities_calculated_) {
+        calculateNonSphericalDensities(wave, unit_cell);
+        addTimingPoint("WFN evaluation on grid");
+    }
+    vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids; // Use helper grids if needed
+    ivec *num_points = needs_helper_grids_ ? &grid_data_.helper_num_points_per_atom : &grid_data_.num_points_per_atom; // Use helper grids if needed
+    std::vector<std::pair<vec, vec>> sig_pop = make_MBIS_vectors(wave, *grid, *num_points);
+    const int s = grid->size();
+    vec2 single_spherical_density(s), combined_spherical_density(s);
+    calculateSphericalDensities(wave, unit_cell, atom_list, single_spherical_density, combined_spherical_density, sig_pop);
+
+    if (config_.debug) {
+        std::cout << "GridManager: Spherical densities calculated, calculating MBIS weights..." << std::endl;
+    }
+    //Calculate MBIS weights
+#pragma omp parallel for
+    for (int g = 0; g < s; g++) {
+        const double *combined_ptr = combined_spherical_density[g].data();
+        const double *single_ptr = single_spherical_density[g].data();
+        vec2 &atom_grid = (*grid)[g];
+        for (int p = 0; p < (*num_points)[g]; p++) {
+            atom_grid[GridData::GridIndex::MBIS_WEIGHT][p] =
+                (combined_ptr[p] != 0.0) ? (atom_grid[GridData::GridIndex::WEIGHT][p] * (single_ptr[p] / combined_ptr[p])) : 0.0;
+        }
+    }
+    return sig_pop;
+}
+
+void GridManager::calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid) {
+    if (!non_spherical_densities_calculated_) {
+        calculateNonSphericalDensities(wave, unit_cell);
+        addTimingPoint("WFN evaluation on grid");
+    }
+    vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids; // Use helper grids if needed
+    ivec *num_points = needs_helper_grids_ ? &grid_data_.helper_num_points_per_atom : &grid_data_.num_points_per_atom; // Use helper grids if needed
+    const int s = grid->size();
+    vec2 single_spherical_density(s), combined_spherical_density(s);
+    const std::vector<std::pair<vec2, vec>> sig_pop = make_EMBIS_tensors(wave, *grid, *num_points, false, MBIS_weights);
+    int g;
+
+    for (g = 0; g < s; g++) {
+        const int np = (*num_points)[g];
+        single_spherical_density[g].resize(np, 0.0);
+        combined_spherical_density[g].resize(np, 0.0);
+    }
+
+    // For each atom
+    for (int atom_idx = 0; atom_idx < wave.get_ncen(); atom_idx++) {
+        const d3 ax = wave.get_atom_pos(atom_idx);
+
+        EMBIS_Atom at(wave.get_atom_charge(atom_idx), sig_pop[atom_idx].first, sig_pop[atom_idx].second);
+        // Add this atom's promolecule density contribution to all grids
+        for (g = 0; g < s; g++) {
+            const int comparator = needs_helper_grids_ ? g : atom_list[g];
+            const int np = (*num_points)[g];
+
+#pragma omp parallel for
+            for (int p = 0; p < np; p++) {
+
+                const d3 dist = vec_diff(d3{ (*grid)[g][GridData::GridIndex::X][p],
+                (*grid)[g][GridData::GridIndex::Y][p],
+                (*grid)[g][GridData::GridIndex::Z][p] }, ax);
+
+                const double density = at.get_density(dist);
+
+                if (atom_idx == comparator) {
+                    single_spherical_density[g][p] += density;
+                }
+                combined_spherical_density[g][p] += density;
+            }
+        }
+    }
+
+    if (config_.debug) {
+        std::cout << "GridManager: Spherical densities calculated, calculating EMBIS weights..." << std::endl;
+    }
+    //Calculate EMBIS weights
+    for (g = 0; g < s; g++) {
+        const double *combined_ptr = combined_spherical_density[g].data();
+        const double *single_ptr = single_spherical_density[g].data();
+        vec2 &atom_grid = (*grid)[g];
+        for (int p = 0; p < (*num_points)[g]; p++) {
+            atom_grid[GridData::GridIndex::EMBIS_WEIGHT][p] =
+                (combined_ptr[p] != 0.0) ? (atom_grid[GridData::GridIndex::WEIGHT][p] * (single_ptr[p] / combined_ptr[p])) : 0.0;
+        }
+    }
+}
+
+void GridManager::calculateNonSphericalDensities(const WFN &wave, const cell &unit_cell) {
     using namespace std;
 
     if (config_.debug) {
         std::cout << "GridManager: Calculating non-spherical densities..." << std::endl;
     }
+    const bool helper = needs_helper_grids_;
+
+    const int *points = helper ? grid_data_.helper_num_points_per_atom.data() : grid_data_.num_points_per_atom.data();
+    vec2 *grids = helper ? grid_data_.helper_grids.data() : grid_data_.atomic_grids.data();
+    const int n_grids = helper ? grid_data_.helper_grids.size() : grid_data_.atomic_grids.size();
 
 #pragma omp parallel
     {
@@ -917,25 +1157,29 @@ void GridManager::calculateNonSphericalDensities(const WFN& wave, const cell& un
             d_temp[i].resize(16, 0.0);
         }
         vec phi_temp(wave.get_nmo(true), 0.0);
-        for (int g = 0; g < grid_data_.atomic_grids.size(); ++g) {
-            const int num_points = grid_data_.num_points_per_atom[g];
-            vec2& atom_grid = grid_data_.atomic_grids[g];
-            double* x_ptr = atom_grid[GridData::GridIndex::X].data(); double* y_ptr = atom_grid[GridData::GridIndex::Y].data(); double* z_ptr = atom_grid[GridData::GridIndex::Z].data();
-            double* densy_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
-#pragma omp for
-            for (int p = 0; p < num_points; ++p) {
+
+        for (int g = 0; g < n_grids; g++) {
+            const int num_points = points[g];
+            vec2 &atom_grid = grids[g];
+            const double *x_ptr = atom_grid[GridData::GridIndex::X].data();
+            const double *y_ptr = atom_grid[GridData::GridIndex::Y].data();
+            const double *z_ptr = atom_grid[GridData::GridIndex::Z].data();
+            double *densy_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
+#pragma omp for schedule(dynamic, 4)
+            for (int p = 0; p < num_points; p++) {
                 // Calculate WFN density at this point
                 densy_ptr[p] = wave.compute_dens({ x_ptr[p], y_ptr[p], z_ptr[p] }, d_temp, phi_temp);
             }
         }
     }
+    non_spherical_densities_calculated_ = true;
 }
 
-vec GridManager::evaluateFunctionOnGrid(const vec2& grid_points, std::function<double(double, double, double)> func) const {
+vec GridManager::evaluateFunctionOnGrid(const vec2 &grid_points, std::function<double(double, double, double)> func) const {
     const long long int num_points = grid_points[0].size();
     vec results(num_points);
 #pragma omp parallel for
-    for (long long int p = 0; p < num_points; ++p) {
+    for (long long int p = 0; p < num_points; p++) {
         results[p] = func(grid_points[GridData::GridIndex::X][p], grid_points[GridData::GridIndex::Y][p], grid_points[GridData::GridIndex::Z][p]) * grid_points[GridData::GridIndex::WEIGHT][p];
     }
 
@@ -956,39 +1200,53 @@ void GridManager::pruneGrid() {
     case PartitionType::Becke:      weight_index = GridData::GridIndex::BECKE_WEIGHT;  break;
     case PartitionType::TFVC:       weight_index = GridData::GridIndex::TFVC_WEIGHT;   break;
     case PartitionType::Hirshfeld:  weight_index = GridData::GridIndex::HIRSH_WEIGHT;  break;
+    case PartitionType::MBIS:       weight_index = GridData::GridIndex::MBIS_WEIGHT;   break;
+    case PartitionType::EMBIS:      weight_index = GridData::GridIndex::EMBIS_WEIGHT;  break;
     default:                        weight_index = GridData::GridIndex::BECKE_WEIGHT;  break;
     }
 
-    bvec2 point_is_kept(grid_data_.atomic_grids.size());
-    ivec pruned_num_points(grid_data_.atomic_grids.size());
+    vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids
+        : &grid_data_.atomic_grids; // Use helper grids if needed
+
+    ivec *num_points = needs_helper_grids_ ? &grid_data_.helper_num_points_per_atom
+        : &grid_data_.num_points_per_atom; // Use helper grids if needed
+
+    const int s = grid->size();
+
+    bvec2 point_is_kept(s);
+    ivec pruned_num_points(s);
 
     // Parallelize safely: each g writes a distinct element.
 #pragma omp parallel for
-    for (int g = 0; g < static_cast<int>(grid_data_.atomic_grids.size()); ++g) {
-        point_is_kept[g].resize(grid_data_.num_points_per_atom[g], false);
-        bvec& kept_local = point_is_kept[g]; // For easier access in lambda;
+    for (int g = 0; g < s; g++) {
+        point_is_kept[g].resize((*num_points)[g], false);
+        bvec &kept_local = point_is_kept[g]; // For easier access in lambda;
 
-        const int n = grid_data_.num_points_per_atom[g];
-        const auto& grid = grid_data_.atomic_grids[g];
-
+        const int n = (*num_points)[g];
+        int p;
+        const auto &_grid = (*grid)[g];
         if (config_.debug || config_.all_charges) {
-            const double* w_Becke = grid[GridData::GridIndex::BECKE_WEIGHT].data();
-            const double* w_TFVC = grid[GridData::GridIndex::TFVC_WEIGHT].data();
-            const double* w_Hirsh = grid[GridData::GridIndex::HIRSH_WEIGHT].data();
+            const double *w_Becke = _grid[GridData::GridIndex::BECKE_WEIGHT].data();
+            const double *w_TFVC = _grid[GridData::GridIndex::TFVC_WEIGHT].data();
+            const double *w_Hirsh = _grid[GridData::GridIndex::HIRSH_WEIGHT].data();
+            const double *w_MBIS = _grid[GridData::GridIndex::MBIS_WEIGHT].data();
+            const double *w_EMBIS = _grid[GridData::GridIndex::EMBIS_WEIGHT].data();
 #pragma omp simd
-            for (int p = 0; p < n; ++p) {
+            for (p = 0; p < n; p++) {
                 // OR-reduce comparisons; branchless.
                 bool keep = fabs(w_Becke[p]) > cutoff;
                 keep |= fabs(w_TFVC[p]) > cutoff;
                 keep |= fabs(w_Hirsh[p]) > cutoff;
+                keep |= fabs(w_MBIS[p]) > cutoff;
+                keep |= fabs(w_EMBIS[p]) > cutoff;
 
                 kept_local[p] = keep;
             }
         }
         else {
-            const double* weights = grid[weight_index].data();
+            const double *weights = _grid[weight_index].data();
 #pragma omp simd
-            for (int p = 0; p < n; ++p) {
+            for (p = 0; p < n; p++) {
                 kept_local[p] = (fabs(weights[p]) > cutoff);//keep;
             }
         }
@@ -996,39 +1254,50 @@ void GridManager::pruneGrid() {
     }
 
     // Create pruned grids
-    vec3 pruned_atomic_grids(grid_data_.atomic_grids.size());
+    vec3 pruned_atomic_grids(s);
 #pragma omp parallel for
-    for (int g = 0; g < grid_data_.atomic_grids.size(); ++g) {
-        pruned_atomic_grids[g].resize(8);
-        for (int coord = 0; coord < 8; ++coord) {
+    for (int g = 0; g < s; g++) {
+        pruned_atomic_grids[g].resize(grid_data_.grid_data_size);
+        for (int coord = 0; coord < grid_data_.grid_data_size; coord++) {
             pruned_atomic_grids[g][coord].resize(pruned_num_points[g]);
         }
-        const bvec& kept_local = point_is_kept[g];
+        const bvec &kept_local = point_is_kept[g];
 
-        const vec2& source = grid_data_.atomic_grids[g];
-        vec2& dest = pruned_atomic_grids[g];
+        const vec2 &source = (*grid)[g];
+        vec2 &dest = pruned_atomic_grids[g];
 
         int reduced_point = 0;
-        for (int p = 0; p < grid_data_.num_points_per_atom[g]; ++p) {
+        for (int p = 0; p < (*num_points)[g]; p++) {
             if (!kept_local[p]) continue;
 
             dest[GridData::GridIndex::X][reduced_point] = source[GridData::GridIndex::X][p];
             dest[GridData::GridIndex::Y][reduced_point] = source[GridData::GridIndex::Y][p];
             dest[GridData::GridIndex::Z][reduced_point] = source[GridData::GridIndex::Z][p];
             dest[GridData::GridIndex::WEIGHT][reduced_point] = source[GridData::GridIndex::WEIGHT][p];
+            dest[GridData::GridIndex::WFN_DENSITY][reduced_point] = source[GridData::GridIndex::WFN_DENSITY][p];
             dest[GridData::GridIndex::HIRSH_WEIGHT][reduced_point] = source[GridData::GridIndex::HIRSH_WEIGHT][p];
             dest[GridData::GridIndex::BECKE_WEIGHT][reduced_point] = source[GridData::GridIndex::BECKE_WEIGHT][p];
             dest[GridData::GridIndex::TFVC_WEIGHT][reduced_point] = source[GridData::GridIndex::TFVC_WEIGHT][p];
+            dest[GridData::GridIndex::MBIS_WEIGHT][reduced_point] = source[GridData::GridIndex::MBIS_WEIGHT][p];
+            dest[GridData::GridIndex::EMBIS_WEIGHT][reduced_point] = source[GridData::GridIndex::EMBIS_WEIGHT][p];
 
             reduced_point++;
         }
     }
 
     // Update grid data
-    grid_data_.atomic_grids = std::move(pruned_atomic_grids);
-    grid_data_.num_points_per_atom = std::move(pruned_num_points);
-    grid_data_.total_points = std::accumulate(grid_data_.num_points_per_atom.begin(),
-        grid_data_.num_points_per_atom.end(), 0);
+    if (needs_helper_grids_) {
+        grid_data_.helper_grids = std::move(pruned_atomic_grids);
+        grid_data_.helper_num_points_per_atom = std::move(pruned_num_points);
+        grid_data_.total_points = std::accumulate(grid_data_.helper_num_points_per_atom.begin(),
+            grid_data_.helper_num_points_per_atom.end(), 0);
+    }
+    else {
+        grid_data_.atomic_grids = std::move(pruned_atomic_grids);
+        grid_data_.num_points_per_atom = std::move(pruned_num_points);
+        grid_data_.total_points = std::accumulate(grid_data_.num_points_per_atom.begin(),
+            grid_data_.num_points_per_atom.end(), 0);
+    }
 
     if (config_.debug) {
         std::cout << "GridManager: Grid pruned from " << original_size << " to " << grid_data_.total_points << " points ("
@@ -1036,7 +1305,7 @@ void GridManager::pruneGrid() {
     }
 }
 
-bvec GridManager::determineAtomsNeedingGrids(const WFN& wave, const ivec& asym_atom_list) {
+bvec GridManager::determineAtomsNeedingGrids(const WFN &wave, const ivec &asym_atom_list) {
     bvec needs_grid(wave.get_ncen(), false);
 
     // Mark atoms in the asymmetric unit list as needing grids
@@ -1052,8 +1321,8 @@ bvec GridManager::determineAtomsNeedingGrids(const WFN& wave, const ivec& asym_a
     return needs_grid;
 }
 
-void  GridManager::writeSimpleGrid(const std::filesystem::path& filename, const vec2& grid_points, std::vector<std::pair<std::string, vec>> data) const {
-    for (auto& [label, vals] : data) {
+void  GridManager::writeSimpleGrid(const std::filesystem::path &filename, const vec2 &grid_points, std::vector<std::pair<std::string, vec>> data) const {
+    for (auto &[label, vals] : data) {
         err_chkf(grid_points[0].size() == vals.size(), "Size mismatch between given data and expected lengh", std::cout);
     }
 
@@ -1061,16 +1330,16 @@ void  GridManager::writeSimpleGrid(const std::filesystem::path& filename, const 
     if (grid_points.size() == 3) file << "# X\tY\tZ\t";
     else if (grid_points.size() == 2) file << "# X\tY\t";
     else if (grid_points.size() == 1) file << "# X\t";
-    for (auto& [label, vals] : data) {
+    for (auto &[label, vals] : data) {
         file << label << "\t";
     }
     file << "\n";
 
     for (int p = 0; p < grid_points[0].size(); p++) {
-        for (int i = 0; i < grid_points.size(); ++i) {
+        for (int i = 0; i < grid_points.size(); i++) {
             file << std::fixed << std::setprecision(3) << grid_points[i][p] << "\t";
         }
-        for (auto& [label, vals] : data) {
+        for (auto &[label, vals] : data) {
             file << std::scientific << std::setprecision(10) << vals[p] << "\t";
         }
         file << "\n";

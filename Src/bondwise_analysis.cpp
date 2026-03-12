@@ -614,13 +614,13 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
     make_Eigenvalues(P, occu);
 #ifdef NSA2DEBUG
     std::cout << "Eigenvalues of projected density P:\n";
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; i++) {
         std::cout << std::setw(14) << std::setprecision(8) << std::fixed << W[i] << " ";
     }
     print_dmatrix2(reshape<dMatrix2>(P, Shape2D(n, n)), "Projected density P");
 #endif
 
-    for (int i = 0; i < n; ++i)
+    for (int i = 0; i < n; i++)
         W[i] = abs(W[i]) < 1E-10 ? 0.0 : 1.0 / W[i];
 
     vec Temp2(n * n, 0.0);
@@ -677,13 +677,13 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
     vec sorted_evecs;
     sorted_evecs.reserve(n * n);
 
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; i++) {
         int original_idx = idx[i];
         if (result.eigenvalues[original_idx] < 0.075)
             continue;
         sorted_evals.emplace_back(result.eigenvalues[original_idx]);
 
-        for (int row = 0; row < n; ++row) {
+        for (int row = 0; row < n; row++) {
             sorted_evecs.emplace_back(result.eigenvectors[row * n + original_idx]);
         }
     }
@@ -747,7 +747,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
      // Construct S^-1/2 = U * Lambda^(-1/2) * U^T
      std::fill(S_PNAO.begin(), S_PNAO.end(), 0.0); // Reuse S_PNAO to store S^-1/2
 
-     for (int k = 0; k < n; ++k) {
+     for (int k = 0; k < n; k++) {
          double scale = 1.0 / std::sqrt(W[k]);
          // Add contribution of k-th eigenvector: scale * (v_k * v_k^T)
          // v_k is the k-th ROW of U.
@@ -755,8 +755,8 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
 
          // This is a rank-1 update (dger), but we can just sum manually or loop
          // Since we need the full matrix for the next multiplication
-         for (int i = 0; i < n; ++i) {
-             for (int j = 0; j < n; ++j) {
+         for (int i = 0; i < n; i++) {
+             for (int j = 0; j < n; j++) {
                  S_PNAO[i * n + j] += scale * v_k[i] * v_k[j];
              }
          }
@@ -1401,5 +1401,62 @@ Roby_information::Roby_information(WFN& wavy) {
     }
     std::cout << "--------------------------------------------------------------------------------------------\n";
 
-    double null = 0;
+}
+
+void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
+{
+    char cwd[1024];
+#ifdef _WIN32
+    if (_getcwd(cwd, sizeof(cwd)) != NULL)
+#else
+    if (getcwd(cwd, sizeof(cwd)) != NULL)
+#endif
+        std::cout << "Current working dir: " << cwd << std::endl;
+    WFN wavy(wfn_name);
+    wavy.delete_unoccupied_MOs();
+    std::cout << NoSpherA2_message(false) << std::endl << build_date << std::endl;
+
+    err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
+
+    int points = 1001;
+
+    for (int i = 0; i < wavy.get_ncen(); i++)
+    {
+        for (int j = i + 1; j < wavy.get_ncen(); j++)
+        {
+            std::filesystem::path path = cwd;
+            double distance = sqrt(pow(wavy.get_atom_coordinate(i, 0) - wavy.get_atom_coordinate(j, 0), 2) + pow(wavy.get_atom_coordinate(i, 1) - wavy.get_atom_coordinate(j, 1), 2) + pow(wavy.get_atom_coordinate(i, 2) - wavy.get_atom_coordinate(j, 2), 2));
+            double svdW = constants::ang2bohr(constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)]);
+            if (distance < 1.35 * svdW)
+            {
+                std::cout << "Bond between " << i << " (" << wavy.get_atom_charge(i) << ") and " << j << " (" << wavy.get_atom_charge(j) << ") with distance " << distance << " and svdW " << svdW << std::endl;
+                const vec bond_vec = {(wavy.get_atom_coordinate(j, 0) - wavy.get_atom_coordinate(i, 0)) / points, (wavy.get_atom_coordinate(j, 1) - wavy.get_atom_coordinate(i, 1)) / points, (wavy.get_atom_coordinate(j, 2) - wavy.get_atom_coordinate(i, 2)) / points};
+                const double dr = distance / points;
+                vec lapl(points, 0.0);
+                const vec pos = {wavy.get_atom_coordinate(i, 0), wavy.get_atom_coordinate(i, 1), wavy.get_atom_coordinate(i, 2)};
+#pragma omp parallel for schedule(dynamic)
+                for (int k = 0; k < points; k++)
+                {
+                    d3 t_pos = {pos[0], pos[1], pos[2]};
+                    t_pos[0] += k * bond_vec[0];
+                    t_pos[1] += k * bond_vec[1];
+                    t_pos[2] += k * bond_vec[2];
+                    lapl[k] = wavy.computeLap(t_pos);
+                }
+                std::filesystem::path outname(wfn_name.string() + "_bondwise_laplacian_" + std::to_string(i) + "_" + std::to_string(j) + ".dat");
+                path = path / std::filesystem::path(outname);
+                std::ofstream result(path, std::ios::out);
+                for (int k = 0; k < points; k++)
+                {
+                    result << std::setw(10) << std::scientific << std::setprecision(6) << dr * k << " " << std::setw(10) << std::scientific << std::setprecision(6) << lapl[k] << "\n";
+                }
+                result.flush();
+                result.close();
+            }
+            else
+            {
+                std::cout << "No bond between " << i << " and " << j << " with distance " << distance << " and svdW " << svdW << std::endl;
+            }
+        }
+    }
 }

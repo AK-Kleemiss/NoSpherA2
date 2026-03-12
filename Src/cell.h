@@ -35,7 +35,7 @@ public:
         for (int i = 0; i < 3; i++)
             sym[i].resize(3);
     };
-    cell(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
+    cell(const std::filesystem::path& filename, std::ostream& file = std::cout, const bool& debug = false)
     {
         if (debug)
             file << "starting to read cif!" << std::endl;
@@ -48,20 +48,66 @@ public:
         if (debug)
         {
             file << "RCM done!" << std::endl;
-            for (int i = 0; i < 3; ++i)
+            for (int i = 0; i < 3; i++)
             {
-                for (int j = 0; j < 3; ++j)
+                for (int j = 0; j < 3; j++)
                     file << std::setw(10) << std::fixed << get_rcm(i, j) / constants::TWO_PI / 0.529177249 << ' ';
                 file << std::endl;
             }
             file << "CM in 2*PI bohr:" << std::endl;
-            for (int i = 0; i < 3; ++i)
+            for (int i = 0; i < 3; i++)
             {
-                for (int j = 0; j < 3; ++j)
+                for (int j = 0; j < 3; j++)
                     file << std::setw(10) << std::fixed << get_cm(i, j) << ' ';
                 file << std::endl;
             }
         }
+    };
+	cell(double a, double b, double c, double alpha, double beta, double gamma)
+    {
+        this->a = a;
+        this->b = b;
+        this->c = c;
+        this->alpha = alpha;
+        this->beta = beta;
+        this->gamma = gamma;
+        set_system();
+        ca = cos(constants::PI_180 * alpha);
+        cb = cos(constants::PI_180 * beta);
+        cg = cos(constants::PI_180 * gamma);
+        sa = sin(constants::PI_180 * alpha);
+        sb = sin(constants::PI_180 * beta);
+        sg = sin(constants::PI_180 * gamma);
+        V = a * b * c * sqrt(1 + 2 * ca * cb * cg - ca * ca - cb * cb - cg * cg);
+        as = b * c * sa / V;
+        bs = a * c * sb / V;
+        cs = a * b * sg / V;
+
+        cm[0][0] = a;
+        cm[0][1] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+        cm[0][2] = sqrt(abs(a * c * cb)) * pow(-1, 1 + (cb > 0));
+
+        cm[1][0] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+        cm[1][1] = b;
+        cm[1][2] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+
+        cm[2][0] = sqrt(abs(a * c * cg)) * pow(-1, 1 + (cg > 0));
+        cm[2][1] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+        cm[2][2] = c;
+
+        rcm[0][0] = constants::TWO_PI / a;
+        rcm[0][1] = 0;
+        rcm[0][2] = 0;
+
+        rcm[1][0] = constants::TWO_PI * -cg / (a * sg);
+        rcm[1][1] = constants::TWO_PI * 1 / (b * sg);
+        rcm[1][2] = 0;
+
+        rcm[2][0] = constants::TWO_PI * b * c * (ca * cg - cb) / V / sg;
+        rcm[2][1] = constants::TWO_PI * a * c * (cb * cg - ca) / V / sg;
+        rcm[2][2] = constants::TWO_PI * a * b * sg / V;
+
+        upper = 1 - pow(ca, 2) - pow(cb, 2) - pow(cg, 2) + 2 * ca * cb * cg;
     };
     double get_as() const { return as; };
     double get_bs() const { return bs; };
@@ -182,7 +228,7 @@ public:
             2 * h * l * a * b * b * c * (cg * ca - cb) +
             2 * h * k * a * b * c * c * (ca * cb - cg);
         //double lower = pow(hkl[0], 2) * pow(sa, 2) / pow(a, 2) + pow(hkl[1], 2) * pow(sb, 2) / pow(b, 2) + pow(hkl[2], 2) * pow(sg, 2) / pow(c, 2) + 2.0 * hkl[1] * hkl[2] / (b * c) * (cb * cg - ca) + 2.0 * hkl[0] * hkl[2] / (a * c) * (cg * ca - cb) + 2.0 * hkl[0] * hkl[1] / (a * b) * (ca * cb - cg);
-        return sqrt(V*V / lower2);
+        return sqrt(V * V / lower2);
     }
 
     /**
@@ -207,7 +253,7 @@ public:
      * @param frac_z given fractional z-coordinate
      * @param in_bohr flag to indicate if the coordinates are in Bohr
      */
-    void make_coords_cartesian(double *positions_cart, const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
+    void make_coords_cartesian(double* positions_cart, const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
     {
         positions_cart[0] = (a * frac_x + b * cg * frac_y + c * cb * frac_z);
         positions_cart[1] = (b * sg * frac_y + c * (ca - cb * cg) / sg * frac_z);
@@ -228,7 +274,7 @@ public:
      */
     vec get_coords_cartesian(const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
     {
-        vec positions_cart{0., 0., 0.};
+        vec positions_cart{ 0., 0., 0. };
         positions_cart[0] = (a * frac_x + b * cg * frac_y + c * cb * frac_z);
         positions_cart[1] = (b * sg * frac_y + c * (ca - cb * cg) / sg * frac_z);
         positions_cart[2] = V / (a * b * sg) * frac_z;
@@ -247,7 +293,7 @@ public:
      * @return true if successful
      * @return false if unsuccessful
      */
-    bool read_CIF(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
+    bool read_CIF(const std::filesystem::path& filename, std::ostream& file = std::cout, const bool& debug = false)
     {
         std::ifstream cif_input(filename, std::ios::in);
         bvec found;
@@ -324,8 +370,8 @@ public:
 
         if (debug)
             file << "Making cm and rcm" << std::endl
-                 << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << std::endl
-                 << as << " " << bs << " " << cs << std::endl;
+            << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << std::endl
+            << as << " " << bs << " " << cs << std::endl;
 
         cm[0][0] = a;
         cm[0][1] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
@@ -377,7 +423,7 @@ public:
      * @param file where to print output
      * @param debug flag to print debug information
      */
-    void read_symm_CIF(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
+    void read_symm_CIF(const std::filesystem::path& filename, std::ostream& file = std::cout, const bool& debug = false)
     {
         std::ifstream cif_input(filename, std::ios::in);
         std::string line;
@@ -416,7 +462,7 @@ public:
                     std::stringstream s(line);
                     svec fields;
                     fields.resize(count_fields);
-                    int sym_from_cif[3][3]{0, 0, 0, 0, 0, 0, 0, 0, 0};
+                    int sym_from_cif[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
                     for (int i = 0; i < count_fields; i++)
                         s >> fields[i];
                     svec vectors;

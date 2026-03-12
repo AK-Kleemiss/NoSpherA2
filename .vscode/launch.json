@@ -7,11 +7,14 @@
       "request": "launch",
       "program": "${workspaceFolder}/NoSpherA2_Debug",
       "args": [
-        "-blastest",
+        "-cif", "olex2/Wfn_job/sucrose.cif",
+		"-dmin", "0.9",
+		"-wfn", "olex2/Wfn_job/sucrose.wfx",
+		"-acc", "1", "-v",
         "-no-date"
       ],
       "stopAtEntry": false,
-      "cwd": "${workspaceFolder}/tests/OpenBLAS",
+      "cwd": "${workspaceFolder}/tests/sucrose_fchk_SF",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",

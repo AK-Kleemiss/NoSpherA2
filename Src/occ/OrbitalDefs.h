@@ -5,12 +5,12 @@
 #include <cmath>
 #include <Eigen/Dense>
 
-inline std::span<const double> occ_vec_span(occ::Vec& v)
+inline std::span<const double> occ_vec_span(occ::Vec &v)
 {
     return std::span<const double>(v.data(), v.size());
 }
 
-inline std::span<const double> eigen_vec_span(const Eigen::VectorXd& v)
+inline std::span<const double> eigen_vec_span(const Eigen::VectorXd &v)
 {
     return std::span<const double>(v.data(), v.size());
 }
@@ -25,17 +25,17 @@ enum class ORB : int {
     H = 5,
 };
 namespace pure2cart {
-    inline const Eigen::Matrix<double, 1, 1> matS {
+    inline const Eigen::Matrix<double, 1, 1> matS{
         {  1.0,  },
     };
 
-    inline const Eigen::Matrix<double, 3, 3> matP {
+    inline const Eigen::Matrix<double, 3, 3> matP{
         { 1.0,  0.0,  0.0 }, // X
         { 0.0,  1.0,  0.0 }, // Y
         { 0.0,  0.0,  1.0 }, // Z
     };
 
-    inline const Eigen::Matrix<double, 6, 5> matD {
+    inline const Eigen::Matrix<double, 6, 5> matD{
         { -0.2886751345948129,  0.0,  0.0,  0.5,  0.0 },                // XX
         { -0.2886751345948129,  0.0,  0.0, -0.5,  0.0 },                // YY
         {  0.5773502691896257,  0.0,  0.0,  0.0,  0.0 },                // ZZ
@@ -44,7 +44,7 @@ namespace pure2cart {
         {  0.0,  0.0,  1.0,  0.0,  0.0 },                               // YZ
     };
 
-    inline const Eigen::Matrix<double, 10, 7> matF {
+    inline const Eigen::Matrix<double, 10, 7> matF{
         {  0.0, -0.158113883008419,  0.0,  0.0,  0.0, -0.2041241452319315,  0.0 },  // XXX
         {  0.0,  0.0, -0.158113883008419,  0.0,  0.0,  0.0,  0.2041241452319315 },  // YYY
         {  0.2581988897471611,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0 },                // ZZZ
@@ -57,7 +57,7 @@ namespace pure2cart {
         {  0.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0 },                               // XYZ
     };
 
-    inline const Eigen::Matrix<double, 15, 9> matG {
+    inline const Eigen::Matrix<double, 15, 9> matG{
         { 0.0633865691011321, 0.0, 0.0, -0.0944911182523068, 0.0, 0.0, 0.0, -0.125, 0.0 },
         { 0.0633865691011321, 0.0, 0.0, 0.0944911182523068, 0.0, 0.0, 0.0, -0.125, 0.0 },
         { 0.1690308509363523, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
@@ -76,10 +76,10 @@ namespace pure2cart {
     };
 }
 
-inline const std::array<Eigen::Map<const Eigen::MatrixXd>, 5> MappedMatrices = {{
+inline const std::array<Eigen::Map<const Eigen::MatrixXd>, 5> MappedMatrices = { {
         { pure2cart::matS.data(), 1, 1 },
         { pure2cart::matP.data(), 3, 3  },
         { pure2cart::matD.data(), 6, 5 },
         { pure2cart::matF.data(), 10, 7 },
         { pure2cart::matG.data(), 15, 9 },
-    }};
+    } };
