@@ -40,7 +40,7 @@ int main(int argc, char **argv)
     ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
 
     ofstream log_file("NoSpherA2.log", ios::out);
-    auto _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+    std::streambuf* _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
@@ -68,7 +68,7 @@ int main(int argc, char **argv)
         cube residual(opt.fract_name, true, wavy[0], std::cout, opt.debug);
         residual.fractal_dimension(0.01);
         log_file.flush();
-        std::cout.rdbuf(log_file.rdbuf()); // reset to standard output again
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished writing fractal dimensions plot to *.cube_fractal_plot file!" << endl;
         return 0;
     }

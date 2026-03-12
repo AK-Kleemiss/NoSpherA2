@@ -415,11 +415,20 @@ bool cube::write_xdgraph(const std::filesystem::path& given_path, bool debug)
 
 bool cube::fractal_dimension(const double stepsize) const
 {
+    if (stepsize <= 0.0)
+        return false;
+
+    if (size[0] < 2 || size[1] < 2 || size[2] < 2)
+        return false;
+
     double min = 100, max = -100;
-    for (const auto& inner_vec : values) {
-        for (const auto& innerest_vec : inner_vec) {
-            auto local_min_it = std::min_element(innerest_vec.begin(), innerest_vec.end());
-            auto local_max_it = std::max_element(innerest_vec.begin(), innerest_vec.end());
+    for (const vec2& inner_vec : values) {
+        for (const vec& innerest_vec : inner_vec) {
+            if (innerest_vec.empty())
+                continue;
+
+            vec::const_iterator local_min_it = std::min_element(innerest_vec.begin(), innerest_vec.end());
+            vec::const_iterator local_max_it = std::max_element(innerest_vec.begin(), innerest_vec.end());
 
             if (*local_min_it < min) {
                 min = *local_min_it;
@@ -430,6 +439,9 @@ bool cube::fractal_dimension(const double stepsize) const
             }
         }
     }
+    if (min > max)
+        return false;
+
     const double map_min = min, map_max = max;
     vec e = double_sum();
     min -= 2 * stepsize, max += 2 * stepsize;
@@ -440,45 +452,43 @@ bool cube::fractal_dimension(const double stepsize) const
     bins.resize(steps), df.resize(steps), iso.resize(steps);
     for (int i = 0; i < steps; i++)
         iso[i] = round((min + i * stepsize) * 100) / 100;
-    const int comparisons = size[0] * size[1] * (size[2] - 1) + size[0] * size[2] * (size[1] - 1) + size[2] * size[1] * (size[0] - 1);
-    double lv1, lv2;
-#pragma omp parallel private(lv1,lv2)
+    const long long comparisons = (long long)size[0] * size[1] * (size[2] - 1) + (long long)size[0] * size[2] * (size[1] - 1) + (long long)size[2] * size[1] * (size[0] - 1);
+#pragma omp parallel
     {
-        long long int x, y, z;
-#pragma omp for
+#pragma omp for schedule(dynamic)
         for (long long int i = 0; i < (size_t)size[0] * size[1] * ((size_t)size[2] - 1); i++)
         {
-            x = i / ((size_t)size[1] * ((size_t)size[2] - 1));
-            y = (i / ((size_t)size[2] - 1)) % size[1];
-            z = i % ((size_t)size[2] - 1);
-            lv1 = values[x][y][z];
-            lv2 = values[x][y][z + 1];
+            const long long int x = i / ((size_t)size[1] * ((size_t)size[2] - 1));
+            const long long int y = (i / ((size_t)size[2] - 1)) % size[1];
+            const long long int z = i % ((size_t)size[2] - 1);
+            const double& lv1 = values[x][y][z];
+            const double& lv2 = values[x][y][z + 1];
             for (int _i = 0; _i < steps; _i++)
                 if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
                     bins[_i]++;
         }
-#pragma omp for
+#pragma omp for schedule(dynamic)
         for (long long int i = 0; i < (size_t)size[0] * size[2] * ((size_t)size[1] - 1); i++)
         {
-            z = i / ((size_t)size[0] * (size[1] - 1));
-            x = (i / ((size_t)size[1] - 1)) % size[0];
-            y = i % ((size_t)size[1] - 1);
-            lv1 = values[x][y][z];
-            lv2 = values[x][y + 1][z];
+            const long long int z = i / ((size_t)size[0] * (size[1] - 1));
+            const long long int x = (i / ((size_t)size[1] - 1)) % size[0];
+            const long long int y = i % ((size_t)size[1] - 1);
+            const double& lv1 = values[x][y][z];
+            const double& lv2 = values[x][y + 1][z];
             for (int _i = 0; _i < steps; _i++)
                 if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
                     bins[_i]++;
         }
-#pragma omp for
+#pragma omp for schedule(dynamic)
         for (long long int i = 0; i < (size_t)size[1] * size[2] * ((size_t)size[0] - 1); i++)
         {
-            y = i / (((size_t)size[0] - 1) * size[2]);
-            z = (i / ((size_t)size[0] - 1)) % size[2];
-            x = i % ((size_t)size[0] - 1);
-            lv1 = values[x][y][z];
-            lv2 = values[x + 1][y][z];
+            const long long int y = i / (((size_t)size[0] - 1) * size[2]);
+            const long long int z = (i / ((size_t)size[0] - 1)) % size[2];
+            const long long int x = i % ((size_t)size[0] - 1);
+            const double& lv1 = values[x][y][z];
+            const double& lv2 = values[x + 1][y][z];
             for (int _i = 0; _i < steps; _i++)
                 if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
@@ -1046,7 +1056,7 @@ vec cube::double_sum() const
     for (int i = 0; i < 3; i++)
     {
         if (size[i] == 0)
-            return (vec(1, 0));
+            return (vec(2, 0));
     }
     double _s = 0.0;
     double _s2 = 0.0;
