@@ -3,6 +3,7 @@ import shutil
 import platform
 import subprocess
 import difflib
+import re
 from pathlib import Path
 
 import pytest
@@ -91,12 +92,17 @@ def print_color_diff(diff):
 def check_approximately_equal(diff, threshold=1e-7):
     actual_values = []
     expected_values = []
+    number_pattern = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
+
+    def extract_floats(text):
+        return [float(token) for token in number_pattern.findall(text)]
+
     for line in diff:
         if line.startswith('+') and not line.startswith('+++'):
-            actual_values.append(float(line[1:].strip()))
+            actual_values.extend(extract_floats(line[1:].strip()))
 
         elif line.startswith('-') and not line.startswith('---'):
-            expected_values.append(float(line[1:].strip()))
+            expected_values.extend(extract_floats(line[1:].strip()))
     
     if len(actual_values) != len(expected_values):
         return False
