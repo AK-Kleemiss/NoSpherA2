@@ -56,9 +56,28 @@ if (-not (Test-Path $ConverterExe)) {
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to build BasisSetConverter via msbuild."
     }
+
+    # The vcxproj can emit the exe under a project-specific OutDir. Resolve a usable path.
+    $candidateConverterPaths = @(
+        $ConverterExe,
+        (Join-Path $PSScriptRoot "BasisSetConverter\$Platform\BasisSetConverter\BasisSetConverter.exe"),
+        (Join-Path $PSScriptRoot "BasisSetConverter\$Platform\$Configuration\BasisSetConverter.exe")
+    )
+    $resolvedConverter = $null
+    foreach ($candidate in $candidateConverterPaths) {
+        if (Test-Path $candidate) {
+            $resolvedConverter = $candidate
+            break
+        }
+    }
+    if ($null -eq $resolvedConverter) {
+        throw "BasisSetConverter was built but executable could not be found. Checked: $($candidateConverterPaths -join '; ')"
+    }
+    $ConverterExe = $resolvedConverter
 }
 
 Write-Host "Generating auxiliary_basis.cpp via BasisSetConverter..."
+Write-Host "Using BasisSetConverter executable: $ConverterExe"
 & $ConverterExe $SolutionDir
 if ($LASTEXITCODE -ne 0) {
     throw "BasisSetConverter execution failed with exit code $LASTEXITCODE"
