@@ -119,5 +119,5 @@ intel-onemkl*.sh*
 *.gch
 pch.h.gch/
 build-windows-clang-cl
-Lib/occ
+Lib/occ*
 build-*

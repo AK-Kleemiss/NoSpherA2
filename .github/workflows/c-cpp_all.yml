@@ -108,7 +108,7 @@ jobs:
       uses: ./.github/actions/build-deps
       with:
         platform: ${{ matrix.name }}
-        upload_libs: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.upload_libs || 'false' }}
+        upload_libs: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.upload_libs == 'true' }}
 
     - name: Build NoSpherA2
       run: ${{ matrix.build-script }}
