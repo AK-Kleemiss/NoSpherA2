@@ -6,7 +6,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Configuration,
     [Parameter(Mandatory = $true)]
-    [string]$Platform
+    [string]$Platform,
+    [Parameter(Mandatory = $false)]
+    [string]$MSBuildExe
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,8 +37,22 @@ if (-not $needsRegeneration) {
 
 if (-not (Test-Path $ConverterExe)) {
     $converterProject = Join-Path $PSScriptRoot "BasisSetConverter\BasisSetConverter.vcxproj"
+    if (-not [string]::IsNullOrWhiteSpace($MSBuildExe)) {
+        if (-not (Test-Path $MSBuildExe)) {
+            throw "Provided MSBuild executable was not found: $MSBuildExe"
+        }
+        $msbuildCmd = $MSBuildExe
+    }
+    else {
+        $resolvedMsbuild = Get-Command msbuild.exe -ErrorAction SilentlyContinue
+        if ($null -eq $resolvedMsbuild) {
+            throw "Could not resolve msbuild.exe. Pass -MSBuildExe explicitly from MSBuild/CI."
+        }
+        $msbuildCmd = $resolvedMsbuild.Source
+    }
+
     Write-Host "BasisSetConverter executable not found. Building $converterProject ($Configuration|$Platform)..."
-    & msbuild $converterProject /m /nologo "/p:Configuration=$Configuration" "/p:Platform=$Platform"
+    & $msbuildCmd $converterProject /m /nologo "/p:Configuration=$Configuration" "/p:Platform=$Platform"
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to build BasisSetConverter via msbuild."
     }
