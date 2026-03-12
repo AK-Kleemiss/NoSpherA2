@@ -47,7 +47,7 @@ TESTS = [
             mtc=["ZP2_part1.gbw", 0.1, "ZP2_part2.gbw", 0.2], mtc_mult=[1, 1], mtc_charge=[0, 0], mtc_ECP=[0, 0]),
     NosTest("malbac_SF_ECP", _dir="ECP_SF", cif="malbac.cif", hkl="malbac.hkl", wfn="malbac.gbw", acc=1, ECP=1, no_date=True),
     NosTest("openBLAS", _dir="OpenBLAS", blastest=True, no_date=True),
-    NosTest("properties", _dir="sucrose_fchk_SF", wfn="olex2/Wfn_job/sucrose.wfx", cif="sucrose.cif", lap=True, eli=True, rdg=True, def=True, resolution=1.5, no_date=True),
+    NosTest("properties", _dir="sucrose_fchk_SF", wfn="olex2/Wfn_job/sucrose.wfx", cif="sucrose.cif", lap=True, eli=True, rdg=True, DEF=True, resolution=1.5, no_date=True),
     NosTest("reading_SALTED", _dir="SALTED", test_reading_SALTED_binary=True),
     NosTest("ri_fit", _dir="epoxide_gbw", _good="ri_fit.good", _skip_mac=True,
             wfn="epoxide.gbw", cif="epoxide.cif", dmin=0.4, ri_fit="combo_basis_fit", no_date=True),
