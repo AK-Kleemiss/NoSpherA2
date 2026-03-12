@@ -47,7 +47,7 @@ TESTS = [
             mtc=["ZP2_part1.gbw", 0.1, "ZP2_part2.gbw", 0.2], mtc_mult=[1, 1], mtc_charge=[0, 0], mtc_ECP=[0, 0]),
     NosTest("malbac_SF_ECP", _dir="ECP_SF", cif="malbac.cif", hkl="malbac.hkl", wfn="malbac.gbw", acc=1, ECP=1, no_date=True),
     NosTest("openBLAS", _dir="OpenBLAS", blastest=True, no_date=True),
-    NosTest("properties", _dir="sucrose_fchk_SF", wfn="olex2/Wfn_job/sucrose.wfx", cif="sucrose.cif", lap=True, eli=True, resolution=0.5, no_date=True),
+    NosTest("properties", _dir="sucrose_fchk_SF", wfn="olex2/Wfn_job/sucrose.wfx", cif="sucrose.cif", lap=True, eli=True, rdg=True, def=True, resolution=1.5, no_date=True),
     NosTest("reading_SALTED", _dir="SALTED", test_reading_SALTED_binary=True),
     NosTest("ri_fit", _dir="epoxide_gbw", _good="ri_fit.good", _skip_mac=True,
             wfn="epoxide.gbw", cif="epoxide.cif", dmin=0.4, ri_fit="combo_basis_fit", no_date=True),
@@ -75,6 +75,31 @@ def exe_path():
 def setup_env():
     if "OCC_DATA_PATH" not in os.environ:
         os.environ["OCC_DATA_PATH"] = os.path.abspath("occ/share")
+
+
+def check_differences(good_path, actual_path):
+    with open(good_path, 'r') as fg, open(actual_path, 'r') as fa:
+        expected = [line.strip() for line in fg if line.strip()]
+        actual = [line.strip() for line in fa if line.strip()]
+
+    if expected != actual:
+        diff = list(difflib.unified_diff(
+            expected, actual,
+            fromfile=f'Expected ({os.path.basename(good_path)})',
+            tofile=f'Actual ({os.path.basename(actual_path)})',
+            lineterm=''
+        ))
+
+        colored_diff = []
+        for line in diff:
+            if line.startswith('+') and not line.startswith('+++'):
+                colored_diff.append(f"\033[92m{line}\033[0m") # Green
+            elif line.startswith('-') and not line.startswith('---'):
+                colored_diff.append(f"\033[91m{line}\033[0m") # Red
+            else:
+                colored_diff.append(line)
+
+        pytest.fail("Output Mismatch!\n" + "\n".join(colored_diff), pytrace=False)
 
 @pytest.mark.parametrize("test", TESTS, ids=lambda t: t.name)
 def test_nos(test, exe_path, tmp_path):
@@ -120,25 +145,24 @@ def test_nos(test, exe_path, tmp_path):
     if not os.path.exists(good_path):
         pytest.fail(f"Expected log {good_path} missing.", pytrace=False)
 
-    with open(good_path, 'r') as fg, open(actual_path, 'r') as fa:
-        expected = [line.strip() for line in fg if line.strip()]
-        actual = [line.strip() for line in fa if line.strip()]
 
-    if expected != actual:
-        diff = list(difflib.unified_diff(
-            expected, actual,
-            fromfile=f'Expected ({test.good})',
-            tofile=f'Actual ({os.path.basename(actual_path)})',
-            lineterm=''
-        ))
+    check_differences(good_path, actual_path)
+    
+    if test.name != "properties":
+        return
+    
+    #Check the extra cubefiles generated from properties calculation
+    cube_dir = os.path.join(work_dir, "olex2", "Wfn_job")
+    cubes = ["sucrose_def.cube", "sucrose_eli.cube", "sucrose_lap.cube", "sucrose_rdg.cube", "sucrose_rho.cube", "sucrose_signed_rho.cube"]
+    for cube in cubes:
+        good_cube = os.path.join(cube_dir, f"{cube}.good")
+        actual_cube = os.path.join(cube_dir, f"{cube}")
+        
+        if not os.path.exists(actual_cube):
+            pytest.fail(f"Log {actual_path} missing.", pytrace=False)
 
-        colored_diff = []
-        for line in diff:
-            if line.startswith('+') and not line.startswith('+++'):
-                colored_diff.append(f"\033[92m{line}\033[0m") # Green
-            elif line.startswith('-') and not line.startswith('---'):
-                colored_diff.append(f"\033[91m{line}\033[0m") # Red
-            else:
-                colored_diff.append(line)
-
-        pytest.fail("Output Mismatch!\n" + "\n".join(colored_diff), pytrace=False)
+        if not os.path.exists(good_cube):
+            pytest.fail(f"Expected log {good_path} missing.", pytrace=False)
+        
+        check_differences(good_cube, actual_cube)
+    
