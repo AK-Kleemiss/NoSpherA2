@@ -86,6 +86,9 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <cstring>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 #endif
 
 #endif // NOSPHERA2_PCH_H

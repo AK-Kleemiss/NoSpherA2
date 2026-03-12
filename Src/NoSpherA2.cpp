@@ -16,7 +16,6 @@ extern "C" {
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 
-
 int main(int argc, char **argv)
 {
     //#ifdef __INSECURELY_AWAIT_FOR_ENV
@@ -37,6 +36,9 @@ int main(int argc, char **argv)
         std::cerr << "getcwd() error" << std::endl;
         return 1;
     }
+
+    ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
+
     ofstream log_file("NoSpherA2.log", ios::out);
     auto _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);

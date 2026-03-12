@@ -17,6 +17,91 @@
 #include <cderr.h>
 #endif
 
+namespace {
+
+bool is_valid_occ_data_path(const std::filesystem::path &base_path)
+{
+    return std::filesystem::is_directory(base_path) &&
+        std::filesystem::is_directory(base_path / "basis") &&
+        std::filesystem::is_directory(base_path / "methods");
+}
+
+std::filesystem::path resolve_executable_directory(const char *argv0)
+{
+#ifdef _WIN32
+    char module_path[MAX_PATH];
+    DWORD len = GetModuleFileNameA(nullptr, module_path, MAX_PATH);
+    if (len > 0 && len < MAX_PATH)
+    {
+        return std::filesystem::path(module_path).parent_path();
+    }
+#elif defined(__APPLE__)
+    uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);
+    std::string exe_path(size, '\0');
+    if (_NSGetExecutablePath(exe_path.data(), &size) == 0)
+    {
+        return std::filesystem::path(exe_path.c_str()).parent_path();
+    }
+#else
+    char exe_path[4096];
+    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len > 0)
+    {
+        exe_path[len] = '\0';
+        return std::filesystem::path(exe_path).parent_path();
+    }
+#endif
+
+    if (argv0 != nullptr)
+    {
+        try
+        {
+            return std::filesystem::absolute(std::filesystem::path(argv0)).parent_path();
+        }
+        catch (...)
+        {
+            return {};
+        }
+    }
+    return {};
+}
+
+bool set_occ_data_path(const std::filesystem::path &path)
+{
+#ifdef _WIN32
+    return _putenv_s("OCC_DATA_PATH", path.string().c_str()) == 0;
+#else
+    return setenv("OCC_DATA_PATH", path.string().c_str(), 1) == 0;
+#endif
+}
+
+std::filesystem::path choose_occ_data_path_from_exe_dir(const std::filesystem::path &exe_dir)
+{
+    const auto parent = exe_dir.parent_path();
+    const auto grandparent = parent.parent_path();
+
+    const std::vector<std::filesystem::path> candidates = {
+        exe_dir,
+        exe_dir / "occ" / "share",
+        exe_dir / "share",
+        parent / "occ" / "share",
+        parent / "share",
+        grandparent / "occ" / "share"
+    };
+
+    for (const auto &candidate : candidates)
+    {
+        if (!candidate.empty() && is_valid_occ_data_path(candidate))
+        {
+            return candidate;
+        }
+    }
+    return {};
+}
+
+}
+
 std::string help_message =
 ("\n----------------------------------------------------------------------------\n"
     "          These commands and arguments are known by NoSpherA2:\n"
@@ -113,6 +198,39 @@ std::string NoSpherA2_message(bool no_date)
 }
 
 std::string build_date = ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
+
+bool ensure_occ_data_path(const char *argv0)
+{
+    const char *occ_data_path_env = std::getenv("OCC_DATA_PATH");
+    if (occ_data_path_env != nullptr && is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
+    {
+        return true;
+    }
+
+    std::filesystem::path exe_dir = resolve_executable_directory(argv0);
+    if (exe_dir.empty())
+    {
+        std::cerr << "OCC_DATA_PATH not set or invalid and executable directory could not be resolved." << std::endl;
+        return false;
+    }
+
+    std::filesystem::path selected_path = choose_occ_data_path_from_exe_dir(exe_dir);
+    if (selected_path.empty())
+    {
+        std::cerr << "OCC_DATA_PATH not set or invalid. No valid OCC data directory found near executable directory: "
+                  << exe_dir << std::endl;
+        return false;
+    }
+
+    if (!set_occ_data_path(selected_path))
+    {
+        std::cerr << "Failed to set OCC_DATA_PATH to resolved directory: " << selected_path << std::endl;
+        return false;
+    }
+
+    std::cout << "OCC_DATA_PATH not set or invalid. Using: " << selected_path << std::endl;
+    return true;
+}
 
 bool is_similar_rel(const double& first, const double& second, const double& tolerance)
 {

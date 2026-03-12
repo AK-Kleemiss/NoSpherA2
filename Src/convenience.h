@@ -224,6 +224,7 @@ bool is_similar_rel(const double &first, const double &second, const double &tol
 bool is_similar(const double &first, const double &second, const double &tolerance);
 bool is_similar_abs(const double &first, const double &second, const double &tolerance);
 std::filesystem::path get_home_path(void);
+bool ensure_occ_data_path(const char *argv0);
 char asciitolower(char in);
 
 bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g);
