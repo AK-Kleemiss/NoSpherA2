@@ -379,7 +379,7 @@ jobs:
       uses: ./.github/actions/build-deps
       with:
         platform: Linux
-        upload_libs: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.upload_libs || 'false' }}
+        upload_libs: false
 
     - name: Build project
       run: cd Linux && make -j1
