@@ -327,7 +327,6 @@ jobs:
 
   # Security analysis jobs
   CodeQL:
-    if: false
     name: Analyze
     runs-on: ubuntu-latest
     needs: build
