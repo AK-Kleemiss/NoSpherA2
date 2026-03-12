@@ -20,6 +20,7 @@ Number of symmetry operations:                   4
 Nr of reflections to be used:                 9982
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 9982
+WARNING!!!!! The use of MBIS with Disorder or multi component calculations is not yet tested! Treat carefully!
 There are:
   25 atoms read from the wavefunction, of which 
   25 are identified as asymmetric unit atoms!

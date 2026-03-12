@@ -66,8 +66,8 @@ int main(int argc, char **argv)
         cube residual(opt.fract_name, true, wavy[0], std::cout, opt.debug);
         residual.fractal_dimension(0.01);
         log_file.flush();
-        std::cout.rdbuf(coutbuf); // reset to standard output again
-        std::cout << "Finished!" << endl;
+        std::cout.rdbuf(log_file.rdbuf()); // reset to standard output again
+        std::cout << "Finished writing fractal dimensions plot to *.cube_fractal_plot file!" << endl;
         return 0;
     }
     // Perform Hirshfeld surface based on input and quit

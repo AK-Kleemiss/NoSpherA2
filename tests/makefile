@@ -105,7 +105,7 @@ fractal:
 	$(call RUN_TEST,$@,sucrose_fchk_SF, \
 		-fractal sucrose_diff.cube \
 		-no_date \
-		&& ${RM} NoSpherA2.log && ${MV} sucrose_diff.cube_fractal_plot $@.log)
+		&& ${RM} NoSpherA2.log && ${MV} sucrose_diff.cube_fractal_plot NoSpherA2.log)
 
 grown_water:
 	$(call RUN_TEST,$@,grown, \
