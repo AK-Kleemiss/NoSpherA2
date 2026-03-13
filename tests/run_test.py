@@ -160,22 +160,22 @@ def check_differences_cubes(good_path, actual_path):
             print_color_diff(diff)
 
 @pytest.mark.parametrize("test", TESTS, ids=lambda t: t.name)
-def test_nos(test, exe_path, tmp_path):
+def test_nos(test, exe_path, tmp_path, request):
     if test.full and not os.environ.get("RUN_FULL_TEST"):
         pytest.skip("RUN_FULL_TEST not set")
-    if nos_test.skip_mac and platform.system() == "Darwin":
+    if test.skip_mac and platform.system() == "Darwin":
         pytest.skip("Skipped on macOS")
 
     # Isolate test execution: Copy source files to pytest's temporary directory
-    src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), nos_test.dir)
-    work_dir = tmp_path / nos_test.dir
+    src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), test.dir)
+    work_dir = tmp_path / test.dir
 
     if os.path.exists(src_dir):
         shutil.copytree(src_dir, work_dir)
     else:
         pytest.fail(f"Source directory missing: {src_dir}", pytrace=False)
 
-    cmd_args = nos_test.build_cmd(exe_path)
+    cmd_args = test.build_cmd(exe_path)
     print(" ".join(cmd_args))
     OCC_DATA_PATH = str(request.config.rootpath / "occ" / "share")
     try:
@@ -190,18 +190,18 @@ def test_nos(test, exe_path, tmp_path):
     except subprocess.CalledProcessError as e:
         pytest.fail(f"Execution failed.\nStderr: {e.stderr}", pytrace=False)
 
-    good_path = os.path.join(work_dir, nos_test.good)
-    actual_gen = os.path.join(work_dir, nos_test.actual)
+    good_path = os.path.join(work_dir, test.good)
+    actual_gen = os.path.join(work_dir, test.actual)
     extra_logs = work_dir.glob("*.log")
     failed_dir = (
-        Path(os.path.dirname(os.path.abspath(__file__))) / "failed_logs" / nos_test.name
+        Path(os.path.dirname(os.path.abspath(__file__))) / "failed_logs" / test.name
     )
     failed_dir.mkdir(parents=True, exist_ok=True)
     for log in extra_logs:
         shutil.copy2(log, failed_dir / log.name)
 
-    if nos_test.actual == "NoSpherA2.log":
-        actual_path = os.path.join(work_dir, nos_test.good.replace("good", "log"))
+    if test.actual == "NoSpherA2.log":
+        actual_path = os.path.join(work_dir, test.good.replace("good", "log"))
         if os.path.exists(actual_gen):
             shutil.move(actual_gen, actual_path)
     else:
