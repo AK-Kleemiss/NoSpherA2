@@ -45,7 +45,7 @@ namespace constants
 
     constexpr double constexpr_pow(double base, int exponent) {
         double result = 1.0;
-        for (int i = 0; i < exponent; ++i) result *= base;
+        for (int i = 0; i < exponent; i++) result *= base;
         return result;
     }
 
@@ -59,6 +59,7 @@ namespace constants
     constexpr int hardness = 3;
     constexpr double cutoff = 1.0e-20;
     constexpr double far_away = 10.0;
+    constexpr double far_away_sq = far_away * far_away;
     constexpr double PI = 3.1415926535897932384626433832795028;
     constexpr double PI_4 = PI / 4.0;
     constexpr long double SQRTPI_4L = .8862269254527580136490837416705725913987747280611935641069038949264l;
@@ -66,6 +67,8 @@ namespace constants
     constexpr double PI_2 = PI / 2.0;
     constexpr double TWO_PI = 2 * PI;
     constexpr double FOUR_PI = 4 * PI;
+    constexpr double EIGHT_PI = 8 * PI;
+    constexpr double INV_EIGHT_PI = 1.0 / EIGHT_PI;
     constexpr double C0 = SQRT2 * FOUR_PI;
     const double sqr_pi = sqrt(PI);
     constexpr double PI2 = PI * PI;
@@ -172,7 +175,7 @@ namespace constants
     constexpr double exp_approx(const double& x, int n = 25) {
         double result = 1.0;
         double term = 1.0;
-        for (int i = 1; i <= n; ++i) {
+        for (int i = 1; i <= n; i++) {
             term *= x / i;
             result += term;
         }
@@ -285,7 +288,7 @@ namespace constants
         std::array<size_t, MAX_FACTORIAL> ft{};
 
         ft[0] = 1;
-        for (int i = 1; i < MAX_FACTORIAL; ++i) {
+        for (int i = 1; i < MAX_FACTORIAL; i++) {
             ft[i] = ft[i - 1] * i;
         }
         return ft;
@@ -402,6 +405,13 @@ namespace constants
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                              28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28,
                              46, 46, 46, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60 };
+
+    constexpr int MBIS_function[] = { 0, 1, 1,
+                             2, 2, 2, 2, 2, 2, 2, 2,
+                             3, 3, 3, 3, 3, 3, 3, 3,
+                             4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+                             5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+                             6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6 };
 
     constexpr int ECP_electrons_xTB[] = { 0, 0, 0,
                                      2, 2, 2, 2, 2, 2, 2, 2,
@@ -571,7 +581,7 @@ namespace constants
             -1;
     };
 
-    const int type_vector[168]{
+    constexpr int type_vector[168]{
     0, 0, 0,
     1, 0, 0,
     0, 1, 0,
@@ -677,8 +687,8 @@ namespace constants
 
         // l = 0 case
         norms[0][0] = constants::c_1_4p;
-        for (int l = 1; l <= ASSOCIATED_LEGENDRE_MAX_L; ++l) {
-            for (int m = -l; m <= l; ++m) {
+        for (int l = 1; l <= ASSOCIATED_LEGENDRE_MAX_L; l++) {
+            for (int m = -l; m <= l; m++) {
                 norms[l][m + l] = sqrt(((2 * l + 1) * double(constants::ft[l - m])) / (constants::TWO_PI * double(constants::ft[l + m])));
             }
             norms[l][l] = sqrt(((2 * l + 1) / constants::FOUR_PI));

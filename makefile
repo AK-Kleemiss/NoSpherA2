@@ -176,16 +176,17 @@ ifeq ($(NAME),WINDOWS)
 WIN_SLN  ?= Windows/NoSpherA2.sln
 WIN_CFG  ?= Release
 WIN_PLAT ?= x64
+WIN_VCTOOLSVERSION ?= 14.50.35717
 NoSpherA2: 
 	echo Building $(WIN_SLN) ($(WIN_CFG) $(WIN_PLAT)) 
-	msbuild $(WIN_SLN) /p:Configuration=$(WIN_CFG) /p:Platform=$(WIN_PLAT)
+	msbuild $(WIN_SLN) /p:Configuration=$(WIN_CFG) /p:Platform=$(WIN_PLAT) /p:VCToolsVersion=$(WIN_VCTOOLSVERSION)
 
 NoSpherA2_Debug:
 	@echo Building NoSpherA2_Debug for $(NAME)
 	@$(MAKE) WIN_CFG=Debug NoSpherA2
 
 clean:
-	@msbuild $(WIN_SLN) /t:Clean /p:Configuration=$(WIN_CFG) /p:Platform=$(WIN_PLAT)
+	@msbuild $(WIN_SLN) /t:Clean /p:Configuration=$(WIN_CFG) /p:Platform=$(WIN_PLAT) /p:VCToolsVersion=$(WIN_VCTOOLSVERSION)
 endif
 
 ifeq ($(NAME),LINUX)

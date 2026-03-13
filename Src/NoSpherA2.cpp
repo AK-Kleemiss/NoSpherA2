@@ -8,17 +8,16 @@
 #include "properties.h"
 #include "isosurface.h"
 #include "cif.h"
-#include "debug_utils.h"
+//#include "debug_utils.h"
 #include "bondwise_analysis.h"
 
-int QCT(options& opt, std::vector<WFN>& wavy);
+int QCT(options &opt, std::vector<WFN> &wavy);
 
-
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-#ifdef __INSECURELY_AWAIT_FOR_ENV
-    wait_for_debugger(); // This is for debugging during tests. It just returns if the env variable DEBUG_WAIT is not set.
-#endif
+    //#ifdef __INSECURELY_AWAIT_FOR_ENV
+    //    wait_for_debugger(); // This is for debugging during tests. It just returns if the env variable DEBUG_WAIT is not set.
+    //#endif
     using namespace std;
     char cwd[1024];
 #ifdef _WIN32
@@ -34,8 +33,11 @@ int main(int argc, char** argv)
         std::cerr << "getcwd() error" << std::endl;
         return 1;
     }
+
+    ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
+
     ofstream log_file("NoSpherA2.log", ios::out);
-    auto _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+    std::streambuf* _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
@@ -63,8 +65,8 @@ int main(int argc, char** argv)
         cube residual(opt.fract_name, true, wavy[0], std::cout, opt.debug);
         residual.fractal_dimension(0.01);
         log_file.flush();
-        std::cout.rdbuf(coutbuf); // reset to standard output again
-        std::cout << "Finished!" << endl;
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
+        std::cout << "Finished writing fractal dimensions plot to *.cube_fractal_plot file!" << endl;
         return 0;
     }
     // Perform Hirshfeld surface based on input and quit
@@ -305,7 +307,7 @@ int main(int argc, char** argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
+                result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
                     opt,
                     *temp_pred,
                     log_file,
@@ -363,7 +365,7 @@ int main(int argc, char** argv)
         svec empty({});
         //use atoms of group 0
         opt.groups[0].push_back(0);
-        itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, log_file, empty, 0);
+        itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, wavy, log_file, empty, 0);
         log_file << "Writing tsc file... " << flush;
         if (opt.binary_tsc)
             res.write_tscb_file();
@@ -382,31 +384,33 @@ int main(int argc, char** argv)
     // This one has conversion to fchk and calculation of one single tsc file
     if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
     {
-      if (opt.occ != "") {
-        log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
-        if (opt.occ.ends_with(".toml")) {
-          auto config = occ::io::read_occ_input_file(opt.occ);
-          occ::log::set_log_file("NoSpherA2_OCC.log");
-          occ::parallel::set_num_threads(config.runtime.threads);
-          auto wfn = occ::main::run_scf_external(config, true);
-          auto wfn_from_occ = WFN(wfn);
-          wavy.emplace_back(wfn_from_occ);
-        } else {
-          occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);
-          auto wfn_from_occ = WFN(wfn, true);
-          wavy.emplace_back(wfn_from_occ);
-        }
+        if (opt.occ != "") {
+            log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
+            if (opt.occ.ends_with(".toml")) {
+                auto config = occ::io::read_occ_input_file(opt.occ);
+                occ::log::set_log_file("NoSpherA2_OCC.log");
+                occ::parallel::set_num_threads(config.runtime.threads);
+                auto wfn = occ::main::run_scf_external(config, true);
+                auto wfn_from_occ = WFN(wfn);
+                wavy.emplace_back(wfn_from_occ);
+            }
+            else {
+                occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);
+                auto wfn_from_occ = WFN(wfn, true);
+                wavy.emplace_back(wfn_from_occ);
+            }
 
-        wavy[0].set_method(opt.method);
-        wavy[0].set_multi(opt.mult);
-        wavy[0].set_charge(opt.charge);
-      } else {
-        log_file << "Reading: " << setw(44) << opt.wfn << flush;
-        wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
-        wavy[0].set_method(opt.method);
-        wavy[0].set_multi(opt.mult);
-        wavy[0].set_charge(opt.charge);
-      }
+            wavy[0].set_method(opt.method);
+            wavy[0].set_multi(opt.mult);
+            wavy[0].set_charge(opt.charge);
+        }
+        else {
+            log_file << "Reading: " << setw(44) << opt.wfn << flush;
+            wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+            wavy[0].set_method(opt.method);
+            wavy[0].set_multi(opt.mult);
+            wavy[0].set_charge(opt.charge);
+        }
         if (opt.debug)
             log_file << "method/mult/charge: " << opt.method << " " << opt.mult << " " << opt.charge << endl;
 
@@ -463,7 +467,7 @@ int main(int argc, char** argv)
                     log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
                 if (wavy[0].get_origin() == 7)
                     opt.iam_switch = true;
-                res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+                res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
                     opt,
                     wavy,
                     log_file,
@@ -475,7 +479,7 @@ int main(int argc, char** argv)
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
 
-                SALTEDPredictor* temp_pred = new SALTEDPredictor(wavy[0], opt);
+                SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[0], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
@@ -484,7 +488,7 @@ int main(int argc, char** argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                res = calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
+                res = calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
                     opt,
                     *temp_pred,
                     log_file,

@@ -106,7 +106,7 @@ make
                 -cif sucrose.cif \
                 -hkl olex2/Wfn_job/sucrose.hkl \
                 -wfn olex2/Wfn_job/sucrose.wfx \
-                -acc 0 \
+                -acc 1 \
                 -no-date)
       ```
 4. **Run `make test`** to ensure your test compiles and runs.

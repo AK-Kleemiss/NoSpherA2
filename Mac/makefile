@@ -121,8 +121,10 @@ build/BasisSetConverter: makefile_basis_set_converter | build/arm64 build/x86_64
 	@$(MAKE) -f makefile_basis_set_converter $(shell uname -m)
 	@touch build/BasisSetConverter
 
+BASIS_SET_CSVS := $(wildcard $(SRC_DIR)/basis_set_helper/basis_sets/*.csv)
+
 # Actually run the converter to generate the file
-$(SRC_DIR)/auxiliary_basis.cpp: build/BasisSetConverter
+$(SRC_DIR)/auxiliary_basis.cpp: build/BasisSetConverter $(BASIS_SET_CSVS)
 	@echo "Running BasisSetConverter..."
 	@./../BasisSetConverter ../Src/basis_set_helper ../Src
 	@echo "auxiliary_basis.cpp generated"

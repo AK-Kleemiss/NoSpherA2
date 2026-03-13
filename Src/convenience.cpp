@@ -9,12 +9,98 @@
 #include "atoms.h"
 #include "JKFit.h"
 #include "fchk.h"
+#include "bondwise_analysis.h"
 
 #ifdef _WIN32
 #include <windows.h>
 #include <commdlg.h>
 #include <cderr.h>
 #endif
+
+namespace {
+
+bool is_valid_occ_data_path(const std::filesystem::path &base_path)
+{
+    return std::filesystem::is_directory(base_path) &&
+        std::filesystem::is_directory(base_path / "basis") &&
+        std::filesystem::is_directory(base_path / "methods");
+}
+
+std::filesystem::path resolve_executable_directory(const char *argv0)
+{
+#ifdef _WIN32
+    char module_path[MAX_PATH];
+    DWORD len = GetModuleFileNameA(nullptr, module_path, MAX_PATH);
+    if (len > 0 && len < MAX_PATH)
+    {
+        return std::filesystem::path(module_path).parent_path();
+    }
+#elif defined(__APPLE__)
+    uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);
+    std::string exe_path(size, '\0');
+    if (_NSGetExecutablePath(exe_path.data(), &size) == 0)
+    {
+        return std::filesystem::path(exe_path.c_str()).parent_path();
+    }
+#else
+    char exe_path[4096];
+    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len > 0)
+    {
+        exe_path[len] = '\0';
+        return std::filesystem::path(exe_path).parent_path();
+    }
+#endif
+
+    if (argv0 != nullptr)
+    {
+        try
+        {
+            return std::filesystem::absolute(std::filesystem::path(argv0)).parent_path();
+        }
+        catch (...)
+        {
+            return {};
+        }
+    }
+    return {};
+}
+
+bool set_occ_data_path(const std::filesystem::path &path)
+{
+#ifdef _WIN32
+    return _putenv_s("OCC_DATA_PATH", path.string().c_str()) == 0;
+#else
+    return setenv("OCC_DATA_PATH", path.string().c_str(), 1) == 0;
+#endif
+}
+
+std::filesystem::path choose_occ_data_path_from_exe_dir(const std::filesystem::path &exe_dir)
+{
+    const auto parent = exe_dir.parent_path();
+    const auto grandparent = parent.parent_path();
+
+    const std::vector<std::filesystem::path> candidates = {
+        exe_dir,
+        exe_dir / "occ" / "share",
+        exe_dir / "share",
+        parent / "occ" / "share",
+        parent / "share",
+        grandparent / "occ" / "share"
+    };
+
+    for (const auto &candidate : candidates)
+    {
+        if (!candidate.empty() && is_valid_occ_data_path(candidate))
+        {
+            return candidate;
+        }
+    }
+    return {};
+}
+
+}
 
 std::string help_message =
 ("\n----------------------------------------------------------------------------\n"
@@ -94,6 +180,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Lukas M. Seifert,\n");
         t.append("      Daniel Bruex,\n");
         t.append("      Marti Gimferrer,\n");
+        t.append("      Anker Nielsen,\n");
         t.append("      and many more in communications or by feedback!\n");
         t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library.\n");
         t.append("The used packages are published under BSD-3 clause License.\n");
@@ -105,11 +192,45 @@ std::string NoSpherA2_message(bool no_date)
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst. 2024, 57, 161 - 174.\n");
         t.append("ECP correction functions at : Kleemiss et al. J. Appl. Cryst. 2025, 58, 374 - 382.\n");
         t.append("TFVC partitioning at        : Gimferrer et al. TBA.\n");
+        t.append("MBIS/EMBIS partitioning at  : Nielsen et al. TBA.\n");
     }
     return t;
 }
 
 std::string build_date = ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
+
+bool ensure_occ_data_path(const char *argv0)
+{
+    const char *occ_data_path_env = std::getenv("OCC_DATA_PATH");
+    if (occ_data_path_env != nullptr && is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
+    {
+        return true;
+    }
+
+    std::filesystem::path exe_dir = resolve_executable_directory(argv0);
+    if (exe_dir.empty())
+    {
+        std::cerr << "OCC_DATA_PATH not set or invalid and executable directory could not be resolved." << std::endl;
+        return false;
+    }
+
+    std::filesystem::path selected_path = choose_occ_data_path_from_exe_dir(exe_dir);
+    if (selected_path.empty())
+    {
+        std::cerr << "OCC_DATA_PATH not set or invalid. No valid OCC data directory found near executable directory: "
+                  << exe_dir << std::endl;
+        return false;
+    }
+
+    if (!set_occ_data_path(selected_path))
+    {
+        std::cerr << "Failed to set OCC_DATA_PATH to resolved directory: " << selected_path << std::endl;
+        return false;
+    }
+
+    std::cout << "OCC_DATA_PATH not set or invalid. Using: " << selected_path << std::endl;
+    return true;
+}
 
 bool is_similar_rel(const double& first, const double& second, const double& tolerance)
 {
@@ -174,7 +295,11 @@ void copy_file(std::filesystem::path& from, std::filesystem::path& to)
     dest.close();
 };
 
-d3 cross(const d3& a, const d3& b)
+d3 vec_diff(const d3& a, const d3& b) {
+    return { a[0] - b[0], a[1] - b[1], a[2] - b[2] };
+};
+
+d3 vec_cross(const d3& a, const d3& b)
 {
     return {
         a[1] * b[2] - a[2] * b[1],
@@ -182,7 +307,7 @@ d3 cross(const d3& a, const d3& b)
         a[0] * b[1] - a[1] * b[0] };
 }
 
-double a_dot(const d3& a, const d3& b)
+double vec_dot(const d3& a, const d3& b)
 {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 };
@@ -1660,6 +1785,58 @@ void options::digest_options()
             spherically_averaged_density(*this, val_MOs, val_MOs_beta);
             exit(0);
         }
+        else if (temp == "-atom_sfac")
+        {
+            std::cout << NoSpherA2_message() << endl;
+            wfn = arguments[i + 1];
+            wfn2 = arguments[i + 2];
+            err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
+            WFN wavy(e_origin::NOT_YET_DEFINED);
+            wavy.read_known_wavefunction_format(wfn, std::cout, debug);
+            wavy.delete_unoccupied_MOs();
+
+            WFN wavy2(e_origin::NOT_YET_DEFINED);
+            wavy2.read_known_wavefunction_format(wfn2, std::cout, debug);
+            wavy2.delete_unoccupied_MOs();
+
+            bvec needs_grid(wavy.get_ncen(), false);
+            needs_grid[0] = true;
+            GridConfiguration conf;
+            conf.partition_type = PartitionType::Hirshfeld;
+            conf.accuracy = 4;
+            GridManager grid(conf);
+            vec2 d1, d2, d3, dens;
+            vec2 d1_2, d2_2, d3_2, dens_2;
+
+            cell unit_cell(10.0, 10.0, 10.0, 90, 90, 90);
+            ivec asym_atom_list(1, 0);
+            // Setup grids for the molecule
+            auto grid2 = grid;
+            grid.setup3DGridsForMolecule(wavy, asym_atom_list, needs_grid, unit_cell);
+            grid.getDensityVectors(wavy, asym_atom_list, d1, d2, d3, dens);
+            grid2.setup3DGridsForMolecule(wavy2, asym_atom_list, needs_grid, unit_cell);
+            grid2.getDensityVectors(wavy2, asym_atom_list, d1_2, d2_2, d3_2, dens_2);
+
+            for (int j = 0; j < d1.size(); j++)
+            {
+                for (int p = 0; p < d1[0].size(); p++)
+                {
+                    dens[j][p] -= dens_2[j][p];
+                }
+            }
+
+            // Calculate partitioned charges
+            PartitionResults results = grid.calculatePartitionedCharges(wavy, unit_cell);
+
+            grid.printChargeTable({ "Fe" }, wavy, asym_atom_list, std::cout, results);
+
+            const int points = grid.getTotalGridPoints();
+            for (double k = 0.001; k < 10; k += 0.002) {
+                cdouble res = calc_spherically_averaged_at_k(d1, d2, d3, dens, k);
+                std::cout << "k: " << k << " sfac: " << setprecision(9) << setw(16) << scientific << res.real() << " " << setprecision(9) << setw(16) << scientific << res.imag() << endl;
+            }
+            exit(0);
+        }
         else if (temp == "-b")
             basis_set = arguments[i + 1];
         else if (temp == "-becke" || temp == "-BECKE" || temp == "-Becke")
@@ -1774,28 +1951,12 @@ void options::digest_options()
                 j++;
             }
         }
-        else if (temp == "-core_dens-corrected")
-        {
-            double prec = stod(arguments[i + 1]);
-            ivec a = split_string<int>(arguments[i + 3], ",");
-            ivec b = split_string<int>(arguments[i + 4], ",");
-            test_core_dens_corrected(prec, threads, arguments[i + 2], a, b);
-            exit(0);
-        }
-        else if (temp == "-core_tsc-corrected")
-        {
-            double prec = stod(arguments[i + 1]);
-            ivec a = split_string<int>(arguments[i + 3], ",");
-            ivec b = split_string<int>(arguments[i + 4], ",");
-            test_core_sfac_corrected(prec, threads, arguments[i + 2], a, b);
-            exit(0);
-        }
         else if (temp == "-convert_to_47") {
             err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
-            std::filesystem::path wfn = arguments[i + 1];
+            std::filesystem::path _wfn = arguments[i + 1];
             WFN wavy(e_origin::NOT_YET_DEFINED);
-            wavy.read_known_wavefunction_format(wfn, std::cout, debug);
-            wavy.write_nbo(wfn.replace_extension(".47"), debug);
+            wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
+            wavy.write_nbo(_wfn.replace_extension(".47"), debug);
             exit(0);
         }
         else if (temp == "-convert_XCW")
@@ -1859,8 +2020,9 @@ void options::digest_options()
             properties.eli = true;
         else if (temp == "-elf")
             properties.elf = true;
-        else if (temp == "-equi_bench") {
-            exit(0);
+        else if (temp == "-embis" || temp == "-EMBIS")
+        {
+            partition_type = PartitionType::EMBIS;
         }
         else if (temp == "-esp")
             properties.esp = true;
@@ -1962,6 +2124,10 @@ void options::digest_options()
             iam_switch = true;
         else if (temp == "-lap")
             properties.lap = true;
+        else if (temp == "-mbis" || temp == "-MBIS")
+        {
+            partition_type = PartitionType::MBIS;
+        }
         else if (temp == "-mem")
         {
             mem = stod(arguments[i + 1]); // In MB
@@ -2137,7 +2303,7 @@ void options::digest_options()
                 aux_basis.push_back(std::make_shared<BasisSet>());
             }
         }
-        else if (temp == "-write_ri_coefs"){
+        else if (temp == "-write_ri_coefs") {
             WFN wavy(wfn);
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
             DensityFitting::CONFIG config;
@@ -2187,9 +2353,9 @@ void options::digest_options()
             filesystem::path salted_model_path = SP.get_salted_filename();
             log_file << "Using " << salted_model_path << " for the prediction" << endl;
             if (!SP.basis_set_loaded()) {
-                string df_basis_name = SP.get_dfbasis_name();
-                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
-                load_basis_into_WFN(SP.wavy, aux_basis);
+                df_basis_name = SP.get_dfbasis_name();
+                std::shared_ptr<BasisSet> _aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                load_basis_into_WFN(SP.wavy, _aux_basis);
             }
             vec coefs = SP.gen_SALTED_densities();
             npy::npy_data<double> np_coeffs;
@@ -2213,20 +2379,14 @@ void options::digest_options()
         }
         else if (temp == "-skpts")
             save_k_pts = true;
-        else if (temp == "-sfac_scan")
-        {
-            d_sfac_scan = fromString<double>(arguments[i + 1]);
-            cif = arguments[i + 2];
-            wfn = arguments[i + 3];
-            sfac_scan(*this, log_file);
-            exit(0);
-        }
         else if (temp == "-sfac_diffuse")
         {
-            sfac_diffuse = fromString<double>(arguments[i + 1]);
-            cif = arguments[i + 2];
-            wfn = arguments[i + 3];
-            dmin = fromString<double>(arguments[i + 4]);
+            sfac_diffuse[0] = fromString<double>(arguments[i + 1]);
+            sfac_diffuse[1] = fromString<double>(arguments[i + 2]);
+            sfac_diffuse[2] = fromString<double>(arguments[i + 3]);
+            cif = arguments[i + 4];
+            wfn = arguments[i + 5];
+            dmin = fromString<double>(arguments[i + 6]);
             calc_sfac_diffuse(*this, std::cout);
         }
         else if (temp == "-atom_dens_diff")
@@ -2353,11 +2513,6 @@ void options::digest_options()
         else if (temp == "-wfn_cif")
         {
             write_CIF = true;
-        }
-        else if (temp == "-xtb_test")
-        {
-            test_xtb_molden(*this, log_file);
-            exit(0);
         }
         else if (temp == "-xyz")
         {
@@ -2555,7 +2710,7 @@ int CountWords(const char* str)
             inSpaces = false;
         }
 
-        ++str;
+        str++;
     }
 
     return numWords;
@@ -3031,13 +3186,13 @@ void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
     uint32_t w[64];
     uint32_t a, b, c, d, e, f, g, h;
 
-    for (int i = 0; i < 16; ++i)
+    for (int i = 0; i < 16; i++)
     {
         w[i] = (block[i * 4] << 24) | (block[i * 4 + 1] << 16) |
             (block[i * 4 + 2] << 8) | (block[i * 4 + 3]);
     }
 
-    for (int i = 16; i < 64; ++i)
+    for (int i = 16; i < 64; i++)
     {
         w[i] = SIG1(w[i - 2]) + w[i - 7] + SIG0(w[i - 15]) + w[i - 16];
     }
@@ -3051,7 +3206,7 @@ void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
     g = state[6];
     h = state[7];
 
-    for (int i = 0; i < 64; ++i)
+    for (int i = 0; i < 64; i++)
     {
         uint32_t temp1 = h + EP1(e) + CH(e, f, g) + k[i] + w[i];
         uint32_t temp2 = EP0(a) + MAJ(a, b, c);
@@ -3078,7 +3233,7 @@ void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
 // SHA-256 update function
 void sha::sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t* data, size_t len, uint64_t& bitlen)
 {
-    for (size_t i = 0; i < len; ++i)
+    for (size_t i = 0; i < len; i++)
     {
         size_t buf_idx = (bitlen / 8) % 64;
         if (buf_idx >= 64) {
@@ -3132,7 +3287,7 @@ void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, u
     memcpy(buffer + 56, &bitlen, 8);
     sha256_transform(state, buffer);
 
-    for (i = 0; i < 8; ++i)
+    for (i = 0; i < 8; i++)
     {
         constexpr size_t HASH_SIZE = 32;
         const size_t off = static_cast<size_t>(i) * 4;
@@ -3161,7 +3316,7 @@ std::string sha::sha256(const std::string& input)
     sha256_final(state, buffer, bitlen, hash);
 
     std::stringstream ss;
-    for (int i = 0; i < 32; ++i)
+    for (int i = 0; i < 32; i++)
     {
         ss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
     }
@@ -3218,7 +3373,7 @@ void ProgressBar::write_progress(std::ostream& os)
     os << "[";
 
     const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
-    for (size_t i = 0; i <= completed; ++i)
+    for (size_t i = 0; i <= completed; i++)
     {
         os << fill_;
     }

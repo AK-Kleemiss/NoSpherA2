@@ -28,10 +28,10 @@ LIBRASCALINE_I := ../Lib/featomic_install/include
 # ---- Compiler flags (no -fopenmp at link time; only at compile time) ----
 GCC_OPTS       := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP \
                   -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math \
-                  -include pch.h
+                  -include pch.h -mfma
 GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP \
                   -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math \
-                  -include pch.h
+                  -include pch.h -mfma
 
 # Include directories
 INCLUDES := $(addprefix -I,$(INC_DIRS))
@@ -84,8 +84,10 @@ all: NoSpherA2
 	@echo "Building basis set converter"
 	@$(MAKE) -f makefile_basis_set_converter
 
+BASIS_SET_CSVS := $(wildcard $(SRC_DIR)/basis_set_helper/basis_sets/*.csv)
+
 # Actually run the converter to generate the file
-$(SRC_DIR)/auxiliary_basis.cpp: ../BasisSetConverter
+$(SRC_DIR)/auxiliary_basis.cpp: ../BasisSetConverter $(BASIS_SET_CSVS)
 	@echo "Running BasisSetConverter..."
 	@./../BasisSetConverter ../Src/basis_set_helper ../Src
 	@echo "auxiliary_basis.cpp generated"

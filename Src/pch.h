@@ -52,6 +52,8 @@
 #include <memory>
 #include <cstddef>
 #include <limits>
+#include <cstdio>
+#include <ranges>
 #ifdef __SSE2__
 #include <emmintrin.h>
 #endif
@@ -84,6 +86,9 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <cstring>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 #endif
 
 #endif // NOSPHERA2_PCH_H

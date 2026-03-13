@@ -5,7 +5,7 @@
 
 #include "ECPs_corrections.h"
 
-inline void not_implemented_SA(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file)
+inline void not_implemented_SA(const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file)
 {
     log_file << function << " at: " << file << ":" << line << " " << error_mesasge << std::endl;
     log_file.flush();
@@ -14,8 +14,8 @@ inline void not_implemented_SA(const std::string &file, const int &line, const s
 #define err_not_impl_SA() not_implemented_SA(__FILE__, __LINE__, __func__, "Virtual_function", std::cout);
 
 inline double linear_interpolate_spherical_density(
-    const vec &radial_dens,
-    const vec &spherical_dist,
+    const vec& radial_dens,
+    const vec& spherical_dist,
     const double dist,
     const double lincr,
     const double start)
@@ -37,22 +37,22 @@ class Spherical_Atom
 protected:
     int atomic_number;
     int ECP_mode;
-    const int first_ex();
-    virtual const int previous_element_coef();
-    const int *nex, *ns, *np, *nd, *nf, *occ, *n;
-    const double *z, *c;
+    const int first_ex() const;
+    virtual const int previous_element_coef() const;
+    const int* nex, * ns, * np, * nd, * nf, * occ, * n;
+    const double* z, * c;
     int charge;
     int _prev_coef, _offset, _first_ex;
     vec radial_density, radial_dist;
     double lincr, start;
-    virtual void calc_orbs(int &nr_ex,
-                           int &nr_coef,
-                           const double &dist,
-                           const int &offset,
-                           const int *n_vector,
-                           const int lower_m,
-                           const int upper_m,
-                           double *Orb)
+    virtual void calc_orbs(int& nr_ex,
+        int& nr_coef,
+        const double& dist,
+        const int& offset,
+        const int* n_vector,
+        const int lower_m,
+        const int upper_m,
+        double* Orb) const
     {
         err_not_impl_SA();
         (void)nr_ex;
@@ -65,15 +65,15 @@ protected:
         (void)Orb;
     };
     virtual double calc_type(
-        int &nr_ex,
-        int &nr_coef,
-        const double &k_vector,
-        const int &offset,
-        const int *n_vector,
+        int& nr_ex,
+        int& nr_coef,
+        const double& k_vector,
+        const int& offset,
+        const int* n_vector,
         const int lower_m,
         const int upper_m,
-        const int &max,
-        const int &min)
+        const int& max,
+        const int& min) const
     {
         err_not_impl_SA();
         (void)nr_ex;
@@ -90,7 +90,7 @@ protected:
 
 public:
     Spherical_Atom(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number),
-                                                                   _offset((atomic_number - 1) * 19), _first_ex(0), _prev_coef(0), c(NULL), n(NULL), nd(NULL), ns(NULL), np(NULL), nf(NULL), nex(NULL), occ(NULL), z(NULL)
+        _offset((atomic_number - 1) * 19), _first_ex(0), _prev_coef(0), c(NULL), n(NULL), nd(NULL), ns(NULL), np(NULL), nf(NULL), nex(NULL), occ(NULL), z(NULL)
     {
         ECP_mode = ECP_m;
         charge = 0;
@@ -101,19 +101,19 @@ public:
         atomic_number = 1;
         charge = 0;
     };
-    virtual const double get_radial_density(const double &dist)
+    virtual const double get_radial_density(const double& dist) const
     {
         err_not_impl_SA();
         (void)dist;
         return -1;
     };
-    virtual const double get_form_factor(const double &k_vector)
+    virtual const double get_form_factor(const double& k_vector) const
     {
         err_not_impl_SA();
         (void)k_vector;
         return -1;
     };
-    virtual const double get_core_form_factor(const double &k_vector, const int &core_els)
+    virtual const double get_core_form_factor(const double& k_vector, const int& core_els) const
     {
         err_not_impl_SA();
         (void)k_vector;
@@ -121,15 +121,15 @@ public:
         return -1;
     };
     virtual const double get_custom_form_factor(
-        const double &k_vector,
-        const int &max_s,
-        const int &max_p,
-        const int &max_d,
-        const int &max_f,
-        const int &min_s,
-        const int &min_p,
-        const int &min_d,
-        const int &min_f)
+        const double& k_vector,
+        const int& max_s,
+        const int& max_p,
+        const int& max_d,
+        const int& max_f,
+        const int& min_s,
+        const int& min_p,
+        const int& min_d,
+        const int& min_f) const
     {
         err_not_impl_SA();
         (void)k_vector;
@@ -148,77 +148,108 @@ public:
         (void)incr;
         (void)min_dist;
     };
-    virtual double get_interpolated_density(const double& dist) {
+    virtual double get_interpolated_density(const double& dist) const {
         err_not_impl_SA();
         (void)dist;
         return -1.0;
     };
     const int get_atomic_number() const { return atomic_number; };
     const int get_charge() const { return charge; };
-    
 };
 
 class Thakkar : public Spherical_Atom
 {
 protected:
-    void calc_orbs(int &nr_ex,
-                   int &nr_coef,
-                   const double &dist,
-                   const int &offset,
-                   const int *n_vector,
-                   const int lower_m,
-                   const int upper_m,
-                   double *Orb) override;
-    void calc_custom_orbs(int &nr_ex,
-                          int &nr_coef,
-                          const double &dist,
-                          const int &offset,
-                          const int *n_vector,
-                          const int lower_m,
-                          const int upper_m,
-                          const int &max,
-                          const int &min,
-                          double *Orb);
-    double calc_type(
-        int &nr_ex,
-        int &nr_coef,
-        const double &k_vector,
-        const int &offset,
-        const int *n_vector,
+    void calc_orbs(int& nr_ex,
+        int& nr_coef,
+        const double& dist,
+        const int& offset,
+        const int* n_vector,
         const int lower_m,
         const int upper_m,
-        const int &max,
-        const int &min) override;
+        double* Orb) const override;
+    void calc_custom_orbs(int& nr_ex,
+        int& nr_coef,
+        const double& dist,
+        const int& offset,
+        const int* n_vector,
+        const int lower_m,
+        const int upper_m,
+        const int& max,
+        const int& min,
+        double* Orb) const;
+    double calc_type(
+        int& nr_ex,
+        int& nr_coef,
+        const double& k_vector,
+        const int& offset,
+        const int* n_vector,
+        const int lower_m,
+        const int upper_m,
+        const int& max,
+        const int& min) const override;
 
 public:
     Thakkar(const int g_atom_number, const int ECP_mode = 1);
     Thakkar();
-    const double get_radial_density(const double &dist) override;
+    const double get_radial_density(const double& dist) const override;
     const double get_radial_custom_density(
-        const double &dist,
-        const int &max_s,
-        const int &max_p,
-        const int &max_d,
-        const int &max_f,
-        const int &min_s,
-        const int &min_p,
-        const int &min_d,
-        const int &min_f);
-    const double get_form_factor(const double &k_vector) override;
-    const double get_core_form_factor(const double &k_vector, const int &core_els) override;
-    const double get_core_density(const double &dist, const int &core_els);
+        const double& dist,
+        const int& max_s,
+        const int& max_p,
+        const int& max_d,
+        const int& max_f,
+        const int& min_s,
+        const int& min_p,
+        const int& min_d,
+        const int& min_f) const;
+    const double get_form_factor(const double& k_vector) const override;
+    const double get_core_form_factor(const double& k_vector, const int& core_els) const override;
+    const double get_core_density(const double& dist, const int& core_els);
     const double get_custom_form_factor(
-        const double &k_vector,
-        const int &max_s,
-        const int &max_p,
-        const int &max_d,
-        const int &max_f,
-        const int &min_s,
-        const int &min_p,
-        const int &min_d,
-        const int &min_f) override;
+        const double& k_vector,
+        const int& max_s,
+        const int& max_p,
+        const int& max_d,
+        const int& max_f,
+        const int& min_s,
+        const int& min_p,
+        const int& min_d,
+        const int& min_f) const override;
     void make_interpolator(const double& incr, const double& min_dist) override;
-    double get_interpolated_density(const double& dist) override;
+    double get_interpolated_density(const double& dist) const override;
+};
+
+class MBIS_Atom
+{
+private:
+    vec sig, pop;
+    int atomic_number;
+    int ECP_mode;
+    int charge;
+    vec radial_density, radial_dist;
+    double lincr, start;
+
+public:
+    MBIS_Atom(const int g_atom_number, const vec& sig, const vec& pop);
+    MBIS_Atom();
+    const double get_radial_density(const double& dist) const;
+    void make_interpolator(const double& incr, const double& min_dist);
+    double get_interpolated_density(const double& dist) const;
+};
+
+class EMBIS_Atom
+{
+private:
+    vec2 alpha;
+    vec sqrt_det;
+    vec pop;
+    int atomic_number;
+    int charge;
+public:
+    EMBIS_Atom(const int g_atom_number, const vec2& alpha, const vec& pop);
+    EMBIS_Atom();
+    const double get_density(const d3& pos) const;
 };
 
 class Thakkar_Anion : public Thakkar
@@ -236,58 +267,58 @@ public:
 class Gaussian_Atom : public Spherical_Atom
 {
 protected:
-    const int *ng, *nh;
+    const int* ng, * nh;
     int first_atomic_number;
-    const int previous_element_coef() override;
-    void calc_orbs(int &nr_ex,
-                   int &nr_coef,
-                   const double &dist,
-                   const int &offset,
-                   const int *n_vector,
-                   const int lower_m,
-                   const int upper_m,
-                   double *Orb) override;
-    double calc_type(
-        int &nr_ex,
-        int &nr_coef,
-        const double &k_vector,
-        const int &offset,
-        const int *n_vector,
+    const int previous_element_coef() const override;
+    void calc_orbs(int& nr_ex,
+        int& nr_coef,
+        const double& dist,
+        const int& offset,
+        const int* n_vector,
         const int lower_m,
         const int upper_m,
-        const int &max,
-        const int &min) override;
+        double* Orb) const override;
+    double calc_type(
+        int& nr_ex,
+        int& nr_coef,
+        const double& k_vector,
+        const int& offset,
+        const int* n_vector,
+        const int lower_m,
+        const int upper_m,
+        const int& max,
+        const int& min) const override;
 
 public:
-    Gaussian_Atom(const int g_atom_number, std::string &basis);
+    Gaussian_Atom(const int g_atom_number, std::string& basis);
     Gaussian_Atom() = default;
-    const double get_radial_density(const double &dist) override;
-    const double get_form_factor(const double &k_vector) override;
-    const double get_core_form_factor(const double &k_vector, const int &core_els) override;
+    const double get_radial_density(const double& dist) const override;
+    const double get_form_factor(const double& k_vector) const override;
+    const double get_core_form_factor(const double& k_vector, const int& core_els) const override;
     const double get_custom_form_factor(
-        const double &k_vector,
-        const int &max_s,
-        const int &max_p,
-        const int &max_d,
-        const int &max_f,
-        const int &min_s,
-        const int &min_p,
-        const int &min_d,
-        const int &min_f) override;
+        const double& k_vector,
+        const int& max_s,
+        const int& max_p,
+        const int& max_d,
+        const int& max_f,
+        const int& min_s,
+        const int& min_p,
+        const int& min_d,
+        const int& min_f) const override;
     const double get_custom_form_factor(
-        const double &k_vector,
-        const int &max_s,
-        const int &max_p,
-        const int &max_d,
-        const int &max_f,
-        const int &max_g,
-        const int &max_h,
-        const int &min_s,
-        const int &min_p,
-        const int &min_d,
-        const int &min_f,
-        const int &min_g,
-        const int &min_h);
+        const double& k_vector,
+        const int& max_s,
+        const int& max_p,
+        const int& max_d,
+        const int& max_f,
+        const int& max_g,
+        const int& max_h,
+        const int& min_s,
+        const int& min_p,
+        const int& min_d,
+        const int& min_f,
+        const int& min_g,
+        const int& min_h) const;
 };
 
 class Spherical_Gaussian_Density
@@ -296,13 +327,13 @@ protected:
     const int atomic_number;
     const int ECP_mode;
     int nex;
-    const double *z, *c;
+    const double* z, * c;
     int charge;
 
 public:
     Spherical_Gaussian_Density(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number),
-                                                                               ECP_mode(ECP_m),
-                                                                               charge(0)
+        ECP_mode(ECP_m),
+        charge(0)
     {
         int temp_Z;
         switch (ECP_m)
@@ -352,9 +383,9 @@ public:
             nex = 0;
         }
     };
-    Spherical_Gaussian_Density() : c(NULL), nex(0), z(NULL), charge(0), atomic_number(1), ECP_mode(1){};
-    virtual const double get_radial_density(const double &dist);
-    virtual const double get_form_factor(const double &k_vector);
+    Spherical_Gaussian_Density() : c(NULL), nex(0), z(NULL), charge(0), atomic_number(1), ECP_mode(1) {};
+    virtual const double get_radial_density(const double& dist) const;
+    virtual const double get_form_factor(const double& k_vector) const;
     const int get_atomic_number() const { return atomic_number; };
     const int get_charge() const { return charge; };
 };

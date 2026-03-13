@@ -16,11 +16,11 @@ vec einsum_ijk_ij_p(const dMatrix3& v1, const dMatrix2& v2)
     vec rho(P, 0.0);
 
     // Perform the summation
-    for (int p = 0; p < P; ++p)
+    for (int p = 0; p < P; p++)
     {
-        for (int i = 0; i < I; ++i)
+        for (int i = 0; i < I; i++)
         {
-            for (int j = 0; j < J; ++j)
+            for (int j = 0; j < J; j++)
             {
                 rho[p] += v1(i, j, p) * v2(i, j);
             }
@@ -308,13 +308,13 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
         vec mulliken_pop(wavy.get_ncen(), 0.0);
 
         size_t mu_begin = 0;
-        for (unsigned iat = 0; iat < wavy.get_ncen(); ++iat) {
+        for (unsigned iat = 0; iat < wavy.get_ncen(); iat++) {
             const atom A = wavy.get_atoms()[iat];
 
             // determine how many AOs belong to this atom (use contracted shells, not primitives!)
             size_t nAO_A = 0;
             int prim = 0;
-            for (size_t sh = 0; sh < A.get_shellcount().size(); ++sh) {
+            for (size_t sh = 0; sh < A.get_shellcount().size(); sh++) {
                 int l = A.get_basis_set_entry(prim).get_type() - 1;
                 nAO_A += size_t(2 * l + 1);
                 prim += A.get_shellcount()[sh];
@@ -322,9 +322,9 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
             size_t mu_end = mu_begin + nAO_A;
 
             double GA = 0.0;
-            for (size_t m = mu_begin; m < mu_end; ++m) {
+            for (size_t m = mu_begin; m < mu_end; m++) {
                 double diag_PS = 0.0;
-                for (size_t n = 0; n < nao; ++n)
+                for (size_t n = 0; n < nao; n++)
                     diag_PS += dm(m, n) * eri2c_ref(n, m);
                 GA += diag_PS;
             }
@@ -339,15 +339,16 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
         config.partition_type = type;
         config.pbc = 0;
         config.debug = false;
+        const int ncen = wavy.get_ncen();
 
-        cell unit_cell = cell();
-        ivec asym_atom_list(wavy.get_ncen());
-        for (int atom_nr = 0; atom_nr < wavy.get_ncen(); atom_nr++) {
+        ivec asym_atom_list(ncen);
+        for (int atom_nr = 0; atom_nr < ncen; atom_nr++) {
             asym_atom_list[atom_nr] = atom_nr;
         }
-        svec labels(wavy.get_ncen());
-        for (int i = 0; i < wavy.get_ncen(); i++) {
-            labels[i] = wavy.get_atoms()[i].get_label();
+        svec labels(ncen);
+        const auto atoms = wavy.get_atoms();
+        for (int i = 0; i < ncen; i++) {
+            labels[i] = atoms[i].get_label();
         }
 
         GridManager grid_manager(config);
@@ -355,12 +356,11 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
         WFN temp = wavy;
         temp.delete_unoccupied_MOs();
         // Setup grids for the molecule
-        bvec needs_grid = GridManager::determineAtomsNeedingGrids(temp, asym_atom_list);
-        grid_manager.setup3DGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+        grid_manager.setup3DGridsForMolecule(temp, asym_atom_list);
 
 
         // Calculate partitioned charges
-        auto results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
+        auto results = grid_manager.calculatePartitionedCharges(temp);
         //results.printChargeTable(labels, temp, std::cout);
         for (int i = 0; i < temp.get_ncen(); i++) {
             expected_populations[i] = results.atom_charges[static_cast<int>(type)][i];
@@ -488,7 +488,6 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
     config.all_charges = true;
     const int weight_index = GridData::HIRSH_WEIGHT;
 
-    cell unit_cell = cell();
     ivec asym_atom_list(wavy.get_ncen());
     for (int atom_nr = 0; atom_nr < wavy.get_ncen(); atom_nr++) {
         asym_atom_list[atom_nr] = atom_nr;
@@ -499,8 +498,7 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
 
     temp.delete_unoccupied_MOs();
     // Setup grids for the molecule
-    bvec needs_grid = GridManager::determineAtomsNeedingGrids(temp, asym_atom_list);
-    grid_manager.setup3DGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+    grid_manager.setup3DGridsForMolecule(temp, asym_atom_list);
     GridData grid_data = grid_manager.getGridData();
 
     enum DiffDensityIndex { DIFF_UNRESTRAINED = 0, DIFF_ENHANCED = 1, DIFF_HYBRID = 2 };
@@ -627,8 +625,8 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
         std::cout << out << std::endl;
     }
 
-    const double radius = 3.0;
-    const double increment = 0.1;
+    //const double radius = 3.0;
+    //const double increment = 0.1;
 
     //std::vector<vec> all_coeffs = { coeff_unrestrained , coeff_enhanced, coeff_hybrid};
     //WFN dummy = wavy;
