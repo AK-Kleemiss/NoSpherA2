@@ -28,8 +28,7 @@ good = "disorder_THPP.good"
 [disorder_THPP.args]
 cif = "thpp.cif"
 hkl = "thpp.hkl"
-acc = 0
-
+acc = 1
 mtc = [
   "olex2/Wfn_job/Part_1/thpp.wfx",
   0.1,
@@ -61,7 +60,7 @@ directory = "grown"
 cif = "water.cif"
 hkl = "water.hkl"
 wfn = "water.wfx"
-acc = 0
+acc = 1
 
 [Hybrid_mode]
 directory = "Hybrid"
@@ -69,7 +68,7 @@ directory = "Hybrid"
 [Hybrid_mode.args]
 cif = "ZP2.cif"
 dmin = 0.9
-acc = 0
+acc = 1
 
 mtc = ["ZP2_part1.gbw", 0.1, "ZP2_part2.gbw", 0.2]
 mtc_mult = [1, 1]
@@ -83,7 +82,7 @@ directory = "ECP_SF"
 cif = "malbac.cif"
 hkl = "malbac.hkl"
 wfn = "malbac.gbw"
-acc = 0
+acc = 1
 ECP = 1
 
 [openBLAS]
@@ -99,8 +98,10 @@ directory = "sucrose_fchk_SF"
 wfn = "olex2/Wfn_job/sucrose.wfx"
 cif = "sucrose.cif"
 lap = true
+rdg = true
+DEF = true
 eli = true
-resolution = 0.5
+resolution = 1.5
 
 [reading_SALTED]
 directory = "SALTED"
@@ -124,8 +125,7 @@ directory = "rubredoxin_cmtc"
 
 [rubredoxin_cmtc.args]
 hkl = "1yk4_h.hkl"
-acc = 0
-
+acc = 1
 cmtc = [
   "residues/1.gbw",
   "residues/1.cif",
@@ -171,7 +171,7 @@ dmin = 0.8
 wfn = "wfn.xtb"
 mult = 0
 charge = 0
-acc = 0
+acc = 1
 ECP = 3
 
 [sucrose_SF]
@@ -181,7 +181,7 @@ directory = "sucrose_fchk_SF"
 cif = "sucrose.cif"
 hkl = "olex2/Wfn_job/sucrose.hkl"
 wfn = "olex2/Wfn_job/sucrose.wfx"
-acc = 0
+acc = 1
 
 [sucrose_twin]
 directory = "sucrose_fchk_SF"
@@ -190,7 +190,7 @@ directory = "sucrose_fchk_SF"
 cif = "sucrose.cif"
 hkl = "olex2/Wfn_job/sucrose.hkl"
 wfn = "olex2/Wfn_job/sucrose.wfx"
-acc = 0
+acc = 1
 twin = [1, 0, 0, 0, -1, 0, 0, 1, -2]
 
 [wfn_reading]
@@ -198,7 +198,7 @@ directory = "wfn_reading"
 
 [wfn_reading.args]
 hkl = "test.hkl"
-acc = 0
+acc = 1
 cif = "test.cif"
 wfn = "test.wfn"
 
