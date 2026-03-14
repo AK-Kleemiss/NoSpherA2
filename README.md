@@ -96,22 +96,33 @@ make
 
 1. **Locate the appropriate test file or directory** (commonly in the `tests/` folder or as specified in the codebase).
 2. **Add your test** following the style of existing tests. For C++ code, this may be a new `.cpp` file or a new function in `Src/test_functions.h` file.
-3. **Register your test in the `makefile`:**
-    - Open the `makefile` in the test subdirectory.
+3. **Register your test in the tests.toml file:**
+    - Open the `tests.toml` in the test subdirectory.
     - Add your test executable or call to the list of tests, as appropriate.
-    - Example (a test calcualting a tsc file for sucrose reading in an hkl file wnd wfn):
-      ```
-        sucrose_SF:
-            $(call RUN_TEST,$@,sucrose_fchk_SF, \
-                -cif sucrose.cif \
-                -hkl olex2/Wfn_job/sucrose.hkl \
-                -wfn olex2/Wfn_job/sucrose.wfx \
-                -acc 1 \
-                -no-date)
-      ```
-4. **Run `make test`** to ensure your test compiles and runs.
-5. **Document your test** if needed, and mention it in your Pull Request.
+    - Example (a test calculating a tsc file for sucrose reading in an hkl file and wfn):
+    ```toml
+    [sucrose_SF]
+    directory = "sucrose_fchk_SF"
+
+    [sucrose_SF.args]
+    cif = "sucrose.cif"
+    hkl = "olex2/Wfn_job/sucrose.hkl"
+    wfn = "olex2/Wfn_job/sucrose.wfx"
+    acc = 0
+    ```
+4. If your test requires a different output file from the test name, you can add the good parameter:
+   ```toml
+   [disorder_THPP]
+   directory = "disorder"
+   good = "disorder_THPP.good"
+
+   [disorder_THPP.args]
+   cif = "thpp.cif"
+   hkl = "thpp.hkl"
+   acc = 0
+   ```
+5. Command line arguments are always passed in the block <testname>.args.
+6. **Run `pytest` or make test** to ensure your test runs.
+7. **Document your test** if needed and mention it in your Pull Request.
 
 ---
-
-

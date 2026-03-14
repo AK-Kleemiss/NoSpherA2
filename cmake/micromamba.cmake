@@ -1,173 +1,256 @@
-function(mamba_get_url MAMBA_URL)
+# Returns the micromamba download URL for the current host platform/arch.
+# Arguments:
+#   OUT_VAR: Name of the variable to store the URL in
+function(_mamba_get_url OUT_VAR)
     if (CMAKE_HOST_APPLE)
-        if (${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "arm")
-            set(${MAMBA_URL} "https://micro.mamba.pm/api/micromamba/osx-arm64/latest" PARENT_SCOPE)
+        if (CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm|arm64")
+            set(_url "https://micro.mamba.pm/api/micromamba/osx-arm64/latest")
         else ()
-            set(${MAMBA_URL} "https://micro.mamba.pm/api/micromamba/osx-64/latest" PARENT_SCOPE)
+            set(_url "https://micro.mamba.pm/api/micromamba/osx-64/latest")
         endif ()
     elseif (LINUX)
-        if (${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "x64|x86_64")
-            set(${MAMBA_URL} "https://micro.mamba.pm/api/micromamba/linux-64/latest" PARENT_SCOPE)
-        elseif (${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "aarch64|arm64")
-            set(${MAMBA_URL} "https://micro.mamba.pm/api/micromamba/linux-aarch64/latest" PARENT_SCOPE)
+        if (CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "x86_64|x64")
+            set(_url "https://micro.mamba.pm/api/micromamba/linux-64/latest")
+        elseif (CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+            set(_url "https://micro.mamba.pm/api/micromamba/linux-aarch64/latest")
+        else ()
+            message(FATAL_ERROR "Unsupported Linux architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}")
         endif ()
     elseif (CMAKE_HOST_WIN32)
-        set(${MAMBA_URL} "https://micro.mamba.pm/api/micromamba/win-64/latest" PARENT_SCOPE)
-    endif ()
-endfunction()
-
-# Ensures the micromamba binary is available
-# Arguments:
-#  MICROMAMBA_BIN: Name of the variable to store the path to the micromamba binary
-function(ensure_micromamba MICROMAMBA_BIN)
-    set(MICROMAMBA_PATH ${CMAKE_BINARY_DIR}/micromamba_bin)
-
-    # On Windows, the binary is micromamba.exe in Library/bin; on Unix, it's micromamba in bin
-    if (CMAKE_HOST_WIN32)
-        set(MAMBA_BIN_SUBDIR "Library/bin")
-        set(MAMBA_ARCHIVE_PATH "Library/bin/micromamba.exe")
+        set(_url "https://micro.mamba.pm/api/micromamba/win-64/latest")
     else ()
-        set(MAMBA_BIN_SUBDIR "bin")
-        set(MAMBA_ARCHIVE_PATH "bin/micromamba")
+        message(FATAL_ERROR "Unsupported platform for micromamba download")
     endif ()
-
-    find_program(_MICROMAMBA_BIN micromamba
-            PATHS ${MICROMAMBA_PATH}/${MAMBA_BIN_SUBDIR}
-    )
-    if (_MICROMAMBA_BIN)
-        message("Found micromamba at ${_MICROMAMBA_BIN}")
-    else ()
-        message("Downloading micromamba")
-        mamba_get_url(MAMBA_URL)
-        message("Native arch: ${MAMBA_URL}")
-        file(MAKE_DIRECTORY ${MICROMAMBA_PATH}/${MAMBA_BIN_SUBDIR})
-        file(DOWNLOAD ${MAMBA_URL} ${MICROMAMBA_PATH}/micromamba.tar.bz2)
-        execute_process(COMMAND
-                ${CMAKE_COMMAND} -E
-                tar xvzf ${MICROMAMBA_PATH}/micromamba.tar.bz2 -- "${MAMBA_ARCHIVE_PATH}"
-                WORKING_DIRECTORY ${MICROMAMBA_PATH})
-
-        find_program(_MICROMAMBA_BIN micromamba
-                PATHS ${MICROMAMBA_PATH}/${MAMBA_BIN_SUBDIR}
-        )
-    endif ()
-    set(${MICROMAMBA_BIN} ${_MICROMAMBA_BIN} PARENT_SCOPE)
-endfunction()
-
-# Checks if a micromamba environment exists
-# Arguments:
-#   ENV_NAME: Name of the environment
-#   OUTVAR: Name of the variable to store the result
-function(check_micromamba_environment ENV_NAME OUTVAR)
-    if (EXISTS "${ENV_PATH}/conda-meta/history")
-        set(${OUTVAR} TRUE PARENT_SCOPE)
-    else ()
-        unset(${OUTVAR} PARENT_SCOPE)
-    endif ()
+    set(${OUT_VAR} "${_url}" PARENT_SCOPE)
 endfunction()
 
 
-# Create a micromamba environment
+# Ensures the micromamba binary is available, first searching the system and
+# then falling back to downloading it into CMAKE_BINARY_DIR.
+#
+# Search order:
+#   1. System PATH (any micromamba already installed on the machine)
+#   2. ${CMAKE_SOURCE_DIR}/micromamba  (vendored copy in-tree)
+#   3. ${CMAKE_BINARY_DIR}/micromamba_bin  (previously downloaded by this script)
+#   4. Download from micro.mamba.pm
 #
 # Arguments:
-#   NAME: Name of the environment
-#   VERBOSE: Verbosity level (0, 1, 2, 3)
-#   RUN_CMD: Name of the variable to store the command for running command within the environment
-#   ENV_PATH: Name of the variable to store the path to the environment
-#   CHANNELS: List of channels to use
-#   DEPENDENCIES: List of dependencies to install
-#   SPEC_FILE: List of spec files to use
-#   NO_PREFIX_PATH: Do not add the environment path to the list of prefix paths
-#   NO_DEPENDS: Do not add the spec files to the configuration dependencies
+#   OUT_VAR: Name of the variable to store the path to the micromamba binary
+function(ensure_micromamba OUT_VAR)
+    set(_download_dir "${CMAKE_BINARY_DIR}/micromamba_bin")
+
+    # Platform-specific sub-directory layout inside the downloaded tarball
+    if (CMAKE_HOST_WIN32)
+        set(_bin_subdir "Library/bin")
+        set(_archive_entry "Library/bin/micromamba.exe")
+    else ()
+        set(_bin_subdir "bin")
+        set(_archive_entry "bin/micromamba")
+    endif ()
+
+    # Steps 1-3: search system PATH, vendored copy, and previously downloaded binary.
+    # NO_CACHE prevents CMake from storing a NOTFOUND result, which would cause the
+    # post-download search to return the cached miss instead of the real binary.
+    find_program(_micromamba_bin micromamba
+        PATHS
+            "${CMAKE_SOURCE_DIR}/micromamba"
+            "${_download_dir}/${_bin_subdir}"
+        NO_CACHE
+    )
+
+    if (_micromamba_bin)
+        message(STATUS "Found micromamba: ${_micromamba_bin}")
+    else ()
+        # Step 4: download
+        _mamba_get_url(_mamba_url)
+        message(STATUS "micromamba not found on system – downloading from ${_mamba_url}")
+
+        file(MAKE_DIRECTORY "${_download_dir}/${_bin_subdir}")
+
+        set(_archive "${_download_dir}/micromamba.tar.bz2")
+        file(DOWNLOAD "${_mamba_url}" "${_archive}"
+            SHOW_PROGRESS
+            STATUS _dl_status
+        )
+        list(GET _dl_status 0 _dl_error_code)
+        if (_dl_error_code)
+            list(GET _dl_status 1 _dl_error_msg)
+            message(FATAL_ERROR "Failed to download micromamba: ${_dl_error_msg}")
+        endif ()
+
+        # Use 'xf' without an explicit compression flag: cmake -E tar auto-detects
+        # the format from the file header, which is more portable (especially on Windows).
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E tar xf "${_archive}" -- "${_archive_entry}"
+            WORKING_DIRECTORY "${_download_dir}"
+            RESULT_VARIABLE _extract_result
+        )
+        if (_extract_result)
+            message(FATAL_ERROR "Failed to extract micromamba archive (exit code: ${_extract_result})")
+        endif ()
+
+        find_program(_micromamba_bin micromamba
+            PATHS "${_download_dir}/${_bin_subdir}"
+            NO_DEFAULT_PATH
+            NO_CACHE
+        )
+        if (NOT _micromamba_bin)
+            message(FATAL_ERROR "micromamba binary not found after download/extract – check the archive layout")
+        endif ()
+
+        message(STATUS "micromamba downloaded to: ${_micromamba_bin}")
+    endif ()
+
+    set(${OUT_VAR} "${_micromamba_bin}" PARENT_SCOPE)
+endfunction()
+
+
+# Checks whether a micromamba environment at ENV_PATH has been created.
+# Arguments:
+#   ENV_PATH: Filesystem path to the environment
+#   OUT_VAR:  Name of the boolean variable to set (TRUE if the env exists)
+function(_check_micromamba_environment ENV_PATH OUT_VAR)
+    if (EXISTS "${ENV_PATH}/conda-meta/history")
+        set(${OUT_VAR} TRUE PARENT_SCOPE)
+    else ()
+        set(${OUT_VAR} FALSE PARENT_SCOPE)
+    endif ()
+endfunction()
+
+
+# Create (or update) a micromamba environment.
+#
+# Named arguments:
+#   NAME           Name of the environment (default: "environment")
+#   VERBOSE        Verbosity level: 0=quiet, 1=normal, 2=verbose, 3=very verbose
+#   RUN_CMD        Variable to receive the command prefix for running inside the env
+#   ENV_PATH       Path for the environment. If given, used directly as the
+#                  environment location (input). If omitted, defaults to
+#                  ${CMAKE_BINARY_DIR}/environments/${NAME}.
+#   CHANNELS       List of conda channels (-c flags)
+#   DEPENDENCIES   Package names to install
+#   SPEC_FILE      Conda spec / environment YAML files (-f flags)
+#
+# Boolean flags:
+#   NO_PREFIX_PATH  Do not prepend the env path to CMAKE_PREFIX_PATH
+#   NO_DEPENDS      Do not register spec files as CMake configure dependencies
 #
 function(micromamba_environment)
-    cmake_parse_arguments(
-            PARSED_ARGS # prefix of output variables
-            "NO_PREFIX_PATH;NO_DEPENDS" # list of names of the boolean arguments (only defined ones will be true)
-            "NAME;VERBOSE;RUN_CMD;ENV_PATH" # list of names of mono-valued arguments
-            "CHANNELS;DEPENDENCIES;SPEC_FILE" # list of names of multi-valued arguments (output variables are lists)
-            ${ARGN} # arguments of the function to parse, here we take the all original ones
+    cmake_parse_arguments(PARSED
+        "NO_PREFIX_PATH;NO_DEPENDS"
+        "NAME;VERBOSE;RUN_CMD;ENV_PATH"
+        "CHANNELS;DEPENDENCIES;SPEC_FILE"
+        ${ARGN}
     )
 
-    # Parse the arguments
-    set(ENV_NAME "environment")
-    if (DEFINED PARSED_ARGS_NAME)
-        set(ENV_NAME ${PARSED_ARGS_NAME})
+    # ---- Resolve environment name & path --------------------------------
+    if (DEFINED PARSED_NAME)
+        set(_env_name "${PARSED_NAME}")
+    else ()
+        set(_env_name "environment")
     endif ()
 
-    # Define the environment path based on the environment name
-    set(ENV_PATH "${CMAKE_BINARY_DIR}/environments/${ENV_NAME}" CACHE STRING "Env path")
-
-    set(VERBOSE_FLAG "--quiet")
-    if (PARSED_ARGS_VERBOSE EQUAL 0)
-        set(VERBOSE_FLAG "--quiet")
-    elseif (PARSED_ARGS_VERBOSE EQUAL 1)
-        set(VERBOSE_FLAG "")
-    elseif (PARSED_ARGS_VERBOSE EQUAL 2)
-        set(VERBOSE_FLAG "--verbose")
-    elseif (PARSED_ARGS_VERBOSE EQUAL 3)
-        set(VERBOSE_FLAG "-vv")
+    # ENV_PATH can be provided directly as an input to override the default location.
+    # If not given, fall back to a path inside the build directory.
+    if (DEFINED PARSED_ENV_PATH)
+        set(_env_path "${PARSED_ENV_PATH}")
+    else ()
+        set(_env_path "${CMAKE_BINARY_DIR}/environments/${_env_name}")
     endif ()
 
-    set(CHANNEL_ARG "")
-    foreach (C ${PARSED_ARGS_CHANNELS})
-        list(APPEND CHANNEL_ARG "-c")
-        list(APPEND CHANNEL_ARG ${C})
+    # ---- Verbosity flag -------------------------------------------------
+    set(_verbose_flag "--quiet")
+    if (DEFINED PARSED_VERBOSE)
+        if (PARSED_VERBOSE EQUAL 1)
+            set(_verbose_flag "")
+        elseif (PARSED_VERBOSE EQUAL 2)
+            set(_verbose_flag "--verbose")
+        elseif (PARSED_VERBOSE EQUAL 3)
+            set(_verbose_flag "-vv")
+        endif ()
+    endif ()
+
+    # ---- Channel & spec-file argument lists -----------------------------
+    set(_channel_args "")
+    foreach (_ch ${PARSED_CHANNELS})
+        list(APPEND _channel_args "-c" "${_ch}")
     endforeach ()
 
-    set(FILE_ARG "")
-    foreach (F ${PARSED_ARGS_SPEC_FILE})
-        list(APPEND FILE_ARG "-f")
-        list(APPEND FILE_ARG ${F})
+    set(_file_args "")
+    foreach (_f ${PARSED_SPEC_FILE})
+        list(APPEND _file_args "-f" "${_f}")
     endforeach ()
 
-    if (NOT OVERWRITE_MICROMAMBA)
-        ensure_micromamba(MICROMAMBA_BIN)
-    else()
-        set(MICROMAMBA_BIN ${OVERWRITE_MICROMAMBA})
+    # ---- Resolve micromamba binary --------------------------------------
+    if (OVERWRITE_MICROMAMBA)
+        set(_mamba_bin "${OVERWRITE_MICROMAMBA}")
+    else ()
+        ensure_micromamba(_mamba_bin)
     endif ()
 
-    check_micromamba_environment(${ENV_NAME} ENV_EXISTS)
+    # Flags applied to every micromamba invocation:
+    #   --no-rc          ignore all system/user .mambarc and condarc files
+    #   --root-prefix    store micromamba's own state (pkgs cache, etc.) inside
+    #                    the build tree instead of the default location, which may
+    #                    be read-only (e.g. a Nix store path)
+    set(_mamba_base_args
+        --no-rc
+        --root-prefix "${CMAKE_BINARY_DIR}/micromamba_root"
+    )
 
-    if (ENV_EXISTS)
-        message("Updating micromamba environment '${ENV_NAME}' at ${ENV_PATH}")
-        execute_process(COMMAND echo
-                ${MICROMAMBA_BIN} update -p ${ENV_PATH} ${CHANNEL_ARG} ${FILE_ARG} ${PARSED_ARGS_DEPENDENCIES} --yes ${VERBOSE_FLAG}
-        )
-        execute_process(COMMAND
-                ${MICROMAMBA_BIN} update -p ${ENV_PATH} ${CHANNEL_ARG} ${FILE_ARG} ${PARSED_ARGS_DEPENDENCIES} --yes ${VERBOSE_FLAG}
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    # ---- Create or update the environment -------------------------------
+    _check_micromamba_environment("${_env_path}" _env_exists)
+
+    if (_env_exists)
+        message(STATUS "Updating micromamba environment '${_env_name}' at ${_env_path}")
+        execute_process(
+            COMMAND ${_mamba_bin} update
+                ${_mamba_base_args}
+                -p "${_env_path}"
+                ${_channel_args}
+                ${_file_args}
+                ${PARSED_DEPENDENCIES}
+                --yes ${_verbose_flag}
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            RESULT_VARIABLE _mamba_result
         )
     else ()
-        message("Creating micromamba environment '${ENV_NAME}' at ${ENV_PATH} - this may take a while")
-        execute_process(COMMAND echo
-                ${MICROMAMBA_BIN} create -p ${ENV_PATH} ${CHANNEL_ARG} ${FILE_ARG} ${PARSED_ARGS_DEPENDENCIES} --yes ${VERBOSE_FLAG})
-        execute_process(COMMAND
-                ${MICROMAMBA_BIN} create -p ${ENV_PATH} ${CHANNEL_ARG} ${FILE_ARG} ${PARSED_ARGS_DEPENDENCIES} --yes ${VERBOSE_FLAG}
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        message(STATUS "Creating micromamba environment '${_env_name}' at ${_env_path} – this may take a while")
+        execute_process(
+            COMMAND ${_mamba_bin} create
+                ${_mamba_base_args}
+                -p "${_env_path}"
+                ${_channel_args}
+                ${_file_args}
+                ${PARSED_DEPENDENCIES}
+                --yes ${_verbose_flag}
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            RESULT_VARIABLE _mamba_result
         )
     endif ()
 
-    # Add the spec files to the list of files to watch for changes
-    if (NOT DEFINED PARSED_ARGS_NO_DEPENDS)
-        set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${PARSED_ARGS_SPEC_FILE})
+    if (_mamba_result)
+        message(FATAL_ERROR "micromamba exited with error code ${_mamba_result}")
     endif ()
 
-    # Add the environment path to the list of prefix paths
-    if (NOT PARSED_ARGS_NO_PREFIX_PATH)
-        set(CMAKE_INSTALL_PREFIX ${ENV_PATH} CACHE INTERNAL "CMAKE_INSTALL_PREFIX")
-        list(PREPEND CMAKE_PREFIX_PATH ${ENV_PATH})
-        set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} PARENT_SCOPE)
+    # ---- Register spec files as configure-time dependencies -------------
+    if (NOT PARSED_NO_DEPENDS AND PARSED_SPEC_FILE)
+        set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${PARSED_SPEC_FILE}
+        )
     endif ()
 
-    if (DEFINED PARSED_ARGS_RUN_CMD)
-        list(APPEND RUN_CMD ${MICROMAMBA_BIN} -p ${ENV_PATH} run)
-        set(${PARSED_ARGS_RUN_CMD} ${RUN_CMD} PARENT_SCOPE)
+    # ---- Propagate prefix path ------------------------------------------
+    if (NOT PARSED_NO_PREFIX_PATH)
+        set(CMAKE_INSTALL_PREFIX "${_env_path}" CACHE INTERNAL "CMAKE_INSTALL_PREFIX")
+        list(PREPEND CMAKE_PREFIX_PATH "${_env_path}")
+        set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}" PARENT_SCOPE)
     endif ()
 
-    if (DEFINED PARSED_ARGS_ENV_PATH)
-        set(${PARSED_ARGS_ENV_PATH} ${ENV_PATH} PARENT_SCOPE)
+    # ---- Propagate output variables to the caller -----------------------
+    if (DEFINED PARSED_RUN_CMD)
+        set(${PARSED_RUN_CMD} "${_mamba_bin}" ${_mamba_base_args} -p "${_env_path}" run PARENT_SCOPE)
     endif ()
-    set(MICROMAMBA_ENV_PATH ${ENV_PATH} PARENT_SCOPE)
 
+    set(MICROMAMBA_ENV_PATH "${_env_path}" PARENT_SCOPE)
 endfunction()

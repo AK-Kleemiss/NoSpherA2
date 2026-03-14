@@ -42,6 +42,7 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     if (NOT "${_SAVED_ENV_HASH}" STREQUAL "${_ENV_HASH}")
         micromamba_environment(
             NAME mambaenv
+            ENV_PATH "${ENV_PATH}"
             SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
         )
         file(SHA1 ${CMAKE_SOURCE_DIR}/environment.yml _ENV_HASH)
