@@ -128,7 +128,7 @@ constexpr unsigned int sum_subshells(unsigned int l, bool cartesian = true) {
     return l * (2 * l + 1);
 }
 
-WFN::WFN(occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
+WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 {
     // Only works with restricted WFNs for now
     using namespace Eigen;
@@ -151,6 +151,26 @@ WFN::WFN(occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     }
     auto &shells = occ_WF.basis.shells();
 
+    // ── Guard 1: max supported angular momentum is l=4 (G). ──────────────────
+    // MappedMatrices has exactly 5 entries (l=0..4). Accessing MappedMatrices[l]
+    // for l>=5 is out-of-bounds UB on std::array and corrupts the heap.
+    for (const auto &shell : shells) {
+        err_checkf(shell.l < static_cast<int>(MappedMatrices.size()),
+            "Shell with angular momentum l=" + std::to_string(shell.l) +
+            " (H or higher) is not supported by the OCC WFN constructor. "
+            "Max supported l is " + std::to_string(MappedMatrices.size() - 1) + " (G).",
+            std::cout);
+    }
+
+    // ── Guard 2: this constructor assumes a spherical basis. ─────────────────
+    // It applies A = MappedMatrices[l] (n_cart x n_sph) to transform spherical
+    // MO coefficients to Cartesian. A Cartesian basis wavefunction would require
+    // a different code path (basis_offset += n_cart, no A transformation).
+    err_checkf(occ_WF.basis.is_pure(),
+        "The OCC WFN constructor only supports spherical (pure) basis sets. "
+        "Cartesian basis sets will produce incorrect MO coefficients.",
+        std::cout);
+
     auto &mo = occ_WF.mo;
     if (mo.kind != occ::qm::Restricted) throw std::runtime_error("This constructor only supports Restricted for now.");
     auto shell2atom = occ_WF.basis.shell_to_atom();
@@ -160,7 +180,13 @@ WFN::WFN(occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     for (const auto shell : shells)
     {
         int l = shell.l;
-        int n_cart = (l + 1) * (l + 2) / 2;
+        const int nprim_shell = static_cast<int>(shell.num_primitives());
+        err_checkf(static_cast<int>(shell.exponents.size()) == nprim_shell,
+            "Shell exponents.size() (" + std::to_string(shell.exponents.size()) +
+            ") != num_primitives() (" + std::to_string(nprim_shell) +
+            ") – cannot build a consistent WFN from this OCC wavefunction.",
+            std::cout);
+        int n_cart = num_subshells(true, l);
         nex += n_cart * shell.exponents.size();
     }
     auto mo_go = occ::io::conversion::orb::to_gaussian_order(occ_WF.basis, occ_WF.mo);
