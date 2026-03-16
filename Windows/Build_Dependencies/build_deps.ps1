@@ -297,9 +297,9 @@ if (Test-Path $FeatomicOut) {
   New-Item -ItemType Directory $bld | Out-Null
   Push-Location $bld
   try {
-    cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
-    msbuild -nologo .\featomic.sln /p:Configuration=Release /p:Platform=$Platform
-    msbuild -nologo .\INSTALL.vcxproj /p:Configuration=Release /p:Platform=$Platform
+    cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
+    cmake --build . --config $Configuration --parallel
+    cmake --install . --config $Configuration
   } finally {
     Pop-Location
   }
