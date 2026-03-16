@@ -13777,7 +13777,7 @@
     <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <Target Name="RunBasisSetConverterIfNeeded" BeforeTargets="PreBuildEvent">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)run_basis_converter_if_needed.ps1&quot; -ConverterExe &quot;$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe&quot; -SolutionDir &quot;$(MSBuildProjectDirectory)\&quot; -Configuration &quot;$(Configuration)&quot; -Platform &quot;$(Platform)&quot; -PlatformToolset &quot;$(PlatformToolset)&quot; -MSBuildExe &quot;$(MSBuildBinPath)\MSBuild.exe&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)run_basis_converter_if_needed.ps1&quot; -ConverterExe &quot;$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe&quot; -SolutionDir &quot;$(MSBuildProjectDirectory)&quot; -Configuration &quot;$(Configuration)&quot; -Platform &quot;$(Platform)&quot; -PlatformToolset &quot;$(PlatformToolset)&quot; -MSBuildExe &quot;$(MSBuildBinPath)\MSBuild.exe&quot;" />
   </Target>
   <Target Name="CopyIntelOpenMP" AfterTargets="Build">
     <!-- Copy if it exists -->
