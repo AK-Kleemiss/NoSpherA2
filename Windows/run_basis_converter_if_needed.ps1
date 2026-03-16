@@ -105,7 +105,16 @@ if (-not (Test-Path $ConverterExe)) {
 
 Write-Host "Generating auxiliary_basis.cpp via BasisSetConverter..."
 Write-Host "Using BasisSetConverter executable: $ConverterExe"
-& $ConverterExe $SolutionDir
+
+$normalizedSolutionDir = [System.IO.Path]::GetFullPath($SolutionDir)
+$dirSep = [System.IO.Path]::DirectorySeparatorChar
+$altDirSep = [System.IO.Path]::AltDirectorySeparatorChar
+if (-not $normalizedSolutionDir.EndsWith($dirSep) -and -not $normalizedSolutionDir.EndsWith($altDirSep)) {
+    $normalizedSolutionDir += $dirSep
+}
+
+Write-Host "Using solution directory argument: $normalizedSolutionDir"
+& $ConverterExe $normalizedSolutionDir
 if ($LASTEXITCODE -ne 0) {
     throw "BasisSetConverter execution failed with exit code $LASTEXITCODE"
 }
