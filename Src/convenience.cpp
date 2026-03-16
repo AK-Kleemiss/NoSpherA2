@@ -203,9 +203,12 @@ std::string build_date = ("This Executable was built on: " + std::string(__DATE_
 bool ensure_occ_data_path(const char *argv0)
 {
     const char *occ_data_path_env = std::getenv("OCC_DATA_PATH");
-    if (occ_data_path_env != nullptr && is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
+    if (occ_data_path_env != nullptr)
     {
-        return true;
+        if (is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
+            return true;
+        else
+            std::cout << "OCC DATA PATH is invalid!" << std::endl;
     }
 
     std::filesystem::path exe_dir = resolve_executable_directory(argv0);

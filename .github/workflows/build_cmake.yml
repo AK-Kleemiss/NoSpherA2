@@ -114,8 +114,9 @@ jobs:
         cd ${{ github.workspace }}
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -D "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" ..
+        cmake -DCMAKE_BUILD_TYPE=Release -D "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
         cmake --build . --config Release --parallel 
+        cmake --install . --config Release 
 
     - name: Upload Universal Binary
       uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
