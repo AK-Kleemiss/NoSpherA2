@@ -212,7 +212,6 @@ jobs:
             artifact-path: |
               NoSpherA2
               libiomp5.so
-              tbb12.so
             executable-name: NoSpherA2
 
           - os: windows-2022
@@ -221,7 +220,6 @@ jobs:
             artifact-path: |
               Windows/x64/Release/NoSpherA2.exe
               Windows/x64/Release/libiomp5md.dll
-              Windows/x64/Release/tbb12.dll
             executable-name: NoSpherA2.exe
 
     runs-on: ${{ matrix.os }}
