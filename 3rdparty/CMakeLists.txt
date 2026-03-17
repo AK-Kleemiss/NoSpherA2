@@ -42,6 +42,7 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     if (NOT "${_SAVED_ENV_HASH}" STREQUAL "${_ENV_HASH}")
         micromamba_environment(
             NAME mambaenv
+            ENV_PATH "${ENV_PATH}"
             SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
         )
         file(SHA1 ${CMAKE_SOURCE_DIR}/environment.yml _ENV_HASH)
@@ -68,8 +69,10 @@ if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     )
     if (WIN32)
         file(COPY "${_ONEAPI_MKL_ROOT}/bin/libiomp5md.dll" DESTINATION "${CMAKE_BINARY_DIR}")
+        file(COPY "${_ONEAPI_MKL_ROOT}/../../tbb/latest/bin/tbb12.dll" DESTINATION "${CMAKE_BINARY_DIR}")
     else ()
         file(COPY "${_ONEAPI_MKL_ROOT}/lib/libiomp5.so" DESTINATION "${CMAKE_BINARY_DIR}")
+        file(COPY "${_ONEAPI_MKL_ROOT}/../../tbb/latest/lib/libtbb.so" DESTINATION "${CMAKE_BINARY_DIR}")
     endif ()
     message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
     set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)

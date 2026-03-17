@@ -110,6 +110,7 @@ std::string help_message =
     "   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n"
     "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (tested for OCC)\n"
     "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename [requires -b and -d]\n"
+    "   -occ            <FILENAME>.toml          Runs a wavefunction calculation for OCC. Requires using OCC input\n"
     "   -b              <FILENAME>               Read this basis set\n"
     "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
     "   -dmin           <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
@@ -202,9 +203,12 @@ std::string build_date = ("This Executable was built on: " + std::string(__DATE_
 bool ensure_occ_data_path(const char *argv0)
 {
     const char *occ_data_path_env = std::getenv("OCC_DATA_PATH");
-    if (occ_data_path_env != nullptr && is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
+    if (occ_data_path_env != nullptr)
     {
-        return true;
+        if (is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
+            return true;
+        else
+            std::cout << "OCC DATA PATH is invalid!" << std::endl;
     }
 
     std::filesystem::path exe_dir = resolve_executable_directory(argv0);

@@ -37,7 +37,7 @@ int main(int argc, char **argv)
     ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
 
     ofstream log_file("NoSpherA2.log", ios::out);
-    std::streambuf* _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+    std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
@@ -387,17 +387,14 @@ int main(int argc, char **argv)
         if (opt.occ != "") {
             log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
             if (opt.occ.ends_with(".toml")) {
-                auto config = occ::io::read_occ_input_file(opt.occ);
+                occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
                 occ::log::set_log_file("NoSpherA2_OCC.log");
                 occ::parallel::set_num_threads(config.runtime.threads);
-                auto wfn = occ::main::run_scf_external(config, true);
-                auto wfn_from_occ = WFN(wfn);
-                wavy.emplace_back(wfn_from_occ);
+                wavy.emplace_back(occ::main::run_scf_external(config, true));
             }
             else {
                 occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);
-                auto wfn_from_occ = WFN(wfn, true);
-                wavy.emplace_back(wfn_from_occ);
+                wavy.emplace_back(wfn, true);
             }
 
             wavy[0].set_method(opt.method);

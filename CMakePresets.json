@@ -14,7 +14,7 @@
         "ENV_PATH": "${sourceDir}/mambaenv",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ",
         "USE_SYSTEM_LIBCINT": "ON",
-        "ONLY_OCC": "ON"
+        "ONLY_OCC": "OFF"
       }
     },
     {
