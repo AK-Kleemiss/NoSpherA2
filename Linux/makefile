@@ -148,7 +148,6 @@ NoSpherA2: ${OBJS}
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2 ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
-	cp ../Lib/MKL/tbb/latest/lib/libtbb.so ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d}
@@ -156,7 +155,6 @@ NoSpherA2_Debug: ${OBJS_d}
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2_Debug ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
-	cp ../Lib/MKL/tbb/latest/lib/libtbb.so ../
 	@echo 'Done building Debug version of NoSpherA2'
 
 clean:
