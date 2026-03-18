@@ -7,3 +7,4 @@ basis = "def2-tzvp"
 multiplicity = 1
 spherical = true
 output = "fchk"
+df-basis = "def2-universal-jkfit"

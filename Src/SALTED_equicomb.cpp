@@ -21,11 +21,31 @@ void equicomb(int natoms, int nrad1, int nrad2,
               const int &nfps, const std::vector<int64_t> &vfps,
               vec &p)
 {
-    const int l21 = 2 * lam + 1;
+    if (natoms < 0 || nrad1 < 0 || nrad2 < 0 || lam < 0 || featsize < 0 || nfps < 0)
+    {
+        throw std::invalid_argument("equicomb: negative dimensions are not allowed");
+    }
+    if (natoms == 0 || nrad1 == 0 || nrad2 == 0 || featsize == 0 || nfps == 0)
+    {
+        return;
+    }
+
+    const long long l21_ll = 2LL * static_cast<long long>(lam) + 1LL;
+    if (l21_ll <= 0LL || l21_ll > static_cast<long long>(std::numeric_limits<int>::max()))
+    {
+        throw std::overflow_error("equicomb: invalid lam leads to invalid 2*lam+1");
+    }
+    const int l21 = static_cast<int>(l21_ll);
     const int llmax = (int)llvec[0].size();
 
+    const size_t required_p = static_cast<size_t>(natoms) * static_cast<size_t>(l21) * static_cast<size_t>(nfps);
+    if (p.size() < required_p)
+    {
+        throw std::out_of_range("equicomb: output buffer p is smaller than required size");
+    }
+
     // Initialize p with zeros
-    std::memset(p.data(), 0, natoms * l21 * nfps * sizeof(double));
+    std::fill(p.begin(), p.begin() + static_cast<std::ptrdiff_t>(required_p), 0.0);
     const vec f_vec(featsize, 0.0);
 
     // Declare variables at the beginning
@@ -114,10 +134,12 @@ void equicomb(int natoms, int nrad1, int nrad2,
             for (i = 0; i < nfps; ++i)
             {
                 const int off_i = i + offset;
-                const int feat_i = vfps[i] * l21;
+                const int feat_i = static_cast<int>(vfps[i]) * l21;
                 for (imu = 0; imu < l21; ++imu)
                 {
-                    p[off_i + (imu * nfps)] = ptemp[imu + feat_i] * normfact;
+                    const size_t out_idx = static_cast<size_t>(off_i + (imu * nfps));
+                    const size_t feat_idx = static_cast<size_t>(imu + feat_i);
+                    p[out_idx] = ptemp[feat_idx] * normfact;
                 }
             }
             //pb.update(std::cout);
@@ -133,6 +155,28 @@ void equicomb(int natoms, int nrad1, int nrad2,
               cvec2 &c2r, int featsize,
               vec &p)
 {
+    if (natoms < 0 || nrad1 < 0 || nrad2 < 0 || llmax < 0 || lam < 0 || featsize < 0)
+    {
+        throw std::invalid_argument("equicomb: negative dimensions are not allowed");
+    }
+    if (natoms == 0 || nrad1 == 0 || nrad2 == 0 || llmax == 0 || featsize == 0)
+    {
+        return;
+    }
+
+    const long long l21_ll = 2LL * static_cast<long long>(lam) + 1LL;
+    if (l21_ll <= 0LL || l21_ll > static_cast<long long>(std::numeric_limits<int>::max()))
+    {
+        throw std::overflow_error("equicomb: invalid lam leads to invalid 2*lam+1");
+    }
+    const int l21 = static_cast<int>(l21_ll);
+
+    const size_t required_p = static_cast<size_t>(natoms) * static_cast<size_t>(l21) * static_cast<size_t>(featsize);
+    if (p.size() < required_p)
+    {
+        throw std::out_of_range("equicomb: output buffer p is smaller than required size");
+    }
+
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
     double inner, normfact;
@@ -140,7 +184,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
 #pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, p, featsize, constants::cnull)
     for (iat = 0; iat < natoms; ++iat)
     {
-        const int l21 = 2 * lam + 1;
         vec2 ptemp(l21, vec(featsize, 0.0));
         cvec pcmplx(l21, constants::cnull);
         vec preal(l21, 0.0);
@@ -191,9 +234,12 @@ void equicomb(int natoms, int nrad1, int nrad2,
         normfact = sqrt(inner);
         for (ifeat = 0; ifeat < featsize; ++ifeat)
         {
-            for (imu = 0; imu < 2 * lam + 1; ++imu)
+            for (imu = 0; imu < l21; ++imu)
             {
-                p[iat * (2 * lam + 1) * featsize + (imu * featsize) + ifeat] = ptemp[imu][ifeat] / normfact;
+                const size_t out_idx = static_cast<size_t>(iat) * static_cast<size_t>(l21) * static_cast<size_t>(featsize)
+                    + static_cast<size_t>(imu) * static_cast<size_t>(featsize)
+                    + static_cast<size_t>(ifeat);
+                p[out_idx] = ptemp[imu][ifeat] / normfact;
             }
         }
     }

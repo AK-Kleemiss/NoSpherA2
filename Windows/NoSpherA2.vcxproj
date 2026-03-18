@@ -13590,23 +13590,12 @@
     <IompDllCandidate1>$(MKLROOT)\..\..\compiler\latest\bin\libiomp5md.dll</IompDllCandidate1>
     <IompDllCandidate2>$(MKLROOT)\intelopenmp.redist.win\runtimes\win-x64\native\libiomp5md.dll</IompDllCandidate2>
   </PropertyGroup>
-  <PropertyGroup>
-    <!-- Candidate paths (absolute or relative) -->
-    <tbbDllCandidate1>$(MKLROOT)\..\..\tbb\latest\bin\tbb12.dll</tbbDllCandidate1>
-    <tbbDllCandidate2>$(MKLROOT)\inteltbb.redist.win\runtimes\win-x64\native\tbb12.dll</tbbDllCandidate2>
-  </PropertyGroup>
   <!-- First match wins -->
   <PropertyGroup Condition="Exists('$(IompDllCandidate1)')">
     <IompDll>$(IompDllCandidate1)</IompDll>
   </PropertyGroup>
   <PropertyGroup Condition="'$(IompDll)'=='' and Exists('$(IompDllCandidate2)')">
     <IompDll>$(IompDllCandidate2)</IompDll>
-  </PropertyGroup>
-  <PropertyGroup Condition="Exists('$(tbbDllCandidate1)')">
-    <TbbDll>$(tbbDllCandidate1)</TbbDll>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(TbbDll)'=='' and Exists('$(tbbDllCandidate2)')">
-    <TbbDll>$(tbbDllCandidate2)</TbbDll>
   </PropertyGroup>
   <PropertyGroup>
     <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
@@ -13620,8 +13609,5 @@
     <Copy SourceFiles="$(IompDll)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(IompDll)')" />
     <!-- If missing, fail with a clear message (optional but recommended) -->
     <Error Condition="!Exists('$(IompDll)')" Text="Could not find libiomp5.dll at $(IompDll). Check MKLROOT or oneAPI compiler install." />
-    <Message Text="Copying Intel Tbb runtime: $(TbbDll) -&gt; $(TargetDir)" Importance="High" Condition="Exists('$(TbbDll)')" />
-    <Copy SourceFiles="$(TbbDll)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(TbbDll)')" />
-    <Error Condition="!Exists('$(TbbDll)')" Text="Could not find tbb12.dll at $(TbbDll). Check MKLROOT or oneAPI compiler install." />
   </Target>
 </Project>
