@@ -716,7 +716,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     std::deque<double> history;
     for (int k_vec = 1; k_vec <= kMax; k_vec++) {
         double temp = 0;
-        pb = new ProgressBar(8 * k_vec * k_vec * k_vec, 60, "-", " ", "Reciprocal-space " + k_vec);
+        pb = new ProgressBar(8 * k_vec * k_vec * k_vec, 60, "-", " ", "Reciprocal-space " + to_string(k_vec));
         for (int h = -k_vec; h <= k_vec; h++) {
             for (int k = -k_vec; k <= k_vec; k++) {
                 for (int l = -k_vec; l <= k_vec; l++) {

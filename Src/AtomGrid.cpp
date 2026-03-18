@@ -646,7 +646,7 @@ std::array<double, 2> get_integration_weights(const int &num_centers,
         }
     }
 
-    delete R_v;
+    delete[] R_v;
 
     double w_becke = 0.0, w_tfvc = 0.0;
     for (int a = 0; a < num_centers; a++) {

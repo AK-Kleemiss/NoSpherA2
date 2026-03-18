@@ -1570,7 +1570,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
         fchk.close();
         file << " ...done!" << endl;
     }
-	else err_checkf(false, "Unsupported wavefunction type: " + wave.get_origin(), file);
+	else err_checkf(false, "Unsupported wavefunction type: " + to_string(wave.get_origin()), file);
     if (debug)
         file << "Finished writing fchk!" << endl;
     return true;
