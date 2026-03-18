@@ -15,7 +15,8 @@ MKL_THREADING ?= INTEL     # INTEL | SEQ  (INTEL = mkl_intel_thread + libiomp5)
 
 # Source & include roots
 SRC_DIR := ../Src
-INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include ../Lib/LibCint/include ../Lib/occ/include
+USER_INC_DIRS := ../Src ../Lib
+SYSTEM_INC_DIRS := ../Lib/featomic_install/include ../Lib/LibCint/include ../Lib/occ/include
 LIB_OCC := $(wildcard ../Lib/occ/lib/*.a)
 #LibCint local libs
 LIBCINT		   := ../Lib/LibCint/lib/libcint.a
@@ -34,7 +35,7 @@ GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP \
                   -include pch.h -mfma
 
 # Include directories
-INCLUDES := $(addprefix -I,$(INC_DIRS))
+INCLUDES := $(addprefix -I,$(USER_INC_DIRS)) $(foreach d,$(SYSTEM_INC_DIRS),-isystem $(d))
 
 # Threading backend selection - STATIC MKL but DYNAMIC libomp
 ifeq ($(MKL_THREADING),SEQ)
