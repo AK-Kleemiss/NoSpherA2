@@ -1231,7 +1231,6 @@ void GridManager::pruneGrid() {
             const double *w_Hirsh = _grid[GridData::GridIndex::HIRSH_WEIGHT].data();
             const double *w_MBIS = _grid[GridData::GridIndex::MBIS_WEIGHT].data();
             const double *w_EMBIS = _grid[GridData::GridIndex::EMBIS_WEIGHT].data();
-#pragma omp simd
             for (p = 0; p < n; p++) {
                 // OR-reduce comparisons; branchless.
                 bool keep = fabs(w_Becke[p]) > cutoff;
@@ -1245,7 +1244,6 @@ void GridManager::pruneGrid() {
         }
         else {
             const double *weights = _grid[weight_index].data();
-#pragma omp simd
             for (p = 0; p < n; p++) {
                 kept_local[p] = (fabs(weights[p]) > cutoff);//keep;
             }

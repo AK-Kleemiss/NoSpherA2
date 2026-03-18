@@ -10,7 +10,8 @@ ARCHS := arm64 x86_64
 
 # Source & include roots
 SRC_DIR := ../Src
-INC_DIRS := ../Src ../Lib ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint_arm64/include ../Lib/LibCint_x86_64/include ../Lib/occ_x86_64/include ../Lib/occ_arm64/include
+USER_INC_DIRS := ../Src ../Lib
+SYSTEM_INC_DIRS := ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint_arm64/include ../Lib/LibCint_x86_64/include ../Lib/occ_x86_64/include ../Lib/occ_arm64/include
 LIB_OCC := ../Lib/occ/lib/libocc.a
 
 # Local static libs (adjust as needed)
@@ -40,7 +41,7 @@ CXXSTD    := -std=c++20 -DACCELERATE_NEW_LAPACK
 OPTFLAGS  := -O3 -fvisibility=hidden
 WARNFLAGS := -fmessage-length=0
 DEPFLAGS  := -MMD -MP
-INCLUDES  := $(addprefix -I,$(INC_DIRS))
+INCLUDES  := $(addprefix -I,$(USER_INC_DIRS)) $(foreach d,$(SYSTEM_INC_DIRS),-isystem $(d))
 
 # macOS SDK and deployment target
 SDKROOT := $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null)

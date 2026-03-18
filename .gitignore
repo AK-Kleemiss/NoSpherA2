@@ -121,3 +121,5 @@ pch.h.gch/
 build-windows-clang-cl
 Lib/occ*
 build-*
+**/basis/*.json
+**/methods/*.json
