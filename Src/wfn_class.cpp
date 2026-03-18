@@ -133,9 +133,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     // Only works with restricted WFNs for now
     using namespace Eigen;
     using occ::gto::num_subshells;
-    origin = e_origin::NOT_YET_DEFINED;
-    // total_energy = occ_WF.energy.total;
-    // virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
+    origin = e_origin::OCC;
     basis_set_name = occ_WF.basis.name();
     has_ECPs = occ_WF.basis.have_ecps();
     charge = occ_WF.charge();
@@ -256,19 +254,15 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
             n_cart = A.rows();
             chunk_size = n_cart * n_prim;
             const auto &exp_arr = shell.exponents.array();
-            // volatile int coeffsize = MOs[n].get_coefficients().size();
             // normalizing the contraction_coeffs
             ArrayXd CC = shell.u_coefficients.array();
             if (!from_file)
                 CC = VectorXd::NullaryExpr(CC.size(), [shell](const Index i) {
                 return shell.coeff_normalized(0, i);
                     });
-            // return contraction_coefficients(coeff_idx, contr_idx) /
-                 // gto_norm(static_cast<int>(l), exponents(coeff_idx));
             const VectorXd &contraction_coeffs = scalar * (2 * exp_arr).pow(p) * CC;
             const auto &MOc = mo_go.C.block(basis_offset, n, n_sph, 1);
             Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);
-            // Map<const VectorXd> contraction(contraction_coeffs.data(), n_prim);
             // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
             dest_block = contraction_coeffs * (A * MOc).transpose();
 

@@ -254,22 +254,39 @@ int main(int argc, char **argv)
             if (opt.cif_based_combined_tsc_calc)
                 err_checkf(std::filesystem::exists(opt.combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_cifs[i].string(), log_file);
         }
-        wavy.resize(opt.combined_tsc_calc_files.size());
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
-            log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
-            if (opt.debug)
+            //If the files is a .toml file, we run OCC; otherwise we read it as a wfn file. This allows to easily run OCC for multiple files in one go, without having to run OCC separately for each file beforehand.
+            if (opt.combined_tsc_calc_files[i].extension() == ".toml")
             {
-                log_file << "\nmult: " << opt.combined_tsc_calc_mult[i] << endl;
-                log_file << "charge: " << opt.combined_tsc_calc_charge[i] << "\n";
-                log_file << "ECP: " << opt.combined_tsc_calc_ECP[i] << "\n";
+                log_file << "Running OCC for " << opt.combined_tsc_calc_files[i] << "..." << endl;
+                occ::io::OccInput config = occ::io::read_occ_input_file(opt.combined_tsc_calc_files[i].string());
+                std::filesystem::path log_path = opt.combined_tsc_calc_files[i].stem().string() + ".log";
+                occ::log::set_log_file(log_path.string());
+                occ::parallel::set_num_threads(config.runtime.threads);
+                wavy.emplace_back(occ::main::run_scf_external(config, true));
+                wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+                wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+                if (opt.combined_tsc_calc_ECP[i] != 0)
+                {
+                    wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
+                }
             }
-            wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
-            wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
-            wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], log_file, opt.debug);
-            if (opt.combined_tsc_calc_ECP[i] != 0)
-            {
-                wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
+            else {
+                log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
+                if (opt.debug)
+                {
+                    log_file << "\nmult: " << opt.combined_tsc_calc_mult[i] << endl;
+                    log_file << "charge: " << opt.combined_tsc_calc_charge[i] << "\n";
+                    log_file << "ECP: " << opt.combined_tsc_calc_ECP[i] << "\n";
+                }
+                wavy.emplace_back(opt.combined_tsc_calc_files[i], opt.debug);
+                wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+                wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+                if (opt.combined_tsc_calc_ECP[i] != 0)
+                {
+                    wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
+                }
             }
             log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
         }
