@@ -437,12 +437,12 @@
       <Configuration>GenCube</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Profile_Disorder|ARM64">
-      <Configuration>Profile_Disorder</Configuration>
+    <ProjectConfiguration Include="Profile|ARM64">
+      <Configuration>Profile</Configuration>
       <Platform>ARM64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Profile_Disorder|x64">
-      <Configuration>Profile_Disorder</Configuration>
+    <ProjectConfiguration Include="Profile|x64">
+      <Configuration>Profile</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Publish|ARM64">
@@ -1270,7 +1270,7 @@
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
@@ -1280,7 +1280,7 @@
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
     <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
@@ -1871,10 +1871,10 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='D_ptb_Disorder|ARM64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_MTC_Disorder|x64'" Label="PropertySheets">
@@ -2295,11 +2295,11 @@
     <LinkIncremental>false</LinkIncremental>
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
     <LinkIncremental>false</LinkIncremental>
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">
     <LinkIncremental>false</LinkIncremental>
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
@@ -5858,7 +5858,7 @@
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
@@ -5878,11 +5878,14 @@
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <LanguageStandard_C>stdclatest</LanguageStandard_C>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -5898,7 +5901,7 @@
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
@@ -7455,10 +7458,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -7587,8 +7590,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -7789,10 +7792,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -7921,8 +7924,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -8123,10 +8126,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -8255,8 +8258,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -8457,10 +8460,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -8589,8 +8592,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -8791,10 +8794,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -8923,8 +8926,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -9125,10 +9128,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -9257,8 +9260,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -9459,10 +9462,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -9591,8 +9594,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -9793,10 +9796,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -9925,8 +9928,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -10127,10 +10130,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -10259,8 +10262,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -10461,10 +10464,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -10593,8 +10596,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -10795,10 +10798,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -10927,8 +10930,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -11129,10 +11132,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -11261,8 +11264,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -11467,10 +11470,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -11599,8 +11602,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -11801,10 +11804,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -11933,8 +11936,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -12138,10 +12141,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -12270,8 +12273,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -12472,10 +12475,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -12604,8 +12607,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -12808,10 +12811,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
@@ -12940,8 +12943,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -13052,8 +13055,8 @@
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdcpp20</LanguageStandard>
-      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdcpp20</LanguageStandard>
-      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdcpp20</LanguageStandard>
+      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdcpp20</LanguageStandard>
+      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdcpp20</LanguageStandard>
@@ -13162,8 +13165,8 @@
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">true</BuildStlModules>
-      <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">true</BuildStlModules>
-      <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">true</BuildStlModules>
+      <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">true</BuildStlModules>
+      <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">true</BuildStlModules>
@@ -13272,8 +13275,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">stdclatest</LanguageStandard_C>
-      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">stdclatest</LanguageStandard_C>
@@ -13382,8 +13385,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">Create</PrecompiledHeader>
@@ -13492,8 +13495,8 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">pch.h</PrecompiledHeaderFile>

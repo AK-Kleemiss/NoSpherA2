@@ -1453,6 +1453,683 @@ void test_NNLS()
 //     case 2: result = p * 7.5 * (7. * x * x - 1.) * s * s; break;
 //     case 3: result = p * 105. * x * s * s * s; break;
 //     case 4: result = p * 105. * s * s * s * s; break;
+
+// ================================================================
+// PROFILING SUITE: run_profiling_tests
+// ================================================================
+//
+// Runs every code path exercised by tests/tests.toml in a single
+// process so a MSVC / clang-cl profiler session can cover all of
+// them without spawning subprocesses.
+//
+// Each test is wrapped in a PROFILING_NOINLINE function so that
+// its name appears as a distinct frame in the VS CPU-Profiler call
+// tree (sampling mode) or Instrumentation timeline.
+//
+// Profiler usage (Visual Studio):
+//   1. Build a Release config that retains debug info (/Zi).
+//   2. Start a "CPU Usage" or "Instrumentation" session.
+//   3. The call tree shows each profiling_<testname> frame.
+//   4. OutputDebugStringA markers appear in the VS Output window
+//      and as Events in the Concurrency Visualizer.
+//
+// Usage:
+//   run_profiling_tests(std::filesystem::path("tests"));
+//
+// Pre-conditions:
+//   - Caller's CWD should be the repository root.
+//   - All test input data must be present in the tests/ directory.
+//   - OCC_DATA_PATH must be set (or occ/share reachable from exe).
+// ================================================================
+
+// Forward declaration for fchk_conversion test. Defined in fchk.cpp.
+// Using a plain declaration (no default arg) to avoid redeclaration
+// conflicts when fchk.h is subsequently included in the same TU.
+bool free_fchk(std::ostream& file,
+               const std::filesystem::path& fchk_name,
+               const std::filesystem::path& basis_set_path,
+               WFN& wave,
+               const bool& debug,
+               bool force_overwrite);
+
+// ---- Cross-platform no-inline attribute ----
+// Makes each test function appear as a named frame in the profiler.
+#if defined(_MSC_VER) || (defined(__clang__) && defined(_WIN32))
+#  define PROFILING_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#  define PROFILING_NOINLINE __attribute__((noinline))
+#else
+#  define PROFILING_NOINLINE
+#endif
+
+// Emit a named section marker.
+// On Windows the OutputDebugStringA call appears in the VS debugger
+// Output window and as a named event in the Concurrency Visualizer.
+static void _profmark(const char* name) {
+#if defined(_WIN32) && defined(WINAPI)
+    ::OutputDebugStringA(("[PROFILING SECTION] " + std::string(name) + "\n").c_str());
+#endif
+    std::cout << "\n[PROFILING] ===== " << name << " =====\n" << std::flush;
+}
+
+// Cross-platform directory change using std::filesystem (C++17).
+static void _prof_cwd(const std::filesystem::path& p) {
+    std::filesystem::current_path(p);
+}
+
+// ================================================================
+// Individual per-test wrapper functions
+// ================================================================
+
+// ---- Test: alanine_occ ----------------------------------------
+// Standard .fchk wavefunction + CIF + dmin, single-wfn tsc path.
+PROFILING_NOINLINE
+static void profiling_alanine_occ(const std::filesystem::path& dir)
+{
+    _profmark("alanine_occ");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date     = true;
+    opt.all_charges = true;
+    opt.cif         = "alanine.cif";
+    opt.dmin        = 0.5;
+    opt.wfn         = "alanine.owf.fchk";
+    opt.accuracy    = 1;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: alanine_integrated_occ ----------------------------
+// OCC .toml wavefunction calculation + CIF + dmin (OCC SCF -> tsc).
+PROFILING_NOINLINE
+static void profiling_alanine_integrated_occ(const std::filesystem::path& dir)
+{
+    _profmark("alanine_integrated_occ");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date     = true;
+    opt.all_charges = true;
+    opt.occ         = "alanine.toml";
+    opt.cif         = "alanine.cif";
+    opt.dmin        = 0.5;
+    opt.accuracy    = 1;
+    std::vector<WFN> wavy;
+    occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
+    occ::log::set_log_file("NoSpherA2_OCC.log");
+    occ::parallel::set_num_threads(config.runtime.threads);
+    wavy.emplace_back(occ::main::run_scf_external(config, true));
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: disorder_THPP -------------------------------------
+// Multi-wfn (mtc) with disorder groups; wfx files + hkl.
+PROFILING_NOINLINE
+static void profiling_disorder_THPP(const std::filesystem::path& dir)
+{
+    _profmark("disorder_THPP");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date              = true;
+    opt.all_charges          = true;
+    opt.cif                  = "thpp.cif";
+    opt.hkl                  = "thpp.hkl";
+    opt.accuracy             = 1;
+    opt.combined_tsc_calc    = true;
+    opt.groups.pop_back();   // remove the default empty group
+    opt.combined_tsc_calc_files  = {
+        "olex2/Wfn_job/Part_1/thpp.wfx",
+        "olex2/Wfn_job/Part_2/thpp.wfx"
+    };
+    // Group strings "0.1" -> {0,1}, "0.2" -> {0,2}
+    opt.groups               = { {0, 1}, {0, 2} };
+    opt.combined_tsc_calc_mult   = {1, 1};
+    opt.combined_tsc_calc_ECP    = {0, 0};
+    opt.combined_tsc_calc_charge = {0, 0};
+    std::vector<WFN> wavy;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        wavy.emplace_back(opt.combined_tsc_calc_files[i], opt.debug);
+        wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+        wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+    }
+    svec known;
+    vec2 known_kpts;
+    itsc_block result;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        known = result.get_scatterers();
+        result.append(
+            calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+                opt, wavy, std::cout, known, i, &known_kpts),
+            std::cout);
+    }
+    result.write_tscb_file();
+}
+
+// ---- Test: fourier_transform ----------------------------------
+// Analytical Fourier transform self-test (non-full variant).
+PROFILING_NOINLINE
+static void profiling_fourier_transform(const std::filesystem::path& dir)
+{
+    _profmark("fourier_transform");
+    _prof_cwd(dir);
+    test_analytical_fourier(false);
+}
+
+// ---- Test: fractal --------------------------------------------
+// Fractal dimension calculation from a difference cube file.
+PROFILING_NOINLINE
+static void profiling_fractal(const std::filesystem::path& dir)
+{
+    _profmark("fractal");
+    _prof_cwd(dir);
+    WFN dummy(e_origin::NOT_YET_DEFINED);
+    cube residual("sucrose_diff.cube", true, dummy, std::cout, false);
+    residual.fractal_dimension(0.01);
+}
+
+// ---- Test: grown_water ----------------------------------------
+// Standard wfx + .hkl path (grown water fragment).
+PROFILING_NOINLINE
+static void profiling_grown_water(const std::filesystem::path& dir)
+{
+    _profmark("grown_water");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date     = true;
+    opt.all_charges = true;
+    opt.cif         = "water.cif";
+    opt.hkl         = "water.hkl";
+    opt.wfn         = "water.wfx";
+    opt.accuracy    = 1;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: Hybrid_mode ----------------------------------------
+// Multi-wfn mtc with .gbw files + dmin (hybrid disorder).
+PROFILING_NOINLINE
+static void profiling_Hybrid_mode(const std::filesystem::path& dir)
+{
+    _profmark("Hybrid_mode");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date              = true;
+    opt.all_charges          = true;
+    opt.cif                  = "ZP2.cif";
+    opt.dmin                 = 0.9;
+    opt.accuracy             = 1;
+    opt.combined_tsc_calc    = true;
+    opt.groups.pop_back();
+    opt.combined_tsc_calc_files  = { "ZP2_part1.gbw", "ZP2_part2.gbw" };
+    opt.groups                   = { {0, 1}, {0, 2} };
+    opt.combined_tsc_calc_mult   = {1, 1};
+    opt.combined_tsc_calc_charge = {0, 0};
+    opt.combined_tsc_calc_ECP    = {0, 0};
+    std::vector<WFN> wavy;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        wavy.emplace_back(opt.combined_tsc_calc_files[i], opt.debug);
+        wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+        wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+    }
+    svec known;
+    vec2 known_kpts;
+    itsc_block result;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        known = result.get_scatterers();
+        result.append(
+            calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+                opt, wavy, std::cout, known, i, &known_kpts),
+            std::cout);
+    }
+    result.write_tscb_file();
+}
+
+// ---- Test: malbac_SF_ECP -------------------------------------
+// .gbw wavefunction + ECP corrections (ECP mode 1 = def2-ECP).
+PROFILING_NOINLINE
+static void profiling_malbac_SF_ECP(const std::filesystem::path& dir)
+{
+    _profmark("malbac_SF_ECP");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date     = true;
+    opt.all_charges = true;
+    opt.cif         = "malbac.cif";
+    opt.hkl         = "malbac.hkl";
+    opt.wfn         = "malbac.gbw";
+    opt.accuracy    = 1;
+    opt.ECP         = true;
+    opt.ECP_mode    = 1;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: openBLAS ------------------------------------------
+// MKL / Accelerate BLAS linear-algebra self-test.
+PROFILING_NOINLINE
+static void profiling_openBLAS(const std::filesystem::path& dir)
+{
+    _profmark("openBLAS");
+    _prof_cwd(dir);
+    test_openblas();
+    test_solve_linear_equations();
+}
+
+// ---- Test: properties ----------------------------------------
+// Cube property calculations: Laplacian, RDG, ELI, deformation density.
+PROFILING_NOINLINE
+static void profiling_properties(const std::filesystem::path& dir)
+{
+    _profmark("properties");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date               = true;
+    opt.all_charges           = true;
+    opt.wfn                   = "olex2/Wfn_job/sucrose.wfx";
+    opt.cif                   = "sucrose.cif";
+    opt.properties.lap        = true;
+    opt.properties.rdg        = true;
+    opt.properties.def        = true;
+    opt.properties.eli        = true;
+    opt.properties.resolution = 1.5;
+    properties_calculation(opt);
+}
+
+// ---- Test: reading_SALTED ------------------------------------
+// SALTED binary model file I/O self-test.
+PROFILING_NOINLINE
+static void profiling_reading_SALTED(const std::filesystem::path& dir)
+{
+    _profmark("reading_SALTED");
+    _prof_cwd(dir);
+    test_reading_SALTED_binary_file();
+}
+
+// ---- Test: ri_fit --------------------------------------------
+// RI density fitting with the combo_basis_fit auxiliary basis.
+PROFILING_NOINLINE
+static void profiling_ri_fit(const std::filesystem::path& dir)
+{
+    _profmark("ri_fit");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date         = true;
+    opt.all_charges     = true;
+    opt.wfn             = "epoxide.gbw";
+    opt.cif             = "epoxide.cif";
+    opt.dmin            = 0.4;
+    opt.RI_FIT          = true;
+    opt.partition_type  = PartitionType::RI;
+    opt.aux_basis.push_back(BasisSetLibrary().get_basis_set("combo_basis_fit"));
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: rubredoxin_cmtc -----------------------------------
+// CIF-based multi-tsc-calc (cmtc) with four residue fragments.
+PROFILING_NOINLINE
+static void profiling_rubredoxin_cmtc(const std::filesystem::path& dir)
+{
+    _profmark("rubredoxin_cmtc");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date                     = true;
+    opt.all_charges                 = true;
+    opt.hkl                         = "1yk4_h.hkl";
+    opt.accuracy                    = 1;
+    opt.cif_based_combined_tsc_calc = true;
+    opt.groups.pop_back();
+    opt.combined_tsc_calc_files = {
+        "residues/1.gbw",
+        "residues/2.gbw",
+        "residues/3.gbw",
+        "residues/4.gbw"
+    };
+    opt.combined_tsc_calc_cifs = {
+        "residues/1.cif",
+        "residues/2.cif",
+        "residues/3.cif",
+        "residues/4.cif"
+    };
+    // Group strings "0" -> {0}, "0.1" -> {0,1}, "0.2" -> {0,2}, "0" -> {0}
+    opt.groups                   = { {0}, {0, 1}, {0, 2}, {0} };
+    opt.combined_tsc_calc_mult   = {1, 1, 1, 1};
+    opt.combined_tsc_calc_charge = {0, 0, 0, 0};
+    opt.combined_tsc_calc_ECP    = {0, 0, 0, 0};
+    std::vector<WFN> wavy;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        wavy.emplace_back(opt.combined_tsc_calc_files[i], opt.debug);
+        wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+        wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+    }
+    svec known;
+    vec2 known_kpts;
+    itsc_block result;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        known = result.get_scatterers();
+        result.append(
+            calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+                opt, wavy, std::cout, known, i, &known_kpts),
+            std::cout);
+    }
+    result.write_tscb_file();
+}
+
+// ---- Test: SALTED -------------------------------------------
+// SALTED ML model -> electron density -> scattering factors.
+PROFILING_NOINLINE
+static void profiling_SALTED(const std::filesystem::path& dir)
+{
+    _profmark("SALTED");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date          = true;
+    opt.all_charges      = true;
+    opt.SALTED           = true;
+    opt.salted_model_dir = "Model";
+    opt.cif              = "test_cysteine.cif";
+    opt.wfn              = "test_cysteine.xyz";
+    opt.dmin             = 0.73;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    SALTEDPredictor* pred = new SALTEDPredictor(wavy[0], opt);
+    std::string df_basis_name = pred->get_dfbasis_name();
+    std::shared_ptr<BasisSet> aux_basis_salted = BasisSetLibrary().get_basis_set(df_basis_name);
+    load_basis_into_WFN(pred->wavy, aux_basis_salted);
+    auto res = calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
+        opt, *pred, std::cout, empty, 0);
+    res.write_tscb_file();
+    delete pred;
+}
+
+// ---- Test: sucrose_IAM ----------------------------------------
+// Thakkar IAM scattering factors computed from an xyz file.
+PROFILING_NOINLINE
+static void profiling_sucrose_IAM(const std::filesystem::path& dir)
+{
+    _profmark("sucrose_IAM");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date     = true;
+    opt.all_charges = true;
+    opt.cif         = "sucrose.cif";
+    opt.hkl         = "sucrose.hkl";
+    opt.xyz_file    = "sucrose.xyz";
+    opt.iam_switch  = true;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.xyz_file, opt.debug);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: sucrose_ptb ----------------------------------------
+// pTB extended tight-binding wavefunction path (ECP mode 3).
+PROFILING_NOINLINE
+static void profiling_sucrose_ptb(const std::filesystem::path& dir)
+{
+    _profmark("sucrose_ptb");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date     = true;
+    opt.all_charges = true;
+    opt.cif         = "sucrose.cif";
+    opt.dmin        = 0.8;
+    opt.wfn         = "wfn.xtb";
+    opt.mult        = 0;
+    opt.charge      = 0;
+    opt.accuracy    = 1;
+    opt.ECP         = true;
+    opt.ECP_mode    = 3;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: sucrose_SF -----------------------------------------
+// Standard sucrose .wfx + hkl scattering factor calculation.
+PROFILING_NOINLINE
+static void profiling_sucrose_SF(const std::filesystem::path& dir)
+{
+    _profmark("sucrose_SF");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date     = true;
+    opt.all_charges = true;
+    opt.cif         = "sucrose.cif";
+    opt.hkl         = "olex2/Wfn_job/sucrose.hkl";
+    opt.wfn         = "olex2/Wfn_job/sucrose.wfx";
+    opt.accuracy    = 1;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: sucrose_twin ---------------------------------------
+// Scattering factor calculation with a 3x3 twin law applied.
+PROFILING_NOINLINE
+static void profiling_sucrose_twin(const std::filesystem::path& dir)
+{
+    _profmark("sucrose_twin");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date     = true;
+    opt.all_charges = true;
+    opt.cif         = "sucrose.cif";
+    opt.hkl         = "olex2/Wfn_job/sucrose.hkl";
+    opt.wfn         = "olex2/Wfn_job/sucrose.wfx";
+    opt.accuracy    = 1;
+    opt.twin_law.resize(1);
+    opt.twin_law[0] = {1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 1.0, -2.0};
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: wfn_reading ----------------------------------------
+// Read a legacy .wfn file and compute scattering factors.
+PROFILING_NOINLINE
+static void profiling_wfn_reading(const std::filesystem::path& dir)
+{
+    _profmark("wfn_reading");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date     = true;
+    opt.all_charges = true;
+    opt.hkl         = "test.hkl";
+    opt.accuracy    = 1;
+    opt.cif         = "test.cif";
+    opt.wfn         = "test.wfn";
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: fchk_conversion (full) ----------------------------
+// Read a legacy .ffn wavefunction and convert it to a Gaussian
+// .fchk file using the specified basis set directory.
+// Marked "full" in tests.toml; run_profiling_tests always exercises
+// this path so the fchk-conversion code is present in the profile.
+PROFILING_NOINLINE
+static void profiling_fchk_conversion(const std::filesystem::path& dir)
+{
+    _profmark("fchk_conversion");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date        = true;
+    opt.all_charges    = true;
+    opt.wfn            = "in.ffn";
+    opt.basis_set      = "dev2-TZVP";
+    opt.basis_set_path = "./";
+    opt.fchk           = "in.fchk";   // explicit output path
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    std::filesystem::path tmp = opt.basis_set_path / opt.basis_set;
+    wavy[0].set_basis_set_name(tmp.string());
+    wavy[0].assign_charge(wavy[0].calculate_charge());
+    wavy[0].guess_multiplicity(std::cout);
+    free_fchk(std::cout, opt.fchk, "", wavy[0], opt.debug, true);
+}
+
+// ---- Test: fourier_transform_full (full) ---------------------
+// Full (heavier) analytical Fourier transform self-test.
+PROFILING_NOINLINE
+static void profiling_fourier_transform_full(const std::filesystem::path& dir)
+{
+    _profmark("fourier_transform_full");
+    _prof_cwd(dir);
+    test_analytical_fourier(true);
+}
+
+// ================================================================
+// Main orchestrator
+// ================================================================
+//
+// Runs all 21 test paths from tests/tests.toml in sequence.
+// Each call is wrapped in a PROFILING_NOINLINE function so that
+// the VS profiler call tree labels each test by name.
+//
+// The CWD is restored to the original after every test so that
+// relative paths used in later tests remain valid.
+// ================================================================
+void run_profiling_tests(const std::filesystem::path& tests_root)
+{
+    const std::filesystem::path orig = std::filesystem::current_path();
+
+    // ---- Quick tests (always run) ----
+    profiling_alanine_occ(tests_root / "alanine_occ");
+    std::filesystem::current_path(orig);
+
+    profiling_alanine_integrated_occ(tests_root / "alanine_integrated_occ");
+    std::filesystem::current_path(orig);
+
+    profiling_disorder_THPP(tests_root / "disorder");
+    std::filesystem::current_path(orig);
+
+    profiling_fourier_transform(tests_root / "SALTED");
+    std::filesystem::current_path(orig);
+
+    profiling_fractal(tests_root / "sucrose_fchk_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_grown_water(tests_root / "grown");
+    std::filesystem::current_path(orig);
+
+    profiling_Hybrid_mode(tests_root / "Hybrid");
+    std::filesystem::current_path(orig);
+
+    profiling_malbac_SF_ECP(tests_root / "ECP_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_openBLAS(tests_root / "OpenBLAS");
+    std::filesystem::current_path(orig);
+
+    profiling_properties(tests_root / "sucrose_fchk_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_reading_SALTED(tests_root / "SALTED");
+    std::filesystem::current_path(orig);
+
+    profiling_ri_fit(tests_root / "epoxide_gbw");
+    std::filesystem::current_path(orig);
+
+    profiling_rubredoxin_cmtc(tests_root / "rubredoxin_cmtc");
+    std::filesystem::current_path(orig);
+
+    profiling_SALTED(tests_root / "SALTED");
+    std::filesystem::current_path(orig);
+
+    profiling_sucrose_IAM(tests_root / "sucrose_IAM_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_sucrose_ptb(tests_root / "sucrose_IAM_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_sucrose_SF(tests_root / "sucrose_fchk_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_sucrose_twin(tests_root / "sucrose_fchk_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_wfn_reading(tests_root / "wfn_reading");
+    std::filesystem::current_path(orig);
+
+    // ---- Full tests (heavier, gated by RUN_FULL_TEST in pytest) ----
+    profiling_fchk_conversion(tests_root / "NiP3_fchk");
+    std::filesystem::current_path(orig);
+
+    profiling_fourier_transform_full(tests_root / "SALTED");
+    std::filesystem::current_path(orig);
+
+    std::cout << "\n[PROFILING] All 21 test paths completed.\n" << std::flush;
+}
 //     }; break;
 //     case 5: switch (m_) {
 //     case 0: result = 0.125 * x * (63. * x * x * x * x - 70. * x * x + 15.); break;

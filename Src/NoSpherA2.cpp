@@ -15,6 +15,7 @@ extern "C" {
 }
 
 int QCT(options &opt, std::vector<WFN> &wavy);
+void run_profiling_tests(const std::filesystem::path& tests_root);
 
 int main(int argc, char **argv)
 {
@@ -60,6 +61,15 @@ int main(int argc, char **argv)
         cls();
         std::cout << "Starting QCT menu..." << endl;
         return QCT(opt, wavy);
+    }
+    if (opt.profiling)
+    {
+        log_file << "Running profiling suite with tests root: " << opt.profiling_tests_root << std::endl;
+        run_profiling_tests(opt.profiling_tests_root);
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf);
+        std::cout << "Finished profiling suite!" << endl;
+        return 0;
     }
     // Perform fractal dimensional analysis and quit
     if (opt.fract)

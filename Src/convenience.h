@@ -656,6 +656,7 @@ struct options
     std::string occ;
     std::filesystem::path occ_toml_path;
     std::filesystem::path cwd;
+    std::filesystem::path profiling_tests_root = "tests";
     properties_options properties;
     bool debug = false;
     bool all_charges = false;
@@ -679,6 +680,7 @@ struct options
     bool qct = false;
     bool rgbi = false;
     bool fract = false;
+    bool profiling = false;
     int accuracy = 2;
     int threads = -1;
     int pbc = 0;

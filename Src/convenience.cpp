@@ -149,6 +149,7 @@ std::string help_message =
     "   -mtc_mult       <List of multiplicity>   Matching multiplicity for -cmtc and -mtc wavefucntions\n"
     "   -mtc_charge     <List of charges>        Matching charges for -cmtc and -mtc wavefucntions\n"
     "   -mtc_ECP        <List of ECP modes>      Matching ECP modes for -cmtc and -mtc wavefucntions\n"
+    "   -profiling      [tests_root]             Runs the internal profiling suite (all test paths). Optional root defaults to ./tests\n"
     "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
     "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
     "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
@@ -2225,6 +2226,14 @@ void options::digest_options()
         }
         else if (temp == "-QCT" || temp == "-qct")
             qct = true;
+        else if (temp == "-profiling" || temp == "-profile")
+        {
+            profiling = true;
+            if (i + 1 < argc && arguments[i + 1].find("-") != 0)
+            {
+                profiling_tests_root = arguments[i + 1];
+            }
+        }
         else if (temp == "-radius")
             properties.radius = stod(arguments[i + 1]);
         else if (temp == "-resolution")
