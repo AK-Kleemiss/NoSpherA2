@@ -182,7 +182,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Daniel Bruex,\n");
         t.append("      Marti Gimferrer,\n");
         t.append("      Anker Nielsen,\n");
-        t.aooebd("      Lucas Militao,´\n");
+        t.append("      Lucas Militao,´\n");
         t.append("      and many more in communications or by feedback!\n");
         t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library, as well as OCC for the calculation of wavefunctions, when required.\n");
         t.append("The used packages are published under BSD-3 clause License or explicit consent for the use in this project was given.\n");
