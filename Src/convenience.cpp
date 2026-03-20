@@ -2376,6 +2376,7 @@ void options::digest_options()
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
 
             create_SALTED_training_data(wavy, wavy_aux);
+            exit(0);
         }
         else if (temp == "-test_reading_SALTED_binary") {
             test_reading_SALTED_binary_file();

@@ -534,6 +534,7 @@ cube calc_cube_ML(const vec& data, WFN& dummy, const int& atom_nr)
 #include "nos_math.h"
 #include "npy.h"
 void create_SALTED_training_data(const WFN& orbital, const WFN& aux) {
+    std::cout << "Calculating density fitting coefficients..." << std::endl;
     DensityFitting::CONFIG config;
     config.analyze_quality = true;
     //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
@@ -541,63 +542,19 @@ void create_SALTED_training_data(const WFN& orbital, const WFN& aux) {
     //if (wavy->get_origin() == e_origin::ptb)
     //    config.restraint_strength = 1.0e-4;
 
-
-    //dMatrixRef2 DM_ref(orbital.get_dm());
-    ////print out dm
-    //for (int i = 0; i < DM_ref.extent(0); i++) {
-    //    std::cout << "[";
-    //    for (int j = 0; j < DM_ref.extent(1); j++) {
-    //        std::cout << DM_ref(i, j) << ", ";
-    //    }
-    //    std::cout << "]," << std::endl;
-    //}
-
-
     vec coefs = DensityFitting::density_fit(orbital, aux, config);
 
     vec overlap;
     Int_Params aux_basis(aux);
     compute2C<Overlap2C_SPH>(aux_basis, overlap);
     const int nao_max = aux_basis.get_nao();
-    dMatrixRef2 overlap_orig(overlap.data(), nao_max, nao_max);
-    
-    //""" Reorder L=1 components from +1,-1,0 to -1,0,+1 in the overlap matrix"""
-    auto get_new_index = [](const int l, const int m_idx) {
-        switch (l) {
-        case 1: { constexpr std::array<int, 3>  map = { 2,0,1 }; return map[m_idx]; }
-        default: return m_idx;
-        }
-     };
 
-    ivec permutations(aux_basis.get_nao());
-    size_t ao = 0;
-    for (const atom& at : aux_basis.get_atoms()) {
-        int prim = 0;
-        for (unsigned int shell = 0; shell < at.get_shellcount_size(); ++shell) {
-            const int l = at.get_basis_set_type(prim) - 1;
-            const size_t shell_start = ao;
-
-            for (int m_idx = 0; m_idx < 2 * l + 1; m_idx++) {
-                permutations[ao++] = int(shell_start + size_t(get_new_index(l, m_idx)));
-            }
-            prim += at.get_shellcount(shell);
-        }
-    }
-    dMatrix2 overlap_permuted(nao_max, nao_max);
-    for (int j = 0; j < nao_max; j++) {
-        const int pj = permutations[j];
-        for (int i = 0; i < j; i++) {
-            const int pi = permutations[i];
-            const double v = overlap_orig(i, j);
-            overlap_permuted(pi, pj) = v;
-            overlap_permuted(pj, pi) = v;
-        }
-        overlap_permuted(pj, pj) = overlap_orig(j, j);
-    }
     dMatrix1 coefs_vec(coefs.size());
     coefs_vec.container() = coefs;
+    dMatrix2 overlap_mat(nao_max, nao_max);
+    overlap_mat.container() = overlap;
 
-    dMatrix1 proj = dot(overlap_permuted, coefs_vec);
+    dMatrix1 proj = dot(overlap_mat, coefs_vec);
 
     npy::write_npy("coefficients.npy", 
         npy::npy_data<double>{
@@ -615,8 +572,8 @@ void create_SALTED_training_data(const WFN& orbital, const WFN& aux) {
 
     npy::write_npy("overlap.npy",
         npy::npy_data<double>{
-        overlap_permuted.container(),
-        { static_cast<unsigned long>(overlap_permuted.extent(0)), static_cast<unsigned long>(overlap_permuted.extent(1)) },
+        overlap,
+        { static_cast<unsigned long>(nao_max), static_cast<unsigned long>(nao_max) },
             false}
     );
 
