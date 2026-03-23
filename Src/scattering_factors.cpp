@@ -594,6 +594,69 @@ void generate_fractional_hkl(const double &dmin,
     if (debug)
         file << "Number of reflections after twin: " << hkl.size() << endl;
 
+    vector<vector<ivec>> sym(3);
+    for (int i = 0; i < 3; i++)
+        sym[i].resize(3);
+    sym = unit_cell.get_sym();
+
+    if (debug)
+    {
+        file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
+        for (int i = 0; i < sym[0][0].size(); i++)
+        {
+            for (int x = 0; x < 3; x++)
+            {
+                for (int y = 0; y < 3; y++)
+                    file << setw(3) << sym[y][x][i];
+                file << endl;
+            }
+            file << endl;
+        }
+    }
+    else
+        file << "Number of symmetry operations: " << setw(19) << sym[0][0].size() << endl;
+
+    d3 tempv;
+    hkl_list_d hkl_enlarged = hkl;
+    for (int s = 0; s < sym[0][0].size(); s++)
+    {
+        if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
+            sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
+            sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0)
+        {
+            continue;
+        }
+        for (const d3 &hkl__ : hkl)
+        {
+            tempv = { 0, 0, 0 };
+            for (int h = 0; h < 3; h++)
+            {
+                for (int j = 0; j < 3; j++)
+                    tempv[j] += hkl__[h] * sym[j][h][s];
+            }
+            hkl_enlarged.emplace(tempv);
+        }
+    }
+    hkl.clear();
+    if (debug)
+        file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
+
+    for (const d3 &hkl__ : hkl_enlarged)
+    {
+        if (hkl.find(hkl__) != hkl.end())
+            continue;
+        tempv = hkl__;
+        tempv[0] *= -1;
+        tempv[1] *= -1;
+        tempv[2] *= -1;
+        if (hkl.find(tempv) == hkl.end())
+        {
+            hkl.emplace(hkl__);
+        }
+    }
+    // Remove 0 0 0 if it exists
+    if (hkl.find(d3{ 0, 0, 0 }) != hkl.end())
+        hkl.erase(d3{ 0, 0, 0 });
     file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
@@ -1038,7 +1101,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
 
             k_pt_local[3] = std::hypot(k_pt_local[0], k_pt_local[1], k_pt_local[2]);
 
-            for (int i = 0; i < 3; ++i)
+            for (int i = 0; i < 3; i++)
                 k_pt_local[i] /= k_pt_local[3];
 
             for (int ia = 0; ia < num_asym_atoms; ++ia)
@@ -1497,7 +1560,7 @@ tsc_block_type calculate_scattering_factors(
     using namespace std;
     int nat = 0;
     WFN *wavy = NULL;
-    if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>) {
+    if constexpr (std::is_same_v<calculator_type, std::vector<WFN> &>) {
         wavy = &calculator[nr];
         wavy->delete_Qs();
         err_checkf(wavy->get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
@@ -1649,21 +1712,34 @@ tsc_block_type calculate_scattering_factors(
     }
     else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor &>)
     {
-        //// Remove all unneccecary atoms from wavy
-        //int current_index = 0;
-        //for (int i = 0; i < needs_grid.size(); i++)
-        //{
-        //    if (opt.debug)
-        //        std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
+        err_checkf(labels.size() == asym_atom_list.size() && labels.size() == constant_atoms.size(),
+            "Inconsistent SALTED atom bookkeeping after CIF read!", file);
 
-        //    if (!needs_grid[i])
-        //    {
-        //        wavy->erase_atom(current_index);
-        //        constant_atoms.erase(constant_atoms.begin() + current_index, constant_atoms.begin() + current_index + 1);
-        //        current_index--;
-        //    }
-        //    current_index++;
-        //}
+        // Remove all atoms that are not part of the current asymmetric unit and remap
+        // the original atom indices to the pruned SALTED wavefunction.
+        ivec original_to_local(needs_grid.size(), -1);
+        int current_index = 0;
+        for (int i = 0; i < needs_grid.size(); i++)
+        {
+            if (opt.debug)
+                std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
+
+            if (!needs_grid[i])
+            {
+                wavy->erase_atom(current_index);
+                continue;
+            }
+
+            original_to_local[i] = current_index;
+            current_index++;
+        }
+
+        for (int &atom_index : asym_atom_list)
+        {
+            err_checkf(atom_index >= 0 && atom_index < original_to_local.size() && original_to_local[atom_index] != -1,
+                "Failed to remap SALTED atom indices after pruning the wavefunction!", file);
+            atom_index = original_to_local[atom_index];
+        }
 
         // Generation of SALTED density coefficients
         file << "\nGenerating densities... " << endl;
@@ -1673,45 +1749,82 @@ tsc_block_type calculate_scattering_factors(
         time_descriptions.push_back("SALTED prediction");
         calculator.shrink_intermediate_vectors();
 
-        // Remove all unneccecary atoms from wavy only if it is not the first calculation
+        // In disorder calculations beyond the first component, keep constant atoms in the
+        // environment for the prediction but remove their contributions from the result.
         if (nr != 0)
         {
-            err_checkf(constant_atoms.size() <= calculator.wavy.get_ncen(),
-                "There are more constant atoms than atoms in the wavefunction! This should not happen!", file);
-            // We need coeffs for the atoms and coeff seperateley
-            size_t current_coef_index = coefs.size();
-            for (int i = static_cast<int>(constant_atoms.size()) - 1; i >= 0; i--)
+            ivec remove_positions;
+            ivec remove_atom_indices;
+            for (int i = 0; i < constant_atoms.size(); i++)
             {
-                // Count up all coeffs for one atom
-                const int lim = (int)wavy->get_atom_basis_set_size(i);
-                int coef_count = 0;
-                for (int i_basis = 0; i_basis < lim; i_basis++)
+                if (!constant_atoms[i])
+                    continue;
+                remove_positions.push_back(i);
+                remove_atom_indices.push_back(asym_atom_list[i]);
+            }
+
+            sort(remove_atom_indices.begin(), remove_atom_indices.end());
+            remove_atom_indices.erase(unique(remove_atom_indices.begin(), remove_atom_indices.end()), remove_atom_indices.end());
+
+            if (!remove_atom_indices.empty())
+            {
+                std::vector<int> coef_offsets(wavy->get_ncen() + 1, 0);
+                for (int atom_idx = 0; atom_idx < wavy->get_ncen(); atom_idx++)
                 {
-                    coef_count += 2 * wavy->get_atom_basis_set_entry(i, i_basis).get_primitive().get_type() + 1;
+                    int coef_count = 0;
+                    const int lim = (int)wavy->get_atom_basis_set_size(atom_idx);
+                    for (int i_basis = 0; i_basis < lim; i_basis++)
+                        coef_count += 2 * wavy->get_atom_basis_set_entry(atom_idx, i_basis).get_primitive().get_type() + 1;
+                    coef_offsets[atom_idx + 1] = coef_offsets[atom_idx] + coef_count;
                 }
 
-                // Remove atoms and coeffs from list if they are constant atoms
-                if (constant_atoms[i])
+                for (auto it = remove_atom_indices.rbegin(); it != remove_atom_indices.rend(); ++it)
                 {
-                    labels.erase(labels.begin() + i, labels.begin() + i + 1);
-                    wavy->erase_atom(i);
-                    coefs.erase(coefs.begin() + current_coef_index - coef_count, coefs.begin() + current_coef_index);
+                    const int atom_idx = *it;
+                    coefs.erase(coefs.begin() + coef_offsets[atom_idx], coefs.begin() + coef_offsets[atom_idx + 1]);
+                    wavy->erase_atom(atom_idx);
                 }
-                current_coef_index -= coef_count;
-            };
+
+                svec filtered_labels;
+                ivec filtered_asym_atom_list;
+                bvec filtered_constant_atoms;
+                filtered_labels.reserve(labels.size() - remove_positions.size());
+                filtered_asym_atom_list.reserve(asym_atom_list.size() - remove_positions.size());
+                filtered_constant_atoms.reserve(constant_atoms.size() - remove_positions.size());
+
+                for (int i = 0; i < labels.size(); i++)
+                {
+                    if (constant_atoms[i])
+                        continue;
+
+                    const int old_atom_index = asym_atom_list[i];
+                    const int removed_before = static_cast<int>(std::lower_bound(remove_atom_indices.begin(), remove_atom_indices.end(), old_atom_index) - remove_atom_indices.begin());
+
+                    filtered_labels.push_back(labels[i]);
+                    filtered_asym_atom_list.push_back(old_atom_index - removed_before);
+                    filtered_constant_atoms.push_back(false);
+                }
+
+                labels = std::move(filtered_labels);
+                asym_atom_list = std::move(filtered_asym_atom_list);
+                constant_atoms = std::move(filtered_constant_atoms);
+            }
         }
+
+        err_checkf(labels.size() == asym_atom_list.size(),
+            "Inconsistent SALTED atom bookkeeping after disorder filtering!", file);
 
         vec atom_elecs = calc_atomic_density(calculator.wavy.get_atoms(), coefs);
         file << "Table of Charges in electrons\n"
             << "       Atom      ML" << endl;
 
-        for (int i = 0; i < asym_atom_list.size(); i++)
+        for (int i = 0; i < labels.size(); i++)
         {
-
+            const int atom_index = asym_atom_list[i];
             file << setw(10) << labels[i]
-                << fixed << setw(10) << setprecision(3) << wavy->get_atom_charge(i) - atom_elecs[asym_atom_list[i]];
+                << fixed << setw(10) << setprecision(3) << wavy->get_atom_charge(atom_index) - atom_elecs[atom_index];
             if (opt.debug)
-                file << " " << setw(4) << wavy->get_atom_charge(i) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[asym_atom_list[i]];
+                file << " " << setw(4) << wavy->get_atom_charge(atom_index) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[atom_index];
             file << endl;
         }
         auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
@@ -1743,7 +1856,7 @@ tsc_block_type calculate_scattering_factors(
                 opt.debug);
         }
     }
-    else if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>) {
+    else if constexpr (std::is_same_v<calculator_type, std::vector<WFN> &>) {
         if (opt.partition_type == PartitionType::Hirshfeld ||
             opt.partition_type == PartitionType::Becke ||
             opt.partition_type == PartitionType::TFVC ||

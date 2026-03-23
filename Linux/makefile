@@ -15,7 +15,8 @@ MKL_THREADING ?= INTEL     # INTEL | SEQ  (INTEL = mkl_intel_thread + libiomp5)
 
 # Source & include roots
 SRC_DIR := ../Src
-INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include ../Lib/LibCint/include ../Lib/occ/include
+USER_INC_DIRS := ../Src ../Lib
+SYSTEM_INC_DIRS := ../Lib/featomic_install/include ../Lib/LibCint/include ../Lib/occ/include
 LIB_OCC := $(wildcard ../Lib/occ/lib/*.a)
 #LibCint local libs
 LIBCINT		   := ../Lib/LibCint/lib/libcint.a
@@ -34,7 +35,7 @@ GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP \
                   -include pch.h -mfma
 
 # Include directories
-INCLUDES := $(addprefix -I,$(INC_DIRS))
+INCLUDES := $(addprefix -I,$(USER_INC_DIRS)) $(foreach d,$(SYSTEM_INC_DIRS),-isystem $(d))
 
 # Threading backend selection - STATIC MKL but DYNAMIC libomp
 ifeq ($(MKL_THREADING),SEQ)
@@ -147,7 +148,6 @@ NoSpherA2: ${OBJS}
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2 ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
-	cp ../Lib/MKL/tbb/latest/lib/libtbb.so ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d}
@@ -155,7 +155,6 @@ NoSpherA2_Debug: ${OBJS_d}
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2_Debug ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
-	cp ../Lib/MKL/tbb/latest/lib/libtbb.so ../
 	@echo 'Done building Debug version of NoSpherA2'
 
 clean:

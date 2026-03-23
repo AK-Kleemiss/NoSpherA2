@@ -15,12 +15,19 @@
 #include <iomanip>
 #include <iostream>
 #include <numeric>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"
+#endif
 #include <occ/main/occ_scf.h>
 #include <occ/gto/gto.h>
 #include <occ/core/parallel.h>
 #include <occ/io/conversion.h>
 #include <occ/io/occ_input.h>
 #include <occ/qm/wavefunction.h>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #if defined(__APPLE__)
 // On macOS we are using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>

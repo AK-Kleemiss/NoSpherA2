@@ -495,7 +495,7 @@ void calc_partition_densities()
             pb->update();
         }
     }
-    free(pb);
+    delete pb;
 
     GridConfiguration config;
     config.all_charges = true;
