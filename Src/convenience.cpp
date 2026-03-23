@@ -183,13 +183,15 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Daniel Bruex,\n");
         t.append("      Marti Gimferrer,\n");
         t.append("      Anker Nielsen,\n");
+        t.append("      Lucas Militao,´\n");
         t.append("      and many more in communications or by feedback!\n");
-        t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library.\n");
-        t.append("The used packages are published under BSD-3 clause License.\n");
+        t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library, as well as OCC for the calculation of wavefunctions, when required.\n");
+        t.append("The used packages are published under BSD-3 clause License or explicit consent for the use in this project was given.\n");
         t.append("Please see, respectively:\n");
         t.append("   https://github.com/Luthaf/featomic\n");
         t.append("   https://github.com/lab-cosmo/metatensor\n");
         t.append("   This software utilizes Intel(c) Math Kernel Library (oneMKL), version 2025.2.0.629, for optimized mathematical computations\n");
+        t.append("OCC can be found at: https://github.com/peterspackman/occ\n");
         t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst. 2024, 57, 161 - 174.\n");
         t.append("ECP correction functions at : Kleemiss et al. J. Appl. Cryst. 2025, 58, 374 - 382.\n");
@@ -2049,6 +2051,38 @@ void options::digest_options()
             delete (temp_w);
             exit(0);
         }
+        else if (temp == "-calc_featomic_descriptor") {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
+
+            std::vector<std::string> species{"B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I"};
+            SALTED_Utils::FeatomicHyperParameters hyperparams{
+                .cutoff_radius = 2.5,
+                .max_radial = 4,
+                .max_angular = 9,
+                .atomic_gaussian_width = 0.15,
+                .center_atom_weight = 1.0,
+                .species = species,
+                .neighspe = species,
+                .radial_basis = {.type = "Gto", .spline_accuracy = 1E-6 },
+                .cutoff_function = { .type = "ShiftedCosine", .width = 0.1 }
+            };
+
+            metatensor::TensorMap descriptor = SALTED_Utils::calculate_SOAP_Powerspectrum(SALTED_Utils::gen_featomic_system(wfn), hyperparams);
+
+            metatensor::TensorBlock temp_block = descriptor.block_by_id(0);
+            metatensor::NDArray<double> temp_values = temp_block.values();
+            std::vector<size_t> sizes = temp_block.values_shape();
+            vec data(sizes[0] * sizes[1]);
+            std::copy(temp_values.data(), temp_values.data() + data.size(), data.data());
+
+            npy::npy_data<double> np_descr;
+            np_descr.data = data;
+            np_descr.fortran_order = false;
+            np_descr.shape = { static_cast<unsigned long>(sizes[0]), static_cast<unsigned long>(sizes[1]) };
+            npy::write_npy("descriptor.npy", np_descr);
+            
+            exit(0);
+        }
         else if (temp == "-fchk")
             fchk = arguments[i + 1];
         else if (temp == "-fractal")
@@ -2326,11 +2360,7 @@ void options::digest_options()
             salted_model_dir = arguments[i + 1];
 
             //Check that wfn is not empty
-            if (wfn.empty())
-            {
-                std::cout << "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction." << std::endl;
-                exit(1);
-            }
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
 
             WFN wavy(wfn);
             SALTEDPredictor SP(wavy, *this);
@@ -2357,6 +2387,7 @@ void options::digest_options()
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
 
             create_SALTED_training_data(wavy, wavy_aux);
+            exit(0);
         }
         else if (temp == "-test_reading_SALTED_binary") {
             test_reading_SALTED_binary_file();
@@ -2516,8 +2547,27 @@ void options::digest_options()
         else if (temp == "-lukas_test")
         {
             //Check that wfn is not empty
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option to specify a wavefunction.", std::cout);
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+            err_chkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED option BEFORE -lukas_test to specify a model directory.", std::cout);
 
+            WFN wavy(wfn);
+            SALTEDPredictor SP(wavy, *this);
+            string df_basis_name = SP.get_dfbasis_name();
+            filesystem::path salted_model_path = SP.get_salted_filename();
+            log_file << "Using " << salted_model_path << " for the prediction" << endl;
+            if (!SP.basis_set_loaded()) {
+                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                load_basis_into_WFN(SP.wavy, aux_basis);
+            }
+            vec coefs = SP.gen_SALTED_densities();
+
+            cube atom_cube = calc_cube_ML(coefs, SP.wavy);
+            atom_cube.write_file("DBA_total.cube");
+
+            for (int atm_idx = 0; atm_idx < wavy.get_ncen(); atm_idx++) {
+                atom_cube = calc_cube_ML(coefs, SP.wavy, atm_idx);
+                atom_cube.write_file("DBA_atom_" + std::to_string(atm_idx) + ".cube");
+            }
         }
         else if (temp == "-calc_dens_1D")
         {
