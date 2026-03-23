@@ -4,6 +4,7 @@
 #include "cube.h"
 #include "featomic.hpp"
 #include "constants.h"
+#include "metatensor.h"
 
 namespace SALTED_Utils
 {
