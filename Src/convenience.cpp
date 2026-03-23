@@ -2547,7 +2547,6 @@ void options::digest_options()
             filesystem::path salted_model_path = SP.get_salted_filename();
             log_file << "Using " << salted_model_path << " for the prediction" << endl;
             if (!SP.basis_set_loaded()) {
-                string df_basis_name = SP.get_dfbasis_name();
                 std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
                 load_basis_into_WFN(SP.wavy, aux_basis);
             }

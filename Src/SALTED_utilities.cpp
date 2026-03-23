@@ -135,7 +135,7 @@ std::string SALTED_Utils::FeatomicHyperParameters::to_json() const
 
 
 // Used to generate metatensor::TensorMap and save the buffer location into the descriptor_buffer
-metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
     // size_t nspe1 = neighspe.size();
     std::vector<std::array<int32_t, 4>> keys_array;
@@ -167,12 +167,11 @@ metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_system, co
     metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
 
 
-    // create the calculator with its name and parameters
+    //create the calculator with its name and parameters
     //Do not ask me, why Featomic expects the max_radial to be one less than the actual number of radial basis functions, but it does, so here we are
-    SALTED_Utils::FeatomicHyperParameters&  modif_param = const_cast<SALTED_Utils::FeatomicHyperParameters&>(parameters);
+    SALTED_Utils::FeatomicHyperParameters modif_param = parameters;
     modif_param.max_radial -= 1;
     auto calculator = featomic::Calculator("spherical_expansion", modif_param.to_json().c_str());
-    modif_param.max_radial += 1;
 
     featomic::CalculationOptions calc_opts;
     calc_opts.selected_keys = keys_selection;
@@ -191,7 +190,7 @@ metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_system, co
 }
 
 // Reads the descriptor buffer and fills the expansion coefficients vector
-cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+static cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
     int n_atoms = (int)featomic_system.size();
     int nspe = (int)parameters.species.size();
@@ -228,7 +227,7 @@ cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomi
 }
 
 
-cvec4 SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+cvec4 SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
     metatensor::TensorMap descriptor = get_feats_projs(featomic_system, parameters);
     std::vector<uint8_t> descriptor_buffer = descriptor.save_buffer();

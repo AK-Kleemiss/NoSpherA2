@@ -16,7 +16,7 @@ namespace SALTED_Utils
     inline featomic::SimpleSystem gen_featomic_system(const std::filesystem::path& filepath)
     {
         featomic::SimpleSystem featomic_system;
-        WFN wfn = WFN(filepath.c_str());
+        WFN wfn = WFN(filepath);
         for (const atom& a : *wfn.get_atoms_ptr())
         {
             d3 xyz = { constants::bohr2ang(a.get_coordinate(0)),
@@ -57,7 +57,7 @@ namespace SALTED_Utils
     };
 
     cvec4 calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
-    metatensor::TensorMap calculate_SOAP_Powerspectrum(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
+    metatensor::TensorMap calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
 }
 
 //Calc density from RI fit coefficients
