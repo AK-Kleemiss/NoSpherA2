@@ -2538,8 +2538,8 @@ void options::digest_options()
         else if (temp == "-lukas_test")
         {
             //Check that wfn is not empty
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
-            err_chkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED option BEVORE -lukas_test to specify a model directory.", std::cout);
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+            err_chkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED option BEFORE -lukas_test to specify a model directory.", std::cout);
 
             WFN wavy(wfn);
             SALTEDPredictor SP(wavy, *this);
