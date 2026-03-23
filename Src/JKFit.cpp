@@ -461,7 +461,6 @@ bool basis_set_complete(const WFN& orbital_wfn, std::shared_ptr<BasisSet> aux_ba
     return true;
 }
 
-
 WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>>& aux_basis) {
     err_checkf(aux_basis.size() > 0, "Aux-Basis Vecor == 0, something went wrong... try calling -ri_fit and see what happens", std::cout);
     //Check every basis set in the vector, if it is empty, generate it using auto_aux
