@@ -2051,7 +2051,7 @@ void options::digest_options()
             exit(0);
         }
         else if (temp == "-calc_featomic_descriptor") {
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE --calc_featomic_descriptor to specify a molecule.", std::cout);
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
 
             std::vector<std::string> species{"B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I"};
             SALTED_Utils::FeatomicHyperParameters hyperparams{
