@@ -178,7 +178,7 @@ std::vector<double> prune_element_candidates_for_L(
     const int n = static_cast<int>(unique_exps.size());
     if (n <= 1) return unique_exps;
 
-    atom tmp_atom(std::to_string('H'), std::to_string('H'), 1, 0.0, 0.0, 0.0, 1);
+    atom tmp_atom("H", "H", 1, 0.0, 0.0, 0.0, 1);
     for (int i = 0; i < unique_exps.size(); i++) {
         tmp_atom.push_back_basis_set(unique_exps[i], 1.0, L, i);
     }
