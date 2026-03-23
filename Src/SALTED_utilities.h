@@ -56,8 +56,8 @@ namespace SALTED_Utils
         std::string to_json() const;
     };
 
-    cvec4 calculate_SALTED_descriptors(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
-    metatensor::TensorMap calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
+    cvec4 calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
+    metatensor::TensorMap calculate_SOAP_Powerspectrum(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
 }
 
 //Calc density from RI fit coefficients
