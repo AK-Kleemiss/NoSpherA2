@@ -241,7 +241,6 @@ metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::Simpl
     // create the calculator with its name and parameters
     auto calculator = featomic::Calculator("soap_power_spectrum", parameters.to_json().c_str());
 
-    int spe_2_start = 0;
     std::vector<std::array<int32_t,3>> keys_array;
     for (const std::string& center_type : parameters.species)
     {
