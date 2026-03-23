@@ -344,29 +344,29 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
         ns = std::log(a_max_adjusted[l] / a_min_by_l_aux[l]) / std::log(beta);
         n_funcs = static_cast<int>(std::ceil(ns)) + 1;
 
-        vec candidate_exps(n_funcs);
-        for (int i = n_funcs - 1; i >= 0; --i) {
-            candidate_exps[i] = a_min_by_l_aux[l] * std::pow(beta, i);
-        }
-        auto kept = prune_element_candidates_for_L(l, candidate_exps, 5e-5);
-        std::cout << "Element " << Z << ", L = " << l << " with beta = " << beta << ": Generated " << n_funcs << " candidates, kept " << kept.size() << " after pruning." << std::endl;
-        n_funcs = static_cast<int>(kept.size());
-        if (n_funcs <= 0) continue;
-        for (double exp : kept) {
-            add_owned_primitive({ 0, l, exp, 1.0, shell });
-            ++shell;
-            ++added_functions;
-        }
-
-        //std::cout << "Beta for Element " << Z << " and l " << l << " : " << beta << " with " << n_funcs << " Functions." << std::endl;
-        //if (n_funcs <= 0) continue;
-        //for (int i = n_funcs - 1; i >= 0; --i, ++added_functions, shell++) {
-        //    double exp = a_min_by_l_aux[l] * std::pow(beta, i);
-        //    add_owned_primitive({ 0, l,
-        //        exp,
-        //        1.0, shell
-        //        });
+        //vec candidate_exps(n_funcs);
+        //for (int i = n_funcs - 1; i >= 0; --i) {
+        //    candidate_exps[i] = a_min_by_l_aux[l] * std::pow(beta, i);
         //}
+        //auto kept = prune_element_candidates_for_L(l, candidate_exps, 5e-5);
+        //std::cout << "Element " << Z << ", L = " << l << " with beta = " << beta << ": Generated " << n_funcs << " candidates, kept " << kept.size() << " after pruning." << std::endl;
+        //n_funcs = static_cast<int>(kept.size());
+        //if (n_funcs <= 0) continue;
+        //for (double exp : kept) {
+        //    add_owned_primitive({ 0, l, exp, 1.0, shell });
+        //    ++shell;
+        //    ++added_functions;
+        //}
+
+        std::cout << "Beta for Element " << Z << " and l " << l << " : " << beta << " with " << n_funcs << " Functions." << std::endl;
+        if (n_funcs <= 0) continue;
+        for (int i = n_funcs - 1; i >= 0; --i, ++added_functions, shell++) {
+            double exp = a_min_by_l_aux[l] * std::pow(beta, i);
+            add_owned_primitive({ 0, l,
+                exp,
+                1.0, shell
+                });
+        }
     }
     set_count_for_element(Z - 1, added_functions);
     _elementOffsets[Z - 1] -= added_functions; //Small hack to set the correct offset
