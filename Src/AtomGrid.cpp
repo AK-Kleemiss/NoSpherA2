@@ -1115,7 +1115,10 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 
                 // Precompute determinants for all atoms and shells - they don't change per point
                 vec det_pop_cache(ncen * 6, 0.0);
+                // Precompute which atoms have ECP electrons to avoid repeated checks
+                std::vector<bool> has_ECP(ncen);
                 for (int k = 0; k < ncen; k++) {
+                    has_ECP[k] = (atoms[k].get_ECP_electrons() > 0);
                     nshell = nshell_cache[k];
                     coi = &copy_of_input[k];
                     for (shell = 0; shell < nshell; shell++) {
@@ -1133,7 +1136,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
-                    density = b_weight[point] * dens[point];
+                    const double b_weight_point = b_weight[point];
+                    density = b_weight_point * dens[point];
                     for (j = 0; j < ncen; j++) {
                         ind = j * 3;
                         d_local = dx.data() + ind;
@@ -1141,19 +1145,24 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         d_local[1] = gy[point] - atom_coords[ind + 1];
                         d_local[2] = gz[point] - atom_coords[ind + 2];
                         d_cache[0] = d_local[0] * d_local[0];
-                        d_cache[3] = d_local[1] * d_local[1];
-                        d_cache[5] = d_local[2] * d_local[2];
-                        // Check distance squared first to avoid sqrt for far away points
-                        if (d_cache[0] + d_cache[3] + d_cache[5] > constants::far_away_sq)
-                            continue;
-
                         d_cache[1] = d_local[0] * d_local[1];
                         d_cache[2] = d_local[0] * d_local[2];
+                        d_cache[3] = d_local[1] * d_local[1];
                         d_cache[4] = d_local[1] * d_local[2];
-                        ECP_els_j = &ECP_els[j];
-                        if (atoms[j].get_ECP_electrons() > 0) {
-                            const double dist = std::sqrt(d_cache[0] + d_cache[3] + d_cache[5]);
-                            density += (ECP_electron_helper[j].get_core_density(dist, *ECP_els_j) + ECP_correction_helper[j].get_radial_density(dist)) * b_weight[point];
+                        d_cache[5] = d_local[2] * d_local[2];
+                        const double dist_sq = d_cache[0] + d_cache[3] + d_cache[5];
+                        // Check distance squared first to avoid sqrt for far away points
+                        if (dist_sq > constants::far_away_sq)
+                            continue;
+
+                        // Only compute distance and ECP correction if needed (precomputed boolean check)
+                        if (has_ECP[j]) {
+                            const double dist = std::sqrt(dist_sq);
+                            ECP_els_j = &ECP_els[j];
+                            // Cache helper references to reduce repeated indexing
+                            const double core_dens = ECP_electron_helper[j].get_core_density(dist, *ECP_els_j);
+                            const double radial_dens = ECP_correction_helper[j].get_radial_density(dist);
+                            density += (core_dens + radial_dens) * b_weight_point;
                         }
 
                         nshell = nshell_cache[j];
@@ -1162,14 +1171,23 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         for (shell = 0; shell < nshell; shell++) {
                             alpha = coi->first[shell].data();
                             // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
-                            g = sqrt(alpha[0] * d_cache[0] +
+                            const double g_sq = alpha[0] * d_cache[0] +
                                 alpha[3] * d_cache[3] +
                                 alpha[5] * d_cache[5] +
-                                2 * (alpha[1] * d_cache[1] + alpha[2] * d_cache[2] + alpha[4] * d_cache[4]));
-                            g_cache[ind + shell] = g;
-                            if (g > 42) // avoid vanishingly small contributions due to exp(-g) and potential overflow in exp(g)
+                                2 * (alpha[1] * d_cache[1] + alpha[2] * d_cache[2] + alpha[4] * d_cache[4]);
+                            // Early exit for large g_sq before sqrt
+                            if (g_sq > 1764.0) // 42^2 = 1764
                                 continue;
-                            tmp = det_pop_cache[ind + shell] * exp(-g);
+                            g = sqrt(g_sq);
+                            g_cache[ind + shell] = g;
+                            if (g > 42.0) // avoid vanishingly small contributions due to exp(-g) and potential overflow in exp(g)
+                                continue;
+                            // Cache det_pop value and check before expensive exp()
+                            const double det_pop_val = det_pop_cache[ind + shell];
+                            if (abs(det_pop_val) < constants::cutoff)
+                                continue;
+                            // Use negative g directly in exp to save one operation
+                            tmp = det_pop_val * exp(-g);
                             if (abs(tmp) < constants::cutoff)
                                 continue;
                             rho0shell[ind + shell] = tmp;
@@ -1208,15 +1226,51 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     }
                 }
 
+                // Optimize atomic updates by hoisting address calculations
                 for (j = 0; j < ncen; j++) {
                     nshell = nshell_cache[j];
+                    const int alpha_base = j * 36;
+                    const int pop_base = j * 6;
                     for (shell = 0; shell < nshell; shell++) {
-                        for (int n = 0; n < 6; n++) {
+                        const int alpha_offset = alpha_base + shell * 6;
+                        // Unroll the loop and hoist pointer arithmetic
+                        const double a0 = alpha_local[alpha_offset + 0];
+                        const double a1 = alpha_local[alpha_offset + 1];
+                        const double a2 = alpha_local[alpha_offset + 2];
+                        const double a3 = alpha_local[alpha_offset + 3];
+                        const double a4 = alpha_local[alpha_offset + 4];
+                        const double a5 = alpha_local[alpha_offset + 5];
+                        const double pop_val = pop_local[pop_base + shell];
+
+                        // Only perform atomic updates if values are non-zero
+                        if (a0 != 0.0) {
 #pragma omp atomic
-                            sig_pop_vector[j].first[shell][n] += alpha_local[j * 36 + shell * 6 + n];
+                            sig_pop_vector[j].first[shell][0] += a0;
                         }
+                        if (a1 != 0.0) {
 #pragma omp atomic
-                        sig_pop_vector[j].second[shell] += pop_local[j * 6 + shell];
+                            sig_pop_vector[j].first[shell][1] += a1;
+                        }
+                        if (a2 != 0.0) {
+#pragma omp atomic
+                            sig_pop_vector[j].first[shell][2] += a2;
+                        }
+                        if (a3 != 0.0) {
+#pragma omp atomic
+                            sig_pop_vector[j].first[shell][3] += a3;
+                        }
+                        if (a4 != 0.0) {
+#pragma omp atomic
+                            sig_pop_vector[j].first[shell][4] += a4;
+                        }
+                        if (a5 != 0.0) {
+#pragma omp atomic
+                            sig_pop_vector[j].first[shell][5] += a5;
+                        }
+                        if (pop_val != 0.0) {
+#pragma omp atomic
+                            sig_pop_vector[j].second[shell] += pop_val;
+                        }
                     }
                 }
             }

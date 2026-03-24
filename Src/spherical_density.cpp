@@ -6,6 +6,55 @@
 #include "ECPs_corrections.h"
 #include "constants.h"
 
+// Optimized integer power function for small exponents
+// This is much faster than std::pow for integer exponents
+inline double fast_int_pow(const double base, const int exponent) {
+    // Handle negative exponents
+    if (exponent < 0) return 1.0 / fast_int_pow(base, -exponent);
+
+    // Use switch for optimal jump table generation
+    switch (exponent) {
+        case 0: return 1.0;
+        case 1: return base;
+        case 2: return base * base;
+        case 3: return base * base * base;
+        case 4: {
+            const double base2 = base * base;
+            return base2 * base2;
+        }
+        case 5: {
+            const double base2 = base * base;
+            return base2 * base2 * base;
+        }
+        case 6: {
+            const double base2 = base * base;
+            return base2 * base2 * base2;
+        }
+        case 7: {
+            const double base2 = base * base;
+            return base2 * base2 * base2 * base;
+        }
+        case 8: {
+            const double base2 = base * base;
+            const double base4 = base2 * base2;
+            return base4 * base4;
+        }
+        default: {
+            // For larger exponents, use binary exponentiation
+            double result = 1.0;
+            double current_base = base;
+            int exp = exponent;
+
+            while (exp > 0) {
+                if (exp & 1) result *= current_base;
+                current_base *= current_base;
+                exp >>= 1;
+            }
+            return result;
+        }
+    }
+}
+
 Thakkar::Thakkar(const int g_atom_number, const int ECP_m) : Spherical_Atom(g_atom_number, ECP_m)
 {
     nex = &(Thakkar_nex[0]);
@@ -99,7 +148,7 @@ void Thakkar::calc_orbs(
                 if (n[nr_ex] == 1)
                     Orb[m] += c[nr_coef] * exp(exponent);
                 else
-                    Orb[m] += c[nr_coef] * pow(dist, n[nr_ex] - 1) * exp(exponent);
+                    Orb[m] += c[nr_coef] * fast_int_pow(dist, n[nr_ex] - 1) * exp(exponent);
             }
             nr_coef++;
         }
@@ -119,27 +168,71 @@ void Thakkar::calc_custom_orbs(
     const int &min,
     double *Orb) const
 {
-    double exponent;
-    for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++)
-    {
-        for (int m = lower_m + min; m < upper_m; m++)
-        {
-            if (occ[offset + m] == 0)
-                continue;
-            if (m < lower_m + max)
-            {
-                exponent = -z[nr_ex] * dist;
-                if (exponent > -46.5)
-                { // Corresponds to at least 1E-20
-                    if (n[nr_ex] == 1)
-                        Orb[m] += c[nr_coef] * exp(exponent);
-                    else
-                        Orb[m] += c[nr_coef] * pow(dist, n[nr_ex] - 1) * exp(exponent);
+    const int upper_ex = n_vector[atomic_number - 1];
+    const int m_start = lower_m + min;
+    const int m_threshold = lower_m + max;
+    
+    // Early exit if no valid m range
+    if (m_start >= upper_m || m_start >= m_threshold) {
+        // Still need to advance counters correctly
+        for (int ex = 0; ex < upper_ex; ex++, nr_ex++) {
+            for (int m = m_start; m < upper_m; m++) {
+                if (occ[offset + m] != 0) {
+                    nr_coef++;
                 }
             }
-            nr_coef++;
         }
-        nr_ex++;
+        return;
+    }
+    
+    for (int ex = 0; ex < upper_ex; ex++, nr_ex++)
+    {
+        const double _z = z[nr_ex];
+        const int _n = n[nr_ex] - 1;
+        
+        // Precompute exponent once per outer loop - major optimization
+        const double exponent = -_z * dist;
+        
+        // Early exit if exponent too small - moved outside inner loop
+        if (exponent <= -46.5) {
+            // Skip this exponential entirely but advance coefficient counter
+            for (int m = m_start; m < upper_m; m++) {
+                if (occ[offset + m] != 0) {
+                    nr_coef++;
+                }
+            }
+            continue;
+        }
+        
+        // Compute exp once per outer iteration instead of per inner iteration
+        const double exp_val = exp(exponent);
+        
+        if (_n != 0) {
+            const double dist_pow = fast_int_pow(dist, _n);
+            const double combined = exp_val * dist_pow;
+            
+            for (int m = m_start; m < upper_m; m++)
+            {
+                if (occ[offset + m] != 0) {
+                    if (m < m_threshold) {
+                        Orb[m] += c[nr_coef] * combined;
+                    }
+                    nr_coef++;
+                }
+            }
+        }
+        else {
+            // Fast path for _n == 0 case (no power calculation needed)
+            for (int m = m_start; m < upper_m; m++)
+            {
+                if (occ[offset + m] != 0) {
+                    if (m < m_threshold) {
+                        Orb[m] += c[nr_coef] * exp_val;
+                    }
+                    nr_coef++;
+                }
+            }
+        }
     }
 }
 

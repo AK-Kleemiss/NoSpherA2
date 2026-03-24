@@ -516,7 +516,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -526,7 +526,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture />
   </PropertyGroup>
@@ -545,7 +545,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -565,7 +565,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -585,7 +585,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -605,7 +605,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -625,7 +625,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -645,7 +645,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -665,7 +665,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -685,7 +685,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -705,7 +705,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -725,7 +725,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -745,7 +745,7 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>false</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -765,7 +765,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -785,7 +785,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -805,7 +805,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -825,7 +825,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -845,7 +845,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -865,7 +865,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -885,7 +885,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -905,7 +905,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -925,7 +925,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -945,7 +945,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -965,7 +965,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -985,7 +985,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1005,7 +1005,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1025,7 +1025,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1045,7 +1045,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1065,7 +1065,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1095,7 +1095,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1105,7 +1105,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture />
   </PropertyGroup>
@@ -1124,7 +1124,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1144,7 +1144,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1164,7 +1164,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1185,7 +1185,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1206,7 +1206,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1236,7 +1236,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1246,7 +1246,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture />
   </PropertyGroup>
@@ -1265,7 +1265,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1285,7 +1285,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1305,7 +1305,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1325,7 +1325,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1345,7 +1345,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1365,7 +1365,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1385,7 +1385,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1405,7 +1405,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1425,7 +1425,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1445,7 +1445,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1465,7 +1465,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1485,7 +1485,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1505,7 +1505,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1525,7 +1525,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
@@ -1547,7 +1547,7 @@
     <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
     <EnableUnitySupport>true</EnableUnitySupport>
@@ -1569,7 +1569,7 @@
     <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
     <EnableUnitySupport>true</EnableUnitySupport>
@@ -1591,7 +1591,7 @@
     <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>
     <EnableUnitySupport>true</EnableUnitySupport>
@@ -1611,7 +1611,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>
     </PreferredToolArchitecture>

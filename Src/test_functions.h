@@ -806,14 +806,14 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
 
 void test_openblas()
 {
-#ifdef __APPLE__
-    omp_set_num_threads(4);
-#else
-    MKL_Set_Num_Threads(4);
-#endif
-#ifdef _OPENMP
-    omp_set_num_threads(4);
-#endif
+//#ifdef __APPLE__
+//    omp_set_num_threads(4);
+//#else
+//    MKL_Set_Num_Threads(4);
+//#endif
+//#ifdef _OPENMP
+//    omp_set_num_threads(4);
+//#endif
     std::cout << "Running MKL/Accelerate test" << std::endl;
     _test_openblas();
 }
@@ -2073,8 +2073,8 @@ void run_profiling_tests(const std::filesystem::path &tests_root)
     profiling_disorder_THPP(tests_root / "disorder");
     std::filesystem::current_path(orig);
 
-    profiling_fourier_transform(tests_root / "SALTED");
-    std::filesystem::current_path(orig);
+    //profiling_fourier_transform(tests_root / "SALTED");
+    //std::filesystem::current_path(orig);
 
     profiling_fractal(tests_root / "sucrose_fchk_SF");
     std::filesystem::current_path(orig);
