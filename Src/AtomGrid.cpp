@@ -934,7 +934,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                 }
                 std::pair<vec, vec> *coi;
 
-#pragma omp for schedule(dynamic, 1)
+#pragma omp for schedule(dynamic, 1) nowait
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(dists.begin(), dists.end(), 0.0);
@@ -1070,6 +1070,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     ivec ECP_els(ncen);
     std::vector<Thakkar> ECP_electron_helper;
     std::vector<Spherical_Gaussian_Density> ECP_correction_helper;
+    std::vector<int> has_ECP(ncen);
     for (int j = 0; j < ncen; j++) {
         atom_coords[j * 3 + 0] = atoms[j].get_coordinate(0);
         atom_coords[j * 3 + 1] = atoms[j].get_coordinate(1);
@@ -1079,6 +1080,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         ECP_electron_helper.emplace_back(c);
         ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_els[j] = atoms[j].get_ECP_electrons();
+        has_ECP[j] = (atoms[j].get_ECP_electrons() > 0);
     }
 
     for (size_t it = 0; it < 2000; it++) {
@@ -1115,10 +1117,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 
                 // Precompute determinants for all atoms and shells - they don't change per point
                 vec det_pop_cache(ncen * 6, 0.0);
-                // Precompute which atoms have ECP electrons to avoid repeated checks
-                std::vector<bool> has_ECP(ncen);
                 for (int k = 0; k < ncen; k++) {
-                    has_ECP[k] = (atoms[k].get_ECP_electrons() > 0);
                     nshell = nshell_cache[k];
                     coi = &copy_of_input[k];
                     for (shell = 0; shell < nshell; shell++) {
@@ -1132,7 +1131,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     }
                 }
 
-#pragma omp for schedule(dynamic,16)
+#pragma omp for schedule(dynamic,4) nowait
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
@@ -1237,7 +1236,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                             const int alpha_offset = alpha_base + shell * 6;
                             // Batch update all values in critical section
                             double *sig_alpha = sig_pop_vector[j].first[shell].data();
-                            
+
                             sig_alpha[0] += alpha_local[alpha_offset + 0];
                             sig_alpha[1] += alpha_local[alpha_offset + 1];
                             sig_alpha[2] += alpha_local[alpha_offset + 2];
