@@ -216,7 +216,7 @@ GridManager::GridManager(const GridConfiguration &config)
 }
 
 void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list,
-    const bvec &needs_grid, const cell &unit_cell) {
+    const bvec &needs_grid, const cell &unit_cell, const bool get_g) {
     if (config_.debug) {
         std::cout << "GridManager: Setting up grids for " << atom_list.size()
             << " atoms with " << config_.getPartitionName() << " partitioning" << std::endl;
@@ -282,6 +282,11 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
     if (!non_spherical_densities_calculated_) {
         calculateNonSphericalDensities(wave, unit_cell);
         addTimingPoint("WFN evaluation on grid");
+    }
+
+    if (get_g) {
+        calculateNonSphericalg(wave, unit_cell);
+        addTimingPoint("g(r) calculation");
     }
 
     if (config_.debug) {
@@ -671,7 +676,7 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const
     return results;
 }
 
-void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens) {
+void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g) {
     if (config_.debug) {
         std::cout << "GridManager: Generating density vectors..." << std::endl;
     }
@@ -715,7 +720,8 @@ void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2
         }
         dens[final_atoms].resize(n_points); d1[final_atoms].resize(n_points); d2[final_atoms].resize(n_points); d3[final_atoms].resize(n_points);
 
-        const double *rho = atomic_grid[GridData::GridIndex::WFN_DENSITY].data();
+        double *rho = NULL;
+        get_g ? rho = atomic_grid[GridData::GridIndex::g_DENSITY].data(): rho = atomic_grid[GridData::GridIndex::WFN_DENSITY].data();
         const double *w = atomic_grid[idx_single].data();
         double *res = dens[final_atoms].data();
 
@@ -1174,6 +1180,45 @@ void GridManager::calculateNonSphericalDensities(const WFN &wave, const cell &un
     }
     non_spherical_densities_calculated_ = true;
 }
+
+void GridManager::calculateNonSphericalg(const WFN &wave, const cell &unit_cell) {
+    using namespace std;
+
+    if (config_.debug) {
+        std::cout << "GridManager: Calculating non-spherical g values..." << std::endl;
+    }
+    const bool helper = needs_helper_grids_;
+
+    const int *points = helper ? grid_data_.helper_num_points_per_atom.data() : grid_data_.num_points_per_atom.data();
+    vec2 *grids = helper ? grid_data_.helper_grids.data() : grid_data_.atomic_grids.data();
+    const int n_grids = helper ? grid_data_.helper_grids.size() : grid_data_.atomic_grids.size();
+
+#pragma omp parallel
+    {
+        vec2 d_temp(wave.get_ncen());
+        for (int i = 0; i < wave.get_ncen(); i++)
+        {
+            d_temp[i].resize(16, 0.0);
+        }
+        vec phi_temp(wave.get_nmo(true), 0.0);
+
+        for (int g = 0; g < n_grids; g++) {
+            const int num_points = points[g];
+            vec2 &atom_grid = grids[g];
+            const double *x_ptr = atom_grid[GridData::GridIndex::X].data();
+            const double *y_ptr = atom_grid[GridData::GridIndex::Y].data();
+            const double *z_ptr = atom_grid[GridData::GridIndex::Z].data();
+            double *densy_ptr = atom_grid[GridData::GridIndex::g_DENSITY].data();
+#pragma omp for schedule(dynamic, 4)
+            for (int p = 0; p < num_points; p++) {
+                // Calculate WFN density at this point
+                densy_ptr[p] = wave.compute_g_cartesian({ x_ptr[p], y_ptr[p], z_ptr[p] }, d_temp, phi_temp);
+            }
+        }
+    }
+    non_spherical_densities_calculated_ = true;
+}
+
 
 vec GridManager::evaluateFunctionOnGrid(const vec2 &grid_points, std::function<double(double, double, double)> func) const {
     const long long int num_points = grid_points[0].size();

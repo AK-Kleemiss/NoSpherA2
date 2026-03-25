@@ -1515,7 +1515,7 @@ int make_atomic_grids_wrapper(
     temp.delete_unoccupied_MOs();
 
     // Setup grids for the molecule
-    grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell);
+    grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell, opt.get_g);
     grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
 
     // Calculate partitioned charges
@@ -1524,7 +1524,7 @@ int make_atomic_grids_wrapper(
     time_points.push_back(get_time());
     time_descriptions.push_back("calculate charges");
 
-    grid_manager.getDensityVectors(temp, asym_atom_list, d1, d2, d3, dens);
+    grid_manager.getDensityVectors(temp, asym_atom_list, d1, d2, d3, dens, opt.get_g);
     time_points.push_back(get_time());
     time_descriptions.push_back("combined density vectors");
 

@@ -205,7 +205,7 @@ void Thakkar::calc_custom_orbs(
         }
         
         // Compute exp once per outer iteration instead of per inner iteration
-        const double exp_val = exp(exponent);
+        const double exp_val = fast_exp_neg(exponent);
         
         if (_n != 0) {
             const double dist_pow = fast_int_pow(dist, _n);

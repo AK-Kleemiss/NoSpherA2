@@ -471,6 +471,7 @@ public:
     const double compute_spin_dens(const d3& Pos) const;
     /** Spin density with scratch arrays. */
     const double compute_spin_dens(const d3& Pos, vec2& d, vec& phi) const;
+    const double compute_g_cartesian(const d3 &Pos, vec2 &d, vec &phi) const;
     /** Evaluate multiple properties (density, gradient norm, Hessian, ELF/ELI/Laplacian). */
     const void computeValues(const d3& PosGrid, double& Rho, double& normGrad, double* Hess, double& Elf, double& Eli, double& Lap) const;
     /** Compute Laplacian, ELI and ELF together. */

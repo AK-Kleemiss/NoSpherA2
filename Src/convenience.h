@@ -155,6 +155,20 @@ extern std::string help_message;
 std::string NoSpherA2_message(bool no_date = false);
 extern std::string build_date;
 
+// Fast exp approximation for negative values
+inline double fast_exp_neg(double x) {
+    // For x in [-42, 0], use a fast approximation
+    if (x < -42.0) return 0.0;
+    if (x > -0.693147) { // ln(0.5) - use standard exp for values close to 0
+        return exp(x);
+    }
+    // Power of 2 approximation: exp(x) ≈ (1 + x/1024)^1024
+    x = 1.0 + x / 1024.0;
+    x *= x; x *= x; x *= x; x *= x; x *= x; // x^32
+    x *= x; x *= x; x *= x; x *= x; x *= x; // x^1024
+    return x;
+}
+
 namespace sha
 {
     // Rotate right operation
@@ -681,6 +695,7 @@ struct options
     bool rgbi = false;
     bool fract = false;
     bool profiling = false;
+    bool get_g = false;
     int accuracy = 2;
     int threads = -1;
     int pbc = 0;

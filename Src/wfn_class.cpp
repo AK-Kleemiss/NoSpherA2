@@ -6987,6 +6987,142 @@ const double WFN::compute_dens_cartesian(
     return Rho;
 }
 
+const double WFN::compute_g_cartesian(
+    const d3 &Pos,
+    vec2 &d,
+    vec &phi) const
+{
+    std::fill(phi.begin(), phi.end(), 0.0);
+    double g = 0.0;
+    int j;
+    double ex, *d_;
+
+    // precalculate some distances and powers of distances for faster computation
+    for (j = 0; j < ncen; j++)
+    {
+        const atom &a = atoms[j];
+        d_ = d[j].data();
+        d_[0] = Pos[0] - a.get_coordinate(0);
+        d_[1] = Pos[1] - a.get_coordinate(1);
+        d_[2] = Pos[2] - a.get_coordinate(2);
+        d_[4] = d_[0] * d_[0];
+        d_[5] = d_[1] * d_[1];
+        d_[6] = d_[2] * d_[2];
+        d_[3] = d_[4] + d_[5] + d_[6];
+        d_[7] = d_[0] * d_[4];
+        d_[8] = d_[1] * d_[5];
+        d_[9] = d_[2] * d_[6];
+        d_[10] = d_[0] * d_[7];
+        d_[11] = d_[1] * d_[8];
+        d_[12] = d_[2] * d_[9];
+        d_[13] = d_[0] * d_[10];
+        d_[14] = d_[1] * d_[11];
+        d_[15] = d_[2] * d_[12];
+    }
+
+    // Pre-cache frequently accessed data
+    const int *centers_data = centers.data();
+    const int *types_data = types.data();
+    const double *exponents_data = exponents.data();
+    double *phi_data = phi.data();
+    const double exp_cutoff = constants::exp_cutoff;
+
+    for (j = 0; j < nex; j++)
+    {
+        d_ = d[centers_data[j] - 1].data();
+        ex = -exponents_data[j] * d_[3];
+        if (ex < exp_cutoff)
+        { // corresponds to cutoff of maximum density contribution of 1E-5
+            continue;
+        }
+        ex = exp(ex);
+        switch (types_data[j])
+        {
+        case 0:  break;
+        case 1:  break;// 0, 0, 0,
+        case 2:  ex *= d_[0]; break;// 1, 0, 0,
+        case 3:  ex *= d_[1]; break;// 0, 1, 0,
+        case 4:  ex *= d_[2]; break;// 0, 0, 1,
+        case 5:  ex *= d_[4]; break;// 2, 0, 0,
+        case 6:  ex *= d_[5]; break;// 0, 2, 0,
+        case 7:  ex *= d_[6]; break;// 0, 0, 2,
+        case 8:  ex *= d_[0] * d_[1]; break;// 1, 1, 0,
+        case 9:  ex *= d_[0] * d_[2]; break;// 1, 0, 1,
+        case 10: ex *= d_[1] * d_[2]; break;// 0, 1, 1,
+        case 11: ex *= d_[7]; break;// 3, 0, 0,
+        case 12: ex *= d_[8]; break;// 0, 3, 0,
+        case 13: ex *= d_[9]; break;// 0, 0, 3,
+        case 14: ex *= d_[4] * d_[1]; break;// 2, 1, 0,
+        case 15: ex *= d_[4] * d_[2]; break;// 2, 0, 1,
+        case 16: ex *= d_[5] * d_[2]; break;// 0, 2, 1,
+        case 17: ex *= d_[0] * d_[5]; break;// 1, 2, 0,
+        case 18: ex *= d_[0] * d_[6]; break;// 1, 0, 2,
+        case 19: ex *= d_[1] * d_[6]; break;// 0, 1, 2,
+        case 20: ex *= d_[0] * d_[1] * d_[2]; break;// 1, 1, 1,
+        case 21: ex *= d_[12]; break;// 0, 0, 4,
+        case 22: ex *= d_[1] * d_[9]; break;// 0, 1, 3,
+        case 23: ex *= d_[5] * d_[6]; break;// 0, 2, 2,
+        case 24: ex *= d_[8] * d_[2]; break;// 0, 3, 1,
+        case 25: ex *= d_[11]; break;// 0, 4, 0,
+        case 26: ex *= d_[0] * d_[9]; break;// 1, 0, 3,
+        case 27: ex *= d_[0] * d_[1] * d_[6]; break;// 1, 1, 2,
+        case 28: ex *= d_[0] * d_[5] * d_[2]; break;// 1, 2, 1,
+        case 29: ex *= d_[0] * d_[8]; break;// 1, 3, 0,
+        case 30: ex *= d_[4] * d_[6]; break;// 2, 0, 2,
+        case 31: ex *= d_[4] * d_[1] * d_[2]; break;// 2, 1, 1,
+        case 32: ex *= d_[4] * d_[5]; break;// 2, 2, 0,
+        case 33: ex *= d_[7] * d_[2]; break;// 3, 0, 1,
+        case 34: ex *= d_[7] * d_[1]; break;// 3, 1, 0,
+        case 35: ex *= d_[10]; break;// 4, 0, 0,
+        case 36: ex *= d_[15]; break;// 0, 0, 5,
+        case 37: ex *= d_[1] * d_[12]; break;// 0, 1, 4,
+        case 38: ex *= d_[5] * d_[9]; break;// 0, 2, 3,
+        case 39: ex *= d_[8] * d_[6]; break;// 0, 3, 2,
+        case 40: ex *= d_[11] * d_[2]; break;// 0, 4, 1,
+        case 41: ex *= d_[14]; break;// 0, 5, 0,
+        case 42: ex *= d_[0] * d_[12]; break;// 1, 0, 4,
+        case 43: ex *= d_[0] * d_[1] * d_[9]; break;// 1, 1, 3,
+        case 44: ex *= d_[0] * d_[8] * d_[2]; break;// 1, 3, 1,
+        case 45: ex *= d_[0] * d_[11]; break;// 1, 4, 0,
+        case 46: ex *= d_[4] * d_[9]; break;// 2, 0, 3,
+        case 47: ex *= d_[4] * d_[1] * d_[6]; break;// 2, 1, 2,
+        case 48: ex *= d_[4] * d_[5] * d_[2]; break;// 2, 2, 1,
+        case 49: ex *= d_[4] * d_[8]; break;// 2, 3, 0,
+        case 50: ex *= d_[7] * d_[6]; break;// 3, 0, 2,
+        case 51: ex *= d_[7] * d_[1] * d_[2]; break;// 3, 1, 1,
+        case 52: ex *= d_[7] * d_[5]; break;// 3, 2, 0,
+        case 53: ex *= d_[10] * d_[2]; break;// 4, 0, 1,
+        case 54: ex *= d_[10] * d_[1]; break;// 4, 1, 0,
+        case 55: ex *= d_[13]; break;// 5, 0, 0 
+        default: break;
+        }
+
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        double *phi_ptr = phi_data;
+        const double *phi_end = phi_ptr + nmo;
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; phi_ptr != phi_end; ++phi_ptr)
+        {
+            *phi_ptr += ex;
+        }
+    }
+
+    // use pointer arithmetic and minimize overhead
+    const double *phi_ptr = phi_data;
+    const double *phi_end = phi_ptr + nmo;
+
+    for (; phi_ptr != phi_end; ++phi_ptr)
+    {
+        const double &phi_val = *phi_ptr;
+        g += phi_val * phi_val;
+    }
+
+    return g;
+}
+
+
 const double WFN::compute_spin_dens_cartesian(
     const d3 &Pos,
     vec2 &d,

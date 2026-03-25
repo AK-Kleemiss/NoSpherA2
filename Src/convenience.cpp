@@ -2089,6 +2089,8 @@ void options::digest_options()
             fract = true, fract_name = arguments[i + 1];
         else if (temp == "-gbw2wfn")
             gbw2wfn = true;
+        else if (temp == "-get_g")
+            get_g = true;
         else if (temp == "-group")
         {
             int n = 1;

@@ -934,7 +934,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                 }
                 std::pair<vec, vec> *coi;
 
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(dynamic, 1)
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(dists.begin(), dists.end(), 0.0);
@@ -1103,7 +1103,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 #pragma omp parallel
             {
                 vec rho0shell(ncen * 6, 0.0);
-                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
+                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det, dist;
                 int j, shell, nshell, ind, *ECP_els_j;
                 double *alpha, *d_local, *pop_p;
                 vec dx(ncen * 3);
@@ -1132,7 +1132,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     }
                 }
 
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(dynamic,16)
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
@@ -1156,13 +1156,13 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                             continue;
 
                         // Only compute distance and ECP correction if needed (precomputed boolean check)
+                        dist = 0.0;
                         if (has_ECP[j]) {
-                            const double dist = std::sqrt(dist_sq);
+                            dist = std::sqrt(dist_sq);
                             ECP_els_j = &ECP_els[j];
                             // Cache helper references to reduce repeated indexing
-                            const double core_dens = ECP_electron_helper[j].get_core_density(dist, *ECP_els_j);
-                            const double radial_dens = ECP_correction_helper[j].get_radial_density(dist);
-                            density += (core_dens + radial_dens) * b_weight_point;
+                            const double corr_dens = ECP_electron_helper[j].get_core_density(dist, *ECP_els_j) + ECP_correction_helper[j].get_radial_density(dist);
+                            density += corr_dens * b_weight_point;
                         }
 
                         nshell = nshell_cache[j];
@@ -1186,17 +1186,15 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                             const double det_pop_val = det_pop_cache[ind + shell];
                             if (abs(det_pop_val) < constants::cutoff)
                                 continue;
-                            // Use negative g directly in exp to save one operation
-                            tmp = det_pop_val * exp(-g);
-                            if (abs(tmp) < constants::cutoff)
-                                continue;
+                            // Use fast exp approximation for better performance
+                            tmp = det_pop_val * fast_exp_neg(-g);
                             rho0shell[ind + shell] = tmp;
                             rho0 += tmp;
                         }
                     } //We first need to finish building total rho0 before we can calculate the contributions to the sigmas and populations
                     if (rho0 == 0.0)
                         continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
-                    const double rho0_inv = 1.0 / rho0;
+                    const double dens_rho0_inv = density / rho0;
                     for (j = 0; j < ncen; j++) {
                         d_local = dx.data() + (j * 3);
                         nshell = nshell_cache[j];
@@ -1207,69 +1205,46 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         d_cache[4] = d_local[1] * d_local[2];
                         d_cache[5] = d_local[2] * d_local[2];
                         ind = j * 6;
+                        const int ind6 = j * 36;
                         pop_p = pop_local.data() + ind;
                         for (shell = 0; shell < nshell; shell++) {
                             r0s = rho0shell[ind + shell];
                             if (r0s <= constants::cutoff)
                                 continue;
                             g = 1.0 / g_cache[ind + shell];
-                            temp_res = density * r0s * rho0_inv;
-                            alpha = alpha_local.data() + (ind * 6 + shell * 6);
-                            alpha[0] += temp_res * d_cache[0] * g;
-                            alpha[1] += temp_res * d_cache[1] * g;
-                            alpha[2] += temp_res * d_cache[2] * g;
-                            alpha[3] += temp_res * d_cache[3] * g;
-                            alpha[4] += temp_res * d_cache[4] * g;
-                            alpha[5] += temp_res * d_cache[5] * g;
+                            temp_res = dens_rho0_inv * r0s;
+                            const double temp_res_g = temp_res * g;
+                            alpha = alpha_local.data() + (ind6 + shell * 6);
+                            alpha[0] += temp_res_g * d_cache[0];
+                            alpha[1] += temp_res_g * d_cache[1];
+                            alpha[2] += temp_res_g * d_cache[2];
+                            alpha[3] += temp_res_g * d_cache[3];
+                            alpha[4] += temp_res_g * d_cache[4];
+                            alpha[5] += temp_res_g * d_cache[5];
                             pop_p[shell] += temp_res;
                         }
                     }
                 }
 
-                // Optimize atomic updates by hoisting address calculations
-                for (j = 0; j < ncen; j++) {
-                    nshell = nshell_cache[j];
-                    const int alpha_base = j * 36;
-                    const int pop_base = j * 6;
-                    for (shell = 0; shell < nshell; shell++) {
-                        const int alpha_offset = alpha_base + shell * 6;
-                        // Unroll the loop and hoist pointer arithmetic
-                        const double a0 = alpha_local[alpha_offset + 0];
-                        const double a1 = alpha_local[alpha_offset + 1];
-                        const double a2 = alpha_local[alpha_offset + 2];
-                        const double a3 = alpha_local[alpha_offset + 3];
-                        const double a4 = alpha_local[alpha_offset + 4];
-                        const double a5 = alpha_local[alpha_offset + 5];
-                        const double pop_val = pop_local[pop_base + shell];
-
-                        // Only perform atomic updates if values are non-zero
-                        if (a0 != 0.0) {
-#pragma omp atomic
-                            sig_pop_vector[j].first[shell][0] += a0;
-                        }
-                        if (a1 != 0.0) {
-#pragma omp atomic
-                            sig_pop_vector[j].first[shell][1] += a1;
-                        }
-                        if (a2 != 0.0) {
-#pragma omp atomic
-                            sig_pop_vector[j].first[shell][2] += a2;
-                        }
-                        if (a3 != 0.0) {
-#pragma omp atomic
-                            sig_pop_vector[j].first[shell][3] += a3;
-                        }
-                        if (a4 != 0.0) {
-#pragma omp atomic
-                            sig_pop_vector[j].first[shell][4] += a4;
-                        }
-                        if (a5 != 0.0) {
-#pragma omp atomic
-                            sig_pop_vector[j].first[shell][5] += a5;
-                        }
-                        if (pop_val != 0.0) {
-#pragma omp atomic
-                            sig_pop_vector[j].second[shell] += pop_val;
+                // Use critical section for batch updates instead of individual atomic operations
+#pragma omp critical
+                {
+                    for (j = 0; j < ncen; j++) {
+                        nshell = nshell_cache[j];
+                        const int alpha_base = j * 36;
+                        const int pop_base = j * 6;
+                        for (shell = 0; shell < nshell; shell++) {
+                            const int alpha_offset = alpha_base + shell * 6;
+                            // Batch update all values in critical section
+                            double *sig_alpha = sig_pop_vector[j].first[shell].data();
+                            
+                            sig_alpha[0] += alpha_local[alpha_offset + 0];
+                            sig_alpha[1] += alpha_local[alpha_offset + 1];
+                            sig_alpha[2] += alpha_local[alpha_offset + 2];
+                            sig_alpha[3] += alpha_local[alpha_offset + 3];
+                            sig_alpha[4] += alpha_local[alpha_offset + 4];
+                            sig_alpha[5] += alpha_local[alpha_offset + 5];
+                            sig_pop_vector[j].second[shell] += pop_local[pop_base + shell];
                         }
                     }
                 }
