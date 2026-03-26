@@ -32,11 +32,11 @@ enum cube_type {
  * @param file The output stream to write the results to.
  */
 void Calc_Static_Def(
-    cube& CubeDEF,
-    cube& CubeRho,
-    WFN& wavy,
+    cube &CubeDEF,
+    cube &CubeRho,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap = true);
 
 /**
@@ -52,10 +52,10 @@ void Calc_Static_Def(
  * @param file The output stream to write the results to.
  */
 void Calc_Static_Def(
-    std::vector<cube>& Cubes,
-    WFN& wavy,
+    std::vector<cube> &Cubes,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap = true);
 /**
  * Calculates the spherical density of a cube using the given WFN object.
@@ -66,10 +66,10 @@ void Calc_Static_Def(
  * @param file The output stream to write the results to.
  */
 void Calc_Spherical_Dens(
-    cube& CubeSpher,
-    WFN& wavy,
+    cube &CubeSpher,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap = true);
 /**
  * Calculates the density (Rho) for a given cube and WFN object.
@@ -80,10 +80,10 @@ void Calc_Spherical_Dens(
  * @param file The output stream to write the results to.
  */
 void Calc_Rho(
-    cube& CubeRho,
-    WFN& wavy,
+    cube &CubeRho,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap = true);
 
 /**
@@ -94,9 +94,9 @@ void Calc_Rho(
  * @param file The output stream to write the result to.
  */
 void Calc_Rho_spherical_harmonics(
-    cube& CubeRho,
-    WFN& wavy,
-    std::ostream& file);
+    cube &CubeRho,
+    const WFN &wavy,
+    std::ostream &file);
 /**
  * Calculates the molecular orbital (MO) using the spherical harmonics.
  *
@@ -106,10 +106,10 @@ void Calc_Rho_spherical_harmonics(
  * @param file The output stream to write the calculated spherical harmonics.
  */
 void Calc_MO_spherical_harmonics(
-    cube& CubeRho,
-    WFN& wavy,
+    cube &CubeRho,
+    const WFN &wavy,
     int MO,
-    std::ostream& file,
+    std::ostream &file,
     bool nodate = false);
 /**
  * Calculates the properties of the given cubes and WFN object.
@@ -126,10 +126,10 @@ void Calc_MO_spherical_harmonics(
  * @param test A boolean flag indicating whether to run the function in test mode.
  */
 void Calc_Prop(
-    std::vector<cube>& Cubes,
-    WFN& wavy,
+    std::vector<cube> &Cubes,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool test,
     bool wrap = true);
 /**
@@ -142,11 +142,11 @@ void Calc_Prop(
  * @param file The output stream to write the ESP results.
  */
 void Calc_ESP(
-    cube& CubeESP,
-    WFN& wavy,
+    cube &CubeESP,
+    const WFN &wavy,
     double radius,
     bool no_date,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap = true);
 /**
  * Calculates the molecular orbital (MO) for a given cube.
@@ -158,11 +158,11 @@ void Calc_ESP(
  * @param file The output stream to write the calculated MO.
  */
 void Calc_MO(
-    cube& CubeMO,
+    cube &CubeMO,
     int mo,
-    WFN& wavy,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap = true);
 /**
  * Calculates the Spin density cube using the provided WFN object.
@@ -173,10 +173,10 @@ void Calc_MO(
  * @param nodate A boolean flag indicating whether to include the date in the output.
  */
 void Calc_S_Rho(
-    cube& Cube_S_Rho,
-    WFN& wavy,
-    std::ostream& file,
-    bool& nodate);
+    cube &Cube_S_Rho,
+    const WFN &wavy,
+    std::ostream &file,
+    bool &nodate);
 /**
  * Calculates the Hirshfeld Deformation Density for a given set of parameters.
  *
@@ -188,11 +188,11 @@ void Calc_S_Rho(
  * @param file The output stream to write the results to.
  */
 void Calc_Hirshfeld(
-    std::vector<cube>& Cubes,
-    WFN& wavy,
+    std::vector<cube> &Cubes,
+    const WFN &wavy,
     double radius,
     int ignore_atom,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap = true);
 /**
  * Calculates the Hirshfeld Deformation Density for a given set of parameters.
@@ -206,13 +206,13 @@ void Calc_Hirshfeld(
  * @param file The output stream to write the results to.
  */
 void Calc_Hirshfeld(
-    cube& CubeHDEF,
-    cube& CubeRho,
-    cube& CubeSpherical,
-    WFN& wavy,
+    cube &CubeHDEF,
+    cube &CubeRho,
+    cube &CubeSpherical,
+    const WFN &wavy,
     double radius,
     int ignore,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap = true);
 /**
  * Calculates the Hirshfeld atom electron density.
@@ -226,11 +226,11 @@ void Calc_Hirshfeld(
  * @param file The output stream to write the results to.
  */
 void Calc_Hirshfeld_atom(
-    std::vector<cube>& Cubes,
-    WFN& wavy,
+    std::vector<cube> &Cubes,
+    const WFN &wavy,
     double radius,
     int ignore_atom,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap = true);
 
 /**
@@ -238,18 +238,18 @@ void Calc_Hirshfeld_atom(
  *
  * @param opt The options object containing the necessary data for the calculation.
  */
-void properties_calculation(options& opt);
+void properties_calculation(options &opt);
 
 /**
  * Combines the MO (Molecular Orbital) files based on the given options.
  *
  * @param opt The options specifying the details of the combination process.
  */
-void do_combine_mo(options& opt);
+void do_combine_mo(options &opt);
 
-void dipole_moments(options& opt, std::ostream& log2 = std::cout);
-vec2 dipole_moments(WFN& wavy, cube& SPHER, double* MinMax, int* NbSteps, int threads, double radius, std::ostream& log2 = std::cout, bool debug = false);
-void polarizabilities(options& opt, std::ostream& log2 = std::cout);
+void dipole_moments(options &opt, std::ostream &log2 = std::cout);
+vec2 dipole_moments(WFN &wavy, cube &SPHER, double *MinMax, int *NbSteps, int threads, double radius, std::ostream &log2 = std::cout, bool debug = false);
+void polarizabilities(options &opt, std::ostream &log2 = std::cout);
 
 #include "wfn_class.h"
 #include "cell.h"

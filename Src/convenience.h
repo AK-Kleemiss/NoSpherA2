@@ -301,7 +301,7 @@ void copy_file(std::filesystem::path &from, std::filesystem::path &to);
 std::string shrink_string(std::string &input);
 std::string shrink_string_to_atom(std::string &input, const int &atom_number);
 //------------------Functions to work with configuration files--------------------------
-bool check_bohr(WFN &wave, bool debug);
+bool check_bohr(const WFN &wave, bool debug);
 
 bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std::string> filter, const std::string &current_path);
 bool save_file_dialog(std::filesystem::path &path, bool debug, const svec &endings, const std::string &filename_given = "", const std::string &current_path = "");
@@ -382,7 +382,7 @@ private:
 };
 
 void readxyzMinMax_fromWFN(
-    WFN &wavy,
+    const WFN &wavy,
     properties_options &opts,
     bool no_bohr = false);
 

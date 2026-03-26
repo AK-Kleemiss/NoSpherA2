@@ -8,7 +8,7 @@
 #include "integration_params.h"
 
 #ifdef NSA2DEBUG
-void print_dmatrix2(const dMatrix2& EVC2, const std::string name) {
+void print_dmatrix2(const dMatrix2 &EVC2, const std::string name) {
     std::cout << std::endl << name << ":\n";
     for (int i = 0; i < EVC2.extent(0); i++) {
         for (int j = 0; j < EVC2.extent(1); j++)
@@ -19,7 +19,7 @@ void print_dmatrix2(const dMatrix2& EVC2, const std::string name) {
 #endif
 
 
-int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector, double* incr, std::string& outname, bool rho, bool rdg, bool eli, bool lap) {
+int compute_dens(WFN &wavy, bool debug, int *np, double *origin, double *gvector, double *incr, std::string &outname, bool rho, bool rdg, bool eli, bool lap) {
     properties_options opts;
     opts.lap = lap;
     opts.eli = eli;
@@ -119,11 +119,11 @@ int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector
     return 0;
 };
 
-bond do_bonds(WFN& wavy,
+bond do_bonds(WFN &wavy,
     int mode_sel, bool mode_leng, bool mode_res,
     double res[], bool cub, double boxsize[],
     int atom1, int atom2, int atom3,
-    const bool& debug, const bool& bohr,
+    const bool &debug, const bool &bohr,
     int runnumber,
     bool rho, bool rdg, bool eli, bool lap) {
     bond results{ "","","","",false,false,false };
@@ -421,7 +421,7 @@ bond do_bonds(WFN& wavy,
     return(results);
 }
 
-int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, const bool& bohr) {
+int autobonds(bool debug, WFN &wavy, const std::filesystem::path &inputfile, const bool &bohr) {
     char inputFile[2048] = "";
     if (!exists(inputfile))
     {
@@ -494,7 +494,7 @@ int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, con
     return 1;
 }
 
-std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN& wavy) {
+std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN &wavy) {
     std::vector<std::pair<int, int>> bonds;
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
@@ -515,7 +515,7 @@ std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN& wavy) {
 }
 
 //Assuming square matrices
-vec change_basis_sq(const vec& in, const vec& transformation, int size) {
+vec change_basis_sq(const vec &in, const vec &transformation, int size) {
 
     // new = transform^T * in * tranform
     vec result(size * size);
@@ -545,7 +545,7 @@ vec change_basis_sq(const vec& in, const vec& transformation, int size) {
 //For non-square transformation matrices
 //performs res = trans * in * trans^T in case of forward
 //and res = trans^T * int * trans in case of !forward
-dMatrix2 change_basis_general(const dMatrix2& in, const dMatrix2& transformation, bool forward = true) {
+dMatrix2 change_basis_general(const dMatrix2 &in, const dMatrix2 &transformation, bool forward = true) {
     //Checks should be handled by dot itself
     //int a, b, c, d;
     //c = transformation.extent(1); //cols of t
@@ -575,9 +575,9 @@ dMatrix2 change_basis_general(const dMatrix2& in, const dMatrix2& transformation
  * @param atom_indices A vector containing the indices (0-based) of the basis functions for this atom
  * @return NAOResult containing sorted occupancies and coefficients
  */
-Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2& D_full,
-    const dMatrix2& S_full,
-    const std::vector<int>& atom_indices) {
+Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 &D_full,
+    const dMatrix2 &S_full,
+    const std::vector<int> &atom_indices) {
 
     err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
     err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
@@ -624,7 +624,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
         W[i] = abs(W[i]) < 1E-10 ? 0.0 : 1.0 / W[i];
 
     vec Temp2(n * n, 0.0);
-    double* T;
+    double *T;
     int in, jn;
     for (int i = 0; i < n; i++) {
         in = i * n;
@@ -778,7 +778,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
  }
  */
 
-double Roby_information::projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals, const ivec& eigvecs, dMatrix2* given_NAO) {
+double Roby_information::projection_matrix_and_expectation(const ivec &indices, const ivec &eigvals, const ivec &eigvecs, dMatrix2 *given_NAO) {
     const int n = indices.size();
     //vec D_Sub(n * n, 0.0);
     vec S_Sub(n * n, 0.0);
@@ -852,7 +852,7 @@ double Roby_information::projection_matrix_and_expectation(const ivec& indices, 
 double Roby_information::Roby_population_analysis(const ivec atoms) {
     ivec bf_indices;
     if (atoms.size() == 0) {
-        for (NAOResult& NAO : NAOs) {
+        for (NAOResult &NAO : NAOs) {
             for (auto index : NAO.matrix_elements)
                 bf_indices.push_back(index);
         }
@@ -864,7 +864,7 @@ double Roby_information::Roby_population_analysis(const ivec atoms) {
     return P;
 }
 
-void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
+void Roby_information::computeAllAtomicNAOs(WFN &wavy) {
     const int N_atoms = wavy.get_ncen();
     const std::vector<atom> ats = wavy.get_atoms();
     NAOs.reserve(N_atoms);
@@ -888,12 +888,12 @@ void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
 
     int last_index = 0;
     ivec2 indices(wavy.get_ncen());
-    for (auto& a : ats) {
+    for (auto &a : ats) {
         indices[a.get_nr() - 1].reserve(density_matrix.extent(0) / N_atoms); // Rough estimate
         int current_shell = -1;
         int nr_indices = 0;
         std::vector<basis_set_entry> basis_set = a.get_basis_set();
-        for (auto& bf : basis_set) {
+        for (auto &bf : basis_set) {
             if (bf.get_shell() != current_shell) {
                 current_shell++;
                 if (wavy.get_origin() != e_origin::tonto)
@@ -923,7 +923,7 @@ void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
 #endif
 }
 
-ivec Roby_information::find_eigenvalue_pairs(const vec& eigvals, const double tolerance) {
+ivec Roby_information::find_eigenvalue_pairs(const vec &eigvals, const double tolerance) {
     const int n = eigvals.size();
     ivec pairs(n, -1);
     for (int i = 0; i < n; i++) {
@@ -947,12 +947,12 @@ ivec Roby_information::find_eigenvalue_pairs(const vec& eigvals, const double to
 }
 
 void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(
-    dMatrix2& EVC,
-    const vec& eigvals,
-    const ivec& pairs,
+    dMatrix2 &EVC,
+    const vec &eigvals,
+    const ivec &pairs,
     const int index_a,
     const int index_b,
-    const ivec& pair_matrix_indices)
+    const ivec &pair_matrix_indices)
 {
     double fp, fm, fa, fb, s, c, s2;
     const int n_ab = EVC.extent(0);
@@ -1035,9 +1035,9 @@ void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(
 }
 
 std::map<char, dMatrix2> Roby_information::make_covalent_from_ionic(
-    const dMatrix2& theta_I,
-    const vec& eigvals,
-    const ivec& pairs) {
+    const dMatrix2 &theta_I,
+    const vec &eigvals,
+    const ivec &pairs) {
     std::map<char, dMatrix2> res; // A = angle, V = eigen_value, T = Theta_vector
     const int size = eigvals.size();
     res.emplace('A', dMatrix2(size, 1));
@@ -1070,7 +1070,7 @@ std::map<char, dMatrix2> Roby_information::make_covalent_from_ionic(
     return res;
 }
 
-Roby_information::Roby_information(WFN& wavy) {
+Roby_information::Roby_information(WFN &wavy) {
     auto bonds = get_bonded_atom_pairs(wavy);
     std::cout << "Calculating NAOs for all atoms...                 " << std::flush;
     computeAllAtomicNAOs(wavy);
@@ -1121,7 +1121,7 @@ Roby_information::Roby_information(WFN& wavy) {
     std::cout << std::endl << "Total Population: " << all_atom_population << "\n\n";
     vec atom_pops(NAOs.size(), 0.0);
 #ifndef NSA2DEBUG
-    ProgressBar* pb = new ProgressBar(NAOs.size(), 40, "-", " ", "Calculating Atomic Populations");
+    ProgressBar *pb = new ProgressBar(NAOs.size(), 40, "-", " ", "Calculating Atomic Populations");
 #endif
     for (auto NAO : NAOs) {
         atom_pops[NAO.atom_index] = Roby_population_analysis(NAO.matrix_elements);
@@ -1379,7 +1379,7 @@ Roby_information::Roby_information(WFN& wavy) {
     std::cout << "--------------------------------------------------------------------------------------------\n";
 
     //Sort results by Element of the heavier atom of the bonds and then within each group by the heavier of the second atom
-    std::sort(RGBI.begin(), RGBI.end(), [](const bond_index_result& a, const bond_index_result& b) {
+    std::sort(RGBI.begin(), RGBI.end(), [](const bond_index_result &a, const bond_index_result &b) {
         if (a.atom_element_nr.first != b.atom_element_nr.first) {
             return a.atom_element_nr.first > b.atom_element_nr.first;
         }
@@ -1430,14 +1430,14 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
             if (distance < 1.35 * svdW)
             {
                 std::cout << "Bond between " << i << " (" << wavy.get_atom_charge(i) << ") and " << j << " (" << wavy.get_atom_charge(j) << ") with distance " << distance << " and svdW " << svdW << std::endl;
-                const vec bond_vec = {(wavy.get_atom_coordinate(j, 0) - wavy.get_atom_coordinate(i, 0)) / points, (wavy.get_atom_coordinate(j, 1) - wavy.get_atom_coordinate(i, 1)) / points, (wavy.get_atom_coordinate(j, 2) - wavy.get_atom_coordinate(i, 2)) / points};
+                const vec bond_vec = { (wavy.get_atom_coordinate(j, 0) - wavy.get_atom_coordinate(i, 0)) / points, (wavy.get_atom_coordinate(j, 1) - wavy.get_atom_coordinate(i, 1)) / points, (wavy.get_atom_coordinate(j, 2) - wavy.get_atom_coordinate(i, 2)) / points };
                 const double dr = distance / points;
                 vec lapl(points, 0.0);
-                const vec pos = {wavy.get_atom_coordinate(i, 0), wavy.get_atom_coordinate(i, 1), wavy.get_atom_coordinate(i, 2)};
+                const vec pos = { wavy.get_atom_coordinate(i, 0), wavy.get_atom_coordinate(i, 1), wavy.get_atom_coordinate(i, 2) };
 #pragma omp parallel for schedule(dynamic)
                 for (int k = 0; k < points; k++)
                 {
-                    d3 t_pos = {pos[0], pos[1], pos[2]};
+                    d3 t_pos = { pos[0], pos[1], pos[2] };
                     t_pos[0] += k * bond_vec[0];
                     t_pos[1] += k * bond_vec[1];
                     t_pos[2] += k * bond_vec[2];
@@ -1460,3 +1460,68 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
         }
     }
 }
+
+void ELI_analysis(const WFN &wavy, const options &opt, cube &rho) {
+    err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
+    std::cout << "Analysing ELI basins in the wavefunction..." << std::endl;
+
+    const double radius = opt.properties.radius;
+    const double grid_spacing = opt.properties.resolution;
+    properties_options prop_opt = opt.properties;
+    cube eli_cube;
+    if (rho.get_size(0) == 0 || rho.get_size(1) == 0 || rho.get_size(2) == 0) {
+        std::cout << "No density cube provided, calculating ELI and rho..." << std::endl;
+        readxyzMinMax_fromWFN(wavy, prop_opt, false);
+        Calc_Rho(rho, wavy, opt.properties.radius, std::cout, false);
+    }
+    else {
+        std::cout << "Using provided density cube to calculate ELI..." << std::endl;
+
+    }
+    _time_point start = get_time();
+    const int high_i = rho.get_size(0);
+    const int high_j = rho.get_size(1);
+    const int high_k = rho.get_size(2);
+    const double radius_bohr = constants::ang2bohr(radius);
+    const std::vector<atom> atoms = wavy.get_atoms();
+    const int ncen = wavy.get_ncen();
+    ProgressBar *progress = new ProgressBar(eli_cube.get_size(0), 50, "=", " ", "Calculating Rho");
+
+#pragma omp parallel for schedule(dynamic, 1)
+    for (int i = 0; i < high_i; i++)
+    {
+        for (int j = 0; j < high_j; j++)
+            for (int k = 0; k < high_k; k++)
+            {
+
+                const d3 PosGrid = eli_cube.get_pos(i, j, k);
+
+                bool skip = true;
+                for (int a = 0; a < ncen; a++)
+                    if (array_length(PosGrid, atoms[a].get_pos()) < radius_bohr) {
+                        skip = false;
+                        break;
+                    }
+                if (skip)
+                    continue;
+
+                const double Rho = wavy.computeELI(PosGrid);
+
+                eli_cube.set_value(i, j, k, Rho);
+            }
+        progress->update();
+    }
+    delete (progress);
+
+    _time_point end = get_time();
+    if (get_sec(start, end) < 60)
+        std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) << " s" << std::endl;
+    else if (get_sec(start, end) < 3600)
+        std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << std::endl;
+    else
+        std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << std::endl;
+
+
+
+}
+

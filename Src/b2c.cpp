@@ -4,12 +4,6 @@
 
 using namespace std;
 
-double vec_length(vector <double>& vector) {        //    Calculates the length of a given Vector (obviously...)
-    return sqrt(abs(vector[0] * vector[0]
-        + vector[1] * vector[1]
-        + vector[2] * vector[2]));
-}
-
 struct cubepoint {
     int x;
     int y;
@@ -17,7 +11,7 @@ struct cubepoint {
     double value;
 };
 
-bool b2c(const cube* cub, const vector<atom>& atoms, bool debug, bool bcp)
+bool b2c(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp)
 {
     iMatrix3 CP(cub->get_size(0), cub->get_size(1), cub->get_size(2));
     ivec2 Liste(3);
@@ -98,7 +92,9 @@ bool b2c(const cube* cub, const vector<atom>& atoms, bool debug, bool bcp)
                                     }
                                 }
                     } while (!(GradMax == 0 || CP(Max.x, Max.y, Max.z) > 0));
-                    if (CP(Max.x, Max.y, Max.z) > 0) for (int i = 0; i < ListeMax; i++) CP(Liste[0][i], Liste[1][i], Liste[2][i]) = CP(Max.x, Max.y, Max.z);
+                    if (CP(Max.x, Max.y, Max.z) > 0)
+                        for (int i = 0; i < ListeMax; i++)
+                            CP(Liste[0][i], Liste[1][i], Liste[2][i]) = CP(Max.x, Max.y, Max.z);
                     else {
                         const d3 pos = { Max.x * xlength + cub->get_origin(0),Max.y * ylength + cub->get_origin(1),Max.z * zlength + cub->get_origin(2) };
                         if (debug) {
@@ -111,7 +107,8 @@ bool b2c(const cube* cub, const vector<atom>& atoms, bool debug, bool bcp)
                         Maxima.push_back(Max.value);
                         iCP++;
                         min_dist = 10000;
-                        for (int i = 0; i < ListeMax; i++) CP(Liste[0][i], Liste[1][i], Liste[2][i]) = iCP;
+                        for (int i = 0; i < ListeMax; i++)
+                            CP(Liste[0][i], Liste[1][i], Liste[2][i]) = iCP;
                         for (int i = 0; i < atoms.size(); i++) {
                             temp = array_length(pos, atoms[i].get_pos());
                             //if(debug)std::cout << "DBUG: Distance to atom " << i  << " with label " << atoms[i].get_label() << " is " << temp;
@@ -202,7 +199,7 @@ bool b2c(const cube* cub, const vector<atom>& atoms, bool debug, bool bcp)
                 for (int i = 0; i < neighbours[neighbours[b][n]].size(); i++)
                     if (neighbours[neighbours[b][n]][i] == b)
                         back_reference = i;
-                if(BCPs[b][n].x-BCPs[neighbours[b][n]][back_reference].x > 2 || BCPs[b][n].y-BCPs[neighbours[b][n]][back_reference].y > 2 || BCPs[b][n].z-BCPs[neighbours[b][n]][back_reference].z > 2){
+                if (BCPs[b][n].x - BCPs[neighbours[b][n]][back_reference].x > 2 || BCPs[b][n].y - BCPs[neighbours[b][n]][back_reference].y > 2 || BCPs[b][n].z - BCPs[neighbours[b][n]][back_reference].z > 2) {
                     std::cout << "The BCPs on both sides of the ZFS are too far apart..." << endl;
                 }
                 else {
@@ -224,7 +221,8 @@ bool b2c(const cube* cub, const vector<atom>& atoms, bool debug, bool bcp)
             }
         if (debug)std::cout << "done with BCPs" << endl;
     }
-    if (debug)std::cout << "done with liste, writing basins now!" << endl;
+    if (debug)
+        std::cout << "done with liste, writing basins now!" << endl;
     ivec basins;
     vec EDS(iCP);
     vec VOL(iCP);
@@ -356,21 +354,21 @@ bool b2c(const cube* cub, const vector<atom>& atoms, bool debug, bool bcp)
     }
     logfile << "Integral over all basins: " << Integral << endl;
     if (bcp)
-        for (int b=0; b<iCP; b++)
-            for (int n=0; n<neighbours[b].size(); n++){
-                int back_reference=0;
-                for (int i=0; i<neighbours[neighbours[b][n]].size(); i++) 
-                    if(neighbours[neighbours[b][n]][i]==b) 
-                        back_reference=i;
+        for (int b = 0; b < iCP; b++)
+            for (int n = 0; n < neighbours[b].size(); n++) {
+                int back_reference = 0;
+                for (int i = 0; i < neighbours[neighbours[b][n]].size(); i++)
+                    if (neighbours[neighbours[b][n]][i] == b)
+                        back_reference = i;
                 auto pos = cub->get_pos(
                     (BCPs[b][n].x + BCPs[neighbours[b][n]][back_reference].x) / 2,
                     (BCPs[b][n].y + BCPs[neighbours[b][n]][back_reference].y) / 2,
                     (BCPs[b][n].z + BCPs[neighbours[b][n]][back_reference].z) / 2
                 );
-                logfile << "BCP: " << Labels[b] << "-" << Labels[neighbours[b][n]] << " ED: " << (BCPs[b][n].value+BCPs[neighbours[b][n]][back_reference].value)/2  << " Position: "
-                        << pos[0] << " "
-                        << pos[1] << " "
-                        << pos[2] << endl;
+                logfile << "BCP: " << Labels[b] << "-" << Labels[neighbours[b][n]] << " ED: " << (BCPs[b][n].value + BCPs[neighbours[b][n]][back_reference].value) / 2 << " Position: "
+                    << pos[0] << " "
+                    << pos[1] << " "
+                    << pos[2] << endl;
             }
     logfile.flush();
     logfile.close();

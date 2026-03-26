@@ -6,11 +6,20 @@
 #include "cube.h"
 #include "constants.h"
 
+void print_time(_time_point &start, _time_point &end, std::ostream &file) {
+    if (get_sec(start, end) < 60)
+        file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) << " s" << std::endl;
+    else if (get_sec(start, end) < 3600)
+        file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << std::endl;
+    else
+        file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << std::endl;
+}
+
 void Calc_Spherical_Dens(
-    cube& CubeSpher,
-    WFN& wavy,
+    cube &CubeSpher,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap)
 {
     using namespace std;
@@ -87,25 +96,20 @@ void Calc_Spherical_Dens(
     //delete (progress);
 
     _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    print_time(start, end, file);
 };
 
 void Calc_Static_Def(
-    cube& CubeDEF,
-    cube& CubeRho,
-    WFN& wavy,
+    cube &CubeDEF,
+    cube &CubeRho,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar* progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
+    ProgressBar *progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
 
     vector<Thakkar> atoms;
     atoms.reserve(wavy.get_ncen());
@@ -171,24 +175,19 @@ void Calc_Static_Def(
     delete (progress);
 
     _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    print_time(start, end, file);
 };
 
 void Calc_Static_Def(
-    std::vector<cube>& Cubes,
-    WFN& wavy,
+    std::vector<cube> &Cubes,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar* progress = new ProgressBar(Cubes[cube_type::DEF].get_size(0), 50, "=", " ", "Calculating Deformation");
+    ProgressBar *progress = new ProgressBar(Cubes[cube_type::DEF].get_size(0), 50, "=", " ", "Calculating Deformation");
 
     const int low_i = wrap ? -Cubes[cube_type::DEF].get_size(0) : 0;
     const int high_i = wrap ? 2 * Cubes[cube_type::DEF].get_size(0) : Cubes[cube_type::DEF].get_size(0);
@@ -245,25 +244,20 @@ void Calc_Static_Def(
     delete (progress);
 
     _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    print_time(start, end, file);
 };
 
 void Calc_Hirshfeld(
-    std::vector<cube>& Cubes,
-    WFN& wavy,
+    std::vector<cube> &Cubes,
+    const WFN &wavy,
     double radius,
     int ignore_atom,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar* progress = new ProgressBar(Cubes[cube_type::HDEF].get_size(0), 50, "=", " ", "Calculating Values");
+    ProgressBar *progress = new ProgressBar(Cubes[cube_type::HDEF].get_size(0), 50, "=", " ", "Calculating Values");
 
     vector<Thakkar> atoms;
     atoms.reserve(wavy.get_ncen());
@@ -335,27 +329,22 @@ void Calc_Hirshfeld(
     delete (progress);
 
     _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    print_time(start, end, file);
 };
 
 void Calc_Hirshfeld(
-    cube& CubeHDEF,
-    cube& CubeRho,
-    cube& CubeSpherical,
-    WFN& wavy,
+    cube &CubeHDEF,
+    cube &CubeRho,
+    cube &CubeSpherical,
+    const WFN &wavy,
     double radius,
     int ignore_atom,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar* progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
+    ProgressBar *progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
 
     const int low_i = wrap ? -CubeHDEF.get_size(0) : 0;
@@ -410,25 +399,20 @@ void Calc_Hirshfeld(
     delete (progress);
 
     _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    print_time(start, end, file);
 };
 
 void Calc_Hirshfeld_atom(
-    std::vector<cube>& Cubes,
-    WFN& wavy,
+    std::vector<cube> &Cubes,
+    const WFN &wavy,
     double radius,
     int ignore_atom,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar* progress = new ProgressBar(Cubes[cube_type::Hirsh].get_size(0), 50, "=", " ", "Calculating Values");
+    ProgressBar *progress = new ProgressBar(Cubes[cube_type::Hirsh].get_size(0), 50, "=", " ", "Calculating Values");
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
 
     const int low_i = wrap ? -Cubes[cube_type::Hirsh].get_size(0) : 0;
@@ -483,24 +467,19 @@ void Calc_Hirshfeld_atom(
     delete (progress);
 
     _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    print_time(start, end, file);
 };
 
 void Calc_Rho(
-    cube& CubeRho,
-    WFN& wavy,
+    cube &CubeRho,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
+    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
 
     const int low_i = wrap ? -CubeRho.get_size(0) : 0;
     const int high_i = wrap ? 2 * CubeRho.get_size(0) : CubeRho.get_size(0);
@@ -560,23 +539,18 @@ void Calc_Rho(
     delete (progress);
 
     _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    print_time(start, end, file);
 };
 
 void Calc_Rho_spherical_harmonics(
-    cube& CubeRho,
-    WFN& wavy,
-    std::ostream& file)
+    cube &CubeRho,
+    WFN &wavy,
+    std::ostream &file)
 {
     using namespace std;
     _time_point start = get_time();
 
-    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
+    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
 
 #pragma omp parallel shared(CubeRho)
     {
@@ -597,24 +571,19 @@ void Calc_Rho_spherical_harmonics(
     delete (progress);
 
     _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    print_time(start, end, file);
 };
 
 void Calc_MO_spherical_harmonics(
-    cube& CubeMO,
-    WFN& wavy,
+    cube &CubeMO,
+    WFN &wavy,
     int MO,
-    std::ostream& file,
+    std::ostream &file,
     bool nodate)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar* progress = NULL;
+    ProgressBar *progress = NULL;
     if (!nodate)
         progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating Values");
 
@@ -632,24 +601,19 @@ void Calc_MO_spherical_harmonics(
         delete (progress);
 
         _time_point end = get_time();
-        if (get_sec(start, end) < 60)
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-        else if (get_sec(start, end) < 3600)
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-        else
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+        print_time(start, end, file);
     }
 };
 
 void Calc_S_Rho(
-    cube& Cube_S_Rho,
-    WFN& wavy,
-    std::ostream& file,
-    bool& nodate)
+    cube &Cube_S_Rho,
+    WFN &wavy,
+    std::ostream &file,
+    bool &nodate)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar* progress = NULL;
+    ProgressBar *progress = NULL;
     if (!nodate)
         progress = new ProgressBar(Cube_S_Rho.get_size(0), 50, "=", " ", "Calculating Values");
 
@@ -671,26 +635,21 @@ void Calc_S_Rho(
         delete (progress);
 
         _time_point end = get_time();
-        if (get_sec(start, end) < 60)
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-        else if (get_sec(start, end) < 3600)
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-        else
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+        print_time(start, end, file);
     }
 };
 
 void Calc_Prop(
-    std::vector<cube>& Cubes,
-    WFN& wavy,
+    std::vector<cube> &Cubes,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool test,
     bool wrap)
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar* progress = NULL;
+    ProgressBar *progress = NULL;
     if (!test)
         progress = new ProgressBar(Cubes[cube_type::Rho].get_size(0), 50, "=", " ", "Calculating Values");
 
@@ -836,21 +795,16 @@ void Calc_Prop(
     {
         delete (progress);
         _time_point end = get_time();
-        if (get_sec(start, end) < 60)
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-        else if (get_sec(start, end) < 3600)
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-        else
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+        print_time(start, end, file);
     }
 };
 
 void Calc_ESP(
-    cube& CubeESP,
-    WFN& wavy,
+    cube &CubeESP,
+    const WFN &wavy,
     double radius,
     bool no_date,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap)
 {
     using namespace std;
@@ -872,7 +826,7 @@ void Calc_ESP(
         }
     }
 
-    ProgressBar* progress = NULL;
+    ProgressBar *progress = NULL;
     if (!no_date)
         progress = new ProgressBar(CubeESP.get_size(0), 50, "=", " ", "Calculating ESP");
 
@@ -933,28 +887,23 @@ void Calc_ESP(
         delete (progress);
 
         _time_point end = get_time();
-        if (get_sec(start, end) < 60)
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-        else if (get_sec(start, end) < 3600)
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-        else
-            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+        print_time(start, end, file);
     }
 };
 
 void Calc_MO(
-    cube& CubeMO,
+    cube &CubeMO,
     int mo,
-    WFN& wavy,
+    const WFN &wavy,
     double radius,
-    std::ostream& file,
+    std::ostream &file,
     bool wrap)
 {
     using namespace std;
     err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
     _time_point start = get_time();
 
-    ProgressBar* progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating MO");
+    ProgressBar *progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating MO");
 
     const int low_i = wrap ? -CubeMO.get_size(0) : 0;
     const int high_i = wrap ? 2 * CubeMO.get_size(0) : CubeMO.get_size(0);
@@ -1014,15 +963,10 @@ void Calc_MO(
     delete (progress);
 
     _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    print_time(start, end, file);
 };
 
-void properties_calculation(options& opt)
+void properties_calculation(options &opt)
 {
     using namespace std;
     ofstream log2("NoSpherA2_cube.log", ios::out);
@@ -1094,22 +1038,22 @@ void properties_calculation(options& opt)
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hirsh);
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef || opt.properties.hirsh);
 
-    for (cube& cube : cubes)
+    for (cube &cube : cubes)
         cube.give_parent_wfn(wavy);
 
 
     for (int i = 0; i < 3; i++)
     {
-        for (cube& cube : cubes)
+        for (cube &cube : cubes)
             cube.set_origin(i, opt.properties.MinMax[i]);
 
         for (int j = 0; j < 3; j++)
         {
-            for (cube& cube : cubes)
+            for (cube &cube : cubes)
                 cube.set_vector(i, j, cell_matrix[i][j]);
         }
     }
-    for (cube& cube : cubes)
+    for (cube &cube : cubes)
         cube.calc_dv();
     if (opt.debug)
         log2 << "Origins etc. are set up" << endl;
@@ -1172,7 +1116,7 @@ void properties_calculation(options& opt)
         log2 << "Refining grid files to integral accuracy of " << opt.properties.integral_accuracy << " ..." << flush;
         vec2 d(16, vec(wavy.get_ncen(), 0.0));
         vec phi(wavy.get_nmo(true), 0.0);
-        cubes[cube_type::Rho].adaptive_refine([&wavy](const d3& pos) { return wavy.compute_dens(pos); }, opt.properties.integral_accuracy, 8, 3);
+        cubes[cube_type::Rho].adaptive_refine([&wavy](const d3 &pos) { return wavy.compute_dens(pos); }, opt.properties.integral_accuracy, 8, 3);
     }
 
     if (opt.properties.MO_numbers.size() != 0)
@@ -1293,7 +1237,7 @@ void properties_calculation(options& opt)
     std::cout << "Properties calculation done!" << std::endl;
 }
 
-void do_combine_mo(options& opt)
+void do_combine_mo(options &opt)
 {
     using namespace std;
     WFN wavy1(e_origin::wfn);
@@ -1403,12 +1347,12 @@ void do_combine_mo(options& opt)
 }
 
 static void Calc_Hirshfeld_atom_2(
-    cube& CubeHirsh,
-    cube& CubeRho,
-    cube& CubeSpherical,
-    WFN& wavy,
+    cube &CubeHirsh,
+    cube &CubeRho,
+    cube &CubeSpherical,
+    WFN &wavy,
     int _atom,
-    std::ostream& file)
+    std::ostream &file)
 {
     (void)file;
     using namespace std;
@@ -1444,7 +1388,7 @@ enum class dipole_types
     Unknown
 };
 
-dipole_types stringTodipole_types(const std::string& str)
+dipole_types stringTodipole_types(const std::string &str)
 {
     static const std::unordered_map<std::string, dipole_types> stringToEnumMap = {
         {"atom", dipole_types::atom},
@@ -1463,7 +1407,7 @@ dipole_types stringTodipole_types(const std::string& str)
     }
 }
 
-vec calc_dipole_for_atom(WFN& wavy, const int& i, cube& Hirshfeld_atom, vec& charges, std::string type = "atom")
+vec calc_dipole_for_atom(WFN &wavy, const int &i, cube &Hirshfeld_atom, vec &charges, std::string type = "atom")
 {
     double mu_x = 0, mu_y = 0, mu_z = 0;
     double scratch = 0;
@@ -1528,7 +1472,7 @@ vec calc_dipole_for_atom(WFN& wavy, const int& i, cube& Hirshfeld_atom, vec& cha
     return { mu_x, mu_y, mu_z, charge };
 }
 
-void dipole_moments(options& opt, std::ostream& log2)
+void dipole_moments(options &opt, std::ostream &log2)
 {
     using namespace std;
     log2 << NoSpherA2_message(opt.no_date);
@@ -1611,7 +1555,7 @@ void dipole_moments(options& opt, std::ostream& log2)
     std::cout << "\n\nProperties calculation done!" << std::endl;
 }
 
-vec2 dipole_moments(WFN& wavy, cube& SPHER, const properties_options& opts, int threads, std::ostream& log2, bool debug)
+vec2 dipole_moments(WFN &wavy, cube &SPHER, const properties_options &opts, int threads, std::ostream &log2, bool debug)
 {
     using namespace std;
     if (debug)
@@ -1666,7 +1610,7 @@ vec2 dipole_moments(WFN& wavy, cube& SPHER, const properties_options& opts, int 
     return dipole_moments;
 }
 
-void polarizabilities(options& opt, std::ostream& log2)
+void polarizabilities(options &opt, std::ostream &log2)
 {
     using namespace std;
     std::vector<WFN> wavy;
