@@ -1476,9 +1476,9 @@ void ELI_analysis(const WFN &wavy, const options &opt, cube &rho) {
     }
     else {
         std::cout << "Using provided density cube to calculate ELI..." << std::endl;
-
     }
     Calc_Eli(eli_cube, wavy, opt.properties.radius, std::cout, false);
+
 
 
 
