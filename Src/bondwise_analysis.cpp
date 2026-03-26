@@ -1478,48 +1478,7 @@ void ELI_analysis(const WFN &wavy, const options &opt, cube &rho) {
         std::cout << "Using provided density cube to calculate ELI..." << std::endl;
 
     }
-    _time_point start = get_time();
-    const int high_i = rho.get_size(0);
-    const int high_j = rho.get_size(1);
-    const int high_k = rho.get_size(2);
-    const double radius_bohr = constants::ang2bohr(radius);
-    const std::vector<atom> atoms = wavy.get_atoms();
-    const int ncen = wavy.get_ncen();
-    ProgressBar *progress = new ProgressBar(eli_cube.get_size(0), 50, "=", " ", "Calculating Rho");
-
-#pragma omp parallel for schedule(dynamic, 1)
-    for (int i = 0; i < high_i; i++)
-    {
-        for (int j = 0; j < high_j; j++)
-            for (int k = 0; k < high_k; k++)
-            {
-
-                const d3 PosGrid = eli_cube.get_pos(i, j, k);
-
-                bool skip = true;
-                for (int a = 0; a < ncen; a++)
-                    if (array_length(PosGrid, atoms[a].get_pos()) < radius_bohr) {
-                        skip = false;
-                        break;
-                    }
-                if (skip)
-                    continue;
-
-                const double Rho = wavy.computeELI(PosGrid);
-
-                eli_cube.set_value(i, j, k, Rho);
-            }
-        progress->update();
-    }
-    delete (progress);
-
-    _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) << " s" << std::endl;
-    else if (get_sec(start, end) < 3600)
-        std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << std::endl;
-    else
-        std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << std::endl;
+    Calc_Eli(eli_cube, wavy, opt.properties.radius, std::cout, false);
 
 
 

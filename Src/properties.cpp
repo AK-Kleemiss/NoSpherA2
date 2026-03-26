@@ -542,6 +542,78 @@ void Calc_Rho(
     print_time(start, end, file);
 };
 
+void Calc_Eli(
+    cube &CubeRho,
+    const WFN &wavy,
+    double radius,
+    std::ostream &file,
+    bool wrap)
+{
+    using namespace std;
+    _time_point start = get_time();
+    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
+
+    const int low_i = wrap ? -CubeRho.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeRho.get_size(0) : CubeRho.get_size(0);
+    const int low_j = wrap ? -CubeRho.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeRho.get_size(1) : CubeRho.get_size(1);
+    const int low_k = wrap ? -CubeRho.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeRho.get_size(2) : CubeRho.get_size(2);
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> atoms = wavy.get_atoms();
+    const int ncen = wavy.get_ncen();
+
+#pragma omp parallel for schedule(dynamic)
+    for (int i = low_i; i < high_i; i++)
+    {
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
+            {
+
+                const d3 PosGrid = CubeRho.get_pos(i, j, k);
+
+                bool skip = true;
+                for (int a = 0; a < ncen; a++)
+                    if (array_length(PosGrid, atoms[a].get_pos()) < radius_bohr) {
+                        skip = false;
+                        break;
+                    }
+                if (skip)
+                    continue;
+
+                const double Rho = wavy.computeELI(PosGrid);
+                int temp_i, temp_j, temp_k;
+                if (i < 0)
+                    temp_i = i + CubeRho.get_size(0);
+                else if (i < CubeRho.get_size(0))
+                    temp_i = i;
+                else
+                    temp_i = i - CubeRho.get_size(0);
+
+                if (j < 0)
+                    temp_j = j + CubeRho.get_size(1);
+                else if (j < CubeRho.get_size(1))
+                    temp_j = j;
+                else
+                    temp_j = j - CubeRho.get_size(1);
+
+                if (k < 0)
+                    temp_k = k + CubeRho.get_size(2);
+                else if (k < CubeRho.get_size(2))
+                    temp_k = k;
+                else
+                    temp_k = k - CubeRho.get_size(2);
+
+                CubeRho.set_value(temp_i, temp_j, temp_k, CubeRho.get_value(temp_i, temp_j, temp_k) + Rho);
+            }
+        progress->update();
+    }
+    delete (progress);
+
+    _time_point end = get_time();
+    print_time(start, end, file);
+};
+
 void Calc_Rho_spherical_harmonics(
     cube &CubeRho,
     WFN &wavy,

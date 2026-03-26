@@ -86,6 +86,13 @@ void Calc_Rho(
     std::ostream &file,
     bool wrap = true);
 
+void Calc_Eli(
+    cube &CubeRho,
+    const WFN &wavy,
+    double radius,
+    std::ostream &file = std::cout,
+    bool wrap = false);
+
 /**
  * Calculates the density based on a wfn with spherical harmonicsand stores the result in the given cube.
  *
