@@ -134,7 +134,7 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
             return {
                 low_angular_momentum ? constants::lebedev_table[2] : constants::lebedev_table[3],
                 low_angular_momentum ? constants::lebedev_table[6] : constants::lebedev_table[7],
-                1e-5
+                1e-3
             };
         }
         else {
@@ -150,7 +150,7 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
             return {
                 low_angular_momentum ? constants::lebedev_table[6] : constants::lebedev_table[7],
                 low_angular_momentum ? constants::lebedev_table[10] : constants::lebedev_table[11],
-                1e-6
+                1e-4
             };
         }
         else {
@@ -166,7 +166,7 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
             return {
                 low_angular_momentum ? constants::lebedev_table[11] : constants::lebedev_table[13],
                 low_angular_momentum ? constants::lebedev_table[13] : constants::lebedev_table[15],
-                1e-11
+                1e-9
             };
         }
         else {
@@ -182,7 +182,7 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
             return {
                 low_angular_momentum ? constants::lebedev_table[13] : constants::lebedev_table[16],
                 low_angular_momentum ? constants::lebedev_table[18] : constants::lebedev_table[20],
-                1e-15
+                1e-19
             };
         }
         else {
@@ -198,7 +198,7 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
             return {
                 low_angular_momentum ? constants::lebedev_table[28] : constants::lebedev_table[30],
                 low_angular_momentum ? constants::lebedev_table[30] : constants::lebedev_table[32],
-                1e-15
+                1e-19
             };
         }
         else {
