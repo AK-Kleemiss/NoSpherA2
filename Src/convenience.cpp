@@ -1721,6 +1721,29 @@ double get_decimal_precision_from_CIF_number(std::string &given_string)
         return 0.005;
 };
 
+void write_spherical_atoms() {
+#pragma omp parallel for
+    for(int i=1; i<103; i++) {
+        std::cout << "Atom " << i << std::endl;
+        Thakkar atom(i);
+        std::ofstream out("spherical_" + std::string(constants::atnr2letter(i)) + ".txt");
+        out << std::scientific << std::setprecision(10);
+        out << std::to_string(i) << " r Density" << std::endl;
+        const double min_dist = 1E-7;
+        const double incr = 1.025;
+
+        // Make radial grids
+        double current = 1;
+        double _dist = min_dist;
+        while (current > 1E-15)
+        {
+            current = atom.get_radial_density(_dist);
+            out << _dist << " " << current << std::endl;
+            _dist *= incr;
+        }
+    }
+}
+
 void options::digest_options()
 {
     using namespace std;
@@ -2462,6 +2485,10 @@ void options::digest_options()
         else if (temp == "-spherical_harmonic")
         {
             spherical_harmonic_test();
+            exit(0);
+        }
+        else if (temp == "-spherical_atoms") {
+            write_spherical_atoms();
             exit(0);
         }
         else if (temp == "-test")
