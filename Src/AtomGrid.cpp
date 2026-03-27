@@ -1064,7 +1064,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     sp_vec copy_of_input = sig_pop_vector;
 
     const int ncen = wavy.get_ncen();
-    int grid_inex = 0;
+    //int grid_inex = 0;
     vec atom_coords(ncen * 3);
     ivec nshell_cache(ncen);
     ivec ECP_els(ncen);
@@ -1082,6 +1082,51 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         ECP_els[j] = atoms[j].get_ECP_electrons();
         has_ECP[j] = (atoms[j].get_ECP_electrons() > 0);
     }
+    vec2 corrected_dens(ncen);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int i = 0; i < ncen; i++) {
+        const int end = num_grid_points[i];
+        const double *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+        corrected_dens[i] = grid[i][7];
+
+        double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, dist;
+        int j, ind, *ECP_els_j;
+        double *d_local;
+        vec dx(ncen * 3);
+        double d_cache[6] = {0.0};
+
+
+        for (int point = 0; point < end; point++) {
+            // Pre-load grid coordinates once instead of accessing multiple times
+            const double gx_pt = gx[point];
+            const double gy_pt = gy[point];
+            const double gz_pt = gz[point];
+
+            for (j = 0; j < ncen; j++) {
+                if (!has_ECP[j])
+                    continue; // Skip ECP correction if not needed, most points will skip this, so it should be a good optimization
+                ind = j * 3;
+                d_local = dx.data() + ind;
+                d_local[0] = gx_pt - atom_coords[ind + 0];
+                d_local[1] = gy_pt - atom_coords[ind + 1];
+                d_local[2] = gz_pt - atom_coords[ind + 2];
+                d_cache[0] = d_local[0] * d_local[0];
+                d_cache[1] = d_local[0] * d_local[1];
+                d_cache[2] = d_local[0] * d_local[2];
+                d_cache[3] = d_local[1] * d_local[1];
+                d_cache[4] = d_local[1] * d_local[2];
+                d_cache[5] = d_local[2] * d_local[2];
+                const double dist_sq = d_cache[0] + d_cache[3] + d_cache[5];
+                // Check distance squared first to avoid sqrt for far away points
+                if (dist_sq > constants::far_away_sq)
+                    continue;
+
+                dist = std::sqrt(dist_sq);
+                ECP_els_j = &ECP_els[j];
+                corrected_dens[i][point] += ECP_electron_helper[j].get_core_density(dist, *ECP_els_j) + ECP_correction_helper[j].get_radial_density(dist);
+            }
+        }
+    }
 
     for (size_t it = 0; it < 2000; it++) {
         for (int j = 0; j < ncen; j++) {
@@ -1090,23 +1135,22 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         }
         it == 0 ? std::cout << "Starting EMBIS iterations..." << std::endl : std::cout << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
-        for (int i = 0, grid_index = 0; i < ncen; i++) {
+        for (int i = 0; i < ncen; i++) {
             const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
-            const int end = num_grid_points[grid_index];
+            const int end = num_grid_points[i];
             //Assuming 3 is the quadrature weight and 7 is the electron density 
-            b_weight = grid[grid_index][5].data();
-            dens = grid[grid_index][7].data();
+            b_weight = grid[i][5].data();
+            dens = corrected_dens[i].data();
             //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-            gx = grid[grid_index][0].data();
-            gy = grid[grid_index][1].data();
-            gz = grid[grid_index][2].data();
-            grid_index++;
+            gx = grid[i][0].data();
+            gy = grid[i][1].data();
+            gz = grid[i][2].data();
 
 #pragma omp parallel
             {
                 vec rho0shell(ncen * 6, 0.0);
-                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det, dist;
-                int j, shell, nshell, ind, *ECP_els_j;
+                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
+                int j, shell, nshell, ind;
                 double *alpha, *d_local, *pop_p;
                 vec dx(ncen * 3);
                 vec alpha_local(ncen * 36, 0.0);
@@ -1137,12 +1181,18 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
                     const double b_weight_point = b_weight[point];
                     density = b_weight_point * dens[point];
+                    
+                    // Pre-load grid coordinates once instead of accessing multiple times
+                    const double gx_pt = gx[point];
+                    const double gy_pt = gy[point];
+                    const double gz_pt = gz[point];
+                    
                     for (j = 0; j < ncen; j++) {
                         ind = j * 3;
                         d_local = dx.data() + ind;
-                        d_local[0] = gx[point] - atom_coords[ind + 0];
-                        d_local[1] = gy[point] - atom_coords[ind + 1];
-                        d_local[2] = gz[point] - atom_coords[ind + 2];
+                        d_local[0] = gx_pt - atom_coords[ind + 0];
+                        d_local[1] = gy_pt - atom_coords[ind + 1];
+                        d_local[2] = gz_pt - atom_coords[ind + 2];
                         d_cache[0] = d_local[0] * d_local[0];
                         d_cache[1] = d_local[0] * d_local[1];
                         d_cache[2] = d_local[0] * d_local[2];
@@ -1153,16 +1203,6 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         // Check distance squared first to avoid sqrt for far away points
                         if (dist_sq > constants::far_away_sq)
                             continue;
-
-                        // Only compute distance and ECP correction if needed (precomputed boolean check)
-                        dist = 0.0;
-                        if (has_ECP[j]) {
-                            dist = std::sqrt(dist_sq);
-                            ECP_els_j = &ECP_els[j];
-                            // Cache helper references to reduce repeated indexing
-                            const double corr_dens = ECP_electron_helper[j].get_core_density(dist, *ECP_els_j) + ECP_correction_helper[j].get_radial_density(dist);
-                            density += corr_dens * b_weight_point;
-                        }
 
                         nshell = nshell_cache[j];
                         coi = &copy_of_input[j];
@@ -1186,7 +1226,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                             if (abs(det_pop_val) < constants::cutoff)
                                 continue;
                             // Use fast exp approximation for better performance
-                            tmp = det_pop_val * fast_exp_neg(-g);
+                            tmp = det_pop_val * exp(-g);
                             rho0shell[ind + shell] = tmp;
                             rho0 += tmp;
                         }
@@ -1197,6 +1237,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     for (j = 0; j < ncen; j++) {
                         d_local = dx.data() + (j * 3);
                         nshell = nshell_cache[j];
+                        // Reuse d_cache values instead of recalculating (they're the same as before)
                         d_cache[0] = d_local[0] * d_local[0];
                         d_cache[1] = d_local[0] * d_local[1];
                         d_cache[2] = d_local[0] * d_local[2];

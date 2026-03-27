@@ -1863,8 +1863,6 @@ tsc_block_type calculate_scattering_factors(
             opt.partition_type == PartitionType::MBIS ||
             opt.partition_type == PartitionType::EMBIS)
         {
-            if (opt.combined_tsc_calc && (opt.partition_type == PartitionType::MBIS || opt.partition_type == PartitionType::EMBIS || opt.debug || opt.all_charges))
-                std::cout << "WARNING!!!!! The use of MBIS with Disorder or multi component calculations is not yet tested! Treat carefully!" << std::endl;
             vec2 d1, d2, d3, dens;
             const int points = make_atomic_grids_wrapper(
                 *wavy,
