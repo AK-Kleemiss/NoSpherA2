@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "wfn_class.h"
 #include "convenience.h"
+#include "constants.h"
 
 using namespace std;
 
@@ -16,9 +17,20 @@ bool b2c(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp)
     iMatrix3 CP(cub->get_size(0), cub->get_size(1), cub->get_size(2));
     ivec2 Liste(3);
     double GradMax, xlength, ylength, zlength;
-    xlength = sqrt(cub->get_vector(0, 0) * cub->get_vector(0, 0) + cub->get_vector(0, 1) * cub->get_vector(0, 1) + cub->get_vector(0, 2) * cub->get_vector(0, 2));
-    ylength = sqrt(cub->get_vector(1, 0) * cub->get_vector(1, 0) + cub->get_vector(1, 1) * cub->get_vector(1, 1) + cub->get_vector(1, 2) * cub->get_vector(1, 2));
-    zlength = sqrt(cub->get_vector(2, 0) * cub->get_vector(2, 0) + cub->get_vector(2, 1) * cub->get_vector(2, 1) + cub->get_vector(2, 2) * cub->get_vector(2, 2));
+    xlength = std::sqrt(
+        cub->get_vector(0, 0) * cub->get_vector(0, 0) +
+        cub->get_vector(1, 0) * cub->get_vector(1, 0) +
+        cub->get_vector(2, 0) * cub->get_vector(2, 0));
+
+    ylength = std::sqrt(
+        cub->get_vector(0, 1) * cub->get_vector(0, 1) +
+        cub->get_vector(1, 1) * cub->get_vector(1, 1) +
+        cub->get_vector(2, 1) * cub->get_vector(2, 1));
+
+    zlength = std::sqrt(
+        cub->get_vector(0, 2) * cub->get_vector(0, 2) +
+        cub->get_vector(1, 2) * cub->get_vector(1, 2) +
+        cub->get_vector(2, 2) * cub->get_vector(2, 2));
     if (debug)std::cout << "calculated lengths!" << endl;
     string s, s1, s2, s3;
     double xmin = cub->get_origin(0);//, xstep;
@@ -371,19 +383,30 @@ bool b2c(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp)
     return true;
 };
 
-cubei topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp)
+cubei topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp, double value_floor, double grad_epsilon, double assignment_radius)
 {
     cubei basin_cube({ cub->get_size(0), cub->get_size(1), cub->get_size(2) }, 0, true);
     ivec2 Liste(3);
     double GradMax, xlength, ylength, zlength;
-    xlength = sqrt(cub->get_vector(0, 0) * cub->get_vector(0, 0) + cub->get_vector(0, 1) * cub->get_vector(0, 1) + cub->get_vector(0, 2) * cub->get_vector(0, 2));
-    ylength = sqrt(cub->get_vector(1, 0) * cub->get_vector(1, 0) + cub->get_vector(1, 1) * cub->get_vector(1, 1) + cub->get_vector(1, 2) * cub->get_vector(1, 2));
-    zlength = sqrt(cub->get_vector(2, 0) * cub->get_vector(2, 0) + cub->get_vector(2, 1) * cub->get_vector(2, 1) + cub->get_vector(2, 2) * cub->get_vector(2, 2));
+    xlength = std::sqrt(
+        cub->get_vector(0, 0) * cub->get_vector(0, 0) +
+        cub->get_vector(1, 0) * cub->get_vector(1, 0) +
+        cub->get_vector(2, 0) * cub->get_vector(2, 0));
+
+    ylength = std::sqrt(
+        cub->get_vector(0, 1) * cub->get_vector(0, 1) +
+        cub->get_vector(1, 1) * cub->get_vector(1, 1) +
+        cub->get_vector(2, 1) * cub->get_vector(2, 1));
+
+    zlength = std::sqrt(
+        cub->get_vector(0, 2) * cub->get_vector(0, 2) +
+        cub->get_vector(1, 2) * cub->get_vector(1, 2) +
+        cub->get_vector(2, 2) * cub->get_vector(2, 2));
     if (debug)
         std::cout << "calculated lengths!" << endl;
-    double xmin = cub->get_origin(0);
-    double ymin = cub->get_origin(1);
-    double zmin = cub->get_origin(2);
+    const double xmin = cub->get_origin(0);
+    const double ymin = cub->get_origin(1);
+    const double zmin = cub->get_origin(2);
 
     if (debug)
         std::cout << "Resized CP and initialized it; GOING TO MAKE LISTE NOW" << endl;
@@ -393,9 +416,6 @@ cubei topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool
     vec3 distances;
     svec Labels;
     ivec nrs;
-    vector<vector<bvec>> border;
-    ivec2 neighbours;
-    vector<vector<cubepoint> > BCPs;
     distances.resize(3);
     for (int i = 0; i < 3; i++) {
         distances[i].resize(3);
@@ -407,12 +427,35 @@ cubei topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool
                 + pow((1 - k) * zlength, 2));
         }
     }
+    const double gradient_threshold = std::max(0.0, grad_epsilon);
+    const double assignment_radius_bohr = assignment_radius > 0.0 ? constants::ang2bohr(assignment_radius) : -1.0;
+    const double assignment_radius2 = assignment_radius_bohr > 0.0 ? assignment_radius_bohr * assignment_radius_bohr : -1.0;
+    const bool use_radius_mask = assignment_radius2 > 0.0;
+    std::function<bool(int, int, int)> inside_assignment_radius = [&](const int gx, const int gy, const int gz) {
+        if (!use_radius_mask)
+            return true;
+        const d3 pos = cub->get_pos(gx, gy, gz);
+        for (const atom &a : atoms) {
+            const d3 apos = a.get_pos();
+            const double dx = pos[0] - apos[0];
+            const double dy = pos[1] - apos[1];
+            const double dz = pos[2] - apos[2];
+            if (dx * dx + dy * dy + dz * dz <= assignment_radius2)
+                return true;
+        }
+        return false;
+    };
+    ProgressBar *progress = nullptr;
+    if (cub->get_size(0) > 1)
+        progress = new ProgressBar(static_cast<unsigned long long>(cub->get_size(0) - 1), 50, "=", " ", "Topological analysis");
     if (debug)
         std::cout << "calculated distances!" << endl;
-    for (int x = 0; x < cub->get_size(0); x++)
-        for (int y = 0; y < cub->get_size(1); y++)
-            for (int z = 0; z < cub->get_size(2); z++) {
+    for (int x = 0; x < cub->get_size(0)-1; x++) {
+        for (int y = 0; y < cub->get_size(1)-1; y++)
+            for (int z = 0; z < cub->get_size(2)-1; z++) {
                 if (basin_cube.get_value(x, y, z) == 0) {
+                    if (cub->get_value(x, y, z) <= value_floor || !inside_assignment_radius(x, y, z))
+                        continue;
                     ListeMax = 0;
                     Max.x = x; Max.y = y; Max.z = z;
                     int xs, ys, zs;
@@ -436,12 +479,15 @@ cubei topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool
                         else
                             Liste[2][ListeMax - 1] = Max.z;
                         GradMax = 0;
+                        if (Max.value <= value_floor || !inside_assignment_radius(xs, ys, zs))
+                            break;
                         for (int ix = xs - 1; ix < xs + 2; ix++)
                             for (int iy = ys - 1; iy < ys + 2; iy++)
                                 for (int iz = zs - 1; iz < zs + 2; iz++) {
                                     if (ix == xs && iy == ys && iz == zs) continue;
                                     if (ix < 0 || iy < 0 || iz < 0) continue;
                                     if (ix >= cub->get_size(0) || iy >= cub->get_size(1) || iz >= cub->get_size(2)) continue;
+                                    if (cub->get_value(ix, iy, iz) <= value_floor || !inside_assignment_radius(ix, iy, iz)) continue;
                                     /*double dist=sqrt(
                                              ((ix-xs)*xlength)*((ix-xs)*xlength)
                                             +((iy-ys)*ylength)*((iy-ys)*ylength)
@@ -453,12 +499,12 @@ cubei topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool
                                         GradMax = ((cub->get_value(ix, iy, iz)) - (cub->get_value(xs, ys, zs))) / distances[1 + ix - xs][1 + iy - ys][1 + iz - zs];
                                     }
                                 }
-                    } while (!(GradMax == 0 || basin_cube.get_value(Max.x, Max.y, Max.z) > 0));
+                    } while (!(GradMax <= gradient_threshold || basin_cube.get_value(Max.x, Max.y, Max.z) > 0));
                     if (basin_cube.get_value(Max.x, Max.y, Max.z) > 0)
                         for (int i = 0; i < ListeMax; i++)
                             basin_cube.set_value(Liste[0][i], Liste[1][i], Liste[2][i], basin_cube.get_value(Max.x, Max.y, Max.z));
                     else {
-                        const d3 pos = { Max.x * xlength + cub->get_origin(0),Max.y * ylength + cub->get_origin(1),Max.z * zlength + cub->get_origin(2) };
+                        const d3 pos = cub->get_pos(Max.x, Max.y, Max.z);
                         if (debug) {
                             std::cout << "DBUG: Position of CP: ";
                             for (int i = 0; i < 3; i++)
@@ -486,125 +532,14 @@ cubei topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool
                         Liste[i].clear(); //Revert Liste and free memory
                 }
             }
-    if (bcp) {
-        neighbours.resize(iCP);
-        BCPs.resize(iCP);
-        border.resize(cub->get_size(0));
-        for (int i = 0; i < cub->get_size(0); i++) {
-            border[i].resize(cub->get_size(1));
-            for (int j = 0; j < cub->get_size(1); j++) {
-                border[i][j].resize(cub->get_size(2));
-                for (int k = 0; k < cub->get_size(2); k++)
-                    border[i][j][k] = false;
-            }
-        }
-        for (int x = 0; x < cub->get_size(0); x++)
-            for (int y = 0; y < cub->get_size(1); y++)
-                for (int z = 0; z < cub->get_size(2); z++)
-                    for (int ix = x - 1; ix < x + 2; ix++)
-                        for (int iy = y - 1; iy < y + 2; iy++)
-                            for (int iz = z - 1; iz < z + 2; iz++) {
-                                if (ix == x && iy == y && iz == z) continue;
-                                if (ix <= 0 || iy <= 0 || iz <= 0) continue;
-                                if (ix >= cub->get_size(0) || iy >= cub->get_size(1) || iz >= cub->get_size(2)) continue;
-                                //    Tests if this voxel has neighboring voxels, that are from a different basin and assigns list of neighbors for each basin
-                                if (basin_cube.get_value(ix, iy, iz) != basin_cube.get_value(x, y, z)) {
-                                    border[x][y][z] = true;
-                                    int found = false;
-                                    for (int i = 0; i < neighbours[basin_cube.get_value(x, y, z)].size(); i++)
-                                        if (neighbours[basin_cube.get_value(x, y, z)][i] == basin_cube.get_value(ix, iy, iz))
-                                            found = true;
-                                    if (!found)
-                                        neighbours[basin_cube.get_value(x, y, z)].push_back(basin_cube.get_value(ix, iy, iz));
-                                }
-                            }
-        //sanity check, all basins must be neighboring each other pairwise!
-        for (int b = 0; b < iCP; b++)
-            for (int n = 0; n < neighbours[b].size(); n++)
-                if (find(neighbours[n].begin(), neighbours[n].end(), b) == neighbours[n].end()) {
-                    std::cout << "ERROR: Basins should be neighbours in a pairwise way! Basin " << b << " has neighbour " << n << ", but it does not appear to be the case the other way around!" << endl;
-                    return {};
-                }
-        //possibly better if we assigned max and min values for coordinates of basins to reduce amount of calculations, lets see...
-        for (int b = 0; b < iCP; b++) {
-            Max = { 0,0,0,0.0 };
-            for (int n = 0; n < neighbours[b].size(); n++) {
-                for (int x = 0; x < cub->get_size(0); x++)
-                    for (int y = 0; y < cub->get_size(1); y++)
-                        for (int z = 0; z < cub->get_size(2); z++) {
-                            //check that we are on A) A border B) in the basin we want C) the neighboring basin we look at is at this border D) the value is bigger than the previously found maximum
-                            if (!border[x][y][z])
-                                continue;
-                            if (basin_cube.get_value(x, y, z) != b)
-                                continue;
-                            bool found = false;
-                            for (int ix = x - 1; ix < x + 2; ix++)
-                                for (int iy = y - 1; iy < y + 2; iy++)
-                                    for (int iz = z - 1; iz < z + 2; iz++) {
-                                        if (ix == x && iy == y && iz == z) continue;
-                                        if (ix <= 0 || iy <= 0 || iz <= 0) continue;
-                                        if (ix >= cub->get_size(0) || iy >= cub->get_size(1) || iz >= cub->get_size(2)) continue;
-                                        if (basin_cube.get_value(ix, iy, iz) != n) continue;
-                                        else found = true;
-                                    }
-                            if (found && cub->get_value(x, y, z) > Max.value)
-                                Max = { x,y,z,cub->get_value(x,y,z) };
-                        }
-                BCPs[b].push_back(Max);
-            }
-        }
-        for (int b = 0; b < iCP; b++)
-            for (int n = 0; n < neighbours[b].size(); n++) {
-                int back_reference = 0;
-                for (int i = 0; i < neighbours[neighbours[b][n]].size(); i++)
-                    if (neighbours[neighbours[b][n]][i] == b)
-                        back_reference = i;
-                if (BCPs[b][n].x - BCPs[neighbours[b][n]][back_reference].x > 2 || BCPs[b][n].y - BCPs[neighbours[b][n]][back_reference].y > 2 || BCPs[b][n].z - BCPs[neighbours[b][n]][back_reference].z > 2) {
-                    std::cout << "The BCPs on both sides of the ZFS are too far apart..." << endl;
-                }
-                else {
-                    std::cout << "BCP: " << Labels[b] << "-" << Labels[neighbours[b][n]] << " ED: " << (BCPs[b][n].value + BCPs[neighbours[b][n]][back_reference].value) / 2 << " Position: "
-                        << (BCPs[b][n].x + BCPs[neighbours[b][n]][back_reference].x) / 2 * cub->get_vector(0, 0)
-                        + (BCPs[b][n].y + BCPs[neighbours[b][n]][back_reference].y) / 2 * cub->get_vector(1, 0)
-                        + (BCPs[b][n].z + BCPs[neighbours[b][n]][back_reference].z) / 2 * cub->get_vector(2, 0)
-                        + xmin << " "
-                        << (BCPs[b][n].x + BCPs[neighbours[b][n]][back_reference].x) / 2 * cub->get_vector(0, 1)
-                        + (BCPs[b][n].y + BCPs[neighbours[b][n]][back_reference].y) / 2 * cub->get_vector(1, 1)
-                        + (BCPs[b][n].z + BCPs[neighbours[b][n]][back_reference].z) / 2 * cub->get_vector(2, 1)
-                        + ymin
-                        << (BCPs[b][n].x + BCPs[neighbours[b][n]][back_reference].x) / 2 * cub->get_vector(0, 2)
-                        + (BCPs[b][n].y + BCPs[neighbours[b][n]][back_reference].y) / 2 * cub->get_vector(1, 2)
-                        + (BCPs[b][n].z + BCPs[neighbours[b][n]][back_reference].z) / 2 * cub->get_vector(2, 2)
-                        + zmin
-                        << endl;
-                }
-            }
-        if (debug)std::cout << "done with BCPs" << endl;
+        if (progress)
+            progress->update();
     }
+    if (progress)
+        delete progress;
     if (debug)
         std::cout << "done with liste, writing basins now!" << endl;
-    ivec basins;
-    vec EDS(iCP);
-    vec VOL(iCP);
-    double dv = cub->get_dv();
-    if (debug)std::cout << "dv: " << dv << " iCP: " << iCP << endl;
-    for (int x = 0; x < cub->get_size(0); x++)
-        for (int y = 0; y < cub->get_size(1); y++)
-            for (int z = 0; z < cub->get_size(2); z++)
-                for (int a = 0; a < iCP; a++) if (a + 1 == basin_cube.get_value(x, y, z)) {
-                    EDS[a] += cub->get_value(x, y, z) * dv;            //    Electrons in this voxel
-                    VOL[a] += dv;                                    //    Size of the voxel
-                }
-    if (debug) for (int a = 0; a < iCP; a++)std::cout << a << " eds: " << EDS[a] << " vol: " << VOL[a] << endl;
-    unsigned int in = 9999999;
     std::cout << "I found " << iCP << " Basins." << endl;
-    for (int a = 0; a < iCP; a++)std::cout << "Integrated value in Basin " << toString<int>(a + 1) << ": " << scientific << setw(14) << setprecision(7) << EDS[a]
-        << " Volume: " << VOL[a] << " Maximum: " << Maxima[a] << " possibly atom: " << Labels[a] << "_" << nrs[a] << endl;
-    if (debug) {
-        std::cout << "DEBUG: Labels_size: " << Labels.size() << endl;
-        for (int i = 0; i < Labels.size(); i++)std::cout << Labels[i] << " ";
-        std::cout << endl;
-    }
 
     for (int d = 0; d < 3; d++) {
         basin_cube.set_origin(d, cub->get_origin(d));
@@ -619,4 +554,34 @@ cubei topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool
         std::cout << "I found " << iCP << " basins. Returning basin-index cubei." << endl;
 
     return basin_cube;
+};
+
+vec integrate_values_in_basins(const cube *cub, const cubei *basin_cube, bool debug)
+{
+    const int basin_count = basin_cube->max_value();
+    vec EDS(basin_count);
+    double dv = cub->get_dv();
+    err_checkf(basin_cube->get_size(0) == cub->get_size(0) && basin_cube->get_size(1) == cub->get_size(1) && basin_cube->get_size(2) == cub->get_size(2), "Basin cube and original cube must have the same dimensions!", std::cout);
+    err_checkf(basin_cube->get_dv() - cub->get_dv() < 1E-10, "Basin must have reasonable size!", std::cout);
+    if (debug)
+        std::cout << "dv: " << dv << " iCP: " << basin_count << endl;
+
+#ifdef _OPENMP
+#pragma omp parallel for collapse(3) schedule(static)
+#endif
+    for (int x = 0; x < cub->get_size(0); x++)
+        for (int y = 0; y < cub->get_size(1); y++)
+            for (int z = 0; z < cub->get_size(2); z++) {
+                const int basin_index = basin_cube->get_value(x, y, z) - 1;
+                if (basin_index < 0 || basin_index >= basin_count)
+                    continue;
+                const double contribution = cub->get_value(x, y, z) * dv;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+                EDS[basin_index] += contribution; // Value in this voxel
+            }
+    for (int a = 0; a < basin_count; a++)
+        std::cout << "basin: " << a << " integrated value: " << std::setprecision(4) << std::fixed << EDS[a] << endl;
+    return EDS;
 };

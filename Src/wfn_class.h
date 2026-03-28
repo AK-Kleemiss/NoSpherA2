@@ -482,6 +482,8 @@ public:
     const void computeLapELI(const d3& PosGrid, double& Eli, double& Lap) const;
     /** Compute Laplacian only. */
     const double computeLap(const d3& PosGrid) const;
+    /** Compute Rho and ELI together. */
+    void computeRhoELI(const d3 &PosGrid, double& Rho, double& Eli) const;
     /** Compute ELI alone. */
     const double computeELI(const d3& PosGrid) const;
     /** Compute ELF alone. */

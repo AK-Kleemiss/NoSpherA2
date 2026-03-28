@@ -240,6 +240,12 @@ void Calc_Hirshfeld_atom(
     std::ostream &file,
     bool wrap = true);
 
+void Calc_RhoEli(
+    cube &CubeRho,
+    cube &CubeEli,
+    const WFN &wavy,
+    double radius);
+
 /**
  * Calculates the properties based on the given options.
  *

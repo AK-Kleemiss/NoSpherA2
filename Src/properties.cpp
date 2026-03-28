@@ -543,7 +543,7 @@ void Calc_Rho(
 };
 
 void Calc_Eli(
-    cube &CubeRho,
+    cube &CubeEli,
     const WFN &wavy,
     double radius,
     std::ostream &file,
@@ -551,14 +551,14 @@ void Calc_Eli(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
+    ProgressBar *progress = new ProgressBar(CubeEli.get_size(0), 50, "=", " ", "Calculating ELI");
 
-    const int low_i = wrap ? -CubeRho.get_size(0) : 0;
-    const int high_i = wrap ? 2 * CubeRho.get_size(0) : CubeRho.get_size(0);
-    const int low_j = wrap ? -CubeRho.get_size(1) : 0;
-    const int high_j = wrap ? 2 * CubeRho.get_size(1) : CubeRho.get_size(1);
-    const int low_k = wrap ? -CubeRho.get_size(2) : 0;
-    const int high_k = wrap ? 2 * CubeRho.get_size(2) : CubeRho.get_size(2);
+    const int low_i = wrap ? -CubeEli.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeEli.get_size(0) : CubeEli.get_size(0);
+    const int low_j = wrap ? -CubeEli.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeEli.get_size(1) : CubeEli.get_size(1);
+    const int low_k = wrap ? -CubeEli.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeEli.get_size(2) : CubeEli.get_size(2);
     const double radius_bohr = constants::ang2bohr(radius);
     const vector<atom> atoms = wavy.get_atoms();
     const int ncen = wavy.get_ncen();
@@ -570,7 +570,7 @@ void Calc_Eli(
             for (int k = low_k; k < high_k; k++)
             {
 
-                const d3 PosGrid = CubeRho.get_pos(i, j, k);
+                const d3 PosGrid = CubeEli.get_pos(i, j, k);
 
                 bool skip = true;
                 for (int a = 0; a < ncen; a++)
@@ -584,27 +584,27 @@ void Calc_Eli(
                 const double Rho = wavy.computeELI(PosGrid);
                 int temp_i, temp_j, temp_k;
                 if (i < 0)
-                    temp_i = i + CubeRho.get_size(0);
-                else if (i < CubeRho.get_size(0))
+                    temp_i = i + CubeEli.get_size(0);
+                else if (i < CubeEli.get_size(0))
                     temp_i = i;
                 else
-                    temp_i = i - CubeRho.get_size(0);
+                    temp_i = i - CubeEli.get_size(0);
 
                 if (j < 0)
-                    temp_j = j + CubeRho.get_size(1);
-                else if (j < CubeRho.get_size(1))
+                    temp_j = j + CubeEli.get_size(1);
+                else if (j < CubeEli.get_size(1))
                     temp_j = j;
                 else
-                    temp_j = j - CubeRho.get_size(1);
+                    temp_j = j - CubeEli.get_size(1);
 
                 if (k < 0)
-                    temp_k = k + CubeRho.get_size(2);
-                else if (k < CubeRho.get_size(2))
+                    temp_k = k + CubeEli.get_size(2);
+                else if (k < CubeEli.get_size(2))
                     temp_k = k;
                 else
-                    temp_k = k - CubeRho.get_size(2);
+                    temp_k = k - CubeEli.get_size(2);
 
-                CubeRho.set_value(temp_i, temp_j, temp_k, CubeRho.get_value(temp_i, temp_j, temp_k) + Rho);
+                CubeEli.set_value(temp_i, temp_j, temp_k, CubeEli.get_value(temp_i, temp_j, temp_k) + Rho);
             }
         progress->update();
     }
@@ -612,6 +612,55 @@ void Calc_Eli(
 
     _time_point end = get_time();
     print_time(start, end, file);
+};
+
+void Calc_RhoEli(
+    cube &CubeRho,
+    cube &CubeEli,
+    const WFN &wavy,
+    double radius)
+{
+    using namespace std;
+    _time_point start = get_time();
+    ProgressBar *progress = new ProgressBar(CubeEli.get_size(0), 50, "=", " ", "Calculating Rho & ELI");
+    err_checkf(CubeRho.get_size(0) == CubeEli.get_size(0) && CubeRho.get_size(1) == CubeEli.get_size(1) && CubeRho.get_size(2) == CubeEli.get_size(2), "Cube sizes do not match", std::cout);
+
+    const int high_i = CubeEli.get_size(0);
+    const int high_j = CubeEli.get_size(1);
+    const int high_k = CubeEli.get_size(2);
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> atoms = wavy.get_atoms();
+    const int ncen = wavy.get_ncen();
+    double Rho, Eli;
+
+#pragma omp parallel for schedule(dynamic) private(Rho, Eli)
+    for (int i = 0; i < high_i; i++)
+    {
+        for (int j = 0; j < high_j; j++)
+            for (int k = 0; k < high_k; k++)
+            {
+
+                const d3 PosGrid = CubeEli.get_pos(i, j, k);
+
+                bool skip = true;
+                for (int a = 0; a < ncen; a++)
+                    if (array_length(PosGrid, atoms[a].get_pos()) < radius_bohr) {
+                        skip = false;
+                        break;
+                    }
+                if (skip)
+                    continue;
+
+                wavy.computeRhoELI(PosGrid, Rho, Eli);
+                CubeRho.set_value(i, j, k, CubeRho.get_value(i, j, k) + Rho);
+                CubeEli.set_value(i, j, k, CubeEli.get_value(i, j, k) + Eli);
+            }
+        progress->update();
+    }
+    delete (progress);
+
+    _time_point end = get_time();
+    print_time(start, end, std::cout);
 };
 
 void Calc_Rho_spherical_harmonics(

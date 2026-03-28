@@ -45,6 +45,28 @@ public:
     double sum() const;
     double diff_sum() const;
     std::vector<double> double_sum() const;
+    double min_value() const {
+        if (size[0] == 0 || size[1] == 0 || size[2] == 0)
+            return 0.0;
+        double result = values[0][0][0];
+        for (int x = 0; x < size[0]; x++)
+            for (int y = 0; y < size[1]; y++)
+                for (int z = 0; z < size[2]; z++)
+                    if (values[x][y][z] < result)
+                        result = values[x][y][z];
+        return result;
+    }
+    double max_value() const {
+        if (size[0] == 0 || size[1] == 0 || size[2] == 0)
+            return 0.0;
+        double result = values[0][0][0];
+        for (int x = 0; x < size[0]; x++)
+            for (int y = 0; y < size[1]; y++)
+                for (int z = 0; z < size[2]; z++)
+                    if (values[x][y][z] > result)
+                        result = values[x][y][z];
+        return result;
+    }
     template<typename T>
     std::array<double, 3> get_pos(const T& i, const T& j, const T& k) const {
         return {
@@ -357,6 +379,30 @@ public:
                 for (int z = 0; z < size[2]; z++)
                     s += values[x][y][z];
         return s * dv;
+    }
+
+    int min_value() const {
+        if (size[0] == 0 || size[1] == 0 || size[2] == 0)
+            return 0;
+        int result = values[0][0][0];
+        for (int x = 0; x < size[0]; x++)
+            for (int y = 0; y < size[1]; y++)
+                for (int z = 0; z < size[2]; z++)
+                    if (values[x][y][z] < result)
+                        result = values[x][y][z];
+        return result;
+    }
+
+    int max_value() const {
+        if (size[0] == 0 || size[1] == 0 || size[2] == 0)
+            return 0;
+        int result = values[0][0][0];
+        for (int x = 0; x < size[0]; x++)
+            for (int y = 0; y < size[1]; y++)
+                for (int z = 0; z < size[2]; z++)
+                    if (values[x][y][z] > result)
+                        result = values[x][y][z];
+        return result;
     }
 
     double get_vector(int i, int j) const {

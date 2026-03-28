@@ -2048,6 +2048,14 @@ void options::digest_options()
             electron_diffraction = true;
         else if (temp == "-eli")
             properties.eli = true;
+        else if (temp == "-eli_analysis") {
+            err_checkf(argc >= i + 4, "Not enough arguments for -eli_analysis\nPlease provide at least wfn, resolution and radius!", std::cout);
+            wfn = arguments[i + 1];
+            properties.resolution = stod(arguments[i + 2]);
+            properties.radius = stod(arguments[i + 3]);
+            ELI_analysis(wfn, *this);
+            exit(0);
+        }
         else if (temp == "-elf")
             properties.elf = true;
         else if (temp == "-embis" || temp == "-EMBIS")

@@ -6,6 +6,7 @@
 #include "libCintMain.h"
 #include "nos_math.h"
 #include "integration_params.h"
+#include "b2c.h"
 
 #ifdef NSA2DEBUG
 void print_dmatrix2(const dMatrix2 &EVC2, const std::string name) {
@@ -1461,26 +1462,57 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
     }
 }
 
-void ELI_analysis(const WFN &wavy, const options &opt, cube &rho) {
+void ELI_analysis(const WFN &wavy, const options &opt) {
     err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
     std::cout << "Analysing ELI basins in the wavefunction..." << std::endl;
 
     const double radius = opt.properties.radius;
     const double grid_spacing = opt.properties.resolution;
     properties_options prop_opt = opt.properties;
-    cube eli_cube;
-    if (rho.get_size(0) == 0 || rho.get_size(1) == 0 || rho.get_size(2) == 0) {
-        std::cout << "No density cube provided, calculating ELI and rho..." << std::endl;
-        readxyzMinMax_fromWFN(wavy, prop_opt, false);
-        Calc_Rho(rho, wavy, opt.properties.radius, std::cout, false);
+    WFN l_w = wavy;
+    l_w.delete_unoccupied_MOs();
+    readxyzMinMax_fromWFN(wavy, prop_opt, false);
+
+    cube rho(prop_opt.NbSteps, l_w.get_ncen(), true);
+    cube eli_cube(prop_opt.NbSteps, l_w.get_ncen(), true);
+    rho.give_parent_wfn(l_w);
+    eli_cube.give_parent_wfn(l_w);
+
+    std::cout << "Calcualting grid of size " << prop_opt.NbSteps[0] << " x " << prop_opt.NbSteps[1] << " x " << prop_opt.NbSteps[2] << "..." << std::endl;
+    std::cout << "Number of points: " << prop_opt.NbSteps[0] * prop_opt.NbSteps[1] * prop_opt.NbSteps[2] << std::endl;
+
+    vec stepsizes{(prop_opt.MinMax[3] - prop_opt.MinMax[0]) / prop_opt.NbSteps[0],
+                  (prop_opt.MinMax[4] - prop_opt.MinMax[1]) / prop_opt.NbSteps[1],
+                  (prop_opt.MinMax[5] - prop_opt.MinMax[2]) / prop_opt.NbSteps[2]};
+
+    for (int i = 0; i < 3; i++)
+    {
+        rho.set_origin(i, prop_opt.MinMax[i]);
+        rho.set_vector(i, i, stepsizes[i]);
+        eli_cube.set_origin(i, prop_opt.MinMax[i]);
+        eli_cube.set_vector(i, i, stepsizes[i]);
     }
-    else {
-        std::cout << "Using provided density cube to calculate ELI..." << std::endl;
-    }
-    Calc_Eli(eli_cube, wavy, opt.properties.radius, std::cout, false);
 
+    rho.calc_dv();
+    eli_cube.calc_dv();
 
+    //Calc_Rho(rho, wavy, radius, std::cout, false);
+    //Calc_Eli(eli_cube, wavy, radius, std::cout, false);
+    Calc_RhoEli(rho, eli_cube, wavy, radius);
+    rho.set_path("rho.cube");
+    eli_cube.set_path("eli.cube");
+    //rho.write_file(true);
+    //eli_cube.write_file(true);
 
+    const std::vector<atom> atoms = wavy.get_atoms();
+    cubei qtaim_basins = topological_cube_analysis(&rho, atoms, opt.debug, false, 0.0, 1e-10, radius);
+    cubei eli_basins = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+
+    std::cout << "Integrating values in basins..." << std::flush;
+    integrate_values_in_basins(&rho, &qtaim_basins, opt.debug);
+    std::cout << "...done!" << std::endl << "Integrating ELI values in basins..." << std::flush;
+    integrate_values_in_basins(&rho, &eli_basins, opt.debug);
+    std::cout << "...done!" << std::endl;
 
 }
 
