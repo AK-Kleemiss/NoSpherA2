@@ -7684,12 +7684,12 @@ const void WFN::computeValues(
                 return;
             }
         }
-        double ex2 = 2 * get_exponent(j);
+        const double ex2 = 2 * get_exponent(j);
         chi[0] = xl[0][0] * xl[1][0] * xl[2][0] * ex;
         chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
         chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
         chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
-        double temp_ex = pow(ex2, 2);
+        const double temp_ex = pow(ex2, 2);
         chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + temp_ex * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
         chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
         chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
@@ -8709,17 +8709,17 @@ double Integrate(int &m, double i, double &expn)
         double a = m;
         double b = a + 0.5;
         a -= 0.5;
-        double id = 1 / i;
+        const double id = 1 / i;
         double approx = 0.88622692 * sqrt(id) * pow(id, m);
         for (x = 0; x < m; x++)
         {
             b--;
             approx *= b;
         }
-        double mult = 0.5 * expn * id;
+        const double mult = 0.5 * expn * id;
         if (mult == 0)
             return approx;
-        double prop = mult / approx;
+        const double prop = mult / approx;
         double term = 1;
         double partsum = 1;
         for (x = 1; x < i + m; x++)
@@ -8756,7 +8756,7 @@ const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
 const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp) const
 {
     double temp = fjtmp * pow(0.25 / gamma, r + i) / Afac_pre[l][r][i];
-    int num = l - 2 * r - 2 * i;
+    const int num = l - 2 * r - 2 * i;
     if (num != 0)
         temp *= pow(PC, num);
     if (i % 2 == 1)

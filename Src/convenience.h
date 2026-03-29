@@ -100,6 +100,7 @@ typedef std::set<i3> hkl_list;
 typedef std::set<i3>::const_iterator hkl_list_it;
 
 typedef std::array<double, 3> d3;
+typedef std::array<double, 4> d4;
 typedef std::set<d3> hkl_list_d;
 typedef std::set<d3>::const_iterator hkl_list_it_d;
 

@@ -652,8 +652,8 @@ void Calc_RhoEli(
                     continue;
 
                 wavy.computeRhoELI(PosGrid, Rho, Eli);
-                CubeRho.set_value(i, j, k, CubeRho.get_value(i, j, k) + Rho);
-                CubeEli.set_value(i, j, k, CubeEli.get_value(i, j, k) + Eli);
+                CubeRho.set_value(i, j, k, Rho);
+                CubeEli.set_value(i, j, k, Eli);
             }
         progress->update();
     }

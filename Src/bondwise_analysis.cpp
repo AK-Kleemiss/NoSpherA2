@@ -1496,8 +1496,6 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     rho.calc_dv();
     eli_cube.calc_dv();
 
-    //Calc_Rho(rho, wavy, radius, std::cout, false);
-    //Calc_Eli(eli_cube, wavy, radius, std::cout, false);
     Calc_RhoEli(rho, eli_cube, wavy, radius);
     rho.set_path("rho.cube");
     eli_cube.set_path("eli.cube");
@@ -1505,14 +1503,15 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     //eli_cube.write_file(true);
 
     const std::vector<atom> atoms = wavy.get_atoms();
-    cubei qtaim_basins = topological_cube_analysis(&rho, atoms, opt.debug, false, 0.0, 1e-10, radius);
-    cubei eli_basins = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius);
+    svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
 
-    std::cout << "Integrating values in basins..." << std::flush;
-    integrate_values_in_basins(&rho, &qtaim_basins, opt.debug);
-    std::cout << "...done!" << std::endl << "Integrating ELI values in basins..." << std::flush;
-    integrate_values_in_basins(&rho, &eli_basins, opt.debug);
-    std::cout << "...done!" << std::endl;
+    std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+    svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
+
+    std::cout << "QTAIM Analysis:\n";
+    integrate_values_in_basins(&rho, &(qtaim_results.first), labels, opt.debug);
+    std::cout << "\n\nELI Analysis:\n";
+    integrate_values_in_basins(&rho, &(eli_results.first), eli_labels, opt.debug);
 
 }
-
