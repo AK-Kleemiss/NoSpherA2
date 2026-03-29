@@ -1528,9 +1528,47 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
         constexpr int nw = 15; // numeric field width — wide enough for large core densities
         for (size_t i = 0; i < density_critical_points.size(); i++) {
             const critical_point &cp = density_critical_points[i];
+
+            std::string ownership_info;
+            if (cp.type == "attractor" || cp.type == "bond") {
+                double min_dist1 = std::numeric_limits<double>::max();
+                double min_dist2 = std::numeric_limits<double>::max();
+                int atom_index1 = -1;
+                int atom_index2 = -1;
+                for (int a = 0; a < l_w.get_ncen(); a++) {
+                    const d3 apos = l_w.get_atom_pos(a);
+                    const double dx = cp.position[0] - apos[0];
+                    const double dy = cp.position[1] - apos[1];
+                    const double dz = cp.position[2] - apos[2];
+                    const double dist2 = dx * dx + dy * dy + dz * dz;
+                    if (dist2 < min_dist1) {
+                        min_dist2 = min_dist1;
+                        atom_index2 = atom_index1;
+                        min_dist1 = dist2;
+                        atom_index1 = a;
+                    }
+                    else if (dist2 < min_dist2) {
+                        min_dist2 = dist2;
+                        atom_index2 = a;
+                    }
+                }
+
+                if (cp.type == "attractor" && atom_index1 >= 0) {
+                    ownership_info = "   " + l_w.get_atom_label(atom_index1) + std::to_string(atom_index1);
+                }
+                else if (cp.type == "bond" && atom_index1 >= 0 && atom_index2 >= 0) {
+                    ownership_info = "   "
+                        + l_w.get_atom_label(atom_index1) + std::to_string(atom_index1)
+                        + "-"
+                        + l_w.get_atom_label(atom_index2) + std::to_string(atom_index2)
+                        + " bond";
+                }
+            }
+
             std::cout << "\n  CP " << std::right << std::setw(3) << i + 1
                       << "  [" << std::left << std::setw(12) << cp.type << "]  "
-                      << (cp.converged ? "converged" : "NOT converged") << "\n";
+                      << (cp.converged ? "converged" : "NOT converged")
+                      << ownership_info << "\n";
             std::cout << std::fixed << std::setprecision(4) << std::right;
             std::cout << "    Position  :"
                       << std::setw(nw) << cp.position[0]
