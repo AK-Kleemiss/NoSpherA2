@@ -3,8 +3,201 @@
 #include "convenience.h"
 #include "constants.h"
 #include "b2c.h"
+#include <Eigen/Dense>
 
 using namespace std;
+
+namespace {
+
+d3 get_axis_lengths(const cube *cub)
+{
+    return {
+        std::sqrt(
+            cub->get_vector(0, 0) * cub->get_vector(0, 0) +
+            cub->get_vector(1, 0) * cub->get_vector(1, 0) +
+            cub->get_vector(2, 0) * cub->get_vector(2, 0)),
+        std::sqrt(
+            cub->get_vector(0, 1) * cub->get_vector(0, 1) +
+            cub->get_vector(1, 1) * cub->get_vector(1, 1) +
+            cub->get_vector(2, 1) * cub->get_vector(2, 1)),
+        std::sqrt(
+            cub->get_vector(0, 2) * cub->get_vector(0, 2) +
+            cub->get_vector(1, 2) * cub->get_vector(1, 2) +
+            cub->get_vector(2, 2) * cub->get_vector(2, 2))
+    };
+}
+
+// array_length(v) and array_length(a,b) are provided by convenience.h
+
+double resolve_value_floor(const cube *cub, double value_floor)
+{
+    if (value_floor >= 0.0)
+        return value_floor;
+    return std::max(1e-8, cub->max_value() * 1e-6);
+}
+
+double resolve_gradient_cutoff(double gradient_epsilon)
+{
+    if (gradient_epsilon >= 0.0)
+        return gradient_epsilon;
+    return std::numeric_limits<double>::infinity();
+}
+
+d3 cube_gradient_at_point(const cube *cub, int x, int y, int z, const d3 &axis_lengths)
+{
+    return {
+        (cub->get_value(x + 1, y, z) - cub->get_value(x - 1, y, z)) / (2.0 * axis_lengths[0]),
+        (cub->get_value(x, y + 1, z) - cub->get_value(x, y - 1, z)) / (2.0 * axis_lengths[1]),
+        (cub->get_value(x, y, z + 1) - cub->get_value(x, y, z - 1)) / (2.0 * axis_lengths[2])
+    };
+}
+
+bool brackets_stationary_point(const cube *cub, int x, int y, int z)
+{
+    const double center = cub->get_value(x, y, z);
+    const bool x_change = (center - cub->get_value(x - 1, y, z)) * (cub->get_value(x + 1, y, z) - center) <= 0.0;
+    const bool y_change = (center - cub->get_value(x, y - 1, z)) * (cub->get_value(x, y + 1, z) - center) <= 0.0;
+    const bool z_change = (center - cub->get_value(x, y, z - 1)) * (cub->get_value(x, y, z + 1) - center) <= 0.0;
+    return x_change && y_change && z_change;
+}
+
+bool is_seed_duplicate(const std::vector<critical_point_seed> &seeds, const critical_point_seed &candidate, double distance_tolerance)
+{
+    for (const critical_point_seed &seed : seeds) {
+        if (array_length(seed.position, candidate.position) <= distance_tolerance)
+            return true;
+    }
+    return false;
+}
+
+std::string classify_density_critical_point(int negative_count, int positive_count, int zero_count)
+{
+    if (zero_count > 0)
+        return "degenerate";
+    if (negative_count == 3)
+        return "attractor";
+    if (negative_count == 2 && positive_count == 1)
+        return "bond";
+    if (negative_count == 1 && positive_count == 2)
+        return "ring";
+    if (negative_count == 0 && positive_count == 3)
+        return "cage";
+    return "unknown";
+}
+
+critical_point evaluate_critical_point(
+    const critical_point_seed &seed,
+    const d3 &position,
+    const WFN &wavy,
+    int iterations,
+    bool converged)
+{
+    critical_point result{};
+    result.grid_index = seed.grid_index;
+    result.seed_position = seed.position;
+    result.position = position;
+    result.seed_value = seed.value;
+    result.iterations = iterations;
+    result.converged = converged;
+    result.ellipticity = std::numeric_limits<double>::quiet_NaN();
+    result.virial_field = std::numeric_limits<double>::quiet_NaN();
+    result.kinetic_lagrangian = std::numeric_limits<double>::quiet_NaN();
+    result.kinetic_hamiltonian = std::numeric_limits<double>::quiet_NaN();
+    result.lagrangian_density = std::numeric_limits<double>::quiet_NaN();
+
+    d3 gradient{ 0.0, 0.0, 0.0 };
+    wavy.computeGrad(position, gradient);
+    result.gradient = gradient;
+    result.gradient_norm = array_length(gradient);
+
+    double rho = 0.0;
+    double norm_grad = 0.0;
+    double elf = 0.0;
+    double eli = 0.0;
+    double laplacian = 0.0;
+    double hessian_data[9]{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    wavy.computeValues(position, rho, norm_grad, hessian_data, elf, eli, laplacian);
+    result.density = rho;
+    result.laplacian = laplacian;
+
+    // Requested quantities from the rho field and its derivatives.
+    // L is defined by user convention: L = K - G = (-1/4) * DelSqRho.
+    const double grad2 = gradient[0] * gradient[0] + gradient[1] * gradient[1] + gradient[2] * gradient[2];
+    if (rho > 1e-14 && std::isfinite(elf) && elf > 0.0 && elf < 1.0) {
+        const double one_over_elf_minus_one = std::max(0.0, (1.0 / elf) - 1.0);
+        const double d_term = std::pow(rho, constants::c_53) * std::sqrt(one_over_elf_minus_one) / constants::ctelf;
+        const double tau = 2.0 * (d_term + 0.125 * grad2 / rho);
+        const double g = 0.5 * tau;
+        const double l = -0.25 * laplacian;
+        const double k = g + l;
+        const double v = k - g;
+        result.kinetic_lagrangian = g;
+        result.kinetic_hamiltonian = k;
+        result.lagrangian_density = l;
+        result.virial_field = v;
+    }
+
+    Eigen::Matrix3d hessian;
+    hessian << hessian_data[0], hessian_data[1], hessian_data[2],
+        hessian_data[3], hessian_data[4], hessian_data[5],
+        hessian_data[6], hessian_data[7], hessian_data[8];
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(hessian);
+    if (solver.info() == Eigen::Success) {
+        const Eigen::Vector3d eigenvalues = solver.eigenvalues();
+        const Eigen::Matrix3d eigenvectors = solver.eigenvectors();
+        result.hessian_eigenvalues = { eigenvalues[0], eigenvalues[1], eigenvalues[2] };
+        result.hessian_eigenvectors = {
+            d3{ eigenvectors(0, 0), eigenvectors(1, 0), eigenvectors(2, 0) },
+            d3{ eigenvectors(0, 1), eigenvectors(1, 1), eigenvectors(2, 1) },
+            d3{ eigenvectors(0, 2), eigenvectors(1, 2), eigenvectors(2, 2) }
+        };
+
+        const double max_abs = std::max({ std::abs(eigenvalues[0]), std::abs(eigenvalues[1]), std::abs(eigenvalues[2]) });
+        const double eigen_tolerance = std::max(1e-10, max_abs * 1e-8);
+        result.negative_eigenvalues = 0;
+        result.positive_eigenvalues = 0;
+        result.zero_eigenvalues = 0;
+        for (int i = 0; i < 3; i++) {
+            if (eigenvalues[i] < -eigen_tolerance)
+                result.negative_eigenvalues++;
+            else if (eigenvalues[i] > eigen_tolerance)
+                result.positive_eigenvalues++;
+            else
+                result.zero_eigenvalues++;
+        }
+        result.type = classify_density_critical_point(result.negative_eigenvalues, result.positive_eigenvalues, result.zero_eigenvalues);
+
+        if (result.type == "bond" && std::abs(eigenvalues[1]) > eigen_tolerance)
+            result.ellipticity = (eigenvalues[0] / eigenvalues[1]) - 1.0;
+    }
+    else {
+        result.hessian_eigenvalues = { 0.0, 0.0, 0.0 };
+        result.hessian_eigenvectors = { d3{ 0.0, 0.0, 0.0 }, d3{ 0.0, 0.0, 0.0 }, d3{ 0.0, 0.0, 0.0 } };
+        result.negative_eigenvalues = 0;
+        result.positive_eigenvalues = 0;
+        result.zero_eigenvalues = 3;
+        result.type = "unknown";
+    }
+
+    return result;
+}
+
+bool try_merge_critical_point(std::vector<critical_point> &points, const critical_point &candidate, double distance_tolerance)
+{
+    for (critical_point &point : points) {
+        if (array_length(point.position, candidate.position) > distance_tolerance)
+            continue;
+
+        const bool candidate_is_better = (candidate.converged && !point.converged) ||
+            (candidate.converged == point.converged && candidate.gradient_norm < point.gradient_norm);
+        if (candidate_is_better)
+            point = candidate;
+        return true;
+    }
+    return false;
+}
+
+} // namespace
 
 bool b2c(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp)
 {
@@ -382,6 +575,324 @@ struct GradientDirection {
     int next_x, next_y, next_z;  // Next point to follow (-1 if local maximum or invalid)
     double gradient;              // Gradient magnitude
 };
+
+std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube *cub, bool debug, double value_floor, double gradient_epsilon)
+{
+    const i3 sizes = cub->get_sizes();
+    if (sizes[0] < 3 || sizes[1] < 3 || sizes[2] < 3)
+        return {};
+
+    const d3 axis_lengths = get_axis_lengths(cub);
+    const double density_floor = resolve_value_floor(cub, value_floor);
+    const double gradient_cutoff = resolve_gradient_cutoff(gradient_epsilon);
+    const double distance_tolerance = 0.75 * std::min({ axis_lengths[0], axis_lengths[1], axis_lengths[2] });
+
+    std::vector<critical_point_seed> seeds;
+    for (int x = 1; x < sizes[0] - 1; x++) {
+        for (int y = 1; y < sizes[1] - 1; y++) {
+            for (int z = 1; z < sizes[2] - 1; z++) {
+                const double value = cub->get_value(x, y, z);
+                if (value <= density_floor)
+                    continue;
+                if (!brackets_stationary_point(cub, x, y, z))
+                    continue;
+
+                const d3 gradient = cube_gradient_at_point(cub, x, y, z, axis_lengths);
+                const double gradient_norm = array_length(gradient);
+                if (!std::isfinite(gradient_norm) || gradient_norm > gradient_cutoff)
+                    continue;
+
+                // Accept this point as a seed if no axis-aligned neighbour has a strictly
+                // smaller finite-difference gradient norm.  We deliberately check only the
+                // 6 axis-aligned neighbours (not all 26) and use a small relative tolerance
+                // so that equidistant nuclei (where adjacent grid points share the same
+                // gradient norm) are not silently dropped.
+                bool local_minimum = true;
+                const double rel_tol = gradient_norm * 1e-4 + 1e-12;
+                const int dx[6] = { -1, 1, 0, 0, 0, 0 };
+                const int dy[6] = { 0, 0, -1, 1, 0, 0 };
+                const int dz[6] = { 0, 0, 0, 0, -1, 1 };
+                for (int n = 0; n < 6 && local_minimum; n++) {
+                    const int ix = x + dx[n], iy = y + dy[n], iz = z + dz[n];
+                    if (ix <= 0 || iy <= 0 || iz <= 0 || ix >= sizes[0] - 1 || iy >= sizes[1] - 1 || iz >= sizes[2] - 1)
+                        continue;
+                    if (cub->get_value(ix, iy, iz) <= density_floor)
+                        continue;
+                    const d3 neighbor_gradient = cube_gradient_at_point(cub, ix, iy, iz, axis_lengths);
+                    const double neighbor_norm = array_length(neighbor_gradient);
+                    if (neighbor_norm < gradient_norm - rel_tol)
+                        local_minimum = false;
+                }
+                if (!local_minimum)
+                    continue;
+
+                critical_point_seed seed{
+                    { x, y, z },
+                    cub->get_pos(x, y, z),
+                    value,
+                    gradient_norm
+                };
+                if (!is_seed_duplicate(seeds, seed, distance_tolerance))
+                    seeds.push_back(seed);
+            }
+        }
+    }
+
+    std::sort(seeds.begin(), seeds.end(), [](const critical_point_seed &left, const critical_point_seed &right) {
+        if (left.gradient_norm != right.gradient_norm)
+            return left.gradient_norm < right.gradient_norm;
+        return left.value > right.value;
+    });
+
+    if (debug)
+        std::cout << "Found " << seeds.size() << " cube-based critical-point seeds" << endl;
+    return seeds;
+}
+
+std::vector<critical_point> refine_cube_critical_points(
+    const cube *cub,
+    const WFN &wavy,
+    const std::vector<critical_point_seed> &seeds,
+    bool debug,
+    double value_floor,
+    double gradient_tolerance,
+    double step_tolerance,
+    int max_iterations)
+{
+    const d3 axis_lengths = get_axis_lengths(cub);
+    const double density_floor = resolve_value_floor(cub, value_floor);
+    const double trust_radius = 1.5 * std::max({ axis_lengths[0], axis_lengths[1], axis_lengths[2] });
+    const double nuclear_trust_radius = 0.25;
+    const double nuclear_max_radius = 0.35;
+    // Merge converged CPs within 0.1 bohr of each other (safely smaller than any bond length).
+    const double merge_distance = 0.1;
+
+    std::vector<critical_point> points;
+    for (const critical_point_seed &seed : seeds) {
+        // Check if this seed is a known nuclear seed (fallback to proximity check for legacy seeds).
+        bool is_nuclear_seed = seed.is_nuclear_seed;
+        int seed_nucleus = seed.nucleus_index;
+        if (!is_nuclear_seed) {
+            for (int a = 0; a < wavy.get_ncen(); a++) {
+                if (array_length(seed.position, wavy.get_atom_pos(a)) < 0.2) {
+                    is_nuclear_seed = true;
+                    seed_nucleus = a;
+                    break;
+                }
+            }
+        }
+        d3 nuclear_center = seed_nucleus >= 0 ? wavy.get_atom_pos(seed_nucleus) : seed.position;
+        // For nuclear seeds, use a much lower density floor (or none at all) since H nuclei have very low density.
+        const double local_density_floor = is_nuclear_seed ? 1e-10 : density_floor;
+        const double local_trust_radius = is_nuclear_seed ? nuclear_trust_radius : trust_radius;
+        const int local_max_iterations = is_nuclear_seed ? std::max(max_iterations, 64) : max_iterations;
+
+        d3 position = seed.position;
+        d3 gradient{ 0.0, 0.0, 0.0 };
+        wavy.computeGrad(position, gradient);
+        double gradient_norm = array_length(gradient);
+
+        bool converged = gradient_norm <= gradient_tolerance;
+        int iterations = 0;
+        for (; iterations < local_max_iterations && !converged; iterations++) {
+            double rho = 0.0;
+            double norm_grad = 0.0;
+            double elf = 0.0;
+            double eli = 0.0;
+            double laplacian = 0.0;
+            double hessian_data[9]{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+            wavy.computeValues(position, rho, norm_grad, hessian_data, elf, eli, laplacian);
+            if (rho <= local_density_floor)
+                break;
+
+            Eigen::Matrix3d hessian;
+            hessian << hessian_data[0], hessian_data[1], hessian_data[2],
+                hessian_data[3], hessian_data[4], hessian_data[5],
+                hessian_data[6], hessian_data[7], hessian_data[8];
+            Eigen::Vector3d grad_vec(gradient[0], gradient[1], gradient[2]);
+            Eigen::FullPivLU<Eigen::Matrix3d> solver(hessian);
+            if (!solver.isInvertible())
+                break;
+
+            Eigen::Vector3d step = -solver.solve(grad_vec);
+            if (!step.allFinite())
+                break;
+            if (step.norm() > local_trust_radius)
+                step *= local_trust_radius / step.norm();
+
+            bool accepted = false;
+            d3 accepted_position = position;
+            d3 accepted_gradient = gradient;
+            double accepted_norm = gradient_norm;
+            double accepted_step_norm = 0.0;
+
+            for (int attempt = 0; attempt < 8; attempt++) {
+                const double damping = std::pow(0.5, attempt);
+                const Eigen::Vector3d trial_step = step * damping;
+                d3 trial_position{
+                    position[0] + trial_step[0],
+                    position[1] + trial_step[1],
+                    position[2] + trial_step[2]
+                };
+                if (is_nuclear_seed && array_length(trial_position, nuclear_center) > nuclear_max_radius)
+                    continue;
+                d3 trial_gradient{ 0.0, 0.0, 0.0 };
+                wavy.computeGrad(trial_position, trial_gradient);
+                const double trial_norm = array_length(trial_gradient);
+                if (!std::isfinite(trial_norm))
+                    continue;
+                if (trial_norm <= gradient_norm || trial_step.norm() <= step_tolerance) {
+                    accepted = true;
+                    accepted_position = trial_position;
+                    accepted_gradient = trial_gradient;
+                    accepted_norm = trial_norm;
+                    accepted_step_norm = trial_step.norm();
+                    break;
+                }
+            }
+
+            if (!accepted)
+                break;
+
+            position = accepted_position;
+            gradient = accepted_gradient;
+            gradient_norm = accepted_norm;
+            converged = gradient_norm <= gradient_tolerance;
+
+            if (accepted_step_norm <= step_tolerance && gradient_norm <= 10.0 * gradient_tolerance)
+                converged = true;
+        }
+
+        critical_point point = evaluate_critical_point(seed, position, wavy, iterations, converged);
+        
+        // Check if this CP is at a known atomic position (nuclear attractor).
+        // Nuclear attractors should be kept even if density is very low (e.g., H atoms), 
+        // and even if not fully converged, as long as the Hessian indicates it's an attractor.
+        bool is_nuclear_attractor = false;
+        if (point.type == "attractor") {
+            for (int a = 0; a < wavy.get_ncen(); a++) {
+                if (array_length(point.position, wavy.get_atom_pos(a)) < 0.5) {
+                    is_nuclear_attractor = true;
+                    break;
+                }
+            }
+        }
+        
+        // For non-nuclear CPs, require that they exceed the normal density floor
+        if (!is_nuclear_attractor && point.density <= density_floor)
+            continue;
+        // Discard non-converged bond CPs; these are typically spurious basin-edge artifacts.
+        if (point.type == "bond" && !point.converged)
+            continue;
+        if (!try_merge_critical_point(points, point, merge_distance))
+            points.push_back(point);
+    }
+
+    std::sort(points.begin(), points.end(), [](const critical_point &left, const critical_point &right) {
+        if (left.type != right.type)
+            return left.type < right.type;
+        return left.density > right.density;
+    });
+
+    if (debug)
+        std::cout << "Refined " << points.size() << " unique critical points from cube seeds" << endl;
+    return points;
+}
+std::vector<critical_point> analyze_cube_critical_points(
+    const cube *cub,
+    const WFN &wavy,
+    bool debug,
+    double value_floor,
+    double gradient_epsilon,
+    double gradient_tolerance,
+    double step_tolerance,
+    int max_iterations)
+{
+    // Grid seeds (non-nuclear CPs: bond, ring, cage)
+    std::vector<critical_point_seed> seeds = find_cube_critical_point_seeds(cub, debug, value_floor, gradient_epsilon);
+
+    // Invert the grid matrix once to convert WFN atom positions → grid indices.
+    // cube::get_pos: pos = origin + V * idx  →  idx = V^{-1} * (pos − origin)
+    Eigen::Matrix3d V;
+    for (int r = 0; r < 3; r++)
+        for (int c = 0; c < 3; c++)
+            V(r, c) = cub->get_vector(r, c);
+    Eigen::Matrix3d Vinv = V.inverse();
+
+    const i3 sizes = cub->get_sizes();
+    const double density_floor = resolve_value_floor(cub, value_floor);
+    const d3 axis_lengths = get_axis_lengths(cub);
+    const double min_step = std::min({ axis_lengths[0], axis_lengths[1], axis_lengths[2] });
+    const double seed_merge_dist = 0.75 * min_step;
+
+    // Helper: project a real-space position onto the nearest interior grid index.
+    auto pos_to_idx = [&](const d3 &pos) -> i3 {
+        Eigen::Vector3d rhs(pos[0] - cub->get_origin(0),
+                            pos[1] - cub->get_origin(1),
+                            pos[2] - cub->get_origin(2));
+        Eigen::Vector3d fidx = Vinv * rhs;
+        return {
+            std::max(1, std::min(sizes[0] - 2, (int)std::round(fidx[0]))),
+            std::max(1, std::min(sizes[1] - 2, (int)std::round(fidx[1]))),
+            std::max(1, std::min(sizes[2] - 2, (int)std::round(fidx[2])))
+        };
+    };
+
+    auto add_seed_at = [&](const d3 &pos, bool skip_density_check = false, bool force_add = false, bool is_nuclear_seed = false, int nucleus_index = -1) {
+        const i3 idx = pos_to_idx(pos);
+        const double cv = cub->get_value(idx[0], idx[1], idx[2]);
+        if (!skip_density_check && cv <= density_floor)
+            return;
+        // Compute approximate grid gradient to supply a gradient_norm hint.
+        const d3 gv = cube_gradient_at_point(cub, idx[0], idx[1], idx[2], axis_lengths);
+        critical_point_seed s{ idx, pos, cv, array_length(gv), is_nuclear_seed, nucleus_index };
+        if (force_add || !is_seed_duplicate(seeds, s, seed_merge_dist))
+            seeds.push_back(s);
+    };
+
+    // Add every WFN atom as an explicit nuclear-attractor seed.
+    // Nuclear attractors should always exist, even if density is low (e.g., H atoms).
+    for (int a = 0; a < wavy.get_ncen(); a++) {
+        add_seed_at(wavy.get_atom_pos(a), true, true, true, a);  // force-add every nuclear seed
+    }
+
+    // Add bond-critical-point seeds along every atom pair that is plausibly bonded
+    // (interatomic distance <= 1.3 * sum of CSD covalent radii).
+    // We inject seeds at multiple positions along the internuclear vector to ensure
+    // coverage even when the BCP is not exactly at the midpoint (e.g. polar bonds).
+    for (int a = 0; a < wavy.get_ncen(); a++) {
+        const d3 pa = wavy.get_atom_pos(a);
+        const int za = wavy.get_atom_charge(a);
+        const double ra = (za > 0 && za < 114) ? constants::covalent_radii[za] : 1.5;
+        for (int b = a + 1; b < wavy.get_ncen(); b++) {
+            const d3 pb = wavy.get_atom_pos(b);
+            const int zb = wavy.get_atom_charge(b);
+            const double rb = (zb > 0 && zb < 114) ? constants::covalent_radii[zb] : 1.5;
+            const double dist = array_length(pa, pb);
+            const double bond_threshold = constants::ang2bohr(1.3 * (ra + rb));
+            if (dist > bond_threshold)
+                continue;
+            // Seeds at 10% to 90% along the bond (9 seeds per bond)
+            for (int i = 1; i < 10; i++) {
+                const double t = i * 0.1;
+                const d3 bpos{
+                    pa[0] + t * (pb[0] - pa[0]),
+                    pa[1] + t * (pb[1] - pa[1]),
+                    pa[2] + t * (pb[2] - pa[2])
+                };
+                add_seed_at(bpos, false);  // skip_density_check=false for bond seeds
+            }
+        }
+    }
+
+    if (debug)
+        std::cout << "Total seeds (grid + atom + bond): " << seeds.size() << endl;
+
+    // Refine all the seed critical points
+    auto points = refine_cube_critical_points(cub, wavy, seeds, debug, value_floor, gradient_tolerance, step_tolerance, max_iterations);
+    
+    return points;
+}
 
 std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp, double value_floor, double grad_epsilon, double assignment_radius)
 {

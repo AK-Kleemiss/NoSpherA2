@@ -35,8 +35,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
-
     ofstream log_file("NoSpherA2.log", ios::out);
     std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);
@@ -266,6 +264,7 @@ int main(int argc, char **argv)
             //If the files is a .toml file, we run OCC; otherwise we read it as a wfn file. This allows to easily run OCC for multiple files in one go, without having to run OCC separately for each file beforehand.
             if (opt.combined_tsc_calc_files[i].extension() == ".toml")
             {
+                ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
                 log_file << "Running OCC for " << opt.combined_tsc_calc_files[i] << "..." << endl;
                 occ::io::OccInput config = occ::io::read_occ_input_file(opt.combined_tsc_calc_files[i].string());
                 std::filesystem::path log_path = opt.combined_tsc_calc_files[i].stem().string() + ".log";

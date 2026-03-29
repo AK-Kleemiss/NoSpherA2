@@ -1515,6 +1515,65 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     //rho.write_file(true);
     //eli_cube.write_file(true);
 
+    const double density_floor = std::max(1e-8, rho.max_value() * 1e-6);
+    const std::vector<critical_point> density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+    std::cout << "Density Critical Points";
+    if (!density_critical_points.empty())
+        std::cout << " (" << density_critical_points.size() << " found)";
+    std::cout << ":\n";
+    if (density_critical_points.empty()) {
+        std::cout << "  No critical points refined from the current cube grid.\n";
+    }
+    else {
+        constexpr int nw = 15; // numeric field width — wide enough for large core densities
+        for (size_t i = 0; i < density_critical_points.size(); i++) {
+            const critical_point &cp = density_critical_points[i];
+            std::cout << "\n  CP " << std::right << std::setw(3) << i + 1
+                      << "  [" << std::left << std::setw(12) << cp.type << "]  "
+                      << (cp.converged ? "converged" : "NOT converged") << "\n";
+            std::cout << std::fixed << std::setprecision(4) << std::right;
+            std::cout << "    Position  :"
+                      << std::setw(nw) << cp.position[0]
+                      << std::setw(nw) << cp.position[1]
+                      << std::setw(nw) << cp.position[2] << "\n";
+            std::cout << "    Rho       :" << std::setw(nw) << cp.density << "\n";
+            std::cout << "    GradRho   :"
+                      << std::setw(nw) << cp.gradient[0]
+                      << std::setw(nw) << cp.gradient[1]
+                      << std::setw(nw) << cp.gradient[2]
+                      << "   |GradRho| :" << std::setw(nw) << cp.gradient_norm << "\n";
+            std::cout << "    HessRho_EigVals:"
+                      << std::scientific << std::setprecision(4)
+                      << std::setw(nw) << cp.hessian_eigenvalues[0]
+                      << std::setw(nw) << cp.hessian_eigenvalues[1]
+                      << std::setw(nw) << cp.hessian_eigenvalues[2]
+                      << std::fixed << std::setprecision(4) << "\n";
+            std::cout << "    HessRho_EigVecs v1:"
+                      << std::setw(nw) << cp.hessian_eigenvectors[0][0]
+                      << std::setw(nw) << cp.hessian_eigenvectors[0][1]
+                      << std::setw(nw) << cp.hessian_eigenvectors[0][2] << "\n";
+            std::cout << "                    v2:"
+                      << std::setw(nw) << cp.hessian_eigenvectors[1][0]
+                      << std::setw(nw) << cp.hessian_eigenvectors[1][1]
+                      << std::setw(nw) << cp.hessian_eigenvectors[1][2] << "\n";
+            std::cout << "                    v3:"
+                      << std::setw(nw) << cp.hessian_eigenvectors[2][0]
+                      << std::setw(nw) << cp.hessian_eigenvectors[2][1]
+                      << std::setw(nw) << cp.hessian_eigenvectors[2][2] << "\n";
+            std::cout << "    DelSqRho  :" << std::setw(nw) << cp.laplacian << "\n";
+            if (std::isfinite(cp.ellipticity))
+                std::cout << "    Bond Ellipticity:" << std::setw(nw) << cp.ellipticity << "\n";
+            if (std::isfinite(cp.virial_field) || std::isfinite(cp.kinetic_lagrangian) || std::isfinite(cp.kinetic_hamiltonian) || std::isfinite(cp.lagrangian_density)) {
+                std::cout << "    V         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.virial_field
+                          << "   G         :" << std::fixed << std::setprecision(4) << std::setw(nw) << cp.kinetic_lagrangian
+                          << "   K         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.kinetic_hamiltonian
+                          << "   L         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.lagrangian_density
+                          << std::fixed << std::setprecision(4) << "\n";
+            }
+        }
+        std::cout << "\n";
+    }
+
     std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius);
     svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
 
