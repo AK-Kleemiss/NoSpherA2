@@ -484,6 +484,8 @@ public:
     const double computeLap(const d3& PosGrid) const;
     /** Compute Rho and ELI together. */
     void computeRhoELI(const d3 &PosGrid, double& Rho, double& Eli) const;
+    /** Compute gradient. */
+    void WFN::computeGrad(const d3 &PosGrid, d3& gradient) const;
     /** Compute ELI alone. */
     const double computeELI(const d3& PosGrid) const;
     /** Compute ELF alone. */

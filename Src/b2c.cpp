@@ -765,8 +765,8 @@ vec integrate_values_in_basins(const cube *cub, const cubei *basin_cube, svec& b
                 EDS[basin_index] += contribution; // Value in this voxel
 #ifdef _OPENMP
 #pragma omp atomic
-                VOL[basin_index] += dv; // Volume of this voxel
 #endif
+                VOL[basin_index] += dv; // Volume of this voxel
             }
     for (int a = 0; a < basin_count; a++) {
         if (EDS[a] > 0.001)
