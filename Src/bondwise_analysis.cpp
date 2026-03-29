@@ -1471,7 +1471,7 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     properties_options prop_opt = opt.properties;
     WFN l_w = wavy;
     l_w.delete_unoccupied_MOs();
-    readxyzMinMax_fromWFN(wavy, prop_opt, false);
+    readxyzMinMax_fromWFN(wavy, prop_opt, true);
 
     cube rho(prop_opt.NbSteps, l_w.get_ncen(), true);
     cube eli_cube(prop_opt.NbSteps, l_w.get_ncen(), true);
@@ -1480,6 +1480,19 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
 
     std::cout << "Calcualting grid of size " << prop_opt.NbSteps[0] << " x " << prop_opt.NbSteps[1] << " x " << prop_opt.NbSteps[2] << "..." << std::endl;
     std::cout << "Number of points: " << prop_opt.NbSteps[0] * prop_opt.NbSteps[1] * prop_opt.NbSteps[2] << std::endl;
+
+    //Print a summary of the grid parameters
+    std::cout << "Grid parameters:\n";
+    std::cout << "  Min: (" << prop_opt.MinMax[0] << ", " << prop_opt.MinMax[1] << ", " << prop_opt.MinMax[2] << ")\n";
+    std::cout << "  Max: (" << prop_opt.MinMax[3] << ", " << prop_opt.MinMax[4] << ", " << prop_opt.MinMax[5] << ")\n";
+
+    const std::vector<atom> atoms = wavy.get_atoms();
+
+    // print table of atom positions
+    std::cout << "Atom positions:\n";
+    for (int a = 0; a < atoms.size(); a++) {
+        std::cout << "  Atom " << a << ": (" << atoms[a].get_coordinate(0) << ", " << atoms[a].get_coordinate(1) << ", " << atoms[a].get_coordinate(2) << ")\n";
+    }
 
     vec stepsizes{(prop_opt.MinMax[3] - prop_opt.MinMax[0]) / prop_opt.NbSteps[0],
                   (prop_opt.MinMax[4] - prop_opt.MinMax[1]) / prop_opt.NbSteps[1],
@@ -1496,13 +1509,12 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     rho.calc_dv();
     eli_cube.calc_dv();
 
-    Calc_RhoEli(rho, eli_cube, wavy, radius);
+    Calc_RhoEli(rho, eli_cube, l_w, radius);
     rho.set_path("rho.cube");
     eli_cube.set_path("eli.cube");
     //rho.write_file(true);
     //eli_cube.write_file(true);
 
-    const std::vector<atom> atoms = wavy.get_atoms();
     std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius);
     svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
 

@@ -430,13 +430,13 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
     const bool use_radius_mask = assignment_radius2 > 0.0;
 
     // Pre-compute radius mask for all grid points (if needed)
-    vector<vector<vector<bool>>> radius_mask;
+    vector<vector<vector<int>>> radius_mask;
     if (use_radius_mask) {
         radius_mask.resize(size_x);
         for (int x = 0; x < size_x; x++) {
             radius_mask[x].resize(size_y);
             for (int y = 0; y < size_y; y++) {
-                radius_mask[x][y].resize(size_z);
+                radius_mask[x][y].resize(size_z, 0);
             }
         }
 
@@ -447,14 +447,14 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
             for (int y = 0; y < size_y; y++) {
                 for (int z = 0; z < size_z; z++) {
                     const d3 pos = cub->get_pos(x, y, z);
-                    bool in_radius = false;
+                    int in_radius = 0;
                     for (const atom &a : atoms) {
                         const d3 apos = a.get_pos();
                         const double dx = pos[0] - apos[0];
                         const double dy = pos[1] - apos[1];
                         const double dz = pos[2] - apos[2];
                         if (dx * dx + dy * dy + dz * dz <= assignment_radius2) {
-                            in_radius = true;
+                            in_radius = 1;
                             break;
                         }
                     }
@@ -475,10 +475,11 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
     }
 
 #ifdef _OPENMP
-#pragma omp parallel for collapse(3) schedule(dynamic)
+#pragma omp parallel for collapse(2) schedule(dynamic)
 #endif
     for (int x = 0; x < size_x; x++) {
         for (int y = 0; y < size_y; y++) {
+            int *orml = radius_mask[x][y].data(); // Cache radius mask row for performance
             for (int z = 0; z < size_z; z++) {
                 GradientDirection &gd = gradient_field[x][y][z];
                 gd.next_x = -1;
@@ -490,7 +491,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                 const double center_value = cub->get_value(x, y, z);
                 if (center_value <= value_floor)
                     continue;
-                if (use_radius_mask && !radius_mask[x][y][z])
+                if (use_radius_mask && orml[z] == 0)
                     continue;
 
                 // Find steepest gradient direction
@@ -501,6 +502,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                     if (ix < 0 || ix >= size_x) continue;
                     for (int iy = y - 1; iy <= y + 1; iy++) {
                         if (iy < 0 || iy >= size_y) continue;
+                        int *rml = radius_mask[ix][iy].data(); // Cache radius mask row for performance
                         for (int iz = z - 1; iz <= z + 1; iz++) {
                             if (ix == x && iy == y && iz == z) continue;
                             if (iz < 0 || iz >= size_z) continue;
@@ -508,7 +510,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                             const double neighbor_value = cub->get_value(ix, iy, iz);
                             if (neighbor_value <= value_floor)
                                 continue;
-                            if (use_radius_mask && !radius_mask[ix][iy][iz])
+                            if (use_radius_mask && rml[iz] == 0)
                                 continue;
 
                             const double grad = (neighbor_value - center_value) / distances[1 + ix - x][1 + iy - y][1 + iz - z];
@@ -587,7 +589,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                         Maxima.push_back(d4{pos[0], pos[1], pos[2], max_value});
 
                         if (debug) {
-                            std::cout << "DBUG: Position of CP: " << pos[0] << " " << pos[1] << " " << pos[2] << endl;
+                            std::cout << "DBUG: Position of CP: " << fixed << pos[0] << " " << pos[1] << " " << pos[2] << endl;
                         }
 
                         // Assign entire path to new basin
@@ -657,7 +659,7 @@ vec integrate_values_in_basins(const cube *cub, const cubei *basin_cube, svec& b
             }
     for (int a = 0; a < basin_count; a++) {
         if (EDS[a] > 0.001)
-            std::cout << "basin: " << setw(4) << a << " label: " << setw(10) << basin_label[a] << " integrated value: " << setw(8) << std::setprecision(4) << std::fixed << EDS[a] << " volume: " << setw(16) << VOL[a] << endl;
+            std::cout << "basin: " << setw(4) << a << " label: " << setw(16) << basin_label[a] << " integrated value: " << setw(8) << std::setprecision(4) << std::fixed << EDS[a] << " volume:" << setw(10) << VOL[a] << endl;
     }
     for (int a = 0; a < basin_count; a++) {
         if (EDS[a] < 0.001)
@@ -688,7 +690,7 @@ svec assign_labels_to_basins(const vector<d4> &Maxima, const vector<atom> &atoms
                 }
             }
             err_checkf(atom_index >= 0, "No atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
-            result[i] = atoms[atom_index].get_label();
+            result[i] = atoms[atom_index].get_label() + to_string(atom_index);
         }
         break;
         case 1: //ELI case, assign core basins based on atom within, valence basins as the connected basin and bonds as the two closest atoms.
@@ -719,11 +721,11 @@ svec assign_labels_to_basins(const vector<d4> &Maxima, const vector<atom> &atoms
                 err_checkf(atom_index2 >= 0, "Only one atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
                 double ratio = std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2);
                 if (min_dist1 < 0.125 && atoms[atom_index1].get_charge() > 2) // If the maximum is very close to an atom, we assume it's a core basin and label it with that atom
-                    result[i] = atoms[atom_index1].get_label() + "_core";
+                    result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + "_core";
                 else if ((ratio < 0.25 || ratio > 4) && atoms[atom_index1].get_charge() > 2) // If the maximum is significantly closer to one atom than to the other, we assume it's a valence basin and label it with the closest atom
-                    result[i] = atoms[atom_index1].get_label() + "_LP";
+                    result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + "_LP";
                 else // Otherwise, we assume it's a bond basin and label it with both atoms
-                    result[i] = atoms[atom_index1].get_label() + "_" + atoms[atom_index2].get_label() + "_bond";
+                    result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + "_" + atoms[atom_index2].get_label() + to_string(atom_index2) + "_bond";
             }
             break;
         default:
