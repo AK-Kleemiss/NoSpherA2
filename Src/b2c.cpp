@@ -612,6 +612,117 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
         std::cout << "done with basin assignment!" << endl;
     std::cout << "I found " << iCP << " Basins." << endl;
 
+    // Post-processing: Merge adjacent basins with very similar maxima values
+    // This handles cases where high-resolution grids split a single basin across multiple local maxima
+    {
+        const double merge_value_tolerance = 2e-1;  // Merge if max values differ by less than this
+        const double merge_distance_threshold = 27.5; // Merge if basin centers are closer than this (in grid units)
+        
+        std::vector<int> basin_mapping(iCP + 1);
+        for (int i = 0; i <= iCP; i++) basin_mapping[i] = i; // Identity mapping initially
+        
+        std::cout << "MERGE PHASE: Consolidating adjacent basins with similar maxima..." << endl;
+        
+        // Find adjacent basins and merge candidates
+        for (int b1 = 1; b1 <= iCP; b1++) {
+            if (basin_mapping[b1] != b1) continue; // Already merged into another basin
+            
+            for (int b2 = b1 + 1; b2 <= iCP; b2++) {
+                if (basin_mapping[b2] != b2) continue; // Already merged into another basin
+                
+                const double val1 = Maxima[b1 - 1][3];
+                const double val2 = Maxima[b2 - 1][3];
+                
+                // Check if maxima values are similar enough
+                if (std::abs(val1 - val2) > merge_value_tolerance)
+                    continue;
+                
+                // Check if basin centers are close enough
+                const double dx = Maxima[b1 - 1][0] - Maxima[b2 - 1][0];
+                const double dy = Maxima[b1 - 1][1] - Maxima[b2 - 1][1];
+                const double dz = Maxima[b1 - 1][2] - Maxima[b2 - 1][2];
+                const double dist = std::sqrt(dx * dx + dy * dy + dz * dz) / xlength;
+                
+                if (dist <= merge_distance_threshold) {
+                    // Merge b2 into b1 (keep larger basin ID to maintain basin indices)
+                    int keep_basin = std::max(b1, b2);
+                    int merge_basin = std::min(b1, b2);
+                    basin_mapping[merge_basin] = keep_basin;
+                    
+                    if (debug)
+                        std::cout << "Merging basin " << merge_basin << " into basin " << keep_basin 
+                                  << " (distance: " << dist << " grid units, value diff: " 
+                                  << std::abs(val1 - val2) << ")" << endl;
+                }
+            }
+        }
+        
+        // Apply basin mapping to grid
+        int merged_count = 0;
+        for (int x = 0; x < size_x; x++) {
+            for (int y = 0; y < size_y; y++) {
+                for (int z = 0; z < size_z; z++) {
+                    int current_basin = basin_cube.get_value(x, y, z);
+                    if (current_basin > 0 && current_basin <= iCP) {
+                        int target_basin = basin_mapping[current_basin];
+                        if (target_basin != current_basin) {
+                            basin_cube.set_value(x, y, z, target_basin);
+                            merged_count++;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (merged_count > 0) {
+            std::cout << "Merged basins: Reassigned " << merged_count << " grid points" << endl;
+        }
+        
+        // Compact basin IDs if some basins were completely merged away
+        std::vector<int> basin_active(iCP + 1, 0);
+        for (int x = 0; x < size_x; x++) {
+            for (int y = 0; y < size_y; y++) {
+                for (int z = 0; z < size_z; z++) {
+                    int basin = basin_cube.get_value(x, y, z);
+                    if (basin > 0 && basin <= iCP)
+                        basin_active[basin] = 1;
+                }
+            }
+        }
+        
+        // Create remapping for compact IDs
+        int new_id = 0;
+        std::vector<int> compact_map(iCP + 1);
+        std::vector<d4> new_Maxima;
+        for (int i = 1; i <= iCP; i++) {
+            if (basin_active[i]) {
+                new_id++;
+                compact_map[i] = new_id;
+                new_Maxima.push_back(Maxima[i - 1]);
+            }
+        }
+        
+        if (new_id < iCP) {
+            // Reassign with compact IDs
+            for (int x = 0; x < size_x; x++) {
+                for (int y = 0; y < size_y; y++) {
+                    for (int z = 0; z < size_z; z++) {
+                        int basin = basin_cube.get_value(x, y, z);
+                        if (basin > 0)
+                            basin_cube.set_value(x, y, z, compact_map[basin]);
+                    }
+                }
+            }
+            iCP = new_id;
+            Maxima = new_Maxima;
+            std::cout << "Basin compaction: Reduced from " << basin_mapping.size() - 1 << " to " << iCP << " basins" << endl;
+        }
+    }
+
+    if (debug)
+        std::cout << "done with basin consolidation!" << endl;
+    std::cout << "Final basin count: " << iCP << " Basins." << endl;
+
     for (int d = 0; d < 3; d++) {
         basin_cube.set_origin(d, cub->get_origin(d));
         for (int j = 0; j < 3; j++)
@@ -717,15 +828,16 @@ svec assign_labels_to_basins(const vector<d4> &Maxima, const vector<atom> &atoms
                         atom_index2 = j;
                     }
                 }
+                const double core_dist = atoms[atom_index1].get_charge() < 18 ? 0.125 : atoms[atom_index1].get_charge() < 36 ? 0.35 : 0.7;
                 err_checkf(atom_index1 >= 0, "No atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
                 err_checkf(atom_index2 >= 0, "Only one atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
                 double ratio = std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2);
-                if (min_dist1 < 0.125 && atoms[atom_index1].get_charge() > 2) // If the maximum is very close to an atom, we assume it's a core basin and label it with that atom
-                    result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + "_core";
-                else if ((ratio < 0.25 || ratio > 4) && atoms[atom_index1].get_charge() > 2) // If the maximum is significantly closer to one atom than to the other, we assume it's a valence basin and label it with the closest atom
-                    result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + "_LP";
+                if (min_dist1 < core_dist && atoms[atom_index1].get_charge() > 2) // If the maximum is very close to an atom, we assume it's a core basin and label it with that atom
+                    result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " core";
+                else if ((ratio < 0.333 || ratio > 3) && atoms[atom_index1].get_charge() > 2) // If the maximum is significantly closer to one atom than to the other, we assume it's a valence basin and label it with the closest atom
+                    result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " LP";
                 else // Otherwise, we assume it's a bond basin and label it with both atoms
-                    result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + "_" + atoms[atom_index2].get_label() + to_string(atom_index2) + "_bond";
+                    result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + "-" + atoms[atom_index2].get_label() + to_string(atom_index2) + " bond";
             }
             break;
         default:
