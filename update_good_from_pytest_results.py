@@ -43,18 +43,13 @@ def load_tests(toml_path: Path) -> list[TestEntry]:
 
 
 def source_candidates(test: TestEntry) -> list[str]:
-    candidates: list[str] = []
-
-    # Primary mapping used by this repository: <good-stem>.log -> <good>
-    good_name = Path(test.good).name
-    candidates.append(f"{Path(good_name).stem}.log")
-
-    # Secondary mapping based on configured `actual` output file.
-    actual_name = Path(test.actual).name
-    if actual_name.endswith(".log") and actual_name not in candidates:
-        candidates.append(actual_name)
-
-    return candidates
+    if test.actual == "NoSpherA2.log":
+        # File is stored under the good-stem name: <good-stem>.log
+        good_name = Path(test.good).name
+        return [f"{Path(good_name).stem}.log"]
+    else:
+        # File is stored as-is (actual filename, may not be a .log)
+        return [Path(test.actual).name]
 
 
 def update_one(

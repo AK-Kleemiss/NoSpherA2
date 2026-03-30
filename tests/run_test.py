@@ -89,6 +89,16 @@ def exe_path():
     return os.path.abspath(exe)
 
 
+@pytest.fixture(scope="function", autouse=True)
+def clean_test_failed_logs(request):
+    """Clean test-specific failed_logs directory before running each test."""
+    # Extract test name from the parametrized test
+    test_name = request.node.callspec.params.get("test").name if hasattr(request.node, "callspec") else None
+    if test_name:
+        test_failed_dir = Path(__file__).parent / "failed_logs" / test_name
+        if test_failed_dir.exists():
+            shutil.rmtree(test_failed_dir)
+
 
 def print_color_diff(diff):
     colored_diff = []
@@ -192,13 +202,10 @@ def test_nos(test, exe_path, tmp_path, request):
 
     good_path = os.path.join(work_dir, test.good)
     actual_gen = os.path.join(work_dir, test.actual)
-    extra_logs = work_dir.glob("*.log")
     failed_dir = (
         Path(os.path.dirname(os.path.abspath(__file__))) / "failed_logs" / test.name
     )
     failed_dir.mkdir(parents=True, exist_ok=True)
-    for log in extra_logs:
-        shutil.copy2(log, failed_dir / log.name)
 
     if test.actual == "NoSpherA2.log":
         actual_path = os.path.join(work_dir, test.good.replace("good", "log"))
@@ -206,6 +213,9 @@ def test_nos(test, exe_path, tmp_path, request):
             shutil.move(actual_gen, actual_path)
     else:
         actual_path = actual_gen
+
+    if os.path.exists(actual_path):
+        shutil.copy2(actual_path, failed_dir / Path(actual_path).name)
 
     if not os.path.exists(actual_path):
         pytest.fail(f"Log {actual_path} missing.", pytrace=False)
