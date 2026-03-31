@@ -640,6 +640,7 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const
             case PartitionType::Hirshfeld: results.atom_charges[PartitionResults::CHARGE_ORDER::S_HIRSH][atom] = acc;  break;
             case PartitionType::MBIS:      results.atom_charges[PartitionResults::CHARGE_ORDER::S_MBIS][atom] = acc;   break;
             case PartitionType::EMBIS:     results.atom_charges[PartitionResults::CHARGE_ORDER::S_EMBIS][atom] = acc;  break;
+            default:                       results.atom_charges[PartitionResults::CHARGE_ORDER::S_HIRSH][atom] = acc;  break;
             }
         }
 
@@ -647,19 +648,20 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const
         if (wave.get_has_ECPs()) {
             const int ecp_e = wave.get_atom_ECP_electrons(atom); // map atom->basis if needed
             if (config_.debug || config_.all_charges) {
-                results.atom_charges[PartitionResults::S_BECKE][atom] += ecp_e;
-                results.atom_charges[PartitionResults::S_HIRSH][atom] += ecp_e;
-                results.atom_charges[PartitionResults::S_TFVC][atom] += ecp_e;
-                results.atom_charges[PartitionResults::S_MBIS][atom] += ecp_e;
-                results.atom_charges[PartitionResults::S_EMBIS][atom] += ecp_e;
+                results.atom_charges[PartitionResults::CHARGE_ORDER::S_BECKE][atom] += ecp_e;
+                results.atom_charges[PartitionResults::CHARGE_ORDER::S_HIRSH][atom] += ecp_e;
+                results.atom_charges[PartitionResults::CHARGE_ORDER::S_TFVC][atom] += ecp_e;
+                results.atom_charges[PartitionResults::CHARGE_ORDER::S_MBIS][atom] += ecp_e;
+                results.atom_charges[PartitionResults::CHARGE_ORDER::S_EMBIS][atom] += ecp_e;
             }
             else {
                 switch (config_.partition_type) {
-                case PartitionType::Becke:     results.atom_charges[PartitionResults::S_BECKE][atom] += ecp_e; break;
-                case PartitionType::TFVC:      results.atom_charges[PartitionResults::S_TFVC][atom] += ecp_e; break;
-                case PartitionType::MBIS:      results.atom_charges[PartitionResults::S_MBIS][atom] += ecp_e; break;
-                case PartitionType::EMBIS:     results.atom_charges[PartitionResults::S_EMBIS][atom] += ecp_e; break;
-                case PartitionType::Hirshfeld: results.atom_charges[PartitionResults::S_HIRSH][atom] += ecp_e; break;
+                case PartitionType::Becke:     results.atom_charges[PartitionResults::CHARGE_ORDER::S_BECKE][atom] += ecp_e; break;
+                case PartitionType::TFVC:      results.atom_charges[PartitionResults::CHARGE_ORDER::S_TFVC][atom] += ecp_e; break;
+                case PartitionType::MBIS:      results.atom_charges[PartitionResults::CHARGE_ORDER::S_MBIS][atom] += ecp_e; break;
+                case PartitionType::EMBIS:     results.atom_charges[PartitionResults::CHARGE_ORDER::S_EMBIS][atom] += ecp_e; break;
+                case PartitionType::Hirshfeld: results.atom_charges[PartitionResults::CHARGE_ORDER::S_HIRSH][atom] += ecp_e; break;
+                default:                       results.atom_charges[PartitionResults::CHARGE_ORDER::S_HIRSH][atom] += ecp_e; break;
                 }
             }
         }
