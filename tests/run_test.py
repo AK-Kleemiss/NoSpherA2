@@ -148,6 +148,10 @@ def _extract_floats(text):
     return [float(token) for token in NUMBER_PATTERN.findall(text)]
 
 
+def _normalize_whitespace(text):
+    return " ".join(text.split())
+
+
 def _numeric_line_within_relative_tolerance(
     expected_line,
     actual_line,
@@ -160,8 +164,8 @@ def _numeric_line_within_relative_tolerance(
     if not expected_values or not actual_values or len(expected_values) != len(actual_values):
         return False
 
-    expected_skeleton = NUMBER_PATTERN.sub("<num>", expected_line)
-    actual_skeleton = NUMBER_PATTERN.sub("<num>", actual_line)
+    expected_skeleton = _normalize_whitespace(NUMBER_PATTERN.sub("<num>", expected_line))
+    actual_skeleton = _normalize_whitespace(NUMBER_PATTERN.sub("<num>", actual_line))
     if expected_skeleton != actual_skeleton:
         return False
 
