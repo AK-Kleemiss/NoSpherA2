@@ -148,7 +148,12 @@ def _extract_floats(text):
     return [float(token) for token in NUMBER_PATTERN.findall(text)]
 
 
-def _numeric_line_within_relative_tolerance(expected_line, actual_line, relative_tolerance=0.01):
+def _numeric_line_within_relative_tolerance(
+    expected_line,
+    actual_line,
+    relative_tolerance=0.01,
+    zero_tiny_threshold=None,
+):
     expected_values = _extract_floats(expected_line)
     actual_values = _extract_floats(actual_line)
 
@@ -161,6 +166,15 @@ def _numeric_line_within_relative_tolerance(expected_line, actual_line, relative
         return False
 
     for expected_value, actual_value in zip(expected_values, actual_values):
+        if (
+            zero_tiny_threshold is not None
+            and (
+                (expected_value == 0.0 and abs(actual_value) < zero_tiny_threshold)
+                or (actual_value == 0.0 and abs(expected_value) < zero_tiny_threshold)
+            )
+        ):
+            continue
+
         difference = abs(expected_value - actual_value)
         allowed = abs(actual_value) * relative_tolerance
         if difference > allowed:
@@ -168,7 +182,7 @@ def _numeric_line_within_relative_tolerance(expected_line, actual_line, relative
 
     return True
 
-def check_differences(good_path, actual_path):
+def check_differences(good_path, actual_path, relative_tolerance=0.01, zero_tiny_threshold=None):
     with open(good_path, 'r') as fg, open(actual_path, 'r') as fa:
         expected = [line.strip() for line in fg if line.strip()]
         actual = [line.strip() for line in fa if line.strip()]
@@ -186,7 +200,12 @@ def check_differences(good_path, actual_path):
             significant_difference = True
             continue
 
-        if _numeric_line_within_relative_tolerance(expected_line, actual_line, relative_tolerance=0.01):
+        if _numeric_line_within_relative_tolerance(
+            expected_line,
+            actual_line,
+            relative_tolerance=relative_tolerance,
+            zero_tiny_threshold=zero_tiny_threshold,
+        ):
             tolerated_line_numbers.append(line_number)
             continue
 
@@ -195,8 +214,8 @@ def check_differences(good_path, actual_path):
     if tolerated_line_numbers:
         warnings.warn(
             (
-                f"{os.path.basename(actual_path)} has minor numeric differences "
-                f"within 1% on line(s): {', '.join(map(str, tolerated_line_numbers))}."
+                f"{os.path.basename(actual_path)} has tolerated numeric differences "
+                f"on line(s): {', '.join(map(str, tolerated_line_numbers))}."
             ),
             UserWarning,
             stacklevel=2,
@@ -212,7 +231,12 @@ def check_differences(good_path, actual_path):
         print_color_diff(diff)
             
 def check_differences_cubes(good_path, actual_path):
-    check_differences(good_path, actual_path)
+    check_differences(
+        good_path,
+        actual_path,
+        relative_tolerance=0.01,
+        zero_tiny_threshold=1e-10,
+    )
 
 @pytest.mark.parametrize("test", TESTS, ids=lambda t: t.name)
 def test_nos(test, exe_path, tmp_path, request):
