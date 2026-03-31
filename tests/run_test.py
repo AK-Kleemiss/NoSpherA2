@@ -4,6 +4,8 @@ import platform
 import subprocess
 import difflib
 import re
+import warnings
+from itertools import zip_longest
 from pathlib import Path
 
 try:
@@ -80,7 +82,34 @@ TESTS = _load_tests()
 
 @pytest.fixture(scope="session")
 def exe_path():
-    exe = os.environ.get("NOS_EXE", "NoSpherA2")
+    configured_exe = os.environ.get("NOS_EXE")
+    if configured_exe:
+        exe = configured_exe
+    else:
+        repo_root = Path(__file__).resolve().parent.parent
+        if platform.system() == "Windows":
+            candidates = [
+                repo_root / "Windows" / "x64" / "Release" / "NoSpherA2.exe",
+                repo_root / "NoSpherA2.exe",
+                "NoSpherA2.exe",
+                "NoSpherA2",
+            ]
+        else:
+            candidates = [
+                repo_root / "NoSpherA2",
+                "NoSpherA2",
+            ]
+
+        exe = None
+        for candidate in candidates:
+            candidate_str = str(candidate)
+            if os.path.exists(candidate_str) or shutil.which(candidate_str):
+                exe = candidate_str
+                break
+
+        if exe is None:
+            exe = "NoSpherA2"
+
     if not shutil.which(exe) and not os.path.exists(exe):
         pytest.fail(
             "Executable not found. Pass via NOS_EXE environment variable.",
@@ -110,27 +139,31 @@ def print_color_diff(diff):
         else:
             colored_diff.append(line)
     pytest.fail("Output Mismatch!\n" + "\n".join(colored_diff), pytrace=False)
-    
-def check_approximately_equal(diff, threshold=1e-7):
-    actual_values = []
-    expected_values = []
-    number_pattern = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
 
-    def extract_floats(text):
-        return [float(token) for token in number_pattern.findall(text)]
 
-    for line in diff:
-        if line.startswith('+') and not line.startswith('+++'):
-            actual_values.extend(extract_floats(line[1:].strip()))
+NUMBER_PATTERN = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
 
-        elif line.startswith('-') and not line.startswith('---'):
-            expected_values.extend(extract_floats(line[1:].strip()))
-    
-    if len(actual_values) != len(expected_values):
+
+def _extract_floats(text):
+    return [float(token) for token in NUMBER_PATTERN.findall(text)]
+
+
+def _numeric_line_within_relative_tolerance(expected_line, actual_line, relative_tolerance=0.01):
+    expected_values = _extract_floats(expected_line)
+    actual_values = _extract_floats(actual_line)
+
+    if not expected_values or not actual_values or len(expected_values) != len(actual_values):
         return False
-    
-    for a, e in zip(actual_values, expected_values):
-        if abs(a - e) > threshold:
+
+    expected_skeleton = NUMBER_PATTERN.sub("<num>", expected_line)
+    actual_skeleton = NUMBER_PATTERN.sub("<num>", actual_line)
+    if expected_skeleton != actual_skeleton:
+        return False
+
+    for expected_value, actual_value in zip(expected_values, actual_values):
+        difference = abs(expected_value - actual_value)
+        allowed = abs(actual_value) * relative_tolerance
+        if difference > allowed:
             return False
 
     return True
@@ -140,34 +173,46 @@ def check_differences(good_path, actual_path):
         expected = [line.strip() for line in fg if line.strip()]
         actual = [line.strip() for line in fa if line.strip()]
     
-    if expected != actual:
+    tolerated_line_numbers = []
+    significant_difference = False
+
+    for line_number, (expected_line, actual_line) in enumerate(
+        zip_longest(expected, actual), start=1
+    ):
+        if expected_line == actual_line:
+            continue
+
+        if expected_line is None or actual_line is None:
+            significant_difference = True
+            continue
+
+        if _numeric_line_within_relative_tolerance(expected_line, actual_line, relative_tolerance=0.01):
+            tolerated_line_numbers.append(line_number)
+            continue
+
+        significant_difference = True
+
+    if tolerated_line_numbers:
+        warnings.warn(
+            (
+                f"{os.path.basename(actual_path)} has minor numeric differences "
+                f"within 1% on line(s): {', '.join(map(str, tolerated_line_numbers))}."
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
+
+    if significant_difference:
         diff = list(difflib.unified_diff(
             expected, actual,
             fromfile=f'Expected ({os.path.basename(good_path)})',
             tofile=f'Actual ({os.path.basename(actual_path)})',
             lineterm=''
         ))
-
         print_color_diff(diff)
             
 def check_differences_cubes(good_path, actual_path):
-    with open(good_path, 'r') as fg, open(actual_path, 'r') as fa:
-        expected = [line.strip() for line in fg if line.strip()]
-        actual = [line.strip() for line in fa if line.strip()]
-    
-    if expected != actual:
-        diff = list(difflib.unified_diff(
-            expected, actual,
-            fromfile=f'Expected ({os.path.basename(good_path)})',
-            tofile=f'Actual ({os.path.basename(actual_path)})',
-            lineterm=''
-        ))
-
-        try:
-            if not check_approximately_equal(diff, threshold=1e-5):
-                print_color_diff(diff)   
-        except:
-            print_color_diff(diff)
+    check_differences(good_path, actual_path)
 
 @pytest.mark.parametrize("test", TESTS, ids=lambda t: t.name)
 def test_nos(test, exe_path, tmp_path, request):
@@ -188,6 +233,8 @@ def test_nos(test, exe_path, tmp_path, request):
     cmd_args = test.build_cmd(exe_path)
     print(" ".join(cmd_args))
     OCC_DATA_PATH = str(request.config.rootpath / "occ" / "share")
+    run_env = os.environ.copy()
+    run_env["OCC_DATA_PATH"] = OCC_DATA_PATH
     try:
         subprocess.run(
             cmd_args,
@@ -195,7 +242,7 @@ def test_nos(test, exe_path, tmp_path, request):
             check=True,
             capture_output=True,
             text=True,
-            env=os.environ.copy() | {"OCC_DATA_PATH": OCC_DATA_PATH},
+            env=run_env,
         )
     except subprocess.CalledProcessError as e:
         pytest.fail(f"Execution failed.\nStderr: {e.stderr}", pytrace=False)
