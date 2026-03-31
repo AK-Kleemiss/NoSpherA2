@@ -2416,11 +2416,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|x64'">
     <LinkIncremental>true</LinkIncremental>
     <RunCodeAnalysis>false</RunCodeAnalysis>
-    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
-    <linkage-MKL-static-win-x64>
-    </linkage-MKL-static-win-x64>
-    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
-    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|ARM64'">
     <LinkIncremental>true</LinkIncremental>
