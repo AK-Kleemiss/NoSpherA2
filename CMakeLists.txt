@@ -89,8 +89,8 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     )
 endif()
 if(
-    NOT ${USE_SANITIZER} STREQUAL ""
-    AND NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug"
+    NOT "${USE_SANITIZER}" STREQUAL ""
+    AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug"
 )
     message(
         FATAL_ERROR
@@ -98,24 +98,35 @@ if(
     )
 endif()
 
+if(NOT "${USE_SANITIZER}" STREQUAL "" AND MSVC)
+    message(
+        FATAL_ERROR
+        "Sanitizers configured via USE_SANITIZER are not supported with the MSVC toolchain in this project."
+    )
+endif()
+
 if(USE_SANITIZER MATCHES "Address")
     add_compile_options(
-        -fsanitize=address,leak,undefined
-        -fno-omit-frame-pointer
-        -O0
+        $<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>
+        $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
+        $<$<CONFIG:Debug>:-O0>
     )
-    add_link_options(-fsanitize=address,leak,undefined)
+    add_link_options($<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>)
 elseif(USE_SANITIZER MATCHES "Thread")
-    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -O0)
-    add_link_options(-fsanitize=thread)
+    add_compile_options(
+        $<$<CONFIG:Debug>:-fsanitize=thread>
+        $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
+        $<$<CONFIG:Debug>:-O0>
+    )
+    add_link_options($<$<CONFIG:Debug>:-fsanitize=thread>)
 elseif(USE_SANITIZER MATCHES "Memory")
     add_compile_options(
-        -fsanitize=memory
-        -fsanitize-memory-track-origins
-        -fno-omit-frame-pointer
-        -O0
+        $<$<CONFIG:Debug>:-fsanitize=memory>
+        $<$<CONFIG:Debug>:-fsanitize-memory-track-origins>
+        $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
+        $<$<CONFIG:Debug>:-O0>
     )
-    add_link_options(-fsanitize=memory)
+    add_link_options($<$<CONFIG:Debug>:-fsanitize=memory>)
 endif()
 
 if(MSVC AND NOT ("${OCC_BUILD_TYPE}" STREQUAL "${CMAKE_BUILD_TYPE}"))
