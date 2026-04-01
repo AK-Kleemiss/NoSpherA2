@@ -26,7 +26,7 @@ pytest_discover_tests(
     NoSpherA2Tests
     TEST_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/run_test.py"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    TRIM_FROM_NAME "^test"
+    TRIM_FROM_NAME "^_nos"
     STRIP_PARAM_BRACKETS
     ENVIRONMENT ${_ENVIRONMENT}
     DEPENDS NoSpherA2
