@@ -22,7 +22,7 @@
 #include <occ/main/occ_scf.h>
 #include <occ/gto/gto.h>
 #include <occ/core/parallel.h>
-#include <occ/io/conversion.h>
+#include <occ/qm/io/conversion.h>
 #include <occ/io/occ_input.h>
 #include <occ/qm/wavefunction.h>
 #if defined(__GNUC__) && !defined(__clang__)
