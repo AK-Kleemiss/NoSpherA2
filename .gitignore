@@ -127,3 +127,6 @@ tests/alanine_integrated_occ/alanine.owf.fchk
 tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_def.cube
 tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rdg.cube
 tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_signed_rho.cube
+**featomic_install*
+**LibCint_arm*
+Mac/NoSpherA2_arm64
