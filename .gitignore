@@ -130,3 +130,4 @@ tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_signed_rho.cube
 **featomic_install*
 **LibCint_arm*
 Mac/NoSpherA2_arm64
+tests/failed_logs/fractal/sucrose_diff.cube_fractal_plot

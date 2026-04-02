@@ -112,7 +112,6 @@ test_reading_SALTED_binary = true
 [ri_fit]
 directory = "epoxide_gbw"
 good = "ri_fit.good"
-skip_mac = true
 
 [ri_fit.args]
 wfn = "epoxide.gbw"
