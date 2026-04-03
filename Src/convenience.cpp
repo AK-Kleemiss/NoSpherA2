@@ -28,6 +28,25 @@ namespace {
 
     std::filesystem::path resolve_executable_directory(const char *argv0)
     {
+        // Prefer argv0 — it comes directly from the program's own argument vector
+        // and avoids reading /proc/self (which Flawfinder flags as a potential
+        // information-hiding / unterminated-result risk on Linux).
+        if (argv0 != nullptr)
+        {
+            try
+            {
+                auto p = std::filesystem::absolute(std::filesystem::path(argv0)).parent_path();
+                if (!p.empty() && std::filesystem::exists(p))
+                    return p;
+            }
+            catch (...)
+            {
+                // Filesystem operations may throw (e.g. on very unusual path strings);
+                // fall through to the platform-specific fallback below.
+            }
+        }
+
+        // Fall back to platform-specific APIs when argv0 is unavailable or unusable.
 #ifdef _WIN32
         char module_path[MAX_PATH];
         DWORD len = GetModuleFileNameA(nullptr, module_path, MAX_PATH);
@@ -53,17 +72,6 @@ namespace {
         }
 #endif
 
-        if (argv0 != nullptr)
-        {
-            try
-            {
-                return std::filesystem::absolute(std::filesystem::path(argv0)).parent_path();
-            }
-            catch (...)
-            {
-                return {};
-            }
-        }
         return {};
     }
 
