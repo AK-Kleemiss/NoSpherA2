@@ -6798,6 +6798,8 @@ const double WFN::compute_dens(
     for (int i = 0; i < ncen; i++)
         d[i].resize(16, 0.0);
     return compute_dens_cartesian(Pos, d, phi);
+    d.clear();
+    phi.clear();
     //}
 };
 
@@ -6973,6 +6975,9 @@ const double WFN::compute_dens_cartesian(
         }
     }
 
+    delete[] MO_coefs_data;
+    MO_coefs_data = nullptr;
+
     // use pointer arithmetic and minimize overhead
     const double *phi_ptr = phi_data;
     const double *phi_end = phi_ptr + nmo;
@@ -6986,6 +6991,142 @@ const double WFN::compute_dens_cartesian(
 
     return Rho;
 }
+
+const double WFN::compute_g_cartesian(
+    const d3 &Pos,
+    vec2 &d,
+    vec &phi) const
+{
+    std::fill(phi.begin(), phi.end(), 0.0);
+    double g = 0.0;
+    int j;
+    double ex, *d_;
+
+    // precalculate some distances and powers of distances for faster computation
+    for (j = 0; j < ncen; j++)
+    {
+        const atom &a = atoms[j];
+        d_ = d[j].data();
+        d_[0] = Pos[0] - a.get_coordinate(0);
+        d_[1] = Pos[1] - a.get_coordinate(1);
+        d_[2] = Pos[2] - a.get_coordinate(2);
+        d_[4] = d_[0] * d_[0];
+        d_[5] = d_[1] * d_[1];
+        d_[6] = d_[2] * d_[2];
+        d_[3] = d_[4] + d_[5] + d_[6];
+        d_[7] = d_[0] * d_[4];
+        d_[8] = d_[1] * d_[5];
+        d_[9] = d_[2] * d_[6];
+        d_[10] = d_[0] * d_[7];
+        d_[11] = d_[1] * d_[8];
+        d_[12] = d_[2] * d_[9];
+        d_[13] = d_[0] * d_[10];
+        d_[14] = d_[1] * d_[11];
+        d_[15] = d_[2] * d_[12];
+    }
+
+    // Pre-cache frequently accessed data
+    const int *centers_data = centers.data();
+    const int *types_data = types.data();
+    const double *exponents_data = exponents.data();
+    double *phi_data = phi.data();
+    const double exp_cutoff = constants::exp_cutoff;
+
+    for (j = 0; j < nex; j++)
+    {
+        d_ = d[centers_data[j] - 1].data();
+        ex = -exponents_data[j] * d_[3];
+        if (ex < exp_cutoff)
+        { // corresponds to cutoff of maximum density contribution of 1E-5
+            continue;
+        }
+        ex = exp(ex);
+        switch (types_data[j])
+        {
+        case 0:  break;
+        case 1:  break;// 0, 0, 0,
+        case 2:  ex *= d_[0]; break;// 1, 0, 0,
+        case 3:  ex *= d_[1]; break;// 0, 1, 0,
+        case 4:  ex *= d_[2]; break;// 0, 0, 1,
+        case 5:  ex *= d_[4]; break;// 2, 0, 0,
+        case 6:  ex *= d_[5]; break;// 0, 2, 0,
+        case 7:  ex *= d_[6]; break;// 0, 0, 2,
+        case 8:  ex *= d_[0] * d_[1]; break;// 1, 1, 0,
+        case 9:  ex *= d_[0] * d_[2]; break;// 1, 0, 1,
+        case 10: ex *= d_[1] * d_[2]; break;// 0, 1, 1,
+        case 11: ex *= d_[7]; break;// 3, 0, 0,
+        case 12: ex *= d_[8]; break;// 0, 3, 0,
+        case 13: ex *= d_[9]; break;// 0, 0, 3,
+        case 14: ex *= d_[4] * d_[1]; break;// 2, 1, 0,
+        case 15: ex *= d_[4] * d_[2]; break;// 2, 0, 1,
+        case 16: ex *= d_[5] * d_[2]; break;// 0, 2, 1,
+        case 17: ex *= d_[0] * d_[5]; break;// 1, 2, 0,
+        case 18: ex *= d_[0] * d_[6]; break;// 1, 0, 2,
+        case 19: ex *= d_[1] * d_[6]; break;// 0, 1, 2,
+        case 20: ex *= d_[0] * d_[1] * d_[2]; break;// 1, 1, 1,
+        case 21: ex *= d_[12]; break;// 0, 0, 4,
+        case 22: ex *= d_[1] * d_[9]; break;// 0, 1, 3,
+        case 23: ex *= d_[5] * d_[6]; break;// 0, 2, 2,
+        case 24: ex *= d_[8] * d_[2]; break;// 0, 3, 1,
+        case 25: ex *= d_[11]; break;// 0, 4, 0,
+        case 26: ex *= d_[0] * d_[9]; break;// 1, 0, 3,
+        case 27: ex *= d_[0] * d_[1] * d_[6]; break;// 1, 1, 2,
+        case 28: ex *= d_[0] * d_[5] * d_[2]; break;// 1, 2, 1,
+        case 29: ex *= d_[0] * d_[8]; break;// 1, 3, 0,
+        case 30: ex *= d_[4] * d_[6]; break;// 2, 0, 2,
+        case 31: ex *= d_[4] * d_[1] * d_[2]; break;// 2, 1, 1,
+        case 32: ex *= d_[4] * d_[5]; break;// 2, 2, 0,
+        case 33: ex *= d_[7] * d_[2]; break;// 3, 0, 1,
+        case 34: ex *= d_[7] * d_[1]; break;// 3, 1, 0,
+        case 35: ex *= d_[10]; break;// 4, 0, 0,
+        case 36: ex *= d_[15]; break;// 0, 0, 5,
+        case 37: ex *= d_[1] * d_[12]; break;// 0, 1, 4,
+        case 38: ex *= d_[5] * d_[9]; break;// 0, 2, 3,
+        case 39: ex *= d_[8] * d_[6]; break;// 0, 3, 2,
+        case 40: ex *= d_[11] * d_[2]; break;// 0, 4, 1,
+        case 41: ex *= d_[14]; break;// 0, 5, 0,
+        case 42: ex *= d_[0] * d_[12]; break;// 1, 0, 4,
+        case 43: ex *= d_[0] * d_[1] * d_[9]; break;// 1, 1, 3,
+        case 44: ex *= d_[0] * d_[8] * d_[2]; break;// 1, 3, 1,
+        case 45: ex *= d_[0] * d_[11]; break;// 1, 4, 0,
+        case 46: ex *= d_[4] * d_[9]; break;// 2, 0, 3,
+        case 47: ex *= d_[4] * d_[1] * d_[6]; break;// 2, 1, 2,
+        case 48: ex *= d_[4] * d_[5] * d_[2]; break;// 2, 2, 1,
+        case 49: ex *= d_[4] * d_[8]; break;// 2, 3, 0,
+        case 50: ex *= d_[7] * d_[6]; break;// 3, 0, 2,
+        case 51: ex *= d_[7] * d_[1] * d_[2]; break;// 3, 1, 1,
+        case 52: ex *= d_[7] * d_[5]; break;// 3, 2, 0,
+        case 53: ex *= d_[10] * d_[2]; break;// 4, 0, 1,
+        case 54: ex *= d_[10] * d_[1]; break;// 4, 1, 0,
+        case 55: ex *= d_[13]; break;// 5, 0, 0 
+        default: break;
+        }
+
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        double *phi_ptr = phi_data;
+        const double *phi_end = phi_ptr + nmo;
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; phi_ptr != phi_end; ++phi_ptr)
+        {
+            *phi_ptr += ex;
+        }
+    }
+
+    // use pointer arithmetic and minimize overhead
+    const double *phi_ptr = phi_data;
+    const double *phi_end = phi_ptr + nmo;
+
+    for (; phi_ptr != phi_end; ++phi_ptr)
+    {
+        const double &phi_val = *phi_ptr;
+        g += phi_val * phi_val;
+    }
+
+    return g;
+}
+
 
 const double WFN::compute_spin_dens_cartesian(
     const d3 &Pos,
@@ -7109,6 +7250,9 @@ const double WFN::compute_spin_dens_cartesian(
             *phi_ptr += (*mo_coef_ptr)[j] * ex;
         }
     }
+
+    delete[] MO_coefs_data;
+    MO_coefs_data = nullptr;
 
     // use pointer arithmetic and minimize overhead
     const double *phi_ptr = phi_data;
@@ -7540,12 +7684,12 @@ const void WFN::computeValues(
                 return;
             }
         }
-        double ex2 = 2 * get_exponent(j);
+        const double ex2 = 2 * get_exponent(j);
         chi[0] = xl[0][0] * xl[1][0] * xl[2][0] * ex;
         chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
         chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
         chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
-        double temp_ex = pow(ex2, 2);
+        const double temp_ex = pow(ex2, 2);
         chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + temp_ex * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
         chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
         chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
@@ -7567,6 +7711,8 @@ const void WFN::computeValues(
                 phi_ptr[k] += c * chi[k];
         }
     }
+    delete[] MO_coefs_data;
+    MO_coefs_data = nullptr;
 
     for (int mo = 0; mo < _nmo; mo++)
     {
@@ -7696,6 +7842,9 @@ const void WFN::computeELIELF(
         }
     }
 
+    delete[] MO_coefs_data;
+    MO_coefs_data = nullptr;
+
     double Grad[3]{ 0, 0, 0 };
     double tau = 0;
     double Rho = 0;
@@ -7814,6 +7963,9 @@ const double WFN::computeELI(
         }
     }
 
+    delete[] MO_coefs_data;
+    MO_coefs_data = nullptr;
+
     double Grad[3]{ 0, 0, 0 };
     double tau = 0;
     double Rho = 0;
@@ -7833,6 +7985,305 @@ const double WFN::computeELI(
         }
     }
     return Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+};
+
+void WFN::computeRhoELI(
+    const d3 &PosGrid, // [3] vector with current position on te grid
+    double& out_Rho,
+    double& out_Eli
+) const
+{
+    const int _nmo = get_nmo(false);
+    vec phi(4 * _nmo, 0.0);
+    double *phi_temp;
+    double chi[4]{ 0, 0, 0, 0 };
+    int k, j;
+    double ex = 0;
+
+    vec2 d(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(16, 0.0);
+
+    for (j = 0; j < ncen; j++)
+    {
+        const atom &a = atoms[j];
+        double *d_ = d[j].data();
+        d_[0] = PosGrid[0] - a.get_coordinate(0);
+        d_[1] = PosGrid[1] - a.get_coordinate(1);
+        d_[2] = PosGrid[2] - a.get_coordinate(2);
+        d_[4] = d_[0] * d_[0];
+        d_[5] = d_[1] * d_[1];
+        d_[6] = d_[2] * d_[2];
+        d_[3] = d_[4] + d_[5] + d_[6];
+        d_[7] = d_[0] * d_[4];
+        d_[8] = d_[1] * d_[5];
+        d_[9] = d_[2] * d_[6];
+        d_[10] = d_[0] * d_[7];
+        d_[11] = d_[1] * d_[8];
+        d_[12] = d_[2] * d_[9];
+        d_[13] = d_[0] * d_[10];
+        d_[14] = d_[1] * d_[11];
+        d_[15] = d_[2] * d_[12];
+    }
+
+    const int *centers_data = centers.data();
+    const int *types_data = types.data();
+    const double *exponents_data = exponents.data();
+    const double exp_cutoff = constants::exp_cutoff;
+
+    const MO *MOs_data = MOs.data();
+    const double **MO_coefs_data = new const double *[_nmo];
+    for (j = 0; j < _nmo; j++) {
+        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
+    }
+    const double ***start_MO_coefs_data = &MO_coefs_data;
+
+    for (j = 0; j < nex; j++)
+    {
+        const double *d_ = d[centers_data[j] - 1].data();
+        const int type = types_data[j];
+        const int type_index = (type - 1) * 3;
+        int lx = 0;
+        int ly = 0;
+        int lz = 0;
+        if (type > 1 && type <= 56) {
+            lx = constants::type_vector[type_index];
+            ly = constants::type_vector[type_index + 1];
+            lz = constants::type_vector[type_index + 2];
+        }
+
+        double temp = -exponents_data[j] * d_[3];
+        if (temp < exp_cutoff)
+            continue;
+        ex = exp(temp);
+
+        double x0 = 1.0, x1 = 0.0, xnext = d_[0];
+        double y0 = 1.0, y1 = 0.0, ynext = d_[1];
+        double z0 = 1.0, z1 = 0.0, znext = d_[2];
+
+        switch (lx) {
+        case 0: x0 = 1.0;   x1 = 0.0;    xnext = d_[0];  break;
+        case 1: x0 = d_[0]; x1 = 1.0;    xnext = d_[4];  break;
+        case 2: x0 = d_[4]; x1 = 2*d_[0]; xnext = d_[7];  break;
+        case 3: x0 = d_[7]; x1 = 3*d_[4]; xnext = d_[10]; break;
+        case 4: x0 = d_[10]; x1 = 4*d_[7]; xnext = d_[13]; break;
+        default:
+            err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
+            break;
+        }
+        switch (ly) {
+        case 0: y0 = 1.0;   y1 = 0.0;    ynext = d_[1];  break;
+        case 1: y0 = d_[1]; y1 = 1.0;    ynext = d_[5];  break;
+        case 2: y0 = d_[5]; y1 = 2*d_[1]; ynext = d_[8];  break;
+        case 3: y0 = d_[8]; y1 = 3*d_[5]; ynext = d_[11]; break;
+        case 4: y0 = d_[11]; y1 = 4*d_[8]; ynext = d_[14]; break;
+        default:
+            err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
+            break;
+        }
+        switch (lz) {
+        case 0: z0 = 1.0;   z1 = 0.0;    znext = d_[2];  break;
+        case 1: z0 = d_[2]; z1 = 1.0;    znext = d_[6];  break;
+        case 2: z0 = d_[6]; z1 = 2*d_[2]; znext = d_[9];  break;
+        case 3: z0 = d_[9]; z1 = 3*d_[6]; znext = d_[12]; break;
+        case 4: z0 = d_[12]; z1 = 4*d_[9]; znext = d_[15]; break;
+        default:
+            err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
+            break;
+        }
+
+        const double ex2 = 2 * exponents_data[j];
+        chi[0] = x0 * y0 * z0 * ex;
+        chi[1] = (x1 - ex2 * xnext) * y0 * z0 * ex;
+        chi[2] = (y1 - ex2 * ynext) * x0 * z0 * ex;
+        chi[3] = (z1 - ex2 * znext) * x0 * y0 * ex;
+
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
+        const double **mo_end = *start_MO_coefs_data + _nmo;
+        double *phi_ptr = phi.data();
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
+        {
+            const double c = (*mo_coef_ptr)[j];
+            for (k = 0; k < 4; k++)
+                phi_ptr[k] += c * chi[k];
+        }
+    }
+
+    delete[] MO_coefs_data;
+    MO_coefs_data = nullptr;
+
+    double Grad[3]{ 0, 0, 0 };
+    double tau = 0;
+    double Rho = 0;
+
+    for (int mo = 0; mo < _nmo; mo++)
+    {
+        const double occ = get_MO_occ(mo);
+        const double docc = 2 * occ;
+        if (occ != 0)
+        {
+            phi_temp = &phi[mo * 4];
+            Rho += occ * pow(*phi_temp, 2);
+            Grad[0] += docc * *phi_temp * phi_temp[1];
+            Grad[1] += docc * *phi_temp * phi_temp[2];
+            Grad[2] += docc * *phi_temp * phi_temp[3];
+            tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
+        }
+    }
+    out_Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    out_Rho = Rho;
+};
+
+void WFN::computeGrad(
+    const d3 &PosGrid, // [3] vector with current position on te grid
+    d3& gradient
+) const
+{
+    const int _nmo = get_nmo(false);
+    vec phi(4 * _nmo, 0.0);
+    double *phi_temp;
+    double chi[4]{ 0, 0, 0, 0 };
+    int k, j;
+    double ex = 0;
+
+    vec2 d(ncen);
+    for (int i = 0; i < ncen; i++)
+        d[i].resize(16, 0.0);
+
+    for (j = 0; j < ncen; j++)
+    {
+        const atom &a = atoms[j];
+        double *d_ = d[j].data();
+        d_[0] = PosGrid[0] - a.get_coordinate(0);
+        d_[1] = PosGrid[1] - a.get_coordinate(1);
+        d_[2] = PosGrid[2] - a.get_coordinate(2);
+        d_[4] = d_[0] * d_[0];
+        d_[5] = d_[1] * d_[1];
+        d_[6] = d_[2] * d_[2];
+        d_[3] = d_[4] + d_[5] + d_[6];
+        d_[7] = d_[0] * d_[4];
+        d_[8] = d_[1] * d_[5];
+        d_[9] = d_[2] * d_[6];
+        d_[10] = d_[0] * d_[7];
+        d_[11] = d_[1] * d_[8];
+        d_[12] = d_[2] * d_[9];
+        d_[13] = d_[0] * d_[10];
+        d_[14] = d_[1] * d_[11];
+        d_[15] = d_[2] * d_[12];
+    }
+
+    const int *centers_data = centers.data();
+    const int *types_data = types.data();
+    const double *exponents_data = exponents.data();
+    const double exp_cutoff = constants::exp_cutoff;
+
+    const MO *MOs_data = MOs.data();
+    const double **MO_coefs_data = new const double *[_nmo];
+    for (j = 0; j < _nmo; j++) {
+        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
+    }
+    const double ***start_MO_coefs_data = &MO_coefs_data;
+
+    for (j = 0; j < nex; j++)
+    {
+        const double *d_ = d[centers_data[j] - 1].data();
+        const int type = types_data[j];
+        const int type_index = (type - 1) * 3;
+        int lx = 0;
+        int ly = 0;
+        int lz = 0;
+        if (type > 1 && type <= 56) {
+            lx = constants::type_vector[type_index];
+            ly = constants::type_vector[type_index + 1];
+            lz = constants::type_vector[type_index + 2];
+        }
+
+        double temp = -exponents_data[j] * d_[3];
+        if (temp < exp_cutoff)
+            continue;
+        ex = exp(temp);
+
+        double x0 = 1.0, x1 = 0.0, xnext = d_[0];
+        double y0 = 1.0, y1 = 0.0, ynext = d_[1];
+        double z0 = 1.0, z1 = 0.0, znext = d_[2];
+
+        switch (lx) {
+        case 0: x0 = 1.0;   x1 = 0.0;    xnext = d_[0];  break;
+        case 1: x0 = d_[0]; x1 = 1.0;    xnext = d_[4];  break;
+        case 2: x0 = d_[4]; x1 = 2*d_[0]; xnext = d_[7];  break;
+        case 3: x0 = d_[7]; x1 = 3*d_[4]; xnext = d_[10]; break;
+        case 4: x0 = d_[10]; x1 = 4*d_[7]; xnext = d_[13]; break;
+        default:
+            err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
+            break;
+        }
+        switch (ly) {
+        case 0: y0 = 1.0;   y1 = 0.0;    ynext = d_[1];  break;
+        case 1: y0 = d_[1]; y1 = 1.0;    ynext = d_[5];  break;
+        case 2: y0 = d_[5]; y1 = 2*d_[1]; ynext = d_[8];  break;
+        case 3: y0 = d_[8]; y1 = 3*d_[5]; ynext = d_[11]; break;
+        case 4: y0 = d_[11]; y1 = 4*d_[8]; ynext = d_[14]; break;
+        default:
+            err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
+            break;
+        }
+        switch (lz) {
+        case 0: z0 = 1.0;   z1 = 0.0;    znext = d_[2];  break;
+        case 1: z0 = d_[2]; z1 = 1.0;    znext = d_[6];  break;
+        case 2: z0 = d_[6]; z1 = 2*d_[2]; znext = d_[9];  break;
+        case 3: z0 = d_[9]; z1 = 3*d_[6]; znext = d_[12]; break;
+        case 4: z0 = d_[12]; z1 = 4*d_[9]; znext = d_[15]; break;
+        default:
+            err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
+            break;
+        }
+
+        const double ex2 = 2 * exponents_data[j];
+        chi[0] = x0 * y0 * z0 * ex;
+        chi[1] = (x1 - ex2 * xnext) * y0 * z0 * ex;
+        chi[2] = (y1 - ex2 * ynext) * x0 * z0 * ex;
+        chi[3] = (z1 - ex2 * znext) * x0 * y0 * ex;
+
+        // use pointer arithmetic and cache coefficient pointer
+        // This avoids repeated virtual function calls to get_coefficient_f
+        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
+        const double **mo_end = *start_MO_coefs_data + _nmo;
+        double *phi_ptr = phi.data();
+
+        // Cache the coefficient pointer for this primitive across all MOs
+        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
+        {
+            const double c = (*mo_coef_ptr)[j];
+            for (k = 0; k < 4; k++)
+                phi_ptr[k] += c * chi[k];
+        }
+    }
+
+    delete[] MO_coefs_data;
+    MO_coefs_data = nullptr;
+
+    double Grad[3]{ 0, 0, 0 };
+
+    for (int mo = 0; mo < _nmo; mo++)
+    {
+        const double occ = get_MO_occ(mo);
+        const double docc = 2 * occ;
+        if (occ != 0)
+        {
+            phi_temp = &phi[mo * 4];
+            Grad[0] += docc * *phi_temp * phi_temp[1];
+            Grad[1] += docc * *phi_temp * phi_temp[2];
+            Grad[2] += docc * *phi_temp * phi_temp[3];
+        }
+    }
+    gradient[0] = Grad[0];
+    gradient[1] = Grad[1];
+    gradient[2] = Grad[2];
+    
 };
 
 const double WFN::computeELF(
@@ -8035,6 +8486,9 @@ const void WFN::computeLapELIELF(
         }
     }
 
+    delete[] MO_coefs_data;
+    MO_coefs_data = nullptr;
+
     double Grad[3]{ 0, 0, 0 };
     double Hess[3]{ 0, 0, 0 };
     double tau = 0;
@@ -8177,6 +8631,9 @@ const void WFN::computeLapELI(
         }
     }
 
+    delete[] MO_coefs_data;
+    MO_coefs_data = nullptr;
+
     double Grad[3]{ 0, 0, 0 };
     double Hess[3]{ 0, 0, 0 };
     double tau = 0;
@@ -8317,6 +8774,7 @@ const double WFN::computeLap(
     }
 
     delete[] MO_coefs_data;
+    MO_coefs_data = nullptr;
 
     double Hess[3]{ 0, 0, 0 };
 
@@ -8399,17 +8857,17 @@ double Integrate(int &m, double i, double &expn)
         double a = m;
         double b = a + 0.5;
         a -= 0.5;
-        double id = 1 / i;
+        const double id = 1 / i;
         double approx = 0.88622692 * sqrt(id) * pow(id, m);
         for (x = 0; x < m; x++)
         {
             b--;
             approx *= b;
         }
-        double mult = 0.5 * expn * id;
+        const double mult = 0.5 * expn * id;
         if (mult == 0)
             return approx;
-        double prop = mult / approx;
+        const double prop = mult / approx;
         double term = 1;
         double partsum = 1;
         for (x = 1; x < i + m; x++)
@@ -8446,7 +8904,7 @@ const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
 const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp) const
 {
     double temp = fjtmp * pow(0.25 / gamma, r + i) / Afac_pre[l][r][i];
-    int num = l - 2 * r - 2 * i;
+    const int num = l - 2 * r - 2 * i;
     if (num != 0)
         temp *= pow(PC, num);
     if (i % 2 == 1)
