@@ -2326,12 +2326,36 @@ void options::digest_options()
         }
         else if (temp == "-RI_CUBE" || temp == "-ri_cube")
         {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+            std::string coef_file = arguments[i + 1];
+            std::vector<unsigned long> shape{};
+            bool fortran_order;
+            vec coefs{};
+
+            npy::LoadArrayFromNumpy(coef_file, shape, fortran_order, coefs);
+
+
             WFN wavy(wfn);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+
+            int nr_coefs = 0;
+            for (const atom& atm : wavy_aux.get_atoms()) {
+                int prim = 0;
+                for (int shell = 0; shell < atm.get_shellcount_size(); shell++) {
+                    const int type = atm.get_basis_set_entry(prim).get_type();
+                    nr_coefs += 2 * type + 1;
+                    prim += atm.get_shellcount(shell);
+                }
+            }
+
+            std::cout << coefs.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
+            
             // First name of coef_file, second name of xyz file
-            // cube_from_coef_npy(arguments[i + 1], arguments[i + 2]);
+            cube_from_coef_npy(coefs, wavy_aux);
 
             // std::string aux_basis = arguments[i + 1];
-            gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
+            //gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
             //gen_CUBE_for_RI(wavy, "def2_universal_jkfit", this);
             //gen_CUBE_for_RI(wavy, "combo-basis-fit", this);
             //gen_CUBE_for_RI(wavy, "cc-pvqz-jkfit", this);

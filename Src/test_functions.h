@@ -784,21 +784,10 @@ void Calc_MO_spherical_harmonics(
     }
 };
 
-void cube_from_coef_npy(std::string& coef_fn, std::string& xyzfile)
+void cube_from_coef_npy(vec& coefs, WFN& wave)
 {
-    std::vector<unsigned long> shape{};
-    bool fortran_order;
-    vec data{};
-
-    npy::LoadArrayFromNumpy(coef_fn, shape, fortran_order, data);
-    WFN dummy(xyzfile);
-
-    // const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
-    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set("cc-pvqz-jkfit");
-    const int nr_coefs = load_basis_into_WFN(dummy, aux_basis);
-    std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
-    cube res = calc_cube_ML(data, dummy);
-    res.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_PySCF_COEFS_rho.cube");
+    cube res = calc_cube_ML(coefs, wave);
+    res.set_path((wave.get_path().parent_path() / wave.get_path().stem()).string() + "_PySCF_COEFS_rho.cube");
     res.write_file(true);
     // for (int i = 0; i < dummy.get_ncen(); i++)
     //     calc_cube_ML(data, dummy, i);

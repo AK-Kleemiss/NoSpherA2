@@ -447,13 +447,13 @@ std::shared_ptr<BasisSet> SALTED_BINARY_FILE::read_basis_set() {
             vec coefficients;
             read_dataset(coefficients, dims);
             size_t primitive_index = 0;
+            bs->set_count_for_element(atomic_nr - 1, dims[0]);
             for (int contraction = 0; contraction < contractions.size(); contraction++) {
                 int angular_momentum = angular_momenta_per_shell[contraction];
                 for (int func = 0; func < contractions[contraction]; func++, primitive_index++) {
                     bs->add_owned_primitive({ 1, angular_momenta_per_shell[primitive_index], exponents_per_shell[primitive_index], coefficients[primitive_index], contraction });
                 }
             }
-            bs->set_count_for_element(atomic_nr-1, dims[0]);
         }
     );
 }
