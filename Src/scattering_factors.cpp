@@ -1072,7 +1072,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
         atom_offsets.begin() + 1);
 
 
-    ivec coef_offsets(num_asym_atoms + 1, 0);
+    ivec coef_offsets(num_asym_atoms, 0);
 
     for (int ia = 0; ia < num_asym_atoms; ++ia) {
         coef_offsets[ia] = atom_offsets[asym_atom_list[ia]];
@@ -1714,32 +1714,6 @@ tsc_block_type calculate_scattering_factors(
     {
         err_checkf(labels.size() == asym_atom_list.size() && labels.size() == constant_atoms.size(),
             "Inconsistent SALTED atom bookkeeping after CIF read!", file);
-
-        // Remove all atoms that are not part of the current asymmetric unit and remap
-        // the original atom indices to the pruned SALTED wavefunction.
-        ivec original_to_local(needs_grid.size(), -1);
-        int current_index = 0;
-        for (int i = 0; i < needs_grid.size(); i++)
-        {
-            if (opt.debug)
-                std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
-
-            if (!needs_grid[i])
-            {
-                wavy->erase_atom(current_index);
-                continue;
-            }
-
-            original_to_local[i] = current_index;
-            current_index++;
-        }
-
-        for (int &atom_index : asym_atom_list)
-        {
-            err_checkf(atom_index >= 0 && atom_index < original_to_local.size() && original_to_local[atom_index] != -1,
-                "Failed to remap SALTED atom indices after pruning the wavefunction!", file);
-            atom_index = original_to_local[atom_index];
-        }
 
         // Generation of SALTED density coefficients
         file << "\nGenerating densities... " << endl;
