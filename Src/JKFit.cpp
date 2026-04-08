@@ -258,7 +258,11 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
             a_max_by_l[shelltype] = std::max(a_max_by_l[shelltype], exps[i]);
         }
         prim_idx += shellsize;
-        coefs = Int_Params::normalize_gto(coefs, exps, shelltype);
+        coefs = Int_Params::normalize_gto(coefs, exps, shelltype);  //TODO: What norm is better, we have to still figure out.... 
+        //for (int i = 0; i < coefs.size(); i++)
+        //{
+        //    coefs[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * shelltype + 1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
+        //}
 
         vec r_exp(shellsize, 0.0);
         for (int i = 0; i < shellsize; i++) {
@@ -331,7 +335,12 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
         );
     }
     for (int l = l_occ_max * 2 + 1; l <= l_max_aux; ++l) {
-        a_max_adjusted[l] = a_aux_by_l_aux[l];
+        if (a_aux_by_l_aux[l] > 1e7) { //Small guard against rediculous exponents...
+            a_max_adjusted[l] = a_max_by_l_aux[l];
+        }
+        else {
+            a_max_adjusted[l] = a_aux_by_l_aux[l];
+        }
     }
 
     int added_functions = 0;

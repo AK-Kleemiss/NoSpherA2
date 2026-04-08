@@ -498,7 +498,10 @@ int main(int argc, char **argv)
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
                 std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
-                load_basis_into_WFN(temp_pred->wavy, aux_basis);
+                if (!temp_pred->basis_set_loaded()) { //If the basis set was supplied by the SALTED model file, do not overwrite it
+                    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                    load_basis_into_WFN(temp_pred->wavy, aux_basis);
+                }
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
