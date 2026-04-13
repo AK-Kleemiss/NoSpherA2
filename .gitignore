@@ -121,6 +121,8 @@ pch.h.gch/
 build-windows-clang-cl
 Lib/occ*
 build-*
+/.direnv
+/.idea
 **/basis/*.json
 **/methods/*.json
 tests/alanine_integrated_occ/alanine.owf.fchk
