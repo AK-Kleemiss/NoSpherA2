@@ -560,18 +560,28 @@ void Calc_Prop(
     _time_point start = get_time();
     const double radius_bohr = constants::ang2bohr(radius);
     const vector<atom> atoms = wavy.get_atoms();
+    cube rho_contrib(Cubes[cube_type::Rho]);
 
-    Cubes[cube_type::Rho].evaluate_on_grid(
-        [&](const d3 &PosGrid, const i3 &, const i3 &mapped_idx)
-        {
-            if (!is_within_radius(PosGrid, atoms, radius_bohr))
+    rho_contrib.evaluate_on_grid(
+        [&](const d3 &pos_grid, const i3 &, const i3 &mapped_idx) {
+            if (!is_within_radius(pos_grid, atoms, radius_bohr))
                 return 0.0;
 
-            const PropValues values = compute_prop_values(Cubes, wavy, PosGrid);
+            const PropValues values = compute_prop_values(Cubes, wavy, pos_grid);
             accumulate_prop_values(Cubes, mapped_idx, values);
             return values.rho;
         },
         wrap);
+
+#pragma omp parallel for schedule(dynamic)
+    for (int x = 0; x < Cubes[cube_type::Rho].get_size(0); x++)
+        for (int y = 0; y < Cubes[cube_type::Rho].get_size(1); y++)
+            for (int z = 0; z < Cubes[cube_type::Rho].get_size(2); z++)
+                Cubes[cube_type::Rho].set_value(
+                    x,
+                    y,
+                    z,
+                    Cubes[cube_type::Rho].get_value(x, y, z) + rho_contrib.get_value(x, y, z));
 
     if (!test)
     {
