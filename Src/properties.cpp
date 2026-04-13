@@ -66,6 +66,23 @@ void evaluate_cube_in_radius_mapped(
         wrap);
 }
 
+template <typename EvalFn>
+void evaluate_cube_near_atom_mapped(
+    cube &target,
+    bool wrap,
+    const d3 &atom_pos,
+    double radius_bohr,
+    EvalFn &&evaluate_inside_mapped)
+{
+    target.evaluate_on_grid(
+        [&](const d3 &pos, const i3 &raw_idx, const i3 &mapped_idx) {
+            if (array_length(pos, atom_pos) >= radius_bohr)
+                return 0.0;
+            return evaluate_inside_mapped(pos, raw_idx, mapped_idx);
+        },
+        wrap);
+}
+
 struct PropValues {
     double rho = 0.0;
     double grad = 0.0;
@@ -295,12 +312,11 @@ void Calc_Hirshfeld(
     _time_point start = get_time();
     Thakkar atom_model(wavy.get_atom_charge(ignore_atom));
     const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> focus_atom{ wavy.get_atoms()[ignore_atom] };
 
-    evaluate_cube_in_radius_mapped(
+    evaluate_cube_near_atom_mapped(
         CubeHDEF,
         wrap,
-        focus_atom,
+        wavy.get_atom_pos(ignore_atom),
         radius_bohr,
         [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
             const double dist = array_length(pos, wavy.get_atom_pos(ignore_atom));
@@ -331,12 +347,11 @@ void Calc_Hirshfeld_atom(
     _time_point start = get_time();
     Thakkar atom_model(wavy.get_atom_charge(ignore_atom));
     const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> focus_atom{ wavy.get_atoms()[ignore_atom] };
 
-    evaluate_cube_in_radius_mapped(
+    evaluate_cube_near_atom_mapped(
         Cubes[cube_type::Hirsh],
         wrap,
-        focus_atom,
+        wavy.get_atom_pos(ignore_atom),
         radius_bohr,
         [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
             const double dist = array_length(pos, wavy.get_atom_pos(ignore_atom));
