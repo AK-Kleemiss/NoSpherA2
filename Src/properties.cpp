@@ -293,7 +293,7 @@ void Calc_Hirshfeld(
 {
     using namespace std;
     _time_point start = get_time();
-    Thakkar atom(wavy.get_atom_charge(ignore_atom));
+    Thakkar atom_model(wavy.get_atom_charge(ignore_atom));
     const double radius_bohr = constants::ang2bohr(radius);
     const vector<atom> focus_atom{ wavy.get_atoms()[ignore_atom] };
 
@@ -311,7 +311,7 @@ void Calc_Hirshfeld(
             if (std::abs(spherical) < 1E-20)
                 return 0.0;
 
-            const double dens_choice = atom.get_radial_density(dist);
+            const double dens_choice = atom_model.get_radial_density(dist);
             return (dens_choice / spherical * CubeRho.get_value(x, y, z)) - dens_choice;
         });
 
@@ -329,7 +329,7 @@ void Calc_Hirshfeld_atom(
 {
     using namespace std;
     _time_point start = get_time();
-    Thakkar atom(wavy.get_atom_charge(ignore_atom));
+    Thakkar atom_model(wavy.get_atom_charge(ignore_atom));
     const double radius_bohr = constants::ang2bohr(radius);
     const vector<atom> focus_atom{ wavy.get_atoms()[ignore_atom] };
 
@@ -340,7 +340,7 @@ void Calc_Hirshfeld_atom(
         radius_bohr,
         [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
             const double dist = array_length(pos, wavy.get_atom_pos(ignore_atom));
-            const double dens_choice = atom.get_radial_density(dist);
+            const double dens_choice = atom_model.get_radial_density(dist);
             const int x = mapped_idx[0];
             const int y = mapped_idx[1];
             const int z = mapped_idx[2];
