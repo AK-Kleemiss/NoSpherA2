@@ -1249,6 +1249,73 @@ void cube::set_zero()
             fill(values[i][j].begin(), values[i][j].end(), 0.0);
 };
 
+bool cube::evaluate_on_grid(const std::function<double(const d3 &)> &func, bool wrap)
+{
+    return evaluate_on_grid(
+        [&func](const d3 &pos, const i3 &, const i3 &) {
+            return func(pos);
+        },
+        wrap);
+}
+
+namespace {
+inline int wrapped_index(const int idx, const int size)
+{
+    if (idx < 0)
+        return idx + size;
+    if (idx < size)
+        return idx;
+    return idx - size;
+}
+}
+
+bool cube::evaluate_on_grid(const std::function<double(const d3 &, const i3 &, const i3 &)> &func, bool wrap)
+{
+    if (size[0] <= 0 || size[1] <= 0 || size[2] <= 0)
+        return false;
+
+    set_zero();
+
+    if (!wrap)
+    {
+#pragma omp parallel for schedule(dynamic)
+        for (int x = 0; x < size[0]; x++)
+            for (int y = 0; y < size[1]; y++)
+                for (int z = 0; z < size[2]; z++)
+                {
+                    const i3 raw_idx = { x, y, z };
+                    const i3 mapped_idx = raw_idx;
+                    values[x][y][z] = func(get_pos(x, y, z), raw_idx, mapped_idx);
+                }
+    }
+    else
+    {
+        const int low_i = -size[0], high_i = 2 * size[0];
+        const int low_j = -size[1], high_j = 2 * size[1];
+        const int low_k = -size[2], high_k = 2 * size[2];
+
+#pragma omp parallel for schedule(dynamic)
+        for (int i = low_i; i < high_i; i++)
+            for (int j = low_j; j < high_j; j++)
+                for (int k = low_k; k < high_k; k++)
+                {
+                    const i3 raw_idx = { i, j, k };
+                    const i3 mapped_idx = {
+                        wrapped_index(i, size[0]),
+                        wrapped_index(j, size[1]),
+                        wrapped_index(k, size[2])
+                    };
+
+                    const double v = func(get_pos(i, j, k), raw_idx, mapped_idx);
+#pragma omp atomic
+                    values[mapped_idx[0]][mapped_idx[1]][mapped_idx[2]] += v;
+                }
+    }
+
+    loaded = true;
+    return true;
+}
+
 double cube::jaccard(const cube &right) const {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -1261,11 +1328,10 @@ double cube::jaccard(const cube &right) const {
                 top += std::min(values[x][y][z], right.get_value(x, y, z));
                 bot += std::max(values[x][y][z], right.get_value(x, y, z));
             }
-    return (top / bot); //RETURN Real Space R-value between this cube and the given one
+    return (top / bot);
 };
 
 auto fast_clamp = [](int v, int lo, int hi) {
-    //assume lo <= hi
     if (v < lo) return lo;
     if (v > hi) return hi;
     return v;
@@ -1301,7 +1367,6 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                 if (i + 1 > size[0]) sum_side += values[i + 1][j][k];
                 if (i > 0)           sum_side += values[i - 1][j][k];
 
-
                 if (i > 0 && j > 0)                     sum_edge += values[i - 1][j - 1][k];
                 if (i > 0 && k > 0)                     sum_edge += values[i - 1][j][k - 1];
                 if (j > 0 && k > 0)                     sum_edge += values[i][j - 1][k - 1];
@@ -1332,7 +1397,6 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                 if (i > 1)           sum_2edge += values[i - 2][j][k];
 
                 const double inhomog = (-78 * values[i][j][k] + sum_side + 2 * sum_edge + 3 * sum_vert + 4 * sum_2edge) / 888.;
-                //--------------------------------------------------------
                 total_inhomog += abs(inhomog);
                 // If variation is significant compared to magnitude and target error, we recompute.
                 if (abs(inhomog) < target_error) {
@@ -1375,29 +1439,17 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
         //    b) where new Refine points are being added use them with smaller sizes
 
         long long count_computed = 0;
-
         ProgressBar *pb = new ProgressBar(new_size[0], 50, "#", " ", "Level " + to_string(depth + 1));
 
 #pragma omp parallel for reduction(+:count_computed) schedule(dynamic)
         for (int i = 0; i < new_size[0]; i++) {
             const double old_i = double(i) / fac;
             int i0 = static_cast<int>(old_i);
-            if (size[0] > 1) {
-                i0 = fast_clamp(i0, 0, size[0] - 2);
-            }
-            else {
-                i0 = 0;
-            }
-            //const int i0 = size[0] > 1 ? std::clamp((int)std::floor(old_i), 0, size[0] - 2) : 0;
+            i0 = size[0] > 1 ? fast_clamp(i0, 0, size[0] - 2) : 0;
             for (int j = 0; j < new_size[1]; j++) {
                 const double old_j = double(j) / fac;
                 int j0 = static_cast<int>(old_j);
-                if (size[1] > 1) {
-                    j0 = fast_clamp(j0, 0, size[1] - 2);
-                }
-                else {
-                    j0 = 0;
-                }
+                j0 = size[1] > 1 ? fast_clamp(j0, 0, size[1] - 2) : 0;
                 int *ihf = inhomog_fine[i0][j0].data();
                 for (int k = 0; k < new_size[2]; k++) {
                     // Check if this corresponds to an exact old point
@@ -1408,13 +1460,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                     // Map to continuous old coordinates
                     const double old_k = double(k) / fac;
                     int k0 = static_cast<int>(old_k);
-                    // Neighbors in old grid
-                    if (size[2] > 1) {
-                        k0 = fast_clamp(k0, 0, size[2] - 2);
-                    }
-                    else {
-                        k0 = 0;
-                    }
+                    k0 = size[2] > 1 ? fast_clamp(k0, 0, size[2] - 2) : 0;
 
                     if (ihf[k0] == 1) {
                         // Already marked as not inhomogeneous anymore
@@ -1422,8 +1468,6 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                     }
 
                     const double val = func(get_pos(old_i, old_j, old_k));
-                    //err_checkf(!std::isnan(val) && !std::isinf(val), "Error in new value calculation!", cout);
-
 #pragma omp critical
                     refine_points.emplace(i3{ i0, j0, k0 }, std::make_pair(val, d3{ old_i, old_j, old_k }));
                     count_computed++;
@@ -1485,8 +1529,6 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                 }
 
         nr_fine[depth + 1] = initially_fine;
-        //new_integral *= new_dv;
-
         double rel_error = abs(new_integral - current_integral) / (abs(new_integral) + 1e-20);
 
         cout << "Refinement Level " << depth + 1

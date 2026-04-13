@@ -213,6 +213,26 @@ std::string build_date = ("This Executable was built on: " + std::string(__DATE_
 
 bool ensure_occ_data_path(const char *argv0)
 {
+#ifdef _WIN32
+    char *occ_data_path_env = nullptr;
+    size_t len = 0;
+    errno_t err = _dupenv_s(&occ_data_path_env, &len, "OCC_DATA_PATH");
+
+    if (err == 0 && occ_data_path_env != nullptr)
+    {
+        std::filesystem::path path(occ_data_path_env);
+        free(occ_data_path_env);
+
+        if (is_valid_occ_data_path(path))
+            return true;
+        else
+            std::cout << "OCC DATA PATH is invalid!" << std::endl;
+    }
+    else if (occ_data_path_env != nullptr)
+    {
+        free(occ_data_path_env);
+    }
+#else
     const char *occ_data_path_env = std::getenv("OCC_DATA_PATH");
     if (occ_data_path_env != nullptr)
     {
@@ -221,6 +241,7 @@ bool ensure_occ_data_path(const char *argv0)
         else
             std::cout << "OCC DATA PATH is invalid!" << std::endl;
     }
+#endif
 
     std::filesystem::path exe_dir = resolve_executable_directory(argv0);
     if (exe_dir.empty())
@@ -1731,7 +1752,7 @@ double get_decimal_precision_from_CIF_number(std::string &given_string)
 
 void write_spherical_atoms() {
 #pragma omp parallel for
-    for(int i=1; i<103; i++) {
+    for (int i = 1; i < 103; i++) {
         std::cout << "Atom " << i << std::endl;
         Thakkar atom(i);
         std::ofstream out("spherical_" + std::string(constants::atnr2letter(i)) + ".txt");

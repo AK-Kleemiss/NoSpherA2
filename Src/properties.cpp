@@ -15,6 +15,119 @@ void print_time(_time_point &start, _time_point &end, std::ostream &file) {
         file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << std::endl;
 }
 
+namespace {
+
+bool is_within_radius(const d3 &pos, const std::vector<atom> &atoms, double radius_bohr)
+{
+    for (const atom &entry : atoms)
+        if (array_length(pos, entry.get_pos()) < radius_bohr)
+            return true;
+    return false;
+}
+
+double sanitize_finite(double value)
+{
+    if (std::isnan(value) || std::isinf(value))
+        return 0.0;
+    return value;
+}
+
+template <typename EvalFn>
+void evaluate_cube_in_radius(
+    cube &target,
+    bool wrap,
+    const std::vector<atom> &atoms,
+    double radius_bohr,
+    EvalFn &&evaluate_inside)
+{
+    target.evaluate_on_grid(
+        [&](const d3 &pos) {
+            if (!is_within_radius(pos, atoms, radius_bohr))
+                return 0.0;
+            return evaluate_inside(pos);
+        },
+        wrap);
+}
+
+template <typename EvalFn>
+void evaluate_cube_in_radius_mapped(
+    cube &target,
+    bool wrap,
+    const std::vector<atom> &atoms,
+    double radius_bohr,
+    EvalFn &&evaluate_inside_mapped)
+{
+    target.evaluate_on_grid(
+        [&](const d3 &pos, const i3 &raw_idx, const i3 &mapped_idx) {
+            if (!is_within_radius(pos, atoms, radius_bohr))
+                return 0.0;
+            return evaluate_inside_mapped(pos, raw_idx, mapped_idx);
+        },
+        wrap);
+}
+
+struct PropValues {
+    double rho = 0.0;
+    double grad = 0.0;
+    double elf = 0.0;
+    double eli = 0.0;
+    double lap = 0.0;
+    double hess[9]{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+};
+
+PropValues compute_prop_values(const std::vector<cube> &cubes, const WFN &wavy, const d3 &pos)
+{
+    PropValues values;
+
+    const bool rdg_loaded = cubes[cube_type::RDG].get_loaded();
+    const bool lap_loaded = cubes[cube_type::Lap].get_loaded();
+    const bool elf_loaded = cubes[cube_type::Elf].get_loaded();
+    const bool eli_loaded = cubes[cube_type::Eli].get_loaded();
+
+    if (cubes[cube_type::ESP].get_loaded() && !rdg_loaded)
+        values.rho = wavy.compute_dens(pos);
+
+    if (rdg_loaded && lap_loaded && (elf_loaded || eli_loaded))
+        wavy.computeValues(pos, values.rho, values.grad, values.hess, values.elf, values.eli, values.lap);
+    else if (elf_loaded && eli_loaded && !rdg_loaded && !lap_loaded)
+        wavy.computeELIELF(pos, values.elf, values.eli);
+    else if (elf_loaded && !eli_loaded && !rdg_loaded && !lap_loaded)
+        values.elf = wavy.computeELF(pos);
+    else if (!elf_loaded && eli_loaded && !rdg_loaded && !lap_loaded)
+        values.eli = wavy.computeELI(pos);
+    else if (elf_loaded && eli_loaded && lap_loaded && !rdg_loaded)
+        wavy.computeLapELIELF(pos, values.elf, values.eli, values.lap);
+    else if (!elf_loaded && eli_loaded && lap_loaded && !rdg_loaded)
+        wavy.computeLapELI(pos, values.eli, values.lap);
+    else if (!elf_loaded && !eli_loaded && lap_loaded && !rdg_loaded)
+        values.lap = wavy.computeLap(pos);
+    else
+        wavy.computeValues(pos, values.rho, values.grad, values.hess, values.elf, values.eli, values.lap);
+
+    if (rdg_loaded)
+        values.rho = get_lambda_1(values.hess) < 0 ? -values.rho : values.rho;
+
+    return values;
+}
+
+void accumulate_prop_values(std::vector<cube> &cubes, const i3 &mapped_idx, const PropValues &values)
+{
+    const int x = mapped_idx[0];
+    const int y = mapped_idx[1];
+    const int z = mapped_idx[2];
+
+    if (cubes[cube_type::RDG].get_loaded())
+        cubes[cube_type::RDG].set_value(x, y, z, cubes[cube_type::RDG].get_value(x, y, z) + sanitize_finite(values.grad));
+    if (cubes[cube_type::Lap].get_loaded())
+        cubes[cube_type::Lap].set_value(x, y, z, cubes[cube_type::Lap].get_value(x, y, z) + sanitize_finite(values.lap));
+    if (cubes[cube_type::Elf].get_loaded())
+        cubes[cube_type::Elf].set_value(x, y, z, cubes[cube_type::Elf].get_value(x, y, z) + sanitize_finite(values.elf));
+    if (cubes[cube_type::Eli].get_loaded())
+        cubes[cube_type::Eli].set_value(x, y, z, cubes[cube_type::Eli].get_value(x, y, z) + sanitize_finite(values.eli));
+}
+
+} // namespace
+
 void Calc_Spherical_Dens(
     cube &CubeSpher,
     const WFN &wavy,
@@ -24,76 +137,30 @@ void Calc_Spherical_Dens(
 {
     using namespace std;
     _time_point start = get_time();
-    //ProgressBar *progress = new ProgressBar(CubeSpher.get_size(0), 50, "=", " ", "Calculating Spherical Density");
 
-    vector<Thakkar> atoms;
+    vector<Thakkar> atom_models;
     for (int a = 0; a < 92; a++) {
-        atoms.emplace_back(a);
-        atoms[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
+        atom_models.emplace_back(a);
+        atom_models[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
     }
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> wavy_atoms = wavy.get_atoms();
 
-    const int low_i = wrap ? -CubeSpher.get_size(0) : 0;
-    const int high_i = wrap ? 2 * CubeSpher.get_size(0) : CubeSpher.get_size(0);
-    const int low_j = wrap ? -CubeSpher.get_size(1) : 0;
-    const int high_j = wrap ? 2 * CubeSpher.get_size(1) : CubeSpher.get_size(1);
-    const int low_k = wrap ? -CubeSpher.get_size(2) : 0;
-    const int high_k = wrap ? 2 * CubeSpher.get_size(2) : CubeSpher.get_size(2);
+    evaluate_cube_in_radius(
+        CubeSpher,
+        wrap,
+        wavy_atoms,
+        radius_bohr,
+        [&](const d3 &pos) {
+            vector<double> dists(wavy.get_ncen(), 0.0);
+            for (int a = 0; a < wavy.get_ncen(); a++)
+                dists[a] = array_length(pos, wavy.get_atom_pos(a));
 
-#pragma omp parallel for schedule(dynamic)
-    for (int i = low_i; i < high_i; i++)
-    {
-        vec dists(wavy.get_ncen(), 0);
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
-            {
-
-                const d3 PosGrid{ i * CubeSpher.get_vector(0, 0) + j * CubeSpher.get_vector(0, 1) + k * CubeSpher.get_vector(0, 2) + CubeSpher.get_origin(0),
-                                  i * CubeSpher.get_vector(1, 0) + j * CubeSpher.get_vector(1, 1) + k * CubeSpher.get_vector(1, 2) + CubeSpher.get_origin(1),
-                                  i * CubeSpher.get_vector(2, 0) + j * CubeSpher.get_vector(2, 1) + k * CubeSpher.get_vector(2, 2) + CubeSpher.get_origin(2) };
-
-                bool skip = true;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                {
-                    dists[a] = array_length(PosGrid, wavy.get_atom_pos(i));
-                    if (dists[a] < constants::ang2bohr(radius))
-                        skip = false;
-                }
-                if (skip)
-                    continue;
-
-                double dens_all = 0.0;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                {
-                    dens_all += atoms[wavy.get_atom_charge(a) - 1].get_interpolated_density(dists[a]);
-                }
-
-                int temp_i, temp_j, temp_k;
-                if (i < 0)
-                    temp_i = i + CubeSpher.get_size(0);
-                else if (i < CubeSpher.get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - CubeSpher.get_size(0);
-
-                if (j < 0)
-                    temp_j = j + CubeSpher.get_size(1);
-                else if (j < CubeSpher.get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - CubeSpher.get_size(1);
-
-                if (k < 0)
-                    temp_k = k + CubeSpher.get_size(2);
-                else if (k < CubeSpher.get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - CubeSpher.get_size(2);
-
-                CubeSpher.set_value(temp_i, temp_j, temp_k, CubeSpher.get_value(temp_i, temp_j, temp_k) + dens_all);
-            }
-        //progress->update();
-    }
-    //delete (progress);
+            double dens_all = 0.0;
+            for (int a = 0; a < wavy.get_ncen(); a++)
+                dens_all += atom_models[wavy.get_atom_charge(a) - 1].get_interpolated_density(dists[a]);
+            return dens_all;
+        });
 
     _time_point end = get_time();
     print_time(start, end, file);
@@ -109,70 +176,30 @@ void Calc_Static_Def(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
-
     vector<Thakkar> atoms;
     atoms.reserve(wavy.get_ncen());
     for (int a = 0; a < wavy.get_ncen(); a++)
         atoms.emplace_back(wavy.get_atom_charge(a));
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> wavy_atoms = wavy.get_atoms();
 
-    const int low_i = wrap ? -CubeDEF.get_size(0) : 0;
-    const int high_i = wrap ? 2 * CubeDEF.get_size(0) : CubeDEF.get_size(0);
-    const int low_j = wrap ? -CubeDEF.get_size(1) : 0;
-    const int high_j = wrap ? 2 * CubeDEF.get_size(1) : CubeDEF.get_size(1);
-    const int low_k = wrap ? -CubeDEF.get_size(2) : 0;
-    const int high_k = wrap ? 2 * CubeDEF.get_size(2) : CubeDEF.get_size(2);
+    evaluate_cube_in_radius_mapped(
+        CubeDEF,
+        wrap,
+        wavy_atoms,
+        radius_bohr,
+        [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
+            vector<double> dists(wavy.get_ncen(), 0.0);
+            for (int a = 0; a < wavy.get_ncen(); a++)
+                dists[a] = array_length(pos, wavy.get_atom_pos(a));
 
-#pragma omp parallel for schedule(dynamic)
-    for (int i = low_i; i < high_i; i++)
-    {
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
-            {
+            double dens_all = 0.0;
+            for (int a = 0; a < wavy.get_ncen(); a++)
+                dens_all += atoms[a].get_radial_density(dists[a]);
 
-                const d3 PosGrid{ i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0),
-                                        i * CubeDEF.get_vector(1, 0) + j * CubeDEF.get_vector(1, 1) + k * CubeDEF.get_vector(1, 2) + CubeDEF.get_origin(1),
-                                        i * CubeDEF.get_vector(2, 0) + j * CubeDEF.get_vector(2, 1) + k * CubeDEF.get_vector(2, 2) + CubeDEF.get_origin(2) };
-
-                bool skip = true;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (array_length(PosGrid, wavy.get_atom_pos(i)) < constants::ang2bohr(radius))
-                        skip = false;
-                if (skip)
-                    continue;
-
-                double dens_all = 0.0;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                    dens_all += atoms[a].get_radial_density(array_length(PosGrid, wavy.get_atom_pos(i)));
-
-                int temp_i, temp_j, temp_k;
-                if (i < 0)
-                    temp_i = i + CubeDEF.get_size(0);
-                else if (i < CubeDEF.get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - CubeDEF.get_size(0);
-
-                if (j < 0)
-                    temp_j = j + CubeDEF.get_size(1);
-                else if (j < CubeDEF.get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - CubeDEF.get_size(1);
-
-                if (k < 0)
-                    temp_k = k + CubeDEF.get_size(2);
-                else if (k < CubeDEF.get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - CubeDEF.get_size(2);
-
-                dens_all -= CubeRho.get_value(temp_i, temp_j, temp_k);
-                CubeDEF.set_value(temp_i, temp_j, temp_k, CubeDEF.get_value(temp_i, temp_j, temp_k) - dens_all);
-            }
-        progress->update();
-    }
-    delete (progress);
+            dens_all -= CubeRho.get_value(mapped_idx[0], mapped_idx[1], mapped_idx[2]);
+            return -dens_all;
+        });
 
     _time_point end = get_time();
     print_time(start, end, file);
@@ -187,61 +214,22 @@ void Calc_Static_Def(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(Cubes[cube_type::DEF].get_size(0), 50, "=", " ", "Calculating Deformation");
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> wavy_atoms = wavy.get_atoms();
 
-    const int low_i = wrap ? -Cubes[cube_type::DEF].get_size(0) : 0;
-    const int high_i = wrap ? 2 * Cubes[cube_type::DEF].get_size(0) : Cubes[cube_type::DEF].get_size(0);
-    const int low_j = wrap ? -Cubes[cube_type::DEF].get_size(1) : 0;
-    const int high_j = wrap ? 2 * Cubes[cube_type::DEF].get_size(1) : Cubes[cube_type::DEF].get_size(1);
-    const int low_k = wrap ? -Cubes[cube_type::DEF].get_size(2) : 0;
-    const int high_k = wrap ? 2 * Cubes[cube_type::DEF].get_size(2) : Cubes[cube_type::DEF].get_size(2);
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = low_i; i < high_i; i++)
-    {
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
-            {
-
-                const d3 PosGrid = Cubes[cube_type::DEF].get_pos(i, j, k);
-
-                bool skip = true;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (array_length(PosGrid, wavy.get_atom_pos(a)) < constants::ang2bohr(radius))
-                        skip = false;
-                if (skip)
-                    continue;
-
-                int temp_i, temp_j, temp_k;
-                if (i < 0)
-                    temp_i = i + Cubes[cube_type::DEF].get_size(0);
-                else if (i < Cubes[cube_type::DEF].get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - Cubes[cube_type::DEF].get_size(0);
-
-                if (j < 0)
-                    temp_j = j + Cubes[cube_type::DEF].get_size(1);
-                else if (j < Cubes[cube_type::DEF].get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - Cubes[cube_type::DEF].get_size(1);
-
-                if (k < 0)
-                    temp_k = k + Cubes[cube_type::DEF].get_size(2);
-                else if (k < Cubes[cube_type::DEF].get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - Cubes[cube_type::DEF].get_size(2);
-
-                double rho = Cubes[cube_type::Rho].get_value(temp_i, temp_j, temp_k);
-                double spher = Cubes[cube_type::spherical_density].get_value(temp_i, temp_j, temp_k);
-                double temp = rho - spher;
-                Cubes[cube_type::DEF].set_value(temp_i, temp_j, temp_k, Cubes[cube_type::DEF].get_value(temp_i, temp_j, temp_k) + temp);
-            }
-        progress->update();
-    }
-    delete (progress);
+    evaluate_cube_in_radius_mapped(
+        Cubes[cube_type::DEF],
+        wrap,
+        wavy_atoms,
+        radius_bohr,
+        [&](const d3 &, const i3 &, const i3 &mapped_idx) {
+            const int x = mapped_idx[0];
+            const int y = mapped_idx[1];
+            const int z = mapped_idx[2];
+            const double rho = Cubes[cube_type::Rho].get_value(x, y, z);
+            const double spher = Cubes[cube_type::spherical_density].get_value(x, y, z);
+            return rho - spher;
+        });
 
     _time_point end = get_time();
     print_time(start, end, file);
@@ -257,76 +245,37 @@ void Calc_Hirshfeld(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(Cubes[cube_type::HDEF].get_size(0), 50, "=", " ", "Calculating Values");
 
     vector<Thakkar> atoms;
     atoms.reserve(wavy.get_ncen());
     for (int a = 0; a < wavy.get_ncen(); a++)
         atoms.emplace_back(wavy.get_atom_charge(a));
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> focus_atom{ wavy.get_atoms()[ignore_atom] };
 
-    const int low_i = wrap ? -Cubes[cube_type::HDEF].get_size(0) : 0;
-    const int high_i = wrap ? 2 * Cubes[cube_type::HDEF].get_size(0) : Cubes[cube_type::HDEF].get_size(0);
-    const int low_j = wrap ? -Cubes[cube_type::HDEF].get_size(1) : 0;
-    const int high_j = wrap ? 2 * Cubes[cube_type::HDEF].get_size(1) : Cubes[cube_type::HDEF].get_size(1);
-    const int low_k = wrap ? -Cubes[cube_type::HDEF].get_size(2) : 0;
-    const int high_k = wrap ? 2 * Cubes[cube_type::HDEF].get_size(2) : Cubes[cube_type::HDEF].get_size(2);
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = low_i; i < high_i; i++)
-    {
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
+    evaluate_cube_in_radius_mapped(
+        Cubes[cube_type::HDEF],
+        wrap,
+        focus_atom,
+        radius_bohr,
+        [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
+            double dens_choice = 0.0;
+            double dens_all = 0.0;
+            for (int a = 0; a < wavy.get_ncen(); a++)
             {
-
-                d3 PosGrid = Cubes[cube_type::Rho].get_pos(i, j, k);
-
-                bool skip = true;
-                double dist = array_length(PosGrid, wavy.get_atom_pos(ignore_atom));
-                if (dist < constants::ang2bohr(radius))
-                    skip = false;
-                if (skip)
-                    continue;
-
-                double dens_choice = 0.0;
-                double dens_all = 0.0;
-                double temp;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                {
-                    dist = array_length(PosGrid, wavy.get_atom_pos(a));
-                    temp = atoms[a].get_radial_density(dist);
-                    if (ignore_atom == a)
-                        dens_choice = temp;
-                    dens_all += temp;
-                }
-
-                int temp_i, temp_j, temp_k;
-                if (i < 0)
-                    temp_i = i + Cubes[cube_type::HDEF].get_size(0);
-                else if (i < Cubes[cube_type::HDEF].get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - Cubes[cube_type::HDEF].get_size(0);
-
-                if (j < 0)
-                    temp_j = j + Cubes[cube_type::HDEF].get_size(1);
-                else if (j < Cubes[cube_type::HDEF].get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - Cubes[cube_type::HDEF].get_size(1);
-
-                if (k < 0)
-                    temp_k = k + Cubes[cube_type::HDEF].get_size(2);
-                else if (k < Cubes[cube_type::HDEF].get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - Cubes[cube_type::HDEF].get_size(2);
-
-                dens_all = dens_choice / dens_all * Cubes[cube_type::Rho].get_value(temp_i, temp_j, temp_k);
-                Cubes[cube_type::HDEF].set_value(temp_i, temp_j, temp_k, Cubes[cube_type::HDEF].get_value(temp_i, temp_j, temp_k) + dens_all - dens_choice);
+                const double dist = array_length(pos, wavy.get_atom_pos(a));
+                const double temp = atoms[a].get_radial_density(dist);
+                if (ignore_atom == a)
+                    dens_choice = temp;
+                dens_all += temp;
             }
-        progress->update();
-    }
-    delete (progress);
+
+            if (std::abs(dens_all) < 1E-20)
+                return 0.0;
+
+            const double rho = Cubes[cube_type::Rho].get_value(mapped_idx[0], mapped_idx[1], mapped_idx[2]);
+            return dens_choice / dens_all * rho - dens_choice;
+        });
 
     _time_point end = get_time();
     print_time(start, end, file);
@@ -344,59 +293,27 @@ void Calc_Hirshfeld(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> focus_atom{ wavy.get_atoms()[ignore_atom] };
 
-    const int low_i = wrap ? -CubeHDEF.get_size(0) : 0;
-    const int high_i = wrap ? 2 * CubeHDEF.get_size(0) : CubeHDEF.get_size(0);
-    const int low_j = wrap ? -CubeHDEF.get_size(1) : 0;
-    const int high_j = wrap ? 2 * CubeHDEF.get_size(1) : CubeHDEF.get_size(1);
-    const int low_k = wrap ? -CubeHDEF.get_size(2) : 0;
-    const int high_k = wrap ? 2 * CubeHDEF.get_size(2) : CubeHDEF.get_size(2);
+    evaluate_cube_in_radius_mapped(
+        CubeHDEF,
+        wrap,
+        focus_atom,
+        radius_bohr,
+        [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
+            const double dist = array_length(pos, wavy.get_atom_pos(ignore_atom));
+            const int x = mapped_idx[0];
+            const int y = mapped_idx[1];
+            const int z = mapped_idx[2];
+            const double spherical = CubeSpherical.get_value(x, y, z);
+            if (std::abs(spherical) < 1E-20)
+                return 0.0;
 
-#pragma omp parallel for schedule(dynamic)
-    for (int i = low_i; i < high_i; i++)
-    {
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
-            {
-
-                d3 PosGrid = CubeRho.get_pos(i, j, k);
-
-                bool skip = true;
-                double dist = array_length(PosGrid, wavy.get_atom_pos(ignore_atom));
-                if (dist < constants::ang2bohr(radius))
-                    skip = false;
-                if (skip)
-                    continue;
-
-                const double dens_choice = atom.get_radial_density(dist);
-                int temp_i, temp_j, temp_k;
-                if (i < 0)
-                    temp_i = i + CubeHDEF.get_size(0);
-                else if (i < CubeHDEF.get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - CubeHDEF.get_size(0);
-
-                if (j < 0)
-                    temp_j = j + CubeHDEF.get_size(1);
-                else if (j < CubeHDEF.get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - CubeHDEF.get_size(1);
-
-                if (k < 0)
-                    temp_k = k + CubeHDEF.get_size(2);
-                else if (k < CubeHDEF.get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - CubeHDEF.get_size(2);
-                CubeHDEF.set_value(temp_i, temp_j, temp_k, CubeHDEF.get_value(temp_i, temp_j, temp_k) + (dens_choice / CubeSpherical.get_value(temp_i, temp_j, temp_k) * CubeRho.get_value(temp_i, temp_j, temp_k)) - dens_choice);
-            }
-        progress->update();
-    }
-    delete (progress);
+            const double dens_choice = atom.get_radial_density(dist);
+            return (dens_choice / spherical * CubeRho.get_value(x, y, z)) - dens_choice;
+        });
 
     _time_point end = get_time();
     print_time(start, end, file);
@@ -412,59 +329,27 @@ void Calc_Hirshfeld_atom(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(Cubes[cube_type::Hirsh].get_size(0), 50, "=", " ", "Calculating Values");
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> focus_atom{ wavy.get_atoms()[ignore_atom] };
 
-    const int low_i = wrap ? -Cubes[cube_type::Hirsh].get_size(0) : 0;
-    const int high_i = wrap ? 2 * Cubes[cube_type::Hirsh].get_size(0) : Cubes[cube_type::Hirsh].get_size(0);
-    const int low_j = wrap ? -Cubes[cube_type::Hirsh].get_size(1) : 0;
-    const int high_j = wrap ? 2 * Cubes[cube_type::Hirsh].get_size(1) : Cubes[cube_type::Hirsh].get_size(1);
-    const int low_k = wrap ? -Cubes[cube_type::Hirsh].get_size(2) : 0;
-    const int high_k = wrap ? 2 * Cubes[cube_type::Hirsh].get_size(2) : Cubes[cube_type::Hirsh].get_size(2);
+    evaluate_cube_in_radius_mapped(
+        Cubes[cube_type::Hirsh],
+        wrap,
+        focus_atom,
+        radius_bohr,
+        [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
+            const double dist = array_length(pos, wavy.get_atom_pos(ignore_atom));
+            const double dens_choice = atom.get_radial_density(dist);
+            const int x = mapped_idx[0];
+            const int y = mapped_idx[1];
+            const int z = mapped_idx[2];
+            const double spherical = Cubes[cube_type::spherical_density].get_value(x, y, z);
+            if (std::abs(spherical) < 1E-20)
+                return 0.0;
 
-#pragma omp parallel for schedule(dynamic)
-    for (int i = low_i; i < high_i; i++)
-    {
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
-            {
-
-                d3 PosGrid = Cubes[cube_type::Rho].get_pos(i, j, k);
-
-                bool skip = true;
-                double dist = array_length(PosGrid, wavy.get_atom_pos(ignore_atom));
-                if (dist < constants::ang2bohr(radius))
-                    skip = false;
-                if (skip)
-                    continue;
-
-                const double dens_choice = atom.get_radial_density(dist);
-                int temp_i, temp_j, temp_k;
-                if (i < 0)
-                    temp_i = i + Cubes[cube_type::Hirsh].get_size(0);
-                else if (i < Cubes[cube_type::Hirsh].get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - Cubes[cube_type::Hirsh].get_size(0);
-
-                if (j < 0)
-                    temp_j = j + Cubes[cube_type::Hirsh].get_size(1);
-                else if (j < Cubes[cube_type::Hirsh].get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - Cubes[cube_type::Hirsh].get_size(1);
-
-                if (k < 0)
-                    temp_k = k + Cubes[cube_type::Hirsh].get_size(2);
-                else if (k < Cubes[cube_type::Hirsh].get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - Cubes[cube_type::Hirsh].get_size(2);
-                Cubes[cube_type::Hirsh].set_value(temp_i, temp_j, temp_k, Cubes[cube_type::Hirsh].get_value(temp_i, temp_j, temp_k) + (dens_choice / Cubes[cube_type::spherical_density].get_value(temp_i, temp_j, temp_k) * Cubes[cube_type::Rho].get_value(temp_i, temp_j, temp_k)));
-            }
-        progress->update();
-    }
-    delete (progress);
+            return dens_choice / spherical * Cubes[cube_type::Rho].get_value(x, y, z);
+        });
 
     _time_point end = get_time();
     print_time(start, end, file);
@@ -479,64 +364,17 @@ void Calc_Rho(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
-
-    const int low_i = wrap ? -CubeRho.get_size(0) : 0;
-    const int high_i = wrap ? 2 * CubeRho.get_size(0) : CubeRho.get_size(0);
-    const int low_j = wrap ? -CubeRho.get_size(1) : 0;
-    const int high_j = wrap ? 2 * CubeRho.get_size(1) : CubeRho.get_size(1);
-    const int low_k = wrap ? -CubeRho.get_size(2) : 0;
-    const int high_k = wrap ? 2 * CubeRho.get_size(2) : CubeRho.get_size(2);
     const double radius_bohr = constants::ang2bohr(radius);
     const vector<atom> atoms = wavy.get_atoms();
-    const int ncen = wavy.get_ncen();
 
-#pragma omp parallel for schedule(dynamic)
-    for (int i = low_i; i < high_i; i++)
-    {
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
-            {
-
-                const d3 PosGrid = CubeRho.get_pos(i, j, k);
-
-                bool skip = true;
-                for (int a = 0; a < ncen; a++)
-                    if (array_length(PosGrid, atoms[a].get_pos()) < radius_bohr) {
-                        skip = false;
-                        break;
-                    }
-                if (skip)
-                    continue;
-
-                const double Rho = wavy.compute_dens(PosGrid);
-                int temp_i, temp_j, temp_k;
-                if (i < 0)
-                    temp_i = i + CubeRho.get_size(0);
-                else if (i < CubeRho.get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - CubeRho.get_size(0);
-
-                if (j < 0)
-                    temp_j = j + CubeRho.get_size(1);
-                else if (j < CubeRho.get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - CubeRho.get_size(1);
-
-                if (k < 0)
-                    temp_k = k + CubeRho.get_size(2);
-                else if (k < CubeRho.get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - CubeRho.get_size(2);
-
-                CubeRho.set_value(temp_i, temp_j, temp_k, CubeRho.get_value(temp_i, temp_j, temp_k) + Rho);
-            }
-        progress->update();
-    }
-    delete (progress);
+    evaluate_cube_in_radius(
+        CubeRho,
+        wrap,
+        atoms,
+        radius_bohr,
+        [&](const d3 &pos) {
+            return wavy.compute_dens(pos);
+        });
 
     _time_point end = get_time();
     print_time(start, end, file);
@@ -551,64 +389,17 @@ void Calc_Eli(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeEli.get_size(0), 50, "=", " ", "Calculating ELI");
-
-    const int low_i = wrap ? -CubeEli.get_size(0) : 0;
-    const int high_i = wrap ? 2 * CubeEli.get_size(0) : CubeEli.get_size(0);
-    const int low_j = wrap ? -CubeEli.get_size(1) : 0;
-    const int high_j = wrap ? 2 * CubeEli.get_size(1) : CubeEli.get_size(1);
-    const int low_k = wrap ? -CubeEli.get_size(2) : 0;
-    const int high_k = wrap ? 2 * CubeEli.get_size(2) : CubeEli.get_size(2);
     const double radius_bohr = constants::ang2bohr(radius);
     const vector<atom> atoms = wavy.get_atoms();
-    const int ncen = wavy.get_ncen();
 
-#pragma omp parallel for schedule(dynamic)
-    for (int i = low_i; i < high_i; i++)
-    {
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
-            {
-
-                const d3 PosGrid = CubeEli.get_pos(i, j, k);
-
-                bool skip = true;
-                for (int a = 0; a < ncen; a++)
-                    if (array_length(PosGrid, atoms[a].get_pos()) < radius_bohr) {
-                        skip = false;
-                        break;
-                    }
-                if (skip)
-                    continue;
-
-                const double Rho = wavy.computeELI(PosGrid);
-                int temp_i, temp_j, temp_k;
-                if (i < 0)
-                    temp_i = i + CubeEli.get_size(0);
-                else if (i < CubeEli.get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - CubeEli.get_size(0);
-
-                if (j < 0)
-                    temp_j = j + CubeEli.get_size(1);
-                else if (j < CubeEli.get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - CubeEli.get_size(1);
-
-                if (k < 0)
-                    temp_k = k + CubeEli.get_size(2);
-                else if (k < CubeEli.get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - CubeEli.get_size(2);
-
-                CubeEli.set_value(temp_i, temp_j, temp_k, CubeEli.get_value(temp_i, temp_j, temp_k) + Rho);
-            }
-        progress->update();
-    }
-    delete (progress);
+    evaluate_cube_in_radius(
+        CubeEli,
+        wrap,
+        atoms,
+        radius_bohr,
+        [&](const d3 &pos) {
+            return wavy.computeELI(pos);
+        });
 
     _time_point end = get_time();
     print_time(start, end, file);
@@ -622,42 +413,24 @@ void Calc_RhoEli(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeEli.get_size(0), 50, "=", " ", "Calculating Rho & ELI");
     err_checkf(CubeRho.get_size(0) == CubeEli.get_size(0) && CubeRho.get_size(1) == CubeEli.get_size(1) && CubeRho.get_size(2) == CubeEli.get_size(2), "Cube sizes do not match", std::cout);
 
-    const int high_i = CubeEli.get_size(0);
-    const int high_j = CubeEli.get_size(1);
-    const int high_k = CubeEli.get_size(2);
     const double radius_bohr = constants::ang2bohr(radius);
     const vector<atom> atoms = wavy.get_atoms();
-    const int ncen = wavy.get_ncen();
-    double Rho, Eli;
+    CubeEli.set_zero();
 
-#pragma omp parallel for schedule(dynamic) private(Rho, Eli)
-    for (int i = 0; i < high_i; i++)
-    {
-        for (int j = 0; j < high_j; j++)
-            for (int k = 0; k < high_k; k++)
-            {
-
-                const d3 PosGrid = CubeEli.get_pos(i, j, k);
-
-                bool skip = true;
-                for (int a = 0; a < ncen; a++)
-                    if (array_length(PosGrid, atoms[a].get_pos()) < radius_bohr) {
-                        skip = false;
-                        break;
-                    }
-                if (skip)
-                    continue;
-
-                wavy.computeRhoELI(PosGrid, Rho, Eli);
-                CubeRho.set_value(i, j, k, Rho);
-                CubeEli.set_value(i, j, k, Eli);
-            }
-        progress->update();
-    }
-    delete (progress);
+    evaluate_cube_in_radius_mapped(
+        CubeRho,
+        false,
+        atoms,
+        radius_bohr,
+        [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
+            double rho = 0.0;
+            double eli = 0.0;
+            wavy.computeRhoELI(pos, rho, eli);
+            CubeEli.set_value(mapped_idx[0], mapped_idx[1], mapped_idx[2], eli);
+            return rho;
+        });
 
     _time_point end = get_time();
     print_time(start, end, std::cout);
@@ -770,151 +543,23 @@ void Calc_Prop(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = NULL;
-    if (!test)
-        progress = new ProgressBar(Cubes[cube_type::Rho].get_size(0), 50, "=", " ", "Calculating Values");
-
-    const int low_i = wrap ? -Cubes[cube_type::Rho].get_size(0) : 0;
-    const int high_i = wrap ? 2 * Cubes[cube_type::Rho].get_size(0) : Cubes[cube_type::Rho].get_size(0);
-    const int low_j = wrap ? -Cubes[cube_type::Rho].get_size(1) : 0;
-    const int high_j = wrap ? 2 * Cubes[cube_type::Rho].get_size(1) : Cubes[cube_type::Rho].get_size(1);
-    const int low_k = wrap ? -Cubes[cube_type::Rho].get_size(2) : 0;
-    const int high_k = wrap ? 2 * Cubes[cube_type::Rho].get_size(2) : Cubes[cube_type::Rho].get_size(2);
     const double radius_bohr = constants::ang2bohr(radius);
     const vector<atom> atoms = wavy.get_atoms();
 
-#pragma omp parallel for schedule(dynamic)
-    for (int i = low_i; i < high_i; i++)
-    {
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
-            {
-                const d3 PosGrid = Cubes[cube_type::Rho].get_pos(i, j, k);
-                double Rho = 0,
-                    Grad = 0,
-                    Elf = 0,
-                    Eli = 0,
-                    Lap = 0,
-                    Hess[9]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    Cubes[cube_type::Rho].evaluate_on_grid(
+        [&](const d3 &PosGrid, const i3 &, const i3 &mapped_idx)
+        {
+            if (!is_within_radius(PosGrid, atoms, radius_bohr))
+                return 0.0;
 
-                bool skip = true;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (array_length(PosGrid, atoms[a].get_pos()) < radius_bohr) {
-                        skip = false;
-                        break;
-                    }
-                if (skip)
-                    continue;
+            const PropValues values = compute_prop_values(Cubes, wavy, PosGrid);
+            accumulate_prop_values(Cubes, mapped_idx, values);
+            return values.rho;
+        },
+        wrap);
 
-                if (Cubes[cube_type::ESP].get_loaded() && !Cubes[cube_type::RDG].get_loaded())
-                    Rho = wavy.compute_dens(PosGrid);
-
-                if (Cubes[cube_type::RDG].get_loaded() && Cubes[cube_type::Lap].get_loaded() && (Cubes[cube_type::Elf].get_loaded() || Cubes[cube_type::Eli].get_loaded()))
-                    wavy.computeValues(
-                        PosGrid,
-                        Rho,
-                        Grad,
-                        Hess,
-                        Elf,
-                        Eli,
-                        Lap);
-                else if ((Cubes[cube_type::Elf].get_loaded() && Cubes[cube_type::Eli].get_loaded()) && !Cubes[cube_type::RDG].get_loaded() && !Cubes[cube_type::Lap].get_loaded())
-                    wavy.computeELIELF(
-                        PosGrid,
-                        Elf,
-                        Eli);
-                else if (Cubes[cube_type::Elf].get_loaded() && !Cubes[cube_type::Eli].get_loaded() && !Cubes[cube_type::RDG].get_loaded() && !Cubes[cube_type::Lap].get_loaded())
-                    Elf = wavy.computeELF(PosGrid);
-                else if (!Cubes[cube_type::Elf].get_loaded() && Cubes[cube_type::Eli].get_loaded() && !Cubes[cube_type::RDG].get_loaded() && !Cubes[cube_type::Lap].get_loaded())
-                    Eli = wavy.computeELI(PosGrid);
-                else if (Cubes[cube_type::Elf].get_loaded() && Cubes[cube_type::Eli].get_loaded() && Cubes[cube_type::Lap].get_loaded() && !Cubes[cube_type::RDG].get_loaded())
-                    wavy.computeLapELIELF(
-                        PosGrid,
-                        Elf,
-                        Eli,
-                        Lap);
-                else if (!Cubes[cube_type::Elf].get_loaded() && Cubes[cube_type::Eli].get_loaded() && Cubes[cube_type::Lap].get_loaded() && !Cubes[cube_type::RDG].get_loaded())
-                    wavy.computeLapELI(
-                        PosGrid,
-                        Eli,
-                        Lap);
-                else if (!Cubes[cube_type::Elf].get_loaded() && !Cubes[cube_type::Eli].get_loaded() && Cubes[cube_type::Lap].get_loaded() && !Cubes[cube_type::RDG].get_loaded())
-                    Lap = wavy.computeLap(PosGrid);
-                else
-                    wavy.computeValues(
-                        PosGrid,
-                        Rho,
-                        Grad,
-                        Hess,
-                        Elf,
-                        Eli,
-                        Lap);
-
-                if (Cubes[cube_type::RDG].get_loaded())
-                    Rho = get_lambda_1(Hess) < 0 ? -Rho : Rho;
-
-                int temp_i, temp_j, temp_k;
-                if (i < 0)
-                    temp_i = i + Cubes[cube_type::Rho].get_size(0);
-                else if (i < Cubes[cube_type::Rho].get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - Cubes[cube_type::Rho].get_size(0);
-
-                if (j < 0)
-                    temp_j = j + Cubes[cube_type::Rho].get_size(1);
-                else if (j < Cubes[cube_type::Rho].get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - Cubes[cube_type::Rho].get_size(1);
-
-                if (k < 0)
-                    temp_k = k + Cubes[cube_type::Rho].get_size(2);
-                else if (k < Cubes[cube_type::Rho].get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - Cubes[cube_type::Rho].get_size(2);
-
-                Cubes[cube_type::Rho].set_value(temp_i, temp_j, temp_k, Cubes[cube_type::Rho].get_value(temp_i, temp_j, temp_k) + Rho);
-                if (Cubes[cube_type::RDG].get_loaded())
-                {
-                    if (isnan(Grad))
-                        Grad = 0;
-                    if (isinf(Grad))
-                        Grad = 0;
-                    Cubes[cube_type::RDG].set_value(temp_i, temp_j, temp_k, Cubes[cube_type::RDG].get_value(temp_i, temp_j, temp_k) + Grad);
-                }
-                if (Cubes[cube_type::Lap].get_loaded())
-                {
-                    if (isnan(Lap))
-                        Lap = 0;
-                    if (isinf(Lap))
-                        Lap = 0;
-                    Cubes[cube_type::Lap].set_value(temp_i, temp_j, temp_k, Cubes[cube_type::Lap].get_value(temp_i, temp_j, temp_k) + Lap);
-                }
-                if (Cubes[cube_type::Elf].get_loaded())
-                {
-                    if (isnan(Elf))
-                        Elf = 0;
-                    if (isinf(Elf))
-                        Elf = 0;
-                    Cubes[cube_type::Elf].set_value(temp_i, temp_j, temp_k, Cubes[cube_type::Elf].get_value(temp_i, temp_j, temp_k) + Elf);
-                }
-                if (Cubes[cube_type::Eli].get_loaded())
-                {
-                    if (isnan(Eli))
-                        Eli = 0;
-                    if (isinf(Eli))
-                        Eli = 0;
-                    Cubes[cube_type::Eli].set_value(temp_i, temp_j, temp_k, Cubes[cube_type::Eli].get_value(temp_i, temp_j, temp_k) + Eli);
-                }
-            }
-        if (!test)
-            progress->update();
-    }
     if (!test)
     {
-        delete (progress);
         _time_point end = get_time();
         print_time(start, end, file);
     }
@@ -935,7 +580,7 @@ void Calc_ESP(
     d2.resize(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
-        d2[i].resize(wavy.get_ncen());
+        d2[i].resize(wavy.get_ncen(), 0.0);
         for (int j = 0; j < wavy.get_ncen(); j++)
         {
             if (i == j)
@@ -946,67 +591,20 @@ void Calc_ESP(
             d2[i][j] = pow(wavy.get_atom_coordinate(i, 0) - wavy.get_atom_coordinate(j, 0), 2) + pow(wavy.get_atom_coordinate(i, 1) - wavy.get_atom_coordinate(j, 1), 2) + pow(wavy.get_atom_coordinate(i, 2) - wavy.get_atom_coordinate(j, 2), 2);
         }
     }
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> atoms = wavy.get_atoms();
 
-    ProgressBar *progress = NULL;
-    if (!no_date)
-        progress = new ProgressBar(CubeESP.get_size(0), 50, "=", " ", "Calculating ESP");
+    evaluate_cube_in_radius(
+        CubeESP,
+        wrap,
+        atoms,
+        radius_bohr,
+        [&](const d3 &pos) {
+            return wavy.computeESP(pos, d2);
+        });
 
-    const int low_i = wrap ? -CubeESP.get_size(0) : 0;
-    const int high_i = wrap ? 2 * CubeESP.get_size(0) : CubeESP.get_size(0);
-    const int low_j = wrap ? -CubeESP.get_size(1) : 0;
-    const int high_j = wrap ? 2 * CubeESP.get_size(1) : CubeESP.get_size(1);
-    const int low_k = wrap ? -CubeESP.get_size(2) : 0;
-    const int high_k = wrap ? 2 * CubeESP.get_size(2) : CubeESP.get_size(2);
-    double temp;
-    int temp_i, temp_j, temp_k;
-
-#pragma omp parallel for schedule(dynamic) private(temp, temp_i, temp_j, temp_k)
-    for (int i = low_i; i < high_i; i++)
-    {
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
-            {
-                const d3 PosGrid = CubeESP.get_pos(i, j, k);
-
-                bool skip = true;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (array_length(PosGrid, wavy.get_atom_pos(a)) < constants::ang2bohr(radius))
-                        skip = false;
-                if (skip)
-                    continue;
-
-                if (i < 0)
-                    temp_i = i + CubeESP.get_size(0);
-                else if (i < CubeESP.get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - CubeESP.get_size(0);
-
-                if (j < 0)
-                    temp_j = j + CubeESP.get_size(1);
-                else if (j < CubeESP.get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - CubeESP.get_size(1);
-
-                if (k < 0)
-                    temp_k = k + CubeESP.get_size(2);
-                else if (k < CubeESP.get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - CubeESP.get_size(2);
-
-                temp = wavy.computeESP(PosGrid, d2);
-                CubeESP.set_value(temp_i, temp_j, temp_k, CubeESP.get_value(temp_i, temp_j, temp_k) + temp);
-                // CubeESP.set_value(i, j, k, computeESP(PosGrid, d2, wavy));
-            }
-        if (!no_date)
-            progress->update();
-    }
     if (!no_date)
     {
-        delete (progress);
-
         _time_point end = get_time();
         print_time(start, end, file);
     }
@@ -1023,65 +621,17 @@ void Calc_MO(
     using namespace std;
     err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
     _time_point start = get_time();
-
-    ProgressBar *progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating MO");
-
-    const int low_i = wrap ? -CubeMO.get_size(0) : 0;
-    const int high_i = wrap ? 2 * CubeMO.get_size(0) : CubeMO.get_size(0);
-    const int low_j = wrap ? -CubeMO.get_size(1) : 0;
-    const int high_j = wrap ? 2 * CubeMO.get_size(1) : CubeMO.get_size(1);
-    const int low_k = wrap ? -CubeMO.get_size(2) : 0;
-    const int high_k = wrap ? 2 * CubeMO.get_size(2) : CubeMO.get_size(2);
     const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> atoms = wavy.get_atoms();
 
-#pragma omp parallel for schedule(dynamic)
-    for (int i = low_i; i < high_i; i++)
-    {
-        for (int j = low_j; j < high_j; j++)
-            for (int k = low_k; k < high_k; k++)
-            {
-
-                d3 PosGrid = CubeMO.get_pos(i, j, k);
-                double MO = 0;
-
-                bool skip = true;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (array_length(PosGrid, wavy.get_atom_pos(a)) < radius_bohr)
-                        skip = false;
-                if (skip)
-                    continue;
-
-                MO = wavy.computeMO(
-                    PosGrid,
-                    mo);
-
-                int temp_i, temp_j, temp_k;
-                if (i < 0)
-                    temp_i = i + CubeMO.get_size(0);
-                else if (i < CubeMO.get_size(0))
-                    temp_i = i;
-                else
-                    temp_i = i - CubeMO.get_size(0);
-
-                if (j < 0)
-                    temp_j = j + CubeMO.get_size(1);
-                else if (j < CubeMO.get_size(1))
-                    temp_j = j;
-                else
-                    temp_j = j - CubeMO.get_size(1);
-
-                if (k < 0)
-                    temp_k = k + CubeMO.get_size(2);
-                else if (k < CubeMO.get_size(2))
-                    temp_k = k;
-                else
-                    temp_k = k - CubeMO.get_size(2);
-
-                CubeMO.set_value(temp_i, temp_j, temp_k, CubeMO.get_value(temp_i, temp_j, temp_k) + MO);
-            }
-        progress->update();
-    }
-    delete (progress);
+    evaluate_cube_in_radius(
+        CubeMO,
+        wrap,
+        atoms,
+        radius_bohr,
+        [&](const d3 &pos) {
+            return wavy.computeMO(pos, mo);
+        });
 
     _time_point end = get_time();
     print_time(start, end, file);
