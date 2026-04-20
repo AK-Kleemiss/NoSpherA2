@@ -68,7 +68,7 @@ jobs:
         egress-policy: audit
 
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-    - uses: friendlyanon/setup-vcpkg@dd90d1ea4d644939a9084cb02e46799ee43f9a92 # v1.6.1
+    - uses: friendlyanon/setup-vcpkg@508a6e6b59a3c9d8dac926e1281d4471160d624b # v1.7.0
       with: { committish: 4334d8b4c8916018600212ab4dd4bbdc343065d1 }
     - name: Setup Windows
       shell: powershell
