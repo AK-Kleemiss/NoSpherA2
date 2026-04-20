@@ -22,7 +22,7 @@ jobs:
 
     # Cache IntelMKL
     - name: Cache IntelMKL Build
-      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       id: cache-intelmkl-linux
       with:
         path: Lib/MKL
@@ -37,7 +37,7 @@ jobs:
           sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=/home/runner/work/NoSpherA2/NoSpherA2/Lib/MKL --eula accept
 
     - name: Cache featomic Build
-      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       id: cache-featomic-linux
       with:
         path: build/_deps  # Adjust if featomic installs elsewhere
