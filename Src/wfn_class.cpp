@@ -2924,8 +2924,26 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     int geo_start_bit = 8;
     int basis_start_bit = 16;
     int MO_start_bit = 24;
+    int ECP_start_bit = 32;
     int soi = constants::soi;
     int geo_int_lim = 5;
+
+    auto read_i_soi = [&](int &var) {
+        if (soi == 8) {
+            int64_t temp_64 = 0;
+            rf.read((char *)&temp_64, 8);
+            var = static_cast<int>(temp_64);
+        }
+        else {
+            rf.read((char *)&var, 4);
+        }
+    };
+    auto read_i_4 = [&](int &var) {
+        rf.read((char *)&var, 4);
+    };
+    auto read_i_8 = [&](int64_t &var) {
+        rf.read((char *)&var, 8);
+    };
 
     try
     {
@@ -2936,19 +2954,20 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             geo_start_bit += 24;
             basis_start_bit += 24;
             MO_start_bit += 24;
+            ECP_start_bit += 24;
             soi = 8;
             geo_int_lim = 1;
         }
         // Reading geometry
         rf.seekg(geo_start_bit, ios::beg);
         int64_t geo_start = 0;
-        rf.read((char *)&geo_start, sizeof(geo_start));
+        read_i_8(geo_start);
         err_checkf(geo_start != 0, "Could not read geometry information location from GBW file!", file);
         if (debug)
             file << "I read the pointer of geometry successfully" << endl;
         rf.seekg(geo_start, ios::beg);
         int at = 0;
-        rf.read((char *)&at, constants::soi);
+        read_i_4(at);
         double geo_vals[6]{ 0, 0, 0, 0, 0, 0 }; // x,y,z, ch, exp_fin_nuc, mass
         int geo_ints[5]{ 0, 0, 0, 0, 0 };
         for (int a = 0; a < at; a++)
@@ -2960,7 +2979,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             }
             for (int i = 0; i < geo_int_lim; i++)
             {
-                rf.read((char *)&(geo_ints[i]), soi);
+                read_i_soi(geo_ints[i]);
                 err_checkf(rf.good(), "Error reading geo_int", file);
             }
             string temp = constants::atnr2letter(geo_ints[0]);
@@ -2977,38 +2996,39 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
         rf.seekg(basis_start_bit, ios::beg);
         int64_t basis_start = 0;
-        rf.read((char *)&basis_start, constants::soli);
+        read_i_8(basis_start);
         err_checkf(basis_start != 0, "Could not read beasis information location from GBW file!", file);
         if (debug)
             file << "I read the pointer of basis set successfully" << endl;
         rf.seekg(basis_start, ios::beg);
         int atoms2 = 0, temp = 0;
-        rf.read((char *)&temp, constants::soi);
-        rf.read((char *)&atoms2, constants::soi);
+        read_i_4(temp);
+        read_i_4(atoms2);
         // long unsigned int atoms_with_basis = 0;
         vec exp(37, 0);
         vec con(37, 0);
         for (int a = 0; a < atoms2; a++)
         {
             int atom_based = 0, nr_shells = 0;
-            rf.read((char *)&atom_based, constants::soi);
+            read_i_4(atom_based);
             err_checkf(rf.good(), "Error reading atom_based", file);
-            rf.read((char *)&nr_shells, constants::soi);
+            read_i_4(nr_shells);
             err_checkf(rf.good(), "Error reading nr_shells", file);
             int shell = 0;
             for (int p = 0; p < nr_shells; p++)
             {
                 int ang_mom = 0, coeff_ind = 0, nr_funct = 0, center = 0;
-                rf.read((char *)&ang_mom, constants::soi);
+                read_i_4(ang_mom);
                 err_checkf(rf.good(), "Error reading ang_mom", file);
                 if (ang_mom >= 5)
                     err_not_impl_f("Higher angular momentum basis functions than G", file);
-                rf.read((char *)&coeff_ind, constants::soi);
+                read_i_4(coeff_ind);
                 err_checkf(rf.good(), "Error reading ceof_ind", file);
-                rf.read((char *)&nr_funct, constants::soi);
+                read_i_4(nr_funct);
                 err_checkf(rf.good(), "Error reading nr_func", file);
-                rf.read((char *)&center, constants::soi);
+                read_i_4(center);
                 err_checkf(rf.good(), "Error reading center", file);
+
                 for (int b = 0; b < 37; b++)
                 {
                     rf.read((char *)&(exp[b]), constants::sod);
@@ -3087,17 +3107,18 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
         rf.seekg(MO_start_bit, ios::beg);
         int64_t MOs_start = 0;
-        rf.read((char *)&MOs_start, constants::soli);
+        read_i_8(MOs_start);
         err_checkf(rf.good(), "Error reading MO_start", file);
         err_checkf(MOs_start != 0, "Could not read MO information location from GBW file!", file);
         if (debug)
             file << "I read the pointer of MOs successfully" << endl;
         rf.seekg(MOs_start, ios::beg);
         int operators = 0, dimension = 0;
-        rf.read((char *)&operators, constants::soi);
+        read_i_4(operators);
         err_checkf(rf.good(), "Error reading operators", file);
-        rf.read((char *)&dimension, soi);
+        read_i_soi(dimension);
         err_checkf(rf.good(), "Error reading dimnesion", file);
+
         size_t coef_nr = size_t(dimension) * size_t(dimension);
         vec2 coefficients(operators);
         vec2 occupations(operators);
@@ -3127,11 +3148,13 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             err_checkf(rf.good(), "Error reading energies", file);
             if (debug)
                 file << "I read the energies successfully" << endl;
-            rf.read((char *)irreps[i].data(), constants::soi * dimension);
+            for (int d = 0; d < dimension; d++)
+                read_i_4(irreps[i][d]);
             err_checkf(rf.good(), "Error reading irreps", file);
             if (debug)
                 file << "I read the irreps successfully" << endl;
-            rf.read((char *)cores[i].data(), constants::soi * dimension);
+            for (int d = 0; d < dimension; d++)
+                read_i_4(cores[i][d]);
             err_checkf(rf.good(), "Error reading cores", file);
             if (debug)
             {
@@ -3465,19 +3488,17 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             has_ECPs = true;
             vector<ECP_primitive> ECP_prims;
             // Reading ECPs?
-            rf.seekg(32, ios::beg);
-            long int ECP_start = 0;
-            rf.read((char *)&ECP_start, sizeof(ECP_start));
+            rf.seekg(ECP_start_bit, ios::beg);
+            int64_t ECP_start = 0;
+            read_i_8(ECP_start);
             err_checkf(rf.good(), "Error reading center in ECPs", file);
             err_checkf(ECP_start != 0, "Could not read ECP information location from GBW file!", file);
             if (debug)
                 file << "I read the pointer of ECP successfully" << endl;
             rf.seekg(ECP_start, ios::beg);
-            long int i1 = 0;
+            int64_t i1 = 0;
             int i2 = 0;
-            const int soi = 4;
-            const int sod = 8;
-            rf.read((char *)&i1, 8);
+            read_i_8(i1);
             err_checkf(rf.good(), "Error reading center in ECPs", file);
             file << "First line: " << i1 << endl;
             for (int i = 0; i < i1; i++)
@@ -3494,35 +3515,35 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 int type = 0;
                 double e = 0;
                 double c = 0;
-                rf.read((char *)&Z, soi);
+                read_i_4(Z);
                 err_checkf(Z > 0, "Error reading Z in ECPs", file);
                 err_checkf(rf.good(), "Error reading Z in ECPs", file);
-                rf.read((char *)&temp_0, soi);
+                read_i_4(temp_0);
                 err_checkf(temp_0 > 0, "Error reading temp_0 in ECPs", file);
                 err_checkf(rf.good(), "Error reading temp_0 in ECPs", file);
                 char *temp_c = new char[temp_0];
                 rf.read(temp_c, temp_0);
                 err_checkf(rf.good(), "Error reading temp_c in ECPs", file);
-                rf.read((char *)&nr_core, soi);
+                read_i_4(nr_core);
                 err_checkf(nr_core >= 0, "Error reading nr_core in ECPs", file);
                 err_checkf(rf.good(), "Error reading nr_core in ECPs", file);
                 atoms[i].set_ECP_electrons(nr_core);
-                rf.read((char *)&max_contract, soi);
+                read_i_4(max_contract);
                 err_checkf(max_contract > 0, "Error reading max_contract in ECPs", file);
                 err_checkf(rf.good(), "Error reading max_contract in ECPs", file);
-                rf.read((char *)&max_angular, soi);
+                read_i_4(max_angular);
                 err_checkf(max_angular > 0, "Error reading max_angular in ECPs", file);
                 err_checkf(rf.good(), "Error reading max_angular in ECPs", file);
-                rf.read((char *)&center, soi);
+                read_i_4(center);
                 err_checkf(center > 0, "Error reading center in ECPs", file);
                 err_checkf(rf.good(), "Error reading center in ECPs", file);
                 file << "I read " << Z << " " << temp_0 << " " << nr_core << " " << max_contract << " " << max_angular << endl;
                 for (int l = 0; l < max_angular; l++)
                 {
-                    rf.read((char *)&exps, soi);
+                    read_i_4(exps);
                     err_checkf(exps > 0, "Error reading exps in ECPs", file);
                     err_checkf(rf.good(), "Error reading center in ECPs", file);
-                    rf.read((char *)&type, soi);
+                    read_i_4(type);
                     err_checkf(type >= 0, "Error reading type in ECPs", file);
                     err_checkf(rf.good(), "Error reading center in ECPs", file);
                     err_checkf(type < 200, "This type will give me a headache...", file);
@@ -3531,13 +3552,13 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                     for (int fun = 0; fun < exps; fun++)
                     {
 
-                        rf.read((char *)&n, sod);
+                        rf.read((char *)&n, constants::sod);
                         err_checkf(n < 200, "This Exponent will give me a headache...", file);
                         err_checkf(rf.good(), "Error reading center in ECPs", file);
-                        rf.read((char *)&c, sod);
+                        rf.read((char *)&c, constants::sod);
                         err_checkf(c < 200, "This Coefficient will give me a headache...", file);
                         err_checkf(rf.good(), "Error reading center in ECPs", file);
-                        rf.read((char *)&e, sod);
+                        rf.read((char *)&e, constants::sod);
                         err_checkf(e < 200, "This Exponent will give me a headache...", file);
                         err_checkf(rf.good(), "Error reading center in ECPs", file);
                         file << fun << " " << c << " " << e << " " << n << endl;

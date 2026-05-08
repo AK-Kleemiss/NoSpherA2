@@ -468,12 +468,42 @@ public:
                     svec vectors;
                     vectors.resize(3);
                     int column = 0;
-                    for (int c_ = 0; c_ < fields[operation_field].length(); c_++)
                     {
-                        if (fields[operation_field][c_] != ',')
-                            vectors[column].push_back(fields[operation_field][c_]);
-                        else
-                            column++;
+                        // Re-parse from the raw line to handle CIF single-quoted values
+                        // (e.g. "'x, y, z'" split by >> loses spaces and quotes confuse sign detection)
+                        std::string op_string;
+                        std::istringstream ls(line);
+                        std::string tok;
+                        int fi = 0;
+                        while (ls >> tok) {
+                            if (fi == operation_field) {
+                                if (!tok.empty() && tok.front() == '\'') {
+                                    op_string = tok;
+                                    while (op_string.size() < 2 || op_string.back() != '\'') {
+                                        std::string more;
+                                        if (!(ls >> more)) break;
+                                        op_string += " " + more;
+                                    }
+                                    if (!op_string.empty() && op_string.front() == '\'')
+                                        op_string = op_string.substr(1);
+                                    if (!op_string.empty() && op_string.back() == '\'')
+                                        op_string.pop_back();
+                                } else {
+                                    op_string = tok;
+                                }
+                                break;
+                            }
+                            fi++;
+                        }
+                        for (char c : op_string)
+                            if (c != ',') vectors[column].push_back(c);
+                            else column++;
+                        // Strip spaces from each component so sign detection works correctly
+                        for (auto& v : vectors) {
+                            auto si = v.find_first_not_of(' ');
+                            if (si == std::string::npos) v.clear();
+                            else v = v.substr(si, v.find_last_not_of(' ') - si + 1);
+                        }
                     }
 
                     for (int x = 0; x < 3; x++)
