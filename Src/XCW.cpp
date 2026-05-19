@@ -1,10 +1,10 @@
-#include "XCW.h"
-#include "../convenience.h"
-#include "../scattering_factors.h"
-#include "../npy.h"
-#include "../integration_params.h"
-#include "../libCintMain.h"
-#include "../nos_math.h"
+#include "occ/XCW.h"
+#include "convenience.h"
+#include "scattering_factors.h"
+#include "npy.h"
+#include "integration_params.h"
+#include "libCintMain.h"
+#include "nos_math.h"
 
 
 //#include <occ/io/xyz.h>
