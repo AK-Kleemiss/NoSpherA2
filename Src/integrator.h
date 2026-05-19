@@ -34,23 +34,12 @@ namespace DensityFitting
         double tikhonov_lambda = 1e-6;
         bool adaptive_restraint = true; // Whether to use adaptive weighting for restraints
         CHARGE_SCHEME charge_scheme = CHARGE_SCHEME::TFVC; // Scheme to use for calculating expected electron populations
+
+        std::optional<ivec> asym_atm_list = std::nullopt; //Currently unsued till fixed!// Optional list of atom indices to only compute atoms actually present in the assymetic unit
     };
 
 
     vec density_fit(const WFN& wavy, const WFN& wavy_aux, const CONFIG& config);
-
-    //// Enhanced density fitting with adaptive electron restraints
-    //vec density_fit_restrain(const WFN& wavy, const WFN& wavy_aux, const char metric,
-    //                double restraint_strength = 0.00005, bool adaptive_restraint = true,
-    //                const std::string& charge_scheme = "sanderson_estimate", bool analyze_quality = true);
-    //
-    //// Unrestrained density fitting (original approach)
-    //vec density_fit_unrestrained(WFN& wavy, const WFN& wavy_aux,
-    //                             const char metric, bool analyze_quality = true);
-    //
-    //vec density_fit_hybrid(const WFN& wavy, const WFN& wavy_aux,
-    //                      const char metric, double restraint_strength = 0.00005,
-    //                      double tikhonov_lambda = 1e-6, const std::string& charge_scheme = "mulliken", bool analyze_quality = false);
 
     // Helper functions for charge analysis and restraints
     vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME & = CHARGE_SCHEME::NUCLEAR);

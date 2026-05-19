@@ -92,11 +92,11 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
     switch (config.metric) {
     case METRIC_TYPE::COULOMB:
         compute2C<Coulomb2C_SPH>(aux_basis, eri2c);
-        computeRho<Coulomb3C_SPH>(wavy, wavy_aux, dm, rho);
+        computeRho<Coulomb3C_SPH>(wavy, wavy_aux, dm, rho, config.asym_atm_list);
         break;
     case METRIC_TYPE::OVERLAP:
         compute2C<Overlap2C_SPH>(aux_basis, eri2c);
-        computeRho<Overlap3C_SPH>(normal_basis, aux_basis, dm, rho);
+        computeRho<Overlap3C_SPH>(normal_basis, aux_basis, dm, rho, config.asym_atm_list);
         break;
     }
 
@@ -105,7 +105,7 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
         std::cout << "Solving unrestrained linear system..." << std::endl;
         solve_linear_system(eri2c, aux_basis.get_nao(), rho);
     }
-    else if (config.restrain_type != RESTRAINT_TYPE::NONE) {
+    else {
         //Convert the charge scheme enum to string for display
         std::string charge_scheme;
         switch (config.charge_scheme) {
@@ -154,9 +154,7 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
         std::cout << "Solving regularized linear system..." << std::endl;
         solve_linear_system(eri2c, rho.size(), aux_basis.get_nao(), rho);
     }
-    else {
-        throw std::runtime_error("Unknown restraint type specified in density fitting.");
-    }
+
 
     //write out fitted density coefficients
     //std::cout << "\nFitted density coefficients:" << std::endl;

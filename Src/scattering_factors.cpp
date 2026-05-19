@@ -1873,6 +1873,7 @@ tsc_block_type calculate_scattering_factors(
             //TODO: only compute coefs for atoms that are actually in the symmetric unit!
             DensityFitting::CONFIG config;
             config.analyze_quality = opt.debug;
+            config.asym_atm_list = asym_atom_list;
             //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
             //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
             //if (wavy->get_origin() == e_origin::ptb)
@@ -1949,11 +1950,16 @@ tsc_block_type calculate_scattering_factors(
         file << "Performing the remaining calculation of spherical atoms..." << std::endl;
         opt.needs_Thakkar_fill = false;
         vector<WFN> tempy;
-        tempy.emplace_back(opt.wfn);
+        if (!opt.wfn.empty()) {
+            tempy.emplace_back(opt.wfn);
+        }
+        else {
+            tempy.emplace_back(opt.combined_tsc_calc_files[nr]);
+        }
         opt.m_hkl_list = hkl;
-        opt.iam_switch = true;
+        opt.iam_switch = true; opt.no_date = true;
         tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, 0);
-        opt.iam_switch = false;
+        opt.iam_switch = false; opt.no_date = false;
         blocky.append(std::move(blocky_thakkar), file);
         time_points.push_back(get_time());
         time_descriptions.push_back("Spherical Atoms");
