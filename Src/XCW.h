@@ -1,10 +1,9 @@
 #pragma once
-
-#include "../convenience.h"
-#include "../GridManager.h"
-#include "../integration_params.h"
-#include "../scattering_factors.h"
-#include "../cell.h"
+#include "convenience.h"
+#include "GridManager.h"
+#include "integration_params.h"
+#include "scattering_factors.h"
+#include "cell.h"
 
 class XCW {
 public:

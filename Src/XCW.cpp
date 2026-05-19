@@ -1,4 +1,4 @@
-#include "occ/XCW.h"
+#include "XCW.h"
 #include "convenience.h"
 #include "scattering_factors.h"
 #include "npy.h"

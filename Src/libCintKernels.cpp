@@ -2,18 +2,13 @@
 
 #include "libCintKernels.h"
 
-extern "C" {
-    #include "cint_funcs.h"
-}
-
-
 #define BLKSIZE 8
 /*
  * out[naoi,naoj,naok,comp] in F-order
  */
 void GTOnr3c_fill_s1(
-    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*),
-    double* out, double* buf, int comp, int jobid, int* shls_slice, int* ao_loc, CINTOpt* cintopt,
+    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, libcint::CINTOpt*, double*),
+    double* out, double* buf, int comp, int jobid, int* shls_slice, int* ao_loc, libcint::CINTOpt* cintopt,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
     const int ish0 = shls_slice[0];
@@ -78,7 +73,7 @@ int GTOmax_shell_dim(const int* ao_loc, const int* shls_slice, int ncenter)
 }
 
 size_t GTOmax_cache_size(
-    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*),
+    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, libcint::CINTOpt*, double*),
     int* shls_slice, int ncenter,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
@@ -90,7 +85,7 @@ size_t GTOmax_cache_size(
         i0 = std::min(i0, shls_slice[i * 2]);
         i1 = std::max(i1, shls_slice[i * 2 + 1]);
     }
-    int (*f)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*) = (int (*)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*))intor;
+    int (*f)(double*, int*, int*, int*, int, int*, int, double*, libcint::CINTOpt*, double*) = (int (*)(double*, int*, int*, int*, int, int*, int, double*, libcint::CINTOpt*, double*))intor;
     int cache_size = 0;
     int n;
     int shls[4];
@@ -108,9 +103,9 @@ size_t GTOmax_cache_size(
 
 
 void GTOnr3c_drv(
-    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*),
-    void (*fill)(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*), double*, double*, int, int, int*, int*, CINTOpt*, int*, int, int*, int, double*),
-    double* eri, int comp, int* shls_slice, int* ao_loc, CINTOpt* cintopt,
+    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, libcint::CINTOpt*, double*),
+    void (*fill)(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, libcint::CINTOpt*, double*), double*, double*, int, int, int*, int*, libcint::CINTOpt*, int*, int, int*, int, double*),
+    double* eri, int comp, int* shls_slice, int* ao_loc, libcint::CINTOpt* cintopt,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
     const int ish0 = shls_slice[0];
@@ -145,8 +140,8 @@ void GTOnr3c_drv(
 /*
  * mat(naoi,naoj,comp) in F-order
  */
-void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*), double* mat, int comp, int hermi,
-    int* shls_slice, int* ao_loc, CINTOpt* opt,
+void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, libcint::CINTOpt*, double*), double* mat, int comp, int hermi,
+    int* shls_slice, int* ao_loc, libcint::CINTOpt* opt,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
     const int ish0 = shls_slice[0];
@@ -218,25 +213,25 @@ template ivec make_loc<COORDINATE_TYPE::CART>(ivec& bas, int nbas);
 template ivec make_loc<COORDINATE_TYPE::SPH>(ivec& bas, int nbas);
 
 extern "C" {
-    extern CINTOptimizerFunction int3c2e_optimizer;
-    extern CINTIntegralFunction int3c2e_sph;
-    extern CINTIntegralFunction int3c2e_cart;
+    extern libcint::CINTOptimizerFunction int3c2e_optimizer;
+    extern libcint::CINTIntegralFunction int3c2e_sph;
+    extern libcint::CINTIntegralFunction int3c2e_cart;
 
-    extern CINTOptimizerFunction int2c2e_optimizer;
-    extern CINTIntegralFunction int2c2e_sph;
-    extern CINTIntegralFunction int2c2e_cart;
+    extern libcint::CINTOptimizerFunction int2c2e_optimizer;
+    extern libcint::CINTIntegralFunction int2c2e_sph;
+    extern libcint::CINTIntegralFunction int2c2e_cart;
 
-    extern CINTOptimizerFunction int3c1e_optimizer;
-    extern CINTIntegralFunction int3c1e_sph;
+    extern libcint::CINTOptimizerFunction int3c1e_optimizer;
+    extern libcint::CINTIntegralFunction int3c1e_sph;
 }
 
 #define ADD_FUNCS_TO_KERNEL(Kernel, optimizer_func, driver_func, integral_func, coord_type) \
-    void Kernel::optimizer(CINTOpt*& opt, \
+    void Kernel::optimizer(libcint::CINTOpt*& opt, \
         int* atm, int nat, int* bas, int nbas, double* env) { \
         optimizer_func(&opt, atm, nat, bas, nbas, env); \
     } \
     void Kernel::drv(double* out, int comp, int* shl_slice, int* aoloc, \
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) { \
+        libcint::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) { \
         driver_func(integral_func, out, comp, 0, shl_slice, aoloc, opt, atm, nat, bas, nbas, env); \
     } \
     ivec Kernel::gen_loc(ivec& bas, int nbas) { \
@@ -244,12 +239,12 @@ extern "C" {
     }
 
 #define ADD_FUNCS_TO_KERNEL_NOOPT(Kernel, driver_func, integral_func, coord_type) \
-    void Kernel::optimizer(CINTOpt*& opt, \
+    void Kernel::optimizer(libcint::CINTOpt*& opt, \
         int* atm, int nat, int* bas, int nbas, double* env) { \
         opt = nullptr; \
     } \
     void Kernel::drv(double* out, int comp, int* shl_slice, int* aoloc, \
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) { \
+        libcint::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) { \
         driver_func(integral_func, out, comp, 0, shl_slice, aoloc, opt, atm, nat, bas, nbas, env); \
     } \
     ivec Kernel::gen_loc(ivec& bas, int nbas) { \
@@ -257,12 +252,12 @@ extern "C" {
     }
 
 #define ADD_FUNCS_TO_KERNEL_3C(Kernel, optimizer_func, driver_func, integral_func, fill_func, coord_type) \
-    void Kernel::optimizer(CINTOpt*& opt, \
+    void Kernel::optimizer(libcint::CINTOpt*& opt, \
         int* atm, int nat, int* bas, int nbas, double* env) { \
         optimizer_func(&opt, atm, nat, bas, nbas, env); \
     } \
     void Kernel::drv(double* out, int comp, int* shl_slice, int* aoloc, \
-        CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) { \
+        libcint::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) { \
         driver_func(integral_func, fill_func, out, comp, shl_slice, aoloc, opt, atm, nat, bas, nbas, env); \
     } \
     ivec Kernel::gen_loc(ivec& bas, int nbas) { \
@@ -271,8 +266,8 @@ extern "C" {
 
 ADD_FUNCS_TO_KERNEL(Coulomb2C_SPH, int2c2e_optimizer, GTOint2c, int2c2e_sph, COORDINATE_TYPE::SPH)
 ADD_FUNCS_TO_KERNEL(Coulomb2C_CRT, int2c2e_optimizer, GTOint2c, int2c2e_cart, COORDINATE_TYPE::CART)
-ADD_FUNCS_TO_KERNEL(Overlap2C_SPH, int1e_ovlp_optimizer, GTOint2c, int1e_ovlp_sph, COORDINATE_TYPE::SPH) //If this is suddenly wrong, use the NOOPT version
-ADD_FUNCS_TO_KERNEL(Overlap2C_CRT, int1e_ovlp_optimizer, GTOint2c, int1e_ovlp_cart, COORDINATE_TYPE::CART)
+ADD_FUNCS_TO_KERNEL(Overlap2C_SPH, libcint::int1e_ovlp_optimizer, GTOint2c, libcint::int1e_ovlp_sph, COORDINATE_TYPE::SPH) //If this is suddenly wrong, use the NOOPT version
+ADD_FUNCS_TO_KERNEL(Overlap2C_CRT, libcint::int1e_ovlp_optimizer, GTOint2c, libcint::int1e_ovlp_cart, COORDINATE_TYPE::CART)
 
 ADD_FUNCS_TO_KERNEL_3C(Coulomb3C_SPH, int3c2e_optimizer, GTOnr3c_drv, int3c2e_sph, GTOnr3c_fill_s1, COORDINATE_TYPE::SPH)
 ADD_FUNCS_TO_KERNEL_3C(Coulomb3C_CRT, int3c2e_optimizer, GTOnr3c_drv, int3c2e_cart, GTOnr3c_fill_s1, COORDINATE_TYPE::CART)
@@ -490,7 +485,7 @@ void GTOeval_sph_iter(FPtr_eval feval, FPtr_exp fexp, double fac,
                 for (i = 0; i < ncomp; i++) {
                     pao = ao + (i * nao + ao_id) * ngrids;
                     for (k = 0; k < nc; k++) {
-                        CINTc2s_ket_sph1(pao, pcart,
+                        libcint::CINTc2s_ket_sph1(pao, pcart,
                             ngrids, bgrids, l);
                         pao += deg * ngrids;
                         pcart += dcart * bgrids;

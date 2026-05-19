@@ -10,10 +10,7 @@
 #include "cif.h"
 //#include "debug_utils.h"
 #include "bondwise_analysis.h"
-extern "C" {
-#include "cint_funcs.h"
-}
-#include "occ/XCW.h"
+#include "XCW.h"
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 void run_profiling_tests(const std::filesystem::path& tests_root);

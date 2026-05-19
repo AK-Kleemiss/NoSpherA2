@@ -13563,6 +13563,7 @@
     <ClInclude Include="..\Src\SALTED_io.h" />
     <ClInclude Include="..\Src\SALTED_predictor.h" />
     <ClInclude Include="..\Src\SALTED_utilities.h" />
+    <ClInclude Include="..\Src\XCW.h" />
     <ClInclude Include="icon.h" />
   </ItemGroup>
   <ItemGroup>
