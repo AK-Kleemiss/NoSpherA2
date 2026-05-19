@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+      uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
       with:
         egress-policy: audit
 
@@ -22,7 +22,7 @@ jobs:
 
     # Cache IntelMKL
     - name: Cache IntelMKL Build
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       id: cache-intelmkl-linux
       with:
         path: Lib/MKL
@@ -37,7 +37,7 @@ jobs:
           sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=/home/runner/work/NoSpherA2/NoSpherA2/Lib/MKL --eula accept
 
     - name: Cache featomic Build
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       id: cache-featomic-linux
       with:
         path: build/_deps  # Adjust if featomic installs elsewhere
@@ -63,7 +63,7 @@ jobs:
     runs-on:  windows-2022
     steps:
     - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+      uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
       with:
         egress-policy: audit
 
@@ -96,7 +96,7 @@ jobs:
 #        & "$env:VCPKG_ROOT/vcpkg.exe" install intel-mkl --vcpkg-root ${{ env.VCPKG_ROOT }}
 
     - name: Setup MSBuild (Windows)
-      uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2.0.0
+      uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
 
     - name: Setup Cargo environment (Windows)
       shell: powershell
@@ -114,11 +114,12 @@ jobs:
         cd ${{ github.workspace }}
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -D "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" ..
+        cmake -DCMAKE_BUILD_TYPE=Release -D "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
         cmake --build . --config Release --parallel 
+        cmake --install . --config Release 
 
     - name: Upload Universal Binary
-      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: windowsExec
         path: |

@@ -28,7 +28,8 @@ enum e_origin {
     gbw = 9,
     tonto = 10,
     xtb = 11,
-    ptb = 12
+    ptb = 12,
+    OCC = 13
 };
 
 /**
@@ -164,8 +165,8 @@ public:
     /** Construct with forced charge / multiplicity while reading a file. */
     WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug = false);
     ///@}
-	/** Construct from an OCC Wavefunction Struct. If from_file=true, it will use OCC to read any wfn format supported by it*/
-    WFN(occ::qm::Wavefunction& occ_WF, bool from_file=false);
+    /** Construct from an OCC Wavefunction Struct. If from_file=true, it will use OCC to read any wfn format supported by it*/
+    WFN(const occ::qm::Wavefunction& occ_WF, bool from_file=false);
 	// virtual ~WFN() {};
     //-------------------- OCC additional things--------------------------------------------
     // friend class WfnAdapter;
@@ -473,6 +474,7 @@ public:
     const double compute_spin_dens(const d3& Pos) const;
     /** Spin density with scratch arrays. */
     const double compute_spin_dens(const d3& Pos, vec2& d, vec& phi) const;
+    const double compute_g_cartesian(const d3 &Pos, vec2 &d, vec &phi) const;
     /** Evaluate multiple properties (density, gradient norm, Hessian, ELF/ELI/Laplacian). */
     const void computeValues(const d3& PosGrid, double& Rho, double& normGrad, double* Hess, double& Elf, double& Eli, double& Lap) const;
     /** Compute Laplacian, ELI and ELF together. */
@@ -483,6 +485,10 @@ public:
     const void computeLapELI(const d3& PosGrid, double& Eli, double& Lap) const;
     /** Compute Laplacian only. */
     const double computeLap(const d3& PosGrid) const;
+    /** Compute Rho and ELI together. */
+    void computeRhoELI(const d3 &PosGrid, double& Rho, double& Eli) const;
+    /** Compute gradient. */
+    void computeGrad(const d3 &PosGrid, d3& gradient) const;
     /** Compute ELI alone. */
     const double computeELI(const d3& PosGrid) const;
     /** Compute ELF alone. */

@@ -34,12 +34,10 @@ public:
         _elementOffsets.fill(0);
     }
 
-    //Constructor for the generation of a basis set from a given WFN and beta value
+    //Constructor for the generation of a basis set from a given WFN
     BasisSet(const WFN& wavy) : BasisSet() {
         gen_auto_aux(wavy);
     }
-
-
 
     std::shared_ptr<std::array<std::vector<primitive>, 118>> get_data();
     const std::span<const SimplePrimitive> operator[](const int&element) const ;
@@ -70,8 +68,6 @@ public:
     
     void gen_auto_aux(const WFN& orbital_wfn);
     void gen_auto_aux_for_element(const atom& atm);
-
-    void SVD_prune_aux_basis(const WFN& orbital_wfn);
 
     bool has_element(const int& element) const {
         return _elementCounts[element - 1] != 0;

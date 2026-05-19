@@ -16,6 +16,7 @@ extern "C" {
 #include "occ/XCW.h"
 
 int QCT(options &opt, std::vector<WFN> &wavy);
+void run_profiling_tests(const std::filesystem::path& tests_root);
 
 int main(int argc, char **argv)
 {
@@ -38,10 +39,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
-
     ofstream log_file("NoSpherA2.log", ios::out);
-    std::streambuf* _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+    std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
@@ -61,6 +60,15 @@ int main(int argc, char **argv)
         cls();
         std::cout << "Starting QCT menu..." << endl;
         return QCT(opt, wavy);
+    }
+    if (opt.profiling)
+    {
+        log_file << "Running profiling suite with tests root: " << opt.profiling_tests_root << std::endl;
+        run_profiling_tests(opt.profiling_tests_root);
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf);
+        std::cout << "Finished profiling suite!" << endl;
+        return 0;
     }
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
@@ -255,22 +263,40 @@ int main(int argc, char **argv)
             if (opt.cif_based_combined_tsc_calc)
                 err_checkf(std::filesystem::exists(opt.combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_cifs[i].string(), log_file);
         }
-        wavy.resize(opt.combined_tsc_calc_files.size());
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
-            log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
-            if (opt.debug)
+            //If the files is a .toml file, we run OCC; otherwise we read it as a wfn file. This allows to easily run OCC for multiple files in one go, without having to run OCC separately for each file beforehand.
+            if (opt.combined_tsc_calc_files[i].extension() == ".toml")
             {
-                log_file << "\nmult: " << opt.combined_tsc_calc_mult[i] << endl;
-                log_file << "charge: " << opt.combined_tsc_calc_charge[i] << "\n";
-                log_file << "ECP: " << opt.combined_tsc_calc_ECP[i] << "\n";
+                ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
+                log_file << "Running OCC for " << opt.combined_tsc_calc_files[i] << "..." << endl;
+                occ::io::OccInput config = occ::io::read_occ_input_file(opt.combined_tsc_calc_files[i].string());
+                std::filesystem::path log_path = opt.combined_tsc_calc_files[i].stem().string() + ".log";
+                occ::log::set_log_file(log_path.string());
+                occ::parallel::set_num_threads(config.runtime.threads);
+                wavy.emplace_back(occ::main::run_scf_external(config, true));
+                wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+                wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+                if (opt.combined_tsc_calc_ECP[i] != 0)
+                {
+                    wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
+                }
             }
-            wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
-            wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
-            wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], log_file, opt.debug);
-            if (opt.combined_tsc_calc_ECP[i] != 0)
-            {
-                wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
+            else {
+                log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
+                if (opt.debug)
+                {
+                    log_file << "\nmult: " << opt.combined_tsc_calc_mult[i] << endl;
+                    log_file << "charge: " << opt.combined_tsc_calc_charge[i] << "\n";
+                    log_file << "ECP: " << opt.combined_tsc_calc_ECP[i] << "\n";
+                }
+                wavy.emplace_back(opt.combined_tsc_calc_files[i], opt.debug);
+                wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+                wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+                if (opt.combined_tsc_calc_ECP[i] != 0)
+                {
+                    wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
+                }
             }
             log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
         }
@@ -391,17 +417,14 @@ int main(int argc, char **argv)
         if (opt.occ != "") {
             log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
             if (opt.occ.ends_with(".toml")) {
-                auto config = occ::io::read_occ_input_file(opt.occ);
+                occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
                 occ::log::set_log_file("NoSpherA2_OCC.log");
                 occ::parallel::set_num_threads(config.runtime.threads);
-                auto wfn = occ::main::run_scf_external(config, true);
-                auto wfn_from_occ = WFN(wfn);
-                wavy.emplace_back(wfn_from_occ);
+                wavy.emplace_back(occ::main::run_scf_external(config, true));
             }
             else {
                 occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);
-                auto wfn_from_occ = WFN(wfn, true);
-                wavy.emplace_back(wfn_from_occ);
+                wavy.emplace_back(wfn, true);
             }
 
             wavy[0].set_method(opt.method);

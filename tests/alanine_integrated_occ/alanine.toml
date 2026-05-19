@@ -3,7 +3,8 @@ threads = 4
 [scf]
 input = "alanine.xyz"
 method = "r2scan"
-basis = "def2-tzvp"
+basis = "def2-svp"
 multiplicity = 1
 spherical = true
 output = "fchk"
+df-basis = "def2-universal-jkfit"

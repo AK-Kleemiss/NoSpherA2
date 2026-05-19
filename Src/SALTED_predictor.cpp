@@ -6,7 +6,7 @@
 #include "constants.h"
 #include "wfn_class.h"
 #include <filesystem>
-#include "JKFit.h"
+
 
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
 {
@@ -137,29 +137,37 @@ void SALTEDPredictor::setup_atomic_environment()
         natom_dict[atomic_symbols[i]] += 1;
     }
 
+
+    SALTED_Utils::FeatomicHyperParameters hp{
+        .cutoff_radius = config.rcut1,
+        .max_radial = config.nrad1,
+        .max_angular = config.nang1,
+        .atomic_gaussian_width = config.sig1,
+        .center_atom_weight = 1.0,
+        .species = config.species,
+        .neighspe = config.neighspe1,
+        .radial_basis = {
+            .type = "Gto",
+            .spline_accuracy = 1e-6
+        },
+        .cutoff_function = {
+            .type = "ShiftedCosine",
+            .width = 0.1
+        }
+    };
+
+    featomic::SimpleSystem featomic_system = SALTED_Utils::gen_featomic_system(config.predict_filename);
     // RASCALINE (Generate descriptors)
-    v1 = Rascaline_Descriptors(
-             config.predict_filename,
-             config.nrad1,
-             config.nang1,
-             config.sig1,
-             config.rcut1,
-             natoms,
-             config.neighspe1,
-             config.species)
-             .calculate_expansion_coeffs();
+    v1 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp);
+
     if ((config.nrad2 != config.nrad1) || (config.nang2 != config.nang1) || (config.sig2 != config.sig1) || (config.rcut2 != config.rcut1) || (config.neighspe2 != config.neighspe1))
     {
-        v2 = Rascaline_Descriptors(
-                 config.predict_filename,
-                 config.nrad2,
-                 config.nang2,
-                 config.sig2,
-                 config.rcut2,
-                 natoms,
-                 config.neighspe2,
-                 config.species)
-                 .calculate_expansion_coeffs();
+        hp.max_radial = config.nrad2;
+        hp.max_angular = config.nang2;
+        hp.atomic_gaussian_width = config.sig2;
+        hp.cutoff_radius = config.rcut2;
+        hp.neighspe = config.neighspe2;
+        v2 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp);
     }
     else
     {

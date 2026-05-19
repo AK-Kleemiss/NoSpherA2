@@ -121,6 +121,9 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
         case CHARGE_SCHEME::HIRSHFELD:
             charge_scheme = "Hirshfeld";
             break;
+        case CHARGE_SCHEME::NUCLEAR:
+            charge_scheme = "Nuclear Charge";
+            break;
         }
 
         //Simple does nothing extra here

@@ -6,9 +6,10 @@
 #include "libCintMain.h"
 #include "nos_math.h"
 #include "integration_params.h"
+#include "b2c.h"
 
 #ifdef NSA2DEBUG
-void print_dmatrix2(const dMatrix2& EVC2, const std::string name) {
+void print_dmatrix2(const dMatrix2 &EVC2, const std::string name) {
     std::cout << std::endl << name << ":\n";
     for (int i = 0; i < EVC2.extent(0); i++) {
         for (int j = 0; j < EVC2.extent(1); j++)
@@ -19,7 +20,7 @@ void print_dmatrix2(const dMatrix2& EVC2, const std::string name) {
 #endif
 
 
-int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector, double* incr, std::string& outname, bool rho, bool rdg, bool eli, bool lap) {
+int compute_dens(WFN &wavy, bool debug, int *np, double *origin, double *gvector, double *incr, std::string &outname, bool rho, bool rdg, bool eli, bool lap) {
     properties_options opts;
     opts.lap = lap;
     opts.eli = eli;
@@ -119,11 +120,11 @@ int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector
     return 0;
 };
 
-bond do_bonds(WFN& wavy,
+bond do_bonds(WFN &wavy,
     int mode_sel, bool mode_leng, bool mode_res,
     double res[], bool cub, double boxsize[],
     int atom1, int atom2, int atom3,
-    const bool& debug, const bool& bohr,
+    const bool &debug, const bool &bohr,
     int runnumber,
     bool rho, bool rdg, bool eli, bool lap) {
     bond results{ "","","","",false,false,false };
@@ -421,7 +422,7 @@ bond do_bonds(WFN& wavy,
     return(results);
 }
 
-int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, const bool& bohr) {
+int autobonds(bool debug, WFN &wavy, const std::filesystem::path &inputfile, const bool &bohr) {
     char inputFile[2048] = "";
     if (!exists(inputfile))
     {
@@ -494,7 +495,7 @@ int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, con
     return 1;
 }
 
-std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN& wavy) {
+std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN &wavy) {
     std::vector<std::pair<int, int>> bonds;
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
@@ -515,7 +516,7 @@ std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN& wavy) {
 }
 
 //Assuming square matrices
-vec change_basis_sq(const vec& in, const vec& transformation, int size) {
+vec change_basis_sq(const vec &in, const vec &transformation, int size) {
 
     // new = transform^T * in * tranform
     vec result(size * size);
@@ -545,7 +546,7 @@ vec change_basis_sq(const vec& in, const vec& transformation, int size) {
 //For non-square transformation matrices
 //performs res = trans * in * trans^T in case of forward
 //and res = trans^T * int * trans in case of !forward
-dMatrix2 change_basis_general(const dMatrix2& in, const dMatrix2& transformation, bool forward = true) {
+dMatrix2 change_basis_general(const dMatrix2 &in, const dMatrix2 &transformation, bool forward = true) {
     //Checks should be handled by dot itself
     //int a, b, c, d;
     //c = transformation.extent(1); //cols of t
@@ -575,9 +576,9 @@ dMatrix2 change_basis_general(const dMatrix2& in, const dMatrix2& transformation
  * @param atom_indices A vector containing the indices (0-based) of the basis functions for this atom
  * @return NAOResult containing sorted occupancies and coefficients
  */
-Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2& D_full,
-    const dMatrix2& S_full,
-    const std::vector<int>& atom_indices) {
+Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 &D_full,
+    const dMatrix2 &S_full,
+    const std::vector<int> &atom_indices) {
 
     err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
     err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
@@ -624,7 +625,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
         W[i] = abs(W[i]) < 1E-10 ? 0.0 : 1.0 / W[i];
 
     vec Temp2(n * n, 0.0);
-    double* T;
+    double *T;
     int in, jn;
     for (int i = 0; i < n; i++) {
         in = i * n;
@@ -778,7 +779,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2&
  }
  */
 
-double Roby_information::projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals, const ivec& eigvecs, dMatrix2* given_NAO) {
+double Roby_information::projection_matrix_and_expectation(const ivec &indices, const ivec &eigvals, const ivec &eigvecs, dMatrix2 *given_NAO) {
     const int n = indices.size();
     //vec D_Sub(n * n, 0.0);
     vec S_Sub(n * n, 0.0);
@@ -852,7 +853,7 @@ double Roby_information::projection_matrix_and_expectation(const ivec& indices, 
 double Roby_information::Roby_population_analysis(const ivec atoms) {
     ivec bf_indices;
     if (atoms.size() == 0) {
-        for (NAOResult& NAO : NAOs) {
+        for (NAOResult &NAO : NAOs) {
             for (auto index : NAO.matrix_elements)
                 bf_indices.push_back(index);
         }
@@ -864,7 +865,7 @@ double Roby_information::Roby_population_analysis(const ivec atoms) {
     return P;
 }
 
-void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
+void Roby_information::computeAllAtomicNAOs(WFN &wavy) {
     const int N_atoms = wavy.get_ncen();
     const std::vector<atom> ats = wavy.get_atoms();
     NAOs.reserve(N_atoms);
@@ -888,12 +889,12 @@ void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
 
     int last_index = 0;
     ivec2 indices(wavy.get_ncen());
-    for (auto& a : ats) {
+    for (auto &a : ats) {
         indices[a.get_nr() - 1].reserve(density_matrix.extent(0) / N_atoms); // Rough estimate
         int current_shell = -1;
         int nr_indices = 0;
         std::vector<basis_set_entry> basis_set = a.get_basis_set();
-        for (auto& bf : basis_set) {
+        for (auto &bf : basis_set) {
             if (bf.get_shell() != current_shell) {
                 current_shell++;
                 if (wavy.get_origin() != e_origin::tonto)
@@ -923,7 +924,7 @@ void Roby_information::computeAllAtomicNAOs(WFN& wavy) {
 #endif
 }
 
-ivec Roby_information::find_eigenvalue_pairs(const vec& eigvals, const double tolerance) {
+ivec Roby_information::find_eigenvalue_pairs(const vec &eigvals, const double tolerance) {
     const int n = eigvals.size();
     ivec pairs(n, -1);
     for (int i = 0; i < n; i++) {
@@ -947,12 +948,12 @@ ivec Roby_information::find_eigenvalue_pairs(const vec& eigvals, const double to
 }
 
 void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(
-    dMatrix2& EVC,
-    const vec& eigvals,
-    const ivec& pairs,
+    dMatrix2 &EVC,
+    const vec &eigvals,
+    const ivec &pairs,
     const int index_a,
     const int index_b,
-    const ivec& pair_matrix_indices)
+    const ivec &pair_matrix_indices)
 {
     double fp, fm, fa, fb, s, c, s2;
     const int n_ab = EVC.extent(0);
@@ -1035,9 +1036,9 @@ void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(
 }
 
 std::map<char, dMatrix2> Roby_information::make_covalent_from_ionic(
-    const dMatrix2& theta_I,
-    const vec& eigvals,
-    const ivec& pairs) {
+    const dMatrix2 &theta_I,
+    const vec &eigvals,
+    const ivec &pairs) {
     std::map<char, dMatrix2> res; // A = angle, V = eigen_value, T = Theta_vector
     const int size = eigvals.size();
     res.emplace('A', dMatrix2(size, 1));
@@ -1070,7 +1071,7 @@ std::map<char, dMatrix2> Roby_information::make_covalent_from_ionic(
     return res;
 }
 
-Roby_information::Roby_information(WFN& wavy) {
+Roby_information::Roby_information(WFN &wavy) {
     auto bonds = get_bonded_atom_pairs(wavy);
     std::cout << "Calculating NAOs for all atoms...                 " << std::flush;
     computeAllAtomicNAOs(wavy);
@@ -1121,7 +1122,7 @@ Roby_information::Roby_information(WFN& wavy) {
     std::cout << std::endl << "Total Population: " << all_atom_population << "\n\n";
     vec atom_pops(NAOs.size(), 0.0);
 #ifndef NSA2DEBUG
-    ProgressBar* pb = new ProgressBar(NAOs.size(), 40, "-", " ", "Calculating Atomic Populations");
+    ProgressBar *pb = new ProgressBar(NAOs.size(), 40, "-", " ", "Calculating Atomic Populations");
 #endif
     for (auto NAO : NAOs) {
         atom_pops[NAO.atom_index] = Roby_population_analysis(NAO.matrix_elements);
@@ -1379,7 +1380,7 @@ Roby_information::Roby_information(WFN& wavy) {
     std::cout << "--------------------------------------------------------------------------------------------\n";
 
     //Sort results by Element of the heavier atom of the bonds and then within each group by the heavier of the second atom
-    std::sort(RGBI.begin(), RGBI.end(), [](const bond_index_result& a, const bond_index_result& b) {
+    std::sort(RGBI.begin(), RGBI.end(), [](const bond_index_result &a, const bond_index_result &b) {
         if (a.atom_element_nr.first != b.atom_element_nr.first) {
             return a.atom_element_nr.first > b.atom_element_nr.first;
         }
@@ -1430,14 +1431,14 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
             if (distance < 1.35 * svdW)
             {
                 std::cout << "Bond between " << i << " (" << wavy.get_atom_charge(i) << ") and " << j << " (" << wavy.get_atom_charge(j) << ") with distance " << distance << " and svdW " << svdW << std::endl;
-                const vec bond_vec = {(wavy.get_atom_coordinate(j, 0) - wavy.get_atom_coordinate(i, 0)) / points, (wavy.get_atom_coordinate(j, 1) - wavy.get_atom_coordinate(i, 1)) / points, (wavy.get_atom_coordinate(j, 2) - wavy.get_atom_coordinate(i, 2)) / points};
+                const vec bond_vec = { (wavy.get_atom_coordinate(j, 0) - wavy.get_atom_coordinate(i, 0)) / points, (wavy.get_atom_coordinate(j, 1) - wavy.get_atom_coordinate(i, 1)) / points, (wavy.get_atom_coordinate(j, 2) - wavy.get_atom_coordinate(i, 2)) / points };
                 const double dr = distance / points;
                 vec lapl(points, 0.0);
-                const vec pos = {wavy.get_atom_coordinate(i, 0), wavy.get_atom_coordinate(i, 1), wavy.get_atom_coordinate(i, 2)};
+                const vec pos = { wavy.get_atom_coordinate(i, 0), wavy.get_atom_coordinate(i, 1), wavy.get_atom_coordinate(i, 2) };
 #pragma omp parallel for schedule(dynamic)
                 for (int k = 0; k < points; k++)
                 {
-                    d3 t_pos = {pos[0], pos[1], pos[2]};
+                    d3 t_pos = { pos[0], pos[1], pos[2] };
                     t_pos[0] += k * bond_vec[0];
                     t_pos[1] += k * bond_vec[1];
                     t_pos[2] += k * bond_vec[2];
@@ -1459,4 +1460,167 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
             }
         }
     }
+}
+
+void ELI_analysis(const WFN &wavy, const options &opt) {
+    err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
+    std::cout << "Analysing ELI basins in the wavefunction..." << std::endl;
+
+    const double radius = opt.properties.radius;
+    const double grid_spacing = opt.properties.resolution;
+    properties_options prop_opt = opt.properties;
+    WFN l_w = wavy;
+    l_w.delete_unoccupied_MOs();
+    readxyzMinMax_fromWFN(wavy, prop_opt, true);
+
+    cube rho(prop_opt.NbSteps, l_w.get_ncen(), true);
+    cube eli_cube(prop_opt.NbSteps, l_w.get_ncen(), true);
+    rho.give_parent_wfn(l_w);
+    eli_cube.give_parent_wfn(l_w);
+
+    std::cout << "Calcualting grid of size " << prop_opt.NbSteps[0] << " x " << prop_opt.NbSteps[1] << " x " << prop_opt.NbSteps[2] << "..." << std::endl;
+    std::cout << "Number of points: " << prop_opt.NbSteps[0] * prop_opt.NbSteps[1] * prop_opt.NbSteps[2] << std::endl;
+
+    //Print a summary of the grid parameters
+    std::cout << "Grid parameters:\n";
+    std::cout << "  Min: (" << prop_opt.MinMax[0] << ", " << prop_opt.MinMax[1] << ", " << prop_opt.MinMax[2] << ")\n";
+    std::cout << "  Max: (" << prop_opt.MinMax[3] << ", " << prop_opt.MinMax[4] << ", " << prop_opt.MinMax[5] << ")\n";
+
+    const std::vector<atom> atoms = wavy.get_atoms();
+
+    // print table of atom positions
+    std::cout << "Atom positions:\n";
+    for (int a = 0; a < atoms.size(); a++) {
+        std::cout << "  Atom " << a << ": (" << atoms[a].get_coordinate(0) << ", " << atoms[a].get_coordinate(1) << ", " << atoms[a].get_coordinate(2) << ")\n";
+    }
+
+    vec stepsizes{(prop_opt.MinMax[3] - prop_opt.MinMax[0]) / prop_opt.NbSteps[0],
+                  (prop_opt.MinMax[4] - prop_opt.MinMax[1]) / prop_opt.NbSteps[1],
+                  (prop_opt.MinMax[5] - prop_opt.MinMax[2]) / prop_opt.NbSteps[2]};
+
+    for (int i = 0; i < 3; i++)
+    {
+        rho.set_origin(i, prop_opt.MinMax[i]);
+        rho.set_vector(i, i, stepsizes[i]);
+        eli_cube.set_origin(i, prop_opt.MinMax[i]);
+        eli_cube.set_vector(i, i, stepsizes[i]);
+    }
+
+    rho.calc_dv();
+    eli_cube.calc_dv();
+
+    Calc_RhoEli(rho, eli_cube, l_w, radius);
+    rho.set_path("rho.cube");
+    eli_cube.set_path("eli.cube");
+    //rho.write_file(true);
+    //eli_cube.write_file(true);
+
+    const double density_floor = std::max(1e-8, rho.max_value() * 1e-6);
+    const std::vector<critical_point> density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+    std::cout << "Density Critical Points";
+    if (!density_critical_points.empty())
+        std::cout << " (" << density_critical_points.size() << " found)";
+    std::cout << ":\n";
+    if (density_critical_points.empty()) {
+        std::cout << "  No critical points refined from the current cube grid.\n";
+    }
+    else {
+        constexpr int nw = 15; // numeric field width — wide enough for large core densities
+        for (size_t i = 0; i < density_critical_points.size(); i++) {
+            const critical_point &cp = density_critical_points[i];
+
+            std::string ownership_info;
+            if (cp.type == "attractor" || cp.type == "bond") {
+                double min_dist1 = std::numeric_limits<double>::max();
+                double min_dist2 = std::numeric_limits<double>::max();
+                int atom_index1 = -1;
+                int atom_index2 = -1;
+                for (int a = 0; a < l_w.get_ncen(); a++) {
+                    const d3 apos = l_w.get_atom_pos(a);
+                    const double dx = cp.position[0] - apos[0];
+                    const double dy = cp.position[1] - apos[1];
+                    const double dz = cp.position[2] - apos[2];
+                    const double dist2 = dx * dx + dy * dy + dz * dz;
+                    if (dist2 < min_dist1) {
+                        min_dist2 = min_dist1;
+                        atom_index2 = atom_index1;
+                        min_dist1 = dist2;
+                        atom_index1 = a;
+                    }
+                    else if (dist2 < min_dist2) {
+                        min_dist2 = dist2;
+                        atom_index2 = a;
+                    }
+                }
+
+                if (cp.type == "attractor" && atom_index1 >= 0) {
+                    ownership_info = "   " + l_w.get_atom_label(atom_index1) + std::to_string(atom_index1);
+                }
+                else if (cp.type == "bond" && atom_index1 >= 0 && atom_index2 >= 0) {
+                    ownership_info = "   "
+                        + l_w.get_atom_label(atom_index1) + std::to_string(atom_index1)
+                        + "-"
+                        + l_w.get_atom_label(atom_index2) + std::to_string(atom_index2)
+                        + " bond";
+                }
+            }
+
+            std::cout << "\n  CP " << std::right << std::setw(3) << i + 1
+                      << "  [" << std::left << std::setw(12) << cp.type << "]  "
+                      << (cp.converged ? "converged" : "NOT converged")
+                      << ownership_info << "\n";
+            std::cout << std::fixed << std::setprecision(4) << std::right;
+            std::cout << "    Position  :"
+                      << std::setw(nw) << cp.position[0]
+                      << std::setw(nw) << cp.position[1]
+                      << std::setw(nw) << cp.position[2] << "\n";
+            std::cout << "    Rho       :" << std::setw(nw) << cp.density << "\n";
+            std::cout << "    GradRho   :"
+                      << std::setw(nw) << cp.gradient[0]
+                      << std::setw(nw) << cp.gradient[1]
+                      << std::setw(nw) << cp.gradient[2]
+                      << "   |GradRho| :" << std::setw(nw) << cp.gradient_norm << "\n";
+            std::cout << "    HessRho_EigVals:"
+                      << std::scientific << std::setprecision(4)
+                      << std::setw(nw) << cp.hessian_eigenvalues[0]
+                      << std::setw(nw) << cp.hessian_eigenvalues[1]
+                      << std::setw(nw) << cp.hessian_eigenvalues[2]
+                      << std::fixed << std::setprecision(4) << "\n";
+            std::cout << "    HessRho_EigVecs v1:"
+                      << std::setw(nw) << cp.hessian_eigenvectors[0][0]
+                      << std::setw(nw) << cp.hessian_eigenvectors[0][1]
+                      << std::setw(nw) << cp.hessian_eigenvectors[0][2] << "\n";
+            std::cout << "                    v2:"
+                      << std::setw(nw) << cp.hessian_eigenvectors[1][0]
+                      << std::setw(nw) << cp.hessian_eigenvectors[1][1]
+                      << std::setw(nw) << cp.hessian_eigenvectors[1][2] << "\n";
+            std::cout << "                    v3:"
+                      << std::setw(nw) << cp.hessian_eigenvectors[2][0]
+                      << std::setw(nw) << cp.hessian_eigenvectors[2][1]
+                      << std::setw(nw) << cp.hessian_eigenvectors[2][2] << "\n";
+            std::cout << "    DelSqRho  :" << std::setw(nw) << cp.laplacian << "\n";
+            if (std::isfinite(cp.ellipticity))
+                std::cout << "    Bond Ellipticity:" << std::setw(nw) << cp.ellipticity << "\n";
+            if (std::isfinite(cp.virial_field) || std::isfinite(cp.kinetic_lagrangian) || std::isfinite(cp.kinetic_hamiltonian) || std::isfinite(cp.lagrangian_density)) {
+                std::cout << "    V         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.virial_field
+                          << "   G         :" << std::fixed << std::setprecision(4) << std::setw(nw) << cp.kinetic_lagrangian
+                          << "   K         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.kinetic_hamiltonian
+                          << "   L         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.lagrangian_density
+                          << std::fixed << std::setprecision(4) << "\n";
+            }
+        }
+        std::cout << "\n";
+    }
+
+    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius);
+    svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
+
+    std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+    svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
+
+    std::cout << "QTAIM Analysis:\n";
+    integrate_values_in_basins(&rho, &(qtaim_results.first), labels, opt.debug);
+    std::cout << "\n\nELI Analysis:\n";
+    integrate_values_in_basins(&rho, &(eli_results.first), eli_labels, opt.debug);
+
 }

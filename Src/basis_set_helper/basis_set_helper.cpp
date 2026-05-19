@@ -36,9 +36,57 @@ const std::array<std::vector<primitive>, 118> read_basis_set(std::filesystem::pa
 
     }
     file.close();
+
+    //Sort the basis set according to the convention:
+    // 1) Primitives inside each shell sorted by exponent descending
+    // 2) Shells sorted by angular momentum (l = type) ascending, then by first exponent descending within each l
+    for (auto& elem_basis : basis_set) {
+        if (elem_basis.empty()) continue;
+
+        // 1) Sort primitives inside each shell by exponent descending,
+        //    keeping coefficients aligned.
+        for (auto& shell : elem_basis) {
+            if (shell.exp.size() <= 1) continue;
+
+            if (!std::is_sorted(shell.exp.begin(), shell.exp.end(), std::greater<double>{})) {
+                std::vector<std::pair<double, double>> ec;
+                ec.reserve(shell.exp.size());
+
+                for (std::size_t k = 0; k < shell.exp.size(); ++k) {
+                    ec.emplace_back(shell.exp[k], shell.coefficient[k]);
+                }
+
+                std::sort(ec.begin(), ec.end(),
+                    [](const auto& a, const auto& b) {
+                        return a.first > b.first;
+                    });
+
+                for (std::size_t k = 0; k < ec.size(); ++k) {
+                    shell.exp[k] = ec[k].first;
+                    shell.coefficient[k] = ec[k].second;
+                }
+            }
+        }
+
+        // 2) Stable sort shells:
+        //    first by angular momentum l (= type),
+        //    then by first exponent descending within each l.
+        std::stable_sort(elem_basis.begin(), elem_basis.end(),
+            [](const primitive& a, const primitive& b) {
+                if (a.type != b.type) {
+                    return a.type < b.type;
+                }
+
+                // Optional safety for malformed shells
+                const double a0 = a.exp.empty() ? -std::numeric_limits<double>::infinity() : a.exp.front();
+                const double b0 = b.exp.empty() ? -std::numeric_limits<double>::infinity() : b.exp.front();
+
+                return a0 > b0;
+            });
+    }
+
     return basis_set;
 }
-
 
 //constexpr Primitive sto3g_primitives[] = {
 //    // H

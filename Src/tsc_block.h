@@ -439,6 +439,8 @@ public:
         else if (opt.partition_type == PartitionType::TFVC) { result += "'TFVC'\n"; }
         else if (opt.partition_type == PartitionType::Hirshfeld) { result += "'Hirshfeld'\n"; }
         else if (opt.partition_type == PartitionType::RI) { result += "'RI-Fit'\n"; }
+        else if (opt.partition_type == PartitionType::MBIS) { result += "'MBIS'\n"; }
+        else if (opt.partition_type == PartitionType::EMBIS) { result += "'EMBIS'\n"; }
         else { result += "'Unknown'\n"; }
         result += "_aspheric_ffs_partitioning.software 'NoSpherA2'\n";
         result += "_aspheric_ffs_partitioning.source   'partitioned molecular wavefunction calculation'";

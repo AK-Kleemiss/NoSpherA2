@@ -8,6 +8,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Platform,
     [Parameter(Mandatory = $false)]
+    [string]$PlatformToolset,
+    [Parameter(Mandatory = $false)]
     [string]$MSBuildExe
 )
 
@@ -17,10 +19,19 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $auxFile = Join-Path $repoRoot "Src\auxiliary_basis.cpp"
 $basisDir = Join-Path $repoRoot "Src\basis_set_helper\basis_sets"
 
-$csvFiles = Get-ChildItem -Path $basisDir -Filter "*.csv" -File
-$needsRegeneration = -not (Test-Path $auxFile)
+$hasAuxFile = Test-Path $auxFile
+$needsRegeneration = -not $hasAuxFile
+
+if (-not (Test-Path $basisDir)) {
+    if ($hasAuxFile) {
+        Write-Host "Basis set source directory not found ($basisDir), but auxiliary_basis.cpp exists. Skipping BasisSetConverter."
+        exit 0
+    }
+    throw "Basis set source directory not found: $basisDir and auxiliary_basis.cpp is missing at $auxFile"
+}
 
 if (-not $needsRegeneration) {
+    $csvFiles = Get-ChildItem -Path $basisDir -Filter "*.csv" -File
     $auxTimestamp = (Get-Item $auxFile).LastWriteTimeUtc
     foreach ($csv in $csvFiles) {
         if ($csv.LastWriteTimeUtc -gt $auxTimestamp) {
@@ -51,8 +62,24 @@ if (-not (Test-Path $ConverterExe)) {
         $msbuildCmd = $resolvedMsbuild.Source
     }
 
+    if ([string]::IsNullOrWhiteSpace($PlatformToolset) -and -not [string]::IsNullOrWhiteSpace($env:PlatformToolset)) {
+        $PlatformToolset = $env:PlatformToolset
+    }
+
     Write-Host "BasisSetConverter executable not found. Building $converterProject ($Configuration|$Platform)..."
-    & $msbuildCmd $converterProject /m /nologo "/p:Configuration=$Configuration" "/p:Platform=$Platform"
+    $msbuildArgs = @(
+        $converterProject,
+        '/m',
+        '/nologo',
+        "/p:Configuration=$Configuration",
+        "/p:Platform=$Platform"
+    )
+    if (-not [string]::IsNullOrWhiteSpace($PlatformToolset)) {
+        $msbuildArgs += "/p:PlatformToolset=$PlatformToolset"
+        Write-Host "Forwarding PlatformToolset=$PlatformToolset to BasisSetConverter build."
+    }
+
+    & $msbuildCmd @msbuildArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to build BasisSetConverter via msbuild."
     }
@@ -78,7 +105,16 @@ if (-not (Test-Path $ConverterExe)) {
 
 Write-Host "Generating auxiliary_basis.cpp via BasisSetConverter..."
 Write-Host "Using BasisSetConverter executable: $ConverterExe"
-& $ConverterExe $SolutionDir
+
+$normalizedSolutionDir = [System.IO.Path]::GetFullPath($SolutionDir)
+$dirSep = [System.IO.Path]::DirectorySeparatorChar
+$altDirSep = [System.IO.Path]::AltDirectorySeparatorChar
+if (-not $normalizedSolutionDir.EndsWith($dirSep) -and -not $normalizedSolutionDir.EndsWith($altDirSep)) {
+    $normalizedSolutionDir += $dirSep
+}
+
+Write-Host "Using solution directory argument: $normalizedSolutionDir"
+& $ConverterExe $normalizedSolutionDir
 if ($LASTEXITCODE -ne 0) {
     throw "BasisSetConverter execution failed with exit code $LASTEXITCODE"
 }
