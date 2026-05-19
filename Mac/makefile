@@ -10,7 +10,7 @@ ARCHS := arm64 x86_64
 
 # Source & include roots
 SRC_DIR := ../Src
-USER_INC_DIRS := ../Src ../Lib
+USER_INC_DIRS := ../Src ../Lib ../Src/occ
 SYSTEM_INC_DIRS := ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint_arm64/include ../Lib/LibCint_x86_64/include ../Lib/occ_x86_64/include ../Lib/occ_arm64/include
 LIB_OCC := ../Lib/occ/lib/libocc.a
 

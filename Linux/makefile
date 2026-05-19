@@ -15,7 +15,7 @@ MKL_THREADING ?= INTEL     # INTEL | SEQ  (INTEL = mkl_intel_thread + libiomp5)
 
 # Source & include roots
 SRC_DIR := ../Src
-USER_INC_DIRS := ../Src ../Lib
+USER_INC_DIRS := ../Src ../Lib ../Src/occ
 SYSTEM_INC_DIRS := ../Lib/featomic_install/include ../Lib/LibCint/include ../Lib/occ/include
 LIB_OCC := $(wildcard ../Lib/occ/lib/*.a)
 #LibCint local libs
