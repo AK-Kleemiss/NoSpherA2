@@ -279,7 +279,8 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
             << "Using " << wave.get_nmo() << " MOs in temporary wavefunction" << std::endl;
         //wave.write_wfn("temp_wavefunction.wfn", false, true);
     }
-    if (!non_spherical_densities_calculated_) {
+
+    if (!non_spherical_densities_calculated_ && !config_.no_density_eval) {
         calculateNonSphericalDensities(wave, unit_cell);
         addTimingPoint("WFN evaluation on grid");
     }
@@ -754,7 +755,7 @@ void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2
         //            accepted_points += keep;
         //        }
 
-        (*num_points_per_atom)[g] = accepted_points;
+        //(*num_points_per_atom)[g] = accepted_points;  //If anything breaks... i thought this was not neccecary and a bug );
         d1[final_atoms].resize(accepted_points);
         d2[final_atoms].resize(accepted_points);
         d3[final_atoms].resize(accepted_points);

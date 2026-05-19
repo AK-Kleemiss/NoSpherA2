@@ -183,6 +183,13 @@ void atom::set_coordinate(const unsigned int& axis, const double& value) {
     else if (axis == 2) z = value;
 };
 
+double atom::get_frac_coordinate(const unsigned int& axis) const {
+    if (axis == 0) return frac_coords[0];
+    else if (axis == 1) return frac_coords[1];
+    else if (axis == 2) return frac_coords[2];
+    else return 0.0;
+};
+
 void atom::set_frac_coords(const d3& frac) {
     frac_coords = frac;
 };

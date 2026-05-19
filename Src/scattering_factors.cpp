@@ -122,13 +122,14 @@ void save_k_points(vec2 &k_pt, hkl_list &hkl)
  * @param file The output stream to write the generated k-points.
  * @param debug Flag indicating whether to enable debug mode.
  */
+
 void make_k_pts(const bool &read_k_pts,
     const bool &save_k_pts,
     const cell &unit_cell,
     hkl_list &hkl,
     vec2 &k_pt,
     std::ostream &file,
-    bool debug = false)
+    bool debug)
 {
     using namespace std;
     const int size = (int)hkl.size();
@@ -182,7 +183,8 @@ void read_hkl(const std::filesystem::path &hkl_filename,
     const vec2 &twin_law,
     cell &unit_cell,
     std::ostream &file,
-    bool debug = false)
+    bool debug
+    )
 {
     file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
     i3 hkl_;
@@ -291,11 +293,141 @@ void read_hkl(const std::filesystem::path &hkl_filename,
             hkl_enlarged.erase(tempv);
         }
     }
-    hkl = hkl_enlarged;
+    if (unit_cell.get_sym().empty()) {
+        hkl = hkl_enlarged;
+    }
     // Remove 0 0 0 if it exists
     if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
         hkl.erase(i3{ 0, 0, 0 });
     file << "Nr of reflections to be used: " << hkl.size() << std::endl;
+}
+
+hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
+    hkl_list& hkl,
+    const vec2& twin_law,
+    cell& unit_cell,
+    std::ostream& file,
+    vec2& obs,
+    bool debug
+)
+{
+    file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
+    i3 hkl_;
+    double F_, sigma_;
+    err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
+    std::ifstream hkl_input(hkl_filename, std::ios::in);
+    hkl_input.seekg(0, hkl_input.beg);
+    std::regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
+    std::string line, temp;
+    while (!hkl_input.eof())
+    {
+        getline(hkl_input, line);
+        if (hkl_input.eof())
+            break;
+        if (line.size() < 2)
+            continue;
+        std::cmatch result;
+        if (regex_search(line.c_str(), result, r))
+            continue;
+        // if (debug) file << "hkl: ";
+        for (int i = 0; i < 3; i++)
+        {
+            temp = line.substr(4 * size_t(i) + 1, 4);
+            temp.erase(remove_if(temp.begin(), temp.end(), ::isspace), temp.end());
+            hkl_[i] = stoi(temp);
+            // if (debug) file << setw(4) << temp;
+        }
+        for (int i = 0; i < 2; i++) {
+            temp = line;
+            temp.erase(0, 12);
+            int dot = temp.find_first_of('.');
+            std::string temp_F = temp.substr(0, dot + 3);
+            std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
+            temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
+            temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
+            F_ = stof(temp_F);
+            sigma_ = stof(temp_sigma);
+        }
+        // if (debug) file << endl;
+        hkl.emplace(hkl_);
+        obs[0].push_back(F_);
+		obs[1].push_back(sigma_);
+    }
+    hkl_list_it found = hkl.find(i3{ 0, 0, 0 });
+    if (found != hkl.end())
+    {
+        if (debug)
+            file << "popping back 0 0 0" << std::endl;
+        hkl.erase(i3{ 0, 0, 0 });
+    }
+    hkl_input.close();
+    file << " done!\nNr of reflections read from file: " << hkl.size() << std::endl;
+
+    if (debug)
+        file << "Number of reflections before twin: " << hkl.size() << std::endl;
+    if (twin_law.size() > 0)
+    {
+        for (const i3& hkl__ : hkl)
+            for (int i = 0; i < twin_law.size(); i++)
+                hkl.emplace(i3{
+                    static_cast<int>(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
+                    static_cast<int>(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
+                    static_cast<int>(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+    }
+    if (debug)
+        file << "Number of reflections after twin: " << hkl.size() << std::endl;
+
+    std::vector<std::vector<ivec>> sym(3);
+    for (int i = 0; i < 3; i++)
+        sym[i].resize(3);
+    sym = unit_cell.get_sym();
+
+    if (debug)
+    {
+        file << "Read " << sym[0][0].size() << " symmetry elements!" << std::endl;
+        for (int i = 0; i < sym[0][0].size(); i++)
+        {
+            for (int x = 0; x < 3; x++)
+            {
+                for (int y = 0; y < 3; y++)
+                    file << std::setw(3) << sym[y][x][i];
+                file << std::endl;
+            }
+            file << std::endl;
+        }
+    }
+    else
+        file << "Number of symmetry operations: " << sym[0][0].size() << std::endl;
+
+    i3 tempv;
+    hkl_list hkl_enlarged;
+	hkl_enlarged = hkl;
+    vec2 obs_enlarged = obs;
+    for (int s = 0; s < sym[0][0].size(); s++)
+    {
+        if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
+            sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
+            sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0)
+        {
+            continue;
+        }
+        for (const i3& hkl__ : hkl)
+        {
+            tempv = { 0, 0, 0 };
+            for (int h = 0; h < 3; h++)
+            {
+                for (int j = 0; j < 3; j++)
+                    tempv[j] += hkl__[h] * sym[j][h][s];
+            }
+			hkl_enlarged.emplace(tempv);
+        }
+    }
+
+    // Remove 0 0 0 if it exists
+    if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
+        hkl.erase(i3{ 0, 0, 0 });
+    file << "Nr of reflections to be used: " << hkl.size() << std::endl;
+    return hkl_enlarged;
 }
 
 /**
@@ -930,6 +1062,324 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
     return labels2;
 }
 
+//svec read_anom_disp_from_CIF(std::ifstream& cif_input,
+//    const ivec& input_groups,
+//    const cell& unit_cell,
+//    const WFN& wave,
+//    const svec& known_atoms,
+//    ivec& atom_type_list,
+//    ivec& asym_atom_to_type_list,
+//    ivec& asym_atom_list,
+//    bvec& needs_grid,
+//    std::ostream& file,
+//    bvec& constant_atoms,
+//    const bool SALTED,
+//    const bool debug)
+//{
+//    using namespace std;
+//    if (debug)
+//        file << "start working on cif" << endl;
+//    bool atoms_read = false;
+//    int count_fields = 0;
+//    int group_field = -1;
+//    int type_field = -1;
+//    int position_field[3] = { -1, -1, -1 };
+//    int label_field = 1000;
+//    string line;
+//    cif_input.clear();
+//    cif_input.seekg(0, cif_input.beg);
+//    svec labels(wave.get_ncen(), "");
+//    if (debug && input_groups.size() > 0)
+//        file << "Group size: " << input_groups.size() << endl;
+//    else if (debug)
+//        file << "Starting search loop" << endl;
+//    while (!cif_input.eof() && !atoms_read)
+//    {
+//        getline(cif_input, line);
+//        // if (debug)
+//        //     file << "line: " << line << endl;
+//        if (line.find("loop_") != string::npos)
+//        {
+//            count_fields = 0;
+//            getline(cif_input, line);
+//            if (debug)
+//                file << "line in loop field definition: " << trim(line) << endl;
+//            while (trim(line).find("_") == 0)
+//            {
+//                if (line.find("label") != string::npos)
+//                    label_field = count_fields;
+//                else if (line.find("type_symbol") != string::npos)
+//                    type_field = count_fields;
+//                else if (line.find("disorder_group") != string::npos)
+//                    group_field = count_fields;
+//                else if (line.find("fract_x") != string::npos)
+//                    position_field[0] = count_fields;
+//                else if (line.find("fract_y") != string::npos)
+//                    position_field[1] = count_fields;
+//                else if (line.find("fract_z") != string::npos)
+//                    position_field[2] = count_fields;
+//                else if (label_field == 1000)
+//                {
+//                    if (debug)
+//                        file << "I don't think this is the atom block.. moving on!" << endl;
+//                    break;
+//                }
+//                getline(cif_input, line);
+//                count_fields++;
+//            }
+//            if (label_field != 1000) {
+//                err_checkf(position_field[0] != -1, "No x position found, impossible to continue!", std::cout);
+//                err_checkf(position_field[1] != -1, "No y position found, impossible to continue!", std::cout);
+//                err_checkf(position_field[2] != -1, "No z position found, impossible to continue!", std::cout);
+//                err_checkf(type_field != -1, "No type found, impossible to continue!", std::cout);
+//            }
+//            while (trim(line).find("_") > 0 && line.length() > 3)
+//            {
+//                atoms_read = true;
+//                stringstream s(line);
+//                svec fields;
+//                fields.resize(count_fields);
+//                int nr = -1;
+//                for (int i = 0; i < count_fields; i++)
+//                    s >> fields[i];
+//                fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
+//                fields[type_field].erase(remove_if(fields[type_field].begin(), fields[type_field].end(), ::isspace), fields[type_field].end());
+//                if (debug)
+//                    file << "label: " << setw(8) << fields[label_field] << " type: " << fields[type_field] << " frac. pos: "
+//                    << setw(6) << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
+//                    << setw(6) << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
+//                    << setw(6) << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
+//                vec position = unit_cell.get_coords_cartesian(
+//                    stod(fields[position_field[0]]),
+//                    stod(fields[position_field[1]]),
+//                    stod(fields[position_field[2]]));
+//                vec precisions = unit_cell.get_coords_cartesian(
+//                    min(0.01, get_decimal_precision_from_CIF_number(fields[position_field[0]])),
+//                    min(0.01, get_decimal_precision_from_CIF_number(fields[position_field[1]])),
+//                    min(0.01, get_decimal_precision_from_CIF_number(fields[position_field[2]])));
+//                for (int i = 0; i < 3; i++)
+//                {
+//                    precisions[i] = abs(precisions[i]);
+//                }
+//                if (debug)
+//                    file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
+//
+//                bool old_atom = false;
+//#pragma omp parallel for reduction(|| : old_atom)
+//                for (int run = 0; run < known_atoms.size(); run++)
+//                {
+//                    if (fields[label_field] == known_atoms[run])
+//                    {
+//                        if (SALTED && (group_field == -1 || fields[group_field].c_str()[0] == '.'))
+//                            continue;
+//                        old_atom = true;
+//                        if (debug)
+//                            file << "I already know this one! " << fields[label_field] << " " << known_atoms[run] << endl;
+//                    }
+//                }
+//                if (old_atom)
+//                {
+//                    getline(cif_input, line);
+//                    continue;
+//                }
+//                vec tolerances(3);
+//                for (int i = 0; i < wave.get_ncen(); i++)
+//                {
+//                    for (int j = 0; j < 3; j++)
+//                    {
+//                        tolerances[j] = 2 * max(min(abs(precisions[j]), 1.0), 0.01);
+//                    }
+//                    if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
+//                    {
+//                        string element = constants::atnr2letter(wave.get_atom_charge(i));
+//                        err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
+//                        string label = fields[label_field];
+//                        string type = fields[type_field];
+//                        transform(element.begin(), element.end(), element.begin(), asciitolower);
+//                        transform(label.begin(), label.end(), label.begin(), asciitolower);
+//                        transform(type.begin(), type.end(), type.begin(), asciitolower);
+//                        if (debug)
+//                        {
+//                            file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                             wfn cart. pos: "
+//                                << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 0) << " "
+//                                << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 1) << " "
+//                                << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 2) << flush;
+//                            if (input_groups.size() > 0 && group_field != -1)
+//                            {
+//                                file << " checking disorder group: " << fields[group_field] << " vs. ";
+//                                for (int g = 0; g < input_groups.size(); g++)
+//                                    file << input_groups[g] << ",";
+//                            }
+//                        }
+//                        if (input_groups.size() > 0)
+//                        {
+//                            bool yep = false;
+//                            for (int g = 0; g < input_groups.size(); g++)
+//                            {
+//                                if (group_field == -1) {
+//                                    yep = true;
+//                                    break;
+//                                }
+//                                if (fields[group_field].c_str()[0] == '.' && input_groups[g] == 0)
+//                                {
+//                                    if (debug)
+//                                        file << "appears to be group 0" << endl;
+//                                    yep = true;
+//                                    break;
+//                                }
+//                                else if (stoi(fields[group_field]) == input_groups[g])
+//                                    yep = true;
+//                            }
+//                            if (!yep)
+//                            {
+//                                if (debug)
+//                                    file << "Wrong part!" << endl;
+//                                continue;
+//                            }
+//                        }
+//                        if (label.find(element) == string::npos || label.find(element) > 2)
+//                        {
+//                            if (element != "h")
+//                            {
+//                                if (debug)
+//                                {
+//                                    file << "\nElement symbol not found in label, this is a problem!\n checking type...";
+//                                    if (type.find(element) == string::npos || label.find(element) > 2)
+//                                    {
+//                                        file << " ALSO FAILED! WILL IGNORE ATOM!\n";
+//                                        continue;
+//                                    }
+//                                }
+//                                else
+//                                {
+//                                    if (type.find(element) == string::npos || label.find(element) > 2)
+//                                    {
+//                                        file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
+//                                        continue;
+//                                    }
+//                                }
+//                            }
+//                            else if (label.find("d") == string::npos && label.find("t") == string::npos)
+//                            {
+//                                if (debug)
+//                                {
+//                                    file << "\nElement symbol not found in label, this is a problem!\n will check type...";
+//                                    if (type.find(element) == string::npos || label.find(element) > 2)
+//                                    {
+//                                        file << " ALSO FAILED! WILL IGNORE ATOM!\n";
+//                                        continue;
+//                                    }
+//                                }
+//                                else
+//                                {
+//                                    if (type.find(element) == string::npos || label.find(element) > 2)
+//                                    {
+//                                        file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
+//                                        continue;
+//                                    }
+//                                }
+//                            }
+//                        }
+//
+//                        if (group_field == -1)
+//                        {
+//                            constant_atoms.push_back(true);
+//                        }
+//                        else if (fields[group_field].c_str()[0] != '.')
+//                        {
+//                            constant_atoms.push_back(false);
+//                        }
+//                        else
+//                            constant_atoms.push_back(true);
+//
+//                        labels[i] = fields[label_field];
+//                        asym_atom_list.push_back(i);
+//                        needs_grid[i] = true;
+//                        nr = i;
+//                        break;
+//                    }
+//                }
+//                if (debug)
+//                    file << " nr= " << nr << endl;
+//                if (nr != -1)
+//                {
+//                    bool already_there = false;
+//                    for (int i = 0; i < atom_type_list.size(); i++)
+//                        if (atom_type_list[i] == wave.get_atom_charge(nr))
+//                        {
+//                            already_there = true;
+//                            asym_atom_to_type_list.push_back(i);
+//                            break;
+//                        }
+//                    if (already_there == false && wave.get_atom_charge(nr) != 119)
+//                    {
+//                        asym_atom_to_type_list.push_back((int)atom_type_list.size());
+//                        atom_type_list.push_back(wave.get_atom_charge(nr));
+//                    }
+//                }
+//                else if (!old_atom)
+//                {
+//                    if (debug)
+//                    {
+//                        file << "I did not find this atom! Tolerances were: ";
+//                        for (int j = 0; j < 3; j++)
+//                        {
+//                            file << setw(12) << fixed << setprecision(8) << tolerances[j];
+//                        }
+//                        file << endl;
+//                    }
+//                }
+//                getline(cif_input, line);
+//            }
+//        }
+//    }
+//
+//    // Add missing atom types to be able to calc sphericals correctly
+//    for (int nr = 0; nr < wave.get_ncen(); nr++)
+//    {
+//        bool already_there = false;
+//        for (int i = 0; i < atom_type_list.size(); i++)
+//        {
+//            if (atom_type_list[i] == wave.get_atom_charge(nr))
+//            {
+//                already_there = true;
+//                break;
+//            }
+//        }
+//        if (already_there == false && wave.get_atom_charge(nr) != 119)
+//        {
+//            atom_type_list.push_back(wave.get_atom_charge(nr));
+//        }
+//    }
+//
+//    err_checkf(asym_atom_list.size() <= wave.get_ncen(), "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
+//    err_checkf(asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
+//
+//    for (int i = 0; i < atom_type_list.size(); i++)
+//        err_checkf((atom_type_list[i] <= 113 || atom_type_list[i] == 119) && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
+//    file << " done!" << endl;
+//    if (debug)
+//    {
+//        file << "There are " << atom_type_list.size() << " types of atoms" << endl;
+//        for (int i = 0; i < atom_type_list.size(); i++)
+//            file << setw(4) << atom_type_list[i];
+//        file << endl
+//            << "asym_atoms_to_type_list: " << endl;
+//        for (int i = 0; i < asym_atom_to_type_list.size(); i++)
+//            file << setw(4) << asym_atom_to_type_list[i];
+//        file << endl;
+//        file << "Charges of atoms:" << endl;
+//        for (int i = 0; i < wave.get_ncen(); i++)
+//            file << setw(4) << wave.get_atom_charge(i);
+//        file << endl;
+//    }
+//    int size = static_cast<int>(asym_atom_list.size());
+//    svec labels2;
+//    for (int i = 0; i < size; i++)
+//        labels2.emplace_back(labels[asym_atom_list[i]]);
+//    return labels2;
+//}
+
 constexpr double cutoff(const int &accuracy)
 {
     if (accuracy < 3)
@@ -1089,7 +1539,8 @@ void calc_SF(const int &points,
     _time_point &start,
     _time_point &end1,
     bool debug,
-    bool no_date)
+    bool no_date,
+    bool do_XCW)
 {
     const long long int imax = static_cast<long long int>(dens.size());
     const long long int smax = static_cast<long long int>(k_pt[0].size());
@@ -1112,8 +1563,10 @@ void calc_SF(const int &points,
         else
             file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
     }
-
-    ProgressBar *progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
+    ProgressBar* progress = nullptr;
+    if (!do_XCW) {
+        progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
+    }
     long long int pmax, p, s;
     complex<double> *sf_local;
     double work, rho, c, si, *dens_local, re, im, *d1_local, *d2_local, *d3_local;
@@ -1213,9 +1666,13 @@ void calc_SF(const int &points,
             sf_local[s].real(re);
             sf_local[s].imag(im);
         }
-        progress->update();
+        if (!do_XCW) {
+            progress->update();
+        }
     }
-    delete (progress);
+    if (!do_XCW) {
+        delete (progress);
+    }
 }
 
 void calc_SF_CUDA(const int &points,
@@ -1454,6 +1911,7 @@ int make_atomic_grids_wrapper(
     // Setup grids for the molecule
     grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell);
     grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
+
 
     // Calculate partitioned charges
     PartitionResults results = grid_manager.calculatePartitionedCharges(temp, unit_cell);

@@ -13,6 +13,7 @@
 extern "C" {
 #include "cint_funcs.h"
 }
+#include "occ/XCW.h"
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 
@@ -385,7 +386,7 @@ int main(int argc, char **argv)
         return 0;
     }
     // This one has conversion to fchk and calculation of one single tsc file
-    if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
+    if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0 && !opt.do_XCW)
     {
         if (opt.occ != "") {
             log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
@@ -515,6 +516,20 @@ int main(int argc, char **argv)
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         return 0;
+    }
+    // Performs XCW
+    if (opt.wfn != "" && !opt.properties.calc() && !opt.gbw2wfn && opt.do_XCW)
+    {
+        XCW xcw(opt);
+        //xcw.do_SCF();
+        xcw.eval_phase();
+        //xcw.eval_DW();
+        xcw.eval_translation_phase();
+        //cvec3 I = xcw.eval_I();
+        const cvec corr = xcw.eval_anom_disp();
+        xcw.calc_F_calc_fast(corr);
+        //xcw.calc_F_calc(I, corr);
+        exit(0);
     }
     // Contains all calculations of properties and cubes
     if (opt.properties.calc())

@@ -514,3 +514,68 @@ dMatrix2 get_cart2sph_matrix(const WFN& cart_wfn, const bool normalized) {
 
     return c_dm;
 }
+
+
+
+ivec make_loc(ivec& bas, int nbas) {
+    ivec dims(nbas, 0);
+    // Calculate (2*l + 1) * nctr for spherical harmonics
+    for (size_t i = 0; i < nbas; i++)
+    {
+        dims[i] = (2 * bas(ANG_OF, i) + 1) * bas(NCTR_OF, i);
+    }
+
+    // Create the ao_loc array
+    ivec ao_loc(nbas + 1, 0);
+
+    // Compute the cumulative sum
+    std::partial_sum(dims.begin(), dims.end(), ao_loc.begin() + 1);
+
+    return ao_loc;
+}
+
+vec eval_GTO_sph(Int_Params& params, vec2& grid, ivec& shl_slice) {
+    ivec bas = params.get_bas();
+    ivec atm = params.get_atm();
+    vec env = params.get_env();
+
+
+    //grid = numpy.asarray(grid, dtype = numpy.double, order = 'F')
+    vec fortran_grid(grid.size() * 3);
+    for (size_t i = 0; i < grid[0].size(); i++) {
+        for (size_t j = 0; j < 3; j++) {
+			fortran_grid[i + j * grid[0].size()] = grid[j][i];
+
+        }
+	}
+ 
+
+    int nbas = params.get_nbas();
+    int nat = params.get_natoms();
+	int ngrid = grid.size();
+
+    if (shl_slice.size() == 0) {
+		shl_slice = { 0, nbas};
+    }
+    //ivec aoloc = Kernel::gen_loc(bas, nbas);
+    ivec aoloc = make_loc(bas, nbas);
+	int nao = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
+
+    //non0tab = numpy.ones(((ngrids+BLKSIZE-1)//BLKSIZE,nbas),dtype = numpy.uint8)
+	std::vector<uint8_t> non0table(((ngrid + 56 - 1) / 56) * nbas, 1);
+
+    // Compute integrals
+    vec res((size_t)nao * (size_t)ngrid, 0.0);
+    GTOval_sph(ngrid, shl_slice.data(), aoloc.data(), res.data(), fortran_grid.data(), non0table.data(), atm.data(), nat, bas.data(), nbas, env.data());
+
+    vec ret((size_t)nao * (size_t)ngrid, 0.0);
+    // res is in fortran order, write the result in regular ordering
+    for (int i = 0; i < nao; i++)
+    {
+        for (int j = 0; j < ngrid; j++)
+        {
+            ret[(size_t)j * (size_t)nao + i] = res[(size_t)i * (size_t)ngrid + j];
+        }
+    }
+    return ret;
+}

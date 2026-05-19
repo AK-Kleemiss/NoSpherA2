@@ -6967,6 +6967,34 @@ const double WFN::compute_dens_cartesian(
     return Rho;
 }
 
+const double WFN::eval_ao(
+	std::array<double, 4>& d,
+    const std::vector<primitive>& prims,
+    const int &m
+) const
+{   
+
+    // normalize distances for spherical harmonic
+    const int type = prims[0].get_type();
+    const double scale = 1 / d[3];
+	d[0] *= scale;
+	d[1] *= scale;
+	d[2] *= scale;
+    const double rl = std::pow(d[3], type);
+    d[3] *= d[3];
+	
+    double radial = 0;
+    const primitive* p = prims.data();
+    const primitive* const p_end = p + prims.size();
+    
+    for (; p != p_end; p++) {
+        radial += p->eval_gaussian_unnormalized(rl, d[3]);
+    }
+    
+    return radial * constants::spherical_harmonic(type, m, d.data());
+    // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
+}
+
 const double WFN::compute_spin_dens_cartesian(
     const d3 &Pos,
     vec2 &d,

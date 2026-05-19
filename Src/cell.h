@@ -1,6 +1,7 @@
 #pragma once
 
 #include "constants.h"
+#include "nos_math.h"
 #include <filesystem>
 /**
  * @class cell
@@ -19,8 +20,22 @@ private:
     double upper;
     std::string crystal_system;
     std::vector<ivec2> sym;
+    std::vector<vec> trans;
+
+    bool check_special(const vec& pos1, const vec& pos2);
 
 public:
+    struct asym_atom {
+        svec label;
+        ivec type;
+        d3 pos;
+        d3 frac_pos;
+        double asym_fact;
+        cdouble anom;
+    };
+    std::vector<cell::asym_atom> get_asym_atoms(WFN& wave, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
+    void eval_symm(std::vector<asym_atom>& asym_atoms);
+
     cell()
     {
         as = bs = cs = a = b = c = alpha = beta = gamma = V = ca = cb = cg = sa = sb = sg = upper = 0.0;
@@ -35,7 +50,7 @@ public:
         for (int i = 0; i < 3; i++)
             sym[i].resize(3);
     };
-    cell(const std::filesystem::path& filename, std::ostream& file = std::cout, const bool& debug = false)
+    cell(const std::filesystem::path& filename, std::ostream& file = std::cout, const bool& debug = false, const bool& do_XCW = false)
     {
         if (debug)
             file << "starting to read cif!" << std::endl;
@@ -43,8 +58,9 @@ public:
         sym.resize(3);
         for (int i = 0; i < 3; i++)
             sym[i].resize(3);
+        trans.resize(3);
         read_CIF(filename, file, debug);
-        read_symm_CIF(filename, file, debug);
+        read_symm_CIF(filename, file, debug, do_XCW);
         if (debug)
         {
             file << "RCM done!" << std::endl;
@@ -79,21 +95,36 @@ public:
         sb = sin(constants::PI_180 * beta);
         sg = sin(constants::PI_180 * gamma);
         V = a * b * c * sqrt(1 + 2 * ca * cb * cg - ca * ca - cb * cb - cg * cg);
-        as = b * c * sa / V;
-        bs = a * c * sb / V;
-        cs = a * b * sg / V;
+        const vec2 trans_matrix = { {a, 0, 0}, {b * cg, b * sg, 0}, {c * cb, c * (ca - cb * cg) / sg, c * std::sqrt(sb * sb - std::pow((ca - cb * cg) / sg, 2))} };
+		const vec2 unit_matrix = { {1, 0, 0}, {0, 1, 0}, {0, 0, 1} };
 
-        cm[0][0] = a;
-        cm[0][1] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
-        cm[0][2] = sqrt(abs(a * c * cb)) * pow(-1, 1 + (cb > 0));
+        const vec2 cm_temp = self_dot(unit_matrix, trans_matrix, false, false);
+        cm[0][0] = cm_temp[0][0];
+        cm[0][1] = cm_temp[0][1];
+        cm[0][2] = cm_temp[0][2];
+		cm[1][0] = cm_temp[1][0];
+		cm[1][1] = cm_temp[1][1];
+        cm[1][2] = cm_temp[1][2];
+		cm[2][0] = cm_temp[2][0];
+		cm[2][1] = cm_temp[2][1];
+		cm[2][2] = cm_temp[2][2];
 
-        cm[1][0] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
-        cm[1][1] = b;
-        cm[1][2] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+        // I think this is not used and doesn't serve my purpose
+        //as = b * c * sa / V;
+        //bs = a * c * sb / V;
+        //cs = a * b * sg / V;
 
-        cm[2][0] = sqrt(abs(a * c * cg)) * pow(-1, 1 + (cg > 0));
-        cm[2][1] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
-        cm[2][2] = c;
+        //cm[0][0] = a;
+        //cm[0][1] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+        //cm[0][2] = sqrt(abs(a * c * cb)) * pow(-1, 1 + (cb > 0));
+
+        //cm[1][0] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+        //cm[1][1] = b;
+        //cm[1][2] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+
+        //cm[2][0] = sqrt(abs(a * c * cg)) * pow(-1, 1 + (cg > 0));
+        //cm[2][1] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+        //cm[2][2] = c;
 
         rcm[0][0] = constants::TWO_PI / a;
         rcm[0][1] = 0;
@@ -120,10 +151,12 @@ public:
     double get_sg() const { return sg; };
     double get_rcm(const int& i, const int& j) const { return rcm[i][j]; };
     double get_cm(const int& i, const int& j) const { return cm[i][j]; };
-    double get_rcm_angs(const int& i, const int& j) const { return constants::bohr2ang(rcm[i][j] / constants::TWO_PI); };
+    double get_rcm_angs(const int& i, const int& j) const { return constants::ang2bohr(rcm[i][j] / constants::TWO_PI); };
     double get_cm_angs(const int& i, const int& j) const { return constants::bohr2ang(cm[i][j] / constants::TWO_PI); };
     double get_sym(const int& i, const int& j, const int& k) const { return sym[i][j][k]; };
     std::vector<ivec2> get_sym() const { return sym; };
+    std::vector<vec> get_trans() const { return trans; };
+    void set_sym(std::vector<ivec2>& set_vector) { sym = set_vector; };
     double get_a() const { return a; };
     double get_b() const { return b; };
     double get_c() const { return c; };
@@ -373,17 +406,30 @@ public:
             << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << std::endl
             << as << " " << bs << " " << cs << std::endl;
 
-        cm[0][0] = a;
-        cm[0][1] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
-        cm[0][2] = sqrt(abs(a * c * cb)) * pow(-1, 1 + (cb > 0));
+        const vec2 trans_matrix = { {a, 0, 0}, {b * cg, b * sg, 0}, {c * cb, c * (ca - cb * cg) / sg, c * std::sqrt(sb * sb - std::pow((ca - cb * cg) / sg, 2))} };
+        const vec2 unit_matrix = { {1, 0, 0}, {0, 1, 0}, {0, 0, 1} };
+        const vec2 cm_temp = self_dot(unit_matrix, trans_matrix, false, false);
+        cm[0][0] = cm_temp[0][0];
+        cm[0][1] = cm_temp[0][1];
+        cm[0][2] = cm_temp[0][2];
+        cm[1][0] = cm_temp[1][0];
+        cm[1][1] = cm_temp[1][1];
+        cm[1][2] = cm_temp[1][2];
+        cm[2][0] = cm_temp[2][0];
+        cm[2][1] = cm_temp[2][1];
+        cm[2][2] = cm_temp[2][2];
+        //Old implementation, apparently never used
+        //cm[0][0] = a;
+        //cm[0][1] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+        //cm[0][2] = sqrt(abs(a * c * cb)) * pow(-1, 1 + (cb > 0));
 
-        cm[1][0] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
-        cm[1][1] = b;
-        cm[1][2] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+        //cm[1][0] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+        //cm[1][1] = b;
+        //cm[1][2] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
 
-        cm[2][0] = sqrt(abs(a * c * cg)) * pow(-1, 1 + (cg > 0));
-        cm[2][1] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
-        cm[2][2] = c;
+        //cm[2][0] = sqrt(abs(a * c * cg)) * pow(-1, 1 + (cg > 0));
+        //cm[2][1] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+        //cm[2][2] = c;
 
         rcm[0][0] = constants::TWO_PI / a;
         rcm[0][1] = 0;
@@ -404,12 +450,12 @@ public:
                 if (abs(rcm[i][j]) < 10e-10)
                 {
                     rcm[i][j] = 0.0;
-                    // cm[i][j] = 0.0;
+                    cm[i][j] = 0.0;
                 }
                 else
                 {
                     rcm[i][j] = constants::bohr2ang(rcm[i][j]);
-                    cm[i][j] = constants::bohr2ang(cm[i][j]);
+                    cm[i][j] = constants::ang2bohr(cm[i][j]);
                 }
 
         cif_input.close();
@@ -423,7 +469,7 @@ public:
      * @param file where to print output
      * @param debug flag to print debug information
      */
-    void read_symm_CIF(const std::filesystem::path& filename, std::ostream& file = std::cout, const bool& debug = false)
+    void read_symm_CIF(const std::filesystem::path& filename, std::ostream& file = std::cout, const bool& debug = false, const bool& do_XCW = false)
     {
         std::ifstream cif_input(filename, std::ios::in);
         std::string line;
@@ -462,7 +508,7 @@ public:
                     std::stringstream s(line);
                     svec fields;
                     fields.resize(count_fields);
-                    int sym_from_cif[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                    int rot_from_cif[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
                     for (int i = 0; i < count_fields; i++)
                         s >> fields[i];
                     svec vectors;
@@ -490,9 +536,9 @@ public:
                             else if (vectors[x].find("x") == 0)
                                 sign = '+';
                             if (sign == '-')
-                                sym_from_cif[x][0] = -1;
+                                rot_from_cif[x][0] = -1;
                             if (sign == '+')
-                                sym_from_cif[x][0] = 1;
+                                rot_from_cif[x][0] = 1;
                         }
                         if (vectors[x].find("Y") != std::string::npos || vectors[x].find("y") != std::string::npos)
                         {
@@ -506,9 +552,9 @@ public:
                             else if (vectors[x].find("y") == 0)
                                 sign = '+';
                             if (sign == '-')
-                                sym_from_cif[x][1] = -1;
+                                rot_from_cif[x][1] = -1;
                             if (sign == '+')
-                                sym_from_cif[x][1] = 1;
+                                rot_from_cif[x][1] = 1;
                         }
                         if (vectors[x].find("Z") != std::string::npos || vectors[x].find("z") != std::string::npos)
                         {
@@ -522,37 +568,67 @@ public:
                             else if (vectors[x].find("z") == 0)
                                 sign = '+';
                             if (sign == '-')
-                                sym_from_cif[x][2] = -1;
+                                rot_from_cif[x][2] = -1;
                             if (sign == '+')
-                                sym_from_cif[x][2] = 1;
+                                rot_from_cif[x][2] = 1;
                         }
                     }
-                    if (debug)
-                    {
-                        file << "Comparing ";
-                        for (int x = 0; x < 3; x++)
-                            for (int y = 0; y < 3; y++)
-                                file << sym_from_cif[x][y] << " ";
-                        file << std::endl;
+					double temp1, temp2;
+                    if (vectors[0].find("/") != std::string::npos) {
+                        int tmp_pos = vectors[0].find("/");
+                        temp1 = std::stof(vectors[0].substr(0, tmp_pos));
+                        temp2 = std::stof(vectors[0].substr(tmp_pos + 1, tmp_pos + 2));
+                        trans[0].push_back(temp1 / temp2);
+                    }
+                    else {
+                        trans[0].push_back(0);
+                    }
+                    if (vectors[1].find("/") != std::string::npos) {
+                        int tmp_pos = vectors[0].find("/");
+                        temp1 = std::stof(vectors[0].substr(0, tmp_pos));
+                        temp2 = std::stof(vectors[0].substr(tmp_pos + 1, tmp_pos + 2));
+                        trans[1].push_back(temp1 / temp2);
+                    }
+                    else {
+                        trans[1].push_back(0);
+                    }
+                    if (vectors[2].find("/") != std::string::npos) {
+                        int tmp_pos = vectors[0].find("/");
+                        temp1 = std::stof(vectors[0].substr(0, tmp_pos));
+                        temp2 = std::stof(vectors[0].substr(tmp_pos + 1, tmp_pos + 2));
+                        trans[2].push_back(temp1 / temp2);
+                    }
+                    else {
+                        trans[2].push_back(0);
                     }
                     bool already_known = false;
-                    for (int s_ = 0; s_ < sym[0][0].size(); s_++)
-                    {
-                        bool identical = true;
-                        bool inverse = true;
-                        for (int x = 0; x < 3; x++)
-                            for (int y = 0; y < 3; y++)
-                                if (sym[y][x][s_] != sym_from_cif[x][y])
-                                    identical = false;
-                        if (!identical)
+                    if (!do_XCW) {
+                        if (debug)
+                        {
+                            file << "Comparing ";
                             for (int x = 0; x < 3; x++)
                                 for (int y = 0; y < 3; y++)
-                                    if (sym[y][x][s_] != sym_from_cif[x][y] * -1)
-                                        inverse = false;
-                        if (identical || inverse)
+                                    file << rot_from_cif[x][y] << " ";
+                            file << std::endl;
+                        }
+                        for (int s_ = 0; s_ < sym[0][0].size(); s_++)
                         {
-                            already_known = true;
-                            break;
+                            bool identical = true;
+                            bool inverse = true;
+                            for (int x = 0; x < 3; x++)
+                                for (int y = 0; y < 3; y++)
+                                    if (sym[y][x][s_] != rot_from_cif[x][y])
+                                        identical = false;
+                            if (!identical)
+                                for (int x = 0; x < 3; x++)
+                                    for (int y = 0; y < 3; y++)
+                                        if (sym[y][x][s_] != rot_from_cif[x][y] * -1)
+                                            inverse = false;
+                            if (identical || inverse)
+                            {
+                                already_known = true;
+                                break;
+                            }
                         }
                     }
                     if (!already_known)
@@ -561,7 +637,7 @@ public:
                             file << "This is a new symmetry operation!" << std::endl;
                         for (int x = 0; x < 3; x++)
                             for (int y = 0; y < 3; y++)
-                                sym[y][x].push_back(sym_from_cif[x][y]);
+                                sym[y][x].push_back(rot_from_cif[x][y]);
                     }
                     getline(cif_input, line);
                 }

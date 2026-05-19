@@ -265,7 +265,7 @@ public:
     /** Get spin multiplicity. */
     const unsigned int& get_multi() const { return multi; };
     /** Set multiplicity by reference (legacy). */
-    void set_multi(unsigned int& in) { multi = in; };
+    void set_multi(const unsigned int& in) { multi = in; };
     /** Set charge. */
     void set_charge(const int& in) { charge = in; };
     /** Number of primitives (nex). */
@@ -280,6 +280,7 @@ public:
     const int get_nmo(const bool& only_occ) const;
     /** Origin/file type code. */
     const e_origin& get_origin() const { return origin; };
+	void set_origin(const e_origin& in) { origin = in; };
     /** ECP mode (def2/xTB/pTB etc.). */
     const int& get_ECP_mode() const { return ECP_m; };
     /** Freeform comment header. */
@@ -466,6 +467,8 @@ public:
     const double compute_dens(const d3& Pos) const;
     /** Density with caller-provided scratch arrays (faster, reusable). */
     const double compute_dens(const d3& Pos, vec2& d, vec& phi) const;
+    /**Evaluates value of primitives at position relative to atom center*/
+    const double eval_ao(std::array<double, 4>& d, const std::vector<primitive>& prims, const int& m) const;
     /** Spin density at position (allocating version). */
     const double compute_spin_dens(const d3& Pos) const;
     /** Spin density with scratch arrays. */

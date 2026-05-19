@@ -379,6 +379,8 @@ void readxyzMinMax_fromCIF(
 
 bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
 
+vec read_U_iso_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug);
+
 double double_from_string_with_esd(std::string in);
 
 void swap_sort(ivec order, cvec &v);
@@ -590,6 +592,23 @@ public:
     {
         coefficient = c;
     };
+    void set_norm_const(const double& nc)
+    {
+        norm_const = nc;
+        normalized_coefficient = nc * coefficient;
+    };
+	double eval_gaussian(const double& r) const
+    {
+        return pow(r, type) * std::exp(-exp * r * r) * normalized_coefficient;
+    };
+    double eval_gaussian_unnormalized(const double& r) const
+    {
+        return pow(r, type) * std::exp(-exp * r * r) * coefficient;
+	};
+    double eval_gaussian_unnormalized(const double& rl, const double& r2) const
+    {
+        return rl * std::exp(-exp * r2) * coefficient;
+    };
 };
 
 struct ECP_primitive : primitive
@@ -653,6 +672,7 @@ struct options
     std::filesystem::path gaussian_path;
     std::filesystem::path turbomole_path;
     std::filesystem::path basis_set_path;
+    std::filesystem::path anom_disp_path;
     std::string occ;
     std::filesystem::path occ_toml_path;
     std::filesystem::path cwd;
@@ -677,6 +697,7 @@ struct options
     bool RI_FIT = false;
     bool needs_Thakkar_fill = false;
     bool qct = false;
+    bool do_XCW = false;
     bool rgbi = false;
     bool fract = false;
     int accuracy = 2;
@@ -718,8 +739,6 @@ struct options
         look_for_debug(argc, argv);
     };
 };
-
-const double gaussian_radial(const primitive &p, const double &r);
 
 int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b);
 

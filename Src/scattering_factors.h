@@ -10,7 +10,8 @@
 #include <fstream>
 #include "convenience.h"
 #include "SALTED_predictor.h"
-
+ #include "wfn_class.h"
+ #include "tsc_block.h"
  /**
   * @class WFN
   * @brief Class representing the wavefunction.
@@ -54,6 +55,14 @@ enum TotalGridIndex
     TFVC_weight = 7,
     MBIS_weight = 8
 };
+
+void make_k_pts(const bool& read_k_pts,
+    const bool& save_k_pts,
+    const cell& unit_cell,
+    hkl_list& hkl,
+    vec2& k_pt,
+    std::ostream& file,
+    bool debug = false);
 
 /**
  * @brief Calculates the scattering factors based on calculator_type and opt.partitioning_type.
@@ -111,6 +120,7 @@ void generate_hkl(
  * @param stepsize The step size for generating fractional hkl.
  * @param debug Flag indicating whether to enable debug mode.
  */
+
 void generate_fractional_hkl(
     const double& dmin,
     hkl_list_d& hkl,
@@ -148,6 +158,20 @@ svec read_atoms_from_CIF(
     bvec& constant_atoms,
     const bool SALTED = false,
     const bool debug = false);
+
+//svec read_anom_disp_from_CIF(std::ifstream& cif_input,
+//    const ivec& input_groups,
+//    const cell& unit_cell,
+//    const WFN& wave,
+//    const svec& known_atoms,
+//    ivec& atom_type_list,
+//    ivec& asym_atom_to_type_list,
+//    ivec& asym_atom_list,
+//    bvec& needs_grid,
+//    std::ostream& file,
+//    bvec& constant_atoms,
+//    const bool SALTED,
+//    const bool debug);
 
 /**
  * @brief Adds ECP (Effective Core Potential) contribution to the scattering factors.
@@ -195,7 +219,8 @@ void calc_SF(const int& points,
     _time_point& start,
     _time_point& end1,
     bool debug,
-    bool no_date = false);
+    bool no_date = false,
+    bool do_XCW = false);
 
 double fourier_bessel_integral(
     const primitive& p,
@@ -213,5 +238,12 @@ cdouble sfac_bessel(
  */
 void calc_sfac_diffuse(const options& opt, std::ostream& log_file);
 
-#include "wfn_class.h"
-#include "tsc_block.h"
+struct hkl_sym {
+    int h;
+    int k;
+    int l;
+    int sym;
+};
+
+void read_hkl(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, bool debug = false);
+hkl_list read_hkl_full(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, vec2&obs, bool debug = false);

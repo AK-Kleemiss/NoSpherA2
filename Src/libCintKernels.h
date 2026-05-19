@@ -32,3 +32,8 @@ DECLARE_CINT_KERNEL(Coulomb3C_CRT, true);
 DECLARE_CINT_KERNEL(Overlap3C_SPH, false);
 
 #undef DECLARE_CINT_KERNEL
+
+
+void GTOval_sph(int ngrids, int* shls_slice, int* ao_loc,
+    double* ao, double* coord, uint8_t* non0table,
+    int* atm, int natm, int* bas, int nbas, double* env);

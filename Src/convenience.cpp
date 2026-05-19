@@ -1399,6 +1399,122 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_
     return true;
 };
 
+vec read_U_iso_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug)
+{
+    using namespace std;
+    vec U_iso;
+    ifstream asym_cif_input(cif, std::ios::in);
+    asym_cif_input.clear();
+    asym_cif_input.seekg(0, asym_cif_input.beg);
+    string line;
+    svec labels;
+    int count_fields = 0;
+    int position_field[3] = { 0, 0, 0 };
+    int label_field = 100;
+    int U_iso_field = -1;          // <-- NEW: tracks column index of U_iso_or_equiv
+    vec2 positions;
+    positions.resize(wavy.get_ncen());
+
+#pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < wavy.get_ncen(); i++)
+        positions[i].resize(3);
+
+    U_iso.resize(wavy.get_ncen(), 0.0f);  // <-- NEW: pre-fill with zeros
+
+    bool atoms_read = false;
+    while (!asym_cif_input.eof() && !atoms_read)
+    {
+        getline(asym_cif_input, line);
+        if (line.find("loop_") != string::npos)
+        {
+            while (line.find("_") != string::npos)
+            {
+                getline(asym_cif_input, line);
+                if (debug)
+                    log3 << "line in loop field definition: " << line << endl;
+                if (line.find("_atom_site_label") != string::npos          // be specific to avoid
+                    && line.find("aniso") == string::npos)                 // matching aniso_label
+                    label_field = count_fields;
+                else if (line.find("fract_x") != string::npos)
+                    position_field[0] = count_fields;
+                else if (line.find("fract_y") != string::npos)
+                    position_field[1] = count_fields;
+                else if (line.find("fract_z") != string::npos)
+                    position_field[2] = count_fields;
+                else if (line.find("U_iso_or_equiv") != string::npos)     // <-- NEW
+                    U_iso_field = count_fields;
+                else if (label_field == 100)
+                {
+                    if (debug)
+                        log3 << "I don't think this is the atom block.. moving on!" << endl;
+                    break;
+                }
+                count_fields++;
+            }
+            while (line.find("_") == string::npos && line.length() > 3)
+            {
+                atoms_read = true;
+                stringstream s(line);
+                svec fields;
+                fields.resize(count_fields);
+                for (int i = 0; i < count_fields; i++)
+                    s >> fields[i];
+                if (debug)
+                    log3 << "label: " << fields[label_field]
+                    << " frac_position: " << stod(fields[position_field[0]])
+                    << " " << stod(fields[position_field[1]])
+                    << " " << stod(fields[position_field[2]]) << endl;
+                positions[labels.size()] = unit_cell.get_coords_cartesian(
+                    stod(fields[position_field[0]]),
+                    stod(fields[position_field[1]]),
+                    stod(fields[position_field[2]]));
+                bool found_this_one = false;
+                if (debug)
+                    log3 << "label: " << fields[label_field]
+                    << " cartesian position: " << positions[labels.size()][0]
+                    << " " << positions[labels.size()][1]
+                    << " " << positions[labels.size()][2] << endl;
+                for (int i = 0; i < wavy.get_ncen(); i++)
+                {
+                    if (is_similar(positions[labels.size()][0], wavy.get_atom_coordinate(i, 0), -1)
+                        && is_similar(positions[labels.size()][1], wavy.get_atom_coordinate(i, 1), -1)
+                        && is_similar(positions[labels.size()][2], wavy.get_atom_coordinate(i, 2), -1))
+                    {
+                        if (debug)
+                            log3 << "WFN position: "
+                            << wavy.get_atom_coordinate(i, 0) << " "
+                            << wavy.get_atom_coordinate(i, 1) << " "
+                            << wavy.get_atom_coordinate(i, 2) << endl
+                            << "Found an atom: " << fields[label_field]
+                            << " Corresponding to atom charge "
+                            << wavy.get_atom_charge(i) << endl;
+                        wavy.set_atom_label(i, fields[label_field]);
+                        wavy.set_atom_frac_coords(i, {
+                            stod(fields[position_field[0]]),
+                            stod(fields[position_field[1]]),
+                            stod(fields[position_field[2]]) });
+
+                        // NEW: read U_iso_or_equiv, guard against '.' / '?' placeholders
+                        if (U_iso_field >= 0 && U_iso_field < (int)fields.size())
+                        {
+                            try { U_iso[i] = (float)stod(fields[U_iso_field]); }
+                            catch (...) { U_iso[i] = 0.0f; }
+                        }
+
+                        found_this_one = true;
+                        break;
+                    }
+                }
+                if (!found_this_one && debug)
+                    log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
+                labels.push_back(fields[label_field]);
+                getline(asym_cif_input, line);
+            }
+        }
+    }
+    return U_iso;
+}
+
 void swap_sort(ivec order, cvec& v)
 {
     int i = 0;
@@ -1509,11 +1625,6 @@ double get_lambda_1(double* a)
             return eig3;
     }
 };
-
-const double gaussian_radial(const primitive& p, const double& r)
-{
-    return pow(r, p.get_type()) * std::exp(-p.get_exp() * r * r) * p.normalization_constant();
-}
 
 double get_bessel_ratio(const double nu, const double x)
 {
@@ -2490,6 +2601,23 @@ void options::digest_options()
         else if (temp == "-xyz")
         {
             xyz_file = arguments[i + 1];
+        }
+        else if (temp == "-do_XCW") {
+            do_XCW = true;
+        }
+        else if (temp == "-anom_disp")
+        {
+			anom_disp_path = arguments[i + 1];
+            //std::filesystem::path name = arguments[i + 1];
+            //tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
+            //string cif_name = "test.cif";
+            //if (name.extension() == ".tscb")
+            //    blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
+            //else if (name.extension() == ".tsc")
+            //    blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
+            //else
+            //    err_checkf(false, "Wrong file ending!", std::cout);
+            //exit(0);
         }
         else if (temp == "-partitioning_test")
         {
