@@ -816,7 +816,7 @@ void XCW::calc_F_calc_fast(const cvec& corr) {
     const int points = grid_manager.getTotalGridPoints();
     calc_SF(points, k_pt, d1, d2, d3, dens, atomic_scattering_factors, std::cout, time_points.front(), end, opt->debug, true, true);
     // Calculate F_calc
-	auto it = hkl.begin();
+	//auto it = hkl.begin();
 	for (int r = 0; r < nr_small; r++) {
 		const ivec& lookup = generate_asym_lookup(r);
 		for (int at = 0; at < ncen; at++) {
@@ -825,10 +825,10 @@ void XCW::calc_F_calc_fast(const cvec& corr) {
 			}
 		}
 		// Add anomalous dispersion correction
-        const i3& hkl_temp = *it;
-        it++;
+  //      const i3& hkl_temp = *it;
+  //      it++;
         F_calc[r] += corr[r];
-		std::cout << "F_calc for hkl = " << hkl_temp[0] << ", " << hkl_temp[1] << ", " << hkl_temp[2] << ": " << std::fixed << std::setprecision(5) << std::pow(std::abs(F_calc[r]), 2) << std::endl;
+		//std::cout << "F_calc for hkl = " << hkl_temp[0] << ", " << hkl_temp[1] << ", " << hkl_temp[2] << ": " << std::fixed << std::setprecision(5) << std::pow(std::abs(F_calc[r]), 2) << std::endl;
 	}
 	//dump F_calc values as binary file called F_calc
 	std::ofstream fout("F_calc.bin", std::ios::out | std::ios::binary);
