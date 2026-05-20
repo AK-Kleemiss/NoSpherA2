@@ -1,4 +1,4 @@
-#include "occ/XCW.h"
+#include "XCW.h"
 #include "convenience.h"
 #include "scattering_factors.h"
 #include "npy.h"
@@ -612,8 +612,8 @@ cvec XCW::eval_anom_disp() {
     return corr;
 }
 
-void XCW::calc_F_calc(const cvec3& I, const cvec& corr) {
-    cvec F_calc(nr_small, 0);
+void XCW::calc_F_calc(const cvec3& I, const cvec& corr, cvec& F_calc) {
+    F_calc = cvec(nr_small, 0);
     dMatrix2 D = wave.get_dm();
     int mu, nu, r;
     for (r = 0; r < nr_small; r++) {
@@ -634,158 +634,156 @@ void XCW::calc_F_calc(const cvec3& I, const cvec& corr) {
     for (cdouble val : F_calc) {
         std::cout << std::fixed << std::setprecision(5) << std::pow(std::abs(val), 2) << std::endl;
     }
-    std::cout << "Finished" << std::endl;
     // closing function
 }
 
-//bool set_occ_data_path(const std::filesystem::path& path)
-//{
-//#ifdef _WIN32
-//    return _putenv_s("OCC_DATA_PATH", path.string().c_str()) == 0;
-//#else
-//    return setenv("OCC_DATA_PATH", path.string().c_str(), 1) == 0;
-//#endif
-//}
+bool set_occ_data_path(const std::filesystem::path& path)
+{
+#ifdef _WIN32
+    return _putenv_s("OCC_DATA_PATH", path.string().c_str()) == 0;
+#else
+    return setenv("OCC_DATA_PATH", path.string().c_str(), 1) == 0;
+#endif
+}
 
-//void XCW::do_SCF() {
-//    // Use occ to load a molecule from the water.xyz file and create a 6-31G basis set for it, then run Hartree-Fock on it and print the SCF energy
-//
-//    bool x = set_occ_data_path(std::filesystem::current_path());
-//	occ::core::Molecule mol = occ::io::molecule_from_xyz_file("water.xyz");
-//	occ::qm::AOBasis bs = occ::qm::AOBasis::load(mol.atoms(), "def2-TZVP");
-//    occ::qm::HartreeFock hf(bs);
-//    occ::qm::SCF scf(hf, occ::qm::SpinorbitalKind::Restricted);
-//	scf.set_charge_multiplicity(0,1);
-//
-//    const double& energy_conv = scf.convergence_settings.energy_threshold;
-//    const double& commutator_conv = scf.convergence_settings.commutator_threshold;
-//    bool converged = false;
-//	int iteration = 0;
-//
-//	// Initial SCF setup
-//    bool incremental = false;
-//    scf.update_occupied_orbital_count();
-//    scf.compute_initial_guess();
-//    scf.ctx.K = scf.m_procedure.compute_schwarz_ints();
-//    occ::Mat D_diff = scf.ctx.mo.D;
-//    occ::Mat D_last;
-//    occ::Mat FD_comm = occ::Mat::Zero(scf.ctx.F.rows(), scf.ctx.F.cols());
-//    occ::Mat F_diis;
-//    double ehf_last;
-//    scf.update_scf_energy(incremental);
-//    //occ::log::info("starting {} scf iterations", scf.scf_kind());
-//    //occ::log::debug("{} electrons total", scf.ctx.n_electrons);
-//    //occ::log::debug("{} alpha electrons", scf.n_alpha());
-//    //occ::log::debug("{} beta electrons", scf.n_beta());
-//    //occ::log::debug("net charge {}", scf.charge());
-//    scf.total_time = 0.0;
-//
-//    // SCF Loop
-//    do {
-//        const auto tstart = std::chrono::high_resolution_clock::now();
-//		std::cout << "SCF Iteration " << scf.iter + 1 << std::endl;
-//        scf.iter++;
-//
-//        SCF_iteration(scf, ehf_last, D_last, D_diff, incremental, F_diis);
-//
-//        const auto tstop = std::chrono::high_resolution_clock::now();
-//        const std::chrono::duration<double> time_elapsed = tstop - tstart;
-//
-//        if (scf.iter == 1) {
-//            occ::log::info("{:>4s} {: >20s} {: >12s} {: >12s}  {: >8s}", "#",
-//                "E (Hartrees)", "|dE|/E", "max|FDS-SDF|", "T (s)");
-//        }
-//        occ::log::info("{:>4d} {:>20.12f} {:>12.5e} {:>12.5e}  {:>8.2e}", scf.iter,
-//            scf.ctx.energy["total"], scf.ediff_rel, scf.diis_error, time_elapsed.count());
-//        occ::log::flush();
-//
-//        SCF_convergence_check(scf, converged, energy_conv, commutator_conv, ehf_last);
-//
-//        scf.total_time += time_elapsed.count();
-//    } while (!converged && (scf.iter < scf.maxiter));
-//    occ::log::info("{} spinorbital SCF energy converged after {:.5f} seconds",
-//        scf.scf_kind(), scf.total_time);
-//    occ::log::info("{}", scf.ctx.energy.to_string());
-//    scf.ctx.converged = true;
-//    double e = scf.ctx.energy["total"];
-//}
+void XCW::do_SCF() {
+    // Use occ to load a molecule from the water.xyz file and create a 6-31G basis set for it, then run Hartree-Fock on it and print the SCF energy
 
-//void XCW::SCF_iteration(auto& scf, double& ehf_last, occ::Mat& D_last, occ::Mat& D_diff, bool& incremental, occ::Mat& F_diis) {
-//    ehf_last = scf.ctx.energy["electronic"];
-//	std::cout << std::setprecision(12) << "Ehf last: " << ehf_last << std::endl;
-//    D_last = scf.ctx.mo.D;
-//    scf.ctx.H = scf.ctx.T + scf.ctx.V; // +scf.ctx.Vecp + scf.ctx.V_ext; 
-//    scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H); 
-//	incremental = true; // Memory for whether or not the current Fock matrux was built incrementally
-//
-//    // Managing incremental Fock building
-//    //If the incremental Fock build has not started yet but conditions allow it
-//    if (!scf.incremental_Fbuild_started &&
-//        scf.convergence_settings.start_incremental_fock(scf.diis_error)) {
-//        scf.incremental_Fbuild_started = true;
-//        scf.reset_incremental_fock_formation = false;
-//        scf.last_reset_iteration = scf.iter - 1;
-//        scf.next_reset_threshold = scf.diis_error / 10;
-//        occ::log::debug("starting incremental fock build");
-//    }
-//
-//    //If the incremental Fock build needs to be reset or has not started yet
-//    if (scf.reset_incremental_fock_formation ||
-//        !scf.incremental_Fbuild_started) {
-//        scf.ctx.F = scf.ctx.H;
-//        D_diff = scf.ctx.mo.D;
-//        incremental = false;
-//    }
-//
-//    //If the incremental Fock build already started but a reset is due
-//    if (scf.reset_incremental_fock_formation && scf.incremental_Fbuild_started) {
-//        scf.reset_incremental_fock_formation = false;
-//        scf.last_reset_iteration = scf.iter;
-//        scf.next_reset_threshold = scf.diis_error / 10;
-//        occ::log::debug("resetting incremental fock build");
-//    }
-//
-//    // build a new Fock matrix
-//    std::swap(scf.ctx.mo.D, D_diff);
-//    scf.ctx.F += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
-//    std::swap(scf.ctx.mo.D, D_diff);
-//
-//    // compute HF energy with the non-extrapolated Fock matrix
-//    scf.update_scf_energy(incremental);
-//	std::cout << std::setprecision(12) << "Electronic energy after SCF iteration: " << scf.ctx.energy["electronic"] << std::endl;
-//    scf.ediff_rel = std::abs((scf.ctx.energy["electronic"] - ehf_last) / scf.ctx.energy["electronic"]);
-//
-//    F_diis = scf.diis.update(scf.ctx.S, scf.ctx.mo.D, scf.ctx.F);
-//    // double prev_error = diis_error;
-//    scf.diis_error = scf.diis.max_error();
-//    /*
-//    bool use_ediis = (diis_error > 1e-1) || (prev_error /
-//    diis.min_error() > 1.1);
-//
-//    Mat F_ediis = scf.ediis.update(scf.ctx.D, scf.ctx.F, scf.ctx.energy["electronic"]);
-//    if(use_ediis) F_diis = F_ediis;
-//    else if(diis_error > 1e-4) {
-//        F_diis = (10 * diis_error) * F_ediis + (1 - 10 * diis_error)
-//    * F_diis;
-//    }
-//    */
-//
-//    // Check for incremental Fock building
-//    if (scf.diis_error < scf.next_reset_threshold || scf.iter - scf.last_reset_iteration >= 15)
-//        scf.reset_incremental_fock_formation = true;
-//
-//    scf.ctx.orthogonalizer.orthogonalize_molecular_orbitals(scf.ctx.mo, F_diis);
-//    D_diff = scf.ctx.mo.D - D_last;
-//    //closing function
-//}
+    bool x = set_occ_data_path(std::filesystem::current_path());
+	occ::core::Molecule mol = occ::io::molecule_from_xyz_file("water.xyz");
+	occ::qm::AOBasis bs = occ::qm::AOBasis::load(mol.atoms(), "def2-TZVP");
+    occ::qm::HartreeFock hf(bs);
+    occ::qm::SCF scf(hf, occ::qm::SpinorbitalKind::Restricted);
+	scf.set_charge_multiplicity(0,1);
 
-//void XCW::SCF_convergence_check(auto& scf, bool& converged, const double& energy_conv, const double& commutator_conv, const double& ehf_last) {
-//    if (scf.convergence_settings.energy_and_commutator_converged(scf.ediff_rel, scf.diis_error)) {
-//        converged = true;
-//    }
-//    // closing function
-//}
+    const double& energy_conv = scf.convergence_settings.energy_threshold;
+    const double& commutator_conv = scf.convergence_settings.commutator_threshold;
+    bool converged = false;
+	int iteration = 0;
 
+	// Initial SCF setup
+    bool incremental = false;
+    scf.update_occupied_orbital_count();
+    scf.compute_initial_guess();
+    scf.ctx.K = scf.m_procedure.compute_schwarz_ints();
+    occ::Mat D_diff = scf.ctx.mo.D;
+    occ::Mat D_last;
+    occ::Mat FD_comm = occ::Mat::Zero(scf.ctx.F.rows(), scf.ctx.F.cols());
+    occ::Mat F_diis;
+    double ehf_last;
+    scf.update_scf_energy(incremental);
+    //occ::log::info("starting {} scf iterations", scf.scf_kind());
+    //occ::log::debug("{} electrons total", scf.ctx.n_electrons);
+    //occ::log::debug("{} alpha electrons", scf.n_alpha());
+    //occ::log::debug("{} beta electrons", scf.n_beta());
+    //occ::log::debug("net charge {}", scf.charge());
+    scf.total_time = 0.0;
+
+    // SCF Loop
+    do {
+        const auto tstart = std::chrono::high_resolution_clock::now();
+		std::cout << "SCF Iteration " << scf.iter + 1 << std::endl;
+        scf.iter++;
+
+        SCF_iteration(scf, ehf_last, D_last, D_diff, incremental, F_diis);
+
+        const auto tstop = std::chrono::high_resolution_clock::now();
+        const std::chrono::duration<double> time_elapsed = tstop - tstart;
+
+        if (scf.iter == 1) {
+            occ::log::info("{:>4s} {: >20s} {: >12s} {: >12s}  {: >8s}", "#",
+                "E (Hartrees)", "|dE|/E", "max|FDS-SDF|", "T (s)");
+        }
+        occ::log::info("{:>4d} {:>20.12f} {:>12.5e} {:>12.5e}  {:>8.2e}", scf.iter,
+            scf.ctx.energy["total"], scf.ediff_rel, scf.diis_error, time_elapsed.count());
+        occ::log::flush();
+
+        SCF_convergence_check(scf, converged, energy_conv, commutator_conv, ehf_last);
+
+        scf.total_time += time_elapsed.count();
+    } while (!converged && (scf.iter < scf.maxiter));
+    occ::log::info("{} spinorbital SCF energy converged after {:.5f} seconds",
+        scf.scf_kind(), scf.total_time);
+    occ::log::info("{}", scf.ctx.energy.to_string());
+    scf.ctx.converged = true;
+    double e = scf.ctx.energy["total"];
+}
+
+void XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, double& ehf_last, occ::Mat& D_last, occ::Mat& D_diff, bool& incremental, occ::Mat& F_diis) {
+    ehf_last = scf.ctx.energy["electronic"];
+	std::cout << std::setprecision(12) << "Ehf last: " << ehf_last << std::endl;
+    D_last = scf.ctx.mo.D;
+    scf.ctx.H = scf.ctx.T + scf.ctx.V; // +scf.ctx.Vecp + scf.ctx.V_ext; 
+    scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H); 
+	incremental = true; // Memory for whether or not the current Fock matrux was built incrementally
+
+    // Managing incremental Fock building
+    //If the incremental Fock build has not started yet but conditions allow it
+    if (!scf.incremental_Fbuild_started &&
+        scf.convergence_settings.start_incremental_fock(scf.diis_error)) {
+        scf.incremental_Fbuild_started = true;
+        scf.reset_incremental_fock_formation = false;
+        scf.last_reset_iteration = scf.iter - 1;
+        scf.next_reset_threshold = scf.diis_error / 10;
+        occ::log::debug("starting incremental fock build");
+    }
+
+    //If the incremental Fock build needs to be reset or has not started yet
+    if (scf.reset_incremental_fock_formation ||
+        !scf.incremental_Fbuild_started) {
+        scf.ctx.F = scf.ctx.H;
+        D_diff = scf.ctx.mo.D;
+        incremental = false;
+    }
+
+    //If the incremental Fock build already started but a reset is due
+    if (scf.reset_incremental_fock_formation && scf.incremental_Fbuild_started) {
+        scf.reset_incremental_fock_formation = false;
+        scf.last_reset_iteration = scf.iter;
+        scf.next_reset_threshold = scf.diis_error / 10;
+        occ::log::debug("resetting incremental fock build");
+    }
+
+    // build a new Fock matrix
+    std::swap(scf.ctx.mo.D, D_diff);
+    scf.ctx.F += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
+    std::swap(scf.ctx.mo.D, D_diff);
+
+    // compute HF energy with the non-extrapolated Fock matrix
+    scf.update_scf_energy(incremental);
+	std::cout << std::setprecision(12) << "Electronic energy after SCF iteration: " << scf.ctx.energy["electronic"] << std::endl;
+    scf.ediff_rel = std::abs((scf.ctx.energy["electronic"] - ehf_last) / scf.ctx.energy["electronic"]);
+
+    F_diis = scf.convergence_accelerator.update(scf.ctx.mo.kind ,scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
+    // double prev_error = diis_error;
+    scf.diis_error = scf.convergence_accelerator.max_error();
+    /*
+    bool use_ediis = (diis_error > 1e-1) || (prev_error /
+    diis.min_error() > 1.1);
+
+    Mat F_ediis = scf.ediis.update(scf.ctx.D, scf.ctx.F, scf.ctx.energy["electronic"]);
+    if(use_ediis) F_diis = F_ediis;
+    else if(diis_error > 1e-4) {
+        F_diis = (10 * diis_error) * F_ediis + (1 - 10 * diis_error)
+    * F_diis;
+    }
+    */
+
+    // Check for incremental Fock building
+    if (scf.diis_error < scf.next_reset_threshold || scf.iter - scf.last_reset_iteration >= 15)
+        scf.reset_incremental_fock_formation = true;
+
+    scf.ctx.orthogonalizer.orthogonalize_molecular_orbitals(scf.ctx.mo, F_diis);
+    D_diff = scf.ctx.mo.D - D_last;
+    //closing function
+}
+
+void XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, bool& converged, const double& energy_conv, const double& commutator_conv, const double& ehf_last) {
+    if (scf.convergence_settings.energy_and_commutator_converged(scf.ediff_rel, scf.diis_error)) {
+        converged = true;
+    }
+    // closing function
+}
 
 void XCW::calc_F_calc_fast(const cvec& corr) {
 	cvec2 atomic_scattering_factors(ncen, cvec(nr, 0));
@@ -835,5 +833,27 @@ void XCW::calc_F_calc_fast(const cvec& corr) {
 	std::ofstream fout("F_calc.bin", std::ios::out | std::ios::binary);
 	fout.write(reinterpret_cast<const char*>(F_calc.data()), F_calc.size() * sizeof(cdouble));
     fout.close();
+
+}
+
+void XCW::calc_perturb(vec2& perturb, const cvec& F_calc, const double& scale, cvec3& I) {
+    perturb.resize(nmo, vec(nmo, 0));
+    double prefactor = 2 * scale / (nr_small - n_params);
+    int r, mu, nu;
+    for (r = 0; r < nr_small; r++) {
+		double sigma = obs[1][r];
+		double F_calc_abs = std::abs(F_calc[r]);
+        double r_factor = (scale * F_calc_abs - std::abs(obs[0][r])) / (sigma * sigma * F_calc_abs);
+        for (mu = 0; mu < nmo; mu++) {
+            for (nu = mu; nu < nmo; nu++) {
+                perturb[mu][nu] += r_factor * std::real(F_calc[r] * I[mu][nu][r]);
+				perturb[nu][mu] += r_factor * std::real(F_calc[r] * I[mu][nu][r]);
+            }
+        }
+    }
+}
+
+// The main function running the XCW fitting procedure
+void XCW::run_XCW_fitting() {
 
 }

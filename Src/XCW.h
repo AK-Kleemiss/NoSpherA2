@@ -1,10 +1,11 @@
 #pragma once
 
-#include "../convenience.h"
-#include "../GridManager.h"
-#include "../integration_params.h"
-#include "../scattering_factors.h"
-#include "../cell.h"
+#include "convenience.h"
+#include "GridManager.h"
+#include "integration_params.h"
+#include "scattering_factors.h"
+#include "cell.h"
+#include <occ/qm/hf.h>
 
 class XCW {
 public:
@@ -48,9 +49,11 @@ public:
 	void eval_translation_phase();
 	cvec3 eval_I();
 	cvec eval_anom_disp();
-	void calc_F_calc(const cvec3& I, const cvec& corr);
-	//void do_SCF();
+	void calc_F_calc(const cvec3& I, const cvec& corr, cvec& F_calc);
+	void calc_perturb(vec2& perturb, const cvec& F_calc, const double& scale, cvec3& I);
+	void do_SCF();
 	void calc_F_calc_fast(const cvec& corr);
+	void run_XCW_fitting();
 
 private:
 	struct ao_data {
@@ -71,8 +74,8 @@ private:
 	cvec2 eval_integrals(const ao_data& mu, const ao_data& nu, GridManager& grid_manager, const vec2& k_pt);
 	cvec2 calculateXCWintegral(GridManager& grid_manager, const ao_data& mu_data, const ao_data& nu_data, const ivec& asym_atom_list, vec2& k_pt, bool& equal, vec2& mu_vals);
 	void parse_anom_atoms(std::vector<anom_atom>& anom_atoms);
-	//void SCF_iteration(auto& scf, double& ehf_last, occ::Mat& D_last, occ::Mat& D_diff, bool& incremental, occ::Mat& F_diis);
-	//void SCF_convergence_check(auto& scf, bool& converged, const double& energy_conv, const double& commutator_conv, const double& ehf_last);
+	void SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, double& ehf_last, occ::Mat& D_last, occ::Mat& D_diff, bool& incremental, occ::Mat& F_diis);
+	void SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, bool& converged, const double& energy_conv, const double& commutator_conv, const double& ehf_last);
 	const options* opt;
 	WFN wave;
 	Int_Params params;
