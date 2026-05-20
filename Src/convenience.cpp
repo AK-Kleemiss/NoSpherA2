@@ -215,7 +215,11 @@ bool ensure_occ_data_path(const char *argv0)
 {
     char* tmp_occ_path = nullptr;
     size_t len = 0;
+#if defined(_MSC_VER) && defined(_WIN32)
     errno_t err = _dupenv_s(&tmp_occ_path, &len, "OCC_DATA_PATH");
+#else
+    tmp_occ_path = std::getenv("OCC_DATA_PATH");
+#endif
     if (tmp_occ_path != nullptr)
     {
         std::string occ_data_path_env(tmp_occ_path);
