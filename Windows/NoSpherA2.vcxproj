@@ -500,6 +500,7 @@
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
     <UseDynamicDebugging>false</UseDynamicDebugging>
+    <VCToolsVersion>14.51.36231</VCToolsVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_QCT|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -2435,7 +2436,7 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;NONSA2DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;NONSA2DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -2451,10 +2452,10 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
-      <IntrinsicFunctions>false</IntrinsicFunctions>
-      <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
-      <AdditionalOptions>-openmp:experimental /utf-8  /wd4068</AdditionalOptions>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <AdditionalOptions>-openmp:experimental /utf-8 /wd4068 </AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -11281,7 +11282,9 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SF|ARM64'">stdclatest</LanguageStandard_C>
     </ClCompile>
     <ClCompile Include="..\Src\auxiliary_basis.cpp" />
-    <ClCompile Include="..\Src\b2c.cpp" />
+    <ClCompile Include="..\Src\b2c.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="..\Src\bondwise_analysis.cpp" />
     <ClCompile Include="..\Src\cell.cpp" />
     <ClCompile Include="..\Src\cif.cpp" />
@@ -12960,6 +12963,10 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SF|ARM64'">stdclatest</LanguageStandard_C>
     </ClCompile>
+    <ClCompile Include="..\Src\XCW.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="..\Src\pch.cpp">
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Publish|ARM64'">stdcpp20</LanguageStandard>
@@ -13519,7 +13526,6 @@
     <ClCompile Include="..\Src\SALTED_io.cpp" />
     <ClCompile Include="..\Src\SALTED_predictor.cpp" />
     <ClCompile Include="..\Src\SALTED_utilities.cpp" />
-    <ClCompile Include="..\Src\XCW.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h" />
@@ -13556,6 +13562,7 @@
     <ClInclude Include="..\Src\metatensor.h" />
     <ClInclude Include="..\Src\metatensor.hpp" />
     <ClInclude Include="..\Src\nos_math.h" />
+    <ClInclude Include="..\Src\XCW.h" />
     <ClInclude Include="..\Src\pch.h" />
     <ClInclude Include="..\Src\rascaline.h" />
     <ClInclude Include="..\Src\rascaline.hpp" />
