@@ -10,10 +10,7 @@
 #include "cif.h"
 //#include "debug_utils.h"
 #include "bondwise_analysis.h"
-extern "C" {
-#include "cint_funcs.h"
-}
-#include "occ/XCW.h"
+#include "XCW.h"
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 void run_profiling_tests(const std::filesystem::path& tests_root);
@@ -544,14 +541,17 @@ int main(int argc, char **argv)
     if (opt.wfn != "" && !opt.properties.calc() && !opt.gbw2wfn && opt.do_XCW)
     {
         XCW xcw(opt);
-        //xcw.do_SCF();
-        xcw.eval_phase();
+        xcw.do_SCF();
+        //xcw.eval_phase();
         //xcw.eval_DW();
-        xcw.eval_translation_phase();
+        //xcw.eval_translation_phase();
         //cvec3 I = xcw.eval_I();
-        const cvec corr = xcw.eval_anom_disp();
-        xcw.calc_F_calc_fast(corr);
-        //xcw.calc_F_calc(I, corr);
+        //const cvec corr = xcw.eval_anom_disp();
+        //if (opt.calc_F_calc) {
+        //    xcw.calc_F_calc_fast(corr);
+        //}
+        // cvec F_calc;
+        //xcw.calc_F_calc(I, corr, F_calc, I);
         exit(0);
     }
     // Contains all calculations of properties and cubes
