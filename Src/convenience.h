@@ -714,6 +714,7 @@ struct options
     bool needs_Thakkar_fill = false;
     bool qct = false;
     bool do_XCW = false;
+    bool calc_F_calc = false;
     bool rgbi = false;
     bool fract = false;
     bool profiling = false;

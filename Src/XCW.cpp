@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "XCW.h"
 #include "convenience.h"
 #include "scattering_factors.h"
@@ -834,9 +835,9 @@ void XCW::calc_F_calc_fast(const cvec& corr) {
 	//First byte is the number of bytes per double, the next one is the size of a compelx double, to understand how to read the data.
 	//After that an int64 (8 byte) of the number of F.calc values to be expected after that.
 	//Finally, the dump of all F_calc values as cdouble (A,B)
-	fout.write(char(sizeof(double)),sizeof(char));
-	fout.write(char(sizeof(cdouble)),sizeof(char));
-	fout.write(int64(F_calc.size()), sizeof(int64)); 
+	fout.write(reinterpret_cast<const char*>(char(sizeof(double))),sizeof(char));
+	fout.write(reinterpret_cast<const char*>(char(sizeof(cdouble))),sizeof(char));
+	fout.write(reinterpret_cast<const char*>(int64_t(F_calc.size())), sizeof(int64_t));
 	fout.write(reinterpret_cast<const char*>(F_calc.data()), F_calc.size() * sizeof(cdouble));
     fout.close();
 

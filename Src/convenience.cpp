@@ -213,9 +213,13 @@ std::string build_date = ("This Executable was built on: " + std::string(__DATE_
 
 bool ensure_occ_data_path(const char *argv0)
 {
-    const char *occ_data_path_env = std::getenv("OCC_DATA_PATH");
-    if (occ_data_path_env != nullptr)
+    char* tmp_occ_path = nullptr;
+    size_t len = 0;
+    errno_t err = _dupenv_s(&tmp_occ_path, &len, "OCC_DATA_PATH");
+    if (tmp_occ_path != nullptr)
     {
+        std::string occ_data_path_env(tmp_occ_path);
+		free(tmp_occ_path);
         if (is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
             return true;
         else
@@ -2693,19 +2697,12 @@ void options::digest_options()
         else if (temp == "-do_XCW") {
             do_XCW = true;
         }
+        else if(temp == "-calc_F") {
+			calc_F_calc = true;
+		}
         else if (temp == "-anom_disp")
         {
 			anom_disp_path = arguments[i + 1];
-            //std::filesystem::path name = arguments[i + 1];
-            //tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
-            //string cif_name = "test.cif";
-            //if (name.extension() == ".tscb")
-            //    blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
-            //else if (name.extension() == ".tsc")
-            //    blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
-            //else
-            //    err_checkf(false, "Wrong file ending!", std::cout);
-            //exit(0);
         }
         else if (temp == "-partitioning_test")
         {

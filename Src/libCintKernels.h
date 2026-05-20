@@ -1,4 +1,5 @@
 #pragma once
+#include <occ/3rdparty/cint_wrapper.h>
 
 #define DECLARE_CINT_KERNEL(NAME, NEEDS_OPT) \
     struct NAME { \
