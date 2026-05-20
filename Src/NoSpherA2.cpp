@@ -541,15 +541,15 @@ int main(int argc, char **argv)
     if (opt.wfn != "" && !opt.properties.calc() && !opt.gbw2wfn && opt.do_XCW)
     {
         XCW xcw(opt);
-        xcw.do_SCF();
-        //xcw.eval_phase();
+        //xcw.do_SCF();
+        xcw.eval_phase();
         //xcw.eval_DW();
-        //xcw.eval_translation_phase();
+        xcw.eval_translation_phase();
         //cvec3 I = xcw.eval_I();
-        //const cvec corr = xcw.eval_anom_disp();
-        //if (opt.calc_F_calc) {
-        //    xcw.calc_F_calc_fast(corr);
-        //}
+        const cvec corr = xcw.eval_anom_disp();
+        if (opt.calc_F_calc) {
+            xcw.calc_F_calc_fast(corr);
+        }
         // cvec F_calc;
         //xcw.calc_F_calc(I, corr, F_calc, I);
         exit(0);
