@@ -46,8 +46,8 @@ INCLUDES  := $(addprefix -I,$(USER_INC_DIRS)) $(foreach d,$(SYSTEM_INC_DIRS),-is
 # macOS SDK and deployment target
 SDKROOT := $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null)
 SYSROOT := $(if $(SDKROOT),-isysroot $(SDKROOT),)
-# Set deployment target to 13.3 to match LAPACK requirements
-DEPLOYMENT_TARGET := -mmacosx-version-min=13.3
+# Set deployment target to 15.0 to match featomic prebuilt library requirements
+DEPLOYMENT_TARGET := -mmacosx-version-min=15.0
 
 # ---- OpenMP via libomp (Homebrew) ----
 # Override these if your Homebrew lives elsewhere.

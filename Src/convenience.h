@@ -100,6 +100,7 @@ typedef std::set<i3> hkl_list;
 typedef std::set<i3>::const_iterator hkl_list_it;
 
 typedef std::array<double, 3> d3;
+typedef std::array<double, 4> d4;
 typedef std::set<d3> hkl_list_d;
 typedef std::set<d3>::const_iterator hkl_list_it_d;
 
@@ -154,6 +155,20 @@ constexpr const std::complex<double> c_one(0, 1.0);
 extern std::string help_message;
 std::string NoSpherA2_message(bool no_date = false);
 extern std::string build_date;
+
+// Fast exp approximation for negative values
+inline double fast_exp_neg(double x) {
+    // For x in [-42, 0], use a fast approximation
+    if (x < -42.0) return 0.0;
+    if (x > -0.693147) { // ln(0.5) - use standard exp for values close to 0
+        return exp(x);
+    }
+    // Power of 2 approximation: exp(x) ≈ (1 + x/1024)^1024
+    x = 1.0 + x / 1024.0;
+    x *= x; x *= x; x *= x; x *= x; x *= x; // x^32
+    x *= x; x *= x; x *= x; x *= x; x *= x; // x^1024
+    return x;
+}
 
 namespace sha
 {
@@ -287,7 +302,7 @@ void copy_file(std::filesystem::path &from, std::filesystem::path &to);
 std::string shrink_string(std::string &input);
 std::string shrink_string_to_atom(std::string &input, const int &atom_number);
 //------------------Functions to work with configuration files--------------------------
-bool check_bohr(WFN &wave, bool debug);
+bool check_bohr(const WFN &wave, bool debug);
 
 bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std::string> filter, const std::string &current_path);
 bool save_file_dialog(std::filesystem::path &path, bool debug, const svec &endings, const std::string &filename_given = "", const std::string &current_path = "");
@@ -368,7 +383,7 @@ private:
 };
 
 void readxyzMinMax_fromWFN(
-    WFN &wavy,
+    const WFN &wavy,
     properties_options &opts,
     bool no_bohr = false);
 
@@ -656,6 +671,7 @@ struct options
     std::string occ;
     std::filesystem::path occ_toml_path;
     std::filesystem::path cwd;
+    std::filesystem::path profiling_tests_root = "tests";
     properties_options properties;
     bool debug = false;
     bool all_charges = false;
@@ -679,6 +695,8 @@ struct options
     bool qct = false;
     bool rgbi = false;
     bool fract = false;
+    bool profiling = false;
+    bool get_g = false;
     int accuracy = 2;
     int threads = -1;
     int pbc = 0;

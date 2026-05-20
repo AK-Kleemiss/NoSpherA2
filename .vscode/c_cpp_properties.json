@@ -3,7 +3,8 @@
         {
             "name": "windows-MSVC-x64",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "C:\\Program Files (x86)\\Intel\\oneAPI/**"
             ],
             "defines": [
                 "_DEBUG",

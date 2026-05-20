@@ -36,7 +36,7 @@ cube::cube(const std::array<int, 3> xyz, int g_na, bool grow_values)
     calc_dv();
 };
 
-cube::cube(const std::filesystem::path& filepath, bool read, WFN& wave, std::ostream& file, const bool expert, const bool header)
+cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ostream &file, const bool expert, const bool header)
 {
     err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
     parent_wavefunction = &wave;
@@ -47,7 +47,7 @@ cube::cube(const std::filesystem::path& filepath, bool read, WFN& wave, std::ost
     calc_dv();
 };
 
-cube::cube(const int g_na, const ivec& g_size, const vec& g_origin, const vec2& g_vectors, const vec3& g_values)
+cube::cube(const int g_na, const ivec &g_size, const vec &g_origin, const vec2 &g_vectors, const vec3 &g_values)
 {
     using namespace std;
     na = g_na;
@@ -77,7 +77,7 @@ cube::cube(const int g_na, const ivec& g_size, const vec& g_origin, const vec2& 
     calc_dv();
 };
 
-cube::cube(const cube& given)
+cube::cube(const cube &given)
 {
     na = given.get_na();
     path = given.path;
@@ -109,7 +109,7 @@ cube::cube(const cube& given)
     }
 };
 
-bool cube::read_values(std::ifstream& file) {
+bool cube::read_values(std::ifstream &file) {
     using namespace std;
     string line;
     file.seekg(0);
@@ -297,7 +297,7 @@ bool cube::write_file(bool force, bool absolute)
     return (true);
 };
 
-bool cube::write_file(const std::filesystem::path& given_path, bool debug)
+bool cube::write_file(const std::filesystem::path &given_path, bool debug)
 {
     using namespace std;
     stringstream stream;
@@ -358,7 +358,7 @@ bool cube::write_file(const std::filesystem::path& given_path, bool debug)
     return (true);
 };
 
-bool cube::write_xdgraph(const std::filesystem::path& given_path, bool debug)
+bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
 {
     using namespace std;
     stringstream stream;
@@ -422,8 +422,8 @@ bool cube::fractal_dimension(const double stepsize) const
         return false;
 
     double min = 100, max = -100;
-    for (const vec2& inner_vec : values) {
-        for (const vec& innerest_vec : inner_vec) {
+    for (const vec2 &inner_vec : values) {
+        for (const vec &innerest_vec : inner_vec) {
             if (innerest_vec.empty())
                 continue;
 
@@ -461,8 +461,8 @@ bool cube::fractal_dimension(const double stepsize) const
             const long long int x = i / ((size_t)size[1] * ((size_t)size[2] - 1));
             const long long int y = (i / ((size_t)size[2] - 1)) % size[1];
             const long long int z = i % ((size_t)size[2] - 1);
-            const double& lv1 = values[x][y][z];
-            const double& lv2 = values[x][y][z + 1];
+            const double &lv1 = values[x][y][z];
+            const double &lv2 = values[x][y][z + 1];
             for (int _i = 0; _i < steps; _i++)
                 if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
@@ -474,8 +474,8 @@ bool cube::fractal_dimension(const double stepsize) const
             const long long int z = i / ((size_t)size[0] * (size[1] - 1));
             const long long int x = (i / ((size_t)size[1] - 1)) % size[0];
             const long long int y = i % ((size_t)size[1] - 1);
-            const double& lv1 = values[x][y][z];
-            const double& lv2 = values[x][y + 1][z];
+            const double &lv1 = values[x][y][z];
+            const double &lv2 = values[x][y + 1][z];
             for (int _i = 0; _i < steps; _i++)
                 if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
@@ -487,8 +487,8 @@ bool cube::fractal_dimension(const double stepsize) const
             const long long int y = i / (((size_t)size[0] - 1) * size[2]);
             const long long int z = (i / ((size_t)size[0] - 1)) % size[2];
             const long long int x = i % ((size_t)size[0] - 1);
-            const double& lv1 = values[x][y][z];
-            const double& lv2 = values[x + 1][y][z];
+            const double &lv1 = values[x][y][z];
+            const double &lv2 = values[x + 1][y][z];
             for (int _i = 0; _i < steps; _i++)
                 if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
@@ -568,7 +568,7 @@ bool cube::set_value(int x, int y, int z, double value)
     return (true);
 };
 
-void cube::set_dv(const double& given)
+void cube::set_dv(const double &given)
 {
     dv = given;
 };
@@ -579,7 +579,7 @@ void cube::calc_dv() {
 
 // Function to compute dot product
 template <typename T>
-inline const double dot_(const T& a, const T& b) {
+inline const double dot_(const T &a, const T &b) {
     double result = 0;
     for (int i = 0; i < a.size(); i++) {
         result += a[i] * b[i];
@@ -587,7 +587,7 @@ inline const double dot_(const T& a, const T& b) {
     return result;
 }
 
-bool has_converged(const double& current_value, double& previous_value, const double rel_threshold, const double rsE, std::deque<double>& history, const int window_size) {
+bool has_converged(const double &current_value, double &previous_value, const double rel_threshold, const double rsE, std::deque<double> &history, const int window_size) {
     // Calculate relative and absolute differences
     double relative_diff = std::abs((current_value - previous_value) / current_value);
     double absolute_diff = std::abs(current_value - previous_value);
@@ -659,14 +659,14 @@ double cube::ewald_sum(const int kMax, const double conv) {
         vec_cross(cell_vectors[2], cell_vectors[0]),
         vec_cross(cell_vectors[0], cell_vectors[1])
     };
-    for (auto& vec : reciprocalLattice) {
-        for (double& x : vec) x *= 2 * constants::PI / volume;
+    for (auto &vec : reciprocalLattice) {
+        for (double &x : vec) x *= 2 * constants::PI / volume;
     }
     std::cout << "Reciprocal cell lattice:" << std::endl;
     for (int i = 0; i < 3; i++) {
         std::cout << std::setw(10) << reciprocalLattice[i][0] << std::setw(10) << reciprocalLattice[i][1] << std::setw(10) << reciprocalLattice[i][2] << std::endl;
     }
-    ProgressBar* pb = new ProgressBar(grid_points, 60, "-", " ", "Real-space");
+    ProgressBar *pb = new ProgressBar(grid_points, 60, "-", " ", "Real-space");
     double v00 = vectors[0][0], v01 = vectors[0][1], v02 = vectors[0][2];
     double v10 = vectors[1][0], v11 = vectors[1][1], v12 = vectors[1][2];
     double v20 = vectors[2][0], v21 = vectors[2][1], v22 = vectors[2][2];
@@ -795,7 +795,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     return totalEnergy;
 }
 
-void cube::operator=(const cube& right)
+void cube::operator=(const cube &right)
 {
     for (int i = 0; i < 3; i++)
         size[i] = right.get_size(i);
@@ -830,7 +830,7 @@ void cube::operator=(const cube& right)
     parent_wavefunction = right.parent_wavefunction;
 };
 
-cube cube::operator+(const cube& right) const
+cube cube::operator+(const cube &right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "+" + right.get_path().stem().string() + ".cube");
@@ -846,7 +846,7 @@ cube cube::operator+(const cube& right) const
     return (res_cube);
 };
 
-cube cube::operator-(const cube& right) const
+cube cube::operator-(const cube &right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "-" + right.get_path().stem().string() + ".cube");
@@ -862,7 +862,7 @@ cube cube::operator-(const cube& right) const
     return (res_cube);
 };
 
-cube cube::operator*(const cube& right) const
+cube cube::operator*(const cube &right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "*" + right.get_path().stem().string() + ".cube");
@@ -878,7 +878,7 @@ cube cube::operator*(const cube& right) const
     return (res_cube);
 };
 
-cube cube::operator/(const cube& right) const
+cube cube::operator/(const cube &right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "_" + right.get_path().stem().string() + ".cube");
@@ -899,7 +899,7 @@ cube cube::operator/(const cube& right) const
     return (res_cube);
 };
 
-bool cube::operator+=(const cube& right)
+bool cube::operator+=(const cube &right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -912,7 +912,7 @@ bool cube::operator+=(const cube& right)
     return (true);
 };
 
-bool cube::operator-=(const cube& right)
+bool cube::operator-=(const cube &right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -925,7 +925,7 @@ bool cube::operator-=(const cube& right)
     return (true);
 };
 
-bool cube::operator*=(const cube& right)
+bool cube::operator*=(const cube &right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -938,7 +938,7 @@ bool cube::operator*=(const cube& right)
     return (true);
 };
 
-bool cube::operator/=(const cube& right)
+bool cube::operator/=(const cube &right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -951,7 +951,7 @@ bool cube::operator/=(const cube& right)
     return (true);
 };
 
-bool cube::mask(const cube& right)
+bool cube::mask(const cube &right)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -964,7 +964,7 @@ bool cube::mask(const cube& right)
     return (true);
 };
 
-bool cube::thresh(const double& thresh)
+bool cube::thresh(const double &thresh)
 {
     if (size[0] == 0 || size[1] == 0 || size[2] == 0)
         return (false);
@@ -977,7 +977,7 @@ bool cube::thresh(const double& thresh)
     return (true);
 }
 
-bool cube::thresh(const cube& right, const double& thresh)
+bool cube::thresh(const cube &right, const double &thresh)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -990,7 +990,7 @@ bool cube::thresh(const cube& right, const double& thresh)
     return (true);
 };
 
-bool cube::negative_mask(const cube& right)
+bool cube::negative_mask(const cube &right)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -1003,7 +1003,7 @@ bool cube::negative_mask(const cube& right)
     return (true);
 };
 
-double cube::rrs(const cube& right) const
+double cube::rrs(const cube &right) const
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -1249,7 +1249,7 @@ void cube::set_zero()
             fill(values[i][j].begin(), values[i][j].end(), 0.0);
 };
 
-double cube::jaccard(const cube& right) const {
+double cube::jaccard(const cube &right) const {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (-1);
@@ -1376,7 +1376,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
 
         long long count_computed = 0;
 
-        ProgressBar* pb = new ProgressBar(new_size[0], 50, "#", " ", "Level " + to_string(depth + 1));
+        ProgressBar *pb = new ProgressBar(new_size[0], 50, "#", " ", "Level " + to_string(depth + 1));
 
 #pragma omp parallel for reduction(+:count_computed) schedule(dynamic)
         for (int i = 0; i < new_size[0]; i++) {
@@ -1398,7 +1398,7 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                 else {
                     j0 = 0;
                 }
-                int* ihf = inhomog_fine[i0][j0].data();
+                int *ihf = inhomog_fine[i0][j0].data();
                 for (int k = 0; k < new_size[2]; k++) {
                     // Check if this corresponds to an exact old point
                     if (i % subfactor == 0 && j % subfactor == 0 && k % subfactor == 0) {

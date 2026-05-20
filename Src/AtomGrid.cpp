@@ -934,7 +934,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                 }
                 std::pair<vec, vec> *coi;
 
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(dynamic, 1) nowait
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(dists.begin(), dists.end(), 0.0);
@@ -1064,12 +1064,13 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     sp_vec copy_of_input = sig_pop_vector;
 
     const int ncen = wavy.get_ncen();
-    int grid_inex = 0;
+    //int grid_inex = 0;
     vec atom_coords(ncen * 3);
     ivec nshell_cache(ncen);
     ivec ECP_els(ncen);
     std::vector<Thakkar> ECP_electron_helper;
     std::vector<Spherical_Gaussian_Density> ECP_correction_helper;
+    std::vector<int> has_ECP(ncen);
     for (int j = 0; j < ncen; j++) {
         atom_coords[j * 3 + 0] = atoms[j].get_coordinate(0);
         atom_coords[j * 3 + 1] = atoms[j].get_coordinate(1);
@@ -1079,6 +1080,52 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         ECP_electron_helper.emplace_back(c);
         ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_els[j] = atoms[j].get_ECP_electrons();
+        has_ECP[j] = (atoms[j].get_ECP_electrons() > 0);
+    }
+    vec2 corrected_dens(ncen);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int i = 0; i < ncen; i++) {
+        const int end = num_grid_points[i];
+        const double *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+        corrected_dens[i] = grid[i][7];
+
+        double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, dist;
+        int j, ind, *ECP_els_j;
+        double *d_local;
+        vec dx(ncen * 3);
+        double d_cache[6] = {0.0};
+
+
+        for (int point = 0; point < end; point++) {
+            // Pre-load grid coordinates once instead of accessing multiple times
+            const double gx_pt = gx[point];
+            const double gy_pt = gy[point];
+            const double gz_pt = gz[point];
+
+            for (j = 0; j < ncen; j++) {
+                if (!has_ECP[j])
+                    continue; // Skip ECP correction if not needed, most points will skip this, so it should be a good optimization
+                ind = j * 3;
+                d_local = dx.data() + ind;
+                d_local[0] = gx_pt - atom_coords[ind + 0];
+                d_local[1] = gy_pt - atom_coords[ind + 1];
+                d_local[2] = gz_pt - atom_coords[ind + 2];
+                d_cache[0] = d_local[0] * d_local[0];
+                d_cache[1] = d_local[0] * d_local[1];
+                d_cache[2] = d_local[0] * d_local[2];
+                d_cache[3] = d_local[1] * d_local[1];
+                d_cache[4] = d_local[1] * d_local[2];
+                d_cache[5] = d_local[2] * d_local[2];
+                const double dist_sq = d_cache[0] + d_cache[3] + d_cache[5];
+                // Check distance squared first to avoid sqrt for far away points
+                if (dist_sq > constants::far_away_sq)
+                    continue;
+
+                dist = std::sqrt(dist_sq);
+                ECP_els_j = &ECP_els[j];
+                corrected_dens[i][point] += ECP_electron_helper[j].get_core_density(dist, *ECP_els_j) + ECP_correction_helper[j].get_radial_density(dist);
+            }
+        }
     }
 
     for (size_t it = 0; it < 2000; it++) {
@@ -1088,23 +1135,22 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         }
         it == 0 ? std::cout << "Starting EMBIS iterations..." << std::endl : std::cout << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
-        for (int i = 0, grid_index = 0; i < ncen; i++) {
+        for (int i = 0; i < ncen; i++) {
             const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
-            const int end = num_grid_points[grid_index];
+            const int end = num_grid_points[i];
             //Assuming 3 is the quadrature weight and 7 is the electron density 
-            b_weight = grid[grid_index][5].data();
-            dens = grid[grid_index][7].data();
+            b_weight = grid[i][5].data();
+            dens = corrected_dens[i].data();
             //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-            gx = grid[grid_index][0].data();
-            gy = grid[grid_index][1].data();
-            gz = grid[grid_index][2].data();
-            grid_index++;
+            gx = grid[i][0].data();
+            gy = grid[i][1].data();
+            gz = grid[i][2].data();
 
 #pragma omp parallel
             {
                 vec rho0shell(ncen * 6, 0.0);
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
-                int j, shell, nshell, ind, *ECP_els_j;
+                int j, shell, nshell, ind;
                 double *alpha, *d_local, *pop_p;
                 vec dx(ncen * 3);
                 vec alpha_local(ncen * 36, 0.0);
@@ -1129,32 +1175,34 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     }
                 }
 
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(dynamic,4) nowait
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
-                    density = b_weight[point] * dens[point];
+                    const double b_weight_point = b_weight[point];
+                    density = b_weight_point * dens[point];
+                    
+                    // Pre-load grid coordinates once instead of accessing multiple times
+                    const double gx_pt = gx[point];
+                    const double gy_pt = gy[point];
+                    const double gz_pt = gz[point];
+                    
                     for (j = 0; j < ncen; j++) {
                         ind = j * 3;
                         d_local = dx.data() + ind;
-                        d_local[0] = gx[point] - atom_coords[ind + 0];
-                        d_local[1] = gy[point] - atom_coords[ind + 1];
-                        d_local[2] = gz[point] - atom_coords[ind + 2];
+                        d_local[0] = gx_pt - atom_coords[ind + 0];
+                        d_local[1] = gy_pt - atom_coords[ind + 1];
+                        d_local[2] = gz_pt - atom_coords[ind + 2];
                         d_cache[0] = d_local[0] * d_local[0];
-                        d_cache[3] = d_local[1] * d_local[1];
-                        d_cache[5] = d_local[2] * d_local[2];
-                        // Check distance squared first to avoid sqrt for far away points
-                        if (d_cache[0] + d_cache[3] + d_cache[5] > constants::far_away_sq)
-                            continue;
-
                         d_cache[1] = d_local[0] * d_local[1];
                         d_cache[2] = d_local[0] * d_local[2];
+                        d_cache[3] = d_local[1] * d_local[1];
                         d_cache[4] = d_local[1] * d_local[2];
-                        ECP_els_j = &ECP_els[j];
-                        if (atoms[j].get_ECP_electrons() > 0) {
-                            const double dist = std::sqrt(d_cache[0] + d_cache[3] + d_cache[5]);
-                            density += (ECP_electron_helper[j].get_core_density(dist, *ECP_els_j) + ECP_correction_helper[j].get_radial_density(dist)) * b_weight[point];
-                        }
+                        d_cache[5] = d_local[2] * d_local[2];
+                        const double dist_sq = d_cache[0] + d_cache[3] + d_cache[5];
+                        // Check distance squared first to avoid sqrt for far away points
+                        if (dist_sq > constants::far_away_sq)
+                            continue;
 
                         nshell = nshell_cache[j];
                         coi = &copy_of_input[j];
@@ -1162,26 +1210,34 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         for (shell = 0; shell < nshell; shell++) {
                             alpha = coi->first[shell].data();
                             // Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
-                            g = sqrt(alpha[0] * d_cache[0] +
+                            const double g_sq = alpha[0] * d_cache[0] +
                                 alpha[3] * d_cache[3] +
                                 alpha[5] * d_cache[5] +
-                                2 * (alpha[1] * d_cache[1] + alpha[2] * d_cache[2] + alpha[4] * d_cache[4]));
+                                2 * (alpha[1] * d_cache[1] + alpha[2] * d_cache[2] + alpha[4] * d_cache[4]);
+                            // Early exit for large g_sq before sqrt
+                            if (g_sq > 1764.0) // 42^2 = 1764
+                                continue;
+                            g = sqrt(g_sq);
                             g_cache[ind + shell] = g;
-                            if (g > 42) // avoid vanishingly small contributions due to exp(-g) and potential overflow in exp(g)
+                            if (g > 42.0) // avoid vanishingly small contributions due to exp(-g) and potential overflow in exp(g)
                                 continue;
-                            tmp = det_pop_cache[ind + shell] * exp(-g);
-                            if (abs(tmp) < constants::cutoff)
+                            // Cache det_pop value and check before expensive exp()
+                            const double det_pop_val = det_pop_cache[ind + shell];
+                            if (abs(det_pop_val) < constants::cutoff)
                                 continue;
+                            // Use fast exp approximation for better performance
+                            tmp = det_pop_val * exp(-g);
                             rho0shell[ind + shell] = tmp;
                             rho0 += tmp;
                         }
                     } //We first need to finish building total rho0 before we can calculate the contributions to the sigmas and populations
                     if (rho0 == 0.0)
                         continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
-                    const double rho0_inv = 1.0 / rho0;
+                    const double dens_rho0_inv = density / rho0;
                     for (j = 0; j < ncen; j++) {
                         d_local = dx.data() + (j * 3);
                         nshell = nshell_cache[j];
+                        // Reuse d_cache values instead of recalculating (they're the same as before)
                         d_cache[0] = d_local[0] * d_local[0];
                         d_cache[1] = d_local[0] * d_local[1];
                         d_cache[2] = d_local[0] * d_local[2];
@@ -1189,34 +1245,47 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         d_cache[4] = d_local[1] * d_local[2];
                         d_cache[5] = d_local[2] * d_local[2];
                         ind = j * 6;
+                        const int ind6 = j * 36;
                         pop_p = pop_local.data() + ind;
                         for (shell = 0; shell < nshell; shell++) {
                             r0s = rho0shell[ind + shell];
                             if (r0s <= constants::cutoff)
                                 continue;
                             g = 1.0 / g_cache[ind + shell];
-                            temp_res = density * r0s * rho0_inv;
-                            alpha = alpha_local.data() + (ind * 6 + shell * 6);
-                            alpha[0] += temp_res * d_cache[0] * g;
-                            alpha[1] += temp_res * d_cache[1] * g;
-                            alpha[2] += temp_res * d_cache[2] * g;
-                            alpha[3] += temp_res * d_cache[3] * g;
-                            alpha[4] += temp_res * d_cache[4] * g;
-                            alpha[5] += temp_res * d_cache[5] * g;
+                            temp_res = dens_rho0_inv * r0s;
+                            const double temp_res_g = temp_res * g;
+                            alpha = alpha_local.data() + (ind6 + shell * 6);
+                            alpha[0] += temp_res_g * d_cache[0];
+                            alpha[1] += temp_res_g * d_cache[1];
+                            alpha[2] += temp_res_g * d_cache[2];
+                            alpha[3] += temp_res_g * d_cache[3];
+                            alpha[4] += temp_res_g * d_cache[4];
+                            alpha[5] += temp_res_g * d_cache[5];
                             pop_p[shell] += temp_res;
                         }
                     }
                 }
 
-                for (j = 0; j < ncen; j++) {
-                    nshell = nshell_cache[j];
-                    for (shell = 0; shell < nshell; shell++) {
-                        for (int n = 0; n < 6; n++) {
-#pragma omp atomic
-                            sig_pop_vector[j].first[shell][n] += alpha_local[j * 36 + shell * 6 + n];
+                // Use critical section for batch updates instead of individual atomic operations
+#pragma omp critical
+                {
+                    for (j = 0; j < ncen; j++) {
+                        nshell = nshell_cache[j];
+                        const int alpha_base = j * 36;
+                        const int pop_base = j * 6;
+                        for (shell = 0; shell < nshell; shell++) {
+                            const int alpha_offset = alpha_base + shell * 6;
+                            // Batch update all values in critical section
+                            double *sig_alpha = sig_pop_vector[j].first[shell].data();
+
+                            sig_alpha[0] += alpha_local[alpha_offset + 0];
+                            sig_alpha[1] += alpha_local[alpha_offset + 1];
+                            sig_alpha[2] += alpha_local[alpha_offset + 2];
+                            sig_alpha[3] += alpha_local[alpha_offset + 3];
+                            sig_alpha[4] += alpha_local[alpha_offset + 4];
+                            sig_alpha[5] += alpha_local[alpha_offset + 5];
+                            sig_pop_vector[j].second[shell] += pop_local[pop_base + shell];
                         }
-#pragma omp atomic
-                        sig_pop_vector[j].second[shell] += pop_local[j * 6 + shell];
                     }
                 }
             }

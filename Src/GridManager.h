@@ -40,8 +40,8 @@ struct GridConfiguration {
 };
 
 struct GridData {
-    const int grid_data_size = 10;
-    enum GridIndex { X = 0, Y = 1, Z = 2, WEIGHT = 3, HIRSH_WEIGHT = 4, BECKE_WEIGHT = 5, TFVC_WEIGHT = 6, WFN_DENSITY = 7, MBIS_WEIGHT = 8, EMBIS_WEIGHT = 9 };
+    const int grid_data_size = 11;
+    enum GridIndex { X = 0, Y = 1, Z = 2, WEIGHT = 3, HIRSH_WEIGHT = 4, BECKE_WEIGHT = 5, TFVC_WEIGHT = 6, WFN_DENSITY = 7, MBIS_WEIGHT = 8, EMBIS_WEIGHT = 9, g_DENSITY = 10 };
     vec3 atomic_grids;           // [atom][coord_type][point]
     ivec num_points_per_atom;    // Number of points for each atom
     vec3 helper_grids;           // [atom][coord_type][point] - Used for intermediate calculations (e.g. on grown stuff)
@@ -96,15 +96,16 @@ public:
 
     // Main interface methods
     void setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list = {},
-        const bvec &needs_grid = {}, const cell &unit_cell = cell());
+        const bvec &needs_grid = {}, const cell &unit_cell = cell(), const bool get_g = false);
 
     void setup1DGridsForMolecule(const WFN &wave, const int atom_1, const int atom_2, const int gridpoints, const double padding);
 
     void calculateNonSphericalDensities(const WFN &wave, const cell &unit_cell);
+    void calculateNonSphericalg(const WFN &wave, const cell &unit_cell);
 
     PartitionResults calculatePartitionedCharges(const WFN &wave, const cell &unit_cell = cell());
 
-    void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens);
+    void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g = false);
 
     // Configuration and data access
     void setConfiguration(const GridConfiguration &config) { config_ = config; }

@@ -77,5 +77,6 @@ bond do_bonds(WFN& wavy, int mode_general, int mode_sel, bool mode_leng, bool mo
 int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, const bool& bohr);
 
 void bondwise_laplacian_plots(std::filesystem::path &wfn_name);
+void ELI_analysis(const WFN &wavy, const options &opt);
 
 #include "wfn_class.h"
