@@ -1,5 +1,4 @@
 #pragma once
-
 #include "convenience.h"
 #include "GridManager.h"
 #include "integration_params.h"

@@ -47,7 +47,7 @@ void computeEri3c(Int_Params &param1,
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
     int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
 
-    CINTOpt* opty = nullptr;
+    libcint::CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // Compute integrals
@@ -99,7 +99,7 @@ void compute2C(Int_Params& params, vec& ret) {
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
 
-    CINTOpt* opty = nullptr;
+    libcint::CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // Compute integrals
@@ -289,7 +289,7 @@ void computeRho(
         max_block_ij
     );
 
-    CINTOpt* opty = nullptr;
+    libcint::CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     ProgressBar pb(natoms, 60, "#", " ", "Calculating Eri3c Matrix");
@@ -399,7 +399,7 @@ void compute3C(Int_Params& param1,
     unsigned long long int naoj = aoloc[nQM] - aoloc[0];
     unsigned long long int naok = aoloc[nQM + nAux] - aoloc[nQM];
     eri3c.resize(naoi * naoj * naok, 0.0);
-    CINTOpt* opty = nullptr;
+    libcint::CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
     ivec shl_slice = { 0, nQM, 0, nQM, nQM, nQM + nAux };
     Kernel::drv(eri3c.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
@@ -447,7 +447,7 @@ dMatrix2 cart2sph(const int l, const bool normalized) {
     int n_sph = 2 * l + 1;
     vec c_sph(n_sph * n_cart, 0.0);
 
-    CINTc2s_ket_sph(c_sph.data(), n_cart, c_tensor.data(), l);
+    libcint::CINTc2s_ket_sph(c_sph.data(), n_cart, c_tensor.data(), l);
     //Transform back to row-major order
     dMatrix2 c_sph_RM(n_cart, n_sph);
     for (int i = 0; i < n_cart; i++) {
