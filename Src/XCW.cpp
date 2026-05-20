@@ -817,6 +817,7 @@ void XCW::calc_F_calc_fast(const cvec& corr) {
     calc_SF(points, k_pt, d1, d2, d3, dens, atomic_scattering_factors, std::cout, time_points.front(), end, opt->debug, true, true);
     // Calculate F_calc
 	//auto it = hkl.begin();
+#pragma omp parallel for
 	for (int r = 0; r < nr_small; r++) {
 		const ivec& lookup = generate_asym_lookup(r);
 		for (int at = 0; at < ncen; at++) {
@@ -831,14 +832,18 @@ void XCW::calc_F_calc_fast(const cvec& corr) {
 		//std::cout << "F_calc for hkl = " << hkl_temp[0] << ", " << hkl_temp[1] << ", " << hkl_temp[2] << ": " << std::fixed << std::setprecision(5) << std::pow(std::abs(F_calc[r]), 2) << std::endl;
 	}
 	//dump F_calc values as binary file called F_calc
-	std::ofstream fout("F_calc.bin", std::ios::out | std::ios::binary);
+
+    std::ofstream fout("F_calc.bin", std::ios::out | std::ios::binary);
 	//First byte is the number of bytes per double, the next one is the size of a compelx double, to understand how to read the data.
 	//After that an int64 (8 byte) of the number of F.calc values to be expected after that.
 	//Finally, the dump of all F_calc values as cdouble (A,B)
-	fout.write(reinterpret_cast<const char*>(char(sizeof(double))),sizeof(char));
-	fout.write(reinterpret_cast<const char*>(char(sizeof(cdouble))),sizeof(char));
-	fout.write(reinterpret_cast<const char*>(int64_t(F_calc.size())), sizeof(int64_t));
-	fout.write(reinterpret_cast<const char*>(F_calc.data()), F_calc.size() * sizeof(cdouble));
+    char size = sizeof(double);
+    fout.write(reinterpret_cast<const char*>(&size), sizeof(size));
+	size = sizeof(cdouble);
+    fout.write(reinterpret_cast<const char*>(&size), sizeof(size));
+    size_t vec_size = F_calc.size();
+	fout.write(reinterpret_cast<const char*>(&vec_size), sizeof(size_t));
+	fout.write(reinterpret_cast<const char*>(F_calc.data()), vec_size * sizeof(cdouble));
     fout.close();
 
 }

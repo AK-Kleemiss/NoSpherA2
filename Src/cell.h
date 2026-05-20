@@ -584,18 +584,18 @@ public:
                         trans[0].push_back(0);
                     }
                     if (vectors[1].find("/") != std::string::npos) {
-                        int tmp_pos = vectors[0].find("/");
-                        temp1 = std::stof(vectors[0].substr(0, tmp_pos));
-                        temp2 = std::stof(vectors[0].substr(tmp_pos + 1, tmp_pos + 2));
+                        int tmp_pos = vectors[1].find("/");
+                        temp1 = std::stof(vectors[1].substr(0, tmp_pos));
+                        temp2 = std::stof(vectors[1].substr(tmp_pos + 1, tmp_pos + 2));
                         trans[1].push_back(temp1 / temp2);
                     }
                     else {
                         trans[1].push_back(0);
                     }
                     if (vectors[2].find("/") != std::string::npos) {
-                        int tmp_pos = vectors[0].find("/");
-                        temp1 = std::stof(vectors[0].substr(0, tmp_pos));
-                        temp2 = std::stof(vectors[0].substr(tmp_pos + 1, tmp_pos + 2));
+                        int tmp_pos = vectors[2].find("/");
+                        temp1 = std::stof(vectors[2].substr(0, tmp_pos));
+                        temp2 = std::stof(vectors[2].substr(tmp_pos + 1, tmp_pos + 2));
                         trans[2].push_back(temp1 / temp2);
                     }
                     else {
