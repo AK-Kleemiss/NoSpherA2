@@ -25,8 +25,8 @@ EXTRA_LIBS_x86 := ../Lib/featomic_install_x86_64/lib/libfeatomic.a \
 
 # Sources - automatically discover all .cpp files in SRC_DIR
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
-ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_basis.cpp)
-  SRCS += $(SRC_DIR)/auxiliary_basis.cpp
+ifneq ($(filter $(SRC_DIR)/basis_data.cpp,$(SRCS)), $(SRC_DIR)/basis_data.cpp)
+  SRCS += $(SRC_DIR)/basis_data.cpp
 endif
 
 #remove mat_nos_math.cpp and vec_nos_math.cpp from SRCS

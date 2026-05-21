@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <iostream>
 #include "nos_math.h"
-#include "JKFit.h"
+#include "basis_set.h"
 
 std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path)
 {

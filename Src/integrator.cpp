@@ -2,9 +2,9 @@
 #include "integrator.h"
 #include "libCintMain.h"
 #undef I // I had to include complex.h, so I have to undefine I for it to work in Linux.
-#include "JKFit.h"
 #include "nos_math.h"
 #include "GridManager.h"
+#include "basis_set.h"
 
 
 vec einsum_ijk_ij_p(const dMatrix3& v1, const dMatrix2& v2)
