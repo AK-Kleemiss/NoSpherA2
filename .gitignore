@@ -76,6 +76,7 @@ tests/ECP_SF/Atomic_densities/*.gbw
 tests/Coeffs_From_ML/*
 tests/reading_ML_Coeffs
 tests/SALTED/sfacs.dat
+Src/basis_data.cpp
 
 #Executables
 Linux/NoSpherA2
