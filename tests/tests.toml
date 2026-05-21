@@ -44,6 +44,7 @@ directory = "SALTED"
 
 [fourier_transform.args]
 test_analytical = true
+acc = 1
 
 [fractal]
 directory = "sucrose_fchk_SF"
