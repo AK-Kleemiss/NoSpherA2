@@ -784,12 +784,12 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
     {
         if (debug)
             file << "No basis set loaded, will load a complete basis set now!" << endl;
-        err_checkf(read_basis_set_vanilla(basis_set_path, wave, debug), "ERROR during reading of missing basis set!", file);
+        err_checkf(BasisSetLibrary::read_basis_set_vanilla(basis_set_path, wave, debug), "ERROR during reading of missing basis set!", file);
     }
     else if (wave.get_nr_basis_set_loaded() < wave.get_ncen())
     {
         file << "Not all atoms have a basis set loaded!\nLaoding the missing atoms..." << flush;
-        err_checkf(read_basis_set_missing(basis_set_path, wave, debug), "ERROR during reading of missing basis set!", file);
+        err_checkf(BasisSetLibrary::read_basis_set_missing(basis_set_path, wave, debug), "ERROR during reading of missing basis set!", file);
     }
     else if (wave.get_nr_basis_set_loaded() > wave.get_ncen())
     {

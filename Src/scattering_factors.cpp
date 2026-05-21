@@ -13,7 +13,7 @@
 #include "AtomGrid.h"
 #include "npy.h"
 #include "integrator.h"
-#include "JKFit.h"
+#include "basis_set.h"
 #include "SALTED_utilities.h"
 #include "GridManager.h"
 
