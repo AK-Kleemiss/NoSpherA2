@@ -88,10 +88,10 @@ all: NoSpherA2
 BASIS_SET_CSVS := $(wildcard $(SRC_DIR)/basis_set_helper/basis_sets/*.csv)
 
 # Actually run the converter to generate the file
-$(SRC_DIR)/auxiliary_basis.cpp: ../BasisSetConverter $(BASIS_SET_CSVS)
+$(SRC_DIR)/basis_data.cpp: ../BasisSetConverter $(BASIS_SET_CSVS)
 	@echo "Running BasisSetConverter..."
 	@./../BasisSetConverter ../Src/basis_set_helper ../Src
-	@echo "auxiliary_basis.cpp generated"
+	@echo "basis_data.cpp generated"
 
 # Flags without -include pch.h for compiling the PCH itself
 GCC_OPTS_NO_PCH       := $(filter-out -include pch.h,$(GCC_OPTS))

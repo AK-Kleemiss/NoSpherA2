@@ -125,17 +125,17 @@ build/BasisSetConverter: makefile_basis_set_converter | build/arm64 build/x86_64
 BASIS_SET_CSVS := $(wildcard $(SRC_DIR)/basis_set_helper/basis_sets/*.csv)
 
 # Actually run the converter to generate the file
-$(SRC_DIR)/auxiliary_basis.cpp: build/BasisSetConverter $(BASIS_SET_CSVS)
+$(SRC_DIR)/basis_data.cpp: build/BasisSetConverter $(BASIS_SET_CSVS)
 	@echo "Running BasisSetConverter..."
 	@./../BasisSetConverter ../Src/basis_set_helper ../Src
-	@echo "auxiliary_basis.cpp generated"
+	@echo "basis_data.cpp generated"
 
-build/arm64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/arm64
-	@echo "Compiling auxiliary_basis.o (arm64)"
+build/arm64/basis_data.o: $(SRC_DIR)/basis_data.cpp | build/arm64
+	@echo "Compiling basis_data.o (arm64)"
 	@$(COMP) $(CXXFLAGS_arm64_NO_PCH) -O0 -c $< -o $@
 
-build/x86_64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/x86_64
-	@echo "Compiling auxiliary_basis.o (x86_64)"
+build/x86_64/basis_data.o: $(SRC_DIR)/basis_data.cpp | build/x86_64
+	@echo "Compiling basis_data.o (x86_64)"
 	@$(COMP) $(CXXFLAGS_x86_64_NO_PCH) -O0 -c $< -o $@
 
 
