@@ -139,8 +139,7 @@ debug: OPTFLAGS := -O0 -g
 debug: clean NoSpherA2_arm64
 
 clean:
-	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2 BasisSetConverter
-	-@$(MAKE) -f makefile_basis_set_converter clean
+	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2
 	@echo "Cleaned."
 
 .PHONY: all clean debug NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64
