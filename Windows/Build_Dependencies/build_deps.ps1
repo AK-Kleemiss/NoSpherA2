@@ -354,5 +354,29 @@ $stamp = Join-Path $RepoRoot "Windows\Build_Dependencies\deps.stamp"
 New-Item -ItemType Directory -Force (Split-Path $stamp) | Out-Null
 Set-Content -Path $stamp -Value ("OK " + (Get-Date).ToString("s")) -Encoding ASCII
 
+# -----------------------------
+# 4) Build BasisSetConverter (if needed)
+# -----------------------------
+$converterExe = Join-Path $RepoRoot "Lib/BasisSetConverter.exe"
+if (Test-Path $converterExe) {
+  Info "BasisSetConverter already built ($converterExe)"
+} else {
+  $src = Join-Path $RepoRoot "BasisSetGenerator"
+  $bld = Join-Path $src "build"
+  if (-not (Test-Path $bld)) { New-Item -ItemType Directory $bld | Out-Null }
+
+  Push-Location $bld
+  try {
+    cmake -S . -B build
+    cmake --build build --config Release
+    cmake --install build --config Release --prefix ".."
+  } finally {
+    Pop-Location
+  }
+
+  if (-not (Test-Path $converterExe)) { Fail "BasisSetConverter build finished but executable not found: $converterExe" }
+  Info "BasisSetConverter OK"
+}
+
 Info "All dependencies are ready."
 exit 0
