@@ -365,7 +365,7 @@ if (Test-Path $converterExe) {
   $bld = Join-Path $src "build"
   if (-not (Test-Path $bld)) { New-Item -ItemType Directory $bld | Out-Null }
 
-  Push-Location $bld
+  Push-Location $src
   try {
     cmake -S . -B build
     cmake --build build --config Release
