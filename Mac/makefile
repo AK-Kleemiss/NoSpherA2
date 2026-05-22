@@ -107,6 +107,12 @@ NoSpherA2_x86_64: $(OBJS_x86_64)
 	@echo "Link (x86_64)…"
 	@$(COMP) $^ $(EXTRA_LIBS_x86) $(LDFLAGS_x86_64) -o $@
 
+# Actually run the converter to generate the file
+$(SRC_DIR)/basis_data.cpp:
+	@echo "Running BasisSetConverter..."
+	@./../Lib//BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
+	@echo "basis_data.cpp generated"
+
 # ---- Precompiled header build rules ----
 $(PCH_arm64): $(SRC_DIR)/pch.h | build/arm64
 	@echo "Building precompiled header (arm64)..."
@@ -115,12 +121,6 @@ $(PCH_arm64): $(SRC_DIR)/pch.h | build/arm64
 $(PCH_x86_64): $(SRC_DIR)/pch.h | build/x86_64
 	@echo "Building precompiled header (x86_64)..."
 	@$(COMP) $(CXXFLAGS_x86_64_NO_PCH) -x c++-header -o "$@" "$<"
-
-# Actually run the converter to generate the file
-$(SRC_DIR)/basis_data.cpp:
-	@echo "Running BasisSetConverter..."
-	@./../Lib//BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
-	@echo "basis_data.cpp generated"
 
 # Pattern rules
 build/arm64/%.o: $(SRC_DIR)/%.cpp $(PCH_arm64) | build/arm64
