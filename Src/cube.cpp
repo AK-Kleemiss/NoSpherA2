@@ -841,7 +841,7 @@ cube cube::operator+(const cube &right) const
     for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
-                res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
+                res_cube.set_value(x, y, z, this->get_value(x, y, z) + right.get_value(x, y, z));
 
     return (res_cube);
 };
@@ -857,7 +857,7 @@ cube cube::operator-(const cube &right) const
     for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
-                res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) - right.get_value(x, y, z));
+                res_cube.set_value(x, y, z, this->get_value(x, y, z) - right.get_value(x, y, z));
 
     return (res_cube);
 };
@@ -873,7 +873,7 @@ cube cube::operator*(const cube &right) const
     for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
-                res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
+                res_cube.set_value(x, y, z, this->get_value(x, y, z) * right.get_value(x, y, z));
 
     return (res_cube);
 };
@@ -891,7 +891,7 @@ cube cube::operator/(const cube &right) const
                 if (right.get_value(x, y, z) == 0)
                     res_cube.set_value(x, y, z, 1E100);
                 if (values[x][y][z] != 0)
-                    res_cube.set_value(x, y, z, values[x][y][z] / right.get_value(x, y, z));
+                    res_cube.set_value(x, y, z, this->get_value(x, y, z) / right.get_value(x, y, z));
                 else
                     res_cube.set_value(x, y, z, 0);
             }

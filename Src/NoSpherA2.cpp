@@ -176,7 +176,7 @@ int main(int argc, char **argv)
         wavy.emplace_back(opt.wfn, opt.debug);
         wavy.emplace_back(opt.wfn2, opt.debug);
         if (opt.debug)
-            std::cout << opt.wfn << opt.wfn2 << endl;
+            std::cout << opt.wfn << " vs " << opt.wfn2 << endl;
         wavy[0].delete_unoccupied_MOs();
         wavy[1].delete_unoccupied_MOs();
         readxyzMinMax_fromWFN(wavy[0], opt.properties);
@@ -205,15 +205,15 @@ int main(int argc, char **argv)
         Calc_Rho(Rho1, wavy[0], opt.properties.radius, log_file, false);
         Calc_Rho(Rho2, wavy[1], opt.properties.radius, log_file, false);
         cube Rho_diff = Rho1 - Rho2;
-#pragma omp parallel for schedule(dynamic)
-        for (int i = 0; i < Rho1.get_size(0); i++)
-        {
-            for (int j = 0; j < Rho1.get_size(1); j++)
-                for (int k = 0; k < Rho1.get_size(2); k++)
-                {
-                    Rho_diff.set_value(i, j, k, Rho1.get_value(i, j, k) - Rho2.get_value(i, j, k));
-                }
-        }
+//#pragma omp parallel for schedule(dynamic)
+//        for (int i = 0; i < Rho1.get_size(0); i++)
+//        {
+//            for (int j = 0; j < Rho1.get_size(1); j++)
+//                for (int k = 0; k < Rho1.get_size(2); k++)
+//                {
+//                    Rho_diff.set_value(i, j, k, Rho1.get_value(i, j, k) - Rho2.get_value(i, j, k));
+//                }
+//        }
         for (int i = 0; i < 3; i++)
         {
             Rho_diff.set_origin(i, opt.properties.MinMax[i]);
