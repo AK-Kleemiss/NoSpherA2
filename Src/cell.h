@@ -3,6 +3,16 @@
 #include "constants.h"
 #include "nos_math.h"
 #include <filesystem>
+
+struct asym_atom {
+    std::string label;
+    int type;
+    d3 pos;
+    d3 frac_pos;
+    double asym_fact;
+    cdouble anom;
+};
+
 /**
  * @class cell
  * @brief Represents a crystal cell in three-dimensional space.
@@ -25,15 +35,7 @@ private:
     bool check_special(const vec& pos1, const vec& pos2);
 
 public:
-    struct asym_atom {
-        svec label;
-        ivec type;
-        d3 pos;
-        d3 frac_pos;
-        double asym_fact;
-        cdouble anom;
-    };
-    std::vector<cell::asym_atom> get_asym_atoms(WFN& wave, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
+    //void get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
     void eval_symm(std::vector<asym_atom>& asym_atoms);
 
     cell()

@@ -5,6 +5,7 @@
 #include "nos_math.h"
 #include "constants.h"
 #include "wfn_class.h"
+#include "JKFit.h"
 #include <filesystem>
 
 

@@ -7,12 +7,46 @@
 #include "libCintMain.h"
 #include "nos_math.h"
 
+void XCW::construct(const options& opt_in) {
+    opt = &opt_in;
+    std::filesystem::path hkl_filename = opt_in.hkl;
+    std::filesystem::path cif = opt_in.cif;
+    std::ifstream cif_input(cif.c_str(), std::ios::in);
+    unit_cell = cell(cif, std::cout, opt_in.debug, opt_in.do_XCW);
+    obs.resize(2);
+    hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt_in.twin_law, unit_cell, std::cout, obs, opt_in.debug);
+    svec empty({});
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    bvec constant_atoms;
+    std::ofstream log3("log3.txt", std::ios::out);
+    read_atoms_from_CIF(cif_input, unit_cell, ncen, needs_grid, asym_atoms, opt_in.debug);
 
-//#include <occ/io/xyz.h>
-//#include <occ/core/molecule.h>
-//#include <occ/qm/hf.h>
-//#include <occ/qm/scf.h>
-//#include <occ/qm/scf_impl.h>
+    // Generate WFN object from asym_atoms
+    wave.assign_charge(opt->charge);
+    wave.assign_multi(opt->mult);
+    for (int at = 0; at < ncen; at++) {
+        asym_atom_list.push_back(at);
+        atom temp_atom;
+        temp_atom.set_coordinate(0, asym_atoms[at].pos[0]);
+        temp_atom.set_coordinate(1, asym_atoms[at].pos[1]);
+        temp_atom.set_coordinate(2, asym_atoms[at].pos[2]);
+        temp_atom.set_charge(asym_atoms[at].type);
+        wave.push_back_atom(temp_atom);
+    }
+    std::string test_name = "def2-svp_basis";
+    std::shared_ptr<BasisSet> basis = BasisSetLibrary().get_basis_set(test_name);
+    load_basis_into_WFN(wave, basis, false);
+
+    U_iso = read_U_iso_from_CIF(cif, wave, unit_cell, log3, opt_in.debug);
+    unit_cell.eval_symm(asym_atoms);
+    nr = hkl_enlarged.size();
+    nr_small = hkl.size();
+    make_k_pts(nr != 0 && hkl.size() == 0, opt_in.save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt_in.debug);
+    //Read U_iso, U_ij, C_ijk and Dijkl from CIF file
+    read_fracs_ADPs_from_CIF(cif, wave, unit_cell, log3, opt_in.debug);
+    DW_fact.resize(ncen, vec(nr, 1.0));
+}
 
 void XCW::U_frac2U_rec(){
     // For now only second order ADPs are supported
@@ -309,49 +343,181 @@ void XCW::eval_translation_phase() {
     // closing function
 }
 
-cvec3 XCW::eval_I() {
-    // Debugging, calculating atomic scattering factors for single reflex
-    //cvec3 atomic_scattering_factor(nmo, cvec2(nmo, cvec(ncen)));
-
-    cvec3 I(nmo, cvec2(nmo, cvec(nr_small, 0)));
-    int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
-
-    // Do the setup of primitives here so it's only done once
-    std::vector<ao_data> ao_data_shells;
-    const std::map<int, LibCintBasis>& basis_sets_map = params.get_basis_sets();
-
-    // Create primitives for each shell of each atom and store in ao_data_shells
-    for (int atm = 0; atm < ncen; atm++) {
-		const atom atom = wave.get_atom(asym_atom_list[atm]);
-        d3 pos = atom.get_pos();
-        int atomic_number = atom.get_charge();
-        if (basis_sets_map.find(atomic_number) == basis_sets_map.end()) {
+void XCW::parse_anom_atoms(std::vector<anom_atom>& anom_atoms) {
+    std::ifstream file(opt->anom_disp_path);
+    if (!file) {
+        std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty())
             continue;
-        }
-        const LibCintBasis& basis = basis_sets_map.at(atomic_number);
-        int prim_idx = 0;
-        for (int shell = 0; shell < basis.shellcount.size(); shell++) {
-            const int shell_type = basis.shelltypes[shell];
-            int shell_start = prim_idx;
-            std::vector<primitive> tmp_prims;
-            for (int prim = 0; prim < basis.shellcount[shell]; prim++, prim_idx++) {
-                if (prim_idx >= basis.exponents.size()) break;
-                const double alpha = basis.exponents[prim_idx];
-                const double coeff = basis.coefficients[prim_idx];
-                tmp_prims.emplace_back(0, shell_type, alpha, coeff);
-            }
-			const int l = shell_type;
-            for (int m = -l; m <= l; m++) {
-				ao_data_shells.push_back({ tmp_prims, pos, m });
+        std::istringstream iss(line);
+        std::string symbol;
+        double real_part, imag_part;
+        if (iss >> symbol >> real_part >> imag_part) {
+            if (!symbol.empty() && symbol[0] != '_' && symbol != "loop_") {
+                anom_atoms.push_back({ symbol, cdouble(real_part, imag_part) });
             }
         }
     }
-	cvec2 XCW_integral;
+}
 
- //   vec ovlp;
- //   Int_Params wavy_params(wave);
- //   compute2C<Overlap2C_SPH>(wavy_params, ovlp);
-	//dMatrixRef2 ovlp_mat(ovlp.data(), nmo, nmo);
+cvec XCW::eval_anom_disp() {
+    std::vector<anom_atom> anom_atoms;
+    parse_anom_atoms(anom_atoms);
+    cvec corr(nr_small, 0);
+    int r, at, r_asym;
+    for (int at = 0; at < ncen; at++) {
+        const char* symbol = constants::atnr2letter(asym_atoms[at].type);
+        for (const anom_atom& anom_atom : anom_atoms) {
+            if (symbol == anom_atom.identifier) {
+                asym_atoms[at].anom = anom_atom.dispersion;
+                break;
+            }
+        }
+    }
+    std::vector<ivec> asym_lookup(nr_small);
+    for (r = 0; r < nr_small; r++) {
+        asym_lookup[r] = generate_asym_lookup(r);
+    }
+    for (r = 0; r < nr_small; r++) {
+        const ivec& lookup = asym_lookup[r];
+        for (at = 0; at < ncen; at++) {
+            cdouble temp1 = 0;
+            for (r_asym = 0; r_asym < lookup.size(); r_asym++) {
+                temp1 += phase_fact[at][lookup[r_asym]] * DW_fact[at][lookup[r_asym]] * translation_phase[r][r_asym];
+            }
+            corr[r] += temp1 * asym_atoms[at].asym_fact * asym_atoms[at].anom;
+        }
+    }
+    return corr;
+}
+
+void XCW::create_prims(std::vector<ao_data>& ao_data_shells) {
+    for (int atm = 0; atm < ncen; atm++) {
+        d3 pos = { basis_set.atoms()[atm].x, basis_set.atoms()[atm].y, basis_set.atoms()[atm].z };
+        const int first_shell = *basis_set.atom_to_shell()[atm].begin();
+        const int last_shell = basis_set.atom_to_shell()[atm].back();
+        for (int shell = first_shell; shell <= last_shell; shell++) {
+            occ::gto::Shell current_shell = basis_set.shells()[shell];
+            const int shell_type = current_shell.l;
+            std::vector<primitive> tmp_prims;
+            for (int prim_idx = 0; prim_idx < current_shell.exponents.size(); prim_idx++) {
+                const double alpha = current_shell.exponents[prim_idx];
+                const double coeff = current_shell.contraction_coefficients(prim_idx);
+                tmp_prims.emplace_back(0, shell_type, alpha, coeff);
+            }
+            for (int m = -shell_type; m <= shell_type; m++) {
+                ao_data_shells.push_back({ tmp_prims, pos, m });
+            }
+        }
+    }
+	nmo = ao_data_shells.size();
+}
+
+ivec XCW::generate_asym_lookup(const int r) {
+    ivec asym_list;
+    auto it = hkl.begin();
+    std::advance(it, r);
+    ivec3 rots = unit_cell.get_sym();
+    i3 tempv;
+    const i3& hkl_temp = *it;
+    for (int s = 0; s < rots[0][0].size(); s++) {
+        tempv = { 0, 0, 0 };
+        for (int h = 0; h < 3; h++) {
+            for (int j = 0; j < 3; j++) {
+                tempv[j] += hkl_temp[h] * rots[j][h][s];
+            }
+        }
+        int idx_ = 0;
+        auto idx = hkl_enlarged.find(tempv);
+        if (idx != hkl_enlarged.end()) {
+            idx_ = std::distance(hkl_enlarged.begin(), idx);
+        }
+        asym_list.push_back(idx_);
+    }
+    return asym_list;
+    // closing function
+}
+
+cvec2 XCW::calculateXCWintegral(GridManager& grid_manager, const ao_data& mu_data, const ao_data& nu_data, const ivec& asym_atom_list, vec2& k_pt, bool& equal, vec2& mu_vals) {
+    GridData& GD = grid_manager.getGridData();
+    vec2* grids = grid_manager.getNeedsHelper() ? GD.helper_grids.data() : GD.atomic_grids.data();
+    const int n_grids = grid_manager.getNeedsHelper() ? GD.helper_grids.size() : GD.atomic_grids.size();
+    const int* points = grid_manager.getNeedsHelper() ? GD.helper_num_points_per_atom.data() : GD.num_points_per_atom.data();
+    const double mp0 = mu_data.pos[0];
+    const double mp1 = mu_data.pos[1];
+    const double mp2 = mu_data.pos[2];
+    const double np0 = nu_data.pos[0];
+    const double np1 = nu_data.pos[1];
+    const double np2 = nu_data.pos[2];
+    const std::vector<primitive> mu_prims = mu_data.prims;
+    const std::vector<primitive> nu_prims = nu_data.prims;
+    if (equal) {
+        mu_vals.resize(n_grids);
+        for (int g = 0; g < n_grids; g++) {
+            const int num_points = points[g];
+            mu_vals[g].resize(num_points);
+            vec2& atom_grid = grids[g];
+            const double* x_ptr = atom_grid[GridData::GridIndex::X].data();
+            const double* y_ptr = atom_grid[GridData::GridIndex::Y].data();
+            const double* z_ptr = atom_grid[GridData::GridIndex::Z].data();
+            double* overlap_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
+#pragma omp parallel for schedule(dynamic, 4)
+            for (int p = 0; p < num_points; p++) {
+                std::array<double, 4> d_mu;
+                double* d_mu_ptr = d_mu.data();
+                *d_mu_ptr = x_ptr[p] - mp0;
+                *(d_mu_ptr + 1) = y_ptr[p] - mp1;
+                *(d_mu_ptr + 2) = z_ptr[p] - mp2;
+                *(d_mu_ptr + 3) = std::hypot(*(d_mu_ptr), *(d_mu_ptr + 1), *(d_mu_ptr + 2));
+                mu_vals[g][p] = wave.eval_ao(d_mu, mu_prims, mu_data.m);
+                overlap_ptr[p] = std::pow(mu_vals[g][p], 2);
+            }
+        }
+    }
+    else {
+        for (int g = 0; g < n_grids; g++) {
+            const int num_points = points[g];
+            vec2& atom_grid = grids[g];
+            const double* x_ptr = atom_grid[GridData::GridIndex::X].data();
+            const double* y_ptr = atom_grid[GridData::GridIndex::Y].data();
+            const double* z_ptr = atom_grid[GridData::GridIndex::Z].data();
+            double* overlap_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
+#pragma omp parallel for schedule(dynamic, 4)
+            for (int p = 0; p < num_points; p++) {
+                std::array<double, 4> d_mu, d_nu;
+                double* d_mu_ptr = d_mu.data();
+                double* d_nu_ptr = d_nu.data();
+                *d_mu_ptr = x_ptr[p] - mp0;
+                *(d_mu_ptr + 1) = y_ptr[p] - mp1;
+                *(d_mu_ptr + 2) = z_ptr[p] - mp2;
+                *(d_mu_ptr + 3) = std::hypot(*(d_mu_ptr), *(d_mu_ptr + 1), *(d_mu_ptr + 2));
+                *d_nu_ptr = x_ptr[p] - np0;
+                *(d_nu_ptr + 1) = y_ptr[p] - np1;
+                *(d_nu_ptr + 2) = z_ptr[p] - np2;
+                *(d_nu_ptr + 3) = std::hypot(*(d_nu_ptr), *(d_nu_ptr + 1), *(d_nu_ptr + 2));
+                overlap_ptr[p] = (*d_mu_ptr + 3) > 12 || (*d_nu_ptr + 3) > 12 ? 0 : mu_vals[g][p] * wave.eval_ao(d_nu, nu_prims, nu_data.m);
+            }
+        }
+    }
+    vec2 d1, d2, d3, dens;
+    std::vector<_time_point> time_points({ get_time() });
+    _time_point end;
+    grid_manager.getDensityVectors(wave, asym_atom_list, d1, d2, d3, dens);
+    const int points_ = grid_manager.getTotalGridPoints();
+    cvec2 sf;
+    calc_SF(points_, k_pt, d1, d2, d3, dens, sf, std::cout, time_points.front(), end, opt->debug, true, true);
+    return sf;
+}
+
+void XCW::eval_I(cvec3& I, std::vector<ao_data>& ao_data_shells) {
+
+    I.resize(nmo, cvec2(nmo, cvec(nr_small, 0)));
+    int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
+
+	cvec2 XCW_integral;
 
     GridConfiguration config;
     config.accuracy = opt->accuracy;
@@ -419,9 +585,6 @@ cvec3 XCW::eval_I() {
             double asym_fact;
             int idx;
             XCW_integral = calculateXCWintegral(grid_manager, mu_prims, nu_prims, asym_atom_list, k_pt, equal, mu_vals);
-            //for (at = 0; at < ncen; at++) {
-            //    atomic_scattering_factor[mu][nu][at] = XCW_integral[at][0];
-            //}
             for (r = 0; r < nr_small; r++) {
 				const cvec& translation_phase_r = translation_phase[r];
                 const ivec& asym_list = asym_lookup[r];
@@ -442,180 +605,10 @@ cvec3 XCW::eval_I() {
         // Print out that contributions from mu are done
 		std::cout << "Finished contributions from mu = " << mu << std::endl;
     }
-    dMatrix2 D = wave.get_dm();
-
-     //Debugging, calculating atomic scattering factors
-    //cvec scattering_factors(ncen);
-    //for (int at = 0; at < ncen; at++) {
-    //    for (mu = 0; mu < nmo; mu++) {
-    //        for (nu = mu; nu < nmo; nu++) {
-    //            double D_ = D(mu, nu);
-    //            if (mu == nu) {
-    //                scattering_factors[at] += atomic_scattering_factor[mu][nu][at] * D_;
-    //            }
-    //            else {
-    //                scattering_factors[at] += 2.00 * atomic_scattering_factor[mu][nu][at] * D_;
-    //            }
-    //        }
-    //    }
-    //}
-    //std::cout << "Atomic Scattering Factors" << std::endl;
-    //for (at = 0; at < ncen; at++) {
-    //    std::cout << scattering_factors[at] << std::endl;
-    //}
-    return I;
 }
 
-ivec XCW::generate_asym_lookup(const int r) {
-        ivec asym_list;
-        auto it = hkl.begin();
-        std::advance(it, r);
-        ivec3 rots = unit_cell.get_sym();
-        i3 tempv;
-        const i3& hkl_temp = *it;
-        for (int s = 0; s < rots[0][0].size(); s++) {
-            tempv = { 0, 0, 0 };
-            for (int h = 0; h < 3; h++) {
-                for (int j = 0; j < 3; j++) {
-                    tempv[j] += hkl_temp[h] * rots[j][h][s];
-                }
-            }
-            int idx_ = 0;
-            auto idx = hkl_enlarged.find(tempv);
-            if (idx != hkl_enlarged.end()) {
-                idx_ = std::distance(hkl_enlarged.begin(), idx);
-            }
-            asym_list.push_back(idx_);
-        }
-    return asym_list;
-    // closing function
-}
-
-cvec2 XCW::calculateXCWintegral(GridManager& grid_manager, const ao_data& mu_data, const ao_data& nu_data, const ivec& asym_atom_list, vec2& k_pt, bool& equal, vec2& mu_vals) {
-    GridData& GD = grid_manager.getGridData();
-    vec2* grids = grid_manager.getNeedsHelper() ? GD.helper_grids.data() : GD.atomic_grids.data();
-    const int n_grids = grid_manager.getNeedsHelper() ? GD.helper_grids.size() : GD.atomic_grids.size();
-    const int* points = grid_manager.getNeedsHelper() ? GD.helper_num_points_per_atom.data() : GD.num_points_per_atom.data();
-    const double mp0 = mu_data.pos[0];
-    const double mp1 = mu_data.pos[1];
-    const double mp2 = mu_data.pos[2];
-    const double np0 = nu_data.pos[0];
-    const double np1 = nu_data.pos[1];
-    const double np2 = nu_data.pos[2];
-    const std::vector<primitive> mu_prims = mu_data.prims;
-    const std::vector<primitive> nu_prims = nu_data.prims;
-    if (equal) {
-		mu_vals.resize(n_grids);
-		for (int g = 0; g < n_grids; g++) {
-			const int num_points = points[g];
-			mu_vals[g].resize(num_points);
-			vec2& atom_grid = grids[g];
-			const double* x_ptr = atom_grid[GridData::GridIndex::X].data();
-			const double* y_ptr = atom_grid[GridData::GridIndex::Y].data();
-			const double* z_ptr = atom_grid[GridData::GridIndex::Z].data();
-			double* overlap_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
-#pragma omp parallel for schedule(dynamic, 4)
-			for (int p = 0; p < num_points; p++) {
-				std::array<double, 4> d_mu;
-				double* d_mu_ptr = d_mu.data();
-				*d_mu_ptr = x_ptr[p] - mp0;
-				*(d_mu_ptr + 1) = y_ptr[p] - mp1;
-				*(d_mu_ptr + 2) = z_ptr[p] - mp2;
-				*(d_mu_ptr + 3) = std::hypot(*(d_mu_ptr), *(d_mu_ptr + 1), *(d_mu_ptr + 2));
-				mu_vals[g][p] = wave.eval_ao(d_mu, mu_prims, mu_data.m);
-				overlap_ptr[p] = std::pow(mu_vals[g][p], 2);
-			}
-		}
-    }
-    else {
-		for (int g = 0; g < n_grids; g++) {
-			const int num_points = points[g];
-			vec2& atom_grid = grids[g];
-			const double* x_ptr = atom_grid[GridData::GridIndex::X].data();
-			const double* y_ptr = atom_grid[GridData::GridIndex::Y].data();
-			const double* z_ptr = atom_grid[GridData::GridIndex::Z].data();
-			double* overlap_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
-			#pragma omp parallel for schedule(dynamic, 4)
-			for (int p = 0; p < num_points; p++) {
-				std::array<double, 4> d_mu, d_nu;
-				double* d_mu_ptr = d_mu.data();
-				double* d_nu_ptr = d_nu.data();
-				*d_mu_ptr = x_ptr[p] - mp0;
-				*(d_mu_ptr + 1) = y_ptr[p] - mp1;
-				*(d_mu_ptr + 2) = z_ptr[p] - mp2;
-				*(d_mu_ptr + 3) = std::hypot(*(d_mu_ptr), *(d_mu_ptr + 1), *(d_mu_ptr + 2));
-				*d_nu_ptr = x_ptr[p] - np0;
-				*(d_nu_ptr + 1) = y_ptr[p] - np1;
-				*(d_nu_ptr + 2) = z_ptr[p] - np2;
-				*(d_nu_ptr + 3) = std::hypot(*(d_nu_ptr), *(d_nu_ptr + 1), *(d_nu_ptr + 2));
-                overlap_ptr[p] = (*d_mu_ptr + 3) > 12 || (*d_nu_ptr + 3) > 12 ? 0 : mu_vals[g][p] * wave.eval_ao(d_nu, nu_prims, nu_data.m);
-			}
-		}
-    }
-    vec2 d1, d2, d3, dens;
-    std::vector<_time_point> time_points({ get_time() });
-    _time_point end;
-    grid_manager.getDensityVectors(wave, asym_atom_list, d1, d2, d3, dens);
-    const int points_ = grid_manager.getTotalGridPoints();
-    cvec2 sf;
-    calc_SF(points_, k_pt, d1, d2, d3, dens, sf, std::cout, time_points.front(), end, opt->debug, true, true);
-    return sf;
-}
-
-void XCW::parse_anom_atoms(std::vector<anom_atom>& anom_atoms) {
-    std::ifstream file(opt->anom_disp_path);
-    if (!file) {
-		std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
-    }
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty())
-            continue;
-        std::istringstream iss(line);
-        std::string symbol;
-        double real_part, imag_part;
-        if (iss >> symbol >> real_part >> imag_part) {
-            if (!symbol.empty() && symbol[0] != '_' && symbol != "loop_") {
-                anom_atoms.push_back({symbol, cdouble(real_part, imag_part)});
-            }
-        }
-    }
-}
-
-cvec XCW::eval_anom_disp() {
-    std::vector<anom_atom> anom_atoms;
-    parse_anom_atoms(anom_atoms);
-    cvec corr(nr_small, 0);
-    int r, at, r_asym;
-	for (int at = 0; at < ncen; at++) {
-        const char* symbol = constants::atnr2letter(asym_atoms[at].type[0]);
-		for (const anom_atom& anom_atom : anom_atoms) {
-			if (symbol == anom_atom.identifier) {
-				asym_atoms[at].anom = anom_atom.dispersion;
-				break;
-			}
-		}
-	}
-    std::vector<ivec> asym_lookup(nr_small);
-    for (r = 0; r < nr_small; r++) {
-        asym_lookup[r] = generate_asym_lookup(r);
-    }
-    for (r = 0; r < nr_small; r++) {
-        const ivec& lookup = asym_lookup[r];
-        for (at = 0; at < ncen; at++) {
-            cdouble temp1 = 0;
-            for (r_asym = 0; r_asym < lookup.size(); r_asym++) {
-                temp1 += phase_fact[at][lookup[r_asym]] * DW_fact[at][lookup[r_asym]] * translation_phase[r][r_asym];
-            }
-			corr[r] += temp1 * asym_atoms[at].asym_fact * asym_atoms[at].anom;
-        }
-    }
-    return corr;
-}
-
-void XCW::calc_F_calc(const cvec3& I, const cvec& corr, cvec& F_calc) {
+void XCW::calc_F_calc(const cvec3& I, const cvec& corr, cvec& F_calc, dMatrix2& D) {
     F_calc = cvec(nr_small, 0);
-    dMatrix2 D = wave.get_dm();
     int mu, nu, r;
     for (r = 0; r < nr_small; r++) {
         for (mu = 0; mu < nmo; mu++) {
@@ -638,22 +631,54 @@ void XCW::calc_F_calc(const cvec3& I, const cvec& corr, cvec& F_calc) {
     // closing function
 }
 
-bool set_occ_data_path(const std::filesystem::path& path)
-{
-#ifdef _WIN32
-    return _putenv_s("OCC_DATA_PATH", path.string().c_str()) == 0;
-#else
-    return setenv("OCC_DATA_PATH", path.string().c_str(), 1) == 0;
-#endif
+void XCW::calc_perturb(vec2& perturb, const cvec& F_calc, const double& scale, cvec3& I) {
+    perturb.resize(nmo, vec(nmo, 0));
+    double prefactor = 2 * scale / (nr_small - n_params);
+    int r, mu, nu;
+    for (r = 0; r < nr_small; r++) {
+        double sigma = obs[1][r];
+        double F_calc_abs = std::abs(F_calc[r]);
+        double r_factor = (scale * F_calc_abs - std::abs(obs[0][r])) / (sigma * sigma * F_calc_abs);
+        for (mu = 0; mu < nmo; mu++) {
+            for (nu = mu; nu < nmo; nu++) {
+                perturb[mu][nu] += r_factor * std::real(F_calc[r] * I[mu][nu][r]);
+                perturb[nu][mu] += r_factor * std::real(F_calc[r] * I[mu][nu][r]);
+            }
+        }
+    }
 }
 
-void XCW::do_SCF() {
-    // Use occ to load a molecule from the water.xyz file and create a 6-31G basis set for it, then run Hartree-Fock on it and print the SCF energy
+void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
+    double bohr2angstrom = constants::bohr2ang(1);
+    std::ostringstream init_stream;
 
-    bool x = set_occ_data_path(std::filesystem::current_path());
-	occ::core::Molecule mol = occ::io::molecule_from_xyz_file("water.xyz");
-	occ::qm::AOBasis bs = occ::qm::AOBasis::load(mol.atoms(), "def2-TZVP");
-    occ::qm::HartreeFock hf(bs);
+    init_stream << ncen << "\n\n";
+
+    for (int i = 0; i < ncen; ++i) {
+        init_stream
+            << constants::atnr2letter(asym_atoms[i].type) << " "
+            << asym_atoms[i].pos[0] * bohr2angstrom << " "
+            << asym_atoms[i].pos[1] * bohr2angstrom << " "
+            << asym_atoms[i].pos[2] * bohr2angstrom;
+
+        if (i != ncen - 1)
+            init_stream << "\n";
+    }
+
+    std::string init = init_stream.str();
+    mol = occ::io::molecule_from_xyz_string(init);
+    mol.set_charge(opt->charge);
+    mol.set_multiplicity(opt->mult);
+}
+
+void XCW::setup_basis(occ::qm::AOBasis& bs, occ::core::Molecule& mol, std::string& basis_set_name) {
+    std::shared_ptr<BasisSet> basis_set = BasisSetLibrary().get_basis_set(basis_set_name);
+    bs = basis_set->to_AOBasis(mol.atoms());
+}
+
+void XCW::do_SCF(occ::Mat& D_last) {
+
+    occ::qm::HartreeFock hf(basis_set);
     occ::qm::SCF scf(hf, occ::qm::SpinorbitalKind::Restricted);
 	scf.set_charge_multiplicity(0,1);
 
@@ -668,7 +693,6 @@ void XCW::do_SCF() {
     scf.compute_initial_guess();
     scf.ctx.K = scf.m_procedure.compute_schwarz_ints();
     occ::Mat D_diff = scf.ctx.mo.D;
-    occ::Mat D_last;
     occ::Mat FD_comm = occ::Mat::Zero(scf.ctx.F.rows(), scf.ctx.F.cols());
     occ::Mat F_diis;
     double ehf_last;
@@ -786,9 +810,14 @@ void XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, bool& c
     // closing function
 }
 
-void XCW::calc_F_calc_fast(const cvec& corr) {
-	cvec2 atomic_scattering_factors(ncen, cvec(nr, 0));
-	cvec F_calc(nr_small, 0);
+void XCW::calc_F_calc_fast() {
+    eval_phase();
+    //eval_DW();
+    eval_translation_phase();
+    const cvec corr = eval_anom_disp();
+
+    cvec2 atomic_scattering_factors(ncen, cvec(nr, 0));
+    cvec F_calc(nr_small, 0);
 
     // Calculate atomic scattering factors for each atom and symmetry generated reflexes
     GridConfiguration config;
@@ -816,56 +845,59 @@ void XCW::calc_F_calc_fast(const cvec& corr) {
     const int points = grid_manager.getTotalGridPoints();
     calc_SF(points, k_pt, d1, d2, d3, dens, atomic_scattering_factors, std::cout, time_points.front(), end, opt->debug, true, true);
     // Calculate F_calc
-	//auto it = hkl.begin();
 #pragma omp parallel for
-	for (int r = 0; r < nr_small; r++) {
-		const ivec& lookup = generate_asym_lookup(r);
-		for (int at = 0; at < ncen; at++) {
-			for (int r_asym = 0; r_asym < lookup.size(); r_asym++) {
-				F_calc[r] += atomic_scattering_factors[at][lookup[r_asym]] * DW_fact[at][lookup[r_asym]] * phase_fact[at][lookup[r_asym]] * translation_phase[r][r_asym] * asym_atoms[at].asym_fact;
-			}
-		}
-		// Add anomalous dispersion correction
-  //      const i3& hkl_temp = *it;
-  //      it++;
+    for (int r = 0; r < nr_small; r++) {
+        const ivec& lookup = generate_asym_lookup(r);
+        for (int at = 0; at < ncen; at++) {
+            for (int r_asym = 0; r_asym < lookup.size(); r_asym++) {
+                F_calc[r] += atomic_scattering_factors[at][lookup[r_asym]] * DW_fact[at][lookup[r_asym]] * phase_fact[at][lookup[r_asym]] * translation_phase[r][r_asym] * asym_atoms[at].asym_fact;
+            }
+        }
+        // Add anomalous dispersion correction
         F_calc[r] += corr[r];
-		//std::cout << "F_calc for hkl = " << hkl_temp[0] << ", " << hkl_temp[1] << ", " << hkl_temp[2] << ": " << std::fixed << std::setprecision(5) << std::pow(std::abs(F_calc[r]), 2) << std::endl;
-	}
-	//dump F_calc values as binary file called F_calc
+        //std::cout << std::fixed << std::setprecision(5) << std::pow(std::abs(F_calc[r]), 2) << std::endl;
+    }
+    //dump F_calc values as binary file called F_calc
 
     std::ofstream fout("F_calc.bin", std::ios::out | std::ios::binary);
-	//First byte is the number of bytes per double, the next one is the size of a compelx double, to understand how to read the data.
-	//After that an int64 (8 byte) of the number of F.calc values to be expected after that.
-	//Finally, the dump of all F_calc values as cdouble (A,B)
+    //First byte is the number of bytes per double, the next one is the size of a compelx double, to understand how to read the data.
+    //After that an int64 (8 byte) of the number of F.calc values to be expected after that.
+    //Finally, the dump of all F_calc values as cdouble (A,B)
     char size = sizeof(double);
     fout.write(reinterpret_cast<const char*>(&size), sizeof(size));
-	size = sizeof(cdouble);
+    size = sizeof(cdouble);
     fout.write(reinterpret_cast<const char*>(&size), sizeof(size));
     size_t vec_size = F_calc.size();
-	fout.write(reinterpret_cast<const char*>(&vec_size), sizeof(size_t));
-	fout.write(reinterpret_cast<const char*>(F_calc.data()), vec_size * sizeof(cdouble));
+    fout.write(reinterpret_cast<const char*>(&vec_size), sizeof(size_t));
+    fout.write(reinterpret_cast<const char*>(F_calc.data()), vec_size * sizeof(cdouble));
     fout.close();
 
 }
 
-void XCW::calc_perturb(vec2& perturb, const cvec& F_calc, const double& scale, cvec3& I) {
-    perturb.resize(nmo, vec(nmo, 0));
-    double prefactor = 2 * scale / (nr_small - n_params);
-    int r, mu, nu;
-    for (r = 0; r < nr_small; r++) {
-		double sigma = obs[1][r];
-		double F_calc_abs = std::abs(F_calc[r]);
-        double r_factor = (scale * F_calc_abs - std::abs(obs[0][r])) / (sigma * sigma * F_calc_abs);
-        for (mu = 0; mu < nmo; mu++) {
-            for (nu = mu; nu < nmo; nu++) {
-                perturb[mu][nu] += r_factor * std::real(F_calc[r] * I[mu][nu][r]);
-				perturb[nu][mu] += r_factor * std::real(F_calc[r] * I[mu][nu][r]);
-            }
-        }
-    }
-}
-
-// The main function running the XCW fitting procedure
 void XCW::run_XCW_fitting() {
 
+    setup_SCF_mol(mol);
+    std::string test_name = "def2-svp_basis";
+    setup_basis(basis_set, mol, test_name);
+
+    eval_phase();
+    eval_DW();
+    eval_translation_phase();
+    std::vector<ao_data> ao_data_shells;
+    create_prims(ao_data_shells);
+    cvec3 I;
+    eval_I(I, ao_data_shells);
+    const cvec corr = eval_anom_disp();
+    cvec F_calc;
+    occ::Mat D;
+    do_SCF(D);
+    dMatrix2 dm(D.rows(), D.cols());
+    // Factor 2 because occ does god knows what. I will have to figure this out in detail to be completely sure but for now let's assume that this is somehow correct
+	for (int i = 0; i < D.rows(); i++) {
+		for (int j = 0; j < D.cols(); j++) {
+			dm(i, j) = 2 * D(i, j);
+		}
+	}
+    calc_F_calc(I, corr, F_calc, dm);
+    n_params = nmo * nmo / 2;
 }

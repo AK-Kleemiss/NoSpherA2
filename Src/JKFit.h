@@ -39,6 +39,8 @@ public:
         gen_auto_aux(wavy);
     }
 
+	occ::qm::AOBasis to_AOBasis(const std::vector<occ::core::Atom>& atoms) const;
+
     std::shared_ptr<std::array<std::vector<primitive>, 118>> get_data();
     const std::span<const SimplePrimitive> operator[](const int&element) const ;
     void operator+=(const BasisSet& other);
@@ -94,5 +96,5 @@ private:
     BasisSet auxiliary_basis;
 };
 
-int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b);
+int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b, const bool is_aux = true);
 WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>> &aux_basis);

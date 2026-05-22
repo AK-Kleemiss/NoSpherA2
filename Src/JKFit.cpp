@@ -2,6 +2,62 @@
 #include "JKFit.h"
 #include "libCintMain.h"
 
+occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms) const {
+    err_checkf(_primitiveCount != 0, "No basis data available in BasisSet Object, please load something first!", std::cout);
+    std::vector<occ::gto::Shell> shells;
+    std::vector<occ::gto::Shell> ecp_shells;
+
+    std::vector<int> ecp_electrons(atoms.size(), 0);
+    //int nsh_ecp = 0;
+
+    for (size_t a = 0; a < atoms.size(); ++a) {
+        std::array<double, 3> origin = { atoms[a].x, atoms[a].y, atoms[a].z };
+        const std::size_t Z = atoms[a].atomic_number-1;
+        const std::span<const SimplePrimitive> primitives = this->operator[](Z);
+        int primitive_idx = 0;
+        for (int shell_nr = 0; shell_nr <= primitives.back().shell; shell_nr++) {
+			int l = primitives[primitive_idx].type;
+			std::vector<double> exponents;
+            std::vector<double> coefficients;
+            while (shell_nr == primitives[primitive_idx].shell) {
+				exponents.push_back(primitives[primitive_idx].exp);
+				coefficients.push_back(primitives[primitive_idx].coefficient);
+                primitive_idx++;
+            }
+            occ::gto::Shell shell(l, exponents, { coefficients }, origin);
+			shell.kind = occ::gto::Shell::Kind::Spherical;
+			shell.incorporate_shell_norm();
+			shells.push_back(shell);
+        }
+		// TODO: Handle ECPs if needed, currently not supported
+        //if (element_basis.ecp_electrons > 0) {
+        //    occ::log::debug("Setting ECPs on atom {}", a);
+        //    if (element_basis.ecp_shells.size() < 1) {
+        //        std::string errmsg =
+        //            fmt::format("Element (z={}) in basis '{}' has ECP electrons but "
+        //                "no defined ECP shells",
+        //                Z, json_filepath);
+        //        throw std::runtime_error(errmsg);
+        //    }
+        //    for (const auto& s : element_basis.ecp_shells) {
+        //        // handle general contractions by splitting
+        //        for (int i = 0; i < s.angular_momentum.size(); i++) {
+        //            ecp_shells.push_back(Shell(s.angular_momentum[i], s.exponents,
+        //                { s.coefficients[i] }, origin));
+        //            const auto& n = s.r_exponents;
+        //            auto& shell = ecp_shells[nsh_ecp];
+        //            shell.ecp_r_exponents = Eigen::Map<const IVec>(n.data(), n.size());
+        //            nsh_ecp++;
+        //        }
+        //    }
+        //    ecp_electrons[a] = element_basis.ecp_electrons;
+        //}
+    }
+    occ::qm::AOBasis result(atoms, shells, _name, ecp_shells);
+    //result.set_ecp_electrons(ecp_electrons);
+    return result;
+}
+
 std::shared_ptr<std::array<std::vector<primitive>, 118>> BasisSet::get_data() {
     if (_convertedData[0].size() == 0) {
         for (int i = 0; i < 118; i++) {
@@ -229,7 +285,7 @@ std::vector<double> prune_element_candidates_for_L(
 
     std::sort(pruned.begin(), pruned.end(), std::greater<double>());
     return pruned;
-}
+} 
 
 void BasisSet::gen_auto_aux_for_element(const atom& atm) {
     const int Z = atm.get_charge();
@@ -412,7 +468,7 @@ bool BasisSetLibrary::check_basis_set_exists(std::string basis_name) {
 
 
 
-int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b)
+int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b, const bool is_aux)
 {
     wavy.set_basis_set_ptr((*b).get_data());
     int nr_coefs = 0;
@@ -421,23 +477,26 @@ int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b)
         int current_charge = wavy.get_atom_charge(i) - 1;
         const std::span<const SimplePrimitive> basis = (*b)[current_charge];
         int size = (int)basis.size();
-        for (int e = 0; e < size; e++)
-        {
-            wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);  //We decontract the basis, this makes it easier to handle in the long run.
-            nr_coefs += 2 * basis[e].type + 1; //HIER WEITER MACHEN!!
+        if (is_aux) {
+            for (int e = 0; e < size; e++)
+            {
+                wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);  //We decontract the basis, this makes it easier to handle in the long run.
+                nr_coefs += 2 * basis[e].type + 1; //HIER WEITER MACHEN!!
+            }
         }
-
-        //Different loop to keep the original contraction coefficients
-        //int shell = -1;
-        //for (int e = 0; e < size; e++)
-        //{
-        //    if (basis[e].shell != shell)
-        //    {
-        //        shell = basis[e].shell;
-        //        nr_coefs += 2 * basis[e].type + 1;
-        //    }
-        //    wavy.push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, basis[e].type, basis[e].shell); 
-        //}
+        else {
+            //Different loop to keep the original contraction coefficients
+            int shell = -1;
+            for (int e = 0; e < size; e++)
+            {
+                if (basis[e].shell != shell)
+                {
+                    shell = basis[e].shell;
+                    nr_coefs += 2 * basis[e].type + 1;
+                }
+                wavy.push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, basis[e].type, basis[e].shell);
+            }
+        }
     }
     return nr_coefs;
 }

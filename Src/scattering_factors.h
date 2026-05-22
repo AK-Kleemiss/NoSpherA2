@@ -159,6 +159,17 @@ svec read_atoms_from_CIF(
     const bool SALTED = false,
     const bool debug = false);
 
+
+/**
+ * Reads atoms from a CIF file and performs necessary operations. Works without wavefunction for XCW routine.
+ */
+void read_atoms_from_CIF(std::ifstream& cif_input,
+    const cell& unit_cell,
+    int& ncen,
+    bvec& needs_grid,
+    std::vector<asym_atom>& asym_atoms,
+    const bool debug);
+
 //svec read_anom_disp_from_CIF(std::ifstream& cif_input,
 //    const ivec& input_groups,
 //    const cell& unit_cell,

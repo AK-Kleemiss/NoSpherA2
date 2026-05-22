@@ -3,27 +3,23 @@
 #include "wfn_class.h"
 #include "nos_math.h"
 
-std::vector<cell::asym_atom> cell::get_asym_atoms(WFN &wave, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list) {
-	std::vector<cell::asym_atom> asym_atoms(labels.size());
-	for (int i = 0; i < labels.size(); i++) {
-		std::string label = labels[i];
-		int type = atom_type_list[asym_atom_to_type_list[i]];
-		int idx = asym_atom_list[i];
-		d3 pos = { wave.get_atom(idx).get_coordinate(0), wave.get_atom(idx).get_coordinate(1), wave.get_atom(idx).get_coordinate(2) };
-		d3 frac_pos = { wave.get_atom(idx).get_frac_coordinate(0), wave.get_atom(idx).get_frac_coordinate(1), wave.get_atom(idx).get_frac_coordinate(2) };
-		cell::asym_atom asym_atom;
-		asym_atom.label.push_back(label);
-		asym_atom.type.push_back(type);
-		asym_atom.pos = pos;
-		asym_atom.frac_pos = frac_pos;
-		asym_atom.asym_fact = 0.0;
-		asym_atom.anom = 0;
-		asym_atoms[i] = asym_atom;
-	}
-	return asym_atoms;
-}
+//void cell::get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list) {
+//	for (int i = 0; i < labels.size(); i++) {
+//		int idx = asym_atom_list[i];
+//		d3 pos = { wave.get_atom(idx).get_coordinate(0), wave.get_atom(idx).get_coordinate(1), wave.get_atom(idx).get_coordinate(2) };
+//		d3 frac_pos = { wave.get_atom(idx).get_frac_coordinate(0), wave.get_atom(idx).get_frac_coordinate(1), wave.get_atom(idx).get_frac_coordinate(2) };
+//		asym_atom asym_atom;
+//		asym_atom.label = labels[i];
+//		asym_atom.type = atom_type_list[asym_atom_to_type_list[i]];
+//		asym_atom.pos = pos;
+//		asym_atom.frac_pos = frac_pos;
+//		asym_atom.asym_fact = 0.0;
+//		asym_atom.anom = 0;
+//		asym_atoms[i] = asym_atom;
+//	}
+//}
 
-void cell::eval_symm(std::vector<cell::asym_atom>& asym_atoms) {
+void cell::eval_symm(std::vector<asym_atom>& asym_atoms) {
 	const int ncen = asym_atoms.size();
 	vec pos(3);
 	vec new_pos(3);

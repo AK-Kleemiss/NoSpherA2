@@ -195,6 +195,7 @@ public:
     const double& get_MO_energy(const int& mo) const;
     /** Primitive center index (1-based) for primitive nr. */
     const int& get_center(const int& nr) const { return centers[nr]; };
+    void set_center(const ivec& new_centers) { centers = new_centers; nex = new_centers.size(); };
     /** Primitive type code for primitive nr. */
     const int& get_type(const int& nr) const { return types[nr]; };
     /** MO occupation number. */
@@ -289,6 +290,7 @@ public:
     //void write_wfn_CIF(const std::filesystem::path &filename) const;
     /** Get primitive exponent by index. */
     const double& get_exponent(int nr) const { return exponents[nr]; };
+	void set_exponents(const vec& new_exponents) { exponents = new_exponents; nex = new_exponents.size(); };
     /** Number of electrons (Z total - charge - ECP core electrons). */
     const unsigned int get_nr_electrons() const;
     /** Total number of core electrons represented by ECPs. */

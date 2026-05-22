@@ -119,6 +119,10 @@ std::string write_basis_set(std::ofstream& file, const std::string basis_name, s
     std::replace(basis_name_copy.begin(), basis_name_copy.end(), '(', '_');
     std::replace(basis_name_copy.begin(), basis_name_copy.end(), ')', '_');
     std::replace(basis_name_copy.begin(), basis_name_copy.end(), '+', 'P');
+    basis_name_copy.erase(
+        std::remove(basis_name_copy.begin(), basis_name_copy.end(), ','),
+        basis_name_copy.end()
+    );
 
     //If basis_name_copy starts with numeric character, add a prefix
     if (std::isdigit(basis_name_copy[0])) {

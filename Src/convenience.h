@@ -1,11 +1,14 @@
 ﻿#pragma once
 #include "pch.h"
 
+
+
 // Pre-definition of classes included later
 class WFN;
 class cell;
 class atom;
 class BasisSet;
+struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
 
 inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
@@ -758,8 +761,6 @@ struct options
         look_for_debug(argc, argv);
     };
 };
-
-int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b);
 
 void convert_tonto_XCW_lambda_steps(const std::string &str, const std::string &lambda_step, bool debug, options &opt);
 

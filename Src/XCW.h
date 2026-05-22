@@ -4,57 +4,26 @@
 #include "integration_params.h"
 #include "scattering_factors.h"
 #include "cell.h"
+#include "JKFit.h"
 #include <occ/qm/hf.h>
 
 class XCW {
 public:
+	// Constructor
 	XCW(const options& opt_in)
 	{
-		opt = &opt_in;
-		wave.read_known_wavefunction_format(opt_in.wfn, std::cout, opt_in.debug);
-		wave.set_method(opt_in.method);
-		wave.set_charge(opt_in.charge);
-		wave.set_multi(opt_in.mult);
-		params = Int_Params(wave);
-		std::filesystem::path hkl_filename = opt_in.hkl;
-		std::filesystem::path cif = opt_in.cif;
-		std::ifstream cif_input(cif.c_str(), std::ios::in);
-		unit_cell = cell(cif, std::cout, opt_in.debug, opt_in.do_XCW);
-		obs.resize(2);
-		hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt_in.twin_law, unit_cell, std::cout, obs, opt_in.debug);
-		nmo = wave.get_nmo();
-		svec empty({});
-		ivec atom_type_list;
-		ivec asym_atom_to_type_list;
-		bvec constant_atoms;
-		needs_grid = bvec(wave.get_ncen(), false);
-		std::ofstream log3("log3.txt", std::ios::out);
-		labels = read_atoms_from_CIF(cif_input, opt_in.groups[0], unit_cell, wave, empty, atom_type_list, asym_atom_to_type_list, asym_atom_list, needs_grid, std::cout, constant_atoms, opt_in.SALTED, opt_in.debug);
-		U_iso = read_U_iso_from_CIF(cif, wave, unit_cell, log3, opt_in.debug);
-		asym_atoms = unit_cell.get_asym_atoms(wave, labels, atom_type_list, asym_atom_to_type_list, asym_atom_list);
-		ncen = asym_atoms.size();
-		nr = hkl_enlarged.size();
-		nr_small = hkl.size();
-		make_k_pts(nr != 0 && hkl.size() == 0, opt_in.save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt_in.debug);
-		//Read U_iso, U_ij, C_ijk and Dijkl from CIF file
-		read_fracs_ADPs_from_CIF(cif, wave, unit_cell, log3, opt_in.debug);
-		unit_cell.eval_symm(asym_atoms);
-		n_params = nmo * nmo / 2;
-		DW_fact.resize(ncen, vec(nr, 1.0));
-
+		construct(opt_in);
 	};
-	void eval_DW();
-	void eval_phase();
-	void eval_translation_phase();
-	cvec3 eval_I();
-	cvec eval_anom_disp();
-	void calc_F_calc(const cvec3& I, const cvec& corr, cvec& F_calc);
-	void calc_perturb(vec2& perturb, const cvec& F_calc, const double& scale, cvec3& I);
-	void do_SCF();
-	void calc_F_calc_fast(const cvec& corr);
+
+
+	// Calculates F_calc without DW factors (=1)
+	void calc_F_calc_fast();
+	// Does the XCW fitting routine
 	void run_XCW_fitting();
 
 private:
+
+	// Structures
 	struct ao_data {
 		std::vector<primitive> prims;
 		d3 pos;
@@ -64,36 +33,88 @@ private:
 		std::string identifier;
 		cdouble dispersion;
 	};
-	void set_phase(cvec2& phase_in) { phase_fact = phase_in; }
-	void set_DW(vec2& DW_in) { DW_fact = DW_in; }
-	void set_translation_phase(cvec2& phase_in) { translation_phase = phase_in; }
-	void U_frac2U_rec();
-	void U_rec2U_cart();
-	ivec generate_asym_lookup(const int r);
-	cvec2 eval_integrals(const ao_data& mu, const ao_data& nu, GridManager& grid_manager, const vec2& k_pt);
-	cvec2 calculateXCWintegral(GridManager& grid_manager, const ao_data& mu_data, const ao_data& nu_data, const ivec& asym_atom_list, vec2& k_pt, bool& equal, vec2& mu_vals);
+
+
+	// Constructor of the XCW class
+	void construct(const options& opt_in);
+
+
+	// Methods for evaluating essential crystallographic matrices and tensors
+	// Evaluates Debye-Waller factors (currently working up to U_anis = 2)
+	void eval_DW();
+	// Evaluates the rotational contribution to the phase factors
+	void eval_phase();
+	// Evaluates the translational contribution to the phase factors
+	void eval_translation_phase();
+	// Parses the anomalous dispersion information from a CIF style .txt file
 	void parse_anom_atoms(std::vector<anom_atom>& anom_atoms);
+	// Calculates direct corrections of the anomalous dispersion onto F_calc
+	cvec eval_anom_disp();
+
+
+	// Methods for evaluating elements used for building the XCW perturbation potential
+	// Creates primitive vectors from the basis set for calculating the XCW integrals
+	void create_prims(std::vector<ao_data>& ao_data_shells);
+	// Calculates the Hirshfeld weighted overlap integrals with phase factor
+	cvec2 calculateXCWintegral(GridManager& grid_manager, const ao_data& mu_data, const ao_data& nu_data, const ivec& asym_atom_list, vec2& k_pt, bool& equal, vec2& mu_vals);
+	// Evaluates the I tensor (using DW factors & phase factors)
+	void eval_I(cvec3& I, std::vector<ao_data>& ao_data_shells);
+	// Calculates F_calc using the I tensor and adds anomalous dispersion corrections
+	void calc_F_calc(const cvec3& I, const cvec& corr, cvec& F_calc, dMatrix2& D);
+	// Calculates the perturbation matrix elements
+	void calc_perturb(vec2& perturb, const cvec& F_calc, const double& scale, cvec3& I);
+
+
+	// Methods for performing the SCF procedure
+	// Sets up a molecule object from the asym_atoms
+	void setup_SCF_mol(occ::core::Molecule& mol);
+	// Sets up the basis set with a previously generated molecule and basis set from JKFit, where the Olex2 basis sets are now located
+	void setup_basis(occ::qm::AOBasis& bs, occ::core::Molecule& mol, std::string& basis_set_name);
+	// Executes a single SCF solver
+	void do_SCF(occ::Mat& D_last);
+	// Executes a single SCF iteration
 	void SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, double& ehf_last, occ::Mat& D_last, occ::Mat& D_diff, bool& incremental, occ::Mat& F_diis);
+	// Checks convergence for SCF cylce
 	void SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, bool& converged, const double& energy_conv, const double& commutator_conv, const double& ehf_last);
-	const options* opt;
-	WFN wave;
-	Int_Params params;
-	cell unit_cell;
-	hkl_list hkl;
-	hkl_list hkl_enlarged;
-	vec2 obs;
-	vec2 k_pt;
-	cvec2 phase_fact;
-	cvec2 translation_phase;
-	bvec needs_grid;
-	vec U_iso;
-	ivec asym_atom_list;
-	std::vector<cell::asym_atom> asym_atoms;
+
+
+	// Methods for computing temporary variables, matrices and useful lists
+	// Sets the rotational contribution to the phase factors
+	void set_phase(cvec2& phase_in) { phase_fact = phase_in; }
+	// Sets the Debye-Waller factors
+	void set_DW(vec2& DW_in) { DW_fact = DW_in; }
+	// Sets the translational contribution to the phase factors
+	void set_translation_phase(cvec2& phase_in) { translation_phase = phase_in; }
+	// Converts a matrix from fractional to reciprocal coordinates
+	void U_frac2U_rec();
+	// Converts a matrix from reciprocal to cartesian coordinates
+	void U_rec2U_cart();
+	// Generates a list that links the symmetry operations to symmetry-generated reflexes for given reflex r
+	ivec generate_asym_lookup(const int r);
+	
+	
+	// Available lists and variables that are often used
 	int nmo;
 	int ncen;
 	int nr;
 	int nr_small;
 	int n_params;
+	ivec asym_atom_list;
+	vec U_iso;
 	svec labels;
+	bvec needs_grid;
+	vec2 obs;
+	vec2 k_pt;
 	vec2 DW_fact;
+	cvec2 phase_fact;
+	cvec2 translation_phase;
+	std::vector<asym_atom> asym_atoms;
+	hkl_list hkl;
+	hkl_list hkl_enlarged;
+	const options* opt;
+	WFN wave;
+	Int_Params params;
+	cell unit_cell;
+	occ::core::Molecule mol;
+	occ::qm::AOBasis basis_set;
 };
