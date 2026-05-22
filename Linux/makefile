@@ -66,8 +66,8 @@ MKL_LINK_FLAGS = $(MKL_STATIC_LIBS) $(IOMP_LIB) -lpthread -lm -ldl
 # ---- Objects ----
 # Sources - automatically discover all .cpp files in SRC_DIR
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
-ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_basis.cpp)
-  SRCS += $(SRC_DIR)/auxiliary_basis.cpp
+ifneq ($(filter $(SRC_DIR)/basis_data.cpp,$(SRCS)), $(SRC_DIR)/basis_data.cpp)
+  SRCS += $(SRC_DIR)/basis_data.cpp
 endif
 
 #remove mat_nos_math.cpp and vec_nos_math.cpp from SRCS
@@ -88,10 +88,10 @@ all: NoSpherA2
 BASIS_SET_CSVS := $(wildcard $(SRC_DIR)/basis_set_helper/basis_sets/*.csv)
 
 # Actually run the converter to generate the file
-$(SRC_DIR)/auxiliary_basis.cpp: ../BasisSetConverter $(BASIS_SET_CSVS)
+$(SRC_DIR)/basis_data.cpp: ../BasisSetConverter $(BASIS_SET_CSVS)
 	@echo "Running BasisSetConverter..."
 	@./../BasisSetConverter ../Src/basis_set_helper ../Src
-	@echo "auxiliary_basis.cpp generated"
+	@echo "basis_data.cpp generated"
 
 # Flags without -include pch.h for compiling the PCH itself
 GCC_OPTS_NO_PCH       := $(filter-out -include pch.h,$(GCC_OPTS))
