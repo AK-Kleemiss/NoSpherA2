@@ -148,7 +148,7 @@ runs:
         #Build BasisSetConverter
         $converterExe = Join-Path $env:GITHUB_WORKSPACE "Lib/BasisSetConverter.exe"
         if (Test-Path $converterExe) {
-          Info "BasisSetConverter already built ($converterExe)"
+          Write-Host "BasisSetConverter already built ($converterExe)"
         } else {
           $src = Join-Path $env:GITHUB_WORKSPACE "BasisSetGenerator"
           $bld = Join-Path $src "build"
@@ -164,7 +164,7 @@ runs:
           }
 
           if (-not (Test-Path $converterExe)) { Fail "BasisSetConverter build finished but executable not found: $converterExe" }
-          Info "BasisSetConverter OK"
+          Write-Host "BasisSetConverter OK"
         }
 
     - name: Prepare library archive layout (Unix)
