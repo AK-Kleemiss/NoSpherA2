@@ -369,7 +369,7 @@ if (Test-Path $converterExe) {
   try {
     cmake -S . -B build
     cmake --build build --config Release
-    cmake --install build --config Release --prefix ".."
+    cmake --install build --config Release --prefix "../Lib"
   } finally {
     Pop-Location
   }
