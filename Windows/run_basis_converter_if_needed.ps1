@@ -103,7 +103,7 @@ if (-not (Test-Path $ConverterExe)) {
     $ConverterExe = $resolvedConverter
 }
 
-Write-Host "Generating auxiliary_basis.cpp via BasisSetConverter..."
+Write-Host "Generating basis_data.cpp via BasisSetConverter..."
 Write-Host "Using BasisSetConverter executable: $ConverterExe"
 
 $normalizedSolutionDir = [System.IO.Path]::GetFullPath($SolutionDir)

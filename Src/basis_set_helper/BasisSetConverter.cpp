@@ -131,8 +131,8 @@ int main(int argc, char** argv)
 
 
     //Write the basis sets to a file
-    std::ofstream aux_file(src_path / "auxiliary_basis.cpp");
-    aux_file << "#include \"JKFit.h\" \n";
+    std::ofstream aux_file(src_path / "basis_data.cpp");
+    aux_file << "#include \"basis_set.h\" \n";
     std::vector<std::string> basis_names_internal;
     aux_file << "namespace {\n";
 
@@ -152,12 +152,12 @@ int main(int argc, char** argv)
     }
 
     aux_file << "}\n";
-    aux_file << "constexpr BasisSetMetadata aux_basis_sets[] = {\n";
+    aux_file << "constexpr BasisSetMetadata basis_sets[] = {\n";
     for (const std::string& name : basis_names_internal) {
         aux_file << "\t" << name << "_metadata,\n";
     }
     aux_file << "};\n";
-    aux_file << "constexpr std::size_t aux_basis_set_count = std::size(aux_basis_sets);\n";
+    aux_file << "constexpr std::size_t basis_set_count = std::size(basis_sets);\n";
 
     aux_file.close();
     log_file.close();
