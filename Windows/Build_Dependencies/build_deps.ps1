@@ -345,18 +345,12 @@ if (Test-Path $OccOut) {
     cmake --workflow --preset windows-clang-cl
     cmake --install .\build-windows-clang-cl
     $tbbLib = Get-ChildItem `
-      -Path $RepoRoot `
+      -Path (Join-Path $RepoRoot "build-windows-clang-cl") `
       -Recurse `
       -Filter "tbb12.lib" `
       -ErrorAction SilentlyContinue |
       Select-Object -First 1 -ExpandProperty FullName
     Copy-Item $tbbLib -Destination (Join-Path $LibDir "occ\lib\tbb12.lib") -Force
-    #Print if the copy did happen
-    if (Test-Path (Join-Path $LibDir "occ\lib\tbb12.lib")) {
-      Info "Copied TBB from OCC build: $tbbLib"
-    } else {
-      Fail "Failed to copy TBB from OCC build: $tbbLib"
-    }
   } finally {
     Pop-Location
   }
