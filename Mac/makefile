@@ -108,24 +108,10 @@ NoSpherA2_x86_64: $(OBJS_x86_64)
 	@$(COMP) $^ $(EXTRA_LIBS_x86) $(LDFLAGS_x86_64) -o $@
 
 # Actually run the converter to generate the file
-# $(SRC_DIR)/basis_data.cpp:
-# 	@echo "Running BasisSetConverter..."
-# 	@./../Lib//BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
-# 	@echo "basis_data.cpp generated"
-
 $(SRC_DIR)/basis_data.cpp:
 	@echo "Running BasisSetConverter..."
-	@echo "PWD=$$(pwd)"
 	@file ../Lib/BasisSetConverter
-	@lipo -info ../Lib/BasisSetConverter || true
-	@echo "basis_sets file count:"
-	@find ../BasisSetGenerator/basis_sets -type f | wc -l
-	@echo "First basis files:"
-	@find ../BasisSetGenerator/basis_sets -type f | sort | head -20
-	@echo "Src writable?"
-	@test -w ../Src && echo yes || echo no
 	@../Lib/BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
-	@test -s ../Src/basis_data.cpp
 	@echo "basis_data.cpp generated"
 
 # ---- Precompiled header build rules ----
