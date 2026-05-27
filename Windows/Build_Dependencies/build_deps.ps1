@@ -344,6 +344,13 @@ if (Test-Path $OccOut) {
   try {
     cmake --workflow --preset windows-clang-cl
     cmake --install .\build-windows-clang-cl
+    $tbbLib = Get-ChildItem `
+      -Path (Join-Path $RepoRoot "build-windows-clang-cl") `
+      -Recurse `
+      -Filter "tbb12.lib" `
+      -ErrorAction SilentlyContinue |
+      Select-Object -First 1 -ExpandProperty FullName
+    Copy-Item $tbbLib -Destination (Join-Path $LibDir "occ\lib\tbb12.lib") -Force
   } finally {
     Pop-Location
   }
