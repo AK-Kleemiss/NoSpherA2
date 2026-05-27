@@ -144,7 +144,7 @@ runs:
               -Filter "tbb12.lib" `
               -ErrorAction SilentlyContinue |
               Select-Object -First 1 -ExpandProperty FullName
-            Copy-Item $tbbLib -Destination (Join-Path $LibDir "occ\lib\tbb12.lib") -Force
+            Copy-Item $tbbLib -Destination (Join-Path $env:GITHUB_WORKSPACE "Lib\occ\lib\tbb12.lib") -Force
           } finally {
             Pop-Location
           }
