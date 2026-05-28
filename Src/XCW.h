@@ -39,7 +39,7 @@ private:
 	void construct(const options& opt_in);
 
 
-	// Methods for evaluating essential crystallographic matrices and tensors
+	// Methods for evaluating essential crystallographic measures
 	// Evaluates Debye-Waller factors (currently working up to U_anis = 2)
 	void eval_DW();
 	// Evaluates the rotational contribution to the phase factors
@@ -49,7 +49,11 @@ private:
 	// Parses the anomalous dispersion information from a CIF style .txt file
 	void parse_anom_atoms(std::vector<anom_atom>& anom_atoms);
 	// Calculates direct corrections of the anomalous dispersion onto F_calc
-	cvec eval_anom_disp();
+	void eval_anom_disp();
+	// Evaluates the scaling factor for |F_calc| by least squares fitting
+	void eval_scale();
+	// Calculates the chi^2 quality criterion
+	double calc_chi2();
 
 
 	// Methods for evaluating elements used for building the XCW perturbation potential
@@ -57,12 +61,16 @@ private:
 	void create_prims(std::vector<ao_data>& ao_data_shells);
 	// Calculates the Hirshfeld weighted overlap integrals with phase factor
 	cvec2 calculateXCWintegral(GridManager& grid_manager, const ao_data& mu_data, const ao_data& nu_data, const ivec& asym_atom_list, vec2& k_pt, bool& equal, vec2& mu_vals);
+	// Helper function for flattening the I tensor
+	size_t tri_index(int mu, int nu) const noexcept;
+	// Helper function for flattening the I tensor
+	size_t flattened_idx(int r, int mu, int nu) const noexcept;
 	// Evaluates the I tensor (using DW factors & phase factors)
-	void eval_I(cvec3& I, std::vector<ao_data>& ao_data_shells);
+	void eval_I(std::vector<ao_data>& ao_data_shells);
 	// Calculates F_calc using the I tensor and adds anomalous dispersion corrections
-	void calc_F_calc(const cvec3& I, const cvec& corr, cvec& F_calc, dMatrix2& D);
+	void calc_F_calc(const dMatrixRef2& D);
 	// Calculates the perturbation matrix elements
-	void calc_perturb(vec2& perturb, const cvec& F_calc, const double& scale, cvec3& I);
+	void calc_perturb(occ::Mat& perturb);
 
 
 	// Methods for performing the SCF procedure
@@ -71,9 +79,9 @@ private:
 	// Sets up the basis set with a previously generated molecule and basis set from JKFit, where the Olex2 basis sets are now located
 	void setup_basis(occ::qm::AOBasis& bs, occ::core::Molecule& mol, std::string& basis_set_name);
 	// Executes a single SCF solver
-	void do_SCF(occ::Mat& D_last);
+	void do_SCF(const double& lambda, double& alpha);
 	// Executes a single SCF iteration
-	void SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, double& ehf_last, occ::Mat& D_last, occ::Mat& D_diff, bool& incremental, occ::Mat& F_diis);
+	void SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, double& ehf_last, occ::Mat& D_last, occ::Mat& D_diff, bool& incremental, occ::Mat& F_diis, const double& lambda);
 	// Checks convergence for SCF cylce
 	void SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, bool& converged, const double& energy_conv, const double& commutator_conv, const double& ehf_last);
 
@@ -99,6 +107,7 @@ private:
 	int nr;
 	int nr_small;
 	int n_params;
+	double scale;
 	ivec asym_atom_list;
 	vec U_iso;
 	svec labels;
@@ -106,8 +115,11 @@ private:
 	vec2 obs;
 	vec2 k_pt;
 	vec2 DW_fact;
+	cvec anom_corr;
+	cvec F_calc;
 	cvec2 phase_fact;
 	cvec2 translation_phase;
+	cvec I;
 	std::vector<asym_atom> asym_atoms;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
