@@ -81,9 +81,6 @@
     <ClCompile Include="..\Src\atoms.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\JKFit.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\SALTED_io.cpp">
       <Filter>Quelldateien\SALTED</Filter>
     </ClCompile>
@@ -120,9 +117,6 @@
     <ClCompile Include="..\Src\pch.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\auxiliary_basis.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\qct.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -144,10 +138,7 @@
     <ClCompile Include="..\Src\libCintKernels.cpp">
       <Filter>Quelldateien\libCint</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\XCW.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\cell.cpp">
+    <ClCompile Include="..\Src\basis_data.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
@@ -207,9 +198,6 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="../Src/def2-ECPs_GA.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\JKFit.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\metatensor.h">

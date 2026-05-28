@@ -5,7 +5,7 @@
 #include "convenience.h"
 #include "npy.h"
 #include "properties.h"
-#include "JKFit.h"
+#include "basis_set.h"
 #include "SALTED_utilities.h"
 #include "sphere_lebedev_rule.h"
 #include "integrator.h"
@@ -784,21 +784,10 @@ void Calc_MO_spherical_harmonics(
     }
 };
 
-void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
+void cube_from_coef_npy(vec& coefs, WFN& wave)
 {
-    std::vector<unsigned long> shape{};
-    bool fortran_order;
-    vec data{};
-
-    npy::LoadArrayFromNumpy(coef_fn, shape, fortran_order, data);
-    WFN dummy(xyzfile);
-
-    // const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
-    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set("cc-pvqz-jkfit");
-    const int nr_coefs = load_basis_into_WFN(dummy, aux_basis);
-    std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
-    cube res = calc_cube_ML(data, dummy);
-    res.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_PySCF_COEFS_rho.cube");
+    cube res = calc_cube_ML(coefs, wave);
+    res.set_path((wave.get_path().parent_path() / wave.get_path().stem()).string() + "_PySCF_COEFS_rho.cube");
     res.write_file(true);
     // for (int i = 0; i < dummy.get_ncen(); i++)
     //     calc_cube_ML(data, dummy, i);
@@ -1145,7 +1134,7 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 {
     using namespace std;
     //std::shared_ptr<BasisSet> aux_basis_set = std::make_shared<BasisSet>(wavy);
-    std::vector<std::shared_ptr<BasisSet>> aux_basis_set{ BasisSetLibrary().get_basis_set("def2-universal-jkfit") };
+    std::vector<std::shared_ptr<BasisSet>> aux_basis_set{ BasisSetLibrary::get_basis_set("def2-universal-jkfit") };
 
     WFN wavy_aux = generate_aux_wfn(wavy, aux_basis_set);
 
@@ -1787,7 +1776,7 @@ static void profiling_ri_fit(const std::filesystem::path &dir)
     opt.dmin = 0.4;
     opt.RI_FIT = true;
     opt.partition_type = PartitionType::RI;
-    opt.aux_basis.push_back(BasisSetLibrary().get_basis_set("combo_basis_fit"));
+    opt.aux_basis.push_back(BasisSetLibrary::get_basis_set("combo_basis_fit"));
     std::vector<WFN> wavy;
     wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
     wavy[0].set_multi(opt.mult);
@@ -1872,7 +1861,7 @@ static void profiling_SALTED(const std::filesystem::path &dir)
     svec empty;
     SALTEDPredictor *pred = new SALTEDPredictor(wavy[0], opt);
     std::string df_basis_name = pred->get_dfbasis_name();
-    std::shared_ptr<BasisSet> aux_basis_salted = BasisSetLibrary().get_basis_set(df_basis_name);
+    std::shared_ptr<BasisSet> aux_basis_salted = BasisSetLibrary::get_basis_set(df_basis_name);
     load_basis_into_WFN(pred->wavy, aux_basis_salted);
     auto res = calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
         opt, *pred, std::cout, empty, 0);

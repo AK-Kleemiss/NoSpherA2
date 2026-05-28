@@ -103,7 +103,16 @@ else
 endif
 endif
 
-
+BasisSetConverter: 
+	@if [ ! -f Lib/BasisSetConverter ]; then \
+		echo 'Building BasisSetConverter, since Lib/BasisSetConverter doesnt exist'; \
+		cd BasisSetGenerator && mkdir -p build \
+		&& cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH)\
+    	&& cmake --build build --config Release \
+    	&& cmake --install build --config Release --prefix "../Lib"; \
+	else \
+		echo 'Skipping BasisSetConverter build, found Lib/BasisSetConverter'; \
+	fi
 
 ifeq ($(NAME),MAC)
 LibCint:
@@ -139,6 +148,12 @@ occ_x86_64: LibCint_x86_64
 
 occ_arm64: LibCint_arm64
 	@$(MAKE) NATIVE_ARCH=arm64 occ
+
+BasisSetConverter_x86_64:
+	@$(MAKE) NATIVE_ARCH=x86_64 BasisSetConverter
+
+BasisSetConverter_arm64:
+	@$(MAKE) NATIVE_ARCH=arm64 BasisSetConverter
 endif
 
 
@@ -172,6 +187,7 @@ occ: LibCint
 	fi
 endif
 
+
 ifeq ($(NAME),WINDOWS)
 WIN_SLN  ?= Windows/NoSpherA2.sln
 WIN_CFG  ?= Release
@@ -190,12 +206,12 @@ clean:
 endif
 
 ifeq ($(NAME),LINUX)
-NoSpherA2: IntelMKL featomic LibCint occ
+NoSpherA2: IntelMKL featomic LibCint occ BasisSetConverter
 	@echo Start making Linux executable
 	@rm -f NoSpherA2
 	@cd Linux && rm -f NoSpherA2 && make all -j
 
-NoSpherA2_Debug: IntelMKL featomic LibCint occ
+NoSpherA2_Debug: IntelMKL featomic LibCint occ BasisSetConverter
 	@echo Building NoSpherA2_Debug for $(NAME)
 	@rm -f NoSpherA2_Debug
 	@cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
@@ -205,22 +221,22 @@ clean:
 endif
 
 ifeq ($(NAME),MAC)
-NoSpherA2: IntelMKL featomic LibCint occ
+NoSpherA2: IntelMKL featomic LibCint occ BasisSetConverter
 	@echo Start making Mac $(NATIVE_ARCH) executable
 	@rm -f NoSpherA2_$(NATIVE_ARCH)
 	@cd Mac && rm -f NoSpherA2_$(NATIVE_ARCH) && make NoSpherA2_$(NATIVE_ARCH) -j && cp NoSpherA2_$(NATIVE_ARCH) ../NoSpherA2
 
-NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint_arm64 occ_arm64
+NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint_arm64 occ_arm64 BasisSetConverter_arm64
 	@echo Start making Mac arm64 executable
 	@rm -f NoSpherA2_arm64
 	@cd Mac && rm -f NoSpherA2_arm64 && make NoSpherA2_arm64 -j && cp NoSpherA2_arm64 ../NoSpherA2
 
-NoSpherA2_x86_64: IntelMKL featomic_x86_64 LibCint_x86_64 occ_x86_64
+NoSpherA2_x86_64: IntelMKL featomic_x86_64 LibCint_x86_64 occ_x86_64 BasisSetConverter_x86_64
 	@echo Start making Mac x86_64 executable
 	@rm -f NoSpherA2_x86_64
 	@cd Mac && rm -f NoSpherA2_x86_64 && make NoSpherA2_x86_64 -j && cp NoSpherA2_x86_64 ../NoSpherA2_x86_64
 
-NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint_arm64 LibCint_x86_64 LibCint_x86_64 occ_x86_64 occ_arm64
+NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint_arm64 LibCint_x86_64 LibCint_x86_64 occ_x86_64 occ_arm64 BasisSetConverter_arm64 BasisSetConverter_x86_64
 	@echo Start making Mac universal executable
 	@rm -f NoSpherA2
 	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j

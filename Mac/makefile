@@ -25,8 +25,8 @@ EXTRA_LIBS_x86 := ../Lib/featomic_install_x86_64/lib/libfeatomic.a \
 
 # Sources - automatically discover all .cpp files in SRC_DIR
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
-ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_basis.cpp)
-  SRCS += $(SRC_DIR)/auxiliary_basis.cpp
+ifneq ($(filter $(SRC_DIR)/basis_data.cpp,$(SRCS)), $(SRC_DIR)/basis_data.cpp)
+  SRCS += $(SRC_DIR)/basis_data.cpp
 endif
 
 #remove mat_nos_math.cpp and vec_nos_math.cpp from SRCS
@@ -107,6 +107,13 @@ NoSpherA2_x86_64: $(OBJS_x86_64)
 	@echo "Link (x86_64)…"
 	@$(COMP) $^ $(EXTRA_LIBS_x86) $(LDFLAGS_x86_64) -o $@
 
+# Actually run the converter to generate the file
+$(SRC_DIR)/basis_data.cpp:
+	@echo "Running BasisSetConverter..."
+	@file ../Lib/BasisSetConverter
+	@../Lib/BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
+	@echo "basis_data.cpp generated"
+
 # ---- Precompiled header build rules ----
 $(PCH_arm64): $(SRC_DIR)/pch.h | build/arm64
 	@echo "Building precompiled header (arm64)..."
@@ -115,29 +122,6 @@ $(PCH_arm64): $(SRC_DIR)/pch.h | build/arm64
 $(PCH_x86_64): $(SRC_DIR)/pch.h | build/x86_64
 	@echo "Building precompiled header (x86_64)..."
 	@$(COMP) $(CXXFLAGS_x86_64_NO_PCH) -x c++-header -o "$@" "$<"
-
-# Architecture-specific basis set converter
-build/BasisSetConverter: makefile_basis_set_converter | build/arm64 build/x86_64
-	@echo "Building basis set converter for current architecture: $(shell uname -m)"
-	@$(MAKE) -f makefile_basis_set_converter $(shell uname -m)
-	@touch build/BasisSetConverter
-
-BASIS_SET_CSVS := $(wildcard $(SRC_DIR)/basis_set_helper/basis_sets/*.csv)
-
-# Actually run the converter to generate the file
-$(SRC_DIR)/auxiliary_basis.cpp: build/BasisSetConverter $(BASIS_SET_CSVS)
-	@echo "Running BasisSetConverter..."
-	@./../BasisSetConverter ../Src/basis_set_helper ../Src
-	@echo "auxiliary_basis.cpp generated"
-
-build/arm64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/arm64
-	@echo "Compiling auxiliary_basis.o (arm64)"
-	@$(COMP) $(CXXFLAGS_arm64_NO_PCH) -O0 -c $< -o $@
-
-build/x86_64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/x86_64
-	@echo "Compiling auxiliary_basis.o (x86_64)"
-	@$(COMP) $(CXXFLAGS_x86_64_NO_PCH) -O0 -c $< -o $@
-
 
 # Pattern rules
 build/arm64/%.o: $(SRC_DIR)/%.cpp $(PCH_arm64) | build/arm64
@@ -156,8 +140,7 @@ debug: OPTFLAGS := -O0 -g
 debug: clean NoSpherA2_arm64
 
 clean:
-	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2 BasisSetConverter
-	-@$(MAKE) -f makefile_basis_set_converter clean
+	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2
 	@echo "Cleaned."
 
 .PHONY: all clean debug NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64

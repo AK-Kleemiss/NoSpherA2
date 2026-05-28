@@ -393,10 +393,14 @@ void GridManager::getIntegrationGrid1D(const WFN &wave, const int atom_1, const 
     }
 }
 
+
 void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
     std::cout << "GridManager: Setting up prototype grids for atom types..." << std::endl;
     prototype_grids_.clear();
     prototype_grids_.reserve(atom_types.size());
+
+    if (config_.debug) std::cout << "Prototype Grid Properties:\n" << "Atom Type | N_Gridpoints | max_l |  alpha_max  | Accuracy | alpha_min (s, p, d, f) \n"
+        << "-------------------------------------------------------------------------------------------\n";
 
     for (const int atom_type : atom_types) {
         // Calculate basis set parameters for this atom type
@@ -436,16 +440,7 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
         }
 
 
-        //int max_l_temp = max_l - 1;
-        int max_l_temp = max_l;
-        if (config_.debug) {
-            std::cout << "Atom Type: " << atom_type << std::endl;
-            std::cout << "max_l: " << max_l_temp << " alpha_max: " << std::scientific << alpha_max << " alpha_min: ";
-            for (int l = 0; l <= max_l_temp; l++) {
-                std::cout << std::setw(14) << std::scientific << alpha_min[l];
-            }
-            std::cout << " accuracy: " << config_.accuracy << std::endl;
-        }
+        int max_l_temp = max_l - 1;
 
         err_checkf(config_.accuracy >= 0, "Negative accuracy is not defined!", std::cout);
         // Get Lebedev grid parameters using the constexpr function
@@ -463,9 +458,16 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
             std::cout
         );
         if (config_.debug) {
-            std::cout << "Created prototype grid for atom type " << atom_type
-                << " with " << prototype_grids_.back().get_num_grid_points()
-                << " points." << std::endl;
+            std::cout << std::setw(9) << atom_type << " | "
+                << std::setw(12) << prototype_grids_.back().get_num_grid_points() << " | "
+                << std::setw(5) << max_l_temp << " | "
+                << std::setw(11) << alpha_max << " | "
+                << std::setw(8) << config_.accuracy << " | ";
+            std::cout << std::left;
+            for (int l = 0; l <= max_l_temp; l++) {
+                std::cout << std::setw(14) << alpha_min[l];
+            }
+            std::cout << std::right << std::endl;
         }
     }
 }

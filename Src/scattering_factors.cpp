@@ -13,7 +13,7 @@
 #include "AtomGrid.h"
 #include "npy.h"
 #include "integrator.h"
-#include "JKFit.h"
+#include "basis_set.h"
 #include "SALTED_utilities.h"
 #include "GridManager.h"
 
@@ -1668,7 +1668,7 @@ void calc_SF_SALTED(const vec2& k_pt,
 		atom_offsets.begin() + 1);
 
 
-	ivec coef_offsets(num_asym_atoms + 1, 0);
+    ivec coef_offsets(num_asym_atoms, 0);
 
 	for (int ia = 0; ia < num_asym_atoms; ++ia) {
 		coef_offsets[ia] = atom_offsets[asym_atom_list[ia]];
@@ -2319,39 +2319,13 @@ tsc_block_type calculate_scattering_factors(
 		err_checkf(labels.size() == asym_atom_list.size() && labels.size() == constant_atoms.size(),
 			"Inconsistent SALTED atom bookkeeping after CIF read!", file);
 
-		// Remove all atoms that are not part of the current asymmetric unit and remap
-		// the original atom indices to the pruned SALTED wavefunction.
-		ivec original_to_local(needs_grid.size(), -1);
-		int current_index = 0;
-		for (int i = 0; i < needs_grid.size(); i++)
-		{
-			if (opt.debug)
-				std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
-
-			if (!needs_grid[i])
-			{
-				wavy->erase_atom(current_index);
-				continue;
-			}
-
-			original_to_local[i] = current_index;
-			current_index++;
-		}
-
-		for (int& atom_index : asym_atom_list)
-		{
-			err_checkf(atom_index >= 0 && atom_index < original_to_local.size() && original_to_local[atom_index] != -1,
-				"Failed to remap SALTED atom indices after pruning the wavefunction!", file);
-			atom_index = original_to_local[atom_index];
-		}
-
-		// Generation of SALTED density coefficients
-		file << "\nGenerating densities... " << endl;
-		vec coefs = calculator.gen_SALTED_densities();
-		file << setw(13 * 4) << "... done!" << endl;
-		time_points.push_back(get_time());
-		time_descriptions.push_back("SALTED prediction");
-		calculator.shrink_intermediate_vectors();
+        // Generation of SALTED density coefficients
+        file << "\nGenerating densities... " << endl;
+        vec coefs = calculator.gen_SALTED_densities();
+        file << setw(13 * 4) << "... done!" << endl;
+        time_points.push_back(get_time());
+        time_descriptions.push_back("SALTED prediction");
+        calculator.shrink_intermediate_vectors();
 
 		// In disorder calculations beyond the first component, keep constant atoms in the
 		// environment for the prediction but remove their contributions from the result.
@@ -2498,13 +2472,14 @@ tsc_block_type calculate_scattering_factors(
 			file << "\nGenerating densities... " << endl;
 			WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis);
 
-			//TODO: only compute coefs for atoms that are actually in the symmetric unit!
-			DensityFitting::CONFIG config;
-			config.analyze_quality = opt.debug;
-			//config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
-			//config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
-			//if (wavy->get_origin() == e_origin::ptb)
-			//    config.restraint_strength = 1.0e-4;
+            //TODO: only compute coefs for atoms that are actually in the symmetric unit!
+            DensityFitting::CONFIG config;
+            config.analyze_quality = opt.debug;
+            config.asym_atm_list = asym_atom_list;
+            //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+            //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+            //if (wavy->get_origin() == e_origin::ptb)
+            //    config.restraint_strength = 1.0e-4;
 
 			vec coefs = DensityFitting::density_fit(*wavy, wavy_aux, config);
 			file << setw(12 * 4 + 2) << "... done!\n"
@@ -2572,20 +2547,25 @@ tsc_block_type calculate_scattering_factors(
 		labels,
 		hkl);
 
-	if (opt.needs_Thakkar_fill)
-	{
-		file << "Performing the remaining calculation of spherical atoms..." << std::endl;
-		opt.needs_Thakkar_fill = false;
-		vector<WFN> tempy;
-		tempy.emplace_back(opt.wfn);
-		opt.m_hkl_list = hkl;
-		opt.iam_switch = true;
-		tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, tempy, file, labels, 0);
-		opt.iam_switch = false;
-		blocky.append(std::move(blocky_thakkar), file);
-		time_points.push_back(get_time());
-		time_descriptions.push_back("Spherical Atoms");
-	}
+    if (opt.needs_Thakkar_fill)
+    {
+        file << "Performing the remaining calculation of spherical atoms..." << std::endl;
+        opt.needs_Thakkar_fill = false;
+        vector<WFN> tempy;
+        if (!opt.wfn.empty()) {
+            tempy.emplace_back(opt.wfn);
+        }
+        else {
+            tempy.emplace_back(opt.combined_tsc_calc_files[nr]);
+        }
+        opt.m_hkl_list = hkl;
+        opt.iam_switch = true; opt.no_date = true;
+        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, 0);
+        opt.iam_switch = false; opt.no_date = false;
+        blocky.append(std::move(blocky_thakkar), file);
+        time_points.push_back(get_time());
+        time_descriptions.push_back("Spherical Atoms");
+    }
 
 
 	time_points.push_back(get_time());

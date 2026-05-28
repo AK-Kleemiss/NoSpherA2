@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "tsc_block.h"
 #include "convenience.h"
-#include "JKFit.h"
+#include "basis_set.h"
 #include "fchk.h"
 #include "cube.h"
 #include "scattering_factors.h"
@@ -328,7 +328,7 @@ int main(int argc, char **argv)
 
                 if (!temp_pred->basis_set_loaded()) {
                     string df_basis_name = temp_pred->get_dfbasis_name();
-                    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
                     load_basis_into_WFN(temp_pred->wavy, aux_basis);
                 }
 
@@ -507,8 +507,11 @@ int main(int argc, char **argv)
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
-                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
-                load_basis_into_WFN(temp_pred->wavy, aux_basis);
+                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
+                if (!temp_pred->basis_set_loaded()) { //If the basis set was supplied by the SALTED model file, do not overwrite it
+                    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
+                    load_basis_into_WFN(temp_pred->wavy, aux_basis);
+                }
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;

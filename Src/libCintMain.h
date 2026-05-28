@@ -43,7 +43,8 @@ void computeRho(
     const Int_Params& normal_basis,
     const Int_Params& aux_basis,
     const dMatrix2& dm,
-    vec& rho);
+    vec& rho,
+    const std::optional<ivec> asym_atm_list = std::nullopt);
 
 
 //DEPRICATED::Function to compute electron repulsion integrals

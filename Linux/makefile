@@ -66,8 +66,8 @@ MKL_LINK_FLAGS = $(MKL_STATIC_LIBS) $(IOMP_LIB) -lpthread -lm -ldl
 # ---- Objects ----
 # Sources - automatically discover all .cpp files in SRC_DIR
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
-ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_basis.cpp)
-  SRCS += $(SRC_DIR)/auxiliary_basis.cpp
+ifneq ($(filter $(SRC_DIR)/basis_data.cpp,$(SRCS)), $(SRC_DIR)/basis_data.cpp)
+  SRCS += $(SRC_DIR)/basis_data.cpp
 endif
 
 #remove mat_nos_math.cpp and vec_nos_math.cpp from SRCS
@@ -80,18 +80,11 @@ OBJS_d := $(OBJ_NAMES:=.o_d)
 
 all: NoSpherA2
 
-# ---- Basis set converter (kept) ----
-../BasisSetConverter: makefile_basis_set_converter
-	@echo "Building basis set converter"
-	@$(MAKE) -f makefile_basis_set_converter
-
-BASIS_SET_CSVS := $(wildcard $(SRC_DIR)/basis_set_helper/basis_sets/*.csv)
-
 # Actually run the converter to generate the file
-$(SRC_DIR)/auxiliary_basis.cpp: ../BasisSetConverter $(BASIS_SET_CSVS)
+$(SRC_DIR)/basis_data.cpp:
 	@echo "Running BasisSetConverter..."
-	@./../BasisSetConverter ../Src/basis_set_helper ../Src
-	@echo "auxiliary_basis.cpp generated"
+	@./../Lib//BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
+	@echo "basis_data.cpp generated"
 
 # Flags without -include pch.h for compiling the PCH itself
 GCC_OPTS_NO_PCH       := $(filter-out -include pch.h,$(GCC_OPTS))
@@ -114,20 +107,6 @@ $(PCH_GCH_D): ../Src/pch.h
 	@mkdir -p $(PCH_DIR)
 	@echo 'Building precompiled header (debug)...'
 	@$(WITH_ONEAPI) ${COMP} $(GCC_OPTS_DEBUG_NO_PCH) -I"$$MKLROOT/include" $(INCLUDES) -x c++-header -o "$@" "$<"
-
-# ---- auxiliary_basis depends on converter ----
-# auxiliary_basis is compiled with -O0 (mismatches PCH's -O3), so skip PCH for it.
-auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@$(WITH_ONEAPI) ${COMP} $(GCC_OPTS_NO_PCH) -I"$$MKLROOT/include" $(INCLUDES) \
-	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -O0 -o "$@" ../Src/auxiliary_basis.cpp
-	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
-
-auxiliary_basis.o_d: $(SRC_DIR)/auxiliary_basis.cpp
-	@echo 'Compiling auxiliary_basis.o_d after BasisSetConverter finishes'
-	@$(WITH_ONEAPI) ${COMP} $(GCC_OPTS_DEBUG_NO_PCH) -I"$$MKLROOT/include" $(INCLUDES) \
-	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -O0 -o "$@" ../Src/auxiliary_basis.cpp
-	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
 
 # ---- Pattern rules ----
 %.o: ../Src/%.cpp $(PCH_GCH)

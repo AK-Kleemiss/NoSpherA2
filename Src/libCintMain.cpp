@@ -233,24 +233,7 @@ ivec generate_bas_indices_per_atom(const Int_Params& params)
     ivec bas_indices_location(natoms + 1, 0);
     std::partial_sum(bas_indices_per_atom.begin(), bas_indices_per_atom.end(), bas_indices_location.begin() + 1);
 
-    return std::move(bas_indices_location);
-}
-
-void get_matrix_slice(const dMatrix2& dm, std::pair<int, int> row_range, std::pair<int, int> col_range, vec& dm_slice, const double weight)
-{
-    const int nrows = row_range.second - row_range.first;
-    const int ncols = col_range.second - col_range.first;
-    
-    // Direct indexing without mdspan overhead
-    int idx = 0;
-    for (int i = 0; i < nrows; i++)
-    {
-        const int row_idx = row_range.first + i;
-        for (int j = 0; j < ncols; j++)
-        {
-            dm_slice[idx++] = dm(row_idx, col_range.first + j) * weight;
-        }
-    }
+    return bas_indices_location;
 }
 
 template <typename Kernel>
@@ -258,7 +241,8 @@ void computeRho(
     const Int_Params& normal_basis, 
     const Int_Params& aux_basis,
     const dMatrix2& dm,
-    vec& rho)
+    vec& rho,
+    const std::optional<ivec> asym_atm_list)
 {
     Int_Params combined(normal_basis,aux_basis);
 
@@ -295,6 +279,11 @@ void computeRho(
     ProgressBar pb(natoms, 60, "#", " ", "Calculating Eri3c Matrix");
 #pragma omp parallel for schedule(dynamic) shared(pb, rho)
     for (int atm_idx = 0; atm_idx < natoms; atm_idx++) {
+        //if (asym_atm_list.has_value() && std::find(asym_atm_list->begin(), asym_atm_list->end(), atm_idx) == asym_atm_list->end()) { //Frag mal Florian.... dass sollte irgendwie gehen?
+        //    // Skip this atom if it's not in the asymmetry list
+        //    pb.update(std::cout);
+        //    continue;
+        //}
         double* rho_atom = rho.data() + aoloc[nQM + bas_aux_indices[atm_idx]] - aoloc[nQM];
         int shl_slice[6] = {
             0, 0,  // i shells
@@ -368,17 +357,20 @@ template void computeRho<Coulomb3C_SPH>(
     const Int_Params& normal_basis,
     const Int_Params& aux_basis,
     const dMatrix2& dm,
-    vec& rho);
+    vec& rho,
+    const std::optional<ivec> asym_atm_list );
 template void computeRho<Coulomb3C_CRT>(
     const Int_Params& normal_basis,
     const Int_Params& aux_basis,
     const dMatrix2& dm,
-    vec& rho);
+    vec& rho,
+    const std::optional<ivec> asym_atm_list );
 template void computeRho<Overlap3C_SPH>(
     const Int_Params& normal_basis,
     const Int_Params& aux_basis,
     const dMatrix2& dm,
-    vec& rho);
+    vec& rho,
+    const std::optional<ivec> asym_atm_list);
 
 
 template <typename Kernel>
