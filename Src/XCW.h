@@ -4,7 +4,7 @@
 #include "integration_params.h"
 #include "scattering_factors.h"
 #include "cell.h"
-#include "JKFit.h"
+#include "basis_set.h"
 #include <occ/qm/hf.h>
 
 class XCW {
@@ -77,13 +77,15 @@ private:
 	// Sets up a molecule object from the asym_atoms
 	void setup_SCF_mol(occ::core::Molecule& mol);
 	// Sets up the basis set with a previously generated molecule and basis set from JKFit, where the Olex2 basis sets are now located
-	void setup_basis(occ::qm::AOBasis& bs, occ::core::Molecule& mol, std::string& basis_set_name);
+	void setup_basis(occ::core::Molecule& mol, std::string& basis_set_name);
 	// Executes a single SCF solver
-	void do_SCF(const double& lambda, double& alpha);
+	void do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn);
 	// Executes a single SCF iteration
-	void SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, double& ehf_last, occ::Mat& D_last, occ::Mat& D_diff, bool& incremental, occ::Mat& F_diis, const double& lambda);
+	bool SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_old, occ::Mat& dm, const int& iter, double& ehf_last, const double& lambda, double& ehf, double& e_diff, double& alpha, const double& next_alpha, bool alpha_set);
 	// Checks convergence for SCF cylce
-	void SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, bool& converged, const double& energy_conv, const double& commutator_conv, const double& ehf_last);
+	bool SCF_convergence_check(double& e_diff, occ::qm::SCF<occ::qm::HartreeFock>& scf);
+	// Takes the SCF object from occ and creates the tscb file
+	void create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda);
 
 
 	// Methods for computing temporary variables, matrices and useful lists
@@ -112,7 +114,6 @@ private:
 	vec U_iso;
 	svec labels;
 	bvec needs_grid;
-	vec2 obs;
 	vec2 k_pt;
 	vec2 DW_fact;
 	cvec anom_corr;
@@ -121,6 +122,7 @@ private:
 	cvec2 translation_phase;
 	cvec I;
 	std::vector<asym_atom> asym_atoms;
+	std::vector<scattering_data> obs;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
 	const options* opt;
@@ -128,5 +130,6 @@ private:
 	Int_Params params;
 	cell unit_cell;
 	occ::core::Molecule mol;
-	occ::qm::AOBasis basis_set;
+	occ::qm::AOBasis occ_basis_set;
+	std::ofstream XCW_log;
 };

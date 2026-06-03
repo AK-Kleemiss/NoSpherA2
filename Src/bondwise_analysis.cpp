@@ -897,17 +897,36 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy) {
         for (auto &bf : basis_set) {
             if (bf.get_shell() != current_shell) {
                 current_shell++;
-                if (wavy.get_origin() != e_origin::tonto)
-                    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 5 : nr_indices = 7));
-                else {
+                switch (wavy.get_origin()) {
+                case(e_origin::tonto):
                     bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 6 : nr_indices = 10));
-                    if (bf.get_type() == 3) {
-                        //2 - 4; 3 - 6; 5 - 6
-                        swap_rows_cols_symm(overlap_matrix, last_index + 1, last_index + 3);
-                        swap_rows_cols_symm(overlap_matrix, last_index + 2, last_index + 5);
-                        swap_rows_cols_symm(overlap_matrix, last_index + 4, last_index + 5);
-                    }
+					if (bf.get_type() == 3) {
+						//2 - 4; 3 - 6; 5 - 6
+						swap_rows_cols_symm(overlap_matrix, last_index + 1, last_index + 3);
+						swap_rows_cols_symm(overlap_matrix, last_index + 2, last_index + 5);
+						swap_rows_cols_symm(overlap_matrix, last_index + 4, last_index + 5);
+					}
+                    break;
+                case(e_origin::OCC):
+                    bf.get_type() == 0 ? nr_indices = 1 : (bf.get_type() == 1 ? nr_indices = 3 : (bf.get_type() == 2 ? nr_indices = 5 : nr_indices = 7));
+                    break;
+                default:
+                    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 5 : nr_indices = 7));
+                    break;
                 }
+
+                //if (wavy.get_origin() != e_origin::tonto && wavy.get_origin() != e_origin::OCC)
+                //    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 5 : nr_indices = 7));
+                //else {
+                //    
+                //    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 6 : nr_indices = 10));
+                //    if (bf.get_type() == 3 && wavy.get_origin() == e_origin::tonto) {
+                //        //2 - 4; 3 - 6; 5 - 6
+                //        swap_rows_cols_symm(overlap_matrix, last_index + 1, last_index + 3);
+                //        swap_rows_cols_symm(overlap_matrix, last_index + 2, last_index + 5);
+                //        swap_rows_cols_symm(overlap_matrix, last_index + 4, last_index + 5);
+                //    }
+                //}
                 for (int i = 0; i < nr_indices; i++) {
                     indices[a.get_nr() - 1].push_back(last_index);
                     last_index++;

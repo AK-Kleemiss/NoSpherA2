@@ -307,13 +307,14 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	const vec2& twin_law,
 	cell& unit_cell,
 	std::ostream& file,
-	vec2& obs,
+	std::vector<scattering_data>& obs,
 	bool debug
 )
 {
 	file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
 	i3 hkl_;
 	double F_, sigma_;
+	int positive_;
 	err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
 	std::ifstream hkl_input(hkl_filename, std::ios::in);
 	hkl_input.seekg(0, hkl_input.beg);
@@ -344,14 +345,24 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 			std::string temp_F = temp.substr(0, dot + 3);
 			std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
 			temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
+			sigma_ = stof(temp_sigma);
 			temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
 			F_ = stof(temp_F);
-			sigma_ = stof(temp_sigma);
+			if (F_ < 0) {
+				F_ = -std::sqrt(-F_);
+				positive_ = -1;
+				sigma_ = sigma_ * 0.5 / std::sqrt(-F_);
+			}
+			else {
+				positive_ = 1;
+				F_ = std::sqrt(F_);
+				sigma_ = sigma_ * 0.5 / std::sqrt(F_);
+			}
 		}
 		// if (debug) file << endl;
 		hkl.emplace(hkl_);
-		obs[0].push_back(F_);
-		obs[1].push_back(sigma_);
+		scattering_data temp_data = { F_, sigma_, positive_ };
+		obs.push_back(temp_data);
 	}
 	hkl_list_it found = hkl.find(i3{ 0, 0, 0 });
 	if (found != hkl.end())
@@ -402,7 +413,6 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	i3 tempv;
 	hkl_list hkl_enlarged;
 	hkl_enlarged = hkl;
-	vec2 obs_enlarged = obs;
 	for (int s = 0; s < sym[0][0].size(); s++)
 	{
 		if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&

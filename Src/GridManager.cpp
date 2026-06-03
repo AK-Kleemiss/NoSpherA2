@@ -408,39 +408,38 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
         unsigned int max_l = 0;
         vec alpha_min(6, 1e8);  // Support up to f functions
 
-        //for (int i = 0; i < wave.get_ncen(); i++) {
-        //    if (wave.get_atom_charge(i) != atom_type) continue;
-
-        //    for (int b = 0; b < wave.get_nex(); b++) {
-        //        if (wave.get_center(b) != i + 1) continue;
-
-        //        alpha_max = std::max(alpha_max, wave.get_exponent(b));
-
-        //        int l = wave.get_type(b);
-        //        if (l == 1) l = 1;
-        //        else if (l >= 2 && l <= 4) l = 2;
-        //        else if (l >= 5 && l <= 10) l = 3;
-        //        else if (l >= 11 && l <= 20) l = 4;
-        //        else if (l >= 21 && l <= 35) l = 5;
-        //        else if (l >= 36 && l <= 56) l = 6;
-
-        //        max_l = std::max(max_l, l);
-        //        alpha_min[l - 1] = std::min(alpha_min[l - 1], wave.get_exponent(b));
-        //    }
-        //}
         for (int i = 0; i < wave.get_ncen(); i++) {
             if (wave.get_atom_charge(i) != atom_type) continue;
-            const atom& atm = wave.get_atom(i);
-            for (const basis_set_entry& bs_entry : atm.get_basis_set()) {
-                alpha_max = std::max(alpha_max, bs_entry.get_exponent());
-				unsigned int l = bs_entry.get_type();
-				max_l = std::max(max_l, l);
-				alpha_min[l] = std::min(alpha_min[l], bs_entry.get_exponent());
+
+            for (int b = 0; b < wave.get_nex(); b++) {
+                if (wave.get_center(b) != i + 1) continue;
+
+                alpha_max = std::max(alpha_max, wave.get_exponent(b));
+
+                unsigned int l = wave.get_type(b);
+                if (l == 1) l = 1;
+                else if (l >= 2 && l <= 4) l = 2;
+                else if (l >= 5 && l <= 10) l = 3;
+                else if (l >= 11 && l <= 20) l = 4;
+                else if (l >= 21 && l <= 35) l = 5;
+                else if (l >= 36 && l <= 56) l = 6;
+
+                max_l = std::max(max_l, l);
+                alpha_min[l - 1] = std::min(alpha_min[l - 1], wave.get_exponent(b));
             }
         }
+    //    for (int i = 0; i < wave.get_ncen(); i++) {
+    //        if (wave.get_atom_charge(i) != atom_type) continue;
+    //        const atom& atm = wave.get_atom(i);
+    //        for (const basis_set_entry& bs_entry : atm.get_basis_set()) {
+    //            alpha_max = std::max(alpha_max, bs_entry.get_exponent());
+				//unsigned int l = (wave.get_origin() == e_origin::gbw) ? bs_entry.get_type() - 1 : bs_entry.get_type();
+				//max_l = std::max(max_l, l);
+				//alpha_min[l] = std::min(alpha_min[l], bs_entry.get_exponent());
+    //        }
+    //    }
 
-
-        int max_l_temp = max_l - 1;
+        int max_l_temp = max_l;
 
         err_checkf(config_.accuracy >= 0, "Negative accuracy is not defined!", std::cout);
         // Get Lebedev grid parameters using the constexpr function

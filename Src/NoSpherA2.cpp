@@ -541,8 +541,9 @@ int main(int argc, char **argv)
         return 0;
     }
     // Performs XCW
-    if (opt.wfn != "" && !opt.properties.calc() && !opt.gbw2wfn && opt.do_XCW)
+    if (!opt.properties.calc() && opt.do_XCW)
     {
+        opt.groups[0].push_back(0);
         XCW xcw(opt);
         if(!opt.calc_F_calc)
         {

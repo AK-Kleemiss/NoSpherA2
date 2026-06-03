@@ -173,7 +173,7 @@ void Int_Params::collect_basis_data()
                 coef_idx += atoms[atom_idx].get_shellcount(shell);
             }
         }
-        else
+        else if (wfn_origin != e_origin::OCC)
         {
             std::cout << "WFN Origin not recognized, thread carefully! No normalisation was performed!" << std::endl;
         }
@@ -182,7 +182,7 @@ void Int_Params::collect_basis_data()
         for (int func = 0; func < basis.size(); func++)
         {
             int new_l = 0;
-            if (wfn_origin == e_origin::NOT_YET_DEFINED)      new_l = basis[func].get_type();
+            if (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC)      new_l = basis[func].get_type();
             else if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb) new_l = basis[func].get_type() - 1;
             else {
                 std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
@@ -203,7 +203,7 @@ void Int_Params::collect_basis_data()
                 //Sort functions regarding the angular momentum
                 if (((basis[n_funcs].get_type()-1 != l) && //First case, function type start with s=1
                         (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb || wfn_origin == e_origin::xtb))  ||
-                        ((basis[n_funcs].get_type() != l) && (wfn_origin == e_origin::NOT_YET_DEFINED))) {  //Second type s = 0
+                        ((basis[n_funcs].get_type() != l) && (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC))) {  //Second type s = 0
                     n_funcs += curr_funcs;
                     continue;
                 }

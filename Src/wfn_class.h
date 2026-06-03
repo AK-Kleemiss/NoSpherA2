@@ -137,7 +137,7 @@ private:
     void assign_MO_coefs(const int& nr, vec& values);
     void push_back_MO_coef(const int& nr, const double& value);
     bool modified;
-    bool d_f_switch; // true if spherical harmonics are used for the basis set
+    bool d_f_switch; // true if spherical harmonics are used for the basis set, that's a lie, it's the other way around
     bool distance_switch;
     bool has_ECPs;
     bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
@@ -272,6 +272,7 @@ public:
     void set_charge(const int& in) { charge = in; };
     /** Number of primitives (nex). */
     const int& get_nex() const { return nex; };
+	void set_nex(const int& in) { nex = in; };
     /** Number of centers / atoms. */
     const int& get_ncen() const { return ncen; };
     /** Manually set number of centers (use with care). */
@@ -586,6 +587,7 @@ public:
     /** Raw pointer to primitive exponents. */
     const double* get_ptr_exponents() { return &exponents[0]; };
 	const ivec& get_types() { return types; };
+    void set_types(const ivec& in) { types = in; };
 	const vec& get_exponents() { return exponents; };
 	const ivec& get_centers() { return centers; };
 };

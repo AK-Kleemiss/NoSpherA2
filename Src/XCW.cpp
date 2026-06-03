@@ -6,6 +6,7 @@
 #include "integration_params.h"
 #include "libCintMain.h"
 #include "nos_math.h"
+#include "bondwise_analysis.h"
 
 void XCW::construct(const options& opt_in) {
 	opt = &opt_in;
@@ -13,7 +14,6 @@ void XCW::construct(const options& opt_in) {
 	std::filesystem::path cif = opt_in.cif;
 	std::ifstream cif_input(cif.c_str(), std::ios::in);
 	unit_cell = cell(cif, std::cout, opt_in.debug, opt_in.do_XCW);
-	obs.resize(2);
 	hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt_in.twin_law, unit_cell, std::cout, obs, opt_in.debug);
 	svec empty({});
 	ivec atom_type_list;
@@ -35,8 +35,9 @@ void XCW::construct(const options& opt_in) {
 		wave.push_back_atom(temp_atom);
 	}
 	std::string test_name = "def2-svp_basis";
-	std::shared_ptr<BasisSet> basis = BasisSetLibrary().get_basis_set(test_name);
+	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(test_name);
 	load_basis_into_WFN(wave, basis, false);
+	complete_WFN_basis(wave);
 
 	U_iso = read_U_iso_from_CIF(cif, wave, unit_cell, log3, opt_in.debug);
 	unit_cell.eval_symm(asym_atoms);
@@ -46,6 +47,7 @@ void XCW::construct(const options& opt_in) {
 	//Read U_iso, U_ij, C_ijk and Dijkl from CIF file
 	read_fracs_ADPs_from_CIF(cif, wave, unit_cell, log3, opt_in.debug);
 	DW_fact.resize(ncen, vec(nr, 1.0));
+	XCW_log.open("XCW.log");
 }
 
 void XCW::U_frac2U_rec() {
@@ -400,27 +402,22 @@ void XCW::eval_scale() {
 
 #pragma omp parallel for reduction(+:numerator, denominator)
 	for (int i = 0; i < nr_small; ++i) {
-		const double obs0 = obs[0][i];
-
-		if (obs0 > 0.0) {
-			const double calc = std::abs(F_calc[i]);
-
-			numerator += calc * std::sqrt(obs0);
-			denominator += calc * calc;
-		}
+		const double calc = std::abs(F_calc[i]);
+		numerator += calc * obs[i].F_obs;
+		denominator += calc * calc;
 	}
 
 	scale = (denominator != 0.0) ? numerator / denominator : 1.0;
 }
 
 double XCW::calc_chi2() {
-	double num_adps = 0;
-	for (int i = 0; i < ncen; i++) {
-		auto adps_temp = wave.get_atom(i).get_ADPs();
-		for (int k = 0; k < 3; k++) {
-			num_adps += adps_temp[k].size();
-		}
-	}
+	//double num_adps = 0;
+	//for (int i = 0; i < ncen; i++) {
+	//	auto adps_temp = wave.get_atom(i).get_ADPs();
+	//	for (int k = 0; k < 3; k++) {
+	//		num_adps += adps_temp[k].size();
+	//	}
+	//}
 	// I don't know what is right and what is left of me at this point. If these crystallographers don't start to get a grip on reality and convention I'm gonna lose my mind. What do you mean "number of parameters"? 
 	// So you're a crystallographer? Ok name every number.
 	double prefactor = 1.0 / static_cast<double>(nr_small - n_params);
@@ -429,21 +426,20 @@ double XCW::calc_chi2() {
 	double sum = 0;
 #pragma omp parallel for reduction(+:sum)
 	for (int i = 0; i < nr_small; i++) {
-		if (obs[0][i] > 0) {
-			double r_temp = (scale * std::abs(F_calc[i]) - std::sqrt(obs[0][i])) / obs[1][i];
-			sum += r_temp * r_temp;
-		}
+		double diff = (scale * std::abs(F_calc[i]) - obs[i].F_obs);
+		double weighted = diff * diff / (obs[i].sigma_obs);
+		sum += weighted;
 	}
-	return prefactor * sum;
+	return std::sqrt(prefactor * sum);
 }
 
 void XCW::create_prims(std::vector<ao_data>& ao_data_shells) {
 	for (int atm = 0; atm < ncen; atm++) {
-		d3 pos = { basis_set.atoms()[atm].x, basis_set.atoms()[atm].y, basis_set.atoms()[atm].z };
-		const int first_shell = *basis_set.atom_to_shell()[atm].begin();
-		const int last_shell = basis_set.atom_to_shell()[atm].back();
+		d3 pos = { occ_basis_set.atoms()[atm].x, occ_basis_set.atoms()[atm].y, occ_basis_set.atoms()[atm].z };
+		const int first_shell = *occ_basis_set.atom_to_shell()[atm].begin();
+		const int last_shell = occ_basis_set.atom_to_shell()[atm].back();
 		for (int shell = first_shell; shell <= last_shell; shell++) {
-			occ::gto::Shell current_shell = basis_set.shells()[shell];
+			occ::gto::Shell current_shell = occ_basis_set.shells()[shell];
 			const int shell_type = current_shell.l;
 			std::vector<primitive> tmp_prims;
 			for (int prim_idx = 0; prim_idx < current_shell.exponents.size(); prim_idx++) {
@@ -663,7 +659,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells) {
 void XCW::calc_F_calc(const dMatrixRef2& D) { 
 	// Density matrix from occ is half of what I need, so times 2 and times (2x2)=4
 	F_calc.assign(nr_small, 0.0);
-//#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
 	for (int r = 0; r < nr_small; ++r) {
 		cdouble sum = anom_corr[r];
 		size_t base = r * (nmo * (nmo+1)) / 2;
@@ -688,10 +684,8 @@ void XCW::calc_perturb(occ::Mat& perturb) {
 		occ::Mat local = occ::Mat::Zero(nmo, nmo);
 #pragma omp for nowait
 		for (int r = 0; r < nr_small; r++) {
-			if (obs[1][r] <= 0)
-				continue;
 			double F_calc_abs = std::abs(F_calc[r]);
-			cdouble precompute = std::conj(F_calc[r]) *	(scale * F_calc_abs - std::abs(obs[0][r])) / (obs[1][r] * F_calc_abs);
+			cdouble precompute = std::conj(F_calc[r]) *	(scale * F_calc_abs - obs[r].F_obs) / (obs[r].sigma_obs * F_calc_abs);
 			size_t base = r * packed_size; 
 			for (int mu = 0; mu < nmo; mu++) {
 				size_t offset = base + tri_index(mu, mu);
@@ -714,38 +708,6 @@ void XCW::calc_perturb(occ::Mat& perturb) {
 			perturb(nu, mu) = perturb(mu, nu);
 		}
 	}
-
-//	perturb.setZero(nmo, nmo);
-//	double prefactor = 2.0 * scale / (nr_small - n_params);
-//#pragma omp parallel
-//	{
-//		occ::Mat local = occ::Mat::Zero(nmo, nmo);
-//#pragma omp for nowait
-//		for (int r = 0; r < nr_small; r++) {
-//			if (obs[1][r] <= 0)
-//				continue;
-//			double F_calc_abs = std::abs(F_calc[r]);
-//			cdouble precompute = std::conj(F_calc[r]) * (scale * F_calc_abs - std::abs(obs[0][r])) / (obs[1][r] * F_calc_abs);
-//			for (int mu = 0; mu < nmo; mu++) {
-//				cdouble* I_mu = &I[r][mu][0];
-//#pragma omp simd
-//				for (int nu = mu; nu < nmo; nu++) {
-//					double temp = std::real(precompute * I_mu[nu]);
-//					local(mu, nu) += temp;
-//				}
-//			}
-//		}
-//#pragma omp critical
-//		{
-//			perturb += local;
-//		}
-//	}
-//	perturb *= prefactor;
-//	for (int mu = 0; mu < nmo; mu++) {
-//		for (int nu = mu + 1; nu < nmo; nu++) {
-//			perturb(nu, mu) = perturb(mu, nu);
-//		}
-//	}
 }
 
 void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
@@ -771,88 +733,196 @@ void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
 	mol.set_multiplicity(opt->mult);
 }
 
-void XCW::setup_basis(occ::qm::AOBasis& bs, occ::core::Molecule& mol, std::string& basis_set_name) {
-	std::shared_ptr<BasisSet> basis_set = BasisSetLibrary().get_basis_set(basis_set_name);
-	bs = basis_set->to_AOBasis(mol.atoms());
+void XCW::setup_basis(occ::core::Molecule& mol, std::string& basis_set_name) {
+	std::shared_ptr<BasisSet> basis_set = BasisSetLibrary::get_basis_set(basis_set_name);
+	occ_basis_set = basis_set->to_AOBasis(mol.atoms());
 }
 
-void XCW::do_SCF(const double& lambda, double& alpha) {
-	occ::qm::HartreeFock hf(basis_set);
-	occ::qm::SCF scf(hf, occ::qm::SpinorbitalKind::Restricted);
-	scf.set_charge_multiplicity(0, 1);
-	scf.maxiter = 1000;
-	
+void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn) {
+
 	scf.update_occupied_orbital_count();
+	scf.convergence_accelerator.set_strategy(scf.convergence_settings.diis_strategy);
+	scf.convergence_accelerator.set_switch_threshold(scf.convergence_settings.diis_switch_threshold);
 
 	// Debugging implementation that does the SCF and then calculates scattering factors (without perturbation)
 	//scf.compute_scf_energy();
-	//dMatrix2 dm(nmo, nmo);
-	//occ::Mat D = scf.ctx.mo.D;
+	//dMatrix2 dm_effective(nmo, nmo);
 	//for (int i = 0; i < nmo; i++) {
-	//	for (int j = 0; j < nmo; j++) {
-	//		dm(i, j) = 2 * D(i, j);
+	//	dm_effective(i, i) += scf.ctx.mo.D(i, i);
+	//	dm_effective(i, i) += scf.ctx.mo.D(i + nmo, i);
+	//	for (int j = i + 1; j < nmo; j++) {
+	//		dm_effective(i, j) += scf.ctx.mo.D(i, j);
+	//		dm_effective(i, j) += scf.ctx.mo.D(i + nmo, j);
+	//		dm_effective(j, i) = dm_effective(i, j);
 	//	}
 	//}
-	//calc_F_calc(dm);
+	//dMatrixRef2 dm_ref(dm_effective.data(), nmo, nmo);
+	//calc_F_calc(dm_ref);
 	//for (int i = 0; i < nr_small; i++) {
-	//	std::cout << std::fixed << std::setprecision(5) << std::pow(std::abs(F_calc[i]), 2) << std::endl;
+	//	XCW_log << std::fixed << std::setprecision(5) << std::pow(std::abs(F_calc[i]), 2) << std::endl;
 	//}
-	 
-	 
-	scf.compute_initial_guess();
+	//exit(0);
+
+	if (lambda == 0) {
+		scf.compute_initial_guess();
+	}
+	else {
+		scf.set_initial_guess_from_wfn(last_wfn);
+	}
+
+	// Loads the initial density guess from a file
+	//std::ifstream in("density_matrix00", std::ios::binary);
+	//Eigen::Index rows, cols;
+	//in.read(reinterpret_cast<char*>(&rows), sizeof(rows));
+	//in.read(reinterpret_cast<char*>(&cols), sizeof(cols));
+	//Eigen::MatrixXd mat(rows, cols);
+	//in.read(reinterpret_cast<char*>(mat.data()), rows * cols * sizeof(double));
+	//scf.ctx.mo.D = mat;
+
 	scf.ctx.K = scf.m_procedure.compute_schwarz_ints();
 	scf.update_scf_energy(false);
 	occ::Mat dm = scf.ctx.mo.D;
 	occ::Mat dm_old = dm;
 	double ehf_last;
 	double e_diff;
+	double next_alpha = 0;
+	bool alpha_set = true;
 
 	double ehf = scf.ctx.energy["electronic"];
 	scf.ctx.H = scf.ctx.T + scf.ctx.V;
-	for (int iter = 0; iter < scf.maxiter; iter++) {
-		dm_old = dm;
-		dMatrixRef2 dm_ref(dm.data(), nmo, nmo);
-		calc_F_calc(dm_ref);
-		eval_scale();
-		std::cout << "Scale factor: " << scale << std::endl;
-		double chi2 = calc_chi2();
-		std::cout << "Chi2: " << chi2 << std::endl;
-		occ::Mat perturbation;
-		calc_perturb(perturbation);
-		//std::cout << "Perturbation matrix:" << perturbation << std::endl;
-		std::cout << "SCF iteration " << iter + 1 << ": E = " << std::fixed << std::setprecision(7) << ehf << std::endl;
-		ehf_last = ehf;
-		std::cout << "Last electronic energy: " << std::fixed << std::setprecision(7) << ehf_last << std::endl;
-		// Maybe necessary to update the Hamiltoian if a potential changes depending on the density, but that does not happen in normal HF
-		//scf.ctx.H = scf.ctx.T + scf.ctx.V + scf.ctx.Vecp + scf.ctx.V_ext;
-		scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H);
-		scf.ctx.F = scf.ctx.H;
-		scf.ctx.F += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
-		scf.ctx.F += perturbation * lambda;
-		scf.update_scf_energy(false);
-		ehf = scf.ctx.energy["electronic"];
-		std::cout << "New electronic energy: " << std::fixed << std::setprecision(7) << ehf << std::endl;
-		e_diff = std::abs(ehf - ehf_last);
-		std::cout << "Energy difference: " << std::fixed << std::setprecision(7) << e_diff << std::endl;
-		if (e_diff < scf.convergence_settings.energy_threshold) {
-			std::cout << "SCF converged in " << iter + 1 << " iterations." << std::endl;
-			std::cout << "Final total energy: " << std::fixed << std::setprecision(12) << scf.ctx.energy["total"] << std::endl;
-			std::cout << "Final chi2: " << std::fixed << std::setprecision(7) << calc_chi2() << std::endl;
-			break;
+	int iter = 0;
+	bool converged;
+	do {
+		converged = SCF_iteration(scf, dm_old, dm, iter, ehf_last, lambda, ehf, e_diff, alpha, next_alpha, alpha_set);
+		if (alpha_set && iter > 0) {
+			XCW_log << "e_diff is: " << e_diff << " and alpha is: " << alpha << std::endl;
+			next_alpha = e_diff / 10;
+			alpha_set = false;
 		}
-		scf.ctx.orthogonalizer.orthogonalize_molecular_orbitals(scf.ctx.mo, scf.ctx.F);
-		dm = scf.ctx.mo.D;
-		dm = (1-alpha) * dm + alpha * dm_old;
-		scf.ctx.mo.D = dm;
+		iter++;
+
+	} while (!converged && iter < scf.maxiter);
+	converged = true;
+	if (converged) {
+		XCW_log << "SCF converged in " << iter + 1 << " iterations." << std::endl;
+		XCW_log << "Final total energy: " << std::fixed << std::setprecision(12) << scf.ctx.energy["total"] << std::endl;
+		//std::cout << "Scattering Factors:" << std::endl;
+		//for (int i = 0; i < nr_small; i++) {
+		//	std::cout << std::abs(F_calc[i] * F_calc[i]) << std::endl;
+		//}
+
+		//XCW_log << "Writing the density matrix to file..." << std::endl;
+		// Write the converged density matrix to file
+		//std::ofstream out("density_matrix00", std::ios::binary);
+		//Eigen::Index rows = scf.ctx.mo.D.rows();
+		//Eigen::Index cols = scf.ctx.mo.D.cols();
+		//out.write(reinterpret_cast<char*>(&rows), sizeof(rows));
+		//out.write(reinterpret_cast<char*>(&cols), sizeof(cols));
+		//out.write(reinterpret_cast<const char*>(scf.ctx.mo.D.data()), rows * cols * sizeof(double));
+
+		create_tscb(scf, lambda);
 	}
+	else {
+		XCW_log << "SCF did not converge but reached maximum of iterations." << std::endl;
+	}
+
+
 }
 
-void XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, double& ehf_last, occ::Mat& D_last, occ::Mat& D_diff, bool& incremental, occ::Mat& F_diis, const double& lambda) {
+bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_old, occ::Mat& dm, const int& iter, double& ehf_last, const double& lambda, double& ehf, double& e_diff, double& alpha, const double& next_alpha, bool alpha_set) {
+	dm_old = dm;
+	dMatrix2 dm_effective(nmo, nmo);
+	for (int i = 0; i < nmo; i++) {
+		dm_effective(i, i) += scf.ctx.mo.D(i, i);
+		auto test = scf.scf_kind();
+		if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
+			dm_effective(i, i) += scf.ctx.mo.D(i + nmo, i);
+		}
+		for (int j = i + 1; j < nmo; j++) {
+			dm_effective(i, j) += scf.ctx.mo.D(i, j);
+			if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
+				dm_effective(i, j) += scf.ctx.mo.D(i + nmo, j);
+			}
+			dm_effective(j, i) = dm_effective(i, j);
+		}
+	}
+	dMatrixRef2 dm_ref(dm_effective.data(), nmo, nmo);
+	calc_F_calc(dm_ref);
+	eval_scale();
+	double chi2 = calc_chi2();
+	XCW_log << "Chi2: " << chi2 << std::endl;
+	occ::Mat perturbation;
+	calc_perturb(perturbation);
+	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
+		occ::Mat eff_perturbation(2 * nmo, nmo);
+		perturbation.conservativeResize(2 * nmo, Eigen::NoChange);
+		perturbation.bottomRows(nmo) = perturbation.topRows(nmo);
+	}
+	XCW_log << "SCF iteration " << iter + 1 << ": E = " << std::fixed << std::setprecision(7) << ehf << std::endl;
+	ehf_last = ehf;
+	// Maybe necessary to update the Hamiltoian if a potential changes depending on the density, but that does not happen in normal HF
+	//scf.ctx.H = scf.ctx.T + scf.ctx.V + scf.ctx.Vecp + scf.ctx.V_ext;
+	scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H);
+	scf.ctx.F = scf.ctx.H;
+	scf.ctx.F += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
+	scf.ctx.F += perturbation * lambda;
+	scf.update_scf_energy(false);
+	ehf = scf.ctx.energy["electronic"];
+	e_diff = std::abs(ehf - ehf_last);
+	if (e_diff < next_alpha) {
+		alpha = alpha * 0.75 < 0.01 ? 0 : alpha * 0.75;
+		alpha_set = true;
+		XCW_log << "Damping set to: " << alpha << std::endl;
+	}
+	XCW_log << "Energy difference: " << std::fixed << std::setprecision(7) << e_diff << std::endl;
+	if (SCF_convergence_check(e_diff, scf)) {
+		return true;
+	}
+
+	occ::Mat F_diis = scf.convergence_accelerator.update(
+		scf.ctx.mo.kind, scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
+	//scf.diis_error = scf.convergence_accelerator.max_error();
+
+	scf.ctx.orthogonalizer.orthogonalize_molecular_orbitals(scf.ctx.mo, F_diis);
+	dm = scf.ctx.mo.D;
+	dm = (1 - alpha) * dm + alpha * dm_old;
+	scf.ctx.mo.D = dm;
+	return false;
 	//closing function
 }
 
-void XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, bool& converged, const double& energy_conv, const double& commutator_conv, const double& ehf_last) {
+bool XCW::SCF_convergence_check(double& e_diff, occ::qm::SCF<occ::qm::HartreeFock>& scf) {
+	bool converged = true;
+	if (e_diff < scf.convergence_settings.energy_threshold) {
+		converged = true;
+	}
+	return converged;
 	// closing function
+}
+
+void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda) {
+	std::cout << "Creating .tscb file from converged SCF calculation..." << std::endl;
+	std::vector<WFN> sf_wave_vec(1, { scf.wavefunction(), false });
+	svec known_atoms_;
+	tsc_block<int, cdouble> result;
+	vec2 known_kpts_;
+	options* opt_ = const_cast<options*>(opt);
+	result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+		*opt_,
+		sf_wave_vec,
+		std::cout,
+		known_atoms_,
+		0,
+		&k_pt),
+		std::cout);
+	int value = static_cast<int>(std::round(lambda * 100));
+	std::ostringstream oss;
+	oss << "NA2_" << std::setw(3) << std::setfill('0') << value << ".tscb";
+	result.write_tscb_file("test.cif", oss.str());
+	std::ostringstream oss2;
+	oss2 << "NA2_" << std::setw(3) << std::setfill('0') << value << ".wfn";
+	sf_wave_vec[0].write_wfn(oss2.str(), false, true);
+	Roby_information Roby(sf_wave_vec[0]);
 }
 
 void XCW::calc_F_calc_fast() {
@@ -923,7 +993,7 @@ void XCW::run_XCW_fitting() {
 
 	setup_SCF_mol(mol);
 	std::string test_name = "def2-svp_basis";
-	setup_basis(basis_set, mol, test_name);
+	setup_basis(mol, test_name);
 
 	eval_phase();
 	eval_DW();
@@ -974,9 +1044,26 @@ void XCW::run_XCW_fitting() {
 
 	eval_anom_disp();
 
+	int num_steps = 150;
+	double increments = 0.01;
+	occ::qm::HartreeFock hf(occ_basis_set);
+	occ::qm::Wavefunction last_wfn;
+	
+	std::cout << "Continuing output in XCW.log file..." << std::endl;
 	// This should run perturbed SCF for given lambda
-	double lambda = 0.005;
-	double alpha = 0.95;
-	do_SCF(lambda, alpha);
+	for (int step = 0; step < num_steps; step++) {
+		double alpha = 0.8;
+		double lambda = step * increments;
+		XCW_log << "Starting XCW SCF solver with lambda = " << lambda << std::endl;
+
+		occ::qm::SCF scf(hf, occ::qm::SpinorbitalKind::Restricted);
+
+		scf.set_charge_multiplicity(0, 1);
+		scf.maxiter = 100;
+		do_SCF(lambda, alpha, scf, last_wfn);
+		last_wfn = scf.wavefunction();
+	}
+	std::cout << "Finished XCW fitting procedure." << std::endl;
+	exit(0);
 
 }

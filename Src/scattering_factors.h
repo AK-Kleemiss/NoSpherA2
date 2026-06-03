@@ -10,8 +10,9 @@
 #include <fstream>
 #include "convenience.h"
 #include "SALTED_predictor.h"
- #include "wfn_class.h"
- #include "tsc_block.h"
+#include "wfn_class.h"
+#include "tsc_block.h"
+
  /**
   * @class WFN
   * @brief Class representing the wavefunction.
@@ -31,6 +32,11 @@ class cell;
  * @brief Struct representing the options for calculations.
  */
 struct options;
+struct scattering_data {
+    double F_obs;
+    double sigma_obs;
+    int positive;
+};
 
 enum GridIndex
 {
@@ -257,4 +263,4 @@ struct hkl_sym {
 };
 
 void read_hkl(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, bool debug = false);
-hkl_list read_hkl_full(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, vec2&obs, bool debug = false);
+hkl_list read_hkl_full(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, std::vector<scattering_data>& obs, bool debug = false);
