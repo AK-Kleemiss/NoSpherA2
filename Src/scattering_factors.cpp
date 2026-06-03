@@ -1472,13 +1472,12 @@ void convert_to_ED(const ivec &asym_atom_list,
     const cell &unit_cell,
     const hkl_list &hkl)
 {
-    double h2 = 0.0;
     const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
     const int hkl_size = hkl.size();
-#pragma omp parallel for private(h2) shared(hkl_vector)
+#pragma omp parallel for shared(hkl_vector)
     for (int s = 0; s < hkl_size; s++)
     {
-        h2 = pow(unit_cell.get_stl_of_hkl(hkl_vector[s]), 2);
+        const double h2 = pow(unit_cell.get_stl_of_hkl(hkl_vector[s]), 2);
         for (int i = 0; i < asym_atom_list.size(); i++)
             sf[i][s] = cdouble(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
     }
@@ -1679,6 +1678,7 @@ tsc_block_type calculate_scattering_factors(
 #pragma omp parallel for
     for (int i = 0; i < asym_atom_list.size(); i++)
         sf[i].resize(hkl.size());
+
     if (opt.iam_switch) {
         vector<Thakkar> spherical_atoms;
         spherical_atoms.reserve(atom_type_list.size());
@@ -1686,27 +1686,32 @@ tsc_block_type calculate_scattering_factors(
             spherical_atoms.emplace_back(atom_type_list[i]);
 
         const int imax = (int)asym_atom_list.size();
+        const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
+        const int hkl_max = hkl.size();
 
-        hkl_list_it it = hkl.begin();
-#pragma omp parallel for private(it)
-        for (int s = 0; s < hkl.size(); s++)
+        if (!opt.electron_diffraction)
         {
-            it = next(hkl.begin(), s);
-            double k = constants::bohr2ang(constants::FOUR_PI * unit_cell.get_stl_of_hkl(*it));
-            for (int i = 0; i < imax; i++)
-                sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
-        }
-
-        if (opt.electron_diffraction)
-        {
-            double h2;
-#pragma omp parallel for private(h2, it)
-            for (int s = 0; s < hkl.size(); s++)
+#pragma omp parallel for shared(hkl_vector)
+            for (int s = 0; s < hkl_max; s++)
             {
-                it = next(hkl.begin(), s);
-                h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
+                const double k = constants::bohr2ang(constants::FOUR_PI * unit_cell.get_stl_of_hkl(hkl_vector[s]));
                 for (int i = 0; i < imax; i++)
-                    sf[i][s] = constants::ED_fact * ((cdouble)atom_type_list[i] - sf[i][s]) / h2;
+                    sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
+            }
+        }
+        else
+        {
+#pragma omp parallel for shared(hkl_vector)
+            for (int s = 0; s < hkl_max; s++)
+            {
+                const double stl = unit_cell.get_stl_of_hkl(hkl_vector[s]);
+                const double k = constants::bohr2ang(constants::FOUR_PI * stl);
+                const double h2 = pow(stl, 2);
+                double sf_x = 0;
+                for (int i = 0; i < imax; i++) {
+                    sf_x = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
+                    sf[i][s] = cdouble(constants::ED_fact * (atom_type_list[asym_atom_to_type_list[i]] - sf_x) / h2, 0);
+                }
             }
         }
     }
@@ -1929,7 +1934,7 @@ tsc_block_type calculate_scattering_factors(
         }
     }
 
-    if (opt.electron_diffraction)
+    if (opt.electron_diffraction && !opt.iam_switch)
     {
         convert_to_ED(asym_atom_list,
             *wavy,
