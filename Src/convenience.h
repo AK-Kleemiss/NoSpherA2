@@ -328,6 +328,20 @@ inline void print_centered_text(const std::string &text, int &bar_width)
         << "]" << std::endl;
 }
 
+inline void print_centered_message(const std::string& text, int bar_width, std::ostream& os = std::cout)
+{
+    const int text_length = static_cast<int>(text.length());
+    const int total_padding = bar_width - text_length;
+    const int padding_left = total_padding / 2;
+    const int padding_right = (total_padding - padding_left) - 1;
+
+    os
+        << std::setw(padding_left) << std::setfill(' ') << ""
+        << text
+        << std::setw(padding_right) << std::setfill(' ') << ""
+        << std::endl;
+}
+
 //-------------------------Progress_bar--------------------------------------------------
 // LMS: My implementation of a progress bar, I would like it to stay within one line that is compatible with parallel loops
 class ProgressBar

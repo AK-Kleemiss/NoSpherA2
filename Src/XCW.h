@@ -53,7 +53,9 @@ private:
 	// Evaluates the scaling factor for |F_calc| by least squares fitting
 	void eval_scale();
 	// Calculates the chi^2 quality criterion
-	double calc_chi2();
+	void calc_chi2();
+	// Calculates the GooF just like in Olex2
+	void calc_goof();
 
 
 	// Methods for evaluating elements used for building the XCW perturbation potential
@@ -68,9 +70,9 @@ private:
 	// Evaluates the I tensor (using DW factors & phase factors)
 	void eval_I(std::vector<ao_data>& ao_data_shells);
 	// Calculates F_calc using the I tensor and adds anomalous dispersion corrections
-	void calc_F_calc(const dMatrixRef2& D);
+	void calc_F_calc(const dMatrix2& D);
 	// Calculates the perturbation matrix elements
-	void calc_perturb(occ::Mat& perturb);
+	void calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf);
 
 
 	// Methods for performing the SCF procedure
@@ -79,13 +81,17 @@ private:
 	// Sets up the basis set with a previously generated molecule and basis set from JKFit, where the Olex2 basis sets are now located
 	void setup_basis(occ::core::Molecule& mol, std::string& basis_set_name);
 	// Executes a single SCF solver
-	void do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn);
+	void do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool has_guess);
 	// Executes a single SCF iteration
-	bool SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_old, occ::Mat& dm, const int& iter, double& ehf_last, const double& lambda, double& ehf, double& e_diff, double& alpha, const double& next_alpha, bool alpha_set);
+	bool SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& e_diff_mem);
 	// Checks convergence for SCF cylce
-	bool SCF_convergence_check(double& e_diff, occ::qm::SCF<occ::qm::HartreeFock>& scf);
+	bool SCF_convergence_check(const double& e_diff, occ::qm::SCF<occ::qm::HartreeFock>& scf);
 	// Takes the SCF object from occ and creates the tscb file
 	void create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda);
+	// Takes care of dynamic damping (very primitive)
+	double dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& current_alpha, const double& e_diff, double& e_diff_mem);
+	// Builds the density matrix to use for structure factor calculations
+	void build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMatrix2& dm_ref, const occ::Mat& dm_old);
 
 
 	// Methods for computing temporary variables, matrices and useful lists
@@ -110,6 +116,8 @@ private:
 	int nr_small;
 	int n_params;
 	double scale;
+	double GooF;
+	double chi2;
 	ivec asym_atom_list;
 	vec U_iso;
 	svec labels;

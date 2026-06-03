@@ -351,12 +351,12 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 			if (F_ < 0) {
 				F_ = -std::sqrt(-F_);
 				positive_ = -1;
-				sigma_ = sigma_ * 0.5 / std::sqrt(-F_);
+				sigma_ = sigma_ * 0.5 / -F_;
 			}
 			else {
 				positive_ = 1;
 				F_ = std::sqrt(F_);
-				sigma_ = sigma_ * 0.5 / std::sqrt(F_);
+				sigma_ = sigma_ * 0.5 / F_;
 			}
 		}
 		// if (debug) file << endl;
