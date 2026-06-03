@@ -551,6 +551,7 @@ int main(int argc, char **argv)
         err_checkf(opt.wfn != "", "No Wavefunction given!", log_file);
         wavy.emplace_back(opt.wfn, opt.debug);
         wavy[0].write_wfn("converted.wfn", false, false);
+        wavy[0].write_wfn("occupied.wfn", false, true);
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
