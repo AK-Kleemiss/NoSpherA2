@@ -10,6 +10,7 @@
 #include "cif.h"
 //#include "debug_utils.h"
 #include "bondwise_analysis.h"
+#include "XCW.h"
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 void run_profiling_tests(const std::filesystem::path& tests_root);
@@ -408,7 +409,7 @@ int main(int argc, char **argv)
         return 0;
     }
     // This one has conversion to fchk and calculation of one single tsc file
-    if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
+    if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0 && !opt.do_XCW)
     {
         if (opt.occ != "") {
             log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
@@ -538,6 +539,20 @@ int main(int argc, char **argv)
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         return 0;
+    }
+    // Performs XCW
+    if (!opt.properties.calc() && opt.do_XCW)
+    {
+        opt.groups[0].push_back(0);
+        XCW xcw(opt);
+        if(!opt.calc_F_calc)
+        {
+            xcw.run_XCW_fitting();
+        }
+        if (opt.calc_F_calc) {
+            xcw.calc_F_calc_fast();
+        }
+        exit(0);
     }
     // Contains all calculations of properties and cubes
     if (opt.properties.calc())

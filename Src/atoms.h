@@ -76,6 +76,7 @@ public:
     // Non-const overload to obtain a mutable reference
     basis_set_entry& get_basis_set_entry(const int& _nr) { return basis_set[_nr]; }
     double get_coordinate(const unsigned int& axis) const;
+    double get_frac_coordinate(const unsigned int& axis) const;
     int get_charge() const { return charge; };
     int get_ECP_electrons() const { return ECP_electrons; };
     void set_charge(const int& ch) { charge = ch; };

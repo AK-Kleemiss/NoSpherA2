@@ -25,6 +25,10 @@
 #include <occ/qm/io/conversion.h>
 #include <occ/io/occ_input.h>
 #include <occ/qm/wavefunction.h>
+#include <occ/io/xyz.h>
+#include <occ/core/molecule.h>
+#include <occ/qm/scf.h>
+#include <occ/qm/scf_impl.h>
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
 #endif

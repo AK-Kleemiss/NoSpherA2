@@ -765,3 +765,21 @@ void swap_rows_cols_symm(T& mat, const int i, const int j) {
 }
 template void swap_rows_cols_symm(dMatrix2& mat, const int row1, const int row2);
 template void swap_rows_cols_symm(cMatrix2& mat, const int row1, const int row2);
+
+
+//template <typename T>
+//std::vector<std::vector<T>> scalar_mat_mult(std::vector<std::vector<T>>& mat, const T& val) {
+//    std::transform(mat.begin(), mat.end(), mat.begin(), [val](std::vector<T>& vec) {
+//        std::transform(vec.begin(), vec.end(), vec.begin(), [val](T x) { return x * val; });
+//        return vec;});
+//}
+//template vec2 scalar_mat_mult(vec2& mat, const double& val);
+//template cvec2 scalar_mat_mult(cvec2& mat, const cdouble& val);
+//
+//template <typename T>
+//T scalar_NdMat_mult(T cont, const T scalar) {
+//    if constexpr (!std::is_same_v < T, std::vector<T>)
+//    {
+//        for ()
+//    }
+//}

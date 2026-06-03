@@ -34,6 +34,7 @@ struct GridConfiguration {
     PartitionType partition_type = PartitionType::Hirshfeld;
     bool debug = false;
     bool all_charges = false;
+    bool no_density_eval = false;
 
     double getCutoff() const;
     std::string getPartitionName() const;
@@ -111,6 +112,8 @@ public:
     void setConfiguration(const GridConfiguration &config) { config_ = config; }
     const GridConfiguration &getConfiguration() const { return config_; }
     const GridData &getGridData() const { return grid_data_; }
+	GridData& getGridData() { return grid_data_; }  //Access to a mutable reference if deeper access is needed
+	const bool& getNeedsHelper() const { return needs_helper_grids_; }
     int getTotalGridPoints() const { return grid_data_.total_points; }
     int getNumPointsForAtom(const int &atom_index) const { return grid_data_.num_points_per_atom[atom_index]; }
 

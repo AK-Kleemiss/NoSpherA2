@@ -279,7 +279,8 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
             << "Using " << wave.get_nmo() << " MOs in temporary wavefunction" << std::endl;
         //wave.write_wfn("temp_wavefunction.wfn", false, true);
     }
-    if (!non_spherical_densities_calculated_) {
+
+    if (!non_spherical_densities_calculated_ && !config_.no_density_eval) {
         calculateNonSphericalDensities(wave, unit_cell);
         addTimingPoint("WFN evaluation on grid");
     }
@@ -294,7 +295,6 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
             << grid_data_.total_points << std::endl;
     }
 }
-
 
 void GridManager::setup1DGridsForMolecule(const WFN &wave, const int atom_1, const int atom_2, const int gridpoints, const double padding) {
     // Clear previous data
@@ -405,7 +405,7 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
     for (const int atom_type : atom_types) {
         // Calculate basis set parameters for this atom type
         double alpha_max = 0.0;
-        int max_l = 0;
+        unsigned int max_l = 0;
         vec alpha_min(6, 1e8);  // Support up to f functions
 
         for (int i = 0; i < wave.get_ncen(); i++) {
@@ -416,7 +416,7 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
 
                 alpha_max = std::max(alpha_max, wave.get_exponent(b));
 
-                int l = wave.get_type(b);
+                unsigned int l = wave.get_type(b);
                 if (l == 1) l = 1;
                 else if (l >= 2 && l <= 4) l = 2;
                 else if (l >= 5 && l <= 10) l = 3;
@@ -428,8 +428,18 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
                 alpha_min[l - 1] = std::min(alpha_min[l - 1], wave.get_exponent(b));
             }
         }
+    //    for (int i = 0; i < wave.get_ncen(); i++) {
+    //        if (wave.get_atom_charge(i) != atom_type) continue;
+    //        const atom& atm = wave.get_atom(i);
+    //        for (const basis_set_entry& bs_entry : atm.get_basis_set()) {
+    //            alpha_max = std::max(alpha_max, bs_entry.get_exponent());
+				//unsigned int l = (wave.get_origin() == e_origin::gbw) ? bs_entry.get_type() - 1 : bs_entry.get_type();
+				//max_l = std::max(max_l, l);
+				//alpha_min[l] = std::min(alpha_min[l], bs_entry.get_exponent());
+    //        }
+    //    }
 
-        int max_l_temp = max_l - 1;
+        int max_l_temp = max_l;
 
         err_checkf(config_.accuracy >= 0, "Negative accuracy is not defined!", std::cout);
         // Get Lebedev grid parameters using the constexpr function
@@ -765,7 +775,7 @@ void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2
         //            accepted_points += keep;
         //        }
 
-        (*num_points_per_atom)[g] = accepted_points;
+        //(*num_points_per_atom)[g] = accepted_points;  //If anything breaks... i thought this was not neccecary and a bug );
         d1[final_atoms].resize(accepted_points);
         d2[final_atoms].resize(accepted_points);
         d3[final_atoms].resize(accepted_points);

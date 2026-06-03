@@ -137,15 +137,9 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     basis_set_name = occ_WF.basis.name();
     has_ECPs = occ_WF.basis.have_ecps();
     charge = occ_WF.charge();
-    ncen = occ_WF.atoms.size();
-    atoms.resize(ncen);
     const occ::Mat3N atom_positions = occ_WF.positions();
-    for (long i = 0; i < ncen; i++) {
-        atoms[i].set_label(constants::atnr2letter(occ_WF.atoms[i].atomic_number));
-        atoms[i].set_charge(static_cast<int>(occ_WF.nuclear_charges()(i)));
-        atoms[i].set_coordinate(0, atom_positions(0, i));
-        atoms[i].set_coordinate(1, atom_positions(1, i));
-        atoms[i].set_coordinate(2, atom_positions(2, i));
+    for (long i = 0; i < occ_WF.atoms.size(); i++) {
+        push_back_atom(constants::atnr2letter(occ_WF.atoms[i].atomic_number), atom_positions(0, i), atom_positions(1, i), atom_positions(2, i), static_cast<int>(occ_WF.nuclear_charges()(i)), "");
     }
     auto &shells = occ_WF.basis.shells();
 
@@ -195,7 +189,9 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     unsigned int n_cart;
     unsigned int sum_ncart;
     int atom;
+    int last_atom = 0;
     int l;
+    int k = 0;
     for (int i = 0; i < shells.size(); i++)
     {
         const auto &shell = shells[i];
@@ -207,7 +203,17 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
         occ::Vec occ_exp = shell.exponents.replicate(n_cart, 1);
         insert_into_exponents(occ_vec_span(occ_exp));
         atom = shell2atom[i];
+        if (i != 0) {
+            last_atom = shell2atom[i - 1];
+        }
+        if (last_atom != atom) {
+            k = 0;
+        }
         // insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
+        for (int j = 0; j < shell.exponents.size(); j++) {
+            push_back_atom_basis_set(atom, shell.exponents(j), shell.contraction_coefficients(j), shell.l, k);
+        }
+        k++;
         auto repeated = std::views::iota(0u, n_cart * nprim) | std::views::transform([&](auto) { return atom + 1; });
         insert_into_centers(repeated);
 
@@ -271,6 +277,18 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
         }
     }
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+
+    set_origin(e_origin::OCC);
+    d_f_switch = false;
+    int nmo_ = occ_WF.mo.D.rows();
+    DM = dMatrix2(nmo_, nmo_);
+    for (int i = 0; i < nmo_; i++) {
+        DM(i, i) = 2 * occ_WF.mo.D(i, i);
+        for (int j = i + 1; j < nmo_; j++) {
+            DM(i, j) = 2 * occ_WF.mo.D(i, j);
+            DM(j, i) = DM(i, j);
+        }
+    }
 }
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string &ID)
@@ -6937,6 +6955,34 @@ const double WFN::compute_dens_cartesian(
     }
 
     return Rho;
+}
+
+const double WFN::eval_ao(
+	std::array<double, 4>& d,
+    const std::vector<primitive>& prims,
+    const int &m
+) const
+{   
+
+    // normalize distances for spherical harmonic
+    const int type = prims[0].get_type();
+    const double scale = 1 / d[3];
+	d[0] *= scale;
+	d[1] *= scale;
+	d[2] *= scale;
+    const double rl = std::pow(d[3], type);
+    d[3] *= d[3];
+	
+    double radial = 0;
+    const primitive* p = prims.data();
+    const primitive* const p_end = p + prims.size();
+    
+    for (; p != p_end; p++) {
+        radial += p->eval_gaussian_unnormalized(rl, d[3]);
+    }
+    
+    return radial * constants::spherical_harmonic(type, m, d.data());
+    // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
 }
 
 const double WFN::compute_g_cartesian(

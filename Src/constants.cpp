@@ -2,7 +2,10 @@
 #include "constants.h"
 #include "convenience.h"
 
+
+
 namespace constants {
+    double exp_cutoff = -23.5;
     const char* atnr2letter(const int& nr)
     {
         if (nr == 0)
