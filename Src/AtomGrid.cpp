@@ -387,7 +387,9 @@ vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
                     // Some printing on the ratio between pair of atoms, for if strange results (or against chemical intuition) are obtained one can see if it is TFVC problem
                     // This is helpful to see if the "bcp" evaluation is broken, or one face a nasty scenario that is not yet included in the code...
                     if (debug)
-                        std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a * ncen + b] << std::endl;
+#pragma omp critical
+                        {std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a * ncen + b] << std::endl;}
+                        
                 }
             }
             else {

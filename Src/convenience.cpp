@@ -7,7 +7,7 @@
 #include "properties.h"
 #include "wfn_class.h"
 #include "atoms.h"
-#include "JKFit.h"
+#include "basis_set.h"
 #include "fchk.h"
 #include "bondwise_analysis.h"
 
@@ -1750,29 +1750,6 @@ double get_decimal_precision_from_CIF_number(std::string &given_string)
         return 0.005;
 };
 
-void write_spherical_atoms() {
-#pragma omp parallel for
-    for (int i = 1; i < 103; i++) {
-        std::cout << "Atom " << i << std::endl;
-        Thakkar atom(i);
-        std::ofstream out("spherical_" + std::string(constants::atnr2letter(i)) + ".txt");
-        out << std::scientific << std::setprecision(10);
-        out << std::to_string(i) << " r Density" << std::endl;
-        const double min_dist = 1E-7;
-        const double incr = 1.025;
-
-        // Make radial grids
-        double current = 1;
-        double _dist = min_dist;
-        while (current > 1E-15)
-        {
-            current = atom.get_radial_density(_dist);
-            out << _dist << " " << current << std::endl;
-            _dist *= incr;
-        }
-    }
-}
-
 void options::digest_options()
 {
     using namespace std;
@@ -2140,7 +2117,7 @@ void options::digest_options()
             np_descr.fortran_order = false;
             np_descr.shape = { static_cast<unsigned long>(sizes[0]), static_cast<unsigned long>(sizes[1]) };
             npy::write_npy("descriptor.npy", np_descr);
-
+            
             exit(0);
         }
         else if (temp == "-fchk")
@@ -2370,9 +2347,9 @@ void options::digest_options()
                     aux_basis.push_back(std::make_shared<BasisSet>());
                     break;
                 }
-                err_chkf(BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set]),
+                err_chkf(BasisSetLibrary::check_basis_set_exists(arguments[next_basis_set]),
                     "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
-                aux_basis.push_back(BasisSetLibrary().get_basis_set(arguments[next_basis_set]));
+                aux_basis.push_back(BasisSetLibrary::get_basis_set(arguments[next_basis_set]));
                 next_basis_set++;
             }
             if (aux_basis.size() == 0) {
@@ -2397,12 +2374,36 @@ void options::digest_options()
         }
         else if (temp == "-RI_CUBE" || temp == "-ri_cube")
         {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+            std::string coef_file = arguments[i + 1];
+            std::vector<unsigned long> shape{};
+            bool fortran_order;
+            vec coefs{};
+
+            npy::LoadArrayFromNumpy(coef_file, shape, fortran_order, coefs);
+
+
             WFN wavy(wfn);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+
+            int nr_coefs = 0;
+            for (const atom& atm : wavy_aux.get_atoms()) {
+                int prim = 0;
+                for (int shell = 0; shell < atm.get_shellcount_size(); shell++) {
+                    const int type = atm.get_basis_set_entry(prim).get_type();
+                    nr_coefs += 2 * type + 1;
+                    prim += atm.get_shellcount(shell);
+                }
+            }
+
+            std::cout << coefs.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
+            
             // First name of coef_file, second name of xyz file
-            // cube_from_coef_npy(arguments[i + 1], arguments[i + 2]);
+            cube_from_coef_npy(coefs, wavy_aux);
 
             // std::string aux_basis = arguments[i + 1];
-            gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
+            //gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
             //gen_CUBE_for_RI(wavy, "def2_universal_jkfit", this);
             //gen_CUBE_for_RI(wavy, "combo-basis-fit", this);
             //gen_CUBE_for_RI(wavy, "cc-pvqz-jkfit", this);
@@ -2431,7 +2432,7 @@ void options::digest_options()
             log_file << "Using " << salted_model_path << " for the prediction" << endl;
             if (!SP.basis_set_loaded()) {
                 df_basis_name = SP.get_dfbasis_name();
-                std::shared_ptr<BasisSet> _aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                std::shared_ptr<BasisSet> _aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
                 load_basis_into_WFN(SP.wavy, _aux_basis);
             }
             vec coefs = SP.gen_SALTED_densities();
@@ -2622,7 +2623,7 @@ void options::digest_options()
             filesystem::path salted_model_path = SP.get_salted_filename();
             log_file << "Using " << salted_model_path << " for the prediction" << endl;
             if (!SP.basis_set_loaded()) {
-                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
                 load_basis_into_WFN(SP.wavy, aux_basis);
             }
             vec coefs = SP.gen_SALTED_densities();

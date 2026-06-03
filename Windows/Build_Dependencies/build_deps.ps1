@@ -344,6 +344,13 @@ if (Test-Path $OccOut) {
   try {
     cmake --workflow --preset windows-clang-cl
     cmake --install .\build-windows-clang-cl
+    $tbbLib = Get-ChildItem `
+      -Path (Join-Path $RepoRoot "build-windows-clang-cl") `
+      -Recurse `
+      -Filter "tbb12.lib" `
+      -ErrorAction SilentlyContinue |
+      Select-Object -First 1 -ExpandProperty FullName
+    Copy-Item $tbbLib -Destination (Join-Path $LibDir "occ\lib\tbb12.lib") -Force
   } finally {
     Pop-Location
   }
@@ -353,6 +360,30 @@ if (Test-Path $OccOut) {
 $stamp = Join-Path $RepoRoot "Windows\Build_Dependencies\deps.stamp"
 New-Item -ItemType Directory -Force (Split-Path $stamp) | Out-Null
 Set-Content -Path $stamp -Value ("OK " + (Get-Date).ToString("s")) -Encoding ASCII
+
+# -----------------------------
+# 4) Build BasisSetConverter (if needed)
+# -----------------------------
+$converterExe = Join-Path $RepoRoot "Lib/BasisSetConverter.exe"
+if (Test-Path $converterExe) {
+  Info "BasisSetConverter already built ($converterExe)"
+} else {
+  $src = Join-Path $RepoRoot "BasisSetGenerator"
+  $bld = Join-Path $src "build"
+  if (-not (Test-Path $bld)) { New-Item -ItemType Directory $bld | Out-Null }
+
+  Push-Location $src
+  try {
+    cmake -S . -B build
+    cmake --build build --config Release
+    cmake --install build --config Release --prefix "../Lib"
+  } finally {
+    Pop-Location
+  }
+
+  if (-not (Test-Path $converterExe)) { Fail "BasisSetConverter build finished but executable not found: $converterExe" }
+  Info "BasisSetConverter OK"
+}
 
 Info "All dependencies are ready."
 exit 0

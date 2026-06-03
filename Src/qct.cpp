@@ -1959,7 +1959,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                 std::cout << "First you need to read a wavefunction!" << endl;
                 break;
             }
-            if (!read_basis_set_vanilla(opt.basis_set_path, wavy[activewave], opt.debug))std::cout << "Problem during reading of the basis set!" << endl;
+            if (!BasisSetLibrary::read_basis_set_vanilla(opt.basis_set_path, wavy[activewave], opt.debug))std::cout << "Problem during reading of the basis set!" << endl;
             if (opt.debug) Enter();
             cls();
             break;

@@ -8,7 +8,7 @@
 #include "basis_set.h"
 #include "nos_math.h"
 #include "libCintMain.h"
-#include "JKFit.h"
+#include "basis_set.h"
 
 #include "occ/OrbitalDefs.h"
 long long int WFN::pre[9][5][5][9] = {};
@@ -4951,12 +4951,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
     {
         if (debug)
             std::cout << "No basis set loaded, will load a complete basis set now!" << endl;
-        err_checkf(read_basis_set_vanilla(basis_set_path, *this, debug), "ERROR during reading of missing basis set!", std::cout);
+        err_checkf(BasisSetLibrary::read_basis_set_vanilla(basis_set_path, *this, debug), "ERROR during reading of missing basis set!", std::cout);
     }
     else if (get_nr_basis_set_loaded() < get_ncen())
     {
         std::cout << "Not all atoms have a basis set loaded!\nLaoding the missing atoms..." << flush;
-        err_checkf(read_basis_set_missing(basis_set_path, *this, debug), "ERROR during reading of missing basis set!", std::cout);
+        err_checkf(BasisSetLibrary::read_basis_set_missing(basis_set_path, *this, debug), "ERROR during reading of missing basis set!", std::cout);
     }
     else if (get_nr_basis_set_loaded() > get_ncen())
     {
@@ -8965,7 +8965,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         //
         //}
 
-    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set("ptb-vdzp");
+    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set("ptb-vdzp");
     set_basis_set_ptr(aux_basis->get_data());
     int nr_coefs = 0;
     for (int i = 0; i < get_ncen(); i++)
