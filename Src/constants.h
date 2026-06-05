@@ -49,6 +49,12 @@ namespace constants
         return result;
     }
 
+    consteval double pow_const(const double &base, const int &exponent) {
+        double result = 1.0;
+        for (int i = 0; i < exponent; i++) result *= base;
+        return result;
+    }
+
     // Constants for later use
     constexpr double SQRT2 = sqrt(2.0);
     constexpr double SQRT3 = sqrt(3.0);
@@ -70,10 +76,10 @@ namespace constants
     constexpr double EIGHT_PI = 8 * PI;
     constexpr double INV_EIGHT_PI = 1.0 / EIGHT_PI;
     constexpr double C0 = SQRT2 * FOUR_PI;
-    const double sqr_pi = sqrt(PI);
-    constexpr double PI2 = PI * PI;
-    const double PI3_2 = PI * sqr_pi;
-    constexpr double PI3 = PI2 * PI;
+    constexpr double sqr_pi = sqrt(PI);
+    constexpr double PI2 = pow_const(PI, 2);
+    constexpr double PI3_2 = PI * sqr_pi;
+    constexpr double PI3 = pow_const(PI, 3);
     constexpr double PI_180 = PI / 180.0;
     constexpr double INV_PI_180 = 1.0 / PI_180;
     const double TG32 = tgamma(3.0 / 2.0);
@@ -128,7 +134,7 @@ namespace constants
     constexpr std::complex<double> cnull = std::complex<double>(0.0, 0.0);
     constexpr std::complex<double> cone = std::complex<double>(0.0, 1.0);
 
-    const double ctelf = 10 * pow(2, -2.0 / 3.0) * pow(3, c_m53) * pow(PI, -c_43);
+    const double ctelf = 10.0 * pow(2, -c_23) * pow(3, c_m53) * pow(PI, -c_43);
     constexpr double c_1_4p = sqrt(1.0 / (FOUR_PI));
     constexpr double c_3_4p = sqrt(3.0 / (FOUR_PI));
     constexpr double c_5_4p = sqrt(5.0 / (FOUR_PI));
@@ -639,7 +645,7 @@ namespace constants
     4, 1, 0,
     5, 0, 0 };
 
-    const int n_val_electrons[] =
+    constexpr int n_val_electrons[] =
     { 1, 2,
     1, 2, 3, 4, 5, 6, 7, 8,
     1, 2, 3, 4, 5, 6, 7, 8,
@@ -649,7 +655,7 @@ namespace constants
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8 };
 
     // https://en.wikipedia.org/wiki/Electronegativities_of_the_elements_(data_page)
-    const double allen_electronegativities[] =
+    constexpr double allen_electronegativities[] =
     { 2.300, 4.160,
         0.912, 1.576, 2.051, 2.544, 3.066, 3.610, 4.193, 4.787,
         0.869, 1.293, 1.613, 1.916, 2.253, 2.589, 2.869, 3.242,
@@ -712,7 +718,7 @@ namespace constants
 #endif
     }
 
-    static double POLY_SMALLX_R0[] = {
+    static constexpr double POLY_SMALLX_R0[] = {
         // nroots = 1
         5.0000000000000000e-01,
         // nroots = 2
@@ -1242,7 +1248,7 @@ namespace constants
         6.7479733097461019e+02,
     };
 
-    static double POLY_SMALLX_R1[] = {
+    static constexpr double POLY_SMALLX_R1[] = {
         // nroots = 1
         -2.0000000000000001e-01,
         // nroots = 2
@@ -1772,7 +1778,7 @@ namespace constants
         -1.0796757295593762e+01,
     };
 
-    static double POLY_SMALLX_W0[] = {
+    static constexpr double POLY_SMALLX_W0[] = {
         // nroots = 1
         1.0000000000000000e+00,
         // nroots = 2
@@ -2302,7 +2308,7 @@ namespace constants
         1.8992056795136905e-03,
     };
 
-    static double POLY_SMALLX_W1[] = {
+    static constexpr double POLY_SMALLX_W1[] = {
         // nroots = 1
         -3.3333333333333331e-01,
         // nroots = 2
@@ -2832,7 +2838,7 @@ namespace constants
         -1.8660755178749769e-03,
     };
 
-    static double POLY_LARGEX_RT[] = {
+    static constexpr double POLY_LARGEX_RT[] = {
         // nroots = 1
         5.0000000000000000e-01,
         // nroots = 2
@@ -3362,7 +3368,7 @@ namespace constants
         1.0700113899010603e+02,
     };
 
-    static double POLY_LARGEX_WW[] = {
+    static constexpr double POLY_LARGEX_WW[] = {
         // nroots = 1
         1.0000000000000000e+00,
         // nroots = 2
