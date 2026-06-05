@@ -784,7 +784,7 @@ void Calc_MO_spherical_harmonics(
     }
 };
 
-void cube_from_coef_npy(vec& coefs, WFN& wave)
+void cube_from_coef_npy(vec &coefs, WFN &wave)
 {
     cube res = calc_cube_ML(coefs, wave);
     res.set_path((wave.get_path().parent_path() / wave.get_path().stem()).string() + "_PySCF_COEFS_rho.cube");
@@ -795,14 +795,14 @@ void cube_from_coef_npy(vec& coefs, WFN& wave)
 
 void test_openblas()
 {
-//#ifdef __APPLE__
-//    omp_set_num_threads(4);
-//#else
-//    MKL_Set_Num_Threads(4);
-//#endif
-//#ifdef _OPENMP
-//    omp_set_num_threads(4);
-//#endif
+    //#ifdef __APPLE__
+    //    omp_set_num_threads(4);
+    //#else
+    //    MKL_Set_Num_Threads(4);
+    //#endif
+    //#ifdef _OPENMP
+    //    omp_set_num_threads(4);
+    //#endif
     std::cout << "Running MKL/Accelerate test" << std::endl;
     _test_openblas();
 }
@@ -2119,48 +2119,6 @@ void run_profiling_tests(const std::filesystem::path &tests_root)
 
     std::cout << "\n[PROFILING] All 21 test paths completed.\n" << std::flush;
 }
-//     }; break;
-//     case 5: switch (m_) {
-//     case 0: result = 0.125 * x * (63. * x * x * x * x - 70. * x * x + 15.); break;
-//     case 1: result = p * 1.875 * (21. * x * x * x * x - 14. * x * x + 1.) * s; break;
-//     case 2: result = p * 52.5 * x * (3. * x * x - 1.) * s * s; break;
-//     case 3: result = p * 52.5 * (9. * x * x - 1.) * s * s * s; break;
-//     case 4: result = p * 945. * x * s * s * s * s; break;
-//     case 5: result = p * 945. * s * s * s * s * s; break;
-//     }; break;
-//     case 6: switch (m_) {
-//     case 0: result = 0.0625 * (231. * x * x * x * x * x * x - 315. * x * x * x * x + 105. * x * x - 5.); break;
-//     case 1: result = p * 2.625 * x * (33. * x * x * x * x - 30. * x * x + 5.) * s; break;
-//     case 2: result = p * 13.125 * (33. * x * x * x * x - 18. * x * x + 1.) * s * s; break;
-//     case 3: result = p * 157.5 * x * (11. * x * x - 3.) * s * s * s; break;
-//     case 4: result = p * 472.5 * (11. * x * x - 1.) * s * s * s * s; break;
-//     case 5: result = p * 10395. * x * s * s * s * s * s; break;
-//     case 6: result = p * 10395. * s * s * s * s * s * s; break;
-//     }; break;
-//     case 7: switch (m_) {
-//     case 0: result = 0.0625 * x * (429. * x * x * x * x * x * x - 693. * x * x * x * x + 315. * x * x - 35.); break;
-//     case 1: result = p * 0.4375 * (429. * x * x * x * x * x * x - 495. * x * x * x * x + 135. * x * x - 5.) * s; break;
-//     case 2: result = p * 7.875 * x * (143. * x * x * x * x - 110. * x * x + 15.) * s * s; break;
-//     case 3: result = p * 39.375 * (143. * x * x * x * x - 66. * x * x + 3.) * s * s * s; break;
-//     case 4: result = p * 1732.5 * x * (13. * x * x - 3.) * s * s * s * s; break;
-//     case 5: result = p * 5197.5 * (13. * x * x - 1.) * s * s * s * s * s; break;
-//     case 6: result = p * 135135. * x * s * s * s * s * s * s; break;
-//     case 7: result = p * 135135. * s * s * s * s * s * s * s; break;
-//     }; break;
-//     case 8: switch (m_) {
-//     case 0: result = 0.0078125 * (6435. * x * x * x * x * x * x * x * x - 12012. * x * x * x * x * x * x + 6930. * x * x * x * x - 1260. * x * x + 35.); break;
-//     case 1: result = p * 0.5625 * x * (715. * x * x * x * x * x * x - 1001. * x * x * x * x + 385. * x * x - 35.) * s; break;
-//     case 2: result = p * 19.6875 * (143. * x * x * x * x * x * x - 143. * x * x * x * x + 33. * x * x - 1.) * s * s; break;
-//     case 3: result = p * 433.125 * x * (39. * x * x * x * x - 26. * x * x + 3.) * s * s * s; break;
-//     case 4: result = p * 1299.375 * (65. * x * x * x * x - 26. * x * x + 1.) * s * s * s * s; break;
-//     case 5: result = p * 67567.5 * x * (5. * x * x - 1.) * s * s * s * s * s; break;
-//     case 6: result = p * 67567.5 * (15. * x * x - 1.) * s * s * s * s * s * s; break;
-//     case 7: result = p * 2027025. * x * s * s * s * s * s * s * s; break;
-//     case 8: result = p * 2027025. * s * s * s * s * s * s * s * s; break;
-//     }; break;
-//     };
-//     return result;
-// }
 
 // TESTING THE FOURIER BESSEL TRANSFORM for WAVE FUNCTIONS
 // cdouble S_n_recursion(int n, double H, double b);

@@ -46,4 +46,8 @@
     "C_Cpp.inlayHints.autoDeclarationTypes.enabled": true,
     "C_Cpp.inlayHints.autoDeclarationTypes.showOnLeft": true,
     "C_Cpp.inlayHints.parameterNames.enabled": true,
+    "chat.tools.terminal.autoApprove": {
+        "msbuild": true
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:system",
 }
