@@ -26,11 +26,9 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
 set(DEBUG_DIR ${CMAKE_SOURCE_DIR}/build_debug)
-set(CMAKE_INSTALL_PREFIX
-    $ENV{HOME}
-    CACHE PATH
-    "Install path prefix, prepended onto install directories."
-)
+if(NOT CMAKE_INSTALL_PREFIX)
+    set(CMAKE_INSTALL_PREFIX "$ENV{HOME}" CACHE PATH "Install path prefix")
+endif()
 message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
@@ -177,7 +175,7 @@ if(ONLY_OCC)
     else()
         if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
             set(libcint_dir
-                ${CMAKE_SOURCE_DIR}/Lib/LibCint_${CMAKE_SYSTEM_PROCESSOR}
+                ${CMAKE_SOURCE_DIR}/Lib/LibCint_${CMAKE_OSX_ARCHITECTURES}
             )
         else()
             set(libcint_dir ${CMAKE_SOURCE_DIR}/Lib/LibCint)

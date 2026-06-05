@@ -108,9 +108,9 @@ Windows/MKL.auto.props
 
 #Libs
 Lib/MKL
-Lib/occ
-Lib/LibCint
-Lib/featomic_install
+Lib/occ*
+Lib/LibCint*
+Lib/featomic_install*
 
 nul
 pch.h.gch_d

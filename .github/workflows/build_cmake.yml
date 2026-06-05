@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
       with:
         egress-policy: audit
 
@@ -22,7 +22,7 @@ jobs:
 
     # Cache IntelMKL
     - name: Cache IntelMKL Build
-      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       id: cache-intelmkl-linux
       with:
         path: Lib/MKL
@@ -37,7 +37,7 @@ jobs:
           sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=/home/runner/work/NoSpherA2/NoSpherA2/Lib/MKL --eula accept
 
     - name: Cache featomic Build
-      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       id: cache-featomic-linux
       with:
         path: build/_deps  # Adjust if featomic installs elsewhere
@@ -63,12 +63,12 @@ jobs:
     runs-on:  windows-2022
     steps:
     - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
       with:
         egress-policy: audit
 
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-    - uses: friendlyanon/setup-vcpkg@dd90d1ea4d644939a9084cb02e46799ee43f9a92 # v1.6.1
+    - uses: friendlyanon/setup-vcpkg@508a6e6b59a3c9d8dac926e1281d4471160d624b # v1.7.0
       with: { committish: 4334d8b4c8916018600212ab4dd4bbdc343065d1 }
     - name: Setup Windows
       shell: powershell

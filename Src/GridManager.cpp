@@ -393,6 +393,7 @@ void GridManager::getIntegrationGrid1D(const WFN &wave, const int atom_1, const 
     }
 }
 
+
 void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
     std::cout << "GridManager: Setting up prototype grids for atom types..." << std::endl;
     prototype_grids_.clear();
