@@ -8,7 +8,7 @@
 #include "properties.h"
 #include "isosurface.h"
 #include "cif.h"
-//#include "debug_utils.h"
+#include "debug_utils.h"
 #include "bondwise_analysis.h"
 
 int QCT(options &opt, std::vector<WFN> &wavy);
@@ -16,9 +16,7 @@ void run_profiling_tests(const std::filesystem::path& tests_root);
 
 int main(int argc, char **argv)
 {
-    //#ifdef __INSECURELY_AWAIT_FOR_ENV
-    //    wait_for_debugger(); // This is for debugging during tests. It just returns if the env variable DEBUG_WAIT is not set.
-    //#endif
+    wait_for_debugger(); // no-op unless DEBUG_WAIT env var is set
     using namespace std;
     char cwd[1024];
 #ifdef _WIN32

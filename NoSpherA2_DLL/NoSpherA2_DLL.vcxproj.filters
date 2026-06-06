@@ -65,9 +65,6 @@
     <ClCompile Include="..\Src\isosurface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\JKFit.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\nos_math.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -119,9 +116,6 @@
     <ClCompile Include="..\Src\b2c.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\auxiliary_basis.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\cif.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -130,6 +124,9 @@
     </ClCompile>
     <ClCompile Include="..\Src\libCintKernels.cpp">
       <Filter>Source Files\libCInt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\basis_data.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

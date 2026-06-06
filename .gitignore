@@ -133,3 +133,8 @@ Mac/NoSpherA2_arm64
 tests/failed_logs/fractal/sucrose_diff.cube_fractal_plot
 *.bak
 *.pyc
+libiomp5.so
+Windows/x64/Debug/PerformanceTests1.dll
+Windows/x64/Release/PerformanceTests1.dll
+Windows/x64/Debug/Tests.dll
+Windows/x64/Release/Tests.dll
