@@ -2140,6 +2140,7 @@ void options::digest_options()
             np_descr.fortran_order = false;
             np_descr.shape = { static_cast<unsigned long>(sizes[0]), static_cast<unsigned long>(sizes[1]) };
             npy::write_npy("descriptor.npy", np_descr);
+            
             exit(0);
         }
         else if (temp == "-fchk")
