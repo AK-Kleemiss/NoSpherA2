@@ -12,7 +12,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NoSpherA2_DLL", "..\NoSpher
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Build_Dependencies", "Build_Dependencies\Build_Dependencies.vcxproj", "{62DD6DD0-A478-46C8-B693-F18D7C34366A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PerformanceTests1", "PerformanceTests1\PerformanceTests1.vcxproj", "{F3079C99-A478-46C8-B693-F18D7C343670}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tests", "Tests\Tests.vcxproj", "{F3079C99-A478-46C8-B693-F18D7C343670}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -64,7 +64,6 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release|ARM64.ActiveCfg = Release|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release|ARM64.Build.0 = Release|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release|x64.ActiveCfg = Release|x64
-		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release|x64.Build.0 = Release|x64
 		{62DD6DD0-A478-46C8-B693-F18D7C34366A}.Debug|ARM64.ActiveCfg = Debug|x64
 		{62DD6DD0-A478-46C8-B693-F18D7C34366A}.Debug|ARM64.Build.0 = Debug|x64
 		{62DD6DD0-A478-46C8-B693-F18D7C34366A}.Debug|x64.ActiveCfg = Debug|x64
@@ -96,7 +95,6 @@ Global
 		{F3079C99-A478-46C8-B693-F18D7C343670}.Release + Copy|x64.ActiveCfg = Release|x64
 		{F3079C99-A478-46C8-B693-F18D7C343670}.Release|ARM64.ActiveCfg = Release|x64
 		{F3079C99-A478-46C8-B693-F18D7C343670}.Release|x64.ActiveCfg = Release|x64
-		{F3079C99-A478-46C8-B693-F18D7C343670}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
