@@ -1,9 +1,10 @@
+#include "pch.h"
 #include "convenience.h"
 
 #include "libCintKernels.h"
 
 extern "C" {
-    #include "cint_funcs.h"
+#include "cint_funcs.h"
 }
 
 
@@ -12,9 +13,9 @@ extern "C" {
  * out[naoi,naoj,naok,comp] in F-order
  */
 void GTOnr3c_fill_s1(
-    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*),
-    double* out, double* buf, int comp, int jobid, int* shls_slice, int* ao_loc, CINTOpt* cintopt,
-    int* atm, int natm, int* bas, int nbas, double* env)
+    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *),
+    double *out, double *buf, int comp, int jobid, int *shls_slice, int *ao_loc, CINTOpt *cintopt,
+    int *atm, int natm, int *bas, int nbas, double *env)
 {
     const int ish0 = shls_slice[0];
     const int ish1 = shls_slice[1];
@@ -59,7 +60,7 @@ void GTOnr3c_fill_s1(
 
 
 
-int GTOmax_shell_dim(const int* ao_loc, const int* shls_slice, int ncenter)
+int GTOmax_shell_dim(const int *ao_loc, const int *shls_slice, int ncenter)
 {
     int i;
     int i0 = shls_slice[0];
@@ -78,9 +79,9 @@ int GTOmax_shell_dim(const int* ao_loc, const int* shls_slice, int ncenter)
 }
 
 size_t GTOmax_cache_size(
-    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*),
-    int* shls_slice, int ncenter,
-    int* atm, int natm, int* bas, int nbas, double* env)
+    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *),
+    int *shls_slice, int ncenter,
+    int *atm, int natm, int *bas, int nbas, double *env)
 {
     int i;
     int i0 = shls_slice[0];
@@ -90,7 +91,7 @@ size_t GTOmax_cache_size(
         i0 = std::min(i0, shls_slice[i * 2]);
         i1 = std::max(i1, shls_slice[i * 2 + 1]);
     }
-    int (*f)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*) = (int (*)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*))intor;
+    int (*f)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *) = (int (*)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *))intor;
     int cache_size = 0;
     int n;
     int shls[4];
@@ -108,10 +109,10 @@ size_t GTOmax_cache_size(
 
 
 void GTOnr3c_drv(
-    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*),
-    void (*fill)(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*), double*, double*, int, int, int*, int*, CINTOpt*, int*, int, int*, int, double*),
-    double* eri, int comp, int* shls_slice, int* ao_loc, CINTOpt* cintopt,
-    int* atm, int natm, int* bas, int nbas, double* env)
+    int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *),
+    void (*fill)(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *), double *, double *, int, int, int *, int *, CINTOpt *, int *, int, int *, int, double *),
+    double *eri, int comp, int *shls_slice, int *ao_loc, CINTOpt *cintopt,
+    int *atm, int natm, int *bas, int nbas, double *env)
 {
     const int ish0 = shls_slice[0];
     const int ish1 = shls_slice[1];
@@ -130,7 +131,7 @@ void GTOnr3c_drv(
 #pragma omp parallel
     {
         int jobid;
-        double* buf = (double*)malloc(sizeof(double) * (di * di * di * comp + cache_size));
+        double *buf = (double *)malloc(sizeof(double) * (di * di * di * comp + cache_size));
 #pragma omp for nowait schedule(dynamic)
         for (jobid = 0; jobid < njobs; jobid++)
         {
@@ -145,9 +146,9 @@ void GTOnr3c_drv(
 /*
  * mat(naoi,naoj,comp) in F-order
  */
-void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*), double* mat, int comp, int hermi,
-    int* shls_slice, int* ao_loc, CINTOpt* opt,
-    int* atm, int natm, int* bas, int nbas, double* env)
+void GTOint2c(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, CINTOpt *, double *), double *mat, int comp, int hermi,
+    int *shls_slice, int *ao_loc, CINTOpt *opt,
+    int *atm, int natm, int *bas, int nbas, double *env)
 {
     const int ish0 = shls_slice[0];
     const int ish1 = shls_slice[1];
@@ -164,7 +165,7 @@ void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, C
         int dims[] = { (int)naoi, (int)naoj };
         int ish, jsh, ij, i0, j0;
         int shls[2];
-        double* cache = (double*)malloc(sizeof(double) * cache_size);
+        double *cache = (double *)malloc(sizeof(double) * cache_size);
 #pragma omp for schedule(dynamic, 4)
         for (ij = 0; ij < nish * njsh; ij++)
         {
@@ -191,7 +192,7 @@ enum COORDINATE_TYPE {
 };
 
 template<COORDINATE_TYPE CT>
-ivec make_loc(ivec& bas, int nbas) {
+ivec make_loc(ivec &bas, int nbas) {
     ivec dims(nbas, 0);
     // Calculate (2*l + 1) * nctr for spherical harmonics
     for (size_t i = 0; i < nbas; i++)
@@ -214,8 +215,8 @@ ivec make_loc(ivec& bas, int nbas) {
 
     return ao_loc;
 }
-template ivec make_loc<COORDINATE_TYPE::CART>(ivec& bas, int nbas);
-template ivec make_loc<COORDINATE_TYPE::SPH>(ivec& bas, int nbas);
+template ivec make_loc<COORDINATE_TYPE::CART>(ivec &bas, int nbas);
+template ivec make_loc<COORDINATE_TYPE::SPH>(ivec &bas, int nbas);
 
 extern "C" {
     extern CINTOptimizerFunction int3c2e_optimizer;

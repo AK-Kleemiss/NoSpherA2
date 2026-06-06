@@ -240,7 +240,7 @@ namespace NosTestFramework
             nullptr,
             const_cast<LPSTR>(cmdLine.c_str()),
             nullptr, nullptr, FALSE,
-            CREATE_NO_WINDOW,
+            CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
             reinterpret_cast<LPVOID>(const_cast<wchar_t *>(envBlock.data())),
             workDir.c_str(),
             &si, &pi);
@@ -282,9 +282,6 @@ namespace NosTestFramework
         else {
             // Default: exe writes NoSpherA2.log; compare under good-file name with .log ext
             std::string logName = test.goodFile;
-            auto pos = logName.rfind(".good");
-            if (pos != std::string::npos)
-                logName.replace(pos, 5, ".log");
             actualPath = tempBase / logName;
             // If the renamed file doesn't exist, fall back to NoSpherA2.log
             if (!std::filesystem::exists(actualPath)) {
