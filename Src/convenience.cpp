@@ -237,7 +237,6 @@ bool ensure_occ_data_path(const char *argv0)
     if (tmp_occ_data_path_env != nullptr)
     {
         std::string occ_data_path_env(tmp_occ_data_path_env);
-        free(tmp_occ_data_path_env);
         if (is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
             return true;
         else
