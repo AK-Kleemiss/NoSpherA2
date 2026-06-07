@@ -1,11 +1,14 @@
 ﻿#pragma once
 #include "pch.h"
 
+
+
 // Pre-definition of classes included later
 class WFN;
 class cell;
 class atom;
 class BasisSet;
+struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
 
 inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
@@ -325,6 +328,20 @@ inline void print_centered_text(const std::string &text, int &bar_width)
         << "]" << std::endl;
 }
 
+inline void print_centered_message(const std::string& text, int bar_width, std::ostream& os = std::cout)
+{
+    const int text_length = static_cast<int>(text.length());
+    const int total_padding = bar_width - text_length;
+    const int padding_left = total_padding / 2;
+    const int padding_right = (total_padding - padding_left) - 1;
+
+    os
+        << std::setw(padding_left) << std::setfill(' ') << ""
+        << text
+        << std::setw(padding_right) << std::setfill(' ') << ""
+        << std::endl;
+}
+
 //-------------------------Progress_bar--------------------------------------------------
 // LMS: My implementation of a progress bar, I would like it to stay within one line that is compatible with parallel loops
 class ProgressBar
@@ -393,6 +410,8 @@ void readxyzMinMax_fromCIF(
     vec2 &cm);
 
 bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
+
+vec read_U_iso_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug);
 
 double double_from_string_with_esd(std::string in);
 
@@ -605,6 +624,23 @@ public:
     {
         coefficient = c;
     };
+    void set_norm_const(const double& nc)
+    {
+        norm_const = nc;
+        normalized_coefficient = nc * coefficient;
+    };
+	double eval_gaussian(const double& r) const
+    {
+        return pow(r, type) * std::exp(-exp * r * r) * normalized_coefficient;
+    };
+    double eval_gaussian_unnormalized(const double& r) const
+    {
+        return pow(r, type) * std::exp(-exp * r * r) * coefficient;
+	};
+    double eval_gaussian_unnormalized(const double& rl, const double& r2) const
+    {
+        return rl * std::exp(-exp * r2) * coefficient;
+    };
 };
 
 struct ECP_primitive : primitive
@@ -668,6 +704,7 @@ struct options
     std::filesystem::path gaussian_path;
     std::filesystem::path turbomole_path;
     std::filesystem::path basis_set_path;
+    std::filesystem::path anom_disp_path;
     std::string occ;
     std::filesystem::path occ_toml_path;
     std::filesystem::path cwd;
@@ -693,6 +730,8 @@ struct options
     bool RI_FIT = false;
     bool needs_Thakkar_fill = false;
     bool qct = false;
+    bool do_XCW = false;
+    bool calc_F_calc = false;
     bool rgbi = false;
     bool fract = false;
     bool profiling = false;
@@ -736,10 +775,6 @@ struct options
         look_for_debug(argc, argv);
     };
 };
-
-const double gaussian_radial(const primitive &p, const double &r);
-
-int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b);
 
 void convert_tonto_XCW_lambda_steps(const std::string &str, const std::string &lambda_step, bool debug, options &opt);
 

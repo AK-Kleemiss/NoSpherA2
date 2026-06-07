@@ -327,7 +327,7 @@ const double calc_density_ML(const double& x,
 
             for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
-                radial += gaussian_radial(bf.get_primitive(), d[3]) * bf.get_coefficient();
+                radial += bf.get_primitive().eval_gaussian(d[3]);
             }
 
             if (radial < 1E-10)
@@ -384,7 +384,7 @@ const double calc_density_ML(const double& x,
 
             for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
-                radial += gaussian_radial(bf.get_primitive(), d[3]) * bf.get_coefficient();
+                radial += bf.get_primitive().eval_gaussian(d[3]);
             }
 
             if (radial < 1E-10)

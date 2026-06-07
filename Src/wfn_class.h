@@ -137,7 +137,7 @@ private:
     void assign_MO_coefs(const int& nr, vec& values);
     void push_back_MO_coef(const int& nr, const double& value);
     bool modified;
-    bool d_f_switch; // true if spherical harmonics are used for the basis set
+    bool d_f_switch; // true if spherical harmonics are used for the basis set, that's a lie, it's the other way around
     bool distance_switch;
     bool has_ECPs;
     bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
@@ -195,6 +195,7 @@ public:
     const double& get_MO_energy(const int& mo) const;
     /** Primitive center index (1-based) for primitive nr. */
     const int& get_center(const int& nr) const { return centers[nr]; };
+    void set_center(const ivec& new_centers) { centers = new_centers; nex = new_centers.size(); };
     /** Primitive type code for primitive nr. */
     const int& get_type(const int& nr) const { return types[nr]; };
     /** MO occupation number. */
@@ -266,11 +267,12 @@ public:
     /** Get spin multiplicity. */
     const unsigned int& get_multi() const { return multi; };
     /** Set multiplicity by reference (legacy). */
-    void set_multi(unsigned int& in) { multi = in; };
+    void set_multi(const unsigned int& in) { multi = in; };
     /** Set charge. */
     void set_charge(const int& in) { charge = in; };
     /** Number of primitives (nex). */
     const int& get_nex() const { return nex; };
+	void set_nex(const int& in) { nex = in; };
     /** Number of centers / atoms. */
     const int& get_ncen() const { return ncen; };
     /** Manually set number of centers (use with care). */
@@ -281,6 +283,7 @@ public:
     const int get_nmo(const bool& only_occ) const;
     /** Origin/file type code. */
     const e_origin& get_origin() const { return origin; };
+	void set_origin(const e_origin& in) { origin = in; };
     /** ECP mode (def2/xTB/pTB etc.). */
     const int& get_ECP_mode() const { return ECP_m; };
     /** Freeform comment header. */
@@ -288,6 +291,7 @@ public:
     //void write_wfn_CIF(const std::filesystem::path &filename) const;
     /** Get primitive exponent by index. */
     const double& get_exponent(int nr) const { return exponents[nr]; };
+	void set_exponents(const vec& new_exponents) { exponents = new_exponents; nex = new_exponents.size(); };
     /** Number of electrons (Z total - charge - ECP core electrons). */
     const unsigned int get_nr_electrons() const;
     /** Total number of core electrons represented by ECPs. */
@@ -467,6 +471,8 @@ public:
     const double compute_dens(const d3& Pos) const;
     /** Density with caller-provided scratch arrays (faster, reusable). */
     const double compute_dens(const d3& Pos, vec2& d, vec& phi) const;
+    /**Evaluates value of primitives at position relative to atom center*/
+    const double eval_ao(std::array<double, 4>& d, const std::vector<primitive>& prims, const int& m) const;
     /** Spin density at position (allocating version). */
     const double compute_spin_dens(const d3& Pos) const;
     /** Spin density with scratch arrays. */
@@ -581,6 +587,7 @@ public:
     /** Raw pointer to primitive exponents. */
     const double* get_ptr_exponents() { return &exponents[0]; };
 	const ivec& get_types() { return types; };
+    void set_types(const ivec& in) { types = in; };
 	const vec& get_exponents() { return exponents; };
 	const ivec& get_centers() { return centers; };
 };

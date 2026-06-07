@@ -48,7 +48,7 @@ void computeEri3c(Int_Params &param1,
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
     int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
 
-    CINTOpt *opty = nullptr;
+    libcint::CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // Compute integrals
@@ -100,7 +100,7 @@ void compute2C(Int_Params &params, vec &ret) {
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
 
-    CINTOpt *opty = nullptr;
+    libcint::CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // Compute integrals
@@ -274,7 +274,7 @@ void computeRho(
         max_block_ij
     );
 
-    CINTOpt *opty = nullptr;
+    libcint::CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     ProgressBar pb(natoms, 60, "#", " ", "Calculating Eri3c Matrix");
@@ -392,7 +392,7 @@ void compute3C(Int_Params &param1,
     unsigned long long int naoj = aoloc[nQM] - aoloc[0];
     unsigned long long int naok = aoloc[nQM + nAux] - aoloc[nQM];
     eri3c.resize(naoi * naoj * naok, 0.0);
-    CINTOpt *opty = nullptr;
+    libcint::CINTOpt* opty = nullptr;
     Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
     ivec shl_slice = { 0, nQM, 0, nQM, nQM, nQM + nAux };
     Kernel::drv(eri3c.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
@@ -440,7 +440,7 @@ dMatrix2 cart2sph(const int l, const bool normalized) {
     int n_sph = 2 * l + 1;
     vec c_sph(n_sph * n_cart, 0.0);
 
-    CINTc2s_ket_sph(c_sph.data(), n_cart, c_tensor.data(), l);
+    libcint::CINTc2s_ket_sph(c_sph.data(), n_cart, c_tensor.data(), l);
     //Transform back to row-major order
     dMatrix2 c_sph_RM(n_cart, n_sph);
     for (int i = 0; i < n_cart; i++) {
@@ -506,4 +506,69 @@ dMatrix2 get_cart2sph_matrix(const WFN &cart_wfn, const bool normalized) {
     //}
 
     return c_dm;
+}
+
+
+
+ivec make_loc(ivec& bas, int nbas) {
+    ivec dims(nbas, 0);
+    // Calculate (2*l + 1) * nctr for spherical harmonics
+    for (size_t i = 0; i < nbas; i++)
+    {
+        dims[i] = (2 * bas(ANG_OF, i) + 1) * bas(NCTR_OF, i);
+    }
+
+    // Create the ao_loc array
+    ivec ao_loc(nbas + 1, 0);
+
+    // Compute the cumulative sum
+    std::partial_sum(dims.begin(), dims.end(), ao_loc.begin() + 1);
+
+    return ao_loc;
+}
+
+vec eval_GTO_sph(Int_Params& params, vec2& grid, ivec& shl_slice) {
+    ivec bas = params.get_bas();
+    ivec atm = params.get_atm();
+    vec env = params.get_env();
+
+
+    //grid = numpy.asarray(grid, dtype = numpy.double, order = 'F')
+    vec fortran_grid(grid.size() * 3);
+    for (size_t i = 0; i < grid[0].size(); i++) {
+        for (size_t j = 0; j < 3; j++) {
+			fortran_grid[i + j * grid[0].size()] = grid[j][i];
+
+        }
+	}
+ 
+
+    int nbas = params.get_nbas();
+    int nat = params.get_natoms();
+	int ngrid = grid.size();
+
+    if (shl_slice.size() == 0) {
+		shl_slice = { 0, nbas};
+    }
+    //ivec aoloc = Kernel::gen_loc(bas, nbas);
+    ivec aoloc = make_loc(bas, nbas);
+	int nao = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
+
+    //non0tab = numpy.ones(((ngrids+BLKSIZE-1)//BLKSIZE,nbas),dtype = numpy.uint8)
+	std::vector<uint8_t> non0table(((ngrid + 56 - 1) / 56) * nbas, 1);
+
+    // Compute integrals
+    vec res((size_t)nao * (size_t)ngrid, 0.0);
+    GTOval_sph(ngrid, shl_slice.data(), aoloc.data(), res.data(), fortran_grid.data(), non0table.data(), atm.data(), nat, bas.data(), nbas, env.data());
+
+    vec ret((size_t)nao * (size_t)ngrid, 0.0);
+    // res is in fortran order, write the result in regular ordering
+    for (int i = 0; i < nao; i++)
+    {
+        for (int j = 0; j < ngrid; j++)
+        {
+            ret[(size_t)j * (size_t)nao + i] = res[(size_t)i * (size_t)ngrid + j];
+        }
+    }
+    return ret;
 }

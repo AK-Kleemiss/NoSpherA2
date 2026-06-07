@@ -1347,6 +1347,7 @@ double get_r_outer(const double &max_error,
     const int &l,
     const double &guess)
 {
+    double cutoff = std::max(9.9999999999999999e-16, constants::cutoff); //double only accurate to around 1e-16
     const int m = 2 * l;
     double r = guess;
     double r_old = 1.0e50;
@@ -1355,9 +1356,8 @@ double get_r_outer(const double &max_error,
     double sign, sign_old;
     double f = 1.0e50;
 
-    (f > max_error) ? (sign = 1.0) : (sign = -1.0);
-
-    while (std::abs(r_old - r) > constants::cutoff)
+    sign = (f > max_error) ? 1.0 : -1.0;
+    while (step > cutoff)
     {
         c = tgamma((m + 3.0) / 2.0);
         a = std::pow(alpha_outer * r * r, (m + 1.0) / 2.0);
@@ -1365,22 +1365,23 @@ double get_r_outer(const double &max_error,
         f = c * a * e;
 
         sign_old = sign;
-        (f > max_error) ? (sign = 1.0) : (sign = -1.0);
+        sign = (f > max_error) ? 1.0 : -1.0;
+
         if (r < 0.0)
             sign = 1.0;
+
         if (sign != sign_old)
             step *= 0.1;
 
-        r_old = r;
         r += sign * step;
     }
-
     return r;
 }
 
 // TCA 106, 178 (2001), eqs. 17 and 18
 double get_h(const double &max_error, const int &l, const double &guess)
 {
+    double cutoff = std::max(9.9999999999999999e-16, constants::cutoff);
     const int m = 2 * l;
     double h = guess;
     double h_old = h * 2;
@@ -1388,7 +1389,7 @@ double get_h(const double &max_error, const int &l, const double &guess)
     double sign = -1.0, sign_old, f, pl, rd0, e0;
     const double cm = constants::TG32 / tgamma((m + 3.0) / 2.0);
 
-    while (std::abs(h_old - h) > constants::cutoff)
+    while (step > cutoff)
     {
         e0 = std::exp(-constants::PI2 / (2.0 * h));
         pl = std::pow(constants::PI / h, l);

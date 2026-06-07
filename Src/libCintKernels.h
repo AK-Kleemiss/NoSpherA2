@@ -1,17 +1,13 @@
 #pragma once
-
-extern "C" {
-    #include "cint.h"
-}
-
+#include <occ/3rdparty/cint_wrapper.h>
 
 #define DECLARE_CINT_KERNEL(NAME, NEEDS_OPT) \
     struct NAME { \
         static constexpr bool NeedsOpt = NEEDS_OPT; \
-        static void optimizer (CINTOpt*& opt, \
+        static void optimizer (libcint::CINTOpt*& opt, \
         int* atm, int nat, int* bas, int nbas, double* env); \
         static void drv(double* out, int comp, int* shl_slice, int* aoloc, \
-            CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env); \
+            libcint::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env); \
         static ivec gen_loc(ivec& bas, int nbas); \
     };
 
@@ -32,3 +28,8 @@ DECLARE_CINT_KERNEL(Coulomb3C_CRT, true);
 DECLARE_CINT_KERNEL(Overlap3C_SPH, false);
 
 #undef DECLARE_CINT_KERNEL
+
+
+void GTOval_sph(int ngrids, int* shls_slice, int* ao_loc,
+    double* ao, double* coord, uint8_t* non0table,
+    int* atm, int natm, int* bas, int nbas, double* env);
