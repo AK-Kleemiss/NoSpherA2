@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "tsc_block.h"
 #include "convenience.h"
-#include <occ/core/data_directory.h>
 #include "basis_set.h"
 #include "fchk.h"
 #include "cube.h"
@@ -267,9 +266,6 @@ int main(int argc, char **argv)
                 ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
                 log_file << "Running OCC for " << opt.combined_tsc_calc_files[i] << "..." << endl;
                 occ::io::OccInput config = occ::io::read_occ_input_file(opt.combined_tsc_calc_files[i].string());
-                if (config.basis.basis_set_directory.empty())
-                    config.basis.basis_set_directory =
-                        std::string(occ::get_data_directory()) + "/basis";
                 std::filesystem::path log_path = opt.combined_tsc_calc_files[i].stem().string() + ".log";
                 occ::log::set_log_file(log_path.string());
                 occ::parallel::set_num_threads(config.runtime.threads);
@@ -418,9 +414,6 @@ int main(int argc, char **argv)
             if (opt.occ.ends_with(".toml")) {
                 ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
                 occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
-                if (config.basis.basis_set_directory.empty())
-                    config.basis.basis_set_directory =
-                        std::string(occ::get_data_directory()) + "/basis";
                 occ::log::set_log_file("NoSpherA2_OCC.log");
                 occ::parallel::set_num_threads(config.runtime.threads);
                 wavy.emplace_back(occ::main::run_scf_external(config, true));
