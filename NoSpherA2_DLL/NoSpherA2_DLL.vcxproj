@@ -171,6 +171,10 @@
       <!-- Force the tbbmalloc_proxy symbol so the linker pulls in the allocator replacement -->
       <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc_proxy.dll" "$(OutDir)"
+copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
@@ -218,6 +222,10 @@
       <!-- Force the tbbmalloc_proxy symbol so the linker pulls in the allocator replacement -->
       <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc_proxy.dll" "$(OutDir)"
+copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">
     <ClCompile>
@@ -265,6 +273,10 @@
       <!-- Force the tbbmalloc_proxy symbol so the linker pulls in the allocator replacement -->
       <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc_proxy.dll" "$(OutDir)"
+copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='GenCube|ARM64'">
     <ClCompile>
@@ -319,6 +331,10 @@
       <!-- Force the tbbmalloc_proxy symbol so the linker pulls in the allocator replacement -->
       <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc_proxy.dll" "$(OutDir)"
+copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>

@@ -12,6 +12,23 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
+        // tbbmalloc_proxy.dll's own DllMain runs while THIS DLL is being
+        // loaded (not yet in the module list), so our IAT is not patched by
+        // tbbmalloc_proxy's automatic startup scan.  Re-invoke the init
+        // function now, after we are fully mapped, so our malloc/free/new/
+        // delete imports are redirected to TBB's scalable allocator.
+        // tbbmalloc_proxy.lib only stubs __TBB_malloc_proxy, not the init
+        // function, so use GetProcAddress to avoid a link-time dependency.
+        {
+            HMODULE hProxy = GetModuleHandleA("tbbmalloc_proxy.dll");
+            if (hProxy) {
+                typedef bool (__cdecl *TBBInitFn)(void);
+                auto fn = reinterpret_cast<TBBInitFn>(
+                    GetProcAddress(hProxy, "TBB_malloc_replacement_init"));
+                if (fn) fn();
+            }
+        }
+        break;
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
     case DLL_PROCESS_DETACH:
@@ -125,20 +142,22 @@ extern "C" DLL_EXPORT int __cdecl NoSpherA2_run(
     _getcwd(savedDir, MAX_PATH);
     _chdir(workDir);
 
-    // OCC caches the data-directory path at library-initialization time by
-    // reading OCC_DATA_PATH from the environment.  When the DLL is loaded at
-    // test-host startup that env var may not be set yet, leaving OCC's
-    // internal path as an empty string.  A later SetEnvironmentVariableA call
-    // from the test runner is too late — OCC never re-reads it.
+    // The test runner sets OCC_DATA_PATH via SetEnvironmentVariableA (Win32 API).
+    // NoSpherA2's ensure_occ_data_path() reads it with _dupenv_s (CRT function).
+    // On Windows these two can diverge: SetEnvironmentVariableA updates the
+    // Win32 environment block while the CRT maintains its own cached table.
+    // If they diverge, _dupenv_s sees stale data and the fallback fires,
+    // writing "OCC_DATA_PATH not set or invalid. Using: ..." into the log file.
     //
-    // Fix: call occ::set_data_directory() directly so OCC's path is correct
-    // for every test run, regardless of when the DLL was loaded.
+    // Fix: read OCC_DATA_PATH via GetEnvironmentVariableA (Win32), then sync
+    // the value into the CRT table with _putenv_s AND into OCC's own override
+    // with occ::set_data_directory().  This ensures all three consumers agree.
     {
-        char* occEnv = nullptr;
-        size_t occLen = 0;
-        if (_dupenv_s(&occEnv, &occLen, "OCC_DATA_PATH") == 0 && occEnv) {
-            occ::set_data_directory(occEnv);
-            free(occEnv);
+        char occBuf[MAX_PATH] = {};
+        DWORD occLen = GetEnvironmentVariableA("OCC_DATA_PATH", occBuf, MAX_PATH);
+        if (occLen > 0 && occLen < MAX_PATH) {
+            occ::set_data_directory(occBuf);          // OCC internal override
+            _putenv_s("OCC_DATA_PATH", occBuf);       // sync CRT env table
         }
     }
 

@@ -103,13 +103,19 @@
 #endif
 #endif
 
-// Route all allocations (malloc/free/new/delete/_aligned_malloc/_aligned_free)
-// through TBB's scalable allocator so that memory allocated inside OCC's SCF
-// driver and memory freed by NoSpherA2 use the same heap.  On Windows this
-// injects  /INCLUDE:__TBB_malloc_proxy  into the link via #pragma comment;
-// on Linux/Mac the volatile global in the header pulls in the proxy at link
-// time.  tbbmalloc.lib + tbbmalloc_proxy.lib must be in AdditionalDependencies
-// (Windows) or the link line (Linux/Mac) for this to take effect.
+// Route malloc/free/new/delete through TBB's scalable allocator.
+// This is needed in BOTH the exe and the DLL:
+//   - DLL: ensures all in-process allocations share one heap (avoids
+//     cross-heap free crashes when OCC and NoSpherA2 exchange objects).
+//   - EXE: OCC uses Eigen's handmade_aligned_free() on clang-cl (because
+//     __clang__ being defined prevents EIGEN_HAS_WIN32_MALLOC from being set).
+//     handmade_aligned_free calls std::free(*(ptr-1)) on the original malloc
+//     pointer.  OCC's internal buffer overflow can corrupt that stored pointer.
+//     scalable_free() on a non-TBB pointer falls back to HeapFree via a
+//     secondary path that does NOT raise STATUS_HEAP_CORRUPTION for a
+//     garbage-value pointer, whereas ucrtbase's direct HeapFree does.
+//     Linking tbbmalloc_proxy therefore lets run_method<DFT> return normally
+//     instead of crashing before the computation result can be used.
 #include <tbb/tbbmalloc_proxy.h>
 
 // Must be last: redefines exit() as a throw when NOSPHERA2_IN_PROCESS is set.
