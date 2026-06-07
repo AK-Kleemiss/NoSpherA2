@@ -1409,6 +1409,7 @@
     <ClCompile Include="..\Src\SALTED_io.cpp" />
     <ClCompile Include="..\Src\SALTED_predictor.cpp" />
     <ClCompile Include="..\Src\SALTED_utilities.cpp" />
+    <ClCompile Include="..\Src\XCW.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h" />
