@@ -149,6 +149,40 @@ occ_x86_64: LibCint_x86_64
 occ_arm64: LibCint_arm64
 	@$(MAKE) NATIVE_ARCH=arm64 occ
 
+# Build tbbmalloc + tbbmalloc_proxy as shared libs for one arch.
+# tbbmalloc_proxy/CMakeLists.txt returns early when BUILD_SHARED_LIBS=OFF,
+# so we always use a separate shared build tree.
+tbbmalloc_proxy:
+	@TBB_SRC="build-macos-release-$(NATIVE_ARCH)/_deps/onetbb-src"; \
+	OUT="Lib/tbbmalloc_$(NATIVE_ARCH)/libtbbmalloc_proxy.dylib"; \
+	if [ ! -f "$$OUT" ]; then \
+		echo "Building tbbmalloc_proxy for macOS $(NATIVE_ARCH)..."; \
+		mkdir -p build-tbbmalloc-$(NATIVE_ARCH) && \
+		cd build-tbbmalloc-$(NATIVE_ARCH) && \
+		cmake -G Ninja ../$$TBB_SRC \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) \
+			-DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 \
+			-DBUILD_SHARED_LIBS=ON \
+			-DCMAKE_MACOSX_RPATH=ON \
+			-DCMAKE_INSTALL_NAME_DIR="@executable_path" \
+			-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+			-DTBB_TEST=OFF -DTBB_STRICT=OFF && \
+		cmake --build . --target tbbmalloc tbbmalloc_proxy && \
+		cd .. && \
+		mkdir -p Lib/tbbmalloc_$(NATIVE_ARCH) && \
+		find build-tbbmalloc-$(NATIVE_ARCH) \( -name "libtbbmalloc.dylib" -o -name "libtbbmalloc_proxy.dylib" \) \
+			-exec cp {} Lib/tbbmalloc_$(NATIVE_ARCH)/ \;; \
+	else \
+		echo "Skipping tbbmalloc_proxy for $(NATIVE_ARCH), already built"; \
+	fi
+
+tbbmalloc_proxy_arm64:
+	@$(MAKE) NATIVE_ARCH=arm64 tbbmalloc_proxy
+
+tbbmalloc_proxy_x86_64:
+	@$(MAKE) NATIVE_ARCH=x86_64 tbbmalloc_proxy
+
 BasisSetConverter_x86_64:
 	@$(MAKE) NATIVE_ARCH=x86_64 BasisSetConverter
 
@@ -184,6 +218,26 @@ occ: LibCint
 		cp build-linux-occ-gcc/liblibocc.a Lib/occ/lib/libocc.a; \
 	else \
 		echo 'Skipping OCC build, Lib/occ/lib/libocc_main.a already exists'; \
+	fi
+
+tbbmalloc_proxy: occ
+	@TBB_SRC="build-linux-occ-gcc/_deps/onetbb-src"; \
+	OUT="Lib/tbbmalloc/libtbbmalloc_proxy.so.2"; \
+	if [ ! -f "$$OUT" ]; then \
+		echo "Building tbbmalloc_proxy for Linux..."; \
+		mkdir -p build-tbbmalloc-linux && \
+		cd build-tbbmalloc-linux && \
+		cmake -G Ninja ../$$TBB_SRC \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DBUILD_SHARED_LIBS=ON \
+			-DTBB_TEST=OFF -DTBB_STRICT=OFF && \
+		cmake --build . --target tbbmalloc tbbmalloc_proxy && \
+		cd .. && \
+		mkdir -p Lib/tbbmalloc && \
+		find build-tbbmalloc-linux \( -name "libtbbmalloc.so*" -o -name "libtbbmalloc_proxy.so*" \) \
+			! -type d -exec cp -P {} Lib/tbbmalloc/ \;; \
+	else \
+		echo "Skipping tbbmalloc_proxy, already built"; \
 	fi
 endif
 

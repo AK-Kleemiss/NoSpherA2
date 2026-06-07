@@ -335,10 +335,28 @@ if (Test-Path $LibCintOut) {
 # -----------------------------
 # 4) Build OCC (if needed)
 # -----------------------------
-$OccOut = Join-Path $LibDir "occ\lib\occ_main.lib"
-if (Test-Path $OccOut) {
-  Info "OCC already built ($OccOut)"
+# $OccCrtStamp records which CRT the OCC libs were built with (/MT or /MD).
+# If the stamp is absent or doesn't say "MD", force a full rebuild so that
+# the tbbmalloc_proxy IAT-patching mechanism can work.
+$OccOut      = Join-Path $LibDir "occ\lib\occ_main.lib"
+$OccCrtStamp = Join-Path $LibDir "occ\lib\occ_crt.stamp"
+$occNeedsBuild = (-not (Test-Path $OccOut)) -or
+                 (-not (Test-Path $OccCrtStamp)) -or
+                 ((Get-Content $OccCrtStamp -ErrorAction SilentlyContinue) -ne "MD")
+if (-not $occNeedsBuild) {
+  Info "OCC already built with /MD ($OccOut)"
 } else {
+  # Remove stale libs AND the cmake build cache.
+  # Changing /MT → /MD requires a clean configure; an incremental cmake build
+  # will leave stale /MT object files that cause loader failures in the DLL.
+  if (Test-Path (Join-Path $LibDir "occ\lib")) {
+    Remove-Item -Recurse -Force (Join-Path $LibDir "occ\lib")
+  }
+  $occBuildDir = Join-Path $RepoRoot "build-windows-clang-cl"
+  if (Test-Path $occBuildDir) {
+    Info "Removing stale OCC build cache ($occBuildDir)..."
+    Remove-Item -Recurse -Force $occBuildDir
+  }
   Info "Building OCC..."
   Push-Location $RepoRoot
   try {
@@ -355,8 +373,123 @@ if (Test-Path $OccOut) {
     Pop-Location
   }
   if (-not (Test-Path $OccOut)) { Fail "OCC build finished but output not found: $OccOut" }
+  Set-Content -Path $OccCrtStamp -Value "MD" -Encoding ASCII
   Info "OCC OK"
 }
+
+# -----------------------------
+# 4a) Build tbbmalloc + tbbmalloc_proxy (shared build, needed for allocator proxy)
+# -----------------------------
+# tbbmalloc_proxy can only be built as a shared library (its CMakeLists.txt
+# returns early when BUILD_SHARED_LIBS is OFF). We configure a separate
+# build tree for the already-fetched oneTBB source, build only the two
+# malloc targets, and copy the import libs + DLLs into Lib/occ/ and the
+# Windows output directories.
+$TbbMallocProxyOut = Join-Path $LibDir "occ\lib\tbbmalloc_proxy.lib"
+if (Test-Path $TbbMallocProxyOut) {
+  Info "tbbmalloc_proxy already built ($TbbMallocProxyOut)"
+} else {
+  $tbbSrc    = Join-Path $RepoRoot "build-windows-clang-cl\_deps\onetbb-src"
+  $tbbBldDir = Join-Path $RepoRoot "build-tbb-malloc"
+
+  if (-not (Test-Path $tbbSrc)) {
+    Fail "oneTBB source not found at $tbbSrc — run the OCC build first so CMake fetches it."
+  }
+
+  Info "Building tbbmalloc + tbbmalloc_proxy (shared)..."
+  if (Test-Path $tbbBldDir) { Remove-Item -Recurse -Force $tbbBldDir }
+  New-Item -ItemType Directory $tbbBldDir | Out-Null
+
+  Push-Location $tbbBldDir
+  try {
+    # Use the same compiler as the OCC build; MultiThreadedDLL (/MD) is required
+    # for shared TBB on MSVC — the proxy DLL uses its own heap internally.
+    cmake -G Ninja $tbbSrc `
+          -DCMAKE_C_COMPILER=clang-cl.exe `
+          -DCMAKE_CXX_COMPILER=clang-cl.exe `
+          -DCMAKE_C_COMPILER_TARGET=x86_64-pc-windows-msvc `
+          -DCMAKE_CXX_COMPILER_TARGET=x86_64-pc-windows-msvc `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
+          "-DCMAKE_CXX_FLAGS=/EHsc" `
+          "-DCMAKE_C_FLAGS=/EHsc" `
+          -DBUILD_SHARED_LIBS=ON `
+          -DTBB_TEST=OFF `
+          -DTBB_STRICT=OFF `
+          -DTBB_DISABLE_HWLOC_AUTOMATIC_SEARCH=OFF
+
+    cmake --build . --target tbbmalloc tbbmalloc_proxy
+  } finally {
+    Pop-Location
+  }
+
+  # Locate the built artifacts (filter out CMakeFiles stubs)
+  $srcMallocLib = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc.lib" `
+      -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -notmatch "CMakeFiles" } |
+      Select-Object -First 1 -ExpandProperty FullName
+
+  $srcProxyLib = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc_proxy.lib" `
+      -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -notmatch "CMakeFiles" } |
+      Select-Object -First 1 -ExpandProperty FullName
+
+  $srcMallocDll = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc.dll" `
+      -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+
+  $srcProxyDll = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc_proxy.dll" `
+      -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+
+  if (-not $srcMallocLib)  { Fail "tbbmalloc.lib not found after build" }
+  if (-not $srcProxyLib)   { Fail "tbbmalloc_proxy.lib not found after build" }
+  if (-not $srcMallocDll)  { Fail "tbbmalloc.dll not found after build" }
+  if (-not $srcProxyDll)   { Fail "tbbmalloc_proxy.dll not found after build" }
+
+  # Import libs → Lib/occ/lib/ (used by the VS linker)
+  Copy-Item $srcMallocLib  -Destination (Join-Path $LibDir "occ\lib\tbbmalloc.lib")       -Force
+  Copy-Item $srcProxyLib   -Destination (Join-Path $LibDir "occ\lib\tbbmalloc_proxy.lib")  -Force
+
+  # Runtime DLLs → all Windows output directories
+  $outDirs = @(
+    (Join-Path $RepoRoot "Windows\x64\Release"),
+    (Join-Path $RepoRoot "Windows\x64\Debug"),
+    (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug")
+  )
+  foreach ($d in $outDirs) {
+    New-Item -ItemType Directory -Force $d | Out-Null
+    Copy-Item $srcMallocDll  -Destination $d -Force
+    Copy-Item $srcProxyDll   -Destination $d -Force
+  }
+
+  Info "tbbmalloc_proxy OK"
+}
+
+# -----------------------------
+# 4b) Deploy MKL runtime DLLs (needed when OCC is built with /MD)
+# -----------------------------
+# With /MD, the MKL static threading layer emits a dynamic dependency on
+# mkl_intel_thread.2.dll and mkl_core.2.dll.  Deploy them alongside the other
+# runtime DLLs so the test runner can find them.
+$mklBinDir = Join-Path $env:MKLROOT "bin"
+$mklDllsNeeded = @("mkl_intel_thread.2.dll", "mkl_core.2.dll")
+$outDirsMkl = @(
+  (Join-Path $RepoRoot "Windows\x64\Release"),
+  (Join-Path $RepoRoot "Windows\x64\Debug"),
+  (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug")
+)
+foreach ($mklDll in $mklDllsNeeded) {
+  $src = Join-Path $mklBinDir $mklDll
+  if (-not (Test-Path $src)) {
+    Write-Warning "MKL DLL not found: $src — skipping deployment (test runner may fail to load NoSpherA2_DLL.dll)"
+    continue
+  }
+  foreach ($d in $outDirsMkl) {
+    New-Item -ItemType Directory -Force $d | Out-Null
+    Copy-Item $src -Destination $d -Force
+  }
+  Info "Deployed $mklDll"
+}
+
 $stamp = Join-Path $RepoRoot "Windows\Build_Dependencies\deps.stamp"
 New-Item -ItemType Directory -Force (Split-Path $stamp) | Out-Null
 Set-Content -Path $stamp -Value ("OK " + (Get-Date).ToString("s")) -Encoding ASCII

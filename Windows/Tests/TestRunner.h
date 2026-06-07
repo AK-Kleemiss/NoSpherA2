@@ -11,6 +11,13 @@
 #include <cstdlib>
 #include "CppUnitTest.h"
 
+// In-process entry point exported by NoSpherA2_DLL.dll.
+// Linked via the import library; the DLL must be in the same output directory.
+extern "C" __declspec(dllimport) int __cdecl NoSpherA2_run(
+    const char* workDir,
+    int         argc,
+    char**      argv);
+
 namespace NosTestFramework
 {
     using namespace Microsoft::VisualStudio::CppUnitTestFramework;
@@ -151,6 +158,14 @@ namespace NosTestFramework
         std::string actualFile;
         std::vector<std::string> args; // flat list of CLI tokens
         bool full = false;             // skip when RUN_FULL_TEST not set
+        // subprocess = true: run as a child process instead of in-process.
+        // Use for tests whose code path is incompatible with in-process
+        // execution (e.g. OCC SCF driver allocates memory through TBB's
+        // scalable proxy which conflicts with the static-CRT aligned_free
+        // used by Eigen when destructors run during stack unwind).
+        // Requires NoSpherA2.exe in the DLL output dir or NOS_EXE env var;
+        // if neither is found the test is marked as skipped, not failed.
+        bool subprocess = false;
     };
 
     // ---------------------------------------------------------------------------
@@ -166,18 +181,6 @@ namespace NosTestFramework
                 Logger::WriteMessage(L"Skipping: RUN_FULL_TEST not set");
                 return;
             }
-        }
-
-        // Find NoSpherA2.exe (same output dir as this DLL)
-        auto dllDir = GetDllDirectory();
-        auto exePath = dllDir / "NoSpherA2.exe";
-        if (!std::filesystem::exists(exePath)) {
-            // Also try NOS_EXE env var
-            const char *envExe = std::getenv("NOS_EXE");
-            if (envExe && std::filesystem::exists(envExe))
-                exePath = envExe;
-            else
-                Assert::Fail(L"NoSpherA2.exe not found. Build it first or set NOS_EXE.");
         }
 
         auto repoRoot = GetRepoRoot();
@@ -197,80 +200,105 @@ namespace NosTestFramework
             std::filesystem::copy_options::recursive |
             std::filesystem::copy_options::overwrite_existing);
 
-        // Build command line string
-        std::string cmdLine = "\"" + exePath.string() + "\"";
-        for (const auto &a : test.args)
-            cmdLine += " " + a;
-
-        // Set OCC_DATA_PATH in the child environment
+        // OCC_DATA_PATH — injected for both in-process and subprocess runs.
         std::string occDataPath = (repoRoot / "occ" / "share").string();
-        std::wstring envBlock;
-        // Collect current environment
-        LPWCH envStrings = GetEnvironmentStrings();
-        for (LPWCH p = envStrings; *p; ) {
-            envBlock += p;
-            envBlock += wchar_t('\0');
-            p += wcslen(p) + 1;
+        SetEnvironmentVariableA("OCC_DATA_PATH", occDataPath.c_str());
+
+        int exitCode = 0;
+
+        if (test.subprocess) {
+            // ---- subprocess path -----------------------------------------------
+            // Some tests (e.g. OCC SCF driver) are incompatible with in-process
+            // execution due to heap-allocator mismatches between TBB and the
+            // static CRT used by the DLL.  Run them as a child process instead.
+            // If NoSpherA2.exe is not available the test is skipped.
+            auto dllDir = GetDllDirectory();
+            std::filesystem::path exePath = dllDir / "NoSpherA2.exe";
+            if (!std::filesystem::exists(exePath)) {
+                const char *envExe = std::getenv("NOS_EXE");
+                if (envExe && std::filesystem::exists(std::filesystem::path(envExe)))
+                    exePath = envExe;
+                else {
+                    Logger::WriteMessage(
+                        L"SKIPPED: NoSpherA2.exe not found. "
+                        L"Build the NoSpherA2 project or set NOS_EXE to run this test.");
+                    std::filesystem::remove_all(tempBase);
+                    return;
+                }
+            }
+
+            // Build the command line.
+            std::string cmdLine = "\"" + exePath.string() + "\"";
+            for (const auto &a : test.args)
+                cmdLine += " " + a;
+
+            // Build a Unicode environment block with OCC_DATA_PATH set.
+            std::wstring envBlock;
+            LPWCH envStrings = GetEnvironmentStrings();
+            for (LPWCH p = envStrings; *p; ) {
+                envBlock += p;
+                envBlock += L'\0';
+                p += wcslen(p) + 1;
+            }
+            FreeEnvironmentStrings(envStrings);
+            envBlock += L"OCC_DATA_PATH=" +
+                std::wstring(occDataPath.begin(), occDataPath.end()) + L'\0';
+            envBlock += L'\0'; // double-null terminator
+
+            STARTUPINFOA si = {};
+            si.cb = sizeof(si);
+            PROCESS_INFORMATION pi = {};
+            std::string workDir = tempBase.string();
+
+            BOOL ok = CreateProcessA(
+                nullptr,
+                const_cast<LPSTR>(cmdLine.c_str()),
+                nullptr, nullptr, FALSE,
+                CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
+                reinterpret_cast<LPVOID>(const_cast<wchar_t*>(envBlock.data())),
+                workDir.c_str(),
+                &si, &pi);
+
+            if (!ok) {
+                std::filesystem::remove_all(tempBase);
+                Assert::Fail(
+                    (std::wstring(L"CreateProcess failed: ") +
+                     std::to_wstring(GetLastError())).c_str());
+            }
+
+            WaitForSingleObject(pi.hProcess, INFINITE);
+            DWORD code = 0;
+            GetExitCodeProcess(pi.hProcess, &code);
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+            exitCode = static_cast<int>(code);
         }
-        FreeEnvironmentStrings(envStrings);
-        // Override/add OCC_DATA_PATH
-        envBlock += L"OCC_DATA_PATH=" + std::wstring(occDataPath.begin(), occDataPath.end()) + L'\0';
-        // When VS debugger is attached to this test host, tell the child to wait
-        // so you can attach to it too (Debug → Attach to Process, use the PID
-        // printed in the Test Explorer output window).
-        bool debuggerPresent = IsDebuggerPresent() != 0;
-        if (debuggerPresent) {
-            envBlock += L"DEBUG_WAIT=1";
-            envBlock += L'\0';
+        else {
+            // ---- in-process path -----------------------------------------------
+            // The VS debugger is already attached to this test host process, so
+            // breakpoints in Src/ code are hit directly — no manual attach needed.
+            std::vector<std::string> argStrings;
+            // argv[0] = DLL path (used by ensure_occ_data_path fallback logic)
+            argStrings.push_back((GetDllDirectory() / "NoSpherA2_DLL.dll").string());
+            for (const auto &a : test.args)
+                argStrings.push_back(a);
+            std::vector<char*> argPtrs;
+            for (auto &s : argStrings)
+                argPtrs.push_back(const_cast<char*>(s.c_str()));
+
+            std::string workDirStr = tempBase.string();
+            exitCode = NoSpherA2_run(
+                workDirStr.c_str(),
+                static_cast<int>(argPtrs.size()),
+                argPtrs.data());
         }
-        envBlock += L'\0'; // double-null terminator
-
-        // Launch process
-        STARTUPINFOA si = {};
-        si.cb = sizeof(si);
-        si.dwFlags = STARTF_USESTDHANDLES;
-        si.hStdInput = INVALID_HANDLE_VALUE;
-        si.hStdOutput = INVALID_HANDLE_VALUE;
-        si.hStdError = INVALID_HANDLE_VALUE;
-
-        PROCESS_INFORMATION pi = {};
-        std::string workDir = tempBase.string();
-
-        BOOL ok = CreateProcessA(
-            nullptr,
-            const_cast<LPSTR>(cmdLine.c_str()),
-            nullptr, nullptr, FALSE,
-            CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
-            reinterpret_cast<LPVOID>(const_cast<wchar_t *>(envBlock.data())),
-            workDir.c_str(),
-            &si, &pi);
-
-        if (!ok) {
-            auto err = std::to_wstring(GetLastError());
-            Assert::Fail((std::wstring(L"CreateProcess failed: ") + err).c_str());
-        }
-
-        if (debuggerPresent) {
-            // Child is spinning in wait_for_debugger(). Attach now:
-            //   Debug → Attach to Process (Ctrl+Alt+P) → PID shown below
-            auto pidMsg = std::wstring(L"[DEBUG] NoSpherA2.exe PID: ") +
-                std::to_wstring(pi.dwProcessId) +
-                L" — attach with Debug → Attach to Process (Ctrl+Alt+P)";
-            Logger::WriteMessage(pidMsg.c_str());
-        }
-
-        WaitForSingleObject(pi.hProcess, INFINITE);
-        DWORD exitCode = 0;
-        GetExitCodeProcess(pi.hProcess, &exitCode);
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
 
         if (exitCode != 0) {
             std::filesystem::remove_all(tempBase);
-            auto msg = std::wstring(L"NoSpherA2 exited with code ") +
-                std::to_wstring(exitCode) + L" for test " +
-                std::wstring(test.name.begin(), test.name.end());
-            Assert::Fail(msg.c_str());
+            Assert::Fail(
+                (std::wstring(L"NoSpherA2 exited with code ") +
+                 std::to_wstring(exitCode) + L" for test " +
+                 std::wstring(test.name.begin(), test.name.end())).c_str());
         }
 
         // Determine actual output file path

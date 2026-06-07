@@ -89,6 +89,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include <shobjidl.h>
+#include <algorithm>
 #else
 #define GetCurrentDir getcwd
 #include <optional>
@@ -101,6 +102,18 @@
 #include <mach-o/dyld.h>
 #endif
 #endif
+
+// Route all allocations (malloc/free/new/delete/_aligned_malloc/_aligned_free)
+// through TBB's scalable allocator so that memory allocated inside OCC's SCF
+// driver and memory freed by NoSpherA2 use the same heap.  On Windows this
+// injects  /INCLUDE:__TBB_malloc_proxy  into the link via #pragma comment;
+// on Linux/Mac the volatile global in the header pulls in the proxy at link
+// time.  tbbmalloc.lib + tbbmalloc_proxy.lib must be in AdditionalDependencies
+// (Windows) or the link line (Linux/Mac) for this to take effect.
+#include <tbb/tbbmalloc_proxy.h>
+
+// Must be last: redefines exit() as a throw when NOSPHERA2_IN_PROCESS is set.
+#include "early_exit.h"
 
 #endif // NOSPHERA2_PCH_H
 

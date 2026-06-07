@@ -44,6 +44,8 @@ jobs:
             artifact-path: |
               Mac/NoSpherA2_arm64
               Mac/libomp.dylib
+              Mac/libtbbmalloc_proxy.dylib
+              Mac/libtbbmalloc.dylib
 
 
           - os: macos-15-intel  # Intel x86_64
@@ -54,6 +56,8 @@ jobs:
             artifact-path: |
               Mac/NoSpherA2_x86_64
               Mac/libomp.dylib
+              Mac/libtbbmalloc_proxy.dylib
+              Mac/libtbbmalloc.dylib
 
           - os: ubuntu-latest
             name: Linux
@@ -62,6 +66,8 @@ jobs:
             artifact-path: |
               NoSpherA2
               libiomp5.so
+              libtbbmalloc_proxy.so.2
+              libtbbmalloc.so.2
 
           - os: windows-2022
             name: Windows
@@ -72,6 +78,10 @@ jobs:
             artifact-path: |
               Windows/x64/Release/NoSpherA2.exe
               Windows/x64/Release/libiomp5md.dll
+              Windows/x64/Release/tbbmalloc_proxy.dll
+              Windows/x64/Release/tbbmalloc.dll
+              Windows/x64/Release/mkl_intel_thread.2.dll
+              Windows/x64/Release/mkl_core.2.dll
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.name }}
@@ -155,36 +165,56 @@ jobs:
       run: |
         echo "Creating universal binary with lipo..."
         mkdir -p universal
-        
+
         # Make binaries executable
         chmod +x ./arm64/NoSpherA2_arm64
         chmod +x ./x86_64/NoSpherA2_x86_64
-        
+
         # Verify architectures before combining
         echo "ARM64 binary architecture:"
         file ./arm64/NoSpherA2_arm64
         lipo -info ./arm64/NoSpherA2_arm64
-        
+
         echo "x86_64 binary architecture:"
         file ./x86_64/NoSpherA2_x86_64
         lipo -info ./x86_64/NoSpherA2_x86_64
-        
+
         # Create universal binary
         lipo -create -output ./universal/NoSpherA2_Mac ./arm64/NoSpherA2_arm64 ./x86_64/NoSpherA2_x86_64
-        
+
         # Verify universal binary
         echo "Universal binary architecture:"
         file ./universal/NoSpherA2_Mac
         lipo -info ./universal/NoSpherA2_Mac
-        
+
         # Make executable
         chmod +x ./universal/NoSpherA2_Mac
+
+        # Combine arch-specific tbbmalloc dylibs into universal fat dylibs
+        lipo -create \
+          ./arm64/libtbbmalloc_proxy.dylib \
+          ./x86_64/libtbbmalloc_proxy.dylib \
+          -output ./universal/libtbbmalloc_proxy.dylib
+        lipo -create \
+          ./arm64/libtbbmalloc.dylib \
+          ./x86_64/libtbbmalloc.dylib \
+          -output ./universal/libtbbmalloc.dylib
+
+        # Combine arch-specific libomp dylibs into a universal fat dylib
+        lipo -create \
+          ./arm64/libomp.dylib \
+          ./x86_64/libomp.dylib \
+          -output ./universal/libomp.dylib
 
     - name: Upload Universal Binary
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: executable_MacOS_Universal
-        path: ./universal/NoSpherA2_Mac
+        path: |
+          ./universal/NoSpherA2_Mac
+          ./universal/libtbbmalloc_proxy.dylib
+          ./universal/libtbbmalloc.dylib
+          ./universal/libomp.dylib
 
   test:
     needs: build

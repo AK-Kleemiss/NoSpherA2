@@ -76,7 +76,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(UnitTestLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)x64\$(Configuration)\NoSpherA2_DLL.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <!-- ======== Release|x64 ========== -->
@@ -103,7 +103,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(UnitTestLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)x64\$(Configuration)\NoSpherA2_DLL.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <!-- Source files -->
@@ -117,6 +117,12 @@
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="TestRunner.h" />
+  </ItemGroup>
+  <!-- Ensure NoSpherA2_DLL is built before Tests (provides the import lib and the DLL) -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\NoSpherA2_DLL\NoSpherA2_DLL.vcxproj">
+      <Project>{b4802f99-47dd-48df-b5ac-fc18305dec81}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

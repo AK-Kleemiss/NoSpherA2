@@ -1,10 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-v -cpus 8 -wfn epoxid_6_31G.gbw -RI_FIT auto_aux 2.0 -test_RI</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>..\tests\Lukas_Test</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-occ alanine.toml -cif alanine.cif -dmin 0.5 -acc 1 -all_charges</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>..\tests\alanine_integrated_occ</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArgumentsHistory>-v -cpus 8 -wfn epoxid_6_31G.gbw -RI_FIT auto_aux 2.0 -test_RI|</LocalDebuggerCommandArgumentsHistory>
+    <LocalDebuggerCommandArgumentsHistory>-v -cpus 8 -wfn epoxid_6_31G.gbw -RI_FIT auto_aux 2.0 -test_RI|-v -cpus 8 -wfn epoxid_61.gbw -RI_FIT auto_aux 2.0 -dmin 0.6|-v -cpus 8 -wfn epoxide_61.gbw -RI_FIT auto_aux 2.0 -dmin 0.6|-v -cpus 8 -cif epoxide.cif -wfn epoxide_61.gbw -dmin 0.6|-occ alanine.toml -cif alanine.cif -dmin 0.5 -acc 1 -all_charges|</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <LocalDebuggerCommandArguments>-cpus 16 -wfn Iron_Komplex.gbw -RI_CUBE -v -no-date</LocalDebuggerCommandArguments>

@@ -4,7 +4,7 @@ RM := rm -f
 COMP   := g++
 C_COMP := gcc
 
-LIBS := -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lpthread -lm -lc -lquadmath
+LIBS := -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -L../Lib/tbbmalloc -ltbbmalloc_proxy -Wl,-rpath,'$$ORIGIN' -lpthread -lm -lc -lquadmath
 
 # oneAPI env (source setvars.sh before each compile/link)
 SETVARS ?= ../Lib/MKL/setvars.sh
@@ -83,7 +83,7 @@ all: NoSpherA2
 # Actually run the converter to generate the file
 $(SRC_DIR)/basis_data.cpp:
 	@echo "Running BasisSetConverter..."
-	@./../Lib//BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
+	@./../Lib/BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
 	@echo "basis_data.cpp generated"
 
 # Flags without -include pch.h for compiling the PCH itself
@@ -127,6 +127,8 @@ NoSpherA2: ${OBJS}
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2 ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
+	cp ../Lib/tbbmalloc/libtbbmalloc_proxy.so.2 ../
+	cp ../Lib/tbbmalloc/libtbbmalloc.so.2 ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d}
