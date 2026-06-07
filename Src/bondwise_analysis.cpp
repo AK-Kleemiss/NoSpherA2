@@ -1621,7 +1621,7 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
             if (std::isfinite(cp.ellipticity))
                 std::cout << "    Bond Ellipticity:" << std::setw(nw) << cp.ellipticity << "\n";
             if (std::isfinite(cp.virial_field) || std::isfinite(cp.kinetic_lagrangian) || std::isfinite(cp.kinetic_hamiltonian) || std::isfinite(cp.lagrangian_density)) {
-                std::cout << "    V         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.virial_field
+                std::cout << "   V         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.virial_field
                           << "   G         :" << std::fixed << std::setprecision(4) << std::setw(nw) << cp.kinetic_lagrangian
                           << "   K         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.kinetic_hamiltonian
                           << "   L         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.lagrangian_density

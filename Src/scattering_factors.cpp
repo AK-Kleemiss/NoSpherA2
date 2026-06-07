@@ -2085,16 +2085,15 @@ void convert_to_ED(const ivec& asym_atom_list,
 	const cell& unit_cell,
 	const hkl_list& hkl)
 {
-	double h2 = 0.0;
-	const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
-	const int hkl_size = hkl.size();
-#pragma omp parallel for private(h2) shared(hkl_vector)
-	for (int s = 0; s < hkl_size; s++)
-	{
-		h2 = pow(unit_cell.get_stl_of_hkl(hkl_vector[s]), 2);
-		for (int i = 0; i < asym_atom_list.size(); i++)
-			sf[i][s] = cdouble(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
-	}
+    const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
+    const int hkl_size = hkl.size();
+#pragma omp parallel for shared(hkl_vector)
+    for (int s = 0; s < hkl_size; s++)
+    {
+        const double h2 = pow(unit_cell.get_stl_of_hkl(hkl_vector[s]), 2);
+        for (int i = 0; i < asym_atom_list.size(); i++)
+            sf[i][s] = cdouble(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
+    }
 }
 
 
@@ -2291,43 +2290,49 @@ tsc_block_type calculate_scattering_factors(
 	cvec2 sf;
 	sf.resize(asym_atom_list.size());
 #pragma omp parallel for
-	for (int i = 0; i < asym_atom_list.size(); i++)
-		sf[i].resize(hkl.size());
-	if (opt.iam_switch) {
-		vector<Thakkar> spherical_atoms;
-		spherical_atoms.reserve(atom_type_list.size());
-		for (int i = 0; i < atom_type_list.size(); i++)
-			spherical_atoms.emplace_back(atom_type_list[i]);
+    for (int i = 0; i < asym_atom_list.size(); i++)
+        sf[i].resize(hkl.size());
 
-		const int imax = (int)asym_atom_list.size();
+    if (opt.iam_switch) {
+        vector<Thakkar> spherical_atoms;
+        spherical_atoms.reserve(atom_type_list.size());
+        for (int i = 0; i < atom_type_list.size(); i++)
+            spherical_atoms.emplace_back(atom_type_list[i]);
 
-		hkl_list_it it = hkl.begin();
-#pragma omp parallel for private(it)
-		for (int s = 0; s < hkl.size(); s++)
-		{
-			it = next(hkl.begin(), s);
-			double k = constants::bohr2ang(constants::FOUR_PI * unit_cell.get_stl_of_hkl(*it));
-			for (int i = 0; i < imax; i++)
-				sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
-		}
+        const int imax = (int)asym_atom_list.size();
+        const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
+        const int hkl_max = hkl.size();
 
-		if (opt.electron_diffraction)
-		{
-			double h2;
-#pragma omp parallel for private(h2, it)
-			for (int s = 0; s < hkl.size(); s++)
-			{
-				it = next(hkl.begin(), s);
-				h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
-				for (int i = 0; i < imax; i++)
-					sf[i][s] = constants::ED_fact * ((cdouble)atom_type_list[i] - sf[i][s]) / h2;
-			}
-		}
-	}
-	else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor&>)
-	{
-		err_checkf(labels.size() == asym_atom_list.size() && labels.size() == constant_atoms.size(),
-			"Inconsistent SALTED atom bookkeeping after CIF read!", file);
+        if (!opt.electron_diffraction)
+        {
+#pragma omp parallel for shared(hkl_vector)
+            for (int s = 0; s < hkl_max; s++)
+            {
+                const double k = constants::bohr2ang(constants::FOUR_PI * unit_cell.get_stl_of_hkl(hkl_vector[s]));
+                for (int i = 0; i < imax; i++)
+                    sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
+            }
+        }
+        else
+        {
+#pragma omp parallel for shared(hkl_vector)
+            for (int s = 0; s < hkl_max; s++)
+            {
+                const double stl = unit_cell.get_stl_of_hkl(hkl_vector[s]);
+                const double k = constants::bohr2ang(constants::FOUR_PI * stl);
+                const double h2 = pow(stl, 2);
+                double sf_x = 0;
+                for (int i = 0; i < imax; i++) {
+                    sf_x = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
+                    sf[i][s] = cdouble(constants::ED_fact * (atom_type_list[asym_atom_to_type_list[i]] - sf_x) / h2, 0);
+                }
+            }
+        }
+    }
+    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor &>)
+    {
+        err_checkf(labels.size() == asym_atom_list.size() && labels.size() == constant_atoms.size(),
+            "Inconsistent SALTED atom bookkeeping after CIF read!", file);
 
         // Generation of SALTED density coefficients
         file << "\nGenerating densities... " << endl;
@@ -2491,71 +2496,71 @@ tsc_block_type calculate_scattering_factors(
             //if (wavy->get_origin() == e_origin::ptb)
             //    config.restraint_strength = 1.0e-4;
 
-			vec coefs = DensityFitting::density_fit(*wavy, wavy_aux, config);
-			file << setw(12 * 4 + 2) << "... done!\n"
-				<< flush;
-			time_points.push_back(get_time());
-			time_descriptions.push_back("RI-Fit");
+            vec coefs = DensityFitting::density_fit(*wavy, wavy_aux, config);
+            file << setw(12 * 4 + 2) << "... done!\n"
+                << flush;
+            time_points.push_back(get_time());
+            time_descriptions.push_back("RI-Fit");
 
-			vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
-			file << "Table of Charges in electrons\n"
-				<< "       Atom  Charge_RI" << endl;
+            vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
+            file << "Table of Charges in electrons\n"
+                << "       Atom  Charge_RI" << endl;
 
-			for (int i = 0; i < asym_atom_list.size(); i++)
-			{
-				int a = asym_atom_list[i];
-				file << setw(10) << labels[i]
-					<< fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[a];
-				if (opt.debug)
-					file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[a];
-				file << endl;
-			}
+            for (int i = 0; i < asym_atom_list.size(); i++)
+            {
+                int a = asym_atom_list[i];
+                file << setw(10) << labels[i]
+                    << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[a];
+                if (opt.debug)
+                    file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[a];
+                file << endl;
+            }
 
-			auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
-			file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
-			time_points.push_back(get_time());
-			time_descriptions.push_back("Calculation of Charges");
+            auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
+            file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
+            time_points.push_back(get_time());
+            time_descriptions.push_back("Calculation of Charges");
 
-			calc_SF_SALTED(
-				k_pt,
-				coefs,
-				wavy_aux.get_atoms(),
-				asym_atom_list,
-				sf);
-			file << setw(12 * 4 + 2) << "... done!" << endl;
-			time_points.push_back(get_time());
-			time_descriptions.push_back("Fourier transform");
-		}
-		else {
-			std::cout << "Unknown Partition type, stopping here!" << std::endl;
-		}
-		if (wavy->get_has_ECPs())
-		{
-			add_ECP_contribution(
-				asym_atom_list,
-				*wavy,
-				sf,
-				unit_cell,
-				hkl,
-				file,
-				opt.ECP_mode,
-				opt.debug);
-		}
-	}
+            calc_SF_SALTED(
+                k_pt,
+                coefs,
+                wavy_aux.get_atoms(),
+                asym_atom_list,
+                sf);
+            file << setw(12 * 4 + 2) << "... done!" << endl;
+            time_points.push_back(get_time());
+            time_descriptions.push_back("Fourier transform");
+        }
+        else {
+            std::cout << "Unknown Partition type, stopping here!" << std::endl;
+        }
+        if (wavy->get_has_ECPs())
+        {
+            add_ECP_contribution(
+                asym_atom_list,
+                *wavy,
+                sf,
+                unit_cell,
+                hkl,
+                file,
+                opt.ECP_mode,
+                opt.debug);
+        }
+    }
 
-	if (opt.electron_diffraction)
-	{
-		convert_to_ED(asym_atom_list,
-			*wavy,
-			sf,
-			unit_cell,
-			hkl);
-	}
+    if (opt.electron_diffraction && !opt.iam_switch)
+    {
+        convert_to_ED(asym_atom_list,
+            *wavy,
+            sf,
+            unit_cell,
+            hkl);
+    }
 
-	tsc_block_type blocky(
-		sf,
-		labels,
-		hkl);
+    tsc_block_type blocky(
+        sf,
+        labels,
+        hkl);
 
     if (opt.needs_Thakkar_fill)
     {
