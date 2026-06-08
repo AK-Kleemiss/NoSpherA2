@@ -12,22 +12,6 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
-        // tbbmalloc_proxy.dll's own DllMain runs while THIS DLL is being
-        // loaded (not yet in the module list), so our IAT is not patched by
-        // tbbmalloc_proxy's automatic startup scan.  Re-invoke the init
-        // function now, after we are fully mapped, so our malloc/free/new/
-        // delete imports are redirected to TBB's scalable allocator.
-        // tbbmalloc_proxy.lib only stubs __TBB_malloc_proxy, not the init
-        // function, so use GetProcAddress to avoid a link-time dependency.
-        {
-            HMODULE hProxy = GetModuleHandleA("tbbmalloc_proxy.dll");
-            if (hProxy) {
-                typedef bool (__cdecl *TBBInitFn)(void);
-                auto fn = reinterpret_cast<TBBInitFn>(
-                    GetProcAddress(hProxy, "TBB_malloc_replacement_init"));
-                if (fn) fn();
-            }
-        }
         break;
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:

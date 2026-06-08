@@ -161,20 +161,14 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <AdditionalOptions>-openmp:experimental %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 -openmp:experimental %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;../Lib/occ/lib/tbbmalloc_proxy.lib;../Lib/occ/lib/tbbmalloc.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\occ_ints.lib;..\Lib\occ\lib\occ_numint.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
-      <!-- Force the tbbmalloc_proxy symbol so the linker pulls in the allocator replacement -->
-      <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\occ_ints.lib;..\Lib\occ\lib\occ_numint.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc_proxy.dll" "$(OutDir)"
-copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc.dll" "$(OutDir)"</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
@@ -212,20 +206,14 @@ copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <AdditionalOptions>-openmp:experimental %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 -openmp:experimental %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;../Lib/occ/lib/tbbmalloc_proxy.lib;../Lib/occ/lib/tbbmalloc.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\occ_ints.lib;..\Lib\occ\lib\occ_numint.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
-      <!-- Force the tbbmalloc_proxy symbol so the linker pulls in the allocator replacement -->
-      <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\occ_ints.lib;..\Lib\occ\lib\occ_numint.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc_proxy.dll" "$(OutDir)"
-copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc.dll" "$(OutDir)"</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">
     <ClCompile>
@@ -263,20 +251,14 @@ copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <AdditionalOptions>-openmp:experimental %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 -openmp:experimental %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;../Lib/occ/lib/tbbmalloc_proxy.lib;../Lib/occ/lib/tbbmalloc.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\occ_ints.lib;..\Lib\occ\lib\occ_numint.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
-      <!-- Force the tbbmalloc_proxy symbol so the linker pulls in the allocator replacement -->
-      <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\occ_ints.lib;..\Lib\occ\lib\occ_numint.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc_proxy.dll" "$(OutDir)"
-copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc.dll" "$(OutDir)"</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='GenCube|ARM64'">
     <ClCompile>
@@ -319,7 +301,7 @@ copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>-openmp:experimental %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 -openmp:experimental %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -327,14 +309,8 @@ copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;../Lib/occ/lib/tbbmalloc_proxy.lib;../Lib/occ/lib/tbbmalloc.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\occ_ints.lib;..\Lib\occ\lib\occ_numint.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
-      <!-- Force the tbbmalloc_proxy symbol so the linker pulls in the allocator replacement -->
-      <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\occ_ints.lib;..\Lib\occ\lib\occ_numint.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc_proxy.dll" "$(OutDir)"
-copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc.dll" "$(OutDir)"</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>

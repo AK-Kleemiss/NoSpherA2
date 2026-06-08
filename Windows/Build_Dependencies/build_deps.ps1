@@ -393,7 +393,7 @@ if (Test-Path $TbbMallocProxyOut) {
   $tbbBldDir = Join-Path $RepoRoot "build-tbb-malloc"
 
   if (-not (Test-Path $tbbSrc)) {
-    Fail "oneTBB source not found at $tbbSrc — run the OCC build first so CMake fetches it."
+    Fail "oneTBB source not found at $tbbSrc - run the OCC build first so CMake fetches it."
   }
 
   Info "Building tbbmalloc + tbbmalloc_proxy (shared)..."
@@ -480,7 +480,7 @@ $outDirsMkl = @(
 foreach ($mklDll in $mklDllsNeeded) {
   $src = Join-Path $mklBinDir $mklDll
   if (-not (Test-Path $src)) {
-    Write-Warning "MKL DLL not found: $src — skipping deployment (test runner may fail to load NoSpherA2_DLL.dll)"
+    Write-Warning "MKL DLL not found: $src - skipping deployment (test runner may fail to load NoSpherA2_DLL.dll)"
     continue
   }
   foreach ($d in $outDirsMkl) {
