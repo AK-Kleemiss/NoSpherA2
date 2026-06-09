@@ -1,7 +1,14 @@
 #include "pch.h"
 #include "nos_math.h"
-#include "lapacke.h" // for LAPACKE_xxx
-#include "cblas.h"
+
+#if defined(__APPLE__)
+// On macOS we are using Accelerate for BLAS/LAPACK
+#define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 0
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 
 // Flatten Vectors 2D
 template <typename T>
@@ -89,7 +96,7 @@ T self_dot(const T &mat1, const T &mat2, bool transp1, bool transp2)
 
     T result(rows1, v_t(cols2, 0.0));
     const long long int totalIterations = static_cast<long long int>(rows1 * cols2 * cols1);
-    size_t total_size = rows1 * cols2;
+    size_t total_size = (size_t)rows1 * (size_t)cols2;
 
 #pragma omp parallel
     {
@@ -231,15 +238,22 @@ template <typename T>
 T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
 {
     T result{};
-    if (conjugate)
-    {
-        for (size_t i = 0; i < vec1.size(); ++i)
+    if constexpr (std::is_same_v<T, cdouble> ){
+        if (conjugate)
         {
-            result += conj(vec1[i]) * vec2[i];
+            for (size_t i = 0; i < vec1.size(); ++i)
+            {
+                result += std::conj(vec1[i]) * vec2[i];
+            }
         }
-    }
-    else
-    {
+        else
+        {
+            for (size_t i = 0; i < vec1.size(); ++i)
+            {
+                result += vec1[i] * vec2[i];
+            }
+        }
+    } else {
         for (size_t i = 0; i < vec1.size(); ++i)
         {
             result += vec1[i] * vec2[i];
@@ -278,9 +292,9 @@ T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     }
     else if constexpr (std::is_same_v<T, cdouble>)
     {
-        const openblas_complex_double t = conjugate ? cblas_zdotu((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1)
-                                                    : cblas_zdotc((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1);
-        result = cdouble(t.real, t.imag);
+        conjugate ? cblas_zdotu_sub((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1, &result)
+                  : cblas_zdotc_sub((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1, &result);
+        //result = cdouble(t.real, t.imag);
     }
     else
     {
@@ -352,7 +366,7 @@ template ivec2 transpose(const ivec2 &mat);
 template <class T>
 std::vector<T> transpose(const std::vector<T> &mat, const int rows, const int cols)
 {
-    std::vector<T> result(rows * cols);
+    std::vector<T> result((size_t)rows * (size_t)cols);
 
     for (int i = 0; i < rows; ++i)
     {

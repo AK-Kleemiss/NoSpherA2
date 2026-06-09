@@ -1,3 +1,6 @@
+#ifndef NOSPHERA2_PCH_H
+#define NOSPHERA2_PCH_H
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -12,6 +15,33 @@
 #include <iomanip>
 #include <iostream>
 #include <numeric>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"
+#endif
+#include <occ/main/occ_scf.h>
+#include <occ/gto/gto.h>
+#include <occ/core/parallel.h>
+#include <occ/qm/io/conversion.h>
+#include <occ/io/occ_input.h>
+#include <occ/qm/wavefunction.h>
+#include <occ/io/xyz.h>
+#include <occ/core/molecule.h>
+#include <occ/qm/scf.h>
+#include <occ/qm/scf_impl.h>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+#if defined(__APPLE__)
+// On macOS we are using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#define lapack_int int
+#define MKL_Set_Num_Threads(num) omp_set_num_threads(num)
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -33,6 +63,8 @@
 #include <memory>
 #include <cstddef>
 #include <limits>
+#include <cstdio>
+#include <ranges>
 #ifdef __SSE2__
 #include <emmintrin.h>
 #endif
@@ -41,7 +73,11 @@
 #endif
 #define MDSPAN_USE_BRACKET_OPERATOR 0
 #define MDSPAN_USE_PAREN_OPERATOR 1
-#include "../mdspan/include/mdspan/mdarray.hpp"
+#ifdef __CMAKE_BUILD__
+#include <mdspan/mdarray.hpp>
+#else
+#include  "../mdspan/include/mdspan/mdarray.hpp"
+#endif
 
 
 // Here are the system specific libaries
@@ -61,4 +97,10 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <cstring>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
 #endif
+#endif
+
+#endif // NOSPHERA2_PCH_H
+

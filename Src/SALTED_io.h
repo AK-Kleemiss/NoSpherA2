@@ -104,4 +104,7 @@ public:
     vec read_weights();
     std::unordered_map<std::string, dMatrix2> read_projectors();
     std::unordered_map<std::string, dMatrix2> read_features();
+
+    const bool basis_set_defined() { return table_of_contents.find("BASIS") != table_of_contents.end(); }
+    std::shared_ptr<BasisSet> read_basis_set();
 };

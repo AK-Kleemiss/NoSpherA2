@@ -1,11 +1,15 @@
 ﻿#pragma once
 #include "pch.h"
 
+
+
 // Pre-definition of classes included later
 class WFN;
 class cell;
 class atom;
 class BasisSet;
+struct asym_atom;
+enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
 
 inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
 void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file = std::cout);
@@ -27,11 +31,14 @@ typedef std::vector<vec> vec2;
 typedef std::vector<vec2> vec3;
 typedef std::vector<int> ivec;
 typedef std::vector<ivec> ivec2;
+typedef std::vector<ivec2> ivec3;
 typedef std::vector<cdouble> cvec;
 typedef std::vector<cvec> cvec2;
 typedef std::vector<cvec2> cvec3;
 typedef std::vector<std::vector<cvec2>> cvec4;
 typedef std::vector<bool> bvec;
+typedef std::vector<bvec> bvec2;
+typedef std::vector<bvec2> bvec3;
 typedef std::vector<std::string> svec;
 typedef std::vector<std::filesystem::path> pathvec;
 typedef std::chrono::high_resolution_clock::time_point _time_point;
@@ -54,12 +61,62 @@ typedef Kokkos::Experimental::mdarray<bool, Kokkos::extents<unsigned long long, 
 
 typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent>> dMatrixRef1;
 typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dMatrixRef2;
+typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> dMatrixRef3;
 
 typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent>> cMatrixRef1;
 typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> cMatrixRef2;
 typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> cMatrixRef3;
 typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> cMatrixRef4;
 typedef Kokkos::mdspan<const cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> ccMatrixRef4;
+
+struct properties_options
+{
+    bool rho = false;
+    bool eli = false;
+    bool esp = false;
+    bool elf = false;
+    bool lap = false;
+    bool rdg = false;
+    bool hdef = false;
+    bool def = false;
+    bool hirsh = false;
+    bool s_rho = false;
+    bool all_mos = false;
+    double resolution = 0.1;
+    double radius = 2.0;
+    double integral_accuracy = -1;
+    std::array<int, 3> NbSteps = { 0, 0, 0 };
+    std::array<double, 6> MinMax = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    ivec MO_numbers;
+    int hirsh_number = 0;
+    bool calc() const {
+        return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || MO_numbers.size() > 0;
+    }
+    size_t n_grid_points() const {
+        size_t result = static_cast<size_t>(NbSteps[0]) * NbSteps[1] * NbSteps[2];
+        return result;
+    }
+};
+
+typedef std::array<int, 3> i3;
+typedef std::set<i3> hkl_list;
+typedef std::set<i3>::const_iterator hkl_list_it;
+
+typedef std::array<double, 3> d3;
+typedef std::array<double, 4> d4;
+typedef std::set<d3> hkl_list_d;
+typedef std::set<d3>::const_iterator hkl_list_it_d;
+
+struct I3Less {
+    bool operator()(const i3 &a, const i3 &b) const noexcept {
+        if (a[0] != b[0]) return a[0] < b[0];
+        if (a[1] != b[1]) return a[1] < b[1];
+        return a[2] < b[2];
+    }
+};
+
+//indexed by the major grid point the additional points belong to, this map of RefinePoints has field value and the non-integer index in the grid as second
+typedef std::multimap<i3, std::pair<double, d3>, I3Less> Refinepointmap;
 
 int vec_sum(const bvec &in);
 int vec_sum(const ivec &in);
@@ -69,19 +126,32 @@ double vec_length(const vec &in);
 template <typename array>
 const double array_length(const array &in)
 {
-    double sum = 0.0;
-    for (double val : in)
+    return std::hypot(in[0], in[1], in[2]);
+}
+template <typename array>
+const double array_length(const array &in, const array &in2)
+{
+    if (std::size(in) == 3 && std::size(in2) == 3)
     {
-        sum += val * val;
+        return std::hypot(in[0] - in2[0], in[1] - in2[1], in[2] - in2[2]);
+    }
+
+    double sum = 0.0;
+    auto it1 = std::begin(in);
+    auto it2 = std::begin(in2);
+    for (; it1 != std::end(in); it1++, it2++) {
+        sum += (*it1 - *it2) * (*it1 - *it2);
     }
     return sqrt(sum);
 }
 
+d3 vec_diff(const d3 &a, const d3 &b);
+
 // Function to compute cross product
-std::array<double, 3> cross(const std::array<double, 3> &a, const std::array<double, 3> &b);
+d3 vec_cross(const d3 &a, const d3 &b);
 
 // Function to compute dot product
-double a_dot(const std::array<double, 3> &a, const std::array<double, 3> &b);
+double vec_dot(const d3 &a, const d3 &b);
 
 constexpr const std::complex<double> c_one(0, 1.0);
 
@@ -89,9 +159,23 @@ extern std::string help_message;
 std::string NoSpherA2_message(bool no_date = false);
 extern std::string build_date;
 
+// Fast exp approximation for negative values
+inline double fast_exp_neg(double x) {
+    // For x in [-42, 0], use a fast approximation
+    if (x < -42.0) return 0.0;
+    if (x > -0.693147) { // ln(0.5) - use standard exp for values close to 0
+        return exp(x);
+    }
+    // Power of 2 approximation: exp(x) ≈ (1 + x/1024)^1024
+    x = 1.0 + x / 1024.0;
+    x *= x; x *= x; x *= x; x *= x; x *= x; // x^32
+    x *= x; x *= x; x *= x; x *= x; x *= x; // x^1024
+    return x;
+}
+
 namespace sha
 {
-// Rotate right operation
+    // Rotate right operation
 #define ROTR(x, n) ((x >> n) | (x << (32 - n)))
 
 // Logical functions for SHA-256
@@ -105,21 +189,21 @@ namespace sha
     constexpr uint64_t custom_bswap_64(uint64_t x)
     {
         return ((x & 0xFF00000000000000ull) >> 56) |
-               ((x & 0x00FF000000000000ull) >> 40) |
-               ((x & 0x0000FF0000000000ull) >> 24) |
-               ((x & 0x000000FF00000000ull) >> 8) |
-               ((x & 0x00000000FF000000ull) << 8) |
-               ((x & 0x0000000000FF0000ull) << 24) |
-               ((x & 0x000000000000FF00ull) << 40) |
-               ((x & 0x00000000000000FFull) << 56);
+            ((x & 0x00FF000000000000ull) >> 40) |
+            ((x & 0x0000FF0000000000ull) >> 24) |
+            ((x & 0x000000FF00000000ull) >> 8) |
+            ((x & 0x00000000FF000000ull) << 8) |
+            ((x & 0x0000000000FF0000ull) << 24) |
+            ((x & 0x000000000000FF00ull) << 40) |
+            ((x & 0x00000000000000FFull) << 56);
     }
 
     constexpr uint32_t custom_bswap_32(uint32_t value)
     {
         return ((value & 0x000000FF) << 24) |
-               ((value & 0x0000FF00) << 8) |
-               ((value & 0x00FF0000) >> 8) |
-               ((value & 0xFF000000) >> 24);
+            ((value & 0x0000FF00) << 8) |
+            ((value & 0x00FF0000) >> 8) |
+            ((value & 0xFF000000) >> 24);
     }
 
     // Initial hash values
@@ -139,7 +223,7 @@ namespace sha
         0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
         0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
         0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
+        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2 };
 
     // SHA-256 processing function
     void sha256_transform(uint32_t state[8], const uint8_t block[64]);
@@ -158,6 +242,7 @@ bool is_similar_rel(const double &first, const double &second, const double &tol
 bool is_similar(const double &first, const double &second, const double &tolerance);
 bool is_similar_abs(const double &first, const double &second, const double &tolerance);
 std::filesystem::path get_home_path(void);
+bool ensure_occ_data_path(const char *argv0);
 char asciitolower(char in);
 
 bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g);
@@ -220,10 +305,10 @@ void copy_file(std::filesystem::path &from, std::filesystem::path &to);
 std::string shrink_string(std::string &input);
 std::string shrink_string_to_atom(std::string &input, const int &atom_number);
 //------------------Functions to work with configuration files--------------------------
-bool check_bohr(WFN &wave, bool debug);
+bool check_bohr(const WFN &wave, bool debug);
 
-bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std::string> filter, const std::string& current_path);
-bool save_file_dialog(std::filesystem::path &path, bool debug, const svec &endings, const std::string &filename_given = "", const std::string& current_path = "");
+bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std::string> filter, const std::string &current_path);
+bool save_file_dialog(std::filesystem::path &path, bool debug, const svec &endings, const std::string &filename_given = "", const std::string &current_path = "");
 void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes = 1, bool wfnonly = false, bool debug = false);
 bool unsaved_files(std::vector<WFN> &wavy);
 
@@ -234,13 +319,27 @@ inline void print_centered_text(const std::string &text, int &bar_width)
     const int text_length = static_cast<int>(text.length());
     const int total_padding = bar_width - text_length;
     const int padding_left = total_padding / 2;
-    const int padding_right = total_padding - padding_left;
+    const int padding_right = (total_padding - padding_left) - 1;
 
     std::cout << "["
-              << std::setw(padding_left) << std::setfill(' ') << ""
-              << text
-              << std::setw(padding_right) << std::setfill(' ') << ""
-              << "]" << std::endl;
+        << std::setw(padding_left) << std::setfill(' ') << ""
+        << text
+        << std::setw(padding_right) << std::setfill(' ') << ""
+        << "]" << std::endl;
+}
+
+inline void print_centered_message(const std::string& text, int bar_width, std::ostream& os = std::cout)
+{
+    const int text_length = static_cast<int>(text.length());
+    const int total_padding = bar_width - text_length;
+    const int padding_left = total_padding / 2;
+    const int padding_right = (total_padding - padding_left) - 1;
+
+    os
+        << std::setw(padding_left) << std::setfill(' ') << ""
+        << text
+        << std::setw(padding_right) << std::setfill(' ') << ""
+        << std::endl;
 }
 
 //-------------------------Progress_bar--------------------------------------------------
@@ -301,21 +400,18 @@ private:
 };
 
 void readxyzMinMax_fromWFN(
-    WFN &wavy,
-    double *CoordMinMax,
-    int *NbSteps,
-    double Radius,
-    double Increments,
+    const WFN &wavy,
+    properties_options &opts,
     bool no_bohr = false);
 
 void readxyzMinMax_fromCIF(
     std::filesystem::path cif,
-    double *CoordMinMax,
-    int *NbSteps,
-    vec2 &cm,
-    double Resolution);
+    properties_options &opts,
+    vec2 &cm);
 
 bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
+
+vec read_U_iso_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug);
 
 double double_from_string_with_esd(std::string in);
 
@@ -414,7 +510,7 @@ void removeElement(std::vector<T> &vec, const T &x)
     vec.erase(new_end, vec.end());
 }
 
-inline void Enter(){
+inline void Enter() {
     std::cout << "press ENTER to continue... " << std::flush;
     std::cin.ignore();
     std::cin.get();
@@ -430,17 +526,17 @@ inline void cls() {
     std::cout.flush();
 }
 
-inline bool yesno(){
-    bool end=false;
+inline bool yesno() {
+    bool end = false;
     while (!end) {
-        char dum ='?';
+        char dum = '?';
         std::cout << "(Y/N)?";
         std::cin >> dum;
-        if(dum == 'y'||dum == 'Y'){
+        if (dum == 'y' || dum == 'Y') {
             std::cout << "Okay..." << std::endl;
-             return true;
+            return true;
         }
-        else if(dum == 'N'||dum == 'n') return false;
+        else if (dum == 'N' || dum == 'n') return false;
         else std::cout << "Sorry, i did not understand that!" << std::endl;
     }
     return false;
@@ -460,6 +556,8 @@ private:
     int center, type;
     double exp, coefficient;
     double norm_const = -10;
+    double exp_l_plus_3_2 = -10;
+    double normalized_coefficient = -10;
 
 public:
     void normalize()
@@ -477,13 +575,14 @@ public:
     }
     primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {};
     primitive(int c, int t, double e, double coef);
-    primitive(const SimplePrimitive& p);
+    primitive(const SimplePrimitive &p);
     bool operator==(const primitive &other) const
     {
         return center == other.center &&
-               type == other.type &&
-               exp == other.exp &&
-               coefficient == other.coefficient;
+            type == other.type &&
+            exp == other.exp &&
+            coefficient == other.coefficient &&
+            exp_l_plus_3_2 == other.exp_l_plus_3_2;
     };
     int get_center() const
     {
@@ -492,6 +591,14 @@ public:
     int get_type() const
     {
         return type;
+    };
+    double get_exp_l_plus_3_2() const
+    {
+        return exp_l_plus_3_2;
+    };
+    double get_normalized_coefficient() const
+    {
+        return normalized_coefficient;
     };
     double get_exp() const
     {
@@ -517,6 +624,23 @@ public:
     {
         coefficient = c;
     };
+    void set_norm_const(const double& nc)
+    {
+        norm_const = nc;
+        normalized_coefficient = nc * coefficient;
+    };
+	double eval_gaussian(const double& r) const
+    {
+        return pow(r, type) * std::exp(-exp * r * r) * normalized_coefficient;
+    };
+    double eval_gaussian_unnormalized(const double& r) const
+    {
+        return pow(r, type) * std::exp(-exp * r * r) * coefficient;
+	};
+    double eval_gaussian_unnormalized(const double& rl, const double& r2) const
+    {
+        return rl * std::exp(-exp * r2) * coefficient;
+    };
 };
 
 struct ECP_primitive : primitive
@@ -526,39 +650,27 @@ struct ECP_primitive : primitive
     ECP_primitive(int c, int t, double e, double coef, int n) : primitive(c, t, e, coef), n(n) {}
 };
 
-typedef std::array<int, 3> hkl_t;
-typedef std::set<hkl_t> hkl_list;
-typedef std::set<hkl_t>::const_iterator hkl_list_it;
-
-typedef std::array<double, 3> hkl_d;
-typedef std::set<hkl_d> hkl_list_d;
-typedef std::set<hkl_d>::const_iterator hkl_list_it_d;
-
 //---------------- Object for handling all input options -------------------------------
 struct options
-/**
- * @brief The `options` class represents a collection of options and settings for a program.
- *
- * It contains various member variables that store different configuration parameters.
- * These parameters control the behavior and functionality of the program.
- *
- * The `options` class also provides constructors and member functions to initialize and manipulate these parameters.
- *
- * @note This class is used to configure the behavior of a specific program and may have different member variables and functions depending on the program's requirements.
- */
+    /**
+     * @brief The `options` class represents a collection of options and settings for a program.
+     *
+     * It contains various member variables that store different configuration parameters.
+     * These parameters control the behavior and functionality of the program.
+     *
+     * The `options` class also provides constructors and member functions to initialize and manipulate these parameters.
+     *
+     * @note This class is used to configure the behavior of a specific program and may have different member variables and functions depending on the program's requirements.
+     */
 {
     std::ostream &log_file;
-    double resolution = 0.1;
-    double radius = 2.0;
     double d_sfac_scan = 0.0;
-    double sfac_diffuse = 0.0;
+    d3 sfac_diffuse = { 0.0, 0.0, 0.0 };
     double dmin = 99.0;
     double mem = 1000.0; // In MB
     double efield = 0.005;
-    double MinMax[6]{0, 0, 0, 0, 0, 0};
-    ivec MOs;
     ivec2 groups;
-    ivec2 hkl_min_max{{-100, 100}, {-100, 100}, {-100, 100}};
+    ivec2 hkl_min_max{ {-100, 100}, {-100, 100}, {-100, 100} };
     vec2 twin_law;
     ivec2 combined_tsc_groups;
     pathvec combined_tsc_calc_files;
@@ -575,7 +687,7 @@ struct options
     ivec cmo2;
     ivec ignore;
     std::filesystem::path salted_model_dir;
-    std::shared_ptr<BasisSet> aux_basis;
+    std::vector<std::shared_ptr<BasisSet>> aux_basis;
     std::filesystem::path wfn;
     std::filesystem::path wfn2;
     std::filesystem::path fchk;
@@ -587,25 +699,19 @@ struct options
     std::filesystem::path coef_file;
     std::filesystem::path hirshfeld_surface;
     std::filesystem::path hirshfeld_surface2;
-    std::string fract_name;
+    std::filesystem::path fract_name;
     std::filesystem::path wavename;
     std::filesystem::path gaussian_path;
     std::filesystem::path turbomole_path;
     std::filesystem::path basis_set_path;
-    std::string cwd;
+    std::filesystem::path anom_disp_path;
+    std::string occ;
+    std::filesystem::path occ_toml_path;
+    std::filesystem::path cwd;
+    std::filesystem::path profiling_tests_root = "tests";
+    properties_options properties;
     bool debug = false;
-    bool rho = false;
-    bool calc = false;
-    bool eli = false;
-    bool esp = false;
-    bool elf = false;
-    bool lap = false;
-    bool rdg = false;
-    bool hdef = false;
-    bool def = false;
-    bool fract = false;
-    bool hirsh = false;
-    bool s_rho = false;
+    bool all_charges = false;
     bool SALTED = false;
     bool Olex2_1_3_switch = false;
     bool iam_switch = false;
@@ -617,23 +723,25 @@ struct options
     bool no_date = false;
     bool gbw2wfn = false;
     bool old_tsc = false;
-    bool thakkar_d_plot = false;
     bool write_CIF = false;
-    bool all_mos = false;
     bool test = false;
-    bool becke = false;
     bool electron_diffraction = false;
     bool ECP = false;
     bool RI_FIT = false;
     bool needs_Thakkar_fill = false;
     bool qct = false;
-    int hirsh_number = 0;
-    int NbSteps[3]{0, 0, 0};
+    bool do_XCW = false;
+    bool calc_F_calc = false;
+    bool rgbi = false;
+    bool fract = false;
+    bool profiling = false;
+    bool get_g = false;
     int accuracy = 2;
     int threads = -1;
     int pbc = 0;
     int charge = 0;
     int ECP_mode = 0;
+    PartitionType partition_type = PartitionType::Hirshfeld;
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 
@@ -668,9 +776,7 @@ struct options
     };
 };
 
-const double gaussian_radial(const primitive& p, const double& r);
-
-int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b);
+void convert_tonto_XCW_lambda_steps(const std::string &str, const std::string &lambda_step, bool debug, options &opt);
 
 double hypergeometric(double a, double b, double c, double x);
 
@@ -678,15 +784,11 @@ cdouble hypergeometric(double a, double b, double c, cdouble x);
 
 bool ends_with(const std::string &str, const std::string &suffix);
 
-bool is_nan(double &in);
-bool is_nan(float &in);
-bool is_nan(long double &in);
-bool is_nan(cdouble &in);
+bool is_nan(const double &in);
+bool is_nan(const float &in);
+bool is_nan(const long double &in);
+bool is_nan(const cdouble &in);
 
 bool read_block_from_fortran_binary(std::ifstream &file, void *Target);
-/*
-#ifdef _WIN32
-bool ExtractDLL(const std::filesystem::path &dllName);
-bool check_OpenBLAS_DLL(const bool &debug = false);
-#endif
-*/
+template <typename T>
+bool read_block_from_fortran_binary(std::ifstream &file, std::vector<T> &Target);

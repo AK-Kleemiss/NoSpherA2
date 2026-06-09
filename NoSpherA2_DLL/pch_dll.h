@@ -49,13 +49,13 @@ typedef std::vector<std::filesystem::path> pathvec;
 // A simple triangle struct composed of three vertices
 /*class Triangle {
 public:
-    Triangle(std::array<double, 3> v1, std::array<double, 3> v2, std::array<double, 3> v3, RGB colour, int colour_index);
-    Triangle(std::array<double, 3> v1, std::array<double, 3> v2, std::array<double, 3> v3, RGB colour);
-    Triangle(std::array<double, 3> v1, std::array<double, 3> v2, std::array<double, 3> v3);
+    Triangle(d3 v1, d3 v2, d3 v3, RGB colour, int colour_index);
+    Triangle(d3 v1, d3 v2, d3 v3, RGB colour);
+    Triangle(d3 v1, d3 v2, d3 v3);
 
     double calc_area() const;
     double calc_inner_volume() const;
-    std::array<double, 3> calc_center() const;
+    d3 calc_center() const;
     RGB get_colour() const;
     std::array<double, 3 > get_v(const int& nr) const;
     void set_colour(const RGB& given);

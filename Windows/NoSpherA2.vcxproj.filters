@@ -34,11 +34,20 @@
     <Filter Include="Headerdateien\mdspan">
       <UniqueIdentifier>{53cebc2e-6707-423c-b1e4-3e8b01ff9900}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Quelldateien\Grids">
+      <UniqueIdentifier>{87b72b91-b668-44bb-b149-21d426980d52}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headerdateien\Grids">
+      <UniqueIdentifier>{3b51d547-fcb2-4002-9c05-8db510272008}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Quelldateien\occ">
+      <UniqueIdentifier>{39048a28-dac0-451a-bef6-1070cd25de3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headerdateien\occ">
+      <UniqueIdentifier>{060433ac-8a80-443a-948f-f1112f133b6b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="../Src/AtomGrid.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="../Src/basis_set.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -72,9 +81,6 @@
     <ClCompile Include="..\Src\atoms.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\JKFit.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\SALTED_io.cpp">
       <Filter>Quelldateien\SALTED</Filter>
     </ClCompile>
@@ -99,19 +105,7 @@
     <ClCompile Include="..\Src\integrator.cpp">
       <Filter>Quelldateien\libCint</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\cart2sph.cpp">
-      <Filter>Quelldateien\libCint</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\integration_params.cpp">
-      <Filter>Quelldateien\libCint</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\rys_roots.cpp">
-      <Filter>Quelldateien\libCint</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\int_optimizer.cpp">
-      <Filter>Quelldateien\libCint</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\int_g2e.cpp">
       <Filter>Quelldateien\libCint</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\libCintMain.cpp">
@@ -123,9 +117,6 @@
     <ClCompile Include="..\Src\pch.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\auxiliary_basis.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\qct.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -135,11 +126,29 @@
     <ClCompile Include="..\Src\bondwise_analysis.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\cif.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/AtomGrid.cpp">
+      <Filter>Quelldateien\Grids</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\GridManager.cpp">
+      <Filter>Quelldateien\Grids</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\libCintKernels.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\basis_data.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\cell.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\XCW.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="../Src/AtomGrid.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="../Src/atoms.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
@@ -197,9 +206,6 @@
     <ClInclude Include="../Src/def2-ECPs_GA.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\JKFit.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\metatensor.h">
       <Filter>Headerdateien\Rascaline</Filter>
     </ClInclude>
@@ -236,19 +242,7 @@
     <ClInclude Include="..\Src\integrator.h">
       <Filter>Headerdateien\libCint</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\cart2sph.h">
-      <Filter>Headerdateien\libCint</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\integration_params.h">
-      <Filter>Headerdateien\libCint</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\rys_roots.h">
-      <Filter>Headerdateien\libCint</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\int_optimizer.h">
-      <Filter>Headerdateien\libCint</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\int_g2e.h">
       <Filter>Headerdateien\libCint</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\libCintMain.h">
@@ -263,7 +257,22 @@
     <ClInclude Include="..\Src\bondwise_analysis.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\scatterer_id.h">
+    <ClInclude Include="..\Src\cif.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="icon.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/AtomGrid.h">
+      <Filter>Headerdateien\Grids</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\GridManager.h">
+      <Filter>Headerdateien\Grids</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\libCintKernels.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\XCW.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
@@ -283,6 +292,10 @@
     <None Include="..\tests\makefile">
       <Filter>Ressourcendateien</Filter>
     </None>
+    <None Include="..\.github\actions\build-deps\action.yml" />
+    <None Include="..\.github\actions\cache-deps\action.yml" />
+    <None Include="..\.github\actions\setup-build-env\action.yml" />
+    <None Include="..\makefile" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">

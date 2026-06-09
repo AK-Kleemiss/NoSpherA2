@@ -1,0 +1,28 @@
+{
+   name=     OH
+   output_style_options= { real_precision= 8 }
+   basis_directory= ./
+   basis_name= custom
+   charge=       -1
+   multiplicity= 1
+   atoms= {
+      keys= { label= { units= angstrom } pos= }
+      data= {
+         1     0.0    0.0    0.0
+         8     1.0    0.0    0.0
+      }
+   }
+   put
+   scfdata= {
+      initial_density= promolecule
+      kind=            rhf
+      direct=          on
+      convergence= 0.001
+      diis= { convergence_tolerance= 0.001 }
+      output= YES
+      output_results= YES
+   }
+   
+   scf
+   write_aim2000_wfn_file
+}

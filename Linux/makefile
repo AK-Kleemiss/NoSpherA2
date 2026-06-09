@@ -1,89 +1,152 @@
-#THIS IS THE LINUX MAKEFILE#
+# === LINUX MAKEFILE ===
 RM := rm -f
 
-COMP := g++
+COMP   := g++
 C_COMP := gcc
 
-#link statically c++ and pthread and dynamically c and m, since they are 
-LIBS := -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lm -lc
-ver := $(shell expr `${COMP} -dumpversion`)
-LIBOMP := ../Lib/OpenMP_build/lib/libomp.a
-LIBRASCALINE := ../Lib/featomic_install/lib/libfeatomic.a
-LIBRASCALINE += ../Lib/featomic_install/lib/libmetatensor.a
+LIBS := -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lpthread -lm -lc -lquadmath
+
+# oneAPI env (source setvars.sh before each compile/link)
+SETVARS ?= ../Lib/MKL/setvars.sh
+WITH_ONEAPI = . "$(SETVARS)" >/dev/null 2>&1 &&
+
+# ---- Optional MKL knobs ----
+MKL_THREADING ?= INTEL     # INTEL | SEQ  (INTEL = mkl_intel_thread + libiomp5)
+
+# Source & include roots
+SRC_DIR := ../Src
+USER_INC_DIRS := ../Src ../Lib ../Src/occ
+SYSTEM_INC_DIRS := ../Lib/featomic_install/include ../Lib/LibCint/include ../Lib/occ/include
+LIB_OCC := $(wildcard ../Lib/occ/lib/*.a)
+#LibCint local libs
+LIBCINT		   := ../Lib/LibCint/lib/libcint.a
+
+# Featomic local libs
+LIBRASCALINE   := ../Lib/featomic_install/lib/libfeatomic.a
+LIBRASCALINE   += ../Lib/featomic_install/lib/libmetatensor.a
 LIBRASCALINE_I := ../Lib/featomic_install/include
-LIBOPENBLAS := ../Lib/OpenBLAS_build/lib/libopenblas.a
-LIBOPENBLAS_I := -I../Lib/OpenBLAS_build/include
 
-all: NoSpherA2 
+# ---- Compiler flags (no -fopenmp at link time; only at compile time) ----
+GCC_OPTS       := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP \
+                  -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math \
+                  -include pch.h -mfma
+GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP \
+                  -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math \
+                  -include pch.h -mfma
 
-# List of object file names without extensions
-OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots auxiliary_basis qct b2c bondwise_analysis
+# Include directories
+INCLUDES := $(addprefix -I,$(USER_INC_DIRS)) $(foreach d,$(SYSTEM_INC_DIRS),-isystem $(d))
 
-# Define the two separate lists with appropriate endings
-OBJS := $(OBJ_NAMES:=.o)
+# Threading backend selection - STATIC MKL but DYNAMIC libomp
+ifeq ($(MKL_THREADING),SEQ)
+  MKL_STATIC_LIBS = \
+    -Wl,--start-group \
+    "$$MKLROOT/lib/intel64/libmkl_intel_lp64.a" \
+    "$$MKLROOT/lib/intel64/libmkl_sequential.a" \
+    "$$MKLROOT/lib/intel64/libmkl_core.a" \
+    -Wl,--end-group
+  IOMP_LIB =
+else
+  MKL_STATIC_LIBS = \
+    -Wl,--start-group \
+    "$$MKLROOT/lib/intel64/libmkl_intel_lp64.a" \
+    "$$MKLROOT/lib/intel64/libmkl_intel_thread.a" \
+    "$$MKLROOT/lib/intel64/libmkl_core.a" \
+    -Wl,--end-group
+  # Use dynamic linking for libiomp5 with rpath for runtime location
+  IOMP_LIB = -L"$$ONEAPI_ROOT/compiler/latest/linux/compiler/lib/intel64_lin" \
+             -Wl,-rpath,"$$ONEAPI_ROOT/compiler/latest/linux/compiler/lib/intel64_lin" \
+             -Wl,-rpath,'$$ORIGIN' \
+             -liomp5
+endif
+
+# MKL link flags - static MKL libraries + dynamic libiomp5
+MKL_LINK_FLAGS = $(MKL_STATIC_LIBS) $(IOMP_LIB) -lpthread -lm -ldl
+
+# ---- Objects ----
+# Sources - automatically discover all .cpp files in SRC_DIR
+SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+ifneq ($(filter $(SRC_DIR)/basis_data.cpp,$(SRCS)), $(SRC_DIR)/basis_data.cpp)
+  SRCS += $(SRC_DIR)/basis_data.cpp
+endif
+
+#remove mat_nos_math.cpp and vec_nos_math.cpp from SRCS
+SRCS := $(filter-out $(SRC_DIR)/mat_nos_math.cpp $(SRC_DIR)/vec_nos_math.cpp, $(SRCS))
+
+# Convert sources to object names (extract basename without path/extension)
+OBJ_NAMES := $(basename $(notdir $(SRCS)))
+OBJS   := $(OBJ_NAMES:=.o)
 OBJS_d := $(OBJ_NAMES:=.o_d)
-GCC_OPTS := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math 
-GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math
 
-#Basis set converter
-basis_set_converter:
-	@make -f makefile_basis_set_converter
-	
-# Precompiled header
-pch.h.gch: ../Src/pch.h
-	@${COMP} ${GCC_OPTS} -x c++-header -o "$@" "$<"
+all: NoSpherA2
 
-# Precompiled header for debug
-pch.h.gch_d: ../Src/pch.h
-	@${COMP} ${GCC_OPTS_DEBUG} -x c++-header -o "$@" "$<"
+# Actually run the converter to generate the file
+$(SRC_DIR)/basis_data.cpp:
+	@echo "Running BasisSetConverter..."
+	@./../Lib//BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
+	@echo "basis_data.cpp generated"
 
-# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
-auxiliary_basis.o: basis_set_converter
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
-	@echo 'Finished building: auxiliary_basis.o'
+# Flags without -include pch.h for compiling the PCH itself
+GCC_OPTS_NO_PCH       := $(filter-out -include pch.h,$(GCC_OPTS))
+GCC_OPTS_DEBUG_NO_PCH := $(filter-out -include pch.h,$(GCC_OPTS_DEBUG))
 
-# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
-auxiliary_basis.o: basis_set_converter
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
-	@echo 'Finished building: auxiliary_basis.o'
+# ---- Precompiled headers ----
+# GCC with -include pch.h searches include paths for pch.h, then checks for pch.h.gch alongside it.
+# If pch.h.gch is a directory, GCC searches inside it for a valid PCH matching the current flags.
+# We output the .gch next to the source header so GCC auto-discovers it.
+PCH_DIR   := $(SRC_DIR)/pch.h.gch
+PCH_GCH   := $(PCH_DIR)/release.gch
+PCH_GCH_D := $(PCH_DIR)/debug.gch
 
-# Pattern rule to compile all .cpp files
-%.o: ../Src/%.cpp pch.h.gch
+$(PCH_GCH): ../Src/pch.h
+	@mkdir -p $(PCH_DIR)
+	@echo 'Building precompiled header (release)...'
+	@$(WITH_ONEAPI) ${COMP} $(GCC_OPTS_NO_PCH) -I"$$MKLROOT/include" $(INCLUDES) -x c++-header -o "$@" "$<"
+
+$(PCH_GCH_D): ../Src/pch.h
+	@mkdir -p $(PCH_DIR)
+	@echo 'Building precompiled header (debug)...'
+	@$(WITH_ONEAPI) ${COMP} $(GCC_OPTS_DEBUG_NO_PCH) -I"$$MKLROOT/include" $(INCLUDES) -x c++-header -o "$@" "$<"
+
+# ---- Pattern rules ----
+%.o: ../Src/%.cpp $(PCH_GCH)
 	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I${LIBRASCALINE_I} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} -I"$$MKLROOT/include" $(INCLUDES) \
+	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
-auxiliary_basis.o_d: basis_set_converter
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
-	@echo 'Finished building: auxiliary_basis.o_d'
-
-# Pattern rule to compile all .cpp files
-%.o_d: ../Src/%.cpp pch.h.gch_d
-	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I${LIBRASCALINE_I} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+%.o_d: ../Src/%.cpp $(PCH_GCH_D)
+	@echo 'Building file (debug): $<'
+	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} -I"$$MKLROOT/include" $(INCLUDES) \
+	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
+# ---- Link ----
 NoSpherA2: ${OBJS}
 	@echo 'Building target: $@'
-	@${COMP} -o "NoSpherA2" ${OBJS} ${LIBOMP} ${LIBRASCALINE} ${LIBOPENBLAS} ${LIBS}
+	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2 ../
+	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
 	@echo 'Done building NoSpherA2'
 
-NoSpherA2_Debug: ${OBJS_d} 
+NoSpherA2_Debug: ${OBJS_d}
 	@echo 'Building target: $@'
-	@${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBOMP} ${LIBRASCALINE} ${LIBOPENBLAS} ${LIBS}
+	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2_Debug ../
+	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
 	@echo 'Done building Debug version of NoSpherA2'
 
 clean:
-	-${RM} NoSpherA2 ../NoSpherA2 NoSpherA2_Debug ../NoSpherA2_Debug ../BasisSetConverter ${OBJS} ${OBJS_d} ${BASIS_OBJS}
+	-${RM} NoSpherA2 ../NoSpherA2 NoSpherA2_Debug ../NoSpherA2_Debug ../BasisSetConverter ${OBJS} ${OBJS_d} $(OBJ_NAMES:=.d)
+	-${RM} -r $(PCH_DIR)
+	-${RM} pch.h.gch pch.h.gch_d pch.h.d pch.d
 	-@echo ' '
 
-.PHONY: all clean basis_set_converter
+.PHONY: all clean
 .SECONDARY:
 
+# Include generated dependency files for correct incremental rebuilds.
+# Only include .d files for our own objects — avoid stale/corrupt .d files
+# from sub-builds (e.g. BasisSetConverter.d, basis_set_helper.d).
+-include $(wildcard $(addsuffix .d,$(OBJ_NAMES)))
 

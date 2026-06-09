@@ -6,7 +6,7 @@
 class MO
 {
 private:
-  int nr;
+  int nr; //acts as an index
   double occ;
   double ener;
   vec coefficients;
@@ -24,6 +24,8 @@ public:
     ener = energy;
     op = oper;
   };
+  virtual ~MO() {};
+  friend class MO_OCC;
   void push_back_coef(const double &val){
     coefficients.emplace_back(val);
   };
@@ -35,7 +37,7 @@ public:
       return false;
 
     // consistencycheck with WFN
-    if (nex != coefficients.size() - 1) 
+    if (nex != coefficients.size() - 1)
       return false;
 
     // delete Vector-Entry and rearrange
@@ -43,17 +45,29 @@ public:
 
     return true;
   };
-  const double get_coefficient(const int& _nr) const {
+  const double& get_coefficient(const int& _nr) const {
     err_checkf(_nr < coefficients.size() && _nr >= 0, "Requested element outside of range! " + std::to_string(_nr), std::cout);
     return coefficients[_nr];
-  }; 
-  const vec get_coefficients() const {
-      return coefficients;
   };
-  const double get_coefficient_f(const int& _nr) const {
+  const vec& get_coefficients() const {
+    return coefficients;
+  };
+  void assign_coefficients_size(int size)
+  {
+    coefficients.assign(size, 0.0);
+  }
+  void set_coefficients(vec coeff) {
+    coefficients = coeff;
+  };
+  void insert_into_coefficients(std::ranges::input_range auto&& v) {
+    coefficients.insert(coefficients.end(), std::ranges::begin(v), std::ranges::end(v));
+  }
+
+
+  const double& get_coefficient_f(const int& _nr) const {
     return coefficients[_nr];
   };
-  const double* get_coefficient_ptr() {
+  const double* get_coefficient_ptr() const {
     return coefficients.data();
   };
   const bool set_coefficient(const int& _nr, const double& value) {
@@ -73,8 +87,8 @@ public:
   void set_occ(const int& iocc) { occ = iocc; };
   void set_occ(const double& iocc) { occ = iocc; };
   void set_op(const int& oper) { op = oper; };
-  const double get_occ() const { return occ; };
-  const int get_op() const { return op; };
+  const double& get_occ() const { return occ; };
+  const int& get_op() const { return op; };
   void set_ener(const double& iener) { ener = iener; };
   const int get_primitive_count() const { return (int) coefficients.size(); };
   const std::string hdr() {
@@ -114,10 +128,9 @@ public:
     }
     return temp;
   }
-  const double get_energy() const {
+  const double& get_energy() const {
     return ener;
   };
-  const double* get_ptr_coefficients() { return &coefficients[0]; };
   const vec& get_ptr_coef_vector() const { return coefficients; };
   void assign_coefs(const vec& values) { coefficients.resize(values.size()); coefficients = values; }
 };

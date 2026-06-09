@@ -47,9 +47,6 @@
     <ClCompile Include="..\Src\basis_set.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\cart2sph.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\constants.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -66,9 +63,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\isosurface.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\JKFit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\nos_math.cpp">
@@ -107,15 +101,6 @@
     <ClCompile Include="..\Src\integrator.cpp">
       <Filter>Source Files\libCInt</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\rys_roots.cpp">
-      <Filter>Source Files\libCInt</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\int_g2e.cpp">
-      <Filter>Source Files\libCInt</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\int_optimizer.cpp">
-      <Filter>Source Files\libCInt</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\integration_params.cpp">
       <Filter>Source Files\libCInt</Filter>
     </ClCompile>
@@ -131,7 +116,16 @@
     <ClCompile Include="..\Src\b2c.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\auxiliary_basis.cpp">
+    <ClCompile Include="..\Src\cif.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\GridManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\libCintKernels.cpp">
+      <Filter>Source Files\libCInt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\basis_data.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,10 +1,15 @@
+#include "pch.h"
+#include "constants.h"
 #include "integration_params.h"
-#include "JKFit.h"
+
 
 Int_Params::Int_Params()
 {
     wfn_origin = 0;
     ncen = 0;
+    atoms.clear();
+    atoms.shrink_to_fit();
+    basis_sets.clear();
 }
 
 Int_Params::Int_Params(const WFN &wavy)
@@ -16,7 +21,50 @@ Int_Params::Int_Params(const WFN &wavy)
     calc_integration_parameters();
 }
 
-vec Int_Params::normalize_gto(vec coef, const vec exp, const int l)
+Int_Params::Int_Params(const Int_Params &first, const Int_Params &second)
+{
+    // Combine two Int_Params objects
+    wfn_origin = 0;
+    atoms.clear();
+    atoms.shrink_to_fit();
+    basis_sets.clear();
+
+    _atm.resize(first._atm.size() + second._atm.size(), 0);
+    _bas.resize(first._bas.size() + second._bas.size(), 0);
+    _env.resize(first._env.size() + second._env.size(), 0);
+    ncen = first.ncen + second.ncen;
+    nbas = first.nbas + second.nbas;
+
+    //// Copy all the data from the first object into the respective containers in the combined object
+    std::copy(first._atm.begin(), first._atm.end(), _atm.begin());
+    std::copy(first._bas.begin(), first._bas.end(), _bas.begin());
+    std::copy(first._env.begin(), first._env.end(), _env.begin());
+    //Also copy the _env data from the second object to the end of the _env data in the combined object
+    std::copy(second._env.begin(), second._env.end(), _env.begin() + first._env.size());
+
+    // Update the pointers in the second object to point to the correct place in the combined _env vector
+    const unsigned int off = first._env.size();
+    const int natm_off = first._atm.size() / 6;
+    ivec atm2 = second._atm;
+    ivec bas2 = second._bas;
+    for (int a = 0; a < natm_off; a++)
+    {
+        atm2[a * 6 + 1] += off;
+        atm2[a * 6 + 3] += off;
+    }
+    for (int b = 0; b < second.nbas; b++)
+    {
+        bas2[b * 8 + 0] += natm_off;
+        bas2[b * 8 + 5] += off;
+        bas2[b * 8 + 6] += off;
+    }
+    //// Copy the data from the second object into the combined objects
+    std::copy(atm2.begin(), atm2.end(), _atm.begin() + first._atm.size());
+    std::copy(bas2.begin(), bas2.end(), _bas.begin() + first._bas.size());
+    nao = first.nao + second.nao;
+}
+
+vec Int_Params::normalize_gto(vec coef, const vec &exp, const int l)
 {
     // GTO norm Ref: H. B. Schlegel and M. J. Frisch, Int. J. Quant.  Chem., 54(1995), 83-87.
     for (int i = 0; i < coef.size(); i++)
@@ -24,42 +72,43 @@ vec Int_Params::normalize_gto(vec coef, const vec exp, const int l)
         coef[i] *= 1.0 / std::sqrt(gaussian_int(l * 2 + 2, 2 * exp[i]));
     }
 
-    // Normalize contracted GTO
-    // #ee = numpy.empty((nprim, nprim))
-    //     #for i in range(nprim) :
-    //     #    for j in range(i + 1) :
-    //     #        ee[i, j] = ee[j, i] = gaussian_int(angl * 2 + 2, es[i] + es[j])
-    //     #s1 = 1 / numpy.sqrt(numpy.einsum('pi,pq,qi->i', cs, ee, cs))
-    //     return numpy.einsum('pi,i->pi', cs, s1)
-    vec2 ee(coef.size(), vec(coef.size(), 0.0));
-    for (int i = 0; i < coef.size(); i++)
+    vec2 ee(exp.size(), vec(exp.size(), 0.0));
+    for (int i = 0; i < exp.size(); i++)
     {
         for (int j = 0; j < i + 1; j++)
         {
             ee[i][j] = ee[j][i] = gaussian_int(l * 2 + 2, exp[i] + exp[j]);
         }
     }
-    // Do the einsum by hand
-    vec s1(coef.size(), 0.0);
-    for (int i = 0; i < coef.size(); i++)
+    //double s1;
+    //for (int i = 0; i < coef.size(); i++)
+    //{
+    //    s1 = 0.0;
+    //    for (int j = 0; j < coef.size(); j++)
+    //    {
+    //        for (int k = 0; k < coef.size(); k++)
+    //        {
+    //            s1 += coef[k] * ee[k][j] * coef[j];
+    //        }
+    //    }
+    //    s1 = 1.0 / std::sqrt(s1);
+    //    coef[i] *= s1;
+    //}
+    double s1 = 0.0;
+    for (int j = 0; j < coef.size(); j++)
     {
-        for (int j = 0; j < coef.size(); j++)
+        for (int k = 0; k < coef.size(); k++)
         {
-            for (int k = 0; k < coef.size(); k++)
-            {
-                s1[i] += coef[k] * ee[k][j] * coef[j];
-            }
+            s1 += coef[k] * ee[k][j] * coef[j];
         }
     }
-    for (int i = 0; i < s1.size(); i++)
-    {
-        s1[i] = 1.0 / std::sqrt(s1[i]);
-    }
+    s1 = 1.0 / std::sqrt(s1);
     for (int i = 0; i < coef.size(); i++)
     {
-        coef[i] *= s1[i];
+        coef[i] *= s1;
     }
-    return coef;
+
+    return std::move(coef);
 }
 
 void Int_Params::collect_basis_data()
@@ -81,30 +130,51 @@ void Int_Params::collect_basis_data()
             exponents.push_back(basis[shell].get_exponent());
         }
         // Normalize the GTOs depending on the context
-        if (wfn_origin == 9 || wfn_origin == 6)
+        if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx)
         {
             for (int i = 0; i < coefficients.size(); i++)
             {
                 int l = basis[i].get_type() - 1;
-                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2*l+1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
+                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
             }
         }
-        else if (wfn_origin == 0)
+        else if (wfn_origin == e_origin::tonto)
+        {
+            for (int i = 0; i < coefficients.size(); i++)
+            {
+                int l = basis[i].get_type() - 1;
+                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from Tonto to libcint  ... something something, cartesian harmonics...
+                if (l == 2) // D functions need an extra normalization factor
+                    coefficients[i] *= std::sqrt(10. / 4.0 / constants::PI); // ... something something, cartesian harmonics...^2
+            }
+        }
+        else if (wfn_origin == e_origin::tonto)
+        {
+            for (int i = 0; i < coefficients.size(); i++)
+            {
+                int l = basis[i].get_type() - 1;
+                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from Tonto to libcint  ... something something, cartesian harmonics...
+                if (l == 2) // D functions need an extra normalization factor
+                    coefficients[i] *= std::sqrt(10. / 4.0 / constants::PI); // ... something something, cartesian harmonics...^2
+            }
+        }
+        else if (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::ptb)
         {
             int coef_idx = 0;
             for (unsigned int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++)
             {
+                const int type = (wfn_origin == e_origin::NOT_YET_DEFINED) ? basis[coef_idx].get_type() : basis[coef_idx].get_type() - 1;
                 vec shell_coefs(coefficients.begin() + coef_idx, coefficients.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
                 vec shell_exp(exponents.begin() + coef_idx, exponents.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
 
-                shell_coefs = normalize_gto(shell_coefs, shell_exp, basis[shell].get_type());
+                shell_coefs = normalize_gto(shell_coefs, shell_exp, type);
 
                 // Place the new coefs at the correct place in the coefficients vector
                 std::copy(shell_coefs.begin(), shell_coefs.end(), coefficients.begin() + coef_idx);
                 coef_idx += atoms[atom_idx].get_shellcount(shell);
             }
         }
-        else
+        else if (wfn_origin != e_origin::OCC)
         {
             std::cout << "WFN Origin not recognized, thread carefully! No normalisation was performed!" << std::endl;
         }
@@ -113,11 +183,11 @@ void Int_Params::collect_basis_data()
         for (int func = 0; func < basis.size(); func++)
         {
             int new_l = 0;
-            if (wfn_origin == 0)      new_l = basis[func].get_type();
-            else if (wfn_origin == 9 || wfn_origin == 6) new_l = basis[func].get_type() -1;
+            if (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC)      new_l = basis[func].get_type();
+            else if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb) new_l = basis[func].get_type() - 1;
             else {
                 std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
-                new_l = basis[func].get_type() -1;
+                new_l = basis[func].get_type() - 1;
             }
 
             if (new_l > max_l) max_l = new_l;
@@ -131,8 +201,10 @@ void Int_Params::collect_basis_data()
             for (unsigned int shell_idx = 0; shell_idx < atoms[atom_idx].get_shellcount_size(); shell_idx++) {
                 int curr_funcs = (int)atoms[atom_idx].get_shellcount()[shell_idx];
 
-                if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == 9 || wfn_origin == 6))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) { //Sort functions regarding the angular momentum
-                    if (wfn_origin != 0 && wfn_origin != 9 && wfn_origin != 6) std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
+                //Sort functions regarding the angular momentum
+                if (((basis[n_funcs].get_type()-1 != l) && //First case, function type start with s=1
+                        (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb || wfn_origin == e_origin::xtb))  ||
+                        ((basis[n_funcs].get_type() != l) && (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC))) {  //Second type s = 0
                     n_funcs += curr_funcs;
                     continue;
                 }
@@ -143,12 +215,10 @@ void Int_Params::collect_basis_data()
                 shelltype.push_back(l);
                 pos_in_new_coeffs += curr_funcs;
                 n_funcs += curr_funcs;
-
-
             }
         }
         //Populate basis_sets dictionary  (Element:[coefficients, exponents, starting point in _env vector, shellcount])
-        basis_sets.insert({ atoms[atom_idx].get_charge(), LibCintBasis{coefficients_new, exponents_new, 0, shellcount_new, shelltype}});
+        basis_sets.insert({ atoms[atom_idx].get_charge(), LibCintBasis{coefficients_new, exponents_new, 0, shellcount_new, shelltype} });
     }
 }
 
@@ -206,7 +276,7 @@ void Int_Params::populate_env()
             }
             func_count += n_funcs;
         }
-        bas_ptr += func_count*2;
+        bas_ptr += func_count * 2;
     }
 }
 
@@ -221,17 +291,18 @@ void Int_Params::populate_bas()
         int bas_ptr = basis.env_idx;
         for (int shell = 0; shell < basis.shellcount.size(); shell++)
         {
-            _bas[index * 8 + 0] = atom_idx; // atom_id
-            _bas[index * 8 + 1] = (int)basis.shelltypes[shell];  // l s=0, p=1, d=2 ...
-            _bas[index * 8 + 2] = (int)basis.shellcount[shell];                  // nprim
-            _bas[index * 8 + 3] = 1;                                     // ncentr    Not sure
-            _bas[index * 8 + 5] = bas_ptr;                               // Pointer to the exponents of a shell
+            size_t eightind = (size_t)index * 8;
+            _bas[eightind + 0] = atom_idx; // atom_id
+            _bas[eightind + 1] = (int)basis.shelltypes[shell];  // l s=0, p=1, d=2 ...
+            _bas[eightind + 2] = (int)basis.shellcount[shell];                  // nprim
+            _bas[eightind + 3] = 1;                                     // ncentr    Not sure
+            _bas[eightind + 5] = bas_ptr;                               // Pointer to the exponents of a shell
             bas_ptr += (int)basis.shellcount[shell];                     // Add the number of contracted functions per shell to gain the pointer to the coefficient
-            _bas[index * 8 + 6] = bas_ptr;                               // Pointer to the coefficients of a shell
+            _bas[eightind + 6] = bas_ptr;                               // Pointer to the coefficients of a shell
             //_bas 8 is set to 0
-            bas_ptr += _bas[index * 8 + 2] * _bas[atom_idx * 8 + 3];
+            bas_ptr += _bas[eightind + 2] * _bas[eightind + 3];
 
-            nao += (_bas[index * 8 + 1] * 2 + 1) * _bas[index * 8 + 3]; // 2l+1 + n_centr
+            nao += ((size_t)_bas[eightind + 1] * 2 + 1) * _bas[eightind + 3]; // 2l+1 + n_centr
             index++;
         }
     }
@@ -245,53 +316,11 @@ void Int_Params::calc_integration_parameters()
     populate_bas();
 }
 
-Int_Params Int_Params::operator+(const Int_Params &other)
-{
-    // Combine two Int_Params objects
-    // Create a new Int_Params object and resize the arrays to fit the new size
-    Int_Params combined;
-    combined._atm.resize(_atm.size() + other._atm.size(), 0);
-    combined._bas.resize(_bas.size() + other._bas.size(), 0);
-    combined._env.resize(_env.size() + other._env.size(), 0);
-    combined.ncen = ncen + other.ncen;
-    combined.nbas = nbas + other.nbas;
-
-    // Copy all the data from the first object into the respective containers in the combined object
-    std::copy(_atm.begin(), _atm.end(), combined._atm.begin());
-    std::copy(_bas.begin(), _bas.end(), combined._bas.begin());
-    std::copy(_env.begin(), _env.end(), combined._env.begin());
-    // Also copy the _env data from the second object to the end of the _env data in the combined object
-    std::copy(other._env.begin(), other._env.end(), combined._env.begin() + _env.size());
-
-    // Update the pointers in the second object to point to the correct place in the combined _env vector
-    unsigned int off = _env.size();
-    int natm_off = _atm.size() / 6;
-    ivec atm2 = other._atm;
-    ivec bas2 = other._bas;
-    for (int a = 0; a < natm_off; a++)
-    {
-        atm2[a * 6 + 1] += off;
-        atm2[a * 6 + 3] += off;
-    }
-    for (int b = 0; b < other.nbas; b++)
-    {
-        bas2[b * 8 + 0] += natm_off;
-        bas2[b * 8 + 5] += off;
-        bas2[b * 8 + 6] += off;
-    }
-    // Copy the data from the second object into the combined objects
-    std::copy(atm2.begin(), atm2.end(), combined._atm.begin() + _atm.size());
-    std::copy(bas2.begin(), bas2.end(), combined._bas.begin() + _bas.size());
-    combined.nao = nao + other.nao;
-
-    return combined;
-}
-
 void Int_Params::print_data(std::string name) {
     std::cout << "Printing data for " << name << std::endl;
     std::ofstream file(name + ".txt");
     file << "ATM:" << std::endl;
-    for (int a = 0; a < _atm.size()/6; a++) {
+    for (int a = 0; a < _atm.size() / 6; a++) {
         for (int i = 0; i < 6; i++) {
             file << _atm[a * 6 + i] << " ";
         }
@@ -311,25 +340,7 @@ void Int_Params::print_data(std::string name) {
     file.close();
 }
 
-
-ivec make_loc(ivec& bas, int nbas) {
-    ivec dims(nbas, 0);
-    // Calculate (2*l + 1) * nctr for spherical harmonics
-    for (size_t i = 0; i < nbas; i++)
-    {
-        dims[i] = (2 * bas(ANG_OF, i) + 1) * bas(NCTR_OF, i);
-    }
-
-    // Create the ao_loc array
-    ivec ao_loc(nbas + 1, 0);
-
-    // Compute the cumulative sum
-    std::partial_sum(dims.begin(), dims.end(), ao_loc.begin() + 1);
-
-    return ao_loc;
-}
-
-double CINTcommon_fac_sp(int l)
+double NOS_CINTcommon_fac_sp(int l)
 {
     switch (l)
     {

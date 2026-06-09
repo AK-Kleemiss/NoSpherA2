@@ -1,0 +1,6 @@
+- Use repo-root `uv run pytest` for Python test harness checks.
+- CI sets `NOS_EXE` to downloaded artifact path and runs tests from repository root.
+- Test helper auto-sets `OCC_DATA_PATH` to `occ/share` if not defined.
+- `RUN_FULL_TEST` controls optional heavy tests.
+- Prefer minimal, targeted edits in `tests/run_test.py` for regression fixes.
+- Preserve expected-output semantics (`.good` vs generated logs/cubes).

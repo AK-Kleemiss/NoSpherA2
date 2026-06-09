@@ -19,8 +19,10 @@ public:
     };
     WFN wavy;
     void shrink_intermediate_vectors();
+    const bool basis_set_loaded() const { return bbasis_set_loaded; };
 
 private:
+    bool bbasis_set_loaded = false;
     Config config;
     int natoms;
     std::filesystem::path SALTED_DIR;

@@ -5,7 +5,9 @@
 #include "nos_math.h"
 #include "constants.h"
 #include "wfn_class.h"
+#include "basis_set.h"
 #include <filesystem>
+
 
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
 {
@@ -15,7 +17,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
 
     config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
 
-	  if (config.salted_filename == "") {
+    if (config.salted_filename == "") {
         if (opt_in.coef_file != "") {
             std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
             config.dfbasis = "cc-pvqz-jkfit";
@@ -76,6 +78,11 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     config.predict_filename = "temp_rascaline.xyz";
     if (wavy.get_nmo() != 0)
         wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
+
+    if (file.basis_set_defined()) {
+        load_basis_into_WFN(wavy, file.read_basis_set());
+        bbasis_set_loaded = true;
+    }
 }
 
 const std::string SALTEDPredictor::get_dfbasis_name() const
@@ -131,29 +138,37 @@ void SALTEDPredictor::setup_atomic_environment()
         natom_dict[atomic_symbols[i]] += 1;
     }
 
+
+    SALTED_Utils::FeatomicHyperParameters hp{
+        .cutoff_radius = config.rcut1,
+        .max_radial = config.nrad1,
+        .max_angular = config.nang1,
+        .atomic_gaussian_width = config.sig1,
+        .center_atom_weight = 1.0,
+        .species = config.species,
+        .neighspe = config.neighspe1,
+        .radial_basis = {
+            .type = "Gto",
+            .spline_accuracy = 1e-6
+        },
+        .cutoff_function = {
+            .type = "ShiftedCosine",
+            .width = 0.1
+        }
+    };
+
+    featomic::SimpleSystem featomic_system = SALTED_Utils::gen_featomic_system(config.predict_filename);
     // RASCALINE (Generate descriptors)
-    v1 = Rascaline_Descriptors(
-             config.predict_filename,
-             config.nrad1,
-             config.nang1,
-             config.sig1,
-             config.rcut1,
-             natoms,
-             config.neighspe1,
-             config.species)
-             .calculate_expansion_coeffs();
+    v1 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp);
+
     if ((config.nrad2 != config.nrad1) || (config.nang2 != config.nang1) || (config.sig2 != config.sig1) || (config.rcut2 != config.rcut1) || (config.neighspe2 != config.neighspe1))
     {
-        v2 = Rascaline_Descriptors(
-                 config.predict_filename,
-                 config.nrad2,
-                 config.nang2,
-                 config.sig2,
-                 config.rcut2,
-                 natoms,
-                 config.neighspe2,
-                 config.species)
-                 .calculate_expansion_coeffs();
+        hp.max_radial = config.nrad2;
+        hp.max_angular = config.nang2;
+        hp.atomic_gaussian_width = config.sig2;
+        hp.cutoff_radius = config.rcut2;
+        hp.neighspe = config.neighspe2;
+        v2 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp);
     }
     else
     {
@@ -168,7 +183,7 @@ void SALTEDPredictor::setup_atomic_environment()
 
 void SALTEDPredictor::read_model_data() {
     const std::filesystem::path _SALTEDpath = SALTED_DIR / config.salted_filename;
-    SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_SALTEDpath);
+    SALTED_BINARY_FILE file(_SALTEDpath);
     if (config.field) {
         err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
     }
@@ -237,13 +252,13 @@ vec SALTEDPredictor::predict()
         if (config.sparsify)
         {
             int nfps = static_cast<int>(vfps[lam].size());
-            p.assign(natoms * (2 * lam + 1) * nfps, 0.0);
+            p.assign((size_t)natoms * ((size_t)2 * lam + 1) * nfps, 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p);
             featsize[lam] = nfps;
         }
         else
         {
-            p.assign(natoms * (2 * lam + 1) * featsize[lam], 0.0);
+            p.assign((size_t)natoms * ((size_t)2 * lam + 1) * featsize[lam], 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
         }
         pvec[lam] = p;

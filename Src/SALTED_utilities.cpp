@@ -28,9 +28,9 @@ std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int>
         }
         transformed_matrix[lval][lval] = sqrt_2;
         // Divide each element by sqrt(2.0)
-        for (auto &row : transformed_matrix)
+        for (auto& row : transformed_matrix)
         {
-            for (auto &elem : row)
+            for (auto& elem : row)
             {
                 elem /= sqrt_2;
             }
@@ -40,10 +40,10 @@ std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int>
     return matrices;
 }
 
-int SALTED_Utils::get_lmax_max(std::unordered_map<std::string, int> &lmax)
+int SALTED_Utils::get_lmax_max(std::unordered_map<std::string, int>& lmax)
 {
     int lmax_max = 0;
-    for (auto &[key, value] : lmax)
+    for (auto& [key, value] : lmax)
     {
         if (value > lmax_max)
         {
@@ -53,12 +53,12 @@ int SALTED_Utils::get_lmax_max(std::unordered_map<std::string, int> &lmax)
     return lmax_max;
 }
 
-void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const std::array<std::vector<primitive>, 118> &basis_set, std::vector<std::string> species)
+void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int>& lmax, std::unordered_map<std::string, int>& nmax, const std::array<std::vector<primitive>, 118>& basis_set, std::vector<std::string> species)
 {
     // lmax = {"C": 5, "H":2,...} with the numbers beeing the maximum angular momentum (type) for the given atom
     // nmax = {C0: 10, C1: 7, ...} with the numbers beeing the maximum number of primitives for the given atom and type
 
-    for (auto &spe : species)
+    for (auto& spe : species)
     {
         int atom_index = constants::get_Z_from_label(spe.c_str());
         // get the last element of the basis set for the given atom
@@ -77,7 +77,7 @@ void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std
 }
 
 // Function to filter out atoms that belong to species not available for the model selected
-std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::string> &atomic_symbols, const std::vector<std::string> &species)
+std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::string>& atomic_symbols, const std::vector<std::string>& species)
 {
     std::vector<std::string> filtered_symbols;
     std::set<std::string> excluded_species;
@@ -86,7 +86,7 @@ std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::str
     std::set<std::string> species_set(species.begin(), species.end());
 
     // Find all species that are not in the input species set
-    for (const auto &symbol : atomic_symbols)
+    for (const auto& symbol : atomic_symbols)
     {
         if (species_set.find(symbol) == species_set.end())
         {
@@ -98,7 +98,7 @@ std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::str
     if (!excluded_species.empty())
     {
         std::cout << "Excluded species: ";
-        for (const auto &_species : excluded_species)
+        for (const auto& _species : excluded_species)
         {
             std::cout << _species << " ";
         }
@@ -107,7 +107,7 @@ std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::str
     }
 
     // Filter out excluded species from atomic_symbols
-    for (const auto &symbol : atomic_symbols)
+    for (const auto& symbol : atomic_symbols)
     {
         if (excluded_species.find(symbol) == excluded_species.end())
         {
@@ -118,98 +118,60 @@ std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::str
     return filtered_symbols;
 }
 
-std::string Rascaline_Descriptors::to_json(const HyperParametersDensity &params)
+std::string SALTED_Utils::FeatomicHyperParameters::to_json() const
 {
     std::ostringstream oss;
     oss << "{\n"
         << "  \"cutoff\": {  \
-                    \"radius\": " << params.cutoff << " , \"smoothing\": \
-                                  {\"type\": \"" << params.cutoff_function.type << "\", \"width\": " << params.cutoff_function.width << "} }, \n"
+                    \"radius\": " << this->cutoff_radius << " , \"smoothing\": \
+                                  {\"type\": \"" << this->cutoff_function.type << "\", \"width\": " << this->cutoff_function.width << "} }, \n"
         << "  \"density\": { \
-                    \"type\": \"Gaussian\", \"width\": " << params.atomic_gaussian_width << ", \"center_atom_weight\": " << params.center_atom_weight << "},\n"
+                    \"type\": \"Gaussian\", \"width\": " << this->atomic_gaussian_width << ", \"center_atom_weight\": " << this->center_atom_weight << "},\n"
         << "  \"basis\": { \
-                    \"type\": \"TensorProduct\", \"max_angular\": " << params.max_angular << ", \"radial\": {\"type\":  \"" << params.radial_basis.type << "\", \"max_radial\": " << params.max_radial << "} , \"spline_accuracy\": " << params.radial_basis.spline_accuracy << "}\n"
+                    \"type\": \"TensorProduct\", \"max_angular\": " << this->max_angular << ", \"radial\": {\"type\":  \"" << this->radial_basis.type << "\", \"max_radial\": " << this->max_radial << "} , \"spline_accuracy\": " << this->radial_basis.spline_accuracy << "}\n"
         << "}";
     return oss.str();
 }
 
-std::string Rascaline_Descriptors::gen_parameters()
-{
-    HyperParametersDensity hyper_parameters_density = {
-        this->rcut,                           // cutoff
-        this->nrad -1,                        // max_radial    //DO NOT ASK ME WHY 1-
-        this->nang,                           // max_angular
-        this->atomic_gaussian_width,          // atomic_gaussian_width
-        this->center_atom_weight,             // center_atom_weight
-        {"Gto", this->spline_accuracy},       // radial_basis
-        {"ShiftedCosine", this->cutoff_width} // cutoff_function
-    };
-    std::string json_string = to_json(hyper_parameters_density);
-    return json_string;
-}
 
-// How about this?
-Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path &filepath, const int &nrad, const int &nang, const double &atomic_gaussian_width,
-                                             const double &rcut, const int &n_atoms, const std::vector<std::string> &neighspe, const std::vector<std::string> &species,
-                                             const double &center_atom_weight, const double &spline_accuracy, const double &cutoff_width)
+// Used to generate metatensor::TensorMap and save the buffer location into the descriptor_buffer
+static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
-    this->filepath = filepath;
-    this->nrad = nrad;
-    this->nang = nang;
-    this->atomic_gaussian_width = atomic_gaussian_width;
-    this->rcut = rcut;
-    this->n_atoms = n_atoms;
-    this->neighspe = neighspe;
-    this->species = species;
-    this->center_atom_weight = center_atom_weight;
-    this->spline_accuracy = spline_accuracy;
-    this->cutoff_width = cutoff_width;
-    this->nspe = (int)neighspe.size();
-}
-
-// FEATOMIC1
-metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
-{
-    featomic::SimpleSystem featomic_system;
-    WFN wfn = WFN(this->filepath.c_str());
-    for (const atom& a : *wfn.get_atoms_ptr())
-    {
-        std::array<double, 3> xyz = { constants::bohr2ang(a.get_coordinate(0)),
-                                      constants::bohr2ang(a.get_coordinate(1)),
-                                      constants::bohr2ang(a.get_coordinate(2)) };
-        featomic_system.add_atom(a.get_charge(), xyz);
-    }
-    // Construct the parameters for the calculator from the inputs given
-    std::string temp_p = gen_parameters();
-    const char *parameters = temp_p.c_str();
-
     // size_t nspe1 = neighspe.size();
-    std::vector<std::vector<int32_t>> keys_array;
-    for (int l = 0; l < this->nang + 1; ++l)
+    std::vector<std::array<int32_t, 4>> keys_array;
+    keys_array.reserve((parameters.max_angular + 1) * parameters.species.size() * parameters.neighspe.size());
+
+    for (int l = 0; l < parameters.max_angular + 1; ++l)
     {
-        for (const std::string &specen : this->species)
+        for (const std::string& center_spe : parameters.species)
         {
-            for (const std::string &speneigh : this->neighspe)
+            int32_t center_z = constants::get_Z_from_label(center_spe.c_str()) + 1;
+            for (const std::string& neigh_spe : parameters.neighspe)
             {
+                int32_t neigh_z = constants::get_Z_from_label(neigh_spe.c_str()) + 1;
                 // Directly emplace back initializer_lists into keys_array
-                keys_array.emplace_back(std::vector<int32_t>{ l, 1, constants::get_Z_from_label(specen.c_str()) + 1, constants::get_Z_from_label(speneigh.c_str()) + 1 });
+                keys_array.push_back({ l, 1, center_z, neigh_z});
             }
         }
     }
 
     // Assuming metatensor::Labels expects a flat sequence of integers for each label
     std::vector<int32_t> flattened_keys;
-    for (const auto &subVector : keys_array)
+    for (const auto& subVector : keys_array)
     {
         flattened_keys.insert(flattened_keys.end(), subVector.begin(), subVector.end());
     }
 
     // Convert keys_array to rascaline::Labels
-    std::vector<std::string> names = {"o3_lambda", "o3_sigma", "center_type", "neighbor_type"};
+    std::vector<std::string> names = { "o3_lambda", "o3_sigma", "center_type", "neighbor_type" };
     metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
 
-    // create the calculator with its name and parameters
-    auto calculator = featomic::Calculator("spherical_expansion", parameters);
+
+    //create the calculator with its name and parameters
+    //Do not ask me, why Featomic expects the max_radial to be one less than the actual number of radial basis functions, but it does, so here we are
+    SALTED_Utils::FeatomicHyperParameters modif_param = parameters;
+    modif_param.max_radial -= 1;
+    auto calculator = featomic::Calculator("spherical_expansion", modif_param.to_json().c_str());
 
     featomic::CalculationOptions calc_opts;
     calc_opts.selected_keys = keys_selection;
@@ -227,25 +189,26 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     return descriptor;
 }
 
-// FEATOMIC2
-cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer)
+// Reads the descriptor buffer and fills the expansion coefficients vector
+static cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
-
+    int n_atoms = (int)featomic_system.size();
+    int nspe = (int)parameters.species.size();
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
     // cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
-    cvec4 omega(this->n_atoms, std::vector<cvec2>(this->nspe * this->nrad, cvec2(this->nang + 1, cvec(2 * this->nang + 1, {0.0, 0.0}))));
-    for (int l = 0; l < nang + 1; ++l)
+    cvec4 omega(n_atoms, std::vector<cvec2>((size_t)nspe * parameters.max_radial, cvec2((size_t)parameters.max_angular + 1, cvec((size_t)2 * parameters.max_angular + 1, { 0.0, 0.0 }))));
+    for (int l = 0; l < parameters.max_angular + 1; ++l)
     {
-        cvec2 c2r = SALTED_Utils::complex_to_real_transformation({(2 * l) + 1})[0];
+        cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ (2 * l) + 1 })[0];
         metatensor::TensorBlock descriptor_block = descriptor.block_by_id(l);
         metatensor::NDArray<double> descriptor_values = descriptor_block.values();
 
         // Perform the matrix multiplication and assignment
-        for (int a = 0; a < this->n_atoms; ++a)
+        for (int a = 0; a < n_atoms; ++a)
         {
             for (int c = 0; c < 2 * l + 1; ++c)
             {
-                for (int d = 0; d < this->nspe * this->nrad; ++d)
+                for (int d = 0; d < nspe * parameters.max_radial; ++d)
                 {
                     // omega[l][a][c][d] = 0.0;
                     omega[a][d][l][c] = 0.0;
@@ -263,12 +226,63 @@ cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descripto
     return omega;
 }
 
-cvec4 Rascaline_Descriptors::calculate_expansion_coeffs()
-{
 
-    metatensor::TensorMap descriptor = get_feats_projs();
+cvec4 SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+{
+    metatensor::TensorMap descriptor = get_feats_projs(featomic_system, parameters);
     std::vector<uint8_t> descriptor_buffer = descriptor.save_buffer();
-    return get_expansion_coeffs(descriptor_buffer);
+    return get_expansion_coeffs(descriptor_buffer, featomic_system, parameters);
+}
+
+
+//FEATOMIC POWER Spectrum
+metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters) {
+    // create the calculator with its name and parameters
+    auto calculator = featomic::Calculator("soap_power_spectrum", parameters.to_json().c_str());
+
+    std::vector<std::array<int32_t,3>> keys_array;
+    for (const std::string& center_type : parameters.species)
+    {
+        int32_t z_center = constants::get_Z_from_label(center_type.c_str()) + 1;
+
+        for (size_t i = 0; i < parameters.neighspe.size(); ++i)
+        {
+            int32_t z1 = constants::get_Z_from_label(parameters.neighspe[i].c_str()) + 1;
+
+            for (size_t j = i; j < parameters.neighspe.size(); ++j)
+            {
+                int32_t z2 = constants::get_Z_from_label(parameters.neighspe[j].c_str()) + 1;
+
+                keys_array.push_back({ z_center, z1, z2 });
+            }
+        }
+    }
+
+    // Assuming metatensor::Labels expects a flat sequence of integers for each label
+    std::vector<int32_t> flattened_keys;
+    for (const auto& subVector : keys_array)
+    {
+        flattened_keys.insert(flattened_keys.end(), subVector.begin(), subVector.end());
+    }
+
+    // Convert keys_array to rascaline::Labels
+    std::vector<std::string> names = {"center_type", "neighbor_1_type", "neighbor_2_type"};
+    metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
+
+    featomic::CalculationOptions calc_opts;
+    calc_opts.use_native_system = true;
+    calc_opts.selected_keys = keys_selection;
+    // run the calculation
+    // Initialize descriptor directly from computation result
+    metatensor::TensorMap descriptor = calculator.compute(featomic_system, calc_opts);
+
+    // The descriptor is a metatensor `TensorMap`, containing multiple blocks.
+    // We can transform it to a single block containing a dense representation,
+    // with one sample for each atom-centered environment.
+    descriptor = descriptor.keys_to_samples("center_type");
+    descriptor = descriptor.keys_to_properties(svec{ "neighbor_1_type" , "neighbor_2_type" });
+
+    return descriptor;
 }
 
 
@@ -280,13 +294,14 @@ const double calc_density_ML(const double& x,
 {
     double dens = 0, radial;
     int coef_counter = 0;
-    unsigned int e = 0, size = 0;
+    unsigned int shell = 0, n_shells = 0, prim = 0;
     basis_set_entry bf;
     primitive p;
 
     for (int a = 0; a < atoms.size(); a++)
     {
-        size = (int)atoms[a].get_basis_set_size();
+        prim = 0;
+        n_shells = static_cast<unsigned int>(atoms[a].get_shellcount().size());
         double d[4]{
             x - atoms[a].get_coordinate(0),
             y - atoms[a].get_coordinate(1),
@@ -295,24 +310,24 @@ const double calc_density_ML(const double& x,
         d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (d[3] < -46.0517)
         { // corresponds to cutoff of ex ~< 1E-20
-            for (e = 0; e < size; e++)
+            for (shell = 0; shell < n_shells; shell++)
             {
-                bf = atoms[a].get_basis_set_entry(e);
-                coef_counter += (2 * bf.get_type() + 1);
+                coef_counter += (2 * atoms[a].get_basis_set_type(prim) + 1);
+                prim += atoms[a].get_shellcount()[shell];
             }
             continue;
         }
         // normalize distances for spherical harmonic
-        for (e = 0; e < 3; e++)
-            d[e] /= d[3];
-        int prim = 0;
-        for (int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
+        for (int i = 0; i < 3; i++)
+            d[i] /= d[3];
+        
+        for (int shell = 0; shell < n_shells; shell++) {
             radial = 0;
             int type = atoms[a].get_basis_set_entry(prim).get_type();
 
             for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
-                radial += gaussian_radial(bf.get_primitive(), d[3]) * bf.get_coefficient();
+                radial += bf.get_primitive().eval_gaussian(d[3]);
             }
 
             if (radial < 1E-10)
@@ -338,19 +353,21 @@ const double calc_density_ML(const double& x,
 {
     double dens = 0, radial = 0;
     int coef_counter = 0;
-    int e = 0, size = 0;
+    unsigned int shell = 0, n_shells = 0;
 
     for (int a = 0; a < atoms.size(); a++)
     {
+        n_shells = static_cast<unsigned int>(atoms[a].get_shellcount().size());
+        unsigned int prim = 0;
         if (a != atom_nr) {
-            for (e = 0; e < size; e++)
+            for (shell = 0; shell < n_shells; shell++)
             {
-                coef_counter += (2 * atoms[a].get_basis_set_type(e) + 1);
+                coef_counter += (2 * atoms[a].get_basis_set_type(prim) + 1);
+                prim += atoms[a].get_shellcount()[shell];
             }
             continue;
         }
-        size = (int)atoms[a].get_basis_set_size();
-
+        
         basis_set_entry bf;
         double d[4]{
             x - atoms[a].get_coordinate(0),
@@ -359,16 +376,15 @@ const double calc_density_ML(const double& x,
         // store r in last element
         d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         // normalize distances for spherical harmonic
-        for (e = 0; e < 3; e++)
-            d[e] /= d[3];
-        unsigned int prim = 0;
-        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
+        for (int i = 0; i < 3; i++)
+            d[i] /= d[3];
+        for (shell = 0; shell < n_shells; shell++) {
             radial = 0;
             unsigned int type = atoms[a].get_basis_set_entry(prim).get_type();
 
             for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
-                radial += gaussian_radial(bf.get_primitive(), d[3]) * bf.get_coefficient();
+                radial += bf.get_primitive().eval_gaussian(d[3]);
             }
 
             if (radial < 1E-10)
@@ -388,18 +404,6 @@ const double calc_density_ML(const double& x,
 }
 
 
-
-double helper_even(const int l) {
-    if (l == 0) {
-        return 1.0;
-    }
-    double res = 1.0;
-    for (int i = 0; i <= l; i += 2) {
-        res *= i;
-    }
-    return res;
-}
-
 /**
  * Calculates the atomic density for a given list of atoms and coefficients.
  *
@@ -407,7 +411,7 @@ double helper_even(const int l) {
  * @param coefs The coefficients used in the calculation.
  * @return The atomic density for each atom.
  */
-vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
+vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs)
 {
     double radial;
     basis_set_entry bf;
@@ -437,113 +441,138 @@ vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
             atom_elecs[a] += radial * coefs[coef_counter];
             coef_counter++;
         }
+        atom_elecs[a] += atoms[a].get_ECP_electrons();
     }
     return atom_elecs;
 }
 
-cube calc_cube_ML(const vec data, WFN &dummy, const int atom_nr)
+void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr)
 {
-    double MinMax[6]{0, 0, 0, 0, 0, 0};
-    int steps[3]{0, 0, 0};
-    readxyzMinMax_fromWFN(dummy, MinMax, steps, 2.5, 0.1, true);
-    cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
+    _time_point start = get_time();
+
+    const int s1 = cube_data.get_size(0), s2 = cube_data.get_size(1), s3 = cube_data.get_size(2), total_size = s1 * s2 * s3;
+    std::cout << "Lets go into the loop! There is " << total_size << " points" << std::endl;
+
+    ProgressBar* progress = new ProgressBar(total_size, 60, "=", " ", "Calculating Values");
+    vec v1{
+        cube_data.get_vector(0, 0),
+        cube_data.get_vector(1, 0),
+        cube_data.get_vector(2, 0) },
+        v2{
+            cube_data.get_vector(0, 1),
+            cube_data.get_vector(1, 1),
+            cube_data.get_vector(2, 1) },
+            v3{
+                cube_data.get_vector(0, 2),
+                cube_data.get_vector(1, 2),
+                cube_data.get_vector(2, 2) },
+                orig{
+                    cube_data.get_origin(0),
+                    cube_data.get_origin(1),
+                    cube_data.get_origin(2) };
+
+    if (atom_nr != -1)
+        std::cout << "Calculation for atom " << atom_nr << std::endl;
+
+    std::vector<atom> atoms = dummy.get_atoms();
+#pragma omp parallel for schedule(dynamic)
+    for (int index = 0; index < total_size; index++)
+    {
+        int i = index / (s2 * s3);
+        int j = (index / s3) % s2;
+        int k = index % s3;
+
+        vec PosGrid{
+            i * v1[0] + j * v2[0] + k * v3[0] + orig[0],
+            i * v1[1] + j * v2[1] + k * v3[1] + orig[1],
+            i * v1[2] + j * v2[2] + k * v3[2] + orig[2] };
+        cube_data.set_value(i, j, k,
+            (atom_nr == -1)
+            ? calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, atoms)
+            : calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, atoms, atom_nr));
+        progress->update();
+    }
+    delete (progress);
+
+    using namespace std;
+    _time_point end = get_time();
+    if (get_sec(start, end) < 60)
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+    else if (get_sec(start, end) < 3600)
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
+    else
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    cube_data.calc_dv();
+    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << cube_data.sum() << std::endl;
+};
+
+cube calc_cube_ML(const vec& data, WFN& dummy, const int& atom_nr)
+{
+    properties_options opts;
+    readxyzMinMax_fromWFN(dummy, opts, true);
+    cube CubeRho(opts.NbSteps, dummy.get_ncen(), true);
     CubeRho.give_parent_wfn(dummy);
 
     for (int i = 0; i < 3; i++)
     {
-        CubeRho.set_origin(i, MinMax[i]);
-        CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+        CubeRho.set_origin(i, opts.MinMax[i]);
+        CubeRho.set_vector(i, i, (opts.MinMax[i + 3] - opts.MinMax[i]) / opts.NbSteps[i]);
     }
     CubeRho.set_comment1("Calculated density using NoSpherA2 from ML Data");
     CubeRho.set_comment2("from " + dummy.get_path().string());
     CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_RI_rho.cube");
 
-    _time_point start = get_time();
+    calc_cube_ML(data, dummy, CubeRho, atom_nr);
 
-    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 60, "=", " ", "Calculating Values");
-    if (atom_nr != -1)
-        std::cout << "Calculation for atom " << atom_nr << std::endl;
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < CubeRho.get_size(0); i++)
-    {
-        for (int j = 0; j < CubeRho.get_size(1); j++)
-            for (int k = 0; k < CubeRho.get_size(2); k++)
-            {
-
-                vec PosGrid{
-                    i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
-                    i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
-                    i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)};
-
-                if (atom_nr == -1)
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms()));
-                else
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms(), atom_nr));
-            }
-        progress->update();
-    }
-    delete (progress);
-
-    using namespace std;
-    _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
-    CubeRho.calc_dv();
-    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
     return CubeRho;
 };
 
-void calc_cube_ML(const vec data, WFN& dummy, const int atom_nr, cube &CubeRho)
-{
-    CubeRho.set_comment1("Calculated density using NoSpherA2 from ML Data");
-    CubeRho.set_comment2("from " + dummy.get_path().string());
-    CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_RI_rho.cube");
-    _time_point start = get_time();
+#include "integrator.h"
+#include "libCintMain.h"
+#include "nos_math.h"
+#include "npy.h"
+void create_SALTED_training_data(const WFN& orbital, const WFN& aux) {
+    std::cout << "Calculating density fitting coefficients..." << std::endl;
+    DensityFitting::CONFIG config;
+    config.analyze_quality = true;
+    //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+    //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+    //if (wavy->get_origin() == e_origin::ptb)
+    //    config.restraint_strength = 1.0e-4;
 
-    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 60, "=", " ", "Calculating Values");
-    if (atom_nr != -1)
-        std::cout << "Calculation for atom " << atom_nr << std::endl;
-    double dens = 0.0;
-#pragma omp parallel for schedule(dynamic) private(dens)
-    for (int i = 0; i < CubeRho.get_size(0); i++)
-    {
-        for (int j = 0; j < CubeRho.get_size(1); j++)
-            for (int k = 0; k < CubeRho.get_size(2); k++)
-            {
+    vec coefs = DensityFitting::density_fit(orbital, aux, config);
 
-                vec PosGrid{
-                    i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
-                    i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
-                    i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2) };
+    vec overlap;
+    Int_Params aux_basis(aux);
+    compute2C<Overlap2C_SPH>(aux_basis, overlap);
+    const int nao_max = aux_basis.get_nao();
 
-                dens = (atom_nr == -1)
-                    ? calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms())
-                    : calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms(), atom_nr);
+    dMatrix1 coefs_vec(coefs.size());
+    coefs_vec.container() = coefs;
+    dMatrix2 overlap_mat(nao_max, nao_max);
+    overlap_mat.container() = overlap;
 
-                CubeRho.set_value(i, j, k, dens);
+    dMatrix1 proj = dot(overlap_mat, coefs_vec);
 
-                //if (atom_nr == -1)
-                //    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms()));
-                //else
-                //    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms(), atom_nr));
-            }
-        progress->update();
-    }
-    delete (progress);
+    npy::write_npy("coefficients.npy", 
+        npy::npy_data<double>{
+            coefs, 
+            { static_cast<unsigned long>(coefs.size()) },
+            false}
+    );
 
-    using namespace std;
-    _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
-    CubeRho.calc_dv();
-    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
-};
+    npy::write_npy("projections.npy",
+        npy::npy_data<double>{
+        proj.container(),
+        { static_cast<unsigned long>(proj.size()) },
+            false}
+    );
+
+    npy::write_npy("overlap.npy",
+        npy::npy_data<double>{
+        overlap,
+        { static_cast<unsigned long>(nao_max), static_cast<unsigned long>(nao_max) },
+            false}
+    );
+
+}

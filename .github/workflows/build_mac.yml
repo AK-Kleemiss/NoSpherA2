@@ -12,42 +12,17 @@ jobs:
 
     steps:
     - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
       with:
         egress-policy: audit
 
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
         submodules: recursive
 
-    # Cache OpenBLAS
-    - name: Cache OpenBLAS Build
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-      id: cache-openblas-mac
-      with:
-        path: OpenBLAS/installation
-        key: openblas-arm-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
-        restore-keys: |
-          openblas-arm-mac-${{ runner.os }}-
-
-    - name: make_OpenBLAS
-      if: steps.cache-openblas-arm-mac.outputs.cache-hit != 'true'
-      run: |
-          cd OpenBLAS 
-          make -j 
-          make PREFIX=installation install
-
-    - name: make_OpenMP
-      run: |
-          cd llvm-project/openmp 
-          mkdir build 
-          cd build 
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. 
-          make
-
     # Cache featomic
     - name: Cache featomic Build
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       id: cache-featomic-mac
       with:
         path: featomic/featomic_install
@@ -71,7 +46,7 @@ jobs:
           mv NoSpherA2 ../NoSpherA2_Mac_arm
 
     - name: Archive executable
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: executable_MacOS_arm
         path: NoSpherA2_Mac_arm
@@ -81,42 +56,17 @@ jobs:
 
     steps:
     - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
       with:
         egress-policy: audit
 
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
         submodules: recursive
 
-    # Cache OpenBLAS
-    - name: Cache OpenBLAS Build
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-      id: cache-openblas-mac
-      with:
-        path: OpenBLAS/installation
-        key: openblas-x86-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
-        restore-keys: |
-          openblas-x86-mac-${{ runner.os }}-
-
-    - name: make_OpenMP_x86_64
-      run: |
-          cd llvm-project/openmp 
-          mkdir build_x86_64 
-          cd build_x86_64 
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=x86_64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. 
-          make
-
-    - name: make_OpenBLAS_x86_64
-      if: steps.cache-openblas-x86-mac.outputs.cache-hit != 'true'
-      run: |
-          cd OpenBLAS 
-          make TARGET=NEHALEM NO_AVX=1 NOFORTRAN=1 BIANRY=64 CC="cc -arch x86_64" -j 
-          make PREFIX=installationx86_64 install
-
     # Cache featomic
     - name: Cache featomic Build
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       id: cache-featomic-mac
       with:
         path: featomic/featomic_install
@@ -141,7 +91,7 @@ jobs:
           mv NoSpherA2 ../NoSpherA2_Mac_x86
 
     - name: Archive executable
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: executable_MacOS_x86
         path: NoSpherA2_Mac_x86
@@ -152,23 +102,23 @@ jobs:
 
     steps:
     - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
       with:
         egress-policy: audit
 
     - name: Download artifacts
-      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
         name: executable_MacOS_arm
     - name: Download artifacts
-      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
         name: executable_MacOS_x86
     - name: Combine artifacts
       run: |
         lipo -create -output NoSpherA2_Mac NoSpherA2_arm NoSpherA2_x86
     - name: Archive combined executable
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: NoSpherA2_Mac_combined  
         path: NoSpherA2_Mac

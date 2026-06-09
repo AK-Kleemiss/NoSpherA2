@@ -30,6 +30,7 @@ atom::atom() {
     basis_set_id = 0;
     ECP_electrons = 0;
     frac_coords = { 0.,0.,0. };
+    is_asym = false;
 };
 
 atom::atom(const std::string& l, 
@@ -38,7 +39,7 @@ atom::atom(const std::string& l,
     const double& c1, 
     const double& c2, 
     const double& c3, 
-    const int& ch) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(0), basis_set_id(0), frac_coords({ 0,0,0 }) 
+    const int& ch) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(0), basis_set_id(0), frac_coords({ 0,0,0 }), is_asym(false)
 {};
 
 atom::atom(const std::string& l, 
@@ -48,10 +49,10 @@ atom::atom(const std::string& l,
     const double& c2, 
     const double& c3, 
     const int& ch, 
-    const int& ECP_els) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(ECP_els), basis_set_id(0), frac_coords({ 0,0,0 })
+    const int& ECP_els) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(ECP_els), basis_set_id(0), frac_coords({ 0,0,0 }), is_asym(false)
 {};
 
-atom atom::operator= (const atom& rhs) {
+atom& atom::operator= (const atom& rhs) {
     label = rhs.label;
     ID = rhs.ID;
     nr = rhs.nr;
@@ -182,7 +183,14 @@ void atom::set_coordinate(const unsigned int& axis, const double& value) {
     else if (axis == 2) z = value;
 };
 
-void atom::set_frac_coords(const std::array<double, 3>& frac) {
+double atom::get_frac_coordinate(const unsigned int& axis) const {
+    if (axis == 0) return frac_coords[0];
+    else if (axis == 1) return frac_coords[1];
+    else if (axis == 2) return frac_coords[2];
+    else return 0.0;
+};
+
+void atom::set_frac_coords(const d3& frac) {
     frac_coords = frac;
 };
 
@@ -202,4 +210,11 @@ bool atom::operator==(const atom& other) const {
         basis_set == other.basis_set &&
         shellcount == other.shellcount &&
         ADPs == other.ADPs;
+}
+
+double atom::distance_to(const atom& other) const {
+    const double dx = x - other.x;
+    const double dy = y - other.y;
+    const double dz = z - other.z;
+    return std::hypot(dx, dy, dz);
 }

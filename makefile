@@ -3,200 +3,246 @@ ifeq ($(OS), Windows_NT)
 else
   UNAME_S := $(shell uname -s)
   ifeq ($(UNAME_S), Linux)
-    COMP := g++
-    C_COMP := gcc
-    NAME := LINUX
+	COMP := g++
+	C_COMP := gcc
+	NAME := LINUX
   endif
   ifeq ($(UNAME_S), Darwin)
-    COMP := clang++
-    C_COMP := clang
-    NAME := MAC
+	COMP := clang++
+	C_COMP := clang
+	NAME := MAC
+	# Detect native architecture on macOS
+	NATIVE_ARCH := $(shell uname -m)
+	ifeq ($(NATIVE_ARCH),arm64)
+		NATIVE_ARCH := arm64
+	else
+		NATIVE_ARCH := x86_64
+	endif
   endif
+endif
+
+#Set some environemt variables for macOS builds
+ifeq ($(NAME),MAC)
+export MACOSX_DEPLOYMENT_TARGET=13.3
+export CMAKE_OSX_DEPLOYMENT_TARGET=13.3
+export RUSTFLAGS=-C link-arg=-mmacosx-version-min=13.3
 endif
 
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-all: check_rust NoSpherA2
+all: NoSpherA2
 
-# Check for Rust
+# --- Cross-platform rust check ---
 check_rust:
-	@rustc --version >nul 2>&1 || (echo Rust is not installed. Please install Rust from https://www.rust-lang.org/tools/install && exit 1)
+	@command -v rustc >/dev/null 2>&1 || { \
+	  echo "Rust is not installed or not on PATH. Install via https://www.rust-lang.org/tools/install"; exit 1; }; \
+	echo "Found: $$(rustc --version)"
 
-OpenBLAS:
-ifeq ($(NAME),WINDOWS)
-	@if not exist Lib/OpenBLAS_build/lib/openblas.lib ( \
-		echo Building OpenBLAS for $(NAME) && \
-		cd OpenBLAS && \
-		(if exist build rd /s /q build) && \
-		mkdir build && \
-		echo Starting build && \
-		cd build && \
-		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON .. && \
-		msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m && \
-		cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake && \
-		robocopy ./install/ ../../Lib/OpenBLAS_build\ /E || IF %ERRORLEVEL% LEQ 7 EXIT 0 \
-	) else ( \
-		echo OpenBLAS already built \
-	)
-else ifeq ($(NAME),MAC)
-	@if [ ! -f Lib/OpenBLAS_build/lib/libopenblas.a ]; then \
-		echo 'Building OpenBLAS, since Lib/OpenBLAS_build/lib/libopenblas.a doesnt exist'; \
-		cd OpenBLAS && \
-		make -j && \
-		make install PREFIX=../Lib/OpenBLAS_build/; \
+
+ifeq ($(NAME),MAC)
+featomic:  check_rust
+	@if [ ! -f Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a ]; then \
+		echo 'Building featomic for $(NATIVE_ARCH), since Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a doesnt exist'; \
+		cd $(MAKEFILE_DIR)/featomic/featomic && \
+		mkdir -p build_$(NATIVE_ARCH) && \
+		cd build_$(NATIVE_ARCH) && \
+		if [ "$(NATIVE_ARCH)" = "x86_64" ]; then \
+			rustup target add x86_64-apple-darwin; \
+			cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_$(NATIVE_ARCH) -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. ; \
+		else \
+			cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_$(NATIVE_ARCH) .. ; \
+		fi && \
+		make install || true; \
 	else \
-		echo 'Skipping OpenBLAS build, Lib/OpenBLAS_build/lib/libopenblas.a already exists'; \
+		echo 'Skipping featomic build, Lib/featomic_install_$(NATIVE_ARCH)/lib/libfeatomic.a already exists'; \
 	fi
-else
-	@if [ ! -f Lib/OpenBLAS_build/lib/libopenblas.a ]; then \
-		echo 'Building OpenBLAS, since Lib/OpenBLAS_build/lib/libopenblas.a doesnt exist'; \
-		cd OpenBLAS && \
-		make -j && \
-		make install PREFIX=../Lib/OpenBLAS_build/; \
-	else \
-		echo 'Skipping OpenBLAS build, Lib/OpenBLAS_build/lib/libopenblas.a already exists'; \
-	fi
+featomic_x86_64:
+	@$(MAKE) NATIVE_ARCH=x86_64 featomic
+
+featomic_arm64: check_rust
+	@$(MAKE) NATIVE_ARCH=arm64 featomic
 endif
 
-omp: 
-ifeq ($(NAME),WINDOWS)
-	@echo OpenMP build not required for $(NAME)
-else ifeq ($(NAME),MAC)
-	@if [ ! -f Lib/OpenMP_build/lib/libomp.a ]; then \
-		echo 'Building OpenMP, since Lib/OpenMP_build/lib/libomp.a doesnt exist'; \
-		cd llvm-project/openmp && \
-		mkdir -p build && \
-		cd build && \
-		cmake .. -DCMAKE_C_COMPILER=${C_COMP} -DCMAKE_CXX_COMPILER=${COMP} -DCMAKE_BUILD_TYPE=Release -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 && \
-		make -j && \
-		cd runtime/src && \
-		cmake -DCMAKE_INSTALL_PREFIX=../../../../../Lib/OpenMP_build/ -P cmake_install.cmake; \
-	else \
-		echo 'Skipping OpenMP build, Lib/OpenMP_build/lib/libomp.a already exists'; \
-	fi
-else 
-	@if [ ! -f Lib/OpenMP_build/lib/libomp.a ]; then \
-		echo 'Building OpenMP, since Lib/OpenMP_build/lib/libomp.a doesnt exist'; \
-		cd llvm-project/openmp && \
-		mkdir -p build && \
-		cd build && \
-		cmake .. -DCMAKE_C_COMPILER=${C_COMP} -DCMAKE_CXX_COMPILER=${COMP} -DCMAKE_BUILD_TYPE=Release -DLIBOMP_ENABLE_SHARED=OFF && \
-		make -j && \
-		cd runtime/src && \
-		cmake -DCMAKE_INSTALL_PREFIX=../../../../../Lib/OpenMP_build/ -P cmake_install.cmake; \
-	else \
-		echo 'Skipping OpenMP build, Lib/OpenMP_build/lib/libomp.a already exists'; \
-	fi
-endif
-	
-
+ifeq ($(NAME),LINUX)
 featomic: check_rust
-ifeq ($(NAME),WINDOWS)
-	@if not exist Lib\featomic_install\lib\metatensor.lib ( \
-		echo Building featomic for $(NAME) && \
-		cd $(MAKEFILE_DIR)/featomic/featomic && \
-		(if exist build rd /s /q build) && \
-		mkdir build && \
-		cd build && \
-		echo Starting build && \
-		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" .. && \
-		msbuild -nologo .\featomic.sln -p:Configuration=Release && \
-		msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release \
-	) else ( \
-		echo featomic already built \
-	)
-else ifeq ($(NAME),MAC)
 	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
 		echo 'Building featomic, since Lib/featomic_install/lib/libfeatomic.a doesnt exist'; \
 		cd $(MAKEFILE_DIR)/featomic/featomic && \
 		mkdir -p build && \
 		cd build && \
 		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
-		make install || true;
+		make install && cd $(MAKEFILE_DIR)/ && \
+		if [ -f Lib/featomic_install/lib64/libmetatensor.a ]; then \
+			echo "Copying lib64/libmetatensor.a to lib/"; \
+		    cp Lib/featomic_install/lib64/libmetatensor.a Lib/featomic_install/lib; \
+		fi; \
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
 	fi
-else
-	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
-		echo 'Building featomic, since Lib/featomic_install/lib/libfeatomic.a doesnt exist'; \
-		cd $(MAKEFILE_DIR)/featomic/featomic && \
-		mkdir -p build && \
-		cd build && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
-		make install; \
-	else \
-		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
-	fi
+
 endif
 
-featomic_x86: check_rust
+
+
 ifeq ($(NAME),MAC)
-	MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-	@if [ ! -f Lib/featomic_install_x86/lib/libfeatomic.a ]; then \
-		echo 'Building featomic, since Lib/featomic_install_x86/lib/libfeatomic.a doesnt exist'; \
-		rustup target add x86_64-apple-darwin; \
-		cd $(MAKEFILE_DIR)/featomic/featomic && \
-		mkdir -p build_x86_64 && \
-		cd build_x86_64 && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. && \
-		make install; \
-	else \
-		echo 'Skipping featomic build, featomic/featomic_install_x86/lib/libfeatomic.a already exists'; \
-	fi
-else
-	@echo No need for cross compile featomic on non-MacOS systems
+IntelMKL:
+	@brew list --versions libomp >/dev/null 2>&1 || \
+	  { echo "Installing libomp (arm64)…"; brew install libomp; }
 endif
 
-NoSpherA2_Debug: featomic featomic_x86 OpenBLAS omp
+ifeq ($(NAME),LINUX)
+MKLROOT := $(CURDIR)/Lib/MKL
+IntelMKL:
+ifeq ($(wildcard $(MKLROOT)),)
+	@echo MKL not found, building/installing Intel MKL for Linux
+	@wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/6a17080f-f0de-41b9-b587-52f92512c59a/intel-onemkl-2025.3.1.11_offline.sh
+	@echo Installing MKL, this will take some time! DO NOT CLOSE THE TERMINAL!
+	@sh intel-onemkl-2025.3.1.11_offline.sh -a -s --install-dir=$(MKLROOT) --eula accept
+else
+	@echo Skipping IntelMKL build, found MKL at: $(MKLROOT)
+endif
+endif
+
+BasisSetConverter: 
+	@if [ ! -f Lib/BasisSetConverter ]; then \
+		echo 'Building BasisSetConverter, since Lib/BasisSetConverter doesnt exist'; \
+		cd BasisSetGenerator && mkdir -p build \
+		&& cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH)\
+    	&& cmake --build build --config Release \
+    	&& cmake --install build --config Release --prefix "../Lib"; \
+	else \
+		echo 'Skipping BasisSetConverter build, found Lib/BasisSetConverter'; \
+	fi
+
+ifeq ($(NAME),MAC)
+LibCint:
+	@if [ ! -f Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a ]; then \
+		echo 'Building LibCint for $(NATIVE_ARCH), since Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a doesnt exist'; \
+		cd libcint && mkdir -p build_$(NATIVE_ARCH) && cd build_$(NATIVE_ARCH) &&\
+		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint_$(NATIVE_ARCH) \
+			-DENABLE_STATIC="ON" -DWITH_CINT2_INTERFACE="OFF" -DBUILD_SHARED_LIBS="OFF" -DPYPZPX="ON" \
+			-DWITH_RANGE_COULOMB="ON" -DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 .. && \
+		make install; \
+	else \
+		echo 'Skipping LibCint build, Lib/LibCint_$(NATIVE_ARCH)/lib/libcint.a already exists'; \
+	fi
+
+occ: LibCint
+	@if [ ! -f Lib/occ_$(NATIVE_ARCH)/lib/libocc.a ]; then \
+		echo 'Building OCC for $(NATIVE_ARCH), since Lib/occ_$(NATIVE_ARCH)/lib/libocc.a doesnt exist'; \
+        cmake --workflow --preset macos-release-$(NATIVE_ARCH) && \
+        cmake --install ./build-macos-release-$(NATIVE_ARCH) && \
+		libtool -static -o Lib/occ_$(NATIVE_ARCH)/lib/libocc.a Lib/occ_$(NATIVE_ARCH)/lib/*.a; \
+	else \
+		echo 'Skipping occ build, Lib/occ_$(NATIVE_ARCH)/lib/libocc.a already exists'; \
+	fi
+
+LibCint_x86_64:
+	@$(MAKE) NATIVE_ARCH=x86_64 LibCint
+
+LibCint_arm64:
+	@$(MAKE) NATIVE_ARCH=arm64 LibCint
+
+occ_x86_64: LibCint_x86_64
+	@$(MAKE) NATIVE_ARCH=x86_64 occ
+
+occ_arm64: LibCint_arm64
+	@$(MAKE) NATIVE_ARCH=arm64 occ
+
+BasisSetConverter_x86_64:
+	@$(MAKE) NATIVE_ARCH=x86_64 BasisSetConverter
+
+BasisSetConverter_arm64:
+	@$(MAKE) NATIVE_ARCH=arm64 BasisSetConverter
+endif
+
+
+
+ifeq ($(NAME),LINUX)
+LibCint:
+	@if [ ! -f Lib/LibCint/lib/libcint.a ]; then \
+		cd libcint && mkdir -p build && cd build && \
+		cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE \
+			-DENABLE_STATIC="ON" -DWITH_CINT2_INTERFACE="OFF" -DBUILD_SHARED_LIBS="OFF" -DPYPZPX="ON" \
+            -DWITH_RANGE_COULOMB="ON" -DCMAKE_INSTALL_PREFIX=../../Lib/LibCint .. && \
+		make install && cd $(MAKEFILE_DIR)/ && \
+		if [ -f Lib/LibCint/lib64/libcint.a ]; then \
+			echo "Copying lib64/libcint.a to lib/"; \
+			mkdir -p Lib/LibCint/lib && \
+		    cp Lib/LibCint/lib64/libcint.a Lib/LibCint/lib; \
+		fi; \
+	else \
+		echo 'Skipping LibCint build, Lib/LibCint/lib/libcint.a already exists'; \
+	fi
+
+occ: LibCint
+	@if [ ! -f Lib/occ/lib/libocc.a ]; then \
+		echo 'Building OCC, since Lib/occ/lib/libocc_main.a doesnt exist'; \
+		cmake --workflow --preset linux-occ-gcc && \
+		cmake --install build-linux-occ-gcc && \
+	  	cd build-linux-occ-gcc && ar M < libocc.ar && cd .. && \
+		cp build-linux-occ-gcc/liblibocc.a Lib/occ/lib/libocc.a; \
+	else \
+		echo 'Skipping OCC build, Lib/occ/lib/libocc_main.a already exists'; \
+	fi
+endif
+
+
+ifeq ($(NAME),WINDOWS)
+WIN_SLN  ?= Windows/NoSpherA2.sln
+WIN_CFG  ?= Release
+WIN_PLAT ?= x64
+WIN_VCTOOLSVERSION ?= 14.50.35717
+NoSpherA2: 
+	echo Building $(WIN_SLN) ($(WIN_CFG) $(WIN_PLAT)) 
+	msbuild $(WIN_SLN) /p:Configuration=$(WIN_CFG) /p:Platform=$(WIN_PLAT) /p:VCToolsVersion=$(WIN_VCTOOLSVERSION)
+
+NoSpherA2_Debug:
 	@echo Building NoSpherA2_Debug for $(NAME)
-ifeq ($(NAME),WINDOWS)
-	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
-endif
-ifeq ($(NAME),LINUX)
-	@echo Start making Linux executable for NoSpherA2_Debug
-	@rm -f NoSpherA2_Debug
-	@cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
-endif
-ifeq ($(NAME),MAC)
-	@echo Start making Mac executable for NoSpherA2_Debug
-	@cd Mac && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
+	@$(MAKE) WIN_CFG=Debug NoSpherA2
+
+clean:
+	@msbuild $(WIN_SLN) /t:Clean /p:Configuration=$(WIN_CFG) /p:Platform=$(WIN_PLAT) /p:VCToolsVersion=$(WIN_VCTOOLSVERSION)
 endif
 
-NoSpherA2: featomic OpenBLAS omp
-	@echo Building NoSpherA2 for $(NAME)
-ifeq ($(NAME),WINDOWS)
-	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe .
-endif
 ifeq ($(NAME),LINUX)
+NoSpherA2: IntelMKL featomic LibCint occ BasisSetConverter
 	@echo Start making Linux executable
 	@rm -f NoSpherA2
 	@cd Linux && rm -f NoSpherA2 && make all -j
-endif
-ifeq ($(NAME),MAC)
-	@echo Start making Mac executable
-	@rm -f NoSpherA2
-	@cd Mac && rm -f NoSpherA2_native && make NoSpherA2_native -j
+
+NoSpherA2_Debug: IntelMKL featomic LibCint occ BasisSetConverter
+	@echo Building NoSpherA2_Debug for $(NAME)
+	@rm -f NoSpherA2_Debug
+	@cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
+
+clean:
+	@cd Linux && make clean
 endif
 
-NoSpherA2_arm: featomic OpenBLAS omp
 ifeq ($(NAME),MAC)
-	@echo Start making Mac executable
-	@rm -f NoSpherA2
-	@cd Mac && rm -f NoSpherA2 && make NoSpherA2_arm -j && cp NoSpherA2_arm ../NoSpherA2
-endif
+NoSpherA2: IntelMKL featomic LibCint occ BasisSetConverter
+	@echo Start making Mac $(NATIVE_ARCH) executable
+	@rm -f NoSpherA2_$(NATIVE_ARCH)
+	@cd Mac && rm -f NoSpherA2_$(NATIVE_ARCH) && make NoSpherA2_$(NATIVE_ARCH) -j && cp NoSpherA2_$(NATIVE_ARCH) ../NoSpherA2
 
-NoSpherA2_x86: featomic_x86 OpenBLAS omp
-ifeq ($(NAME),MAC)
-	@echo Start making Mac executable
-	@rm -f NoSpherA2
-	@cd Mac && rm -f NoSpherA2 && make NoSpherA2_x86 -j && cp NoSpherA2_x86 ../NoSpherA2
-endif
+NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint_arm64 occ_arm64 BasisSetConverter_arm64
+	@echo Start making Mac arm64 executable
+	@rm -f NoSpherA2_arm64
+	@cd Mac && rm -f NoSpherA2_arm64 && make NoSpherA2_arm64 -j && cp NoSpherA2_arm64 ../NoSpherA2
 
-NoSpherA2_lipo: featomic OpenBLAS omp featomic_x86 OpenBLAS_x86 omp_x86
-ifeq ($(NAME),MAC)
-	@echo Start making Mac executable
+NoSpherA2_x86_64: IntelMKL featomic_x86_64 LibCint_x86_64 occ_x86_64 BasisSetConverter_x86_64
+	@echo Start making Mac x86_64 executable
+	@rm -f NoSpherA2_x86_64
+	@cd Mac && rm -f NoSpherA2_x86_64 && make NoSpherA2_x86_64 -j && cp NoSpherA2_x86_64 ../NoSpherA2_x86_64
+
+NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint_arm64 LibCint_x86_64 LibCint_x86_64 occ_x86_64 occ_arm64 BasisSetConverter_arm64 BasisSetConverter_x86_64
+	@echo Start making Mac universal executable
 	@rm -f NoSpherA2
-	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j && cp NoSpherA2 ../NoSpherA2
+	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j
+
+clean:
+	@cd Mac && make clean
 endif
 
 test: NoSpherA2
@@ -205,4 +251,4 @@ tests: NoSpherA2
 	make -C tests all -k -B
 
 
-.PHONY: test tests NoSpherA2 all NoSpherA2_Debug OpenBLAS
+.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust LibCint

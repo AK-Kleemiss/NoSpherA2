@@ -5,287 +5,17 @@
 #include "convenience.h"
 #include "npy.h"
 #include "properties.h"
-#include "JKFit.h"
+#include "basis_set.h"
 #include "SALTED_utilities.h"
 #include "sphere_lebedev_rule.h"
 #include "integrator.h"
 #include "nos_math.h"
 #include "featomic.hpp"
 #include "metatensor.h"
+#include "GridManager.h"
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif
-
-
-void thakkar_d_test(options &opt)
-{
-    using namespace std;
-    Thakkar Os(76), Ca(20), C(6), O(8), H(1), P(15);
-    Thakkar_Cation C_cat(6), O_cat(8), P_cat(15), Ca_cat(20);
-    Thakkar_Anion C_an(6), O_an(8), H_an(1), P_an(15);
-    double k_value = 0.0;
-    if (!opt.electron_diffraction)
-    {
-        ofstream result("thakkar.dat", ios::out);
-        for (double i = 0.001; i <= 4.0; i += 0.001)
-        {
-            k_value = constants::bohr2ang(constants::FOUR_PI * i);
-            result << showpos << setw(6) << setprecision(3) << fixed << i;
-            result << showpos << setw(16) << setprecision(8) << scientific << H.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << P.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << Ca.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << Os.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << C_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << P_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << Ca_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << H_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << C_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << P_an.get_form_factor(k_value);
-            result << endl;
-        }
-        result.flush();
-        result.close();
-    }
-    else
-    {
-        ofstream result("thakkar_ED.dat", ios::out);
-        for (double i = 0.001; i <= 4.0; i += 0.001)
-        {
-            k_value = constants::bohr2ang(constants::FOUR_PI * i);
-            result << showpos << setw(6) << setprecision(3) << fixed << i;
-            complex<double> temp = H.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i, 0).real();
-            temp = C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 0).real();
-            temp = O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 0).real();
-            temp = P.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i, 0).real();
-            temp = Ca.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i, 0).real();
-            temp = Os.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(76, temp, i, 0).real();
-            temp = 0.0;
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i, 0).real();
-            temp = C_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 0).real();
-            temp = O_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 0).real();
-            temp = P_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i, 0).real();
-            temp = Ca_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i, 0).real();
-            temp = H_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i, 0).real();
-            temp = C_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 0).real();
-            temp = O_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 0).real();
-            temp = P_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i, 0).real();
-            temp = C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 1).real();
-            temp = O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 1).real();
-            temp = C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, -1).real();
-            temp = O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(7, temp, i, -1).real();
-            result << endl;
-        }
-        result.flush();
-        result.close();
-    }
-}
-
-void sfac_scan(options &opt, std::ostream &log_file)
-{
-    using namespace std;
-    std::vector<WFN> wavy;
-    auto t = new WFN(opt.wfn);
-    wavy.push_back(*t);
-    delete t;
-    Thakkar O(wavy[0].get_atom_charge(0));
-    Thakkar_Cation O_cat(wavy[0].get_atom_charge(0));
-    Thakkar_Anion O_an(wavy[0].get_atom_charge(0));
-    err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
-    err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
-    // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-
-    std::vector<_time_point> time_points;
-    std::vector<std::string> time_descriptions;
-
-    cell unit_cell(opt.cif, std::cout, opt.debug);
-    ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    ivec atom_type_list;
-    ivec asym_atom_to_type_list;
-    ivec asym_atom_list;
-    bvec constant_atoms;
-    bvec needs_grid(wavy[0].get_ncen(), false);
-    svec known_atoms;
-    std::vector<uint64_t> better_IDs;
-
-    auto labels = read_atoms_from_CIF(cif_input,
-                                      opt.groups[0],
-                                      unit_cell,
-                                      wavy[0],
-                                      known_atoms,
-                                      atom_type_list,
-                                      asym_atom_to_type_list,
-                                      asym_atom_list,
-                                      needs_grid,
-                                      better_IDs,
-                                      std::cout,
-                                      constant_atoms,
-                                      opt.debug);
-
-    cif_input.close();
-    vec2 d1, d2, d3, dens;
-
-    make_hirshfeld_grids(opt.pbc,
-                         opt.accuracy,
-                         unit_cell,
-                         wavy[0],
-                         atom_type_list,
-                         asym_atom_list,
-                         needs_grid,
-                         d1, d2, d3, dens,
-                         labels,
-                         std::cout,
-                         time_points,
-                         time_descriptions,
-                         opt.debug,
-                         opt.no_date);
-
-    std::cout << "finished partitioning" << endl;
-    const int size = 4000;
-    const int phi_size = 50;
-    const int theta_size = 50;
-    const double phi_step = 360.0 / phi_size * constants::PI_180;
-    const double theta_step = 180.0 / phi_size * constants::PI_180;
-
-    // This bit is basically the substitute for make_k_pts, where we sample the whole sphere
-    //  by iterating over both spherical angles by a fixed step defined above
-    vec2 k_pt;
-    k_pt.resize(4);
-#pragma omp parallel for
-    for (int i = 0; i < 4; i++)
-        k_pt[i].resize(size * phi_size * theta_size, 0.0);
-
-    // int null = 0;
-#pragma omp parallel for
-    for (int ref = 1; ref <= size; ref++)
-    {
-        for (int p = 0; p < phi_size; p++)
-        {
-            for (int _t = 0; _t < theta_size; _t++)
-            {
-                int ind = _t + (p + (ref - 1) * phi_size) * theta_size;
-                double k_length = constants::bohr2ang(constants::FOUR_PI * ref / size * opt.d_sfac_scan);
-                k_pt[0][ind] = k_length * sin(_t * theta_step) * cos(p * phi_step);
-                k_pt[1][ind] = k_length * sin(_t * theta_step) * sin(p * phi_step);
-                k_pt[2][ind] = k_length * cos(_t * theta_step);
-                k_pt[3][ind] = k_length;
-            }
-        }
-    }
-    // below is a strip of Calc_SF without the file IO or progress bar
-    cvec2 sf;
-
-    const int imax = (int)dens.size();
-    const int smax = (int)k_pt[0].size();
-    int pmax = (int)dens[0].size();
-    std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
-    sf.resize(imax);
-#pragma omp parallel for
-    for (int i = 0; i < imax; i++)
-        sf[i].resize(k_pt[0].size());
-    double *dens_local, *d1_local, *d2_local, *d3_local;
-    complex<double> *sf_local;
-    const double *k1_local = k_pt[0].data();
-    const double *k2_local = k_pt[1].data();
-    const double *k3_local = k_pt[2].data();
-    double work, rho;
-    ProgressBar *progress = new ProgressBar(smax, 50, "=", " ", "Calculating Scattering factors");
-    for (int i = 0; i < imax; i++)
-    {
-        pmax = (int)dens[i].size();
-        dens_local = dens[i].data();
-        d1_local = d1[i].data();
-        d2_local = d2[i].data();
-        d3_local = d3[i].data();
-        sf_local = sf[i].data();
-#pragma omp parallel for private(work, rho)
-        for (int s = 0; s < smax; s++)
-        {
-            for (int p = pmax - 1; p >= 0; p--)
-            {
-                rho = dens_local[p];
-                work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
-                sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
-            }
-            progress->update();
-        }
-    }
-    delete (progress);
-    if (true)
-    { // Change if oyu do not want X-ray
-        ofstream result("sfacs.dat", ios::out);
-        log_file << "Writing X-ray sfacs...";
-        log_file.flush();
-        // Now we just need to write the result to a file, together with the spherical results and separated for valence and core
-        for (int i = 0; i < k_pt[0].size(); i++)
-        {
-            result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][i] / constants::FOUR_PI);
-            result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor((k_pt[3][i]));
-            result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor((k_pt[3][i]));
-            result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor((k_pt[3][i]));
-            result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
-            result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), 1, 0, 0, 0, 0, 0, 0, 0);
-            result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), 2, 1, 0, 0, 1, 0, 0, 0);
-            result << "\n";
-        }
-        log_file << " ... done!" << endl;
-        result.flush();
-        result.close();
-    }
-    if (true)
-    { // change if you do not want ED sfacs
-        log_file << "Writing ED sfacs...";
-        log_file.flush();
-        ofstream result = ofstream("sfacs_ED.dat", ios::out);
-        const double fact = 0.023934;
-        double h2;
-        for (int s = 0; s < k_pt[0].size(); s++)
-        {
-            h2 = pow(constants::ang2bohr(k_pt[3][s] / constants::FOUR_PI), 2);
-            sf[0][s] = std::complex<double>(fact * (wavy[0].get_atom_charge(0) - sf[0][s].real()) / h2, -fact * sf[0][s].imag() / h2);
-
-            result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][s] / constants::FOUR_PI);
-            double temp = fact * (wavy[0].get_atom_charge(0) - O.get_form_factor(k_pt[3][s])) / h2;
-            result << showpos << setw(16) << setprecision(8) << scientific << temp;
-            temp = fact * (wavy[0].get_atom_charge(0) - O_an.get_form_factor(k_pt[3][s])) / h2;
-            result << showpos << setw(16) << setprecision(8) << scientific << temp;
-            temp = fact * (wavy[0].get_atom_charge(0) - O_cat.get_form_factor(k_pt[3][s])) / h2;
-            result << showpos << setw(16) << setprecision(8) << scientific << temp;
-
-            result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][s].real(), 2) + pow(sf[0][s].imag(), 2));
-
-            temp = fact * (2 - O.get_custom_form_factor(k_pt[3][s], 1, 0, 0, 0, 0, 0, 0, 0)) / h2;
-            result << showpos << setw(16) << setprecision(8) << scientific << temp;
-            temp = fact * (6 - O.get_custom_form_factor(k_pt[3][s], 2, 1, 0, 0, 1, 0, 0, 0)) / h2;
-            result << showpos << setw(16) << setprecision(8) << scientific << temp;
-            result << "\n";
-        }
-        result.flush();
-        result.close();
-        log_file << " ... done!" << endl;
-    }
-}
 
 template <typename T>
 std::vector<T> geomspace(T start, T stop, int num)
@@ -300,83 +30,10 @@ std::vector<T> geomspace(T start, T stop, int num)
     return result;
 }
 
-double calc_spherically_averaged_at_r(const WFN &wavy,
-                                      const double &r,
-                                      const double rel_precision = 1E-4,
-                                      const double start_angle = 5.0,
-                                      const bool print = false)
-{
-    double old_result = 1E100;
-    double new_result = 0.9E100;
-    double angle = start_angle;
-    double ratio = abs(old_result / new_result - 1.0);
-    vec2 d;
-    vec _phi(wavy.get_nmo(), 0.0);
-    d.resize(16);
-    for (int i = 0; i < 16; i++)
-        d[i].resize(1, 0.0);
-
-    while (ratio > rel_precision)
-    {
-        const double da = constants::PI / angle;
-        const double da2 = da * da;
-        // Make angular grids
-        double x0, y0, z0, st0;
-        double v = 0;
-        for (double phi = 0; phi <= constants::TWO_PI; phi += da)
-        {
-            const double cp = cos(phi);
-            const double sp = sin(phi);
-            for (double theta = da; theta <= constants::PI; theta += da)
-            {
-                const double st = sin(theta);
-                st0 = st * da2;
-                x0 = st * cp, y0 = st * sp, z0 = cos(theta);
-                v += wavy.compute_dens(r * x0, r * y0, r * z0, d, _phi) * st0;
-            }
-        }
-        if (v != 0.0)
-        {
-            old_result = new_result;
-            new_result = v / constants::FOUR_PI;
-            ratio = abs(old_result / new_result - 1.0);
-            if ((new_result < 1E-15 && angle > 36))
-            {
-#pragma omp critical
-                std::cout << "Aborted due to too small density at r = " << r << " and angle = " << angle << std::endl;
-                break;
-            }
-            if (new_result > 1E90)
-            {
-#pragma omp critical
-                std::cout << "Aborted due too large density value at r = " << r << std::endl;
-                break;
-            }
-            if (angle > 360)
-            {
-#pragma omp critical
-                std::cout << "Aborted due to too large angle = " << angle << std::endl;
-                break;
-            }
-        }
-        else
-        {
-            new_result = 0.0;
-#pragma omp critical
-            std::cout << "ZERO result at r = " << r << std::endl;
-            break;
-        }
-        angle *= 1.2;
-    }
-    if (print)
-        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << " " << (ratio > rel_precision) << std::setw(14) << angle << std::endl;
-    return new_result;
-}
-
 double calc_grid_averaged_at_r(const WFN &wavy,
-                               const double &r,
-                               const int &min_angular = 60,
-                               const int &max_angular = 1000)
+    const double &r,
+    const int &min_angular = 60,
+    const int &max_angular = 1000)
 {
 
     const int min_num_angular_points_closest =
@@ -396,10 +53,10 @@ double calc_grid_averaged_at_r(const WFN &wavy,
     {
         angular_off = i * constants::MAG;
         ls.ld_by_order(constants::lebedev_table[i],
-                       angular_x.data() + angular_off,
-                       angular_y.data() + angular_off,
-                       angular_z.data() + angular_off,
-                       angular_w.data() + angular_off);
+            angular_x.data() + angular_off,
+            angular_y.data() + angular_off,
+            angular_z.data() + angular_off,
+            angular_w.data() + angular_off);
     }
 
     const double rb = constants::bragg_angstrom[wavy.get_atom_charge(0)] / (5.0E10 * constants::a0);
@@ -408,7 +65,7 @@ double calc_grid_averaged_at_r(const WFN &wavy,
     if (r < rb)
     {
         num_angular = static_cast<int>(max_num_angular_points_closest *
-                                       (r / rb));
+            (r / rb));
         num_angular = constants::get_closest_num_angular(num_angular);
         err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
         if (num_angular < min_num_angular_points_closest)
@@ -420,9 +77,9 @@ double calc_grid_averaged_at_r(const WFN &wavy,
     const int start = 0;
     vec2 d;
     vec _phi(wavy.get_nmo(), 0.0);
-    d.resize(16);
-    for (int i = 0; i < 16; i++)
-        d[i].resize(1, 0.0);
+    d.resize(1);
+    for (int i = 0; i < 1; i++)
+        d[i].resize(16, 0.0);
     angular_off -= start;
     const int size = start + num_angular;
     int p = 0;
@@ -430,22 +87,21 @@ double calc_grid_averaged_at_r(const WFN &wavy,
     for (int iang = start; iang < size; iang++)
     {
         p = angular_off + iang;
-        double x = angular_x[p] * r + wavy.get_atom_coordinate(0, 0);
-        double y = angular_y[p] * r + wavy.get_atom_coordinate(0, 1);
-        double z = angular_z[p] * r + wavy.get_atom_coordinate(0, 2);
-        dens += wavy.compute_dens(x, y, z, d, _phi) * constants::FOUR_PI * angular_w[p];
+        const d3 Pos = { angular_x[p] * r + wavy.get_atom_coordinate(0, 0), angular_y[p] * r + wavy.get_atom_coordinate(0, 1), angular_z[p] * r + wavy.get_atom_coordinate(0, 2) };
+        dens += wavy.compute_dens(Pos, d, _phi) * constants::FOUR_PI * angular_w[p];
     }
     // if (print)
     //     std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
     return dens;
 }
+
 /// not like above //////////////////////////////////////////////////////////////////////////-spherical_aver_hirsh in convience.cpp////////
 double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
-                                     const int i, /// now counts for several atoms
-                                     const double &r,
-                                     const int &min_angular = 60,
-                                     const int &max_angular = 1000,
-                                     const bool print = false)
+    const int i, /// now counts for several atoms
+    const double &r,
+    const int &min_angular = 60,
+    const int &max_angular = 1000,
+    const bool print = false)
 {
 
     const int min_num_angular_points_closest =
@@ -465,10 +121,10 @@ double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
     {
         angular_off = j * constants::MAG;
         ls.ld_by_order(constants::lebedev_table[j],
-                       angular_x.data() + angular_off,
-                       angular_y.data() + angular_off,
-                       angular_z.data() + angular_off,
-                       angular_w.data() + angular_off);
+            angular_x.data() + angular_off,
+            angular_y.data() + angular_off,
+            angular_z.data() + angular_off,
+            angular_w.data() + angular_off);
     }
 
     const double rb = constants::bragg_angstrom[wavy.get_atom_charge(i)] / (5.0E10 * constants::a0);
@@ -477,7 +133,7 @@ double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
     if (r < rb)
     {
         num_angular = static_cast<int>(max_num_angular_points_closest *
-                                       (r / rb));
+            (r / rb));
         num_angular = constants::get_closest_num_angular(num_angular);
         err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
         if (num_angular < min_num_angular_points_closest)
@@ -494,18 +150,18 @@ double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
     Thakkar A(wavy.get_atom_charge(i)); /// for the atom i, a Thakkar object is created
 #pragma omp parallel
     {
-        vec2 d(16);
+        vec2 d(wavy.get_ncen());
         vec _phi(wavy.get_nmo(), 0.0);
-        for (int j = 0; j < 16; j++)
-            d[j].resize(wavy.get_ncen(), 0.0);
+        for (int j = 0; j < wavy.get_ncen(); j++)
+            d[j].resize(16, 0.0);
 #pragma omp for reduction(+ : dens)
         for (int iang = start; iang < size; iang++)
         {
             p = angular_off + iang;
-            const double x = angular_x[p] * r + wavy.get_atom_coordinate(i, 0); /// moving the lebedev points to the atom i
-            const double y = angular_y[p] * r + wavy.get_atom_coordinate(i, 1);
-            const double z = angular_z[p] * r + wavy.get_atom_coordinate(i, 2);
-            const std::array<double, 3> d_ = {angular_x[p] * r, angular_y[p] * r, angular_z[p] * r}; /// as the function get_radial_density needs a distance, the distance is calculated. The atom A is in the origin, the wavy.get_atom_coordinate(i,0) is 0
+            const d3 Pos = { angular_x[p] * r + wavy.get_atom_coordinate(i, 0), /// moving the lebedev points to the atom i
+            angular_y[p] * r + wavy.get_atom_coordinate(i, 1),
+            angular_z[p] * r + wavy.get_atom_coordinate(i, 2) };
+            const d3 d_ = { angular_x[p] * r, angular_y[p] * r, angular_z[p] * r }; /// as the function get_radial_density needs a distance, the distance is calculated. The atom A is in the origin, the wavy.get_atom_coordinate(i,0) is 0
             const double dist = array_length(d_);
             const double rho_a = A.get_radial_density(dist); /// the radial density of the atom i is calculated
             double rho_all = rho_a;                          /// the molecular density based on pro-atoms
@@ -513,13 +169,13 @@ double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
             { /// a new for loop is started, which calculates the sum of rhos, with respect to the lebedev points
                 if (atom == i)
                     continue; /// if the atom is the same as the atom i, the loop is skipped
-                const std::array<double, 3> d_atom = {x - wavy.get_atom_coordinate(atom, 0), y - wavy.get_atom_coordinate(atom, 1), z - wavy.get_atom_coordinate(atom, 2)};
+                const d3 d_atom = { Pos[0] - wavy.get_atom_coordinate(atom, 0), Pos[1] - wavy.get_atom_coordinate(atom, 1), Pos[2] - wavy.get_atom_coordinate(atom, 2) };
                 const double dist_atom = array_length(d_atom); /// is like d_, but for another atom
                 Thakkar thakkar_atom(wavy.get_atom_charge(atom));
                 rho_all += thakkar_atom.get_radial_density(dist_atom);
             }
             const double hirsh_weight = rho_a / rho_all;
-            dens += wavy.compute_dens(x, y, z, d, _phi) * hirsh_weight * constants::FOUR_PI * angular_w[p];
+            dens += wavy.compute_dens(Pos, d, _phi) * hirsh_weight * constants::FOUR_PI * angular_w[p];
         }
     }
     if (print)
@@ -527,10 +183,10 @@ double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
     return dens;
 }
 double calc_grid_averaged_at_r_from_cube(const cube &cuby,
-                                         const double &r,
-                                         const int &min_angular = 60,
-                                         const int &max_angular = 1000,
-                                         const bool print = false)
+    const double &r,
+    const int &min_angular = 60,
+    const int &max_angular = 1000,
+    const bool print = false)
 {
 
     const int min_num_angular_points_closest =
@@ -550,10 +206,10 @@ double calc_grid_averaged_at_r_from_cube(const cube &cuby,
     {
         angular_off = j * constants::MAG;
         ls.ld_by_order(constants::lebedev_table[j],
-                       angular_x.data() + angular_off,
-                       angular_y.data() + angular_off,
-                       angular_z.data() + angular_off,
-                       angular_w.data() + angular_off);
+            angular_x.data() + angular_off,
+            angular_y.data() + angular_off,
+            angular_z.data() + angular_off,
+            angular_w.data() + angular_off);
     }
 
     const double rb = constants::bragg_angstrom[cuby.get_parent_wfn_atoms()[0].get_charge()] / (5.0E10 * constants::a0);
@@ -562,7 +218,7 @@ double calc_grid_averaged_at_r_from_cube(const cube &cuby,
     if (r < rb)
     {
         num_angular = static_cast<int>(max_num_angular_points_closest *
-                                       (r / rb));
+            (r / rb));
         num_angular = constants::get_closest_num_angular(num_angular);
         err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
         if (num_angular < min_num_angular_points_closest)
@@ -598,11 +254,11 @@ double calc_grid_averaged_at_r_from_cube(const cube &cuby,
 }
 
 double calc_fukui_averaged_at_r(const WFN &wavy1,
-                                const WFN &wavy2,
-                                const double &r,
-                                const int &min_angular = 60,
-                                const int &max_angular = 1000,
-                                const bool print = false)
+    const WFN &wavy2,
+    const double &r,
+    const int &min_angular = 60,
+    const int &max_angular = 1000,
+    const bool print = false)
 {
 
     const int min_num_angular_points_closest =
@@ -622,10 +278,10 @@ double calc_fukui_averaged_at_r(const WFN &wavy1,
     {
         angular_off = j * constants::MAG;
         ls.ld_by_order(constants::lebedev_table[j],
-                       angular_x.data() + angular_off,
-                       angular_y.data() + angular_off,
-                       angular_z.data() + angular_off,
-                       angular_w.data() + angular_off);
+            angular_x.data() + angular_off,
+            angular_y.data() + angular_off,
+            angular_z.data() + angular_off,
+            angular_w.data() + angular_off);
     }
 
     const double rb = constants::bragg_angstrom[wavy1.get_atom_charge(0)] / (5.0E10 * constants::a0);
@@ -634,7 +290,7 @@ double calc_fukui_averaged_at_r(const WFN &wavy1,
     if (r < rb)
     {
         num_angular = static_cast<int>(max_num_angular_points_closest *
-                                       (r / rb));
+            (r / rb));
         num_angular = constants::get_closest_num_angular(num_angular);
         err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
         if (num_angular < min_num_angular_points_closest)
@@ -651,18 +307,18 @@ double calc_fukui_averaged_at_r(const WFN &wavy1,
 
 #pragma omp parallel
     {
-        vec2 d(16);
+        vec2 d(wavy1.get_ncen());
         vec _phi(std::max(wavy1.get_nmo(), wavy2.get_nmo()), 0.0);
-        for (int j = 0; j < 16; j++)
-            d[j].resize(wavy1.get_ncen(), 0.0);
+        for (int j = 0; j < wavy1.get_ncen(); j++)
+            d[j].resize(16, 0.0);
 #pragma omp for reduction(+ : dens)
         for (int iang = start; iang < size; iang++)
         {
             p = angular_off + iang;
-            const double x = angular_x[p] * r + wavy1.get_atom_coordinate(0, 0); /// moving the lebedev points to the atom i
-            const double y = angular_y[p] * r + wavy1.get_atom_coordinate(0, 1);
-            const double z = angular_z[p] * r + wavy1.get_atom_coordinate(0, 2);
-            dens += (wavy1.compute_dens(x, y, z, d, _phi) - wavy2.compute_dens(x, y, z, d, _phi)) * constants::FOUR_PI * angular_w[p];
+            const d3 Pos = { angular_x[p] * r + wavy1.get_atom_coordinate(0, 0),
+                                                 angular_y[p] * r + wavy1.get_atom_coordinate(0, 1),
+                                                 angular_z[p] * r + wavy1.get_atom_coordinate(0, 2) };
+            dens += (wavy1.compute_dens(Pos, d, _phi) - wavy2.compute_dens(Pos, d, _phi)) * constants::FOUR_PI * angular_w[p];
         }
     }
     if (print)
@@ -671,41 +327,43 @@ double calc_fukui_averaged_at_r(const WFN &wavy1,
 }
 
 double subtract_dens_from_gbw(std::filesystem::path &wfn_name_1,
-                              std::filesystem::path &wfn_name_2, const double &r, const double &resol)
+    std::filesystem::path &wfn_name_2, const double &r, const double &resol)
 {
     using namespace std;
 
     WFN wavy1(wfn_name_1);
     WFN wavy2(wfn_name_2); //  reading the WFNs
 
-    double MinMax1[6];
-    int steps1[3];
-    readxyzMinMax_fromWFN(wavy1, MinMax1, steps1, r, resol, true);
+    properties_options opts;
+    opts.radius = r;
+    opts.resolution = resol;
+    readxyzMinMax_fromWFN(wavy1, opts, true);
 
-    double MinMax2[6];
-    int steps2[3];
-    readxyzMinMax_fromWFN(wavy2, MinMax2, steps2, r, resol, true); // and getting the MinMax and steps
+    properties_options opts2;
+    opts2.radius = r;
+    opts2.resolution = resol;
+    readxyzMinMax_fromWFN(wavy2, opts2, true); // and getting the MinMax and steps
 
-    double MinMax[6]{100, 100, 100, -100, -100, -100};
-    int steps[3]{0, 0, 0};
+    double MinMax[6]{ 100, 100, 100, -100, -100, -100 };
+    int steps[3]{ 0, 0, 0 };
     for (int i = 0; i < 3; i++)
     {
-        if (MinMax1[i] < MinMax[i])
-            MinMax[i] = MinMax1[i];
-        if (MinMax1[i + 3] > MinMax[i + 3])
-            MinMax[i + 3] = MinMax1[i + 3];
+        if (opts.MinMax[i] < MinMax[i])
+            MinMax[i] = opts.MinMax[i];
+        if (opts.MinMax[i + 3] > MinMax[i + 3])
+            MinMax[i + 3] = opts.MinMax[i + 3];
     }
     for (int i = 0; i < 3; i++)
     {
-        if (MinMax2[i] < MinMax[i])
-            MinMax[i] = MinMax2[i];
-        if (MinMax2[i + 3] > MinMax[i + 3])
-            MinMax[i + 3] = MinMax2[i + 3];
+        if (opts2.MinMax[i] < MinMax[i])
+            MinMax[i] = opts2.MinMax[i];
+        if (opts2.MinMax[i + 3] > MinMax[i + 3])
+            MinMax[i + 3] = opts2.MinMax[i + 3];
         steps[i] = (int)ceil(constants::bohr2ang(MinMax[i + 3] - MinMax[i]) / resol);
     }
 
-    cube dens1(steps[0], steps[1], steps[2], wavy1.get_ncen(), true);
-    cube dens2(steps[0], steps[1], steps[2], wavy2.get_ncen(), true);
+    cube dens1({ steps[0], steps[1], steps[2] }, wavy1.get_ncen(), true);
+    cube dens2({ steps[0], steps[1], steps[2] }, wavy2.get_ncen(), true);
     dens1.give_parent_wfn(wavy1);
     dens2.give_parent_wfn(wavy2);
 
@@ -745,145 +403,137 @@ double subtract_dens_from_gbw(std::filesystem::path &wfn_name_1,
     return 0;
 }
 
-void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
-{
-    char cwd[1024];
-#ifdef _WIN32
-    if (_getcwd(cwd, sizeof(cwd)) != NULL)
-#else
-    if (getcwd(cwd, sizeof(cwd)) != NULL)
-#endif
-        std::cout << "Current working dir: " << cwd << std::endl;
-    WFN wavy(wfn_name);
-
-    err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
-
-    int points = 1001;
-
-    for (int i = 0; i < wavy.get_ncen(); i++)
-    {
-        for (int j = i + 1; j < wavy.get_ncen(); j++)
-        {
-            std::filesystem::path path = cwd;
-            double distance = sqrt(pow(wavy.get_atom_coordinate(i, 0) - wavy.get_atom_coordinate(j, 0), 2) + pow(wavy.get_atom_coordinate(i, 1) - wavy.get_atom_coordinate(j, 1), 2) + pow(wavy.get_atom_coordinate(i, 2) - wavy.get_atom_coordinate(j, 2), 2));
-            double svdW = constants::ang2bohr(constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)]);
-            if (distance < 1.35 * svdW)
-            {
-                std::cout << "Bond between " << i << " (" << wavy.get_atom_charge(i) << ") and " << j << " (" << wavy.get_atom_charge(j) << ") with distance " << distance << " and svdW " << svdW << std::endl;
-                const vec bond_vec = {(wavy.get_atom_coordinate(j, 0) - wavy.get_atom_coordinate(i, 0)) / points, (wavy.get_atom_coordinate(j, 1) - wavy.get_atom_coordinate(i, 1)) / points, (wavy.get_atom_coordinate(j, 2) - wavy.get_atom_coordinate(i, 2)) / points};
-                double dr = distance / points;
-                vec lapl(points, 0.0);
-                const vec pos = {wavy.get_atom_coordinate(i, 0), wavy.get_atom_coordinate(i, 1), wavy.get_atom_coordinate(i, 2)};
-#pragma omp parallel for
-                for (int k = 0; k < points; k++)
-                {
-                    std::array<double, 3> t_pos = {pos[0], pos[1], pos[2]};
-                    t_pos[0] += k * bond_vec[0];
-                    t_pos[1] += k * bond_vec[1];
-                    t_pos[2] += k * bond_vec[2];
-                    lapl[k] = wavy.computeLap(t_pos);
-                }
-                std::filesystem::path outname(wfn_name.string() + "_bondwise_laplacian_" + std::to_string(i) + "_" + std::to_string(j) + ".dat");
-                path = path / std::filesystem::path(outname);
-                std::ofstream result(path, std::ios::out);
-                for (int k = 0; k < points; k++)
-                {
-                    result << std::setw(10) << std::scientific << std::setprecision(6) << dr * k << " " << std::setw(10) << std::scientific << std::setprecision(6) << lapl[k] << std::endl;
-                }
-                result.flush();
-                result.close();
-            }
-            else
-            {
-                std::cout << "No bond between " << i << " and " << j << " with distance " << distance << " and svdW " << svdW << std::endl;
-            }
-        }
-    }
-}
-
 void calc_partition_densities()
 {
     using namespace std;
     WFN Hartree_Fock("HF.gbw");
     WFN DFT("DFT.gbw");
+    Hartree_Fock.delete_unoccupied_MOs();
+    DFT.delete_unoccupied_MOs();
 
-    vec Pos_C = {Hartree_Fock.get_atom_coordinate(0, 0), Hartree_Fock.get_atom_coordinate(0, 1), Hartree_Fock.get_atom_coordinate(0, 2)};
-    vec Pos_H1 = {Hartree_Fock.get_atom_coordinate(1, 0), Hartree_Fock.get_atom_coordinate(1, 1), Hartree_Fock.get_atom_coordinate(1, 2)};
-    vec Pos_H2 = {Hartree_Fock.get_atom_coordinate(2, 0), Hartree_Fock.get_atom_coordinate(2, 1), Hartree_Fock.get_atom_coordinate(2, 2)};
-    vec Pos_H3 = {Hartree_Fock.get_atom_coordinate(3, 0), Hartree_Fock.get_atom_coordinate(3, 1), Hartree_Fock.get_atom_coordinate(3, 2)};
-    vec Pos_H4 = {Hartree_Fock.get_atom_coordinate(4, 0), Hartree_Fock.get_atom_coordinate(4, 1), Hartree_Fock.get_atom_coordinate(4, 2)};
+    vec Pos_C = { Hartree_Fock.get_atom_coordinate(0, 0), Hartree_Fock.get_atom_coordinate(0, 1), Hartree_Fock.get_atom_coordinate(0, 2) };
+    vec Pos_O1 = { Hartree_Fock.get_atom_coordinate(1, 0), Hartree_Fock.get_atom_coordinate(1, 1), Hartree_Fock.get_atom_coordinate(1, 2) };
+    vec Pos_H1 = { Hartree_Fock.get_atom_coordinate(2, 0), Hartree_Fock.get_atom_coordinate(2, 1), Hartree_Fock.get_atom_coordinate(2, 2) };
+    vec Pos_O3 = { Hartree_Fock.get_atom_coordinate(3, 0), Hartree_Fock.get_atom_coordinate(3, 1), Hartree_Fock.get_atom_coordinate(3, 2) };
     vec x_coords = {
         Hartree_Fock.get_atom_coordinate(0, 0),
         Hartree_Fock.get_atom_coordinate(1, 0),
         Hartree_Fock.get_atom_coordinate(2, 0),
-        Hartree_Fock.get_atom_coordinate(3, 0),
-        Hartree_Fock.get_atom_coordinate(4, 0)};
+        Hartree_Fock.get_atom_coordinate(3, 0) };
     vec y_coords = {
         Hartree_Fock.get_atom_coordinate(0, 1),
         Hartree_Fock.get_atom_coordinate(1, 1),
         Hartree_Fock.get_atom_coordinate(2, 1),
-        Hartree_Fock.get_atom_coordinate(3, 1),
-        Hartree_Fock.get_atom_coordinate(4, 1)};
+        Hartree_Fock.get_atom_coordinate(3, 1) };
     vec z_coords = {
         Hartree_Fock.get_atom_coordinate(0, 2),
         Hartree_Fock.get_atom_coordinate(1, 2),
         Hartree_Fock.get_atom_coordinate(2, 2),
-        Hartree_Fock.get_atom_coordinate(3, 2),
-        Hartree_Fock.get_atom_coordinate(4, 2)};
-    ivec charges{6, 1, 1, 1, 1};
-    const double fac = 0.01;
-    const int min = -100, max = 500;
+        Hartree_Fock.get_atom_coordinate(3, 2) };
+    ivec charges{ 6, 8, 1, 8 };
+    const int min = -250, max = 700;
     const int size = -min + max + 1;
     vec C_dens(size, 0.0), H_dens(size, 0.0), total_dens(size, 0.0);
     vec HF_densities(size, 0.0);
     vec DFT_densities(size, 0.0);
     vec B_weights_C(size, 0.0), B_weights_H(size, 0.0);
+    vec TFVC_weights_C(size, 0.0), TFVC_weights_H(size, 0.0);
+    vec TFVC_weights_C_DFT(size, 0.0), TFVC_weights_H_DFT(size, 0.0);
     Thakkar C(6);
     Thakkar H(1);
+    Thakkar O(8);
+    const double dx = (Hartree_Fock.get_atom_coordinate(2, 0) - Hartree_Fock.get_atom_coordinate(0, 0)) / (min + max);
+    const double dy = (Hartree_Fock.get_atom_coordinate(2, 1) - Hartree_Fock.get_atom_coordinate(0, 1)) / (min + max);
+    const double dz = (Hartree_Fock.get_atom_coordinate(2, 2) - Hartree_Fock.get_atom_coordinate(0, 2)) / (min + max);
+
+    std::cout << "Positions:\nH:" << Hartree_Fock.get_atom_coordinate(2, 0) << " " << Hartree_Fock.get_atom_coordinate(2, 1) << " " << Hartree_Fock.get_atom_coordinate(2, 2) << "\n";
+    std::cout << "C:" << Hartree_Fock.get_atom_coordinate(0, 0) << " " << Hartree_Fock.get_atom_coordinate(0, 1) << " " << Hartree_Fock.get_atom_coordinate(0, 2) << "\n";
+    std::cout << "dr:" << dx << " " << dy << " " << dz << "\n";
+
+
+
+    ProgressBar *pb = new ProgressBar(size, 100, "=", "", "Calculating densities");
+
+#pragma omp parallel 
+    {
+        vec2 d(DFT.get_ncen());
+        for (int i = 0; i < DFT.get_ncen(); i++)
+            d[i].resize(16);
+        vec phi(DFT.get_nmo(), 0.0);
+        vec pa_b(5);
+        vec pa_tv(5);
+        vec chi_HF = make_chi(Hartree_Fock, 200);
+        vec chi_DFT = make_chi(DFT, 200);
+#pragma omp for
+        for (int i = 0; i < size; i++)
+        {
+            const double x = Hartree_Fock.get_atom_coordinate(0, 0) + (i + min) * dx;
+            const double y = Hartree_Fock.get_atom_coordinate(0, 1) + (i + min) * dy;
+            const double z = Hartree_Fock.get_atom_coordinate(0, 2) + (i + min) * dz;
+            HF_densities[i] = Hartree_Fock.compute_dens({ x, y, z }, d, phi);
+            DFT_densities[i] = DFT.compute_dens({ x, y, z }, d, phi);
+            double temp = abs(x - Pos_C[0]);
+            C_dens[i] = C.get_radial_density(temp);
+            total_dens[i] = C_dens[i];
+            temp = abs(x - Pos_H1[0]);
+            H_dens[i] = H.get_radial_density(temp);
+            total_dens[i] += H_dens[i];
+            temp = sqrt(pow(x - Pos_O1[0], 2) + pow(y - Pos_O1[1], 2) + pow(z - Pos_O1[2], 2));
+            total_dens[i] += O.get_radial_density(temp);
+            temp = sqrt(pow(x - Pos_O3[0], 2) + pow(y - Pos_O3[1], 2) + pow(z - Pos_O3[2], 2));
+            total_dens[i] += O.get_radial_density(temp);
+            auto res = get_integration_weights(4, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, y, z, pa_b, pa_tv, chi_HF);
+            B_weights_C[i] = res[0];
+            TFVC_weights_C[i] = res[1];
+            res = get_integration_weights(4, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 2, x, y, z, pa_b, pa_tv, chi_HF);
+            B_weights_H[i] = res[0];
+            TFVC_weights_H[i] = res[1];
+            res = get_integration_weights(4, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, y, z, pa_b, pa_tv, chi_DFT);
+            TFVC_weights_C_DFT[i] = res[1];
+            res = get_integration_weights(4, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 2, x, y, z, pa_b, pa_tv, chi_DFT);
+            TFVC_weights_H_DFT[i] = res[1];
+            pb->update();
+        }
+    }
+    delete pb;
+
+    GridConfiguration config;
+    config.all_charges = true;
+    GridManager grid_HF(config);
+    GridManager grid_DFT(config);
+
+    grid_HF.setup3DGridsForMolecule(Hartree_Fock, { 0, 1, 2, 3 });
+    auto res_HF = grid_HF.calculatePartitionedCharges(Hartree_Fock);
+
+    grid_DFT.setup3DGridsForMolecule(DFT, { 0, 1, 2, 3 });
+    auto res_DFT = grid_DFT.calculatePartitionedCharges(DFT);
+
+    std::cout << "\n\nHartree fock charges: " << std::endl;
+    grid_HF.printChargeTable({ "C1", "O1", "H1", "O3" }, Hartree_Fock, { 0, 1, 2, 3 }, std::cout, res_HF);
+    std::cout << "\n\n\nDFT charges: " << std::endl;
+    grid_DFT.printChargeTable({ "C1", "O1", "H1", "O3" }, DFT, { 0, 1, 2, 3 }, std::cout, res_DFT);
 
     ofstream result("densities.dat", ios::out);
-    ProgressBar pb(size, 100, "=", "", "Calculating densities");
-    // #pragma omp parallel
-    //     {
-    vec2 d(16);
-    for (int i = 0; i < 16; i++)
-        d[i].resize(DFT.get_ncen());
-    vec phi(DFT.get_nmo(), 0.0);
-    double x = 0;
-    vec pa(5);
-    // #pragma omp for
+    result << setw(10) << "x" << setw(16) << "HF_density" << setw(16) << "DFT_density" << setw(16) << "C_density" << setw(16) << "H_density" << setw(16) << "total_density"
+        << setw(16) << "B_weight_C" << setw(16) << "B_weight_H"
+        << setw(16) << "TFVC_weight_C_HF" << setw(16) << "TFVC_weight_H_HF"
+        << setw(16) << "TFVC_weight_C_DFT" << setw(16) << "TFVC_weight_H_DFT"
+        << endl;
     for (int i = 0; i < size; i++)
     {
-        x = (i + min) * fac;
-        HF_densities[i] = Hartree_Fock.compute_dens(x, 0, 0, d, phi);
-        DFT_densities[i] = DFT.compute_dens(x, 0, 0, d, phi);
-        double temp = abs(x - Pos_C[0]);
-        C_dens[i] = C.get_radial_density(temp);
-        total_dens[i] = C_dens[i];
-        temp = abs(x - Pos_H1[0]);
-        H_dens[i] = H.get_radial_density(temp);
-        total_dens[i] += H_dens[i];
-        temp = sqrt(pow(x - Pos_H2[0], 2) + pow(Pos_H2[1], 2) + pow(Pos_H2[2], 2));
-        total_dens[i] += H.get_radial_density(temp);
-        temp = sqrt(pow(x - Pos_H3[0], 2) + pow(Pos_H3[1], 2) + pow(Pos_H3[2], 2));
-        total_dens[i] += H.get_radial_density(temp);
-        temp = sqrt(pow(x - Pos_H4[0], 2) + pow(Pos_H4[1], 2) + pow(Pos_H4[2], 2));
-        total_dens[i] += H.get_radial_density(temp);
-        B_weights_C[i] = get_becke_w(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa);
-        B_weights_H[i] = get_becke_w(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa);
-        pb.update();
-    }
-    //    }
-    for (int i = 0; i < size; i++)
-    {
-        result << setw(10) << setprecision(4) << scientific << (i + min) * fac
-               << setw(16) << setprecision(8) << scientific << HF_densities[i]
-               << setw(16) << setprecision(8) << scientific << DFT_densities[i]
-               << setw(16) << setprecision(8) << scientific << C_dens[i]
-               << setw(16) << setprecision(8) << scientific << H_dens[i]
-               << setw(16) << setprecision(8) << scientific << total_dens[i]
-               << setw(16) << setprecision(8) << scientific << B_weights_C[i]
-               << setw(16) << setprecision(8) << scientific << B_weights_H[i] << endl;
+        result << setw(10) << setprecision(4) << scientific << (i + min) * dx
+            << setw(16) << setprecision(8) << scientific << HF_densities[i]
+            << setw(16) << setprecision(8) << scientific << DFT_densities[i]
+            << setw(16) << setprecision(8) << scientific << C_dens[i]
+            << setw(16) << setprecision(8) << scientific << H_dens[i]
+            << setw(16) << setprecision(8) << scientific << total_dens[i]
+            << setw(16) << setprecision(8) << scientific << B_weights_C[i]
+            << setw(16) << setprecision(8) << scientific << B_weights_H[i]
+            << setw(16) << setprecision(8) << scientific << TFVC_weights_C[i]
+            << setw(16) << setprecision(8) << scientific << TFVC_weights_H[i]
+            << setw(16) << setprecision(8) << scientific << TFVC_weights_C_DFT[i]
+            << setw(16) << setprecision(8) << scientific << TFVC_weights_H_DFT[i]
+            << endl;
     }
     result.flush();
     result.close();
@@ -891,66 +541,47 @@ void calc_partition_densities()
 };
 
 cdouble calc_spherically_averaged_at_k(vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens,
-                                       const double &k,
-                                       const double rel_precision = 1E-4,
-                                       const double start_angle = 5.0,
-                                       const bool print = false)
+    const double &k)
 {
-    cdouble old_result = 1E100;
-    cdouble new_result = 0.9E100;
-    double angle = start_angle;
-    double ratio = abs(old_result / new_result - 1.0);
-    double phi_ratio = 2.0;
     double rho, work;
     double *d1_local, *d2_local, *d3_local, *dens_local;
-    int pmax;
+    const int max_num_angular_points_closest = constants::get_closest_num_angular(5810);
 
-    while ((ratio > rel_precision || phi_ratio > rel_precision) && angle / constants::PI < 1E5)
+    int num_angular = max_num_angular_points_closest;
+    vec angular_x(num_angular, 0.0);
+    vec angular_y(num_angular, 0.0);
+    vec angular_z(num_angular, 0.0);
+    vec angular_w(num_angular, 0.0);
+    lebedev_sphere ls;
+    ls.ld_by_order(max_num_angular_points_closest,
+        angular_x.data(),
+        angular_y.data(),
+        angular_z.data(),
+        angular_w.data());
+
+
+    dens_local = dens[0].data();
+    d1_local = d1[0].data();
+    d2_local = d2[0].data();
+    d3_local = d3[0].data();
+    const int dsize = dens[0].size();
+    double re = 0, im = 0, c, si, k1, k2, k3;
+#pragma omp parallel for reduction(+ : re, im)
+    for (int p = 0; p < num_angular; p++)
     {
-        const double da = constants::PI / angle;
-        const double da2 = da * da;
-        // Make angular grids
-        double x0, y0, z0, st0;
-        cdouble sf_local;
-        for (double phi = 0; phi <= constants::TWO_PI; phi += da)
-        {
-            const double cp = cos(phi);
-            const double sp = sin(phi);
-            for (double theta = da; theta <= constants::PI; theta += da)
-            {
-                const double st = sin(theta);
-                st0 = st * da2;
-                x0 = st * cp, y0 = st * sp, z0 = cos(theta);
-
-                pmax = (int)dens[0].size();
-                dens_local = dens[0].data();
-                d1_local = d1[0].data();
-                d2_local = d2[0].data();
-                d3_local = d3[0].data();
-                for (int p = pmax - 1; p >= 0; p--)
-                {
-                    rho = dens_local[p];
-                    work = k * x0 * d1_local[p] + k * y0 * d2_local[p] + k * z0 * d3_local[p];
-                    sf_local += cdouble(rho * cos(work), rho * sin(work)) * st0;
-                }
-            }
+        k1 = k * angular_x[p];
+        k2 = k * angular_y[p];
+        k3 = k * angular_z[p];
+        for (int d = 0; d < dsize; d++) {
+            rho = dens_local[d];
+            work = k1 * d1_local[d] + k2 * d2_local[d] + k3 * d3_local[d];
+            c = cos(work);
+            si = sin(work);
+            re += rho * c * angular_w[p];
+            im += rho * si * angular_w[p];
         }
-        if (sf_local != 0.0)
-        {
-            old_result = new_result;
-            new_result = sf_local / cdouble(constants::FOUR_PI);
-            phi_ratio = std::abs(std::arg(old_result) - std::arg(new_result));
-            // if(print)
-            //     std::cout << "Phi ratio: " << phi_ratio << " " << std::arg(old_result) << " " << std::arg(new_result) << std::endl;
-            ratio = std::abs(std::abs(old_result) / std::abs(new_result) - 1.0);
-            // if(print)
-            //     std::cout << "Ratio:     " << ratio << " " << std::abs(old_result) << " " << std::abs(new_result) << std::endl;
-        }
-        angle *= 1.2;
     }
-    if (print)
-        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << k << " " << (ratio > rel_precision) << " " << angle << std::endl;
-    return new_result;
+    return { re, im };
 }
 
 void spherically_averaged_density(options &opt, const ivec val_els_alpha, const ivec val_els_beta)
@@ -958,9 +589,9 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     std::cout << "Reading wavefunction" << std::endl;
     using namespace std;
     WFN wavy(opt.wfn, opt.charge, opt.mult);
-   std::cout << "Number of MOs before: " << wavy.get_nmo() << endl;
+    std::cout << "Number of MOs before: " << wavy.get_nmo() << endl;
     wavy.delete_unoccupied_MOs();
-   std::cout << "Number of occupied MOs before: " << wavy.get_nmo() << endl;
+    std::cout << "Number of occupied MOs before: " << wavy.get_nmo() << endl;
     bvec MOs_to_delete(wavy.get_nmo(), false);
     int deleted = 0;
     if (val_els_alpha.size() > 0)
@@ -971,7 +602,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
             // only delete if i is not an element of val_els
             if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
             {
-               std::cout << "Deleting from Alpha: " << i << endl;
+                std::cout << "Deleting from Alpha: " << i << endl;
                 wavy.delete_MO(i);
                 MOs_to_delete[i] = true;
                 deleted++;
@@ -980,20 +611,20 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
         for (int i = wavy.get_nmo() - 1; i >= offset; i--)
             if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
             {
-               std::cout << "Deleting from Beta: " << i - offset << endl;
+                std::cout << "Deleting from Beta: " << i - offset << endl;
                 wavy.delete_MO(i);
                 MOs_to_delete[i + deleted] = true;
                 deleted++;
             }
     }
-   std::cout << "MOs deleted: " << deleted << endl;
-   std::cout << "MO map:" << endl;
+    std::cout << "MOs deleted: " << deleted << endl;
+    std::cout << "MO map:" << endl;
     for (int i = 0; i < MOs_to_delete.size(); i++)
-       std::cout << i << " " << MOs_to_delete[i] << endl;
-   std::cout << "Number of MOs after: " << wavy.get_nmo() << endl;
-   std::cout << "\n\nEnergies after:" << endl;
+        std::cout << i << " " << MOs_to_delete[i] << endl;
+    std::cout << "Number of MOs after: " << wavy.get_nmo() << endl;
+    std::cout << "\n\nEnergies after:" << endl;
     for (int i = 0; i < wavy.get_nmo(); i++)
-       std::cout << wavy.get_MO_energy(i) << " " << wavy.get_MO_occ(i) << endl;
+        std::cout << wavy.get_MO_energy(i) << " " << wavy.get_MO_occ(i) << endl;
 
     // Make radial grids on logarithmic scale
     const double dr = 0.00008;
@@ -1002,7 +633,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     long double tot_int2 = 0;
     vec radial_dens2(upper_r, 0.0);
     ProgressBar *progress = new ProgressBar(upper_r, 85, "=", " ", "Calculating Densities");
-   std::cout << endl;
+    std::cout << endl;
 
 #pragma omp parallel for reduction(+ : tot_int2) num_threads(opt.threads)
     for (long long int _r = 1; _r < upper_r; _r++)
@@ -1011,12 +642,12 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
         radial_dens2[_r] = calc_grid_averaged_at_r(wavy, r, 1200, 5800);
         if (_r >= 1)
         {
-            tot_int2 += radial_dens2[_r] * r * r * (r - (_r - 1) * dr);
+            tot_int2 += (long double)radial_dens2[_r] * r * r * (r - (_r - 1) * dr);
         }
         progress->update();
     }
     delete (progress);
-   std::cout << "Start writing the file" << endl;
+    std::cout << "Start writing the file" << endl;
     string el = constants::atnr2letter(wavy.get_atom_charge(0));
     ofstream out(el + ".dat", ios::out);
     out << "Total Integral: " << setw(18) << scientific << setprecision(10) << tot_int2 << "\n";
@@ -1026,31 +657,6 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     out.close();
 }
 
-void add_ECP_contribution_test(const ivec &asym_atom_list,
-                               const WFN &wave,
-                               cvec2 &sf,
-                               vec2 &k_pt)
-{
-    double k = 1.0;
-    // Using a Thakkar core density
-    std::vector<Thakkar> temp;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-    {
-        temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i])));
-    }
-
-#pragma omp parallel for private(k)
-    for (int s = 0; s < sf[0].size(); s++)
-    {
-        k = k_pt[3][s];
-        for (int i = 0; i < asym_atom_list.size(); i++)
-        {
-            if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
-                sf[i][s] += temp[i].get_core_form_factor(k, wave.get_atom_ECP_electrons(asym_atom_list[i]));
-        }
-    }
-}
-
 void spherical_harmonic_test()
 {
     const double phi = 0.3, theta = 0.4;
@@ -1058,9 +664,9 @@ void spherical_harmonic_test()
     {
         for (int m = -lam; m <= lam; m++)
         {
-            vec d{std::sin(theta) * std::cos(phi),
+            vec d{ std::sin(theta) * std::cos(phi),
                   std::sin(theta) * std::sin(phi),
-                  std::cos(theta), 1.0, 1.0};
+                  std::cos(theta), 1.0, 1.0 };
             std::cout << constants::spherical_harmonic(lam, m, d.data()) << " ";
         }
         std::cout << "\n";
@@ -1070,7 +676,7 @@ void spherical_harmonic_test()
 // Only valid for one atom positioned at 0,0,0
 double compute_MO_spherical_orig(double x, double y, double z, double expon, double coef, int type)
 {
-    int l[3]{0, 0, 0};
+    int l[3]{ 0, 0, 0 };
     double ex = 0;
     double temp = 0;
 
@@ -1079,7 +685,7 @@ double compute_MO_spherical_orig(double x, double y, double z, double expon, dou
         x,
         y,
         z,
-        x * x + y * y + z * z};
+        x * x + y * y + z * z };
 
     // if (iat != atom) continue;
     constants::type2vector(type, l);
@@ -1109,7 +715,7 @@ double compute_MO_spherical_orig(double x, double y, double z, double expon, dou
 double compute_MO_spherical_new(double x, double y, double z, double expon, double coef, int type, int m = 1)
 {
     double result = 0.0;
-    int l[3]{0, 0, 0};
+    int l[3]{ 0, 0, 0 };
     int type_local = type;
     double N = 1;
     // convert "type" to l
@@ -1157,7 +763,7 @@ void Calc_MO_spherical_harmonics(
                 double PosGrid[3]{
                     i * CubeMO.get_vector(0, 0) + j * CubeMO.get_vector(0, 1) + k * CubeMO.get_vector(0, 2) + CubeMO.get_origin(0),
                     i * CubeMO.get_vector(1, 0) + j * CubeMO.get_vector(1, 1) + k * CubeMO.get_vector(1, 2) + CubeMO.get_origin(1),
-                    i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2)};
+                    i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2) };
 
                 CubeMO.set_value(i, j, k, compute_MO_spherical_new(PosGrid[0], PosGrid[1], PosGrid[2], wavy.get_exponent(0), wavy.get_MO_coef(0, 0), wavy.get_type(0)));
             }
@@ -1178,392 +784,107 @@ void Calc_MO_spherical_harmonics(
     }
 };
 
-void calc_rho_cube(WFN &dummy)
+void cube_from_coef_npy(vec &coefs, WFN &wave)
 {
-    using namespace std;
-    double MinMax[6]{0, 0, 0, 0, 0, 0};
-    int steps[3]{0, 0, 0};
-    readxyzMinMax_fromWFN(dummy, MinMax, steps, 3., 0.025, true);
-    cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
-    dummy.delete_unoccupied_MOs();
-    CubeRho.give_parent_wfn(dummy);
-   std::cout << "Starting work..." << endl;
-
-    for (int i = 0; i < 3; i++)
-    {
-        CubeRho.set_origin(i, MinMax[i]);
-        CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-    }
-    CubeRho.set_comment1("Calculated density using NoSpherA2");
-    CubeRho.set_comment2("from " + dummy.get_path().string());
-    CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
-
-    _time_point start = get_time();
-    const int s1 = CubeRho.get_size(0), s2 = CubeRho.get_size(1), s3 = CubeRho.get_size(2), total_size = s1 * s2 * s3;
-    ;
-   std::cout << "Lets go into the loop! There is " << total_size << " points" << endl;
-    ProgressBar *progress = new ProgressBar(total_size, 50, "=", " ", "Calculating Rho");
-
-    vec v1{
-        CubeRho.get_vector(0, 0),
-        CubeRho.get_vector(1, 0),
-        CubeRho.get_vector(2, 0)},
-        v2{
-            CubeRho.get_vector(0, 1),
-            CubeRho.get_vector(1, 1),
-            CubeRho.get_vector(2, 1)},
-        v3{
-            CubeRho.get_vector(0, 2),
-            CubeRho.get_vector(1, 2),
-            CubeRho.get_vector(2, 2)},
-        orig{
-            CubeRho.get_origin(0),
-            CubeRho.get_origin(1),
-            CubeRho.get_origin(2)};
-
-#pragma omp parallel
-    {
-        vec2 d;
-        vec phi(dummy.get_nmo(), 0.0);
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize(dummy.get_ncen(), 0.0);
-#pragma omp for schedule(dynamic)
-        for (int index = 0; index < total_size; index++)
-        {
-            int i = index / (s2 * s3);
-            int j = (index / s3) % s2;
-            int k = index % s3;
-
-            vec PosGrid{
-                i * v1[0] + j * v2[0] + k * v3[0] + orig[0],
-                i * v1[1] + j * v2[1] + k * v3[1] + orig[1],
-                i * v1[2] + j * v2[2] + k * v3[2] + orig[2]};
-
-            CubeRho.set_value(i, j, k, dummy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
-            progress->update();
-        }
-    }
-    delete (progress);
-
-    using namespace std;
-    _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
-    CubeRho.calc_dv();
-    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
-
-    std::filesystem::path fn((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
-    CubeRho.write_file(fn, false);
-};
-
-void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
-{
-    std::vector<unsigned long> shape{};
-    bool fortran_order;
-    vec data{};
-
-    npy::LoadArrayFromNumpy(coef_fn, shape, fortran_order, data);
-    WFN dummy(xyzfile);
-
-    // const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
-    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set("cc-pvqz-jkfit");
-    const int nr_coefs = load_basis_into_WFN(dummy, aux_basis);
-    std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
-    cube res = calc_cube_ML(data, dummy);
-    res.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_PySCF_COEFS_rho.cube");
+    cube res = calc_cube_ML(coefs, wave);
+    res.set_path((wave.get_path().parent_path() / wave.get_path().stem()).string() + "_PySCF_COEFS_rho.cube");
     res.write_file(true);
     // for (int i = 0; i < dummy.get_ncen(); i++)
     //     calc_cube_ML(data, dummy, i);
 }
 
-void test_xtb_molden(options &opt, std::ostream &log_file)
-{
-    using namespace std;
-    for (int i = 0; i < 1; i++)
-    {
-        std::vector<WFN> wavy;
-        wavy.emplace_back("Co2.molden");
-        opt.cif = "Co2.cif";
-        opt.dmin = 0.5;
-       std::cout << "STARTING CALC" << endl;
-        svec empty = {};
-        calculate_scattering_factors(
-            opt,
-            wavy,
-            log_file,
-            empty,
-            0);
-    }
-}
-
-void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele = "Au", ivec val_els_alpha = {}, ivec val_els_beta = {})
-{
-    if (ncpus == -1)
-        ncpus = 4;
-    using namespace std;
-#ifdef _OPENMP
-    omp_set_num_threads(ncpus);
-#endif
-    vec2 res(6);
-    for (int i = 0; i < res.size(); i++)
-        res[i].resize(10000, 0.0);
-
-    string dat = "core_dens_" + ele + ".dat";
-    int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
-    Thakkar T_Au(el_nr);
-    string def2 = ele + "_def2TZVP.gbw";
-    WFN ECP_way_Au(def2);
-    ECP_way_Au.delete_unoccupied_MOs();
-    ECP_way_Au.set_has_ECPs(true, true, 1);
-
-    string jorge = ele + "_jorge.gbw";
-    WFN wavy_full_Au(jorge);
-    wavy_full_Au.delete_unoccupied_MOs();
-    WFN wavy_val_Au(jorge);
-    wavy_val_Au.delete_unoccupied_MOs();
-   std::cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
-    bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
-    int deleted = 0;
-    if (val_els_alpha.size() > 0)
-    {
-        // Delete core orbitals
-        int offset = wavy_val_Au.get_MO_op_count(0);
-        for (int i = offset - 1; i >= 0; i--)
-            // only delete if i is not an element of val_els
-            if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
-            {
-               std::cout << "Deleting from Alpha: " << i << endl;
-                wavy_val_Au.delete_MO(i);
-                MOs_to_delete[i] = true;
-                deleted++;
-            }
-        offset = wavy_val_Au.get_MO_op_count(0);
-        for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
-            if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
-            {
-               std::cout << "Deleting from Beta: " << i - offset << endl;
-                wavy_val_Au.delete_MO(i);
-                MOs_to_delete[i + deleted] = true;
-            }
-    }
-   std::cout << "MOs deleted: " << deleted << endl;
-   std::cout << "MO map:" << endl;
-    for (int i = 0; i < MOs_to_delete.size(); i++)
-       std::cout << i << " " << MOs_to_delete[i] << endl;
-   std::cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
-   std::cout << "\n\nEnergies / Occu after:" << endl;
-    for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-       std::cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
-
-    _time_point start = get_time();
-
-    const int upper = static_cast<int>(res[0].size());
-    ProgressBar *progress = new ProgressBar(upper, 60, "=", " ", "Calculating Densities");
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 1; i < upper; i++)
-    {
-        double sr = i * 0.001;
-        res[0][i] = sr;
-        res[1][i] = T_Au.get_core_density(sr, ECP_way_Au.get_atom_ECP_electrons(0));
-        res[2][i] = T_Au.get_radial_density(sr);
-        res[3][i] = calc_spherically_averaged_at_r(ECP_way_Au, sr, precisison, 60);
-        res[4][i] = calc_spherically_averaged_at_r(wavy_full_Au, sr, precisison, 60);
-        res[5][i] = calc_spherically_averaged_at_r(wavy_val_Au, sr, precisison, 60);
-        progress->update();
-    }
-    delete (progress);
-    _time_point end = get_time();
-   std::cout << "Time taken: " << round(get_sec(start, end) / 60) << " m " << get_sec(start, end) % 60 << " s " << get_msec(start, end) << " ms" << endl;
-    ofstream dat_out(dat, ios::out);
-    dat_out << scientific << setprecision(12) << setw(20);
-    for (int i = 0; i < res[0].size(); i++)
-    {
-        for (int j = 0; j < 6; j++)
-        {
-            auto t = res[j][i];
-            dat_out << t;
-            dat_out << " ";
-        }
-        dat_out << "\n";
-    }
-    dat_out << flush;
-    dat_out.close();
-}
-
-void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele = "Au", ivec val_els_alpha = {}, ivec val_els_beta = {})
-{
-    if (ncpus == -1)
-        ncpus = 4;
-    using namespace std;
-#ifdef _OPENMP
-    omp_set_num_threads(ncpus);
-#endif
-    cvec2 res(6);
-    for (int i = 0; i < res.size(); i++)
-        res[i].resize(1000, 0.0);
-
-    string dat = "core_sfac_" + ele + ".dat";
-    const int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
-    Thakkar T_Au(el_nr);
-
-    WFN ECP_way_Au(ele + "_def2TZVP.gbw");
-    ECP_way_Au.delete_unoccupied_MOs();
-    ECP_way_Au.set_has_ECPs(true, true, 1);
-
-    WFN wavy_full_Au(ele + "_jorge.gbw");
-    wavy_full_Au.delete_unoccupied_MOs();
-    WFN wavy_val_Au(ele + "_jorge.gbw");
-    wavy_val_Au.delete_unoccupied_MOs();
-   std::cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
-    bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
-    int deleted = 0;
-    if (val_els_alpha.size() > 0)
-    {
-        // Delete core orbitals
-        int offset = wavy_val_Au.get_MO_op_count(0);
-        for (int i = offset - 1; i >= 0; i--)
-            // only delete if i is not an element of val_els
-            if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
-            {
-               std::cout << "Deleting from Alpha: " << i << endl;
-                wavy_val_Au.delete_MO(i);
-                MOs_to_delete[i] = true;
-                deleted++;
-            }
-        offset = wavy_val_Au.get_MO_op_count(0);
-        for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
-            if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
-            {
-               std::cout << "Deleting from Beta: " << i - offset << endl;
-                wavy_val_Au.delete_MO(i);
-                MOs_to_delete[i + deleted] = true;
-            }
-    }
-   std::cout << "MOs deleted: " << deleted << endl;
-   std::cout << "MO map:" << endl;
-    for (int i = 0; i < MOs_to_delete.size(); i++)
-       std::cout << i << " " << MOs_to_delete[i] << endl;
-   std::cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
-   std::cout << "\n\nEnergies / Occu after:" << endl;
-    for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-       std::cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
-
-    std::vector<_time_point> time_points;
-    std::vector<std::string> time_descriptions;
-
-    ivec atom_type_list({el_nr});
-    ivec asym_atom_list({0});
-    bvec needs_grid({true});
-    vec2 d1_ECP, d2_ECP, d3_ECP, dens_ECP;
-    vec2 d1_all, d2_all, d3_all, dens_all;
-    vec2 d1_val, d2_val, d3_val, dens_val;
-    svec labels({ele});
-
-    auto temp_cell = cell();
-    make_hirshfeld_grids(0,
-                         3,
-                         temp_cell,
-                         ECP_way_Au,
-                         atom_type_list,
-                         asym_atom_list,
-                         needs_grid,
-                         d1_ECP, d2_ECP, d3_ECP, dens_ECP,
-                         labels,
-                        std::cout,
-                         time_points,
-                         time_descriptions);
-    make_hirshfeld_grids(0,
-                         3,
-                         temp_cell,
-                         wavy_full_Au,
-                         atom_type_list,
-                         asym_atom_list,
-                         needs_grid,
-                         d1_all, d2_all, d3_all, dens_all,
-                         labels,
-                        std::cout,
-                         time_points,
-                         time_descriptions);
-    make_hirshfeld_grids(0,
-                         3,
-                         temp_cell,
-                         wavy_val_Au,
-                         atom_type_list,
-                         asym_atom_list,
-                         needs_grid,
-                         d1_val, d2_val, d3_val, dens_val,
-                         labels,
-                        std::cout,
-                         time_points,
-                         time_descriptions);
-
-    const int upper = static_cast<int>(res[0].size());
-    ProgressBar *progress = new ProgressBar(upper, 60, "=", " ", "Calculating SFACs");
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 1; i < upper; i++)
-    {
-        double sr = i * 0.01;
-        res[0][i] = sr;
-        res[1][i] = T_Au.get_core_form_factor(sr, ECP_way_Au.get_atom_ECP_electrons(0));
-        res[2][i] = T_Au.get_form_factor(sr);
-        res[3][i] = calc_spherically_averaged_at_k(d1_ECP, d2_ECP, d3_ECP, dens_ECP, sr, precisison, 150.0);
-        res[4][i] = calc_spherically_averaged_at_k(d1_all, d2_all, d3_all, dens_all, sr, precisison, 150.0);
-        res[5][i] = calc_spherically_averaged_at_k(d1_val, d2_val, d3_val, dens_val, sr, precisison, 150.0);
-        progress->update();
-    }
-    delete (progress);
-
-    ofstream dat_out("core_sfac_" + ele + ".dat", ios::out);
-    _time_point end = get_time();
-   std::cout << "Time taken: " << get_sec(time_points.front(), time_points.back()) << " s " << get_msec(time_points.front(), time_points.back()) << " ms" << endl;
-    dat_out << scientific << setprecision(12) << setw(20);
-    double t = 0;
-    for (int i = 0; i < res[0].size(); i++)
-    {
-        for (int j = 0; j < 6; j++)
-        {
-            t = res[j][i].real();
-            dat_out << t;
-            dat_out << " ";
-        }
-        dat_out << "\n";
-    }
-    dat_out << flush;
-    dat_out.close();
-}
-
-double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist, const double &dr)
-{
-    double res = 0;
-    const double dr3 = dr * dr * dr;
-    double d = 0;
-    for (double x = -cube_dist / dr; x <= cube_dist / dr; x++)
-    {
-        for (double y = -cube_dist / dr; y <= cube_dist / dr; y++)
-        {
-            for (double z = -cube_dist / dr; z <= cube_dist / dr; z++)
-            {
-                d = sqrt((x - r) * (x - r) + y * y + z * z);
-                int offset = static_cast<int>(cube_dist / dr);
-                res += grid[static_cast<int>(x) + offset][static_cast<int>(y) + offset][static_cast<int>(z) + offset] / d * dr3;
-            }
-        }
-    }
-    return res / constants::FOUR_PI;
-}
-
 void test_openblas()
 {
-    set_BLAS_threads(4);
-    std::cout << "Running Openblas test" << std::endl;
+    //#ifdef __APPLE__
+    //    omp_set_num_threads(4);
+    //#else
+    //    MKL_Set_Num_Threads(4);
+    //#endif
+    //#ifdef _OPENMP
+    //    omp_set_num_threads(4);
+    //#endif
+    std::cout << "Running MKL/Accelerate test" << std::endl;
     _test_openblas();
+}
+
+
+void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>> &aux_basis, const int atom_idx_1, const int atom_idx_2, const int gridpoints = 1000, const double padding = 2.0) {
+    GridConfiguration config;
+    config.accuracy = 0;
+    config.partition_type = PartitionType::TFVC;
+    config.pbc = 0;
+    config.debug = false;
+    GridManager grid_manager(config);
+
+    grid_manager.setup1DGridsForMolecule(wavy, atom_idx_1, atom_idx_2, gridpoints, padding);
+    const vec3 atomic_grids_local = grid_manager.getGridData().atomic_grids;
+
+
+    WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+    DensityFitting::CONFIG RI_config;
+    RI_config.analyze_quality = true;
+    vec ri_coefs_u = DensityFitting::density_fit(wavy, wavy_aux, RI_config);
+
+    RI_config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+    RI_config.charge_scheme = DensityFitting::CHARGE_SCHEME::TFVC;
+    RI_config.restraint_strength = 2.0E-4;
+    RI_config.tikhonov_lambda = 1E-6;
+    vec ri_coefs_tfvc = DensityFitting::density_fit(wavy, wavy_aux, RI_config);
+
+    vec2 dens_hirsh(2);
+    vec2 dens_becke(2);
+    vec2 dens_tfvc(2);
+    vec2 dens_RI_u(2);
+    vec2 dens_RI_tfvc(2);
+    ivec atom_indices = { atom_idx_1, atom_idx_2 };
+    for (int g = 0; g < 2; ++g) {
+        dens_hirsh[g].resize(gridpoints), dens_becke[g].resize(gridpoints), dens_tfvc[g].resize(gridpoints), dens_RI_u[g].resize(gridpoints), dens_RI_tfvc[g].resize(gridpoints);
+        for (int p = 0; p < gridpoints; ++p) {
+            dens_hirsh[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::HIRSH_WEIGHT][p];
+            dens_becke[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::BECKE_WEIGHT][p];
+            dens_tfvc[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::TFVC_WEIGHT][p];
+            dens_RI_u[g][p] = calc_density_ML(
+                atomic_grids_local[g][GridData::X][p],
+                atomic_grids_local[g][GridData::Y][p],
+                atomic_grids_local[g][GridData::Z][p],
+                ri_coefs_u,
+                wavy_aux.get_atoms(),
+                atom_indices[g]);
+            dens_RI_tfvc[g][p] = calc_density_ML(
+                atomic_grids_local[g][GridData::X][p],
+                atomic_grids_local[g][GridData::Y][p],
+                atomic_grids_local[g][GridData::Z][p],
+                ri_coefs_tfvc,
+                wavy_aux.get_atoms(),
+                atom_indices[g]);
+        }
+    }
+
+    std::vector<std::pair<std::string, vec>> data_atom1(
+        {
+           {"hirsh", dens_hirsh[0]},
+           {"becke", dens_becke[0]},
+           {"tfvc", dens_tfvc[0]},
+           {"ri_u", dens_RI_u[0]},
+           { "ri_tfvc", dens_RI_tfvc[0] }
+        }
+    );
+    std::vector<std::pair<std::string, vec>> data_atom2(
+        {
+            {"hirsh", dens_hirsh[1]},
+            {"becke", dens_becke[1]},
+            {"tfvc", dens_tfvc[1]},
+            {"ri_u", dens_RI_u[1]},
+            { "ri_tfvc", dens_RI_tfvc[1] }
+        }
+    );
+
+    //std::string atom_specifier = std::format("{}{}_{}{}", wavy.get_atom_label(atom_idx_1), atom_idx_1, wavy.get_atom_label(atom_idx_2), atom_idx_2);
+    std::string atom_specifier = wavy.get_atom_label(atom_idx_1) + std::to_string(atom_idx_1) + "_" + wavy.get_atom_label(atom_idx_2) + std::to_string(atom_idx_2);
+    vec2 grid_points = { atomic_grids_local[0][GridData::X], atomic_grids_local[0][GridData::Y], atomic_grids_local[0][GridData::Z] };
+    grid_manager.writeSimpleGrid("WFN_density_" + atom_specifier + ".dat", grid_points, { {"WFN_density",atomic_grids_local[0][GridData::WFN_DENSITY]} });
+    grid_manager.writeSimpleGrid("Density_" + wavy.get_atom_label(atom_idx_1) + std::to_string(atom_idx_1) + ".dat", grid_points, data_atom1);
+    grid_manager.writeSimpleGrid("Density_" + wavy.get_atom_label(atom_idx_2) + std::to_string(atom_idx_2) + ".dat", grid_points, data_atom2);
 }
 
 void test_analytical_fourier(bool full)
@@ -1576,34 +897,37 @@ void test_analytical_fourier(bool full)
         kpts.push_back({ (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1 });
     }
     vec2 grid;
-    grid.resize(5); // x, y, z, dens, atomic_weight
+    grid.resize(7); // x, y, z, dens, atomic_weight, becke_weight, TFVC_weight
 
     // Conditions for the Wavefunction
     const double c_exp = 2.0;
     double vals[] = { 1.0 };
     unsigned int max_l = 6;
     double radial_res = 1E-17;
+    int charge = 1;
     if (full) {
         max_l = 8;
         radial_res = 1E-25;
     }
 
-    double alpha_min[] = {0.5};
+    double alpha_min[] = { 0.5 };
     AtomGrid griddy(radial_res,
         350,
         5000,
-        1,
+        charge,
         c_exp,
         max_l,
         alpha_min,
         std::cout);
 
-    double pos[] = {0};
+    double pos[] = { 0 };
     for (int i = 0; i < grid.size(); i++)
     {
         grid[i].resize(griddy.get_num_grid_points(), 0.0);
     }
-    griddy.get_atomic_grid(0, pos, pos, pos, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data());
+
+    vec empty(1, 0.0);
+    griddy.get_grid(1, 0, pos, pos, pos, &charge, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data(), grid[5].data(), grid[6].data(), WFN(), empty);
 
     // Initialize the vectors sf_A and sf_N
     cvec2 sf_A, sf_N;
@@ -1611,8 +935,6 @@ void test_analytical_fourier(bool full)
     sf_N.resize(1);
     sf_A[0].resize(kpts.size(), 0.0);
     sf_N[0].resize(kpts.size(), 0.0);
-
-
 
     // double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
     // int steps[3]{ 0, 0, 0 };
@@ -1637,7 +959,7 @@ void test_analytical_fourier(bool full)
         vec coefs(type * 2 + 1);
 
         // Initialize the Wavefunction
-        WFN wavy(0);
+        WFN wavy(e_origin::NOT_YET_DEFINED);
         wavy.push_back_MO(0, 1.0, -13);
         wavy.push_back_atom("H", 0, 0, 0, 1);
         wavy.push_back_atom_basis_set(0, c_exp, vals[0], type, 0);
@@ -1673,30 +995,31 @@ void test_analytical_fourier(bool full)
                 sf_A[0][i] = 0.0;
                 sf_N[0][i] = 0.0;
             }
-#pragma omp parallel for
+            double work = 0.0;
+#pragma omp parallel for private(work)
             for (int i = 0; i < kpts.size(); i++)
             {
                 double k_pt_local[4] = { kpts[i][0] * 2 * constants::PI , kpts[i][1] * 2 * constants::PI , kpts[i][2] * 2 * constants::PI , 0.0 };
                 k_pt_local[3] = sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
                 for (int d = 0; d < 3; d++) k_pt_local[d] /= k_pt_local[3];
 
-                sf_A[0][i] = sfac_bessel(p, k_pt_local, coefs);
+                sf_A[0][i] = sfac_bessel(p, k_pt_local, coefs.data());
                 //sf_A[0][i] = sfac_bessel(p, k_pt_local, ri_coefs);
                 for (int _p = 0; _p < grid[0].size(); _p++)
-            {
-                    double work = 2 * constants::PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
+                {
+                    work = constants::TWO_PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
                     sf_N[0][i] += std::polar(grid[3][_p] * grid[4][_p], work);
                 }
                 diff = abs(sf_A[0][i] - sf_N[0][i]);
                 if (abs(diff) > abs(max_diff))
                 {
                     max_diff = diff;
-            }
+                }
                 if (abs(diff) > 2E-5)
-            {
-                all_correct = false;
+                {
+                    all_correct = false;
                     correct = false;
-            }
+                }
             }
             if (!correct)
             {
@@ -1749,19 +1072,20 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
     }
 
     // Initialize the Wavefunction
-    WFN wavy(0);
+    WFN wavy(e_origin::NOT_YET_DEFINED);
     wavy.push_back_MO(0, 1.0, -13);
     wavy.push_back_atom("H", 0, 0, 0, 1);
     wavy.push_back_atom_basis_set(0, 1.0, 1.0, lambda, 0);
-    double MinMax[6]{0, 0, 0, 0, 0, 0};
-    int steps[3]{0, 0, 0};
-    readxyzMinMax_fromWFN(wavy, MinMax, steps, radius, resulution, true);
-    cube CubeMO(steps[0], steps[1], steps[2], 1, true);
+    properties_options opts;
+    opts.radius = radius;
+    opts.resolution = resulution;
+    readxyzMinMax_fromWFN(wavy, opts, true);
+    cube CubeMO(opts.NbSteps, 1, true);
     CubeMO.give_parent_wfn(wavy);
     for (int i = 0; i < 3; i++)
     {
-        CubeMO.set_origin(i, MinMax[i]);
-        CubeMO.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+        CubeMO.set_origin(i, opts.MinMax[i]);
+        CubeMO.set_vector(i, i, (opts.MinMax[i + 3] - opts.MinMax[i]) / opts.NbSteps[i]);
     }
 #ifdef _OPENMP
     omp_lock_t l;
@@ -1779,7 +1103,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
                 double PosGrid[3]{
                     i * CubeMO.get_vector(0, 0) + j * CubeMO.get_vector(0, 1) + k * CubeMO.get_vector(0, 2) + CubeMO.get_origin(0),
                     i * CubeMO.get_vector(1, 0) + j * CubeMO.get_vector(1, 1) + k * CubeMO.get_vector(1, 2) + CubeMO.get_origin(1),
-                    i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2)};
+                    i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2) };
 
                 const double leng = sqrt(PosGrid[0] * PosGrid[0] + PosGrid[1] * PosGrid[1] + PosGrid[2] * PosGrid[2]);
 
@@ -1809,54 +1133,53 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 {
     using namespace std;
+    //std::shared_ptr<BasisSet> aux_basis_set = std::make_shared<BasisSet>(wavy);
+    std::vector<std::shared_ptr<BasisSet>> aux_basis_set{ BasisSetLibrary::get_basis_set("def2-universal-jkfit") };
 
-    WFN wavy_aux(0);
-    wavy_aux.set_atoms(wavy.get_atoms());
-    wavy_aux.set_ncen(wavy.get_ncen());
-    wavy_aux.delete_basis_set();
-    double beta = 2.0;
-    //std::shared_ptr<BasisSet> aux_basis_set = std::make_shared<BasisSet>(wavy, beta);
-    std::shared_ptr<BasisSet> aux_basis_set = BasisSetLibrary().get_basis_set("def2-universal-jkfit");
+    WFN wavy_aux = generate_aux_wfn(wavy, aux_basis_set);
 
-    load_basis_into_WFN(wavy_aux, aux_basis_set);
+    DensityFitting::CONFIG RI_config;
+    RI_config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+    RI_config.analyze_quality = opt->debug;
 
-    vec ri_coefs = density_fit(wavy, wavy_aux, (*opt).mem, 'C');
+    vec ri_coefs = density_fit(wavy, wavy_aux, RI_config);
 
 
-    vec3 grid;
-    ivec pointy = fuckery(wavy, grid, 1);
+    bvec needs_grid(wavy.get_ncen(), false);
+    needs_grid[0] = true;
+    GridConfiguration conf;
+    conf.partition_type = PartitionType::Hirshfeld;
+    conf.accuracy = 4;
+    GridManager grid(conf);
+    vec2 d1, d2, d3, dens;
+
+    ivec asym_atom_list(1, 0);
+    grid.setup3DGridsForMolecule(wavy, asym_atom_list, needs_grid);
+    grid.getDensityVectors(wavy, asym_atom_list, d1, d2, d3, dens);
+    vec2 ML_grid(wavy.get_ncen());
+    auto grid_data = grid.getGridData();
+    int size;
 #pragma omp parallel
     {
-        vec2 d_temp(16);
-        for (int i = 0; i < 16; i++)
+        vec2 d_temp(wavy.get_ncen());
+        for (int i = 0; i < wavy.get_ncen(); i++)
         {
-            d_temp[i].resize(wavy.get_ncen(), 0.0);
+            d_temp[i].resize(16, 0.0);
         }
         vec phi_temp(wavy.get_nmo(), 0.0);
 
         for (int a = 0; a < wavy.get_ncen(); a++) {
+            size = grid.getNumPointsForAtom(a);
+            ML_grid[a].resize(size, 0.0);
 #pragma omp for
-            for (int i = 0; i < pointy[a]; i++)
+            for (int i = 0; i < size; i++)
             {
-                grid[a][4][i] = wavy.compute_dens(
-                    grid[a][0][i],
-                    grid[a][1][i],
-                    grid[a][2][i],
-                    d_temp,
-                    phi_temp) * grid[a][5][i];
-                //grid[a][6][i] = calc_density_ML(
-                //    grid[a][0][i],
-                //    grid[a][1][i],
-                //    grid[a][2][i],
-                //    ri_coefs,
-                //    wavy_aux.get_atoms(),
-                //    a) * grid[a][3][i];
-                grid[a][6][i] = calc_density_ML(
-                    grid[a][0][i],
-                    grid[a][1][i],
-                    grid[a][2][i],
+                ML_grid[a][i] = calc_density_ML(
+                    d1[a][i],
+                    d2[a][i],
+                    d3[a][i],
                     ri_coefs,
-                    wavy_aux.get_atoms()) * grid[a][5][i];
+                    wavy_aux.get_atoms()) * grid_data.atomic_grids[a][GridData::GridIndex::WEIGHT][i];
             }
         }
         for (int i = 0; i < 16; i++)
@@ -1865,11 +1188,12 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
         shrink_vector<double>(phi_temp);
     }
     vec elecs_DFT(wavy.get_ncen(), 0.0);
+    auto charge_results = grid.calculatePartitionedCharges(wavy);
     vec elecs_RI(wavy.get_ncen(), 0.0);
     for (int a = 0; a < wavy.get_ncen(); a++)
     {
-        elecs_DFT[a] = vec_sum(grid[a][4]);
-        elecs_RI[a] = vec_sum(grid[a][6]);
+        elecs_DFT[a] = charge_results.atom_charges[a][PartitionResults::CHARGE_ORDER::S_HIRSH];
+        elecs_RI[a] = vec_sum(ML_grid[a]);
     }
     vec analytic_RI = calc_atomic_density(wavy_aux.get_atoms(), ri_coefs);
 
@@ -1880,16 +1204,16 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
         std::cout << std::setw(10) << wavy.get_atom_label(i)
             << std::fixed << std::setw(10) << std::setprecision(4) << elecs_DFT[i]
             << std::fixed << std::setw(10) << std::setprecision(4) << elecs_RI[i]
-                << std::fixed << std::setw(10) << std::setprecision(4) << analytic_RI[i]
-                << std::fixed << std::setw(10) << std::setprecision(4) << elecs_DFT[i] - elecs_RI[i]
-                    << std::endl;
+            << std::fixed << std::setw(10) << std::setprecision(4) << analytic_RI[i]
+            << std::fixed << std::setw(10) << std::setprecision(4) << elecs_DFT[i] - elecs_RI[i]
+            << std::endl;
     }
 
     std::cout << "SUM OF CHARGES: " << std::endl;
     std::cout << "DFT: " << std::fixed << std::setprecision(4) << vec_sum(elecs_DFT) << std::endl;
     std::cout << "RI:  " << std::fixed << std::setprecision(4) << vec_sum(elecs_RI) << std::endl;
     std::cout << "Analytic:  " << std::fixed << std::setprecision(4) << vec_sum(analytic_RI) << std::endl;
-   
+
 }
 
 void test_reading_SALTED_binary_file() {
@@ -1928,14 +1252,14 @@ void test_reading_SALTED_binary_file() {
     std::cout << "neighspe2 size:" << config.neighspe2.size() << std::endl;
     for (int i = 0; i < config.neighspe2.size(); i++)
     {
-        std::cout << "neighspe2[" << i << "]:"  << config.neighspe2[i] << std::endl;
+        std::cout << "neighspe2[" << i << "]:" << config.neighspe2[i] << std::endl;
     }
     std::cout << "dfBasis:" << config.dfbasis << std::endl;
 
     std::cout << "Comparing wigners" << std::endl;
     for (int i = 0; i < wigners.size(); i++)
     {
-        for (int j = 0; j < wigners[i].size(); j+=10)
+        for (int j = 0; j < wigners[i].size(); j += 10)
         {
             std::cout << wigners[i][j] << " ";
         }
@@ -1945,7 +1269,7 @@ void test_reading_SALTED_binary_file() {
     std::cout << "Comparing FPS" << std::endl;
     for (int i = 0; i < fps.size(); i++)
     {
-        for (int j = 0; j < fps[i].size(); j+=10)
+        for (int j = 0; j < fps[i].size(); j += 10)
         {
             std::cout << fps[i][j] << " ";
         }
@@ -1959,16 +1283,75 @@ void test_reading_SALTED_binary_file() {
 // Convert a row-major matrix to column-major format
 std::vector<double> rowToColMajor(const std::vector<double> &rowMajorMatrix, int rows, int cols)
 {
-    std::vector<double> colMajorMatrix(rows * cols);
+    std::vector<double> colMajorMatrix((size_t)rows * cols);
 
     for (int r = 0; r < rows; ++r)
     {
         for (int c = 0; c < cols; ++c)
         {
-            colMajorMatrix[c * rows + r] = rowMajorMatrix[r * cols + c];
+            colMajorMatrix[(size_t)c * rows + r] = rowMajorMatrix[(size_t)r * cols + c];
         }
     }
     return colMajorMatrix;
+}
+
+void test_solve_linear_equations() {
+    // Small, well-conditioned 3x3 test (precomputed)
+    // A * x_expected = b
+    const vec2 A = {
+        {3.0,  2.0, -1.0},
+        {2.0, -2.0,  4.0},
+        {-1.0, 0.5, -1.0}
+    };
+
+    // Precomputed true solution
+    const vec x_expected = { 1.0, -2.0, -2.0 };
+
+    // Build right-hand side b = A * x_expected
+    vec b(3, 0.0);
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            b[i] += A[i][j] * x_expected[j];
+
+    // Keep original RHS for logging if the test fails
+    vec b_orig = b;
+
+    // Call the solver -- it replaces b with the solution x (in-place)
+    solve_linear_system(A, b);
+
+    // Validate result
+    const double tol = 1e-9;
+    bool ok = true;
+    for (int i = 0; i < 3; ++i) {
+        if (std::abs(b[i] - x_expected[i]) > tol) {
+            std::cout << "test_solve_linear_equations: mismatch at index " << i
+                << " -> got " << std::setprecision(12) << b[i]
+                << " expected " << x_expected[i] << std::endl;
+            ok = false;
+        }
+    }
+
+    if (ok) {
+        std::cout << "test_solve_linear_equations: PASSED" << std::endl;
+    }
+    else {
+        std::cout << "test_solve_linear_equations: FAILED\n";
+        std::cout << "Matrix A:\n";
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j)
+                std::cout << std::setw(12) << A[i][j];
+            std::cout << std::endl;
+        }
+        std::cout << "Target   b: " << b_orig[0] << " " << b_orig[1] << " " << b_orig[2] << std::endl;
+        std::cout << "Original x: ";
+        for (double v : x_expected) std::cout << v << " ";
+        std::cout << std::endl;
+        std::cout << "Returned x: ";
+        for (double v : b) std::cout << v << " ";
+        std::cout << std::endl;
+        // Make test harness detect failure
+        exit(1);
+    }
 }
 
 void test_NNLS()
@@ -1984,12 +1367,12 @@ void test_NNLS()
         26.45556121, 77.42336894, 45.61503322, 56.84339489, 1.87898004,
         61.76354971, 61.20957227, 61.69339969, 94.37480785, 68.18202991,
         35.95079006, 43.70319538, 69.76311959, 6.02254716, 66.67667154,
-        67.06378696, 21.03825611, 12.89262977, 31.54283509, 36.37107709};
-     //Dimensions
+        67.06378696, 21.03825611, 12.89262977, 31.54283509, 36.37107709 };
+    //Dimensions
     const int m = 10; // Number of rows
     const int n = 5;  // Number of columns
-     //Right-hand side vector B
-    std::vector<double> B_in = {57.01967704, 43.86015135, 98.83738381, 10.20448107, 20.88767561, 16.13095179, 65.31083255, 25.32916025, 46.63107729, 24.4425592};
+    //Right-hand side vector B
+    std::vector<double> B_in = { 57.01967704, 43.86015135, 98.83738381, 10.20448107, 20.88767561, 16.13095179, 65.31083255, 25.32916025, 46.63107729, 24.4425592 };
 
     dMatrix1 B(B_in.size());
     std::copy(B_in.begin(), B_in.end(), B.data());
@@ -2011,7 +1394,7 @@ void test_NNLS()
     std::cout << "Residual: " << res.rnorm << std::endl;
 
     // Check vs correct solution
-    std::vector<double> correct = {0.00370583, 0.58600469, 0.14755389, 0.04786599, 0.0};
+    std::vector<double> correct = { 0.00370583, 0.58600469, 0.14755389, 0.04786599, 0.0 };
     for (int i = 0; i < res.x.size(); i++)
     {
         if (std::abs(res.x[i] - correct[i]) > 1E-8)
@@ -2059,48 +1442,683 @@ void test_NNLS()
 //     case 2: result = p * 7.5 * (7. * x * x - 1.) * s * s; break;
 //     case 3: result = p * 105. * x * s * s * s; break;
 //     case 4: result = p * 105. * s * s * s * s; break;
-//     }; break;
-//     case 5: switch (m_) {
-//     case 0: result = 0.125 * x * (63. * x * x * x * x - 70. * x * x + 15.); break;
-//     case 1: result = p * 1.875 * (21. * x * x * x * x - 14. * x * x + 1.) * s; break;
-//     case 2: result = p * 52.5 * x * (3. * x * x - 1.) * s * s; break;
-//     case 3: result = p * 52.5 * (9. * x * x - 1.) * s * s * s; break;
-//     case 4: result = p * 945. * x * s * s * s * s; break;
-//     case 5: result = p * 945. * s * s * s * s * s; break;
-//     }; break;
-//     case 6: switch (m_) {
-//     case 0: result = 0.0625 * (231. * x * x * x * x * x * x - 315. * x * x * x * x + 105. * x * x - 5.); break;
-//     case 1: result = p * 2.625 * x * (33. * x * x * x * x - 30. * x * x + 5.) * s; break;
-//     case 2: result = p * 13.125 * (33. * x * x * x * x - 18. * x * x + 1.) * s * s; break;
-//     case 3: result = p * 157.5 * x * (11. * x * x - 3.) * s * s * s; break;
-//     case 4: result = p * 472.5 * (11. * x * x - 1.) * s * s * s * s; break;
-//     case 5: result = p * 10395. * x * s * s * s * s * s; break;
-//     case 6: result = p * 10395. * s * s * s * s * s * s; break;
-//     }; break;
-//     case 7: switch (m_) {
-//     case 0: result = 0.0625 * x * (429. * x * x * x * x * x * x - 693. * x * x * x * x + 315. * x * x - 35.); break;
-//     case 1: result = p * 0.4375 * (429. * x * x * x * x * x * x - 495. * x * x * x * x + 135. * x * x - 5.) * s; break;
-//     case 2: result = p * 7.875 * x * (143. * x * x * x * x - 110. * x * x + 15.) * s * s; break;
-//     case 3: result = p * 39.375 * (143. * x * x * x * x - 66. * x * x + 3.) * s * s * s; break;
-//     case 4: result = p * 1732.5 * x * (13. * x * x - 3.) * s * s * s * s; break;
-//     case 5: result = p * 5197.5 * (13. * x * x - 1.) * s * s * s * s * s; break;
-//     case 6: result = p * 135135. * x * s * s * s * s * s * s; break;
-//     case 7: result = p * 135135. * s * s * s * s * s * s * s; break;
-//     }; break;
-//     case 8: switch (m_) {
-//     case 0: result = 0.0078125 * (6435. * x * x * x * x * x * x * x * x - 12012. * x * x * x * x * x * x + 6930. * x * x * x * x - 1260. * x * x + 35.); break;
-//     case 1: result = p * 0.5625 * x * (715. * x * x * x * x * x * x - 1001. * x * x * x * x + 385. * x * x - 35.) * s; break;
-//     case 2: result = p * 19.6875 * (143. * x * x * x * x * x * x - 143. * x * x * x * x + 33. * x * x - 1.) * s * s; break;
-//     case 3: result = p * 433.125 * x * (39. * x * x * x * x - 26. * x * x + 3.) * s * s * s; break;
-//     case 4: result = p * 1299.375 * (65. * x * x * x * x - 26. * x * x + 1.) * s * s * s * s; break;
-//     case 5: result = p * 67567.5 * x * (5. * x * x - 1.) * s * s * s * s * s; break;
-//     case 6: result = p * 67567.5 * (15. * x * x - 1.) * s * s * s * s * s * s; break;
-//     case 7: result = p * 2027025. * x * s * s * s * s * s * s * s; break;
-//     case 8: result = p * 2027025. * s * s * s * s * s * s * s * s; break;
-//     }; break;
-//     };
-//     return result;
-// }
+
+// ================================================================
+// PROFILING SUITE: run_profiling_tests
+// ================================================================
+//
+// Runs every code path exercised by tests/tests.toml in a single
+// process so a MSVC / clang-cl profiler session can cover all of
+// them without spawning subprocesses.
+//
+// Each test is wrapped in a PROFILING_NOINLINE function so that
+// its name appears as a distinct frame in the VS CPU-Profiler call
+// tree (sampling mode) or Instrumentation timeline.
+//
+// Profiler usage (Visual Studio):
+//   1. Build a Release config that retains debug info (/Zi).
+//   2. Start a "CPU Usage" or "Instrumentation" session.
+//   3. The call tree shows each profiling_<testname> frame.
+//   4. OutputDebugStringA markers appear in the VS Output window
+//      and as Events in the Concurrency Visualizer.
+//
+// Usage:
+//   run_profiling_tests(std::filesystem::path("tests"));
+//
+// Pre-conditions:
+//   - Caller's CWD should be the repository root.
+//   - All test input data must be present in the tests/ directory.
+//   - OCC_DATA_PATH must be set (or occ/share reachable from exe).
+// ================================================================
+
+// Forward declaration for fchk_conversion test. Defined in fchk.cpp.
+// Using a plain declaration (no default arg) to avoid redeclaration
+// conflicts when fchk.h is subsequently included in the same TU.
+bool free_fchk(std::ostream &file,
+    const std::filesystem::path &fchk_name,
+    const std::filesystem::path &basis_set_path,
+    WFN &wave,
+    const bool &debug,
+    bool force_overwrite);
+
+// ---- Cross-platform no-inline attribute ----
+// Makes each test function appear as a named frame in the profiler.
+#if defined(_MSC_VER) || (defined(__clang__) && defined(_WIN32))
+#  define PROFILING_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#  define PROFILING_NOINLINE __attribute__((noinline))
+#else
+#  define PROFILING_NOINLINE
+#endif
+
+// Emit a named section marker.
+// On Windows the OutputDebugStringA call appears in the VS debugger
+// Output window and as a named event in the Concurrency Visualizer.
+static void _profmark(const char *name) {
+#if defined(_WIN32) && defined(WINAPI)
+    ::OutputDebugStringA(("[PROFILING SECTION] " + std::string(name) + "\n").c_str());
+#endif
+    std::cout << "\n[PROFILING] ===== " << name << " =====\n" << std::flush;
+}
+
+// Cross-platform directory change using std::filesystem (C++17).
+static void _prof_cwd(const std::filesystem::path &p) {
+    std::filesystem::current_path(p);
+}
+
+// ================================================================
+// Individual per-test wrapper functions
+// ================================================================
+
+// ---- Test: alanine_occ ----------------------------------------
+// Standard .fchk wavefunction + CIF + dmin, single-wfn tsc path.
+PROFILING_NOINLINE
+static void profiling_alanine_occ(const std::filesystem::path &dir)
+{
+    _profmark("alanine_occ");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.cif = "alanine.cif";
+    opt.dmin = 0.5;
+    opt.wfn = "alanine.owf.fchk";
+    opt.accuracy = 1;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: alanine_integrated_occ ----------------------------
+// OCC .toml wavefunction calculation + CIF + dmin (OCC SCF -> tsc).
+PROFILING_NOINLINE
+static void profiling_alanine_integrated_occ(const std::filesystem::path &dir)
+{
+    _profmark("alanine_integrated_occ");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.occ = "alanine.toml";
+    opt.cif = "alanine.cif";
+    opt.dmin = 0.5;
+    opt.accuracy = 1;
+    std::vector<WFN> wavy;
+    occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
+    occ::log::set_log_file("NoSpherA2_OCC.log");
+    occ::parallel::set_num_threads(config.runtime.threads);
+    wavy.emplace_back(occ::main::run_scf_external(config, true));
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: disorder_THPP -------------------------------------
+// Multi-wfn (mtc) with disorder groups; wfx files + hkl.
+PROFILING_NOINLINE
+static void profiling_disorder_THPP(const std::filesystem::path &dir)
+{
+    _profmark("disorder_THPP");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.cif = "thpp.cif";
+    opt.hkl = "thpp.hkl";
+    opt.accuracy = 1;
+    opt.combined_tsc_calc = true;
+    opt.groups.pop_back();   // remove the default empty group
+    opt.combined_tsc_calc_files = {
+        "olex2/Wfn_job/Part_1/thpp.wfx",
+        "olex2/Wfn_job/Part_2/thpp.wfx"
+    };
+    // Group strings "0.1" -> {0,1}, "0.2" -> {0,2}
+    opt.groups = { {0, 1}, {0, 2} };
+    opt.combined_tsc_calc_mult = { 1, 1 };
+    opt.combined_tsc_calc_ECP = { 0, 0 };
+    opt.combined_tsc_calc_charge = { 0, 0 };
+    std::vector<WFN> wavy;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        wavy.emplace_back(opt.combined_tsc_calc_files[i], opt.debug);
+        wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+        wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+    }
+    svec known;
+    vec2 known_kpts;
+    itsc_block result;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        known = result.get_scatterers();
+        result.append(
+            calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+                opt, wavy, std::cout, known, i, &known_kpts),
+            std::cout);
+    }
+    result.write_tscb_file();
+}
+
+// ---- Test: fourier_transform ----------------------------------
+// Analytical Fourier transform self-test (non-full variant).
+PROFILING_NOINLINE
+static void profiling_fourier_transform(const std::filesystem::path &dir)
+{
+    _profmark("fourier_transform");
+    _prof_cwd(dir);
+    test_analytical_fourier(false);
+}
+
+// ---- Test: fractal --------------------------------------------
+// Fractal dimension calculation from a difference cube file.
+PROFILING_NOINLINE
+static void profiling_fractal(const std::filesystem::path &dir)
+{
+    _profmark("fractal");
+    _prof_cwd(dir);
+    WFN dummy(e_origin::NOT_YET_DEFINED);
+    cube residual("sucrose_diff.cube", true, dummy, std::cout, false);
+    residual.fractal_dimension(0.01);
+}
+
+// ---- Test: grown_water ----------------------------------------
+// Standard wfx + .hkl path (grown water fragment).
+PROFILING_NOINLINE
+static void profiling_grown_water(const std::filesystem::path &dir)
+{
+    _profmark("grown_water");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.cif = "water.cif";
+    opt.hkl = "water.hkl";
+    opt.wfn = "water.wfx";
+    opt.accuracy = 1;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: Hybrid_mode ----------------------------------------
+// Multi-wfn mtc with .gbw files + dmin (hybrid disorder).
+PROFILING_NOINLINE
+static void profiling_Hybrid_mode(const std::filesystem::path &dir)
+{
+    _profmark("Hybrid_mode");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.cif = "ZP2.cif";
+    opt.dmin = 0.9;
+    opt.accuracy = 1;
+    opt.combined_tsc_calc = true;
+    opt.groups.pop_back();
+    opt.combined_tsc_calc_files = { "ZP2_part1.gbw", "ZP2_part2.gbw" };
+    opt.groups = { {0, 1}, {0, 2} };
+    opt.combined_tsc_calc_mult = { 1, 1 };
+    opt.combined_tsc_calc_charge = { 0, 0 };
+    opt.combined_tsc_calc_ECP = { 0, 0 };
+    std::vector<WFN> wavy;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        wavy.emplace_back(opt.combined_tsc_calc_files[i], opt.debug);
+        wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+        wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+    }
+    svec known;
+    vec2 known_kpts;
+    itsc_block result;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        known = result.get_scatterers();
+        result.append(
+            calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+                opt, wavy, std::cout, known, i, &known_kpts),
+            std::cout);
+    }
+    result.write_tscb_file();
+}
+
+// ---- Test: malbac_SF_ECP -------------------------------------
+// .gbw wavefunction + ECP corrections (ECP mode 1 = def2-ECP).
+PROFILING_NOINLINE
+static void profiling_malbac_SF_ECP(const std::filesystem::path &dir)
+{
+    _profmark("malbac_SF_ECP");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.cif = "malbac.cif";
+    opt.hkl = "malbac.hkl";
+    opt.wfn = "malbac.gbw";
+    opt.accuracy = 1;
+    opt.ECP = true;
+    opt.ECP_mode = 1;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: openBLAS ------------------------------------------
+// MKL / Accelerate BLAS linear-algebra self-test.
+PROFILING_NOINLINE
+static void profiling_openBLAS(const std::filesystem::path &dir)
+{
+    _profmark("openBLAS");
+    _prof_cwd(dir);
+    test_openblas();
+    test_solve_linear_equations();
+}
+
+// ---- Test: properties ----------------------------------------
+// Cube property calculations: Laplacian, RDG, ELI, deformation density.
+PROFILING_NOINLINE
+static void profiling_properties(const std::filesystem::path &dir)
+{
+    _profmark("properties");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.wfn = "olex2/Wfn_job/sucrose.wfx";
+    opt.cif = "sucrose.cif";
+    opt.properties.lap = true;
+    opt.properties.rdg = true;
+    opt.properties.def = true;
+    opt.properties.eli = true;
+    opt.properties.resolution = 1.5;
+    properties_calculation(opt);
+}
+
+// ---- Test: reading_SALTED ------------------------------------
+// SALTED binary model file I/O self-test.
+PROFILING_NOINLINE
+static void profiling_reading_SALTED(const std::filesystem::path &dir)
+{
+    _profmark("reading_SALTED");
+    _prof_cwd(dir);
+    test_reading_SALTED_binary_file();
+}
+
+// ---- Test: ri_fit --------------------------------------------
+// RI density fitting with the combo_basis_fit auxiliary basis.
+PROFILING_NOINLINE
+static void profiling_ri_fit(const std::filesystem::path &dir)
+{
+    _profmark("ri_fit");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.wfn = "epoxide.gbw";
+    opt.cif = "epoxide.cif";
+    opt.dmin = 0.4;
+    opt.RI_FIT = true;
+    opt.partition_type = PartitionType::RI;
+    opt.aux_basis.push_back(BasisSetLibrary::get_basis_set("combo_basis_fit"));
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: rubredoxin_cmtc -----------------------------------
+// CIF-based multi-tsc-calc (cmtc) with four residue fragments.
+PROFILING_NOINLINE
+static void profiling_rubredoxin_cmtc(const std::filesystem::path &dir)
+{
+    _profmark("rubredoxin_cmtc");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.hkl = "1yk4_h.hkl";
+    opt.accuracy = 1;
+    opt.cif_based_combined_tsc_calc = true;
+    opt.groups.pop_back();
+    opt.combined_tsc_calc_files = {
+        "residues/1.gbw",
+        "residues/2.gbw",
+        "residues/3.gbw",
+        "residues/4.gbw"
+    };
+    opt.combined_tsc_calc_cifs = {
+        "residues/1.cif",
+        "residues/2.cif",
+        "residues/3.cif",
+        "residues/4.cif"
+    };
+    // Group strings "0" -> {0}, "0.1" -> {0,1}, "0.2" -> {0,2}, "0" -> {0}
+    opt.groups = { {0}, {0, 1}, {0, 2}, {0} };
+    opt.combined_tsc_calc_mult = { 1, 1, 1, 1 };
+    opt.combined_tsc_calc_charge = { 0, 0, 0, 0 };
+    opt.combined_tsc_calc_ECP = { 0, 0, 0, 0 };
+    std::vector<WFN> wavy;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        wavy.emplace_back(opt.combined_tsc_calc_files[i], opt.debug);
+        wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+        wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+    }
+    svec known;
+    vec2 known_kpts;
+    itsc_block result;
+    for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++) {
+        known = result.get_scatterers();
+        result.append(
+            calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+                opt, wavy, std::cout, known, i, &known_kpts),
+            std::cout);
+    }
+    result.write_tscb_file();
+}
+
+// ---- Test: SALTED -------------------------------------------
+// SALTED ML model -> electron density -> scattering factors.
+PROFILING_NOINLINE
+static void profiling_SALTED(const std::filesystem::path &dir)
+{
+    _profmark("SALTED");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.SALTED = true;
+    opt.salted_model_dir = "Model";
+    opt.cif = "test_cysteine.cif";
+    opt.wfn = "test_cysteine.xyz";
+    opt.dmin = 0.73;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    SALTEDPredictor *pred = new SALTEDPredictor(wavy[0], opt);
+    std::string df_basis_name = pred->get_dfbasis_name();
+    std::shared_ptr<BasisSet> aux_basis_salted = BasisSetLibrary::get_basis_set(df_basis_name);
+    load_basis_into_WFN(pred->wavy, aux_basis_salted);
+    auto res = calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
+        opt, *pred, std::cout, empty, 0);
+    res.write_tscb_file();
+    delete pred;
+}
+
+// ---- Test: sucrose_IAM ----------------------------------------
+// Thakkar IAM scattering factors computed from an xyz file.
+PROFILING_NOINLINE
+static void profiling_sucrose_IAM(const std::filesystem::path &dir)
+{
+    _profmark("sucrose_IAM");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.cif = "sucrose.cif";
+    opt.hkl = "sucrose.hkl";
+    opt.xyz_file = "sucrose.xyz";
+    opt.iam_switch = true;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.xyz_file, opt.debug);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: sucrose_ptb ----------------------------------------
+// pTB extended tight-binding wavefunction path (ECP mode 3).
+PROFILING_NOINLINE
+static void profiling_sucrose_ptb(const std::filesystem::path &dir)
+{
+    _profmark("sucrose_ptb");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.cif = "sucrose.cif";
+    opt.dmin = 0.8;
+    opt.wfn = "wfn.xtb";
+    opt.mult = 0;
+    opt.charge = 0;
+    opt.accuracy = 1;
+    opt.ECP = true;
+    opt.ECP_mode = 3;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: sucrose_SF -----------------------------------------
+// Standard sucrose .wfx + hkl scattering factor calculation.
+PROFILING_NOINLINE
+static void profiling_sucrose_SF(const std::filesystem::path &dir)
+{
+    _profmark("sucrose_SF");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.cif = "sucrose.cif";
+    opt.hkl = "olex2/Wfn_job/sucrose.hkl";
+    opt.wfn = "olex2/Wfn_job/sucrose.wfx";
+    opt.accuracy = 1;
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: sucrose_twin ---------------------------------------
+// Scattering factor calculation with a 3x3 twin law applied.
+PROFILING_NOINLINE
+static void profiling_sucrose_twin(const std::filesystem::path &dir)
+{
+    _profmark("sucrose_twin");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.cif = "sucrose.cif";
+    opt.hkl = "olex2/Wfn_job/sucrose.hkl";
+    opt.wfn = "olex2/Wfn_job/sucrose.wfx";
+    opt.accuracy = 1;
+    opt.twin_law.resize(1);
+    opt.twin_law[0] = { 1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 1.0, -2.0 };
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: wfn_reading ----------------------------------------
+// Read a legacy .wfn file and compute scattering factors.
+PROFILING_NOINLINE
+static void profiling_wfn_reading(const std::filesystem::path &dir)
+{
+    _profmark("wfn_reading");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.hkl = "test.hkl";
+    opt.accuracy = 1;
+    opt.cif = "test.cif";
+    opt.wfn = "test.wfn";
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    opt.groups[0].push_back(0);
+    svec empty;
+    auto res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+        opt, wavy, std::cout, empty, 0);
+    res.write_tscb_file();
+}
+
+// ---- Test: fchk_conversion (full) ----------------------------
+// Read a legacy .ffn wavefunction and convert it to a Gaussian
+// .fchk file using the specified basis set directory.
+// Marked "full" in tests.toml; run_profiling_tests always exercises
+// this path so the fchk-conversion code is present in the profile.
+PROFILING_NOINLINE
+static void profiling_fchk_conversion(const std::filesystem::path &dir)
+{
+    _profmark("fchk_conversion");
+    _prof_cwd(dir);
+    options opt;
+    opt.no_date = true;
+    opt.all_charges = true;
+    opt.wfn = "in.ffn";
+    opt.basis_set = "dev2-TZVP";
+    opt.basis_set_path = "./";
+    opt.fchk = "in.fchk";   // explicit output path
+    std::vector<WFN> wavy;
+    wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+    wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    std::filesystem::path tmp = opt.basis_set_path / opt.basis_set;
+    wavy[0].set_basis_set_name(tmp.string());
+    wavy[0].assign_charge(wavy[0].calculate_charge());
+    wavy[0].guess_multiplicity(std::cout);
+    free_fchk(std::cout, opt.fchk, tmp, wavy[0], opt.debug, true);
+}
+
+// ---- Test: fourier_transform_full (full) ---------------------
+// Full (heavier) analytical Fourier transform self-test.
+PROFILING_NOINLINE
+static void profiling_fourier_transform_full(const std::filesystem::path &dir)
+{
+    _profmark("fourier_transform_full");
+    _prof_cwd(dir);
+    test_analytical_fourier(true);
+}
+
+// ================================================================
+// Main orchestrator
+// ================================================================
+//
+// Runs all 21 test paths from tests/tests.toml in sequence.
+// Each call is wrapped in a PROFILING_NOINLINE function so that
+// the VS profiler call tree labels each test by name.
+//
+// The CWD is restored to the original after every test so that
+// relative paths used in later tests remain valid.
+// ================================================================
+void run_profiling_tests(const std::filesystem::path &tests_root)
+{
+    const std::filesystem::path orig = std::filesystem::current_path();
+
+    // ---- Quick tests (always run) ----
+    profiling_alanine_occ(tests_root / "alanine_occ");
+    std::filesystem::current_path(orig);
+
+    profiling_alanine_integrated_occ(tests_root / "alanine_integrated_occ");
+    std::filesystem::current_path(orig);
+
+    profiling_disorder_THPP(tests_root / "disorder");
+    std::filesystem::current_path(orig);
+
+    //profiling_fourier_transform(tests_root / "SALTED");
+    //std::filesystem::current_path(orig);
+
+    profiling_fractal(tests_root / "sucrose_fchk_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_grown_water(tests_root / "grown");
+    std::filesystem::current_path(orig);
+
+    profiling_Hybrid_mode(tests_root / "Hybrid");
+    std::filesystem::current_path(orig);
+
+    profiling_malbac_SF_ECP(tests_root / "ECP_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_openBLAS(tests_root / "OpenBLAS");
+    std::filesystem::current_path(orig);
+
+    profiling_properties(tests_root / "sucrose_fchk_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_reading_SALTED(tests_root / "SALTED");
+    std::filesystem::current_path(orig);
+
+    profiling_ri_fit(tests_root / "epoxide_gbw");
+    std::filesystem::current_path(orig);
+
+    profiling_rubredoxin_cmtc(tests_root / "rubredoxin_cmtc");
+    std::filesystem::current_path(orig);
+
+    profiling_SALTED(tests_root / "SALTED");
+    std::filesystem::current_path(orig);
+
+    profiling_sucrose_IAM(tests_root / "sucrose_IAM_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_sucrose_ptb(tests_root / "sucrose_IAM_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_sucrose_SF(tests_root / "sucrose_fchk_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_sucrose_twin(tests_root / "sucrose_fchk_SF");
+    std::filesystem::current_path(orig);
+
+    profiling_wfn_reading(tests_root / "wfn_reading");
+    std::filesystem::current_path(orig);
+
+    // ---- Full tests (heavier, gated by RUN_FULL_TEST in pytest) ----
+    //profiling_fchk_conversion(tests_root / "NiP3_fchk");
+    //std::filesystem::current_path(orig);
+
+    //profiling_fourier_transform_full(tests_root / "SALTED");
+    //std::filesystem::current_path(orig);
+
+    std::cout << "\n[PROFILING] All 21 test paths completed.\n" << std::flush;
+}
 
 // TESTING THE FOURIER BESSEL TRANSFORM for WAVE FUNCTIONS
 // cdouble S_n_recursion(int n, double H, double b);

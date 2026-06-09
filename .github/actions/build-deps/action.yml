@@ -1,0 +1,209 @@
+name: 'Build Dependencies'
+description: 'Build platform-specific dependencies'
+inputs:
+  platform:
+    description: 'Target platform'
+    required: true
+  upload_libs:
+    description:  >
+      This was created to make available the built libraries as artifacts.
+    required: false
+    type: boolean
+    default: false
+
+runs:
+  using: 'composite'
+  steps:
+  #SETUP RUST STUFF
+    - name: Setup Cargo environment (Unix)
+      if: inputs.platform != 'Windows'
+      shell: bash
+      run: |
+        # Ensure cargo is in PATH and verify version
+        source ~/.cargo/env || true
+        export PATH="$HOME/.cargo/bin:$PATH"
+        echo "PATH=$HOME/.cargo/bin:$PATH" >> $GITHUB_ENV
+        
+        # Verify we have the right version
+        cargo --version
+        rustc --version
+
+    - name: Setup Cargo environment (Windows)
+      if: inputs.platform == 'Windows'
+      shell: powershell
+      run: |
+        # Ensure cargo is in PATH
+        $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+        
+        # Verify we have the right version
+        & "$env:USERPROFILE\.cargo\bin\cargo.exe" --version
+        & "$env:USERPROFILE\.cargo\bin\rustc.exe" --version
+
+  #BUILD DEPENDENCIES USING MAKEFILE TARGETS
+    - name: Build deps (macOS ARM64)
+      if: inputs.platform == 'Mac_ARM64'
+      shell: bash
+      run: |
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        export PATH="$HOME/.cargo/bin:$PATH"
+        make featomic_arm64 LibCint_arm64 occ_arm64 BasisSetConverter_arm64 -j
+
+    - name: Build deps (macOS x86_64)
+      if: inputs.platform == 'Mac_x86_64'
+      shell: bash
+      run: |
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        export PATH="$HOME/.cargo/bin:$PATH"
+        make featomic_x86_64 LibCint_x86_64 occ_x86_64 BasisSetConverter_x86_64 -j
+
+
+    - name: Build deps (Linux)
+      if: inputs.platform == 'Linux'
+      shell: bash
+      run: |
+        source ~/.cargo/env || true
+        export PATH="$HOME/.cargo/bin:$PATH"
+        make IntelMKL featomic LibCint occ BasisSetConverter -j3
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/Lib/MKL/compiler/2025.2/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+    - name: Build dependencies (Windows)
+      if: inputs.platform == 'Windows'
+      shell: powershell
+      run: |
+        # Ensure cargo is in PATH
+        $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+
+        #Build Intel MKL
+        # Ensure nuget.exe is available
+        if (-not (Get-Command nuget -ErrorAction SilentlyContinue)) {
+          choco install nuget.commandline -y
+        }
+
+        New-Item -ItemType Directory -Force -Path Windows\packages_mkl | Out-Null
+        nuget install intelmkl.static.win-x64 -OutputDirectory Windows\packages_mkl -ExcludeVersion
+
+        # Absolute path to the packages folder
+        $packages = Join-Path $env:GITHUB_WORKSPACE "Windows\packages_mkl"
+        $propsPath = Join-Path $env:GITHUB_WORKSPACE "Windows\MKL.auto.props"
+
+        $xml = '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">' +
+               "`n  <PropertyGroup>`n" +
+               "    <MKLROOT>$packages</MKLROOT>`n" +
+               "  </PropertyGroup>`n</Project>`n"
+
+        Set-Content -Path $propsPath -Value $xml -Encoding UTF8
+        Write-Host "Wrote $propsPath"
+
+        #Build featomic
+        if (-not (Test-Path "Lib\featomic_install\lib\metatensor.lib")) {
+          Write-Host "Building featomic for Windows"
+          cd featomic\featomic
+          $buildDir = "build"
+          if (-not (Test-Path $buildDir)) {
+            mkdir $buildDir
+          }
+          cd $buildDir
+          cmake -G "Visual Studio 17 2022" ${{ env.FEATOMIC_CMAKE_FLAGS }} -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
+          msbuild -nologo .\featomic.sln -p:Configuration=Release
+          msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
+        } else {
+          Write-Host "Skipping featomic build, already exists"
+        }
+
+        #Build LibCint
+        $build = Join-Path $env:GITHUB_WORKSPACE "libcint\build"
+        $outDir = Join-Path $env:GITHUB_WORKSPACE "Lib\LibCint\lib"
+
+        if (!(Test-Path $outDir)) {
+          Write-Host "Building LibCint for Windows..."
+
+          New-Item -ItemType Directory -Force -Path $build | Out-Null
+          Push-Location $build
+
+          cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DPYPZPX="ON" -DCMAKE_INSTALL_PREFIX="../../Lib/LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" ..
+          cmake --build . --config RELEASE
+          cmake --install .
+        }
+        else {
+          Write-Host "Skipping LibCint build, $outDir already exists"
+        }
+        
+        #Build OCC
+        $OccOut = Join-Path $env:GITHUB_WORKSPACE "Lib\occ\lib\occ_main.lib"
+        if (Test-Path $OccOut) {
+          Write-Host "OCC already built ($OccOut)"
+        } else {
+          Write-Host "Building OCC..."
+          Push-Location $env:GITHUB_WORKSPACE
+          try {
+            cmake --workflow --preset windows-clang-cl
+            cmake --install .\build-windows-clang-cl
+            $tbbLib = Get-ChildItem `
+              -Path (Join-Path $env:GITHUB_WORKSPACE "build-windows-clang-cl") `
+              -Recurse `
+              -Filter "tbb12.lib" `
+              -ErrorAction SilentlyContinue |
+              Select-Object -First 1 -ExpandProperty FullName
+            Copy-Item $tbbLib -Destination (Join-Path $env:GITHUB_WORKSPACE "Lib\occ\lib\tbb12.lib") -Force
+          } finally {
+            Pop-Location
+          }
+          if (-not (Test-Path $OccOut)) { Write-Error "OCC build finished but output not found: $OccOut" }
+            Write-Host "OCC OK"
+        }
+
+        #Build BasisSetConverter
+        $converterExe = Join-Path $env:GITHUB_WORKSPACE "Lib/BasisSetConverter.exe"
+        if (Test-Path $converterExe) {
+          Write-Host "BasisSetConverter already built ($converterExe)"
+        } else {
+          $src = Join-Path $env:GITHUB_WORKSPACE "BasisSetGenerator"
+          $bld = Join-Path $src "build"
+          if (-not (Test-Path $bld)) { New-Item -ItemType Directory $bld | Out-Null }
+
+          Push-Location $src
+          try {
+            cmake -S . -B build
+            cmake --build build --config Release
+            cmake --install build --config Release --prefix "../Lib"
+          } finally {
+            Pop-Location
+          }
+
+          if (-not (Test-Path $converterExe)) { Fail "BasisSetConverter build finished but executable not found: $converterExe" }
+          Write-Host "BasisSetConverter OK"
+        }
+
+    - name: Prepare library archive layout (Unix)
+      if: fromJSON(inputs.upload_libs) && inputs.platform != 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        stage_dir="libraries_${{ inputs.platform }}"
+        rm -rf "$stage_dir"
+        mkdir -p "$stage_dir"
+
+        cp -a Lib/featomic_install* "$stage_dir/featomic_install_${{ inputs.platform }}"
+        cp -a Lib/occ* "$stage_dir/occ_${{ inputs.platform }}"
+        cp -a Lib/LibCint* "$stage_dir/LibCint_${{ inputs.platform }}"
+
+    - name: Prepare library archive layout (Windows)
+      if: fromJSON(inputs.upload_libs) && inputs.platform == 'Windows'
+      shell: powershell
+      run: |
+        $stageDir = "libraries_${{ inputs.platform }}"
+        if (Test-Path $stageDir) {
+          Remove-Item -Recurse -Force $stageDir
+        }
+        New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+
+        Copy-Item -Recurse -Force "Lib/featomic_install" (Join-Path $stageDir "featomic_install_${{ inputs.platform }}")
+        Copy-Item -Recurse -Force "Lib/occ" (Join-Path $stageDir "occ_${{ inputs.platform }}")
+        Copy-Item -Recurse -Force "Lib/LibCint" (Join-Path $stageDir "LibCint_${{ inputs.platform }}")
+
+    - name: Archive libraries
+      if: fromJSON(inputs.upload_libs)
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      with:
+        name: libraries_${{ inputs.platform }}
+        path: libraries_${{ inputs.platform }}

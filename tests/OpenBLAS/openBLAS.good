@@ -1,4 +1,4 @@
-Running Openblas test
+Running MKL/Accelerate test
 Testing matrices directly
 Matrices have size 10x10
 Matrices have size 10x10
@@ -24,3 +24,4 @@ Matrices have size 10x10
 Testing 2D x 1D matrix multiplication
 Matrices have size 12
 All BLAS tests passed!
+test_solve_linear_equations: PASSED

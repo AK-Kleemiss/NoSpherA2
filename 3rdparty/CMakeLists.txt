@@ -1,0 +1,89 @@
+include(ExternalProject)
+
+set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
+set(ENV{CMAKE_TRY_COMPILE_CONFIGURATION} Release)
+if (MSVC)
+    add_compile_options(/EHsc)
+endif ()
+
+# Ccache.cmake - include directly from submodule
+#if (NOT WIN32 AND NOT IS_ACTIONS)
+#    CPMAddPackage("gh:TheLartians/Ccache.cmake")
+#endif ()
+
+if (BUILD_RELEASE_OCC)
+    set(OCC_BUILD_MODE "Release")
+else ()
+    set(OCC_BUILD_MODE ${CMAKE_BUILD_TYPE})
+endif ()
+
+include(CMakePrintHelpers)
+
+# featomic - from submodule
+set(featomic_SOURCE_DIR ${CMAKE_SOURCE_DIR}/featomic)
+set(featomic_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/featomic-build)
+set(featomic_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/featomic-install)
+if (NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+    set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
+    set(MKL_LINK "static")
+    set(MKL_INTERFACE lp64)
+    include(${CMAKE_SOURCE_DIR}/cmake/micromamba.cmake)
+    file(SHA1  ${CMAKE_SOURCE_DIR}/environment.yml _ENV_HASH)
+    set(_SAVED_ENV_HASH "")
+    if (EXISTS ${CMAKE_BINARY_DIR}/env.sha1)
+        file(READ ${CMAKE_BINARY_DIR}/env.sha1 _SAVED_ENV_HASH OPTIONAL)
+        file(READ ${CMAKE_BINARY_DIR}/location MICROMAMBA_ENV_PATH)
+    endif ()
+    if (WIN32)
+        set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
+    else ()
+        set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}")
+    endif ()
+    if (NOT "${_SAVED_ENV_HASH}" STREQUAL "${_ENV_HASH}")
+        micromamba_environment(
+            NAME mambaenv
+            ENV_PATH "${ENV_PATH}"
+            SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
+        )
+        file(SHA1 ${CMAKE_SOURCE_DIR}/environment.yml _ENV_HASH)
+        file(WRITE ${CMAKE_BINARY_DIR}/env.sha1 ${_ENV_HASH})
+        file(WRITE ${CMAKE_BINARY_DIR}/location ${MICROMAMBA_ENV_PATH})
+        # Update the path after environment creation
+        if (WIN32)
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
+        else ()
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}")
+        endif ()
+    else()
+        if (WIN32)
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}/Library")
+        else ()
+            set(_ONEAPI_MKL_ROOT "${MICROMAMBA_ENV_PATH}")
+        endif ()
+    endif ()
+    set(MKL_THREADING intel_thread)
+    set(MKL_MPI intelmpi)
+    find_package(MKL CONFIG REQUIRED
+        HINTS "${_ONEAPI_MKL_ROOT}/lib/cmake"
+        PATH_SUFFIXES "mkl"
+    )
+    if (WIN32)
+        file(COPY "${_ONEAPI_MKL_ROOT}/bin/libiomp5md.dll" DESTINATION "${CMAKE_BINARY_DIR}")
+    else ()
+        file(COPY "${_ONEAPI_MKL_ROOT}/lib/libiomp5.so" DESTINATION "${CMAKE_BINARY_DIR}")
+    endif ()
+    message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
+    set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)
+    set(MKL_DLL_PATH "${_ONEAPI_MKL_ROOT}/bin" PARENT_SCOPE)
+    set(_ONEAPI_MKL_ROOT ${_ONEAPI_MKL_ROOT} PARENT_SCOPE)
+    list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
+endif ()
+
+if (WIN32)
+    set(WIN_FLAGS
+        -DGG_NO_PRAGMA=ON
+        -DCPACK_SYSTEM_NAME=windows
+        "-DCMAKE_CXX_FLAGS=-D__TBB_DYNAMIC_LOAD_ENABLED=0"
+    )
+endif ()
+set(MICROMAMBA_ENV_PATH ${MICROMAMBA_ENV_PATH} PARENT_SCOPE)
