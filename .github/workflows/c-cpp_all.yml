@@ -44,7 +44,6 @@ jobs:
             artifact-path: |
               Mac/NoSpherA2_arm64
               Mac/libomp.dylib
-              Mac/libtbbmalloc_proxy.dylib
               Mac/libtbbmalloc.dylib
 
 
@@ -56,7 +55,6 @@ jobs:
             artifact-path: |
               Mac/NoSpherA2_x86_64
               Mac/libomp.dylib
-              Mac/libtbbmalloc_proxy.dylib
               Mac/libtbbmalloc.dylib
 
           - os: ubuntu-latest
@@ -66,7 +64,6 @@ jobs:
             artifact-path: |
               NoSpherA2
               libiomp5.so
-              libtbbmalloc_proxy.so.2
               libtbbmalloc.so.2
 
           - os: windows-2022
@@ -190,11 +187,7 @@ jobs:
         # Make executable
         chmod +x ./universal/NoSpherA2_Mac
 
-        # Combine arch-specific tbbmalloc dylibs into universal fat dylibs
-        lipo -create \
-          ./arm64/libtbbmalloc_proxy.dylib \
-          ./x86_64/libtbbmalloc_proxy.dylib \
-          -output ./universal/libtbbmalloc_proxy.dylib
+        # Combine arch-specific tbbmalloc dylibs into a universal fat dylib
         lipo -create \
           ./arm64/libtbbmalloc.dylib \
           ./x86_64/libtbbmalloc.dylib \
@@ -212,7 +205,6 @@ jobs:
         name: executable_MacOS_Universal
         path: |
           ./universal/NoSpherA2_Mac
-          ./universal/libtbbmalloc_proxy.dylib
           ./universal/libtbbmalloc.dylib
           ./universal/libomp.dylib
 

@@ -201,7 +201,9 @@ namespace NosTestFramework
             std::filesystem::copy_options::overwrite_existing);
 
         // OCC_DATA_PATH — injected for both in-process and subprocess runs.
-        std::string occDataPath = (repoRoot / "occ" / "share").string();
+        // The prebuilt OCC data lives at Lib/occ/share/occ (not occ/share,
+        // which is the gh-pages documentation checkout).
+        std::string occDataPath = (repoRoot / "Lib" / "occ" / "share" / "occ").string();
         SetEnvironmentVariableA("OCC_DATA_PATH", occDataPath.c_str());
 
         int exitCode = 0;

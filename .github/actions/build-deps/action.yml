@@ -46,7 +46,7 @@ runs:
       run: |
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         export PATH="$HOME/.cargo/bin:$PATH"
-        make featomic_arm64 LibCint_arm64 occ_arm64 tbbmalloc_proxy_arm64 BasisSetConverter_arm64 -j
+        make featomic_arm64 LibCint_arm64 occ_arm64 tbbmalloc_arm64 BasisSetConverter_arm64 -j
 
     - name: Build deps (macOS x86_64)
       if: inputs.platform == 'Mac_x86_64'
@@ -54,7 +54,7 @@ runs:
       run: |
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         export PATH="$HOME/.cargo/bin:$PATH"
-        make featomic_x86_64 LibCint_x86_64 occ_x86_64 tbbmalloc_proxy_x86_64 BasisSetConverter_x86_64 -j
+        make featomic_x86_64 LibCint_x86_64 occ_x86_64 tbbmalloc_x86_64 BasisSetConverter_x86_64 -j
 
     - name: Build deps (Linux)
       if: inputs.platform == 'Linux'
@@ -62,7 +62,7 @@ runs:
       run: |
         source ~/.cargo/env || true
         export PATH="$HOME/.cargo/bin:$PATH"
-        make IntelMKL featomic LibCint occ tbbmalloc_proxy BasisSetConverter -j3
+        make IntelMKL featomic LibCint occ tbbmalloc BasisSetConverter -j3
         echo "LD_LIBRARY_PATH=${{ github.workspace }}/Lib/MKL/compiler/2025.2/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
     - name: Build dependencies (Windows)

@@ -263,13 +263,21 @@ int main(int argc, char **argv)
             //If the files is a .toml file, we run OCC; otherwise we read it as a wfn file. This allows to easily run OCC for multiple files in one go, without having to run OCC separately for each file beforehand.
             if (opt.combined_tsc_calc_files[i].extension() == ".toml")
             {
-                ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
+                if (!ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
+                {
+                    std::cerr << "ERROR: OCC basis set data directory not found.\n"
+                              << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
+                              << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
+                    log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
+                    return 1;
+                }
                 log_file << "Running OCC for " << opt.combined_tsc_calc_files[i] << "..." << endl;
                 occ::io::OccInput config = occ::io::read_occ_input_file(opt.combined_tsc_calc_files[i].string());
                 std::filesystem::path log_path = opt.combined_tsc_calc_files[i].stem().string() + ".log";
                 occ::log::set_log_file(log_path.string());
                 occ::parallel::set_num_threads(config.runtime.threads);
                 wavy.emplace_back(occ::main::run_scf_external(config, true));
+                occ::main::shutdown();
                 wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
                 wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
                 if (opt.combined_tsc_calc_ECP[i] != 0)
@@ -412,11 +420,19 @@ int main(int argc, char **argv)
         if (opt.occ != "") {
             log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
             if (opt.occ.ends_with(".toml")) {
-                ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
+                if (!ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
+                {
+                    std::cerr << "ERROR: OCC basis set data directory not found.\n"
+                              << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
+                              << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
+                    log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
+                    return 1;
+                }
                 occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
                 occ::log::set_log_file("NoSpherA2_OCC.log");
                 occ::parallel::set_num_threads(config.runtime.threads);
                 wavy.emplace_back(occ::main::run_scf_external(config, true));
+                occ::main::shutdown();
             }
             else {
                 occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);

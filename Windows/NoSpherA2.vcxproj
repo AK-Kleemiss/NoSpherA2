@@ -270,11 +270,6 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <!-- Force tbbmalloc_proxy.dll to load at startup; its DllMain patches the
-           IAT so malloc/free/new/delete route through TBB's scalable allocator.
-           This makes OCC's integral-engine heap overwrite non-fatal: scalable_free
-           on a non-TBB (garbage) pointer falls back to a HeapFree that returns
-           FALSE silently, whereas ucrtbase's HeapFree raises STATUS_HEAP_CORRUPTION. -->
       <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -345,7 +340,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>C:\Users\Lukas\source\repos\NoSpherA2\Lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -380,7 +375,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>C:\Users\Lukas\source\repos\NoSpherA2\Lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -426,11 +421,6 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <!-- Force tbbmalloc_proxy.dll to load at startup; its DllMain patches the
-           IAT so malloc/free/new/delete route through TBB's scalable allocator.
-           This makes OCC's integral-engine heap overwrite non-fatal: scalable_free
-           on a non-TBB (garbage) pointer falls back to a HeapFree that returns
-           FALSE silently, whereas ucrtbase's HeapFree raises STATUS_HEAP_CORRUPTION. -->
       <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -598,11 +588,6 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <!-- Force tbbmalloc_proxy.dll to load at startup; its DllMain patches the
-           IAT so malloc/free/new/delete route through TBB's scalable allocator.
-           This makes OCC's integral-engine heap overwrite non-fatal: scalable_free
-           on a non-TBB (garbage) pointer falls back to a HeapFree that returns
-           FALSE silently, whereas ucrtbase's HeapFree raises STATUS_HEAP_CORRUPTION. -->
       <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -689,11 +674,6 @@
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_numint.lib;..\Lib\occ\lib\occ_ints.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\tbb12.lib;..\Lib\occ\lib\tbbmalloc_proxy.lib;..\Lib\occ\lib\tbbmalloc.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
-      <!-- Force tbbmalloc_proxy.dll to load at startup; its DllMain patches the
-           IAT so malloc/free/new/delete route through TBB's scalable allocator.
-           This makes OCC's integral-engine heap overwrite non-fatal: scalable_free
-           on a non-TBB (garbage) pointer falls back to a HeapFree that returns
-           FALSE silently, whereas ucrtbase's HeapFree raises STATUS_HEAP_CORRUPTION. -->
       <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -796,20 +776,11 @@
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/featomic_install/lib/featomic.lib;../Lib/featomic_install/lib/metatensor.lib;../Lib/LibCint/lib/cint.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;../Lib/occ/lib/tbb12.lib;../Lib/occ/lib/tbbmalloc_proxy.lib;../Lib/occ/lib/tbbmalloc.lib;..\Lib\occ\lib\dftd4.lib;..\Lib\occ\lib\fmt.lib;..\Lib\occ\lib\gau2grid_static.lib;..\Lib\occ\lib\libecpint_static.lib;..\Lib\occ\lib\occ_cg.lib;..\Lib\occ\lib\occ_core.lib;..\Lib\occ\lib\occ_crystal.lib;..\Lib\occ\lib\occ_descriptors.lib;..\Lib\occ\lib\occ_dft.lib;..\Lib\occ\lib\occ_disp.lib;..\Lib\occ\lib\occ_dma.lib;..\Lib\occ\lib\occ_driver.lib;..\Lib\occ\lib\occ_elastic_fit.lib;..\Lib\occ\lib\occ_geometry.lib;..\Lib\occ\lib\occ_gto.lib;..\Lib\occ\lib\occ_interaction.lib;..\Lib\occ\lib\occ_io.lib;..\Lib\occ\lib\occ_isosurface.lib;..\Lib\occ\lib\occ_main.lib;..\Lib\occ\lib\occ_opt.lib;..\Lib\occ\lib\occ_qm.lib;..\Lib\occ\lib\occ_numint.lib;..\Lib\occ\lib\occ_ints.lib;..\Lib\occ\lib\occ_sht.lib;..\Lib\occ\lib\occ_slater.lib;..\Lib\occ\lib\occ_solvent.lib;..\Lib\occ\lib\occ_xdm.lib;..\Lib\occ\lib\occ_xtb.lib;..\Lib\occ\lib\scn.lib;..\Lib\occ\lib\spdlog.lib;..\Lib\occ\lib\xc.lib;..\Lib\occ\lib\_subprocess.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
-      <!-- Force tbbmalloc_proxy.dll to load at startup; its DllMain patches the
-           IAT so malloc/free/new/delete route through TBB's scalable allocator.
-           This makes OCC's integral-engine heap overwrite non-fatal: scalable_free
-           on a non-TBB (garbage) pointer falls back to a HeapFree that returns
-           FALSE silently, whereas ucrtbase's HeapFree raises STATUS_HEAP_CORRUPTION. -->
       <AdditionalOptions>/INCLUDE:__TBB_malloc_proxy %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(OutputPath)NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe
-copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc_proxy.dll" "$(OutDir)"
-copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc.dll" "$(OutDir)"
-copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc_proxy.dll" D:\devel\rundir-py3\tbbmalloc_proxy.dll
-copy /Y "$(ProjectDir)..\build-tbb-malloc\clang_20.1_cxx_64_md_release\tbbmalloc.dll" D:\devel\rundir-py3\tbbmalloc.dll</Command>
+      <Command>copy "$(OutputPath)NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)run_basis_converter_if_needed.ps1" -ConverterExe "$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" -SolutionDir "$(MSBuildProjectDirectory)\\" -Configuration "$(Configuration)" -Platform "$(Platform)" -MSBuildExe "$(MSBuildBinPath)\\MSBuild.exe"</Command>

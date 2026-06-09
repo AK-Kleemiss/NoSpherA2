@@ -322,7 +322,7 @@ if (Test-Path $LibCintOut) {
 
   Push-Location $bld
   try {
-    cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DPYPZPX="ON" -DCMAKE_INSTALL_PREFIX="..\..\Lib\LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" ..
+    cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DPYPZPX="ON" -DCMAKE_INSTALL_PREFIX="..\..\Lib\LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreadedDLL" ..
     cmake --build . --config RELEASE
     cmake --install .
   } finally {
@@ -337,7 +337,7 @@ if (Test-Path $LibCintOut) {
 # -----------------------------
 # $OccCrtStamp records which CRT the OCC libs were built with (/MT or /MD).
 # If the stamp is absent or doesn't say "MD", force a full rebuild so that
-# the tbbmalloc_proxy IAT-patching mechanism can work.
+# OCC and the host exe share the same heap (/MD throughout).
 $OccOut      = Join-Path $LibDir "occ\lib\occ_main.lib"
 $OccCrtStamp = Join-Path $LibDir "occ\lib\occ_crt.stamp"
 $occNeedsBuild = (-not (Test-Path $OccOut)) -or
@@ -362,13 +362,30 @@ if (-not $occNeedsBuild) {
   try {
     cmake --workflow --preset windows-clang-cl
     cmake --install .\build-windows-clang-cl
-    $tbbLib = Get-ChildItem `
-      -Path (Join-Path $RepoRoot "build-windows-clang-cl") `
-      -Recurse `
-      -Filter "tbb12.lib" `
-      -ErrorAction SilentlyContinue |
-      Select-Object -First 1 -ExpandProperty FullName
-    Copy-Item $tbbLib -Destination (Join-Path $LibDir "occ\lib\tbb12.lib") -Force
+
+    # Copy TBB import libs and runtime DLLs produced by the OCC cmake build
+    $tbbBldDir = Join-Path $RepoRoot "build-windows-clang-cl"
+    foreach ($filter in @("tbb12.lib", "tbbmalloc.lib")) {
+      $src = Get-ChildItem $tbbBldDir -Recurse -Filter $filter `
+          -ErrorAction SilentlyContinue |
+          Where-Object { $_.FullName -notmatch "CMakeFiles" } |
+          Select-Object -First 1 -ExpandProperty FullName
+      if ($src) { Copy-Item $src -Destination (Join-Path $LibDir "occ\lib\$filter") -Force }
+    }
+
+    $outDirs = @(
+      (Join-Path $RepoRoot "Windows\x64\Release"),
+      (Join-Path $RepoRoot "Windows\x64\Debug"),
+      (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug")
+    )
+    $mallocDll = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc.dll" `
+        -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+    if ($mallocDll) {
+      foreach ($d in $outDirs) {
+        New-Item -ItemType Directory -Force $d | Out-Null
+        Copy-Item $mallocDll -Destination $d -Force
+      }
+    }
   } finally {
     Pop-Location
   }
@@ -378,13 +395,13 @@ if (-not $occNeedsBuild) {
 }
 
 # -----------------------------
-# 4a) Build tbbmalloc + tbbmalloc_proxy (shared build, needed for allocator proxy)
+# 4a) Build tbbmalloc + tbbmalloc_proxy (shared build, needed for heap safety)
 # -----------------------------
-# tbbmalloc_proxy can only be built as a shared library (its CMakeLists.txt
-# returns early when BUILD_SHARED_LIBS is OFF). We configure a separate
-# build tree for the already-fetched oneTBB source, build only the two
-# malloc targets, and copy the import libs + DLLs into Lib/occ/ and the
-# Windows output directories.
+# OCC's integral engine has a latent heap corruption (likely in DF kernel or
+# DIIS storage). With /MD throughout, msvcrt detects this as STATUS_HEAP_CORRUPTION.
+# tbbmalloc_proxy intercepts ucrtbase.dll's IAT so malloc/free route through
+# TBB's scalable allocator, which handles over-writes and invalid frees silently
+# instead of raising. tbbmalloc_proxy can only be built as a shared library.
 $TbbMallocProxyOut = Join-Path $LibDir "occ\lib\tbbmalloc_proxy.lib"
 if (Test-Path $TbbMallocProxyOut) {
   Info "tbbmalloc_proxy already built ($TbbMallocProxyOut)"
@@ -402,8 +419,6 @@ if (Test-Path $TbbMallocProxyOut) {
 
   Push-Location $tbbBldDir
   try {
-    # Use the same compiler as the OCC build; MultiThreadedDLL (/MD) is required
-    # for shared TBB on MSVC — the proxy DLL uses its own heap internally.
     cmake -G Ninja $tbbSrc `
           -DCMAKE_C_COMPILER=clang-cl.exe `
           -DCMAKE_CXX_COMPILER=clang-cl.exe `
@@ -423,33 +438,27 @@ if (Test-Path $TbbMallocProxyOut) {
     Pop-Location
   }
 
-  # Locate the built artifacts (filter out CMakeFiles stubs)
   $srcMallocLib = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc.lib" `
       -ErrorAction SilentlyContinue |
       Where-Object { $_.FullName -notmatch "CMakeFiles" } |
       Select-Object -First 1 -ExpandProperty FullName
-
-  $srcProxyLib = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc_proxy.lib" `
+  $srcProxyLib  = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc_proxy.lib" `
       -ErrorAction SilentlyContinue |
       Where-Object { $_.FullName -notmatch "CMakeFiles" } |
       Select-Object -First 1 -ExpandProperty FullName
-
   $srcMallocDll = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc.dll" `
       -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-
-  $srcProxyDll = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc_proxy.dll" `
+  $srcProxyDll  = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc_proxy.dll" `
       -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
 
-  if (-not $srcMallocLib)  { Fail "tbbmalloc.lib not found after build" }
-  if (-not $srcProxyLib)   { Fail "tbbmalloc_proxy.lib not found after build" }
-  if (-not $srcMallocDll)  { Fail "tbbmalloc.dll not found after build" }
-  if (-not $srcProxyDll)   { Fail "tbbmalloc_proxy.dll not found after build" }
+  if (-not $srcMallocLib) { Fail "tbbmalloc.lib not found after build" }
+  if (-not $srcProxyLib)  { Fail "tbbmalloc_proxy.lib not found after build" }
+  if (-not $srcMallocDll) { Fail "tbbmalloc.dll not found after build" }
+  if (-not $srcProxyDll)  { Fail "tbbmalloc_proxy.dll not found after build" }
 
-  # Import libs → Lib/occ/lib/ (used by the VS linker)
-  Copy-Item $srcMallocLib  -Destination (Join-Path $LibDir "occ\lib\tbbmalloc.lib")       -Force
-  Copy-Item $srcProxyLib   -Destination (Join-Path $LibDir "occ\lib\tbbmalloc_proxy.lib")  -Force
+  Copy-Item $srcMallocLib -Destination (Join-Path $LibDir "occ\lib\tbbmalloc.lib")      -Force
+  Copy-Item $srcProxyLib  -Destination (Join-Path $LibDir "occ\lib\tbbmalloc_proxy.lib") -Force
 
-  # Runtime DLLs → all Windows output directories
   $outDirs = @(
     (Join-Path $RepoRoot "Windows\x64\Release"),
     (Join-Path $RepoRoot "Windows\x64\Debug"),
@@ -457,10 +466,9 @@ if (Test-Path $TbbMallocProxyOut) {
   )
   foreach ($d in $outDirs) {
     New-Item -ItemType Directory -Force $d | Out-Null
-    Copy-Item $srcMallocDll  -Destination $d -Force
-    Copy-Item $srcProxyDll   -Destination $d -Force
+    Copy-Item $srcMallocDll -Destination $d -Force
+    Copy-Item $srcProxyDll  -Destination $d -Force
   }
-
   Info "tbbmalloc_proxy OK"
 }
 

@@ -40,7 +40,8 @@ namespace NoSpherA2IntegrationTests
                 "alanine_integrated_occ", "alanine_integrated_occ",
                 "alanine_integrated_occ.good", "",
                 {"-occ","alanine.toml", "-cif","alanine.cif",
-                 "-dmin","0.5", "-acc","1", "-all_charges", "-no_date"}
+                 "-dmin","0.5", "-acc","1", "-all_charges", "-no_date"},
+                false, true  // subprocess=true: avoids TBB/static-CRT heap mismatch in DLL
             });
         }
 
