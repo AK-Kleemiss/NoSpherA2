@@ -42,6 +42,17 @@ Key environment variables:
 
 Tests are golden-file comparisons: the harness runs `NoSpherA2` with args from `tests/tests.toml`, captures stdout, and diffs against `.good` reference files in each test subdirectory.
 
+### Windows Visual Studio Tests
+
+The repository also has a Visual Studio test project under `Windows/Tests`. Prefer this path when validating Windows/OCC integration issues:
+
+```ps
+msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\
+vstest.console.exe Windows\x64\Release\Tests.dll /Platform:x64
+```
+
+`alanine_integrated_occ` is intentionally run as a subprocess by the VS test harness. If all tests complete in under a second, the test binary or working directory is probably wrong. The default suite should take tens of seconds; `RUN_FULL_TEST=1` enables the longer cases.
+
 ### Adding a Test
 
 Register in `tests/tests.toml`:
@@ -94,11 +105,28 @@ The `occ/` submodule is the heaviest dependency — it provides HF/DFT, crystal 
 
 ### Linking
 
-All dependencies (OCC, featomic, libcint, Intel MKL) are linked **statically** to produce a portable, self-contained executable.
+Most dependencies (OCC, featomic, libcint, Intel MKL static libraries) are linked statically. oneTBB is intentionally built and deployed dynamically because static/proxy TBB caused Windows runtime instability in OCC integration tests.
+
+Expected runtime files beside packaged executables:
+- Windows: `tbb12.dll`
+- Linux: `libtbb.so*`
+- macOS: `libtbb.dylib`
+
+Do not reintroduce `tbbmalloc_proxy` or `tbbmalloc` linking for NoSpherA2. The build scripts copy the core TBB runtime from `Lib/occ`.
 
 ## Known Pitfalls
 
 - **Golden-file float parsing**: the diff parser in `tests/run_test.py` can fail when a line contains multiple values. When fixing comparison logic, support scientific notation and multi-value lines without breaking existing thresholds.
 - **Windows toolchain**: use an x64 VS Developer shell for the `windows-clang-cl` CMake preset flows.
 - **Submodules**: always clone with `--recursive`. If submodules are missing, run `git submodule update --init --recursive`.
+- **OCC submodule commits**: OCC source fixes must be committed in the `occ` repository first, then the parent NoSpherA2 repo must commit the updated submodule pointer.
 - **CI vs local**: when a test passes locally but fails in CI, compare `.github/workflows/c-cpp_all.yml` step-by-step with your local commands, particularly the `NOS_EXE` and `OCC_DATA_PATH` values.
+
+## Recent OCC Integration Fix
+
+The `alanine_integrated_occ` crash was fixed by:
+- building oneTBB shared inside OCC and deploying its runtime with NoSpherA2;
+- removing `tbbmalloc_proxy`/static allocator linking;
+- adding `IntegralEngineDF::~IntegralEngineDF()` in OCC to clear DF-owned Eigen/Split-RI-J buffers before libcint-backed engines are destroyed.
+
+See `HANDOFF.md` for the detailed handoff and validation commands.
