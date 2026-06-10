@@ -27,8 +27,10 @@
     </Exec>
     <PropertyGroup>
       <NosInstructionSet Condition="'$(NosAvx)' == 'ON' or '$(NosAvx)' == 'on' or '$(NosAvx)' == 'true' or '$(NosAvx)' == 'TRUE' or '$(NosAvx)' == '1'">AdvancedVectorExtensions</NosInstructionSet>
-      <NosInstructionSet Condition="'$(NosInstructionSet)' == ''">NotSet</NosInstructionSet>
+      <NosInstructionSet Condition="'$(NosInstructionSet)' == '' and ('$(NosAvx)' == 'OFF' or '$(NosAvx)' == 'off' or '$(NosAvx)' == 'false' or '$(NosAvx)' == 'FALSE' or '$(NosAvx)' == '0')">NotSet</NosInstructionSet>
     </PropertyGroup>
+    <Error Condition="'$(NosInstructionSet)' == ''"
+           Text="AVX detection failed (NOS_AVX='$(NosAvx)'). Set the NOS_AVX environment variable to ON or OFF, matching how the OCC libs in Lib/occ/lib were built." />
     <ItemGroup>
       <ClCompile>
         <EnableEnhancedInstructionSet>$(NosInstructionSet)</EnableEnhancedInstructionSet>
