@@ -213,14 +213,28 @@ std::string build_date = ("This Executable was built on: " + std::string(__DATE_
 
 bool ensure_occ_data_path(const char *argv0)
 {
-    char* tmp_occ_path = nullptr;
+#ifdef _WIN32
+    char *occ_data_path_env = nullptr;
     size_t len = 0;
-#if defined(_MSC_VER) && defined(_WIN32)
-    errno_t err = _dupenv_s(&tmp_occ_path, &len, "OCC_DATA_PATH");
+    errno_t err = _dupenv_s(&occ_data_path_env, &len, "OCC_DATA_PATH");
+
+    if (err == 0 && occ_data_path_env != nullptr)
+    {
+        std::filesystem::path path(occ_data_path_env);
+        free(occ_data_path_env);
+
+        if (is_valid_occ_data_path(path))
+            return true;
+        else
+            std::cout << "OCC DATA PATH is invalid!" << std::endl;
+    }
+    else if (occ_data_path_env != nullptr)
+    {
+        free(occ_data_path_env);
+    }
 #else
-    tmp_occ_path = std::getenv("OCC_DATA_PATH");
-#endif
-    if (tmp_occ_path != nullptr)
+    const char *occ_data_path_env = std::getenv("OCC_DATA_PATH");
+    if (occ_data_path_env != nullptr)
     {
         std::string occ_data_path_env(tmp_occ_path);
 		free(tmp_occ_path);
@@ -229,6 +243,7 @@ bool ensure_occ_data_path(const char *argv0)
         else
             std::cout << "OCC DATA PATH is invalid!" << std::endl;
     }
+#endif
 
     std::filesystem::path exe_dir = resolve_executable_directory(argv0);
     if (exe_dir.empty())
@@ -380,6 +395,29 @@ std::filesystem::path get_home_path(void)
 
     return std::filesystem::path(home);
 #endif
+}
+
+void write_spherical_atoms() {
+#pragma omp parallel for
+    for (int i = 1; i < 103; i++) {
+        std::cout << "Atom " << i << std::endl;
+        Thakkar atom(i);
+        std::ofstream out("spherical_" + std::string(constants::atnr2letter(i)) + ".txt");
+        out << std::scientific << std::setprecision(10);
+        out << std::to_string(i) << " r Density" << std::endl;
+        const double min_dist = 1E-7;
+        const double incr = 1.025;
+
+        // Make radial grids
+        double current = 1;
+        double _dist = min_dist;
+        while (current > 1E-15)
+        {
+            current = atom.get_radial_density(_dist);
+            out << _dist << " " << current << std::endl;
+            _dist *= incr;
+        }
+    }
 }
 
 bool check_bohr(const WFN &wave, bool debug)
@@ -1848,29 +1886,6 @@ double get_decimal_precision_from_CIF_number(std::string &given_string)
         return 0.005;
 };
 
-void write_spherical_atoms() {
-#pragma omp parallel for
-    for(int i=1; i<103; i++) {
-        std::cout << "Atom " << i << std::endl;
-        Thakkar atom(i);
-        std::ofstream out("spherical_" + std::string(constants::atnr2letter(i)) + ".txt");
-        out << std::scientific << std::setprecision(10);
-        out << std::to_string(i) << " r Density" << std::endl;
-        const double min_dist = 1E-7;
-        const double incr = 1.025;
-
-        // Make radial grids
-        double current = 1;
-        double _dist = min_dist;
-        while (current > 1E-15)
-        {
-            current = atom.get_radial_density(_dist);
-            out << _dist << " " << current << std::endl;
-            _dist *= incr;
-        }
-    }
-}
-
 void options::digest_options()
 {
     using namespace std;
@@ -2238,6 +2253,7 @@ void options::digest_options()
             np_descr.fortran_order = false;
             np_descr.shape = { static_cast<unsigned long>(sizes[0]), static_cast<unsigned long>(sizes[1]) };
             npy::write_npy("descriptor.npy", np_descr);
+            
             exit(0);
         }
         else if (temp == "-fchk")

@@ -621,74 +621,23 @@ const int WFN::get_MO_primitive_count(const int &nr_mo) const
 
 const std::string WFN::hdr(const bool &occupied) const
 {
-    std::string temp = "GAUSSIAN            ";
+    std::stringstream temp;
+    temp << "GTO";
     if (!occupied)
     {
-        if (nmo > 100)
-            temp.append(std::to_string(nmo));
-        else if (nmo < 100 && nmo > 10)
-        {
-            temp.append(" ");
-            temp.append(std::to_string(nmo));
-        }
-        else if (nmo < 10 && nmo > 0)
-        {
-            temp.append("  ");
-            temp.append(std::to_string(nmo));
-        }
-        else if (nmo < 0)
-            return "PROBLEM";
+        temp << std::setw(20) << nmo;
     }
     else
     {
         const int occupied_mos = get_nmo(true);
-        if (occupied_mos > 100)
-            temp.append(std::to_string(occupied_mos));
-        else if (occupied_mos < 100 && occupied_mos > 10)
-        {
-            temp.append(" ");
-            temp.append(std::to_string(occupied_mos));
-        }
-        else if (occupied_mos < 10 && occupied_mos > 0)
-        {
-            temp.append("  ");
-            temp.append(std::to_string(occupied_mos));
-        }
-        else if (occupied_mos < 0)
-            return "PROBLEM";
+        temp << std::setw(20) << occupied_mos;
     }
-    temp.append(" MOL ORBITALS    ");
-    if (nex > 100)
-        temp.append(std::to_string(nex));
-    else if (nex < 100 && nex > 10)
-    {
-        temp.append(" ");
-        temp.append(std::to_string(nex));
-    }
-    else if (nex < 10 && nex > 0)
-    {
-        temp.append("  ");
-        temp.append(std::to_string(nex));
-    }
-    else if (nex < 0)
-        return "PROBLEM";
-    temp.append(" PRIMITIVES      ");
-    if (ncen > 100)
-        temp.append(std::to_string(ncen));
-    else if (ncen < 100 && ncen > 10)
-    {
-        temp.append(" ");
-        temp.append(std::to_string(ncen));
-    }
-    else if (ncen < 10 && ncen > 0)
-    {
-        temp.append("  ");
-        temp.append(std::to_string(ncen));
-    }
-    else if (ncen < 0)
-        return "PROBLEM";
-    temp.append(" NUCLEI\n");
-    return temp;
+    temp << " MOL ORBITALS";
+    temp << std::setw(7) << nex;
+    temp << " PRIMITIVES";
+    temp << std::setw(9) << ncen;
+    temp << " NUCLEI\n";
+    return temp.str();
 };
 
 void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, std::ostream &file, const bool debug)
@@ -3821,11 +3770,9 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     rf.flush();
     for (int i = 0; i < ncen; i++)
     {
-        rf << setw(5) << atoms[i].get_label();
-        rf << setw(3) << i + 1 << "    (CENTRE ";
-        if (i < 9)
-            rf << ' ';
-        rf << i + 1 << ") ";
+        rf << setw(3) << atoms[i].get_label() << ' ';
+        rf << left << setw(8) << i + 1 << right << "(CENTRE";
+        rf << setw(3) << i + 1 << ") ";
         rf << fixed << showpoint << setprecision(8);
         rf << setw(12) << get_atom_coordinate(i, 0);
         rf << setw(12) << get_atom_coordinate(i, 1);
@@ -4036,7 +3983,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         return false;
     }
     rf << "END DATA" << endl;
-    rf.flush();
+    rf << " THE SCF ENERGY =" << std::setw(20) << std::fixed << std::setprecision(12) << total_energy << " THE VIRIAL(-V/T)=   0.00000000" << endl;
     rf.close();
     return true;
 };
