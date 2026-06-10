@@ -248,16 +248,6 @@ bool ensure_occ_data_path(const char *argv0)
     {
         free(occ_data_path_env);
     }
-#else
-    const char *tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH");
-    if (tmp_occ_data_path_env != nullptr)
-    {
-        std::string occ_data_path_env(tmp_occ_data_path_env);
-        if (is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
-            return true;
-        else
-            std::cout << "OCC DATA PATH is invalid!" << std::endl;
-    }
 #endif
 
     std::filesystem::path exe_dir = resolve_executable_directory(argv0);
