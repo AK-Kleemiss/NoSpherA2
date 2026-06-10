@@ -64,7 +64,7 @@ OMPLIBS_x86_64  := -L$(LIBOMP_PREFIX_x86_64)/lib  -Wl,-rpath,$(LIBOMP_PREFIX_x86
 
 # Common flags
 CXXFLAGS_COMMON := $(CXXSTD) $(OPTFLAGS) $(WARNFLAGS) $(DEPFLAGS) $(INCLUDES) $(SYSROOT) $(DEPLOYMENT_TARGET)
-LDFLAGS_COMMON  := $(SYSROOT) $(DEPLOYMENT_TARGET) -framework Accelerate -ltbbmalloc_proxy
+LDFLAGS_COMMON  := $(SYSROOT) $(DEPLOYMENT_TARGET) -framework Accelerate
 
 # ---- Precompiled headers ----
 # Clang uses -include-pch to explicitly load a precompiled header.
@@ -77,8 +77,8 @@ CXXFLAGS_x86_64 := $(CXXFLAGS_COMMON)  -arch x86_64 $(OMPFLAGS_x86_64) -include-
 # Flags without PCH for compiling the PCH itself
 CXXFLAGS_arm64_NO_PCH  := $(CXXFLAGS_COMMON)  -arch arm64  $(OMPFLAGS_arm64)
 CXXFLAGS_x86_64_NO_PCH := $(CXXFLAGS_COMMON)  -arch x86_64 $(OMPFLAGS_x86_64)
-LDFLAGS_arm64   := $(LDFLAGS_COMMON)   -arch arm64  $(OMPLIBS_arm64)  -L../Lib/tbbmalloc_arm64  -Wl,-rpath,@executable_path
-LDFLAGS_x86_64  := $(LDFLAGS_COMMON)   -arch x86_64 $(OMPLIBS_x86_64) -L../Lib/tbbmalloc_x86_64 -Wl,-rpath,@executable_path
+LDFLAGS_arm64   := $(LDFLAGS_COMMON)   -arch arm64  $(OMPLIBS_arm64)  -L../Lib/occ_arm64/lib  -ltbb -Wl,-rpath,@executable_path
+LDFLAGS_x86_64  := $(LDFLAGS_COMMON)   -arch x86_64 $(OMPLIBS_x86_64) -L../Lib/occ_x86_64/lib -ltbb -Wl,-rpath,@executable_path
 
 # --------------------------------------------------------------------
 # Targets
@@ -93,12 +93,9 @@ NoSpherA2: NoSpherA2_arm64 NoSpherA2_x86_64
 	@echo "Start making Mac executable"
 	@echo "Lipo → $@"
 	@lipo -create -output $@ NoSpherA2_arm64 NoSpherA2_x86_64
-	@lipo -create -output libtbbmalloc_proxy.dylib \
-		../Lib/tbbmalloc_arm64/libtbbmalloc_proxy.dylib \
-		../Lib/tbbmalloc_x86_64/libtbbmalloc_proxy.dylib
-	@lipo -create -output libtbbmalloc.dylib \
-		../Lib/tbbmalloc_arm64/libtbbmalloc.dylib \
-		../Lib/tbbmalloc_x86_64/libtbbmalloc.dylib
+	@lipo -create -output libtbb.dylib \
+		../Lib/occ_arm64/lib/libtbb.dylib \
+		../Lib/occ_x86_64/lib/libtbb.dylib
 	@lipo -create -output libomp.dylib \
 		$(LIBOMP_PREFIX_arm64)/lib/libomp.dylib \
 		$(LIBOMP_PREFIX_x86_64)/lib/libomp.dylib
@@ -110,15 +107,13 @@ NoSpherA2_arm64: $(OBJS_arm64)
 	@echo "Building MAC executable for arm64"
 	@echo "Link (arm64)…"
 	@$(COMP) $^ $(EXTRA_LIBS_ARM) $(LDFLAGS_arm64) -o $@
-	@cp ../Lib/tbbmalloc_arm64/libtbbmalloc_proxy.dylib ./
-	@cp ../Lib/tbbmalloc_arm64/libtbbmalloc.dylib ./
+	@cp ../Lib/occ_arm64/lib/libtbb*.dylib ./
 
 NoSpherA2_x86_64: $(OBJS_x86_64)
 	@echo "Building MAC executable for x86_64"
 	@echo "Link (x86_64)…"
 	@$(COMP) $^ $(EXTRA_LIBS_x86) $(LDFLAGS_x86_64) -o $@
-	@cp ../Lib/tbbmalloc_x86_64/libtbbmalloc_proxy.dylib ./
-	@cp ../Lib/tbbmalloc_x86_64/libtbbmalloc.dylib ./
+	@cp ../Lib/occ_x86_64/lib/libtbb*.dylib ./
 
 # Actually run the converter to generate the file
 $(SRC_DIR)/basis_data.cpp:

@@ -49,7 +49,7 @@
         "CMAKE_STATIC_LINKER_FLAGS": "/machine:X64",
         "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
         "BUILD_SHARED_LIBS": "OFF",
-        "TBB_BUILD_SHARED": "OFF",
+        "TBB_BUILD_SHARED": "ON",
         "GG_NO_PRAGMA": "ON",
         "CPACK_SYSTEM_NAME": "windows",
         "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MD",
@@ -77,7 +77,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_SHARED_LIBS": "OFF",
-        "TBB_BUILD_SHARED": "OFF",
+        "TBB_BUILD_SHARED": "ON",
         "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store",
         "CMAKE_C_COMPILER_LAUNCHER": "ccache",
         "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
@@ -91,7 +91,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_SHARED_LIBS": "OFF",
-        "TBB_BUILD_SHARED": "OFF",
+        "TBB_BUILD_SHARED": "ON",
         "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store"
       }
     },

@@ -3,7 +3,7 @@
 ## Quick overview
 - **Project**: **NoSpherA2** – a C++ CLI tool that generates `.tsc` files and property grids from quantum‑chemistry wavefunctions.
 - **Key submodules**: `occ/` (quantum‑chemistry core), `featomic/` (Rust ML features), `libcint/`, `mdspan/`.
-- **Build system**: top‑level `Makefile` dispatches to platform‑specific builds (Windows via MSBuild, Linux/macOS via make). All dependencies are built statically and placed under `Lib/`.
+- **Build system**: top‑level `Makefile` dispatches to platform‑specific builds (Windows via MSBuild, Linux/macOS via make). Most dependencies are built statically and placed under `Lib/`; TBB is deployed as a runtime library beside the executable.
 
 ## Build & test commands (agents can run these automatically)
 | Platform | Command | What it does |
@@ -14,10 +14,10 @@
 | **Windows (new version)** | `vstest.console.exe` (or `dotnet test` if using .NET) | Use Visual Studio test tools to run the test suite instead of the `uv` Python path. Ensure the test binaries are built and the appropriate test adapter is installed.
 
 ## Important build notes for AI agents
-- **OCC static library** (`Lib/occ/lib/libocc.a`) is built by the `occ` target. By default it **includes** the TBB scalable allocator (`tbbmalloc`). The Windows Visual Studio project also links `tbbmalloc_proxy.lib` and `tbbmalloc.lib` explicitly – this is optional but harmless.
-- **tbbmalloc**: The top‑level `Makefile` only defines a `tbbmalloc` target for macOS and Linux. On Windows the allocator is provided by the *Build Dependencies* step and linked via the `.vcxproj`. Agents should not attempt to build `tbbmalloc` on Windows; just ensure the `Lib/occ/` binaries are present.
+- **OCC static library** (`Lib/occ/lib/libocc.a`) is built by the `occ` target. OCC links against shared oneTBB, so package the matching TBB runtime beside the executable (`tbb12.dll`, `libtbb.so*`, or `libtbb.dylib`).
+- **TBB runtime**: Do not build or link `tbbmalloc_proxy` for NoSpherA2. The build scripts copy the core TBB runtime from `Lib/occ` into the executable/artifact layout.
 - **Submodule handling**: The repository relies on several git submodules. Before any build, run `git submodule update --init --recursive`.
-- **Static linking**: All third‑party libraries (`featomic`, `libcint`, `occ`, `tbbmalloc`) are linked statically, producing a portable executable.
+- **Static linking**: Most third‑party libraries (`featomic`, `libcint`, `occ`) are linked statically, with OpenMP/MKL and TBB runtime files deployed alongside the executable where needed.
 - **Visual Studio version 18**: Windows builds must always start the VS 2022 Developer Command Prompt (VS version 18) to set up the compiler, linker, and environment variables. Ensure the build step invokes `VsDevCmd.bat` (e.g., `call "%VSINSTALLDIR%\Common7\Tools\VsDevCmd.bat"`) before running `msbuild`.
 - **Test execution on Windows**: For this local version we prefer using Visual Studio test tools (e.g., `vstest.console.exe`) instead of the `uv` Python test runner. Adjust CI or local test scripts accordingly.
  - **OCC build process**: The OCC source resides in `occ/`. Building OCC is performed in a dedicated `build*` directory at the repository root (e.g., `build-macos-release-arm64`, `build-linux-occ-gcc`). After running CMake configuration and `make install`, the resulting libraries are installed into `Lib/occ/`. Whenever OCC source files are modified, the full configure‑build‑install cycle must be rerun to update the binaries in `Lib/occ/` before rebuilding NoSpherA2.

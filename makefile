@@ -149,40 +149,6 @@ occ_x86_64: LibCint_x86_64
 occ_arm64: LibCint_arm64
 	@$(MAKE) NATIVE_ARCH=arm64 occ
 
-# Build tbbmalloc as a shared lib for one arch (TBB runtime dependency).
-# tbbmalloc/CMakeLists.txt requires BUILD_SHARED_LIBS=ON, so we use a
-# separate shared build tree distinct from the static OCC build.
-tbbmalloc:
-	@TBB_SRC="build-macos-release-$(NATIVE_ARCH)/_deps/onetbb-src"; \
-	OUT="Lib/tbbmalloc_$(NATIVE_ARCH)/libtbbmalloc.dylib"; \
-	if [ ! -f "$$OUT" ]; then \
-		echo "Building tbbmalloc for macOS $(NATIVE_ARCH)..."; \
-		mkdir -p build-tbbmalloc-$(NATIVE_ARCH) && \
-		cd build-tbbmalloc-$(NATIVE_ARCH) && \
-		cmake -G Ninja ../$$TBB_SRC \
-			-DCMAKE_BUILD_TYPE=Release \
-			-DCMAKE_OSX_ARCHITECTURES=$(NATIVE_ARCH) \
-			-DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 \
-			-DBUILD_SHARED_LIBS=ON \
-			-DCMAKE_MACOSX_RPATH=ON \
-			-DCMAKE_INSTALL_NAME_DIR="@executable_path" \
-			-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
-			-DTBB_TEST=OFF -DTBB_STRICT=OFF && \
-		cmake --build . --target tbbmalloc && \
-		cd .. && \
-		mkdir -p Lib/tbbmalloc_$(NATIVE_ARCH) && \
-		find build-tbbmalloc-$(NATIVE_ARCH) -name "libtbbmalloc.dylib" \
-			-exec cp {} Lib/tbbmalloc_$(NATIVE_ARCH)/ \;; \
-	else \
-		echo "Skipping tbbmalloc for $(NATIVE_ARCH), already built"; \
-	fi
-
-tbbmalloc_arm64:
-	@$(MAKE) NATIVE_ARCH=arm64 tbbmalloc
-
-tbbmalloc_x86_64:
-	@$(MAKE) NATIVE_ARCH=x86_64 tbbmalloc
-
 BasisSetConverter_x86_64:
 	@$(MAKE) NATIVE_ARCH=x86_64 BasisSetConverter
 
@@ -220,25 +186,6 @@ occ: LibCint
 		echo 'Skipping OCC build, Lib/occ/lib/libocc_main.a already exists'; \
 	fi
 
-tbbmalloc: occ
-	@TBB_SRC="build-linux-occ-gcc/_deps/onetbb-src"; \
-	OUT="Lib/tbbmalloc/libtbbmalloc.so.2"; \
-	if [ ! -f "$$OUT" ]; then \
-		echo "Building tbbmalloc for Linux..."; \
-		mkdir -p build-tbbmalloc-linux && \
-		cd build-tbbmalloc-linux && \
-		cmake -G Ninja ../$$TBB_SRC \
-			-DCMAKE_BUILD_TYPE=Release \
-			-DBUILD_SHARED_LIBS=ON \
-			-DTBB_TEST=OFF -DTBB_STRICT=OFF && \
-		cmake --build . --target tbbmalloc && \
-		cd .. && \
-		mkdir -p Lib/tbbmalloc && \
-		find build-tbbmalloc-linux -name "libtbbmalloc.so*" \
-			! -type d -exec cp -P {} Lib/tbbmalloc/ \;; \
-	else \
-		echo "Skipping tbbmalloc, already built"; \
-	fi
 endif
 
 

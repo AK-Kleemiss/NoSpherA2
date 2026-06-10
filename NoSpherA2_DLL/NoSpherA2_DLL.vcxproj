@@ -470,4 +470,11 @@
     <!-- If missing, fail with a clear message (optional but recommended) -->
     <Error Condition="!Exists('$(IompDll)')" Text="Could not find libiomp5.dll at $(IompDll). Check MKLROOT or oneAPI compiler install." />
   </Target>
+  <Target Name="CopyOccTbb" AfterTargets="Build">
+    <PropertyGroup>
+      <OccTbbDll>$(MSBuildProjectDirectory)\..\Lib\occ\bin\tbb12.dll</OccTbbDll>
+    </PropertyGroup>
+    <Copy SourceFiles="$(OccTbbDll)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(OccTbbDll)')" />
+    <Error Condition="!Exists('$(OccTbbDll)')" Text="Could not find tbb12.dll at $(OccTbbDll). Build and install OCC first." />
+  </Target>
 </Project>

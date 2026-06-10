@@ -4,7 +4,7 @@ RM := rm -f
 COMP   := g++
 C_COMP := gcc
 
-LIBS := -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -L../Lib/tbbmalloc -ltbbmalloc_proxy -Wl,-rpath,'$$ORIGIN' -lpthread -lm -lc -lquadmath
+LIBS := -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -L../Lib/occ/lib -ltbb -Wl,-rpath,'$$ORIGIN' -lpthread -lm -lc -lquadmath
 
 # oneAPI env (source setvars.sh before each compile/link)
 SETVARS ?= ../Lib/MKL/setvars.sh
@@ -127,8 +127,7 @@ NoSpherA2: ${OBJS}
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2 ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
-	cp ../Lib/tbbmalloc/libtbbmalloc_proxy.so.2 ../
-	cp ../Lib/tbbmalloc/libtbbmalloc.so.2 ../
+	cp -P ../Lib/occ/lib/libtbb.so* ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d}
@@ -136,6 +135,7 @@ NoSpherA2_Debug: ${OBJS_d}
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2_Debug ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
+	cp -P ../Lib/occ/lib/libtbb.so* ../
 	@echo 'Done building Debug version of NoSpherA2'
 
 clean:

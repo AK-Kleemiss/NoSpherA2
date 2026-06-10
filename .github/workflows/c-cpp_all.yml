@@ -44,7 +44,7 @@ jobs:
             artifact-path: |
               Mac/NoSpherA2_arm64
               Mac/libomp.dylib
-              Mac/libtbbmalloc.dylib
+              Mac/libtbb.dylib
 
 
           - os: macos-15-intel  # Intel x86_64
@@ -55,7 +55,7 @@ jobs:
             artifact-path: |
               Mac/NoSpherA2_x86_64
               Mac/libomp.dylib
-              Mac/libtbbmalloc.dylib
+              Mac/libtbb.dylib
 
           - os: ubuntu-latest
             name: Linux
@@ -64,7 +64,7 @@ jobs:
             artifact-path: |
               NoSpherA2
               libiomp5.so
-              libtbbmalloc.so.2
+              libtbb.so*
 
           - os: windows-2022
             name: Windows
@@ -75,8 +75,7 @@ jobs:
             artifact-path: |
               Windows/x64/Release/NoSpherA2.exe
               Windows/x64/Release/libiomp5md.dll
-              Windows/x64/Release/tbbmalloc_proxy.dll
-              Windows/x64/Release/tbbmalloc.dll
+              Windows/x64/Release/tbb12.dll
               Windows/x64/Release/mkl_intel_thread.2.dll
               Windows/x64/Release/mkl_core.2.dll
 
@@ -187,11 +186,11 @@ jobs:
         # Make executable
         chmod +x ./universal/NoSpherA2_Mac
 
-        # Combine arch-specific tbbmalloc dylibs into a universal fat dylib
+        # Combine arch-specific TBB dylibs into a universal fat dylib
         lipo -create \
-          ./arm64/libtbbmalloc.dylib \
-          ./x86_64/libtbbmalloc.dylib \
-          -output ./universal/libtbbmalloc.dylib
+          ./arm64/libtbb.dylib \
+          ./x86_64/libtbb.dylib \
+          -output ./universal/libtbb.dylib
 
         # Combine arch-specific libomp dylibs into a universal fat dylib
         lipo -create \
@@ -205,7 +204,7 @@ jobs:
         name: executable_MacOS_Universal
         path: |
           ./universal/NoSpherA2_Mac
-          ./universal/libtbbmalloc.dylib
+          ./universal/libtbb.dylib
           ./universal/libomp.dylib
 
   test:
@@ -232,6 +231,7 @@ jobs:
             artifact-path: |
               NoSpherA2
               libiomp5.so
+              libtbb.so*
             executable-name: NoSpherA2
 
           - os: windows-2022
@@ -240,6 +240,7 @@ jobs:
             artifact-path: |
               Windows/x64/Release/NoSpherA2.exe
               Windows/x64/Release/libiomp5md.dll
+              Windows/x64/Release/tbb12.dll
             executable-name: NoSpherA2.exe
 
     runs-on: ${{ matrix.os }}

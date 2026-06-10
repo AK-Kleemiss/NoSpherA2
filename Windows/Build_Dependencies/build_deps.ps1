@@ -363,28 +363,30 @@ if (-not $occNeedsBuild) {
     cmake --workflow --preset windows-clang-cl
     cmake --install .\build-windows-clang-cl
 
-    # Copy TBB import libs and runtime DLLs produced by the OCC cmake build
+    # Copy the TBB import lib and runtime DLL produced by the OCC CMake build.
     $tbbBldDir = Join-Path $RepoRoot "build-windows-clang-cl"
-    foreach ($filter in @("tbb12.lib", "tbbmalloc.lib")) {
-      $src = Get-ChildItem $tbbBldDir -Recurse -Filter $filter `
-          -ErrorAction SilentlyContinue |
-          Where-Object { $_.FullName -notmatch "CMakeFiles" } |
-          Select-Object -First 1 -ExpandProperty FullName
-      if ($src) { Copy-Item $src -Destination (Join-Path $LibDir "occ\lib\$filter") -Force }
-    }
-
+    $tbbLib = Get-ChildItem $tbbBldDir -Recurse -Filter "tbb12.lib" `
+        -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch "CMakeFiles" } |
+        Select-Object -First 1 -ExpandProperty FullName
+    $tbbDll = Get-ChildItem $tbbBldDir -Recurse -Filter "tbb12.dll" `
+        -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch "CMakeFiles" } |
+        Select-Object -First 1 -ExpandProperty FullName
+    if (-not $tbbLib) { Fail "tbb12.lib not found after OCC build" }
+    if (-not $tbbDll) { Fail "tbb12.dll not found after OCC build" }
+    New-Item -ItemType Directory -Force (Join-Path $LibDir "occ\lib") | Out-Null
+    New-Item -ItemType Directory -Force (Join-Path $LibDir "occ\bin") | Out-Null
+    Copy-Item $tbbLib -Destination (Join-Path $LibDir "occ\lib\tbb12.lib") -Force
+    Copy-Item $tbbDll -Destination (Join-Path $LibDir "occ\bin\tbb12.dll") -Force
     $outDirs = @(
       (Join-Path $RepoRoot "Windows\x64\Release"),
       (Join-Path $RepoRoot "Windows\x64\Debug"),
       (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug")
     )
-    $mallocDll = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc.dll" `
-        -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-    if ($mallocDll) {
-      foreach ($d in $outDirs) {
-        New-Item -ItemType Directory -Force $d | Out-Null
-        Copy-Item $mallocDll -Destination $d -Force
-      }
+    foreach ($d in $outDirs) {
+      New-Item -ItemType Directory -Force $d | Out-Null
+      Copy-Item $tbbDll -Destination $d -Force
     }
   } finally {
     Pop-Location
@@ -395,85 +397,7 @@ if (-not $occNeedsBuild) {
 }
 
 # -----------------------------
-# 4a) Build tbbmalloc + tbbmalloc_proxy (shared build, needed for heap safety)
-# -----------------------------
-# OCC's integral engine has a latent heap corruption (likely in DF kernel or
-# DIIS storage). With /MD throughout, msvcrt detects this as STATUS_HEAP_CORRUPTION.
-# tbbmalloc_proxy intercepts ucrtbase.dll's IAT so malloc/free route through
-# TBB's scalable allocator, which handles over-writes and invalid frees silently
-# instead of raising. tbbmalloc_proxy can only be built as a shared library.
-$TbbMallocProxyOut = Join-Path $LibDir "occ\lib\tbbmalloc_proxy.lib"
-if (Test-Path $TbbMallocProxyOut) {
-  Info "tbbmalloc_proxy already built ($TbbMallocProxyOut)"
-} else {
-  $tbbSrc    = Join-Path $RepoRoot "build-windows-clang-cl\_deps\onetbb-src"
-  $tbbBldDir = Join-Path $RepoRoot "build-tbb-malloc"
-
-  if (-not (Test-Path $tbbSrc)) {
-    Fail "oneTBB source not found at $tbbSrc - run the OCC build first so CMake fetches it."
-  }
-
-  Info "Building tbbmalloc + tbbmalloc_proxy (shared)..."
-  if (Test-Path $tbbBldDir) { Remove-Item -Recurse -Force $tbbBldDir }
-  New-Item -ItemType Directory $tbbBldDir | Out-Null
-
-  Push-Location $tbbBldDir
-  try {
-    cmake -G Ninja $tbbSrc `
-          -DCMAKE_C_COMPILER=clang-cl.exe `
-          -DCMAKE_CXX_COMPILER=clang-cl.exe `
-          -DCMAKE_C_COMPILER_TARGET=x86_64-pc-windows-msvc `
-          -DCMAKE_CXX_COMPILER_TARGET=x86_64-pc-windows-msvc `
-          -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
-          "-DCMAKE_CXX_FLAGS=/EHsc" `
-          "-DCMAKE_C_FLAGS=/EHsc" `
-          -DBUILD_SHARED_LIBS=ON `
-          -DTBB_TEST=OFF `
-          -DTBB_STRICT=OFF `
-          -DTBB_DISABLE_HWLOC_AUTOMATIC_SEARCH=OFF
-
-    cmake --build . --target tbbmalloc tbbmalloc_proxy
-  } finally {
-    Pop-Location
-  }
-
-  $srcMallocLib = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc.lib" `
-      -ErrorAction SilentlyContinue |
-      Where-Object { $_.FullName -notmatch "CMakeFiles" } |
-      Select-Object -First 1 -ExpandProperty FullName
-  $srcProxyLib  = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc_proxy.lib" `
-      -ErrorAction SilentlyContinue |
-      Where-Object { $_.FullName -notmatch "CMakeFiles" } |
-      Select-Object -First 1 -ExpandProperty FullName
-  $srcMallocDll = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc.dll" `
-      -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-  $srcProxyDll  = Get-ChildItem $tbbBldDir -Recurse -Filter "tbbmalloc_proxy.dll" `
-      -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-
-  if (-not $srcMallocLib) { Fail "tbbmalloc.lib not found after build" }
-  if (-not $srcProxyLib)  { Fail "tbbmalloc_proxy.lib not found after build" }
-  if (-not $srcMallocDll) { Fail "tbbmalloc.dll not found after build" }
-  if (-not $srcProxyDll)  { Fail "tbbmalloc_proxy.dll not found after build" }
-
-  Copy-Item $srcMallocLib -Destination (Join-Path $LibDir "occ\lib\tbbmalloc.lib")      -Force
-  Copy-Item $srcProxyLib  -Destination (Join-Path $LibDir "occ\lib\tbbmalloc_proxy.lib") -Force
-
-  $outDirs = @(
-    (Join-Path $RepoRoot "Windows\x64\Release"),
-    (Join-Path $RepoRoot "Windows\x64\Debug"),
-    (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug")
-  )
-  foreach ($d in $outDirs) {
-    New-Item -ItemType Directory -Force $d | Out-Null
-    Copy-Item $srcMallocDll -Destination $d -Force
-    Copy-Item $srcProxyDll  -Destination $d -Force
-  }
-  Info "tbbmalloc_proxy OK"
-}
-
-# -----------------------------
-# 4b) Deploy MKL runtime DLLs (needed when OCC is built with /MD)
+# 4a) Deploy MKL runtime DLLs (needed when OCC is built with /MD)
 # -----------------------------
 # With /MD, the MKL static threading layer emits a dynamic dependency on
 # mkl_intel_thread.2.dll and mkl_core.2.dll.  Deploy them alongside the other
