@@ -133,3 +133,8 @@ Mac/NoSpherA2_arm64
 tests/failed_logs/fractal/sucrose_diff.cube_fractal_plot
 *.bak
 *.pyc
+libiomp5.so
+**/Tests.dll
+**/mkl_intel_thread.2.dll
+**/mkl_core.2.dll
+build_no_tbb**

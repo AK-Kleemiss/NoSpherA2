@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "constants.h"
 #include "integration_params.h"
 
@@ -11,7 +12,7 @@ Int_Params::Int_Params()
     basis_sets.clear();
 }
 
-Int_Params::Int_Params(const WFN& wavy)
+Int_Params::Int_Params(const WFN &wavy)
 {
     // Constructor, copying the atoms and basis set from the WFN object
     atoms = wavy.get_atoms();
@@ -63,7 +64,7 @@ Int_Params::Int_Params(const Int_Params &first, const Int_Params &second)
     nao = first.nao + second.nao;
 }
 
-vec Int_Params::normalize_gto(vec coef, const vec& exp, const int l)
+vec Int_Params::normalize_gto(vec coef, const vec &exp, const int l)
 {
     // GTO norm Ref: H. B. Schlegel and M. J. Frisch, Int. J. Quant.  Chem., 54(1995), 83-87.
     for (int i = 0; i < coef.size(); i++)
@@ -129,7 +130,7 @@ void Int_Params::collect_basis_data()
             exponents.push_back(basis[shell].get_exponent());
         }
         // Normalize the GTOs depending on the context
-        if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx )
+        if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx)
         {
             for (int i = 0; i < coefficients.size(); i++)
             {
@@ -137,17 +138,17 @@ void Int_Params::collect_basis_data()
                 coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
             }
         }
-		else if (wfn_origin == e_origin::tonto)
+        else if (wfn_origin == e_origin::tonto)
         {
             for (int i = 0; i < coefficients.size(); i++)
             {
                 int l = basis[i].get_type() - 1;
                 coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from Tonto to libcint  ... something something, cartesian harmonics...
                 if (l == 2) // D functions need an extra normalization factor
-					coefficients[i] *= std::sqrt(10./4.0/constants::PI); // ... something something, cartesian harmonics...^2
+                    coefficients[i] *= std::sqrt(10. / 4.0 / constants::PI); // ... something something, cartesian harmonics...^2
             }
         }
-        else if (wfn_origin == e_origin::tonto )
+        else if (wfn_origin == e_origin::tonto)
         {
             for (int i = 0; i < coefficients.size(); i++)
             {

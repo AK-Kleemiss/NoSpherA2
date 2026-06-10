@@ -56,7 +56,6 @@ runs:
         export PATH="$HOME/.cargo/bin:$PATH"
         make featomic_x86_64 LibCint_x86_64 occ_x86_64 BasisSetConverter_x86_64 -j
 
-
     - name: Build deps (Linux)
       if: inputs.platform == 'Linux'
       shell: bash
@@ -144,7 +143,18 @@ runs:
               -Filter "tbb12.lib" `
               -ErrorAction SilentlyContinue |
               Select-Object -First 1 -ExpandProperty FullName
+            $tbbDll = Get-ChildItem `
+              -Path (Join-Path $env:GITHUB_WORKSPACE "build-windows-clang-cl") `
+              -Recurse `
+              -Filter "tbb12.dll" `
+              -ErrorAction SilentlyContinue |
+              Select-Object -First 1 -ExpandProperty FullName
+            if (-not $tbbLib) { Write-Error "tbb12.lib not found after OCC build" }
+            if (-not $tbbDll) { Write-Error "tbb12.dll not found after OCC build" }
+            New-Item -ItemType Directory -Force -Path (Join-Path $env:GITHUB_WORKSPACE "Lib\occ\lib") | Out-Null
+            New-Item -ItemType Directory -Force -Path (Join-Path $env:GITHUB_WORKSPACE "Lib\occ\bin") | Out-Null
             Copy-Item $tbbLib -Destination (Join-Path $env:GITHUB_WORKSPACE "Lib\occ\lib\tbb12.lib") -Force
+            Copy-Item $tbbDll -Destination (Join-Path $env:GITHUB_WORKSPACE "Lib\occ\bin\tbb12.dll") -Force
           } finally {
             Pop-Location
           }

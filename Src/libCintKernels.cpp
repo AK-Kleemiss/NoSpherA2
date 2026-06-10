@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "convenience.h"
 
 #include "libCintKernels.h"
@@ -54,7 +55,7 @@ void GTOnr3c_fill_s1(
 
 
 
-int GTOmax_shell_dim(const int* ao_loc, const int* shls_slice, int ncenter)
+int GTOmax_shell_dim(const int *ao_loc, const int *shls_slice, int ncenter)
 {
     int i;
     int i0 = shls_slice[0];
@@ -125,7 +126,7 @@ void GTOnr3c_drv(
 #pragma omp parallel
     {
         int jobid;
-        double* buf = (double*)malloc(sizeof(double) * (di * di * di * comp + cache_size));
+        double *buf = (double *)malloc(sizeof(double) * (di * di * di * comp + cache_size));
 #pragma omp for nowait schedule(dynamic)
         for (jobid = 0; jobid < njobs; jobid++)
         {
@@ -159,7 +160,7 @@ void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, l
         int dims[] = { (int)naoi, (int)naoj };
         int ish, jsh, ij, i0, j0;
         int shls[2];
-        double* cache = (double*)malloc(sizeof(double) * cache_size);
+        double *cache = (double *)malloc(sizeof(double) * cache_size);
 #pragma omp for schedule(dynamic, 4)
         for (ij = 0; ij < nish * njsh; ij++)
         {
@@ -186,7 +187,7 @@ enum COORDINATE_TYPE {
 };
 
 template<COORDINATE_TYPE CT>
-ivec make_loc(ivec& bas, int nbas) {
+ivec make_loc(ivec &bas, int nbas) {
     ivec dims(nbas, 0);
     // Calculate (2*l + 1) * nctr for spherical harmonics
     for (size_t i = 0; i < nbas; i++)
@@ -209,8 +210,8 @@ ivec make_loc(ivec& bas, int nbas) {
 
     return ao_loc;
 }
-template ivec make_loc<COORDINATE_TYPE::CART>(ivec& bas, int nbas);
-template ivec make_loc<COORDINATE_TYPE::SPH>(ivec& bas, int nbas);
+template ivec make_loc<COORDINATE_TYPE::CART>(ivec &bas, int nbas);
+template ivec make_loc<COORDINATE_TYPE::SPH>(ivec &bas, int nbas);
 
 extern "C" {
     extern libcint::CINTOptimizerFunction int3c2e_optimizer;

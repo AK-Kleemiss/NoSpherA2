@@ -491,7 +491,7 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
         x_coords[i] = wave.get_atom_coordinate(i, 0);
         y_coords[i] = wave.get_atom_coordinate(i, 1);
         z_coords[i] = wave.get_atom_coordinate(i, 2);
-        if (pbc != 0) {
+        if (pbc != 0) [[unlikely]] {
             int j = 0;
             for (int pbc_x = -pbc; pbc_x < pbc + 1; pbc_x++)
                 for (int pbc_y = -pbc; pbc_y < pbc + 1; pbc_y++)
@@ -978,7 +978,7 @@ void GridManager::calculateSphericalDensities(
     }
 
     // Add PBC contributions if enabled
-    if (config_.pbc != 0) {
+    if (config_.pbc != 0) [[unlikely]] {
         if (config_.debug) {
             std::cout << "GridManager: Adding PBC contributions (pbc=" << config_.pbc << ")" << std::endl;
         }

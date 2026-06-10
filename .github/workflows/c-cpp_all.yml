@@ -44,6 +44,7 @@ jobs:
             artifact-path: |
               Mac/NoSpherA2_arm64
               Mac/libomp.dylib
+              Mac/libtbb.dylib
 
 
           - os: macos-15-intel  # Intel x86_64
@@ -54,6 +55,7 @@ jobs:
             artifact-path: |
               Mac/NoSpherA2_x86_64
               Mac/libomp.dylib
+              Mac/libtbb.dylib
 
           - os: ubuntu-latest
             name: Linux
@@ -62,6 +64,7 @@ jobs:
             artifact-path: |
               NoSpherA2
               libiomp5.so
+              libtbb.so*
 
           - os: windows-2022
             name: Windows
@@ -72,6 +75,9 @@ jobs:
             artifact-path: |
               Windows/x64/Release/NoSpherA2.exe
               Windows/x64/Release/libiomp5md.dll
+              Windows/x64/Release/tbb12.dll
+              Windows/x64/Release/mkl_intel_thread.2.dll
+              Windows/x64/Release/mkl_core.2.dll
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.name }}
@@ -83,7 +89,7 @@ jobs:
         egress-policy: audit
 
     - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
         submodules: recursive
         fetch-depth: 1
@@ -134,7 +140,7 @@ jobs:
         egress-policy: audit
 
     - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
         submodules: recursive
         fetch-depth: 1
@@ -155,36 +161,51 @@ jobs:
       run: |
         echo "Creating universal binary with lipo..."
         mkdir -p universal
-        
+
         # Make binaries executable
         chmod +x ./arm64/NoSpherA2_arm64
         chmod +x ./x86_64/NoSpherA2_x86_64
-        
+
         # Verify architectures before combining
         echo "ARM64 binary architecture:"
         file ./arm64/NoSpherA2_arm64
         lipo -info ./arm64/NoSpherA2_arm64
-        
+
         echo "x86_64 binary architecture:"
         file ./x86_64/NoSpherA2_x86_64
         lipo -info ./x86_64/NoSpherA2_x86_64
-        
+
         # Create universal binary
         lipo -create -output ./universal/NoSpherA2_Mac ./arm64/NoSpherA2_arm64 ./x86_64/NoSpherA2_x86_64
-        
+
         # Verify universal binary
         echo "Universal binary architecture:"
         file ./universal/NoSpherA2_Mac
         lipo -info ./universal/NoSpherA2_Mac
-        
+
         # Make executable
         chmod +x ./universal/NoSpherA2_Mac
+
+        # Combine arch-specific TBB dylibs into a universal fat dylib
+        lipo -create \
+          ./arm64/libtbb.dylib \
+          ./x86_64/libtbb.dylib \
+          -output ./universal/libtbb.dylib
+
+        # Combine arch-specific libomp dylibs into a universal fat dylib
+        lipo -create \
+          ./arm64/libomp.dylib \
+          ./x86_64/libomp.dylib \
+          -output ./universal/libomp.dylib
 
     - name: Upload Universal Binary
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: executable_MacOS_Universal
-        path: ./universal/NoSpherA2_Mac
+        path: |
+          ./universal/NoSpherA2_Mac
+          ./universal/libtbb.dylib
+          ./universal/libomp.dylib
 
   test:
     needs: build
@@ -210,6 +231,7 @@ jobs:
             artifact-path: |
               NoSpherA2
               libiomp5.so
+              libtbb.so*
             executable-name: NoSpherA2
 
           - os: windows-2022
@@ -218,6 +240,7 @@ jobs:
             artifact-path: |
               Windows/x64/Release/NoSpherA2.exe
               Windows/x64/Release/libiomp5md.dll
+              Windows/x64/Release/tbb12.dll
             executable-name: NoSpherA2.exe
 
     runs-on: ${{ matrix.os }}
@@ -230,7 +253,7 @@ jobs:
         egress-policy: audit
 
     - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
         submodules: recursive
 
@@ -340,7 +363,7 @@ jobs:
         egress-policy: audit
 
     - name: Checkout repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
         submodules: recursive
         fetch-depth: 1
@@ -399,7 +422,7 @@ jobs:
           egress-policy: audit
 
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
             submodules: false
             fetch-depth: 1

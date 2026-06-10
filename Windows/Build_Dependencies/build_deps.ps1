@@ -322,7 +322,7 @@ if (Test-Path $LibCintOut) {
 
   Push-Location $bld
   try {
-    cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DPYPZPX="ON" -DCMAKE_INSTALL_PREFIX="..\..\Lib\LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" ..
+    cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DPYPZPX="ON" -DCMAKE_INSTALL_PREFIX="..\..\Lib\LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreadedDLL" ..
     cmake --build . --config RELEASE
     cmake --install .
   } finally {
@@ -335,28 +335,93 @@ if (Test-Path $LibCintOut) {
 # -----------------------------
 # 4) Build OCC (if needed)
 # -----------------------------
-$OccOut = Join-Path $LibDir "occ\lib\occ_main.lib"
-if (Test-Path $OccOut) {
-  Info "OCC already built ($OccOut)"
+# $OccCrtStamp records which CRT the OCC libs were built with (/MT or /MD).
+# If the stamp is absent or doesn't say "MD", force a full rebuild so that
+# OCC and the host exe share the same heap (/MD throughout).
+$OccOut      = Join-Path $LibDir "occ\lib\occ_main.lib"
+$OccCrtStamp = Join-Path $LibDir "occ\lib\occ_crt.stamp"
+$occNeedsBuild = (-not (Test-Path $OccOut)) -or
+                 (-not (Test-Path $OccCrtStamp)) -or
+                 ((Get-Content $OccCrtStamp -ErrorAction SilentlyContinue) -ne "MD")
+if (-not $occNeedsBuild) {
+  Info "OCC already built with /MD ($OccOut)"
 } else {
+  # Remove stale libs AND the cmake build cache.
+  # Changing /MT → /MD requires a clean configure; an incremental cmake build
+  # will leave stale /MT object files that cause loader failures in the DLL.
+  if (Test-Path (Join-Path $LibDir "occ\lib")) {
+    Remove-Item -Recurse -Force (Join-Path $LibDir "occ\lib")
+  }
+  $occBuildDir = Join-Path $RepoRoot "build-windows-clang-cl"
+  if (Test-Path $occBuildDir) {
+    Info "Removing stale OCC build cache ($occBuildDir)..."
+    Remove-Item -Recurse -Force $occBuildDir
+  }
   Info "Building OCC..."
   Push-Location $RepoRoot
   try {
     cmake --workflow --preset windows-clang-cl
     cmake --install .\build-windows-clang-cl
-    $tbbLib = Get-ChildItem `
-      -Path (Join-Path $RepoRoot "build-windows-clang-cl") `
-      -Recurse `
-      -Filter "tbb12.lib" `
-      -ErrorAction SilentlyContinue |
-      Select-Object -First 1 -ExpandProperty FullName
+
+    # Copy the TBB import lib and runtime DLL produced by the OCC CMake build.
+    $tbbBldDir = Join-Path $RepoRoot "build-windows-clang-cl"
+    $tbbLib = Get-ChildItem $tbbBldDir -Recurse -Filter "tbb12.lib" `
+        -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch "CMakeFiles" } |
+        Select-Object -First 1 -ExpandProperty FullName
+    $tbbDll = Get-ChildItem $tbbBldDir -Recurse -Filter "tbb12.dll" `
+        -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch "CMakeFiles" } |
+        Select-Object -First 1 -ExpandProperty FullName
+    if (-not $tbbLib) { Fail "tbb12.lib not found after OCC build" }
+    if (-not $tbbDll) { Fail "tbb12.dll not found after OCC build" }
+    New-Item -ItemType Directory -Force (Join-Path $LibDir "occ\lib") | Out-Null
+    New-Item -ItemType Directory -Force (Join-Path $LibDir "occ\bin") | Out-Null
     Copy-Item $tbbLib -Destination (Join-Path $LibDir "occ\lib\tbb12.lib") -Force
+    Copy-Item $tbbDll -Destination (Join-Path $LibDir "occ\bin\tbb12.dll") -Force
+    $outDirs = @(
+      (Join-Path $RepoRoot "Windows\x64\Release"),
+      (Join-Path $RepoRoot "Windows\x64\Debug"),
+      (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug")
+    )
+    foreach ($d in $outDirs) {
+      New-Item -ItemType Directory -Force $d | Out-Null
+      Copy-Item $tbbDll -Destination $d -Force
+    }
   } finally {
     Pop-Location
   }
   if (-not (Test-Path $OccOut)) { Fail "OCC build finished but output not found: $OccOut" }
+  Set-Content -Path $OccCrtStamp -Value "MD" -Encoding ASCII
   Info "OCC OK"
 }
+
+# -----------------------------
+# 4a) Deploy MKL runtime DLLs (needed when OCC is built with /MD)
+# -----------------------------
+# With /MD, the MKL static threading layer emits a dynamic dependency on
+# mkl_intel_thread.2.dll and mkl_core.2.dll.  Deploy them alongside the other
+# runtime DLLs so the test runner can find them.
+$mklBinDir = Join-Path $env:MKLROOT "bin"
+$mklDllsNeeded = @("mkl_intel_thread.2.dll", "mkl_core.2.dll")
+$outDirsMkl = @(
+  (Join-Path $RepoRoot "Windows\x64\Release"),
+  (Join-Path $RepoRoot "Windows\x64\Debug"),
+  (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug")
+)
+foreach ($mklDll in $mklDllsNeeded) {
+  $src = Join-Path $mklBinDir $mklDll
+  if (-not (Test-Path $src)) {
+    Write-Warning "MKL DLL not found: $src - skipping deployment (test runner may fail to load NoSpherA2_DLL.dll)"
+    continue
+  }
+  foreach ($d in $outDirsMkl) {
+    New-Item -ItemType Directory -Force $d | Out-Null
+    Copy-Item $src -Destination $d -Force
+  }
+  Info "Deployed $mklDll"
+}
+
 $stamp = Join-Path $RepoRoot "Windows\Build_Dependencies\deps.stamp"
 New-Item -ItemType Directory -Force (Split-Path $stamp) | Out-Null
 Set-Content -Path $stamp -Value ("OK " + (Get-Date).ToString("s")) -Encoding ASCII

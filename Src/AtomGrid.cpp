@@ -6,11 +6,6 @@
 #include "wfn_class.h"
 #include "spherical_density.h"
 
-#ifdef _WIN32
-#include <algorithm>
-#include <io.h>
-#endif
-
 // Helper to describe extrema along a line between two atoms
 struct DensityExtremum
 {
@@ -1172,7 +1167,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         int j, ind, *ECP_els_j;
         double *d_local;
         vec dx(ncen * 3);
-        double d_cache[6] = {0.0};
+        double d_cache[6] = { 0.0 };
 
 
         for (int point = 0; point < end; point++) {
@@ -1260,12 +1255,12 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
                     const double b_weight_point = b_weight[point];
                     density = b_weight_point * dens[point];
-                    
+
                     // Pre-load grid coordinates once instead of accessing multiple times
                     const double gx_pt = gx[point];
                     const double gy_pt = gy[point];
                     const double gz_pt = gz[point];
-                    
+
                     for (j = 0; j < ncen; j++) {
                         ind = j * 3;
                         d_local = dx.data() + ind;
@@ -1424,7 +1419,7 @@ double get_r_outer(const double &max_error,
     const int &l,
     const double &guess)
 {
-    double cutoff = std::max(9.9999999999999999e-16, constants::cutoff); //double only accurate to around 1e-16
+    double cutoff = constants::cutoff;
     const int m = 2 * l;
     double r = guess;
     double r_old = 1.0e50;
@@ -1432,6 +1427,9 @@ double get_r_outer(const double &max_error,
     double step = 0.5;
     double sign, sign_old;
     double f = 1.0e50;
+
+    int iter = 0;
+    int no_flip_count = 0;
 
     sign = (f > max_error) ? 1.0 : -1.0;
     while (step > cutoff)
@@ -1447,10 +1445,22 @@ double get_r_outer(const double &max_error,
         if (r < 0.0)
             sign = 1.0;
 
-        if (sign != sign_old)
+        if (sign != sign_old) {
             step *= 0.1;
+            no_flip_count = 0;
+        }
+        else
+        {
+            no_flip_count++;
+            if (no_flip_count >= constants::grid_max_no_flip)
+            {
+                step *= 0.1;
+                no_flip_count = 0;
+            }
+        }
 
         r += sign * step;
+        iter++;
     }
     return r;
 }

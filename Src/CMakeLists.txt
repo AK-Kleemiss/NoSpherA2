@@ -127,7 +127,7 @@ add_executable(NoSpherA2 "${CMAKE_CURRENT_SOURCE_DIR}/NoSpherA2.cpp")
 set_target_properties(NoSpherA2 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
-target_link_libraries(NoSpherA2 PRIVATE libnosphera2 $<$<PLATFORM_ID:Windows>:occ::tbb>)
+target_link_libraries(NoSpherA2 PRIVATE libnosphera2)
 target_include_directories(NoSpherA2 PRIVATE ${MKL_INCLUDE})
 if(WIN32)
     set_target_properties(libnosphera2 PROPERTIES

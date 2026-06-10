@@ -6,6 +6,7 @@ namespace constants
 {
     extern double exp_cutoff;
     static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
+    constexpr int grid_max_no_flip = 30;
     double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
     {
         return curr == prev
@@ -35,8 +36,8 @@ namespace constants
     struct ConstexprMap {
         std::array<std::pair<K, V>, N> data;
 
-        constexpr V at(const K& key) const {
-            for (auto& [k, v] : data) {
+        constexpr V at(const K &key) const {
+            for (auto &[k, v] : data) {
                 if (k == key) return v;
             }
             throw "Key not found";
@@ -44,6 +45,12 @@ namespace constants
     };
 
     constexpr double constexpr_pow(double base, int exponent) {
+        double result = 1.0;
+        for (int i = 0; i < exponent; i++) result *= base;
+        return result;
+    }
+
+    consteval double pow_const(const double &base, const int &exponent) {
         double result = 1.0;
         for (int i = 0; i < exponent; i++) result *= base;
         return result;
@@ -70,10 +77,10 @@ namespace constants
     constexpr double EIGHT_PI = 8 * PI;
     constexpr double INV_EIGHT_PI = 1.0 / EIGHT_PI;
     constexpr double C0 = SQRT2 * FOUR_PI;
-    const double sqr_pi = sqrt(PI);
-    constexpr double PI2 = PI * PI;
-    const double PI3_2 = PI * sqr_pi;
-    constexpr double PI3 = PI2 * PI;
+    constexpr double sqr_pi = sqrt(PI);
+    constexpr double PI2 = pow_const(PI, 2);
+    constexpr double PI3_2 = PI * sqr_pi;
+    constexpr double PI3 = pow_const(PI, 3);
     constexpr double PI_180 = PI / 180.0;
     constexpr double INV_PI_180 = 1.0 / PI_180;
     const double TG32 = tgamma(3.0 / 2.0);
@@ -128,7 +135,7 @@ namespace constants
     constexpr std::complex<double> cnull = std::complex<double>(0.0, 0.0);
     constexpr std::complex<double> cone = std::complex<double>(0.0, 1.0);
 
-    const double ctelf = 10 * pow(2, -2.0 / 3.0) * pow(3, c_m53) * pow(PI, -c_43);
+    const double ctelf = 10.0 * pow(2, -c_23) * pow(3, c_m53) * pow(PI, -c_43);
     constexpr double c_1_4p = sqrt(1.0 / (FOUR_PI));
     constexpr double c_3_4p = sqrt(3.0 / (FOUR_PI));
     constexpr double c_5_4p = sqrt(5.0 / (FOUR_PI));
@@ -172,7 +179,7 @@ namespace constants
     constexpr size_t socd = sizeof(std::complex<double>);
     constexpr size_t soli = sizeof(long int);
 
-    constexpr double exp_approx(const double& x, int n = 25) {
+    constexpr double exp_approx(const double &x, int n = 25) {
         double result = 1.0;
         double term = 1.0;
         for (int i = 1; i <= n; i++) {
@@ -190,7 +197,7 @@ namespace constants
     constexpr std::optional<std::size_t> orca_2_pySCF(unsigned int l, int m_idx) {
         switch (l) {
         case 0: { constexpr std::array<std::size_t, 1>  map = { 0 }; return map[m_idx]; }
-        //case 1: { constexpr std::array<std::size_t, 3>  map = { 2,0,1 }; return map[m_idx]; }  //For LibCint without -DPYPZPX="ON"
+              //case 1: { constexpr std::array<std::size_t, 3>  map = { 2,0,1 }; return map[m_idx]; }  //For LibCint without -DPYPZPX="ON"
         case 1: { constexpr std::array<std::size_t, 3>  map = { 1,2,0 }; return map[m_idx]; }
         case 2: { constexpr std::array<std::size_t, 5>  map = { 2,3,1,4,0 }; return map[m_idx]; }
         case 3: { constexpr std::array<std::size_t, 7>  map = { 3,4,2,5,1,6,0 }; return map[m_idx]; }
@@ -206,7 +213,7 @@ namespace constants
         }
     }
 
-    constexpr unsigned int type_2_nbo(const int& type) {
+    constexpr unsigned int type_2_nbo(const int &type) {
         if (type == 1) return 1;
         //p types
         else if (type == 2) return 101;
@@ -296,7 +303,7 @@ namespace constants
 
     constexpr std::array<size_t, MAX_FACTORIAL> ft = factorial_const();
 
-    constexpr double log_approx(const double& x, int n = 25) {
+    constexpr double log_approx(const double &x, int n = 25) {
         if (x <= 0.0) return -1.0; // log is not defined for non-positive values
         double result = 0.0;
         double term = (x - 1) / (x + 1);
@@ -309,7 +316,7 @@ namespace constants
         return 2 * result;
     }
 
-    constexpr long long int ft_fun(const int& nr)
+    constexpr long long int ft_fun(const int &nr)
     {
         if (nr >= 0 && nr <= 20)
             return ft[nr];
@@ -319,12 +326,12 @@ namespace constants
             return ft_fun(nr - 1) * nr;
     }
 
-    constexpr const double bohr2ang(const double& inp)
+    constexpr const double bohr2ang(const double &inp)
     {
         return inp * a0 * 1E10;
     }
 
-    constexpr const double bohr2ang_p(const double& inp, const int& p)
+    constexpr const double bohr2ang_p(const double &inp, const int &p)
     {
         if (p == 0)
             return 1.0;
@@ -334,11 +341,11 @@ namespace constants
             return bohr2ang_p(bohr2ang(inp), p - 1);
     }
 
-    constexpr const double ang2bohr(const double& inp)
+    constexpr const double ang2bohr(const double &inp)
     {
         return inp / a0 * 1E-10;
     }
-    constexpr const double ang2bohr_p(const double& inp, const int& p)
+    constexpr const double ang2bohr_p(const double &inp, const int &p)
     {
         if (p == 0)
             return 1.0;
@@ -348,12 +355,12 @@ namespace constants
             return ang2bohr_p(ang2bohr(inp), p - 1);
     }
 
-    constexpr const double cubic_ang2bohr(const double& inp)
+    constexpr const double cubic_ang2bohr(const double &inp)
     {
         return inp / ((a0 * a0 * a0) * 1E30);
     }
 
-    constexpr const double cubic_bohr2ang(const double& inp)
+    constexpr const double cubic_bohr2ang(const double &inp)
     {
         return inp * (a0 * a0 * a0) * 1E30;
     }
@@ -455,14 +462,14 @@ namespace constants
         std::complex<double>(-FOUR_PI, 0.0),
         std::complex<double>(0.0, -FOUR_PI) };
 
-    constexpr const char* Labels[] = { "DM", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr" };
-    const char* atnr2letter(const int& nr);
+    constexpr const char *Labels[] = { "DM", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr" };
+    const char *atnr2letter(const int &nr);
 
-    int get_closest_num_angular(const int& n);
+    int get_closest_num_angular(const int &n);
 
-    int get_angular_order(const int& n);
+    int get_angular_order(const int &n);
 
-    constexpr int get_Z_from_label(const char* tmp)
+    constexpr int get_Z_from_label(const char *tmp)
     {
         return
             (tmp[0] == 'H' && tmp[1] == '\0') ? 0 :
@@ -639,7 +646,7 @@ namespace constants
     4, 1, 0,
     5, 0, 0 };
 
-    const int n_val_electrons[] =
+    constexpr int n_val_electrons[] =
     { 1, 2,
     1, 2, 3, 4, 5, 6, 7, 8,
     1, 2, 3, 4, 5, 6, 7, 8,
@@ -649,7 +656,7 @@ namespace constants
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8 };
 
     // https://en.wikipedia.org/wiki/Electronegativities_of_the_elements_(data_page)
-    const double allen_electronegativities[] =
+    constexpr double allen_electronegativities[] =
     { 2.300, 4.160,
         0.912, 1.576, 2.051, 2.544, 3.066, 3.610, 4.193, 4.787,
         0.869, 1.293, 1.613, 1.916, 2.253, 2.589, 2.869, 3.242,
@@ -659,7 +666,7 @@ namespace constants
         0.67, 0.89
     };
 
-    constexpr void type2vector(int index, int* vector)
+    constexpr void type2vector(int index, int *vector)
     {
         if (index < 1 || index > 56)
         {
@@ -674,10 +681,10 @@ namespace constants
         vector[2] = constants::type_vector[temp * 3 + 2];
     };
 
-    const double normgauss(const int& type, const double& exp);
+    const double normgauss(const int &type, const double &exp);
 
-    const double spherical_harmonic(const int& l, const int& m, const double* d);
-    const double spherical_harmonic(const int& l, const double* d, const double* coefs);
+    const double spherical_harmonic(const int &l, const int &m, const double *d);
+    const double spherical_harmonic(const int &l, const double *d, const double *coefs);
 
     constexpr int ASSOCIATED_LEGENDRE_MAX_L = 12;
     using SphericalNormsArray = std::array<std::array<double, 2 * ASSOCIATED_LEGENDRE_MAX_L + 1>, ASSOCIATED_LEGENDRE_MAX_L + 1>;
@@ -699,12 +706,12 @@ namespace constants
 
 
 
-    double associated_legendre_polynomial(const int& l, const int& m, const double& x);
-    std::vector<double> cartesian_to_spherical(const double& x, const double& y, const double& z);
-    std::pair<double, double> norm_cartesian_to_spherical(const double& x, const double& y, const double& z);
+    double associated_legendre_polynomial(const int &l, const int &m, const double &x);
+    std::vector<double> cartesian_to_spherical(const double &x, const double &y, const double &z);
+    std::pair<double, double> norm_cartesian_to_spherical(const double &x, const double &y, const double &z);
     //Original implementation after P. Coppens DOI: 10.1107/97809553602060000759 Eq. 1.2.7.2b
     //I omitted the abs(m) in the factorial as most other sources do not include it
-    inline double real_spherical(const int& l, const int& m, const double& theta, const double& phi) {
+    inline double real_spherical(const int &l, const int &m, const double &theta, const double &phi) {
 #ifndef __APPLE__
         return constants::spherical_norms[l][l + m] * std::assoc_legendre(l, m, cos(theta)) * ((m >= 0) ? cos(m * phi) : sin(m * phi));
 #else
@@ -712,7 +719,7 @@ namespace constants
 #endif
     }
 
-    static double POLY_SMALLX_R0[] = {
+    static constexpr double POLY_SMALLX_R0[] = {
         // nroots = 1
         5.0000000000000000e-01,
         // nroots = 2
@@ -1242,7 +1249,7 @@ namespace constants
         6.7479733097461019e+02,
     };
 
-    static double POLY_SMALLX_R1[] = {
+    static constexpr double POLY_SMALLX_R1[] = {
         // nroots = 1
         -2.0000000000000001e-01,
         // nroots = 2
@@ -1772,7 +1779,7 @@ namespace constants
         -1.0796757295593762e+01,
     };
 
-    static double POLY_SMALLX_W0[] = {
+    static constexpr double POLY_SMALLX_W0[] = {
         // nroots = 1
         1.0000000000000000e+00,
         // nroots = 2
@@ -2302,7 +2309,7 @@ namespace constants
         1.8992056795136905e-03,
     };
 
-    static double POLY_SMALLX_W1[] = {
+    static constexpr double POLY_SMALLX_W1[] = {
         // nroots = 1
         -3.3333333333333331e-01,
         // nroots = 2
@@ -2832,7 +2839,7 @@ namespace constants
         -1.8660755178749769e-03,
     };
 
-    static double POLY_LARGEX_RT[] = {
+    static constexpr double POLY_LARGEX_RT[] = {
         // nroots = 1
         5.0000000000000000e-01,
         // nroots = 2
@@ -3362,7 +3369,7 @@ namespace constants
         1.0700113899010603e+02,
     };
 
-    static double POLY_LARGEX_WW[] = {
+    static constexpr double POLY_LARGEX_WW[] = {
         // nroots = 1
         1.0000000000000000e+00,
         // nroots = 2
