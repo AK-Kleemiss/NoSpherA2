@@ -138,3 +138,4 @@ libiomp5.so
 **/mkl_intel_thread.2.dll
 **/mkl_core.2.dll
 build_no_tbb**
+tests/P1_test/*.wfn
