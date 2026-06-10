@@ -28,6 +28,11 @@ env:
     OCC_DATA_PATH: "${{ github.workspace }}/occ/share"
     SCCACHE_GHA_ENABLED: "true"
     RUSTC_WRAPPER: "sccache"
+    # Build OCC and NoSpherA2 without AVX (SSE only) so release binaries run
+    # on older CPUs. Honored by CMake (root CMakeLists.txt), MSBuild
+    # (Directory.Build.targets), and Linux/makefile. Both OCC and NoSpherA2
+    # must use the same setting (Eigen ABI differs with AVX).
+    NOS_AVX: "OFF"
 
 jobs:
   # Build matrix for all platforms

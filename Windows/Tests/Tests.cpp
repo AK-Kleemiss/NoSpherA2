@@ -6,15 +6,16 @@ using namespace NosTestFramework;
 
 // ---------------------------------------------------------------------------
 // Integration tests: each method mirrors one entry in tests/tests.toml.
-// The test copies the test directory to a temp folder, runs NoSpherA2.exe,
-// then compares the output log against the corresponding .good file using the
-// same 1% relative numeric tolerance as the Python pytest harness.
+// The test copies the test directory to a temp folder, runs NoSpherA2 in-process
+// through NoSpherA2_DLL.dll, then compares the output log against the
+// corresponding .good file using the same 1% relative numeric tolerance as the
+// Python pytest harness.
 //
 // Prerequisites:
-//   - NoSpherA2.exe must be built (it lives in the same output directory as
-//     this DLL: Windows/x64/<Config>/).
+//   - NoSpherA2_DLL.dll must be built (it lives in the same output directory as
+//     this test DLL: Windows/x64/<Config>/).
 //   - MKLROOT / OCC_DATA_PATH are set automatically; OCC_DATA_PATH is
-//     injected per-process from <repo>/occ/share.
+//     injected per-process from <repo>/Lib/occ/share/occ.
 //   - Full tests (fchk_conversion, fourier_transform_full) are skipped
 //     unless the environment variable RUN_FULL_TEST is set.
 // ---------------------------------------------------------------------------
@@ -41,7 +42,7 @@ namespace NoSpherA2IntegrationTests
                 "alanine_integrated_occ.good", "",
                 {"-occ","alanine.toml", "-cif","alanine.cif",
                  "-dmin","0.5", "-acc","1", "-all_charges", "-no_date"},
-                false, false  // subprocess=true: avoids TBB/static-CRT heap mismatch in DLL
+                false, false
             });
         }
 

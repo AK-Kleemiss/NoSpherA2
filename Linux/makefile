@@ -26,12 +26,22 @@ LIBRASCALINE   := ../Lib/featomic_install/lib/libfeatomic.a
 LIBRASCALINE   += ../Lib/featomic_install/lib/libmetatensor.a
 LIBRASCALINE_I := ../Lib/featomic_install/include
 
+# ---- Vector instructions ----
+# NOS_AVX=ON/OFF overrides (CI sets OFF for max compatibility); unset = detect host.
+# Must match the setting OCC was built with (Eigen ABI differs with AVX).
+NOS_AVX ?= $(shell grep -q avx /proc/cpuinfo 2>/dev/null && echo ON || echo OFF)
+ifeq ($(NOS_AVX),OFF)
+  VEC_OPTS := -msse2 -msse3 -msse4.1 -msse4.2
+else
+  VEC_OPTS := -msse2 -msse3 -msse4.1 -msse4.2 -mavx -mfma
+endif
+
 # ---- Compiler flags (no -fopenmp at link time; only at compile time) ----
 GCC_OPTS       := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP \
-                  -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math \
-                  -include pch.h -mfma
+                  $(VEC_OPTS) -ffast-math \
+                  -include pch.h
 GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP \
-                  -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math \
+                  $(VEC_OPTS) -ffast-math \
                   -include pch.h -mfma
 
 # Include directories

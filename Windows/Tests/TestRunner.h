@@ -159,10 +159,8 @@ namespace NosTestFramework
         std::vector<std::string> args; // flat list of CLI tokens
         bool full = false;             // skip when RUN_FULL_TEST not set
         // subprocess = true: run as a child process instead of in-process.
-        // Use for tests whose code path is incompatible with in-process
-        // execution (e.g. OCC SCF driver allocates memory through TBB's
-        // scalable proxy which conflicts with the static-CRT aligned_free
-        // used by Eigen when destructors run during stack unwind).
+        // This is only an opt-in fallback for future cases that need process
+        // isolation; the normal VS Test Explorer path is in-process.
         // Requires NoSpherA2.exe in the DLL output dir or NOS_EXE env var;
         // if neither is found the test is marked as skipped, not failed.
         bool subprocess = false;
@@ -184,6 +182,7 @@ namespace NosTestFramework
         }
 
         auto repoRoot = GetRepoRoot();
+        auto originalCwd = std::filesystem::current_path();
         auto testSrcDir = repoRoot / "tests" / test.directory;
         if (!std::filesystem::exists(testSrcDir)) {
             auto msg = std::wstring(L"Test directory not found: ") +
@@ -191,10 +190,32 @@ namespace NosTestFramework
             Assert::Fail(msg.c_str());
         }
 
-        // Create isolated temp work directory
-        auto tempBase = std::filesystem::temp_directory_path() / "NosTests" / test.name;
-        std::error_code ec;
-        std::filesystem::remove_all(tempBase, ec);
+        // Create isolated temp work directory. Include process/run identity so
+        // a stale Visual Studio test host cannot lock the next run's folder.
+        auto tempRoot = std::filesystem::temp_directory_path() / "NosTests";
+        auto tempBase = tempRoot /
+            (test.name + "_" + std::to_string(GetCurrentProcessId()) + "_" +
+             std::to_string(GetTickCount64()));
+        auto cleanupTemp = [&]() {
+            std::error_code ignored;
+            std::filesystem::current_path(originalCwd, ignored);
+            SetCurrentDirectoryW(originalCwd.wstring().c_str());
+
+            std::error_code cleanupEc;
+            std::filesystem::remove_all(tempBase, cleanupEc);
+            if (cleanupEc) {
+                auto cleanupMessage = cleanupEc.message();
+                auto msg = std::wstring(L"Warning: could not clean temp test directory: ") +
+                    tempBase.wstring() + L" (" +
+                    std::wstring(cleanupMessage.begin(), cleanupMessage.end()) +
+                    L")";
+                Logger::WriteMessage(msg.c_str());
+            }
+        };
+        {
+            std::error_code ignored;
+            std::filesystem::remove_all(tempRoot / test.name, ignored);
+        }
         std::filesystem::create_directories(tempBase);
         std::filesystem::copy(testSrcDir, tempBase,
             std::filesystem::copy_options::recursive |
@@ -210,10 +231,8 @@ namespace NosTestFramework
 
         if (test.subprocess) {
             // ---- subprocess path -----------------------------------------------
-            // Some tests (e.g. OCC SCF driver) are incompatible with in-process
-            // execution due to heap-allocator mismatches between TBB and the
-            // static CRT used by the DLL.  Run them as a child process instead.
-            // If NoSpherA2.exe is not available the test is skipped.
+            // Optional process-isolation path. If NoSpherA2.exe is not available
+            // the test is skipped.
             auto dllDir = GetDllDirectory();
             std::filesystem::path exePath = dllDir / "NoSpherA2.exe";
             if (!std::filesystem::exists(exePath)) {
@@ -224,7 +243,7 @@ namespace NosTestFramework
                     Logger::WriteMessage(
                         L"SKIPPED: NoSpherA2.exe not found. "
                         L"Build the NoSpherA2 project or set NOS_EXE to run this test.");
-                    std::filesystem::remove_all(tempBase);
+                    cleanupTemp();
                     return;
                 }
             }
@@ -262,7 +281,7 @@ namespace NosTestFramework
                 &si, &pi);
 
             if (!ok) {
-                std::filesystem::remove_all(tempBase);
+                cleanupTemp();
                 Assert::Fail(
                     (std::wstring(L"CreateProcess failed: ") +
                      std::to_wstring(GetLastError())).c_str());
@@ -296,7 +315,7 @@ namespace NosTestFramework
         }
 
         if (exitCode != 0) {
-            std::filesystem::remove_all(tempBase);
+            cleanupTemp();
             Assert::Fail(
                 (std::wstring(L"NoSpherA2 exited with code ") +
                  std::to_wstring(exitCode) + L" for test " +
@@ -322,20 +341,20 @@ namespace NosTestFramework
         }
 
         if (!std::filesystem::exists(actualPath)) {
-            std::filesystem::remove_all(tempBase);
+            cleanupTemp();
             auto msg = std::wstring(L"Output file not found: ") + actualPath.wstring();
             Assert::Fail(msg.c_str());
         }
 
         auto goodPath = testSrcDir / test.goodFile;
         if (!std::filesystem::exists(goodPath)) {
-            std::filesystem::remove_all(tempBase);
+            cleanupTemp();
             auto msg = std::wstring(L"Good file not found: ") + goodPath.wstring();
             Assert::Fail(msg.c_str());
         }
 
         auto diffResult = CompareFiles(goodPath, actualPath);
-        std::filesystem::remove_all(tempBase);
+        cleanupTemp();
 
         if (!diffResult.empty()) {
             auto wmsg = std::wstring(diffResult.begin(), diffResult.end());

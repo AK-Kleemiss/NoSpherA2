@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    Instruction-set policy for all x64 MSBuild projects in this repository.
+
+    OCC static libs (Lib/occ/lib) and every binary linking them must agree on
+    AVX vs SSE: Eigen object layouts differ between the two, and mixing them
+    across the link boundary causes access-violation crashes.
+
+    Policy:
+      NOS_AVX=ON / OFF  (environment variable or msbuild property) - obey it.
+                        CI sets NOS_AVX=OFF for maximum compatibility.
+      unset             - detect the build host's AVX capability.
+
+    The same NOS_AVX variable is honored by the CMake build of OCC
+    (root CMakeLists.txt), keeping both sides consistent.
+  -->
+  <Target Name="NosSelectInstructionSet" BeforeTargets="ClCompile"
+          Condition="'$(Platform)' == 'x64'">
+    <PropertyGroup>
+      <NosAvx Condition="'$(NOS_AVX)' != ''">$(NOS_AVX)</NosAvx>
+    </PropertyGroup>
+    <Exec Condition="'$(NosAvx)' == ''"
+          Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)Windows\detect_avx.ps1&quot;"
+          ConsoleToMSBuild="true" StandardOutputImportance="low" EchoOff="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="NosAvx" />
+    </Exec>
+    <PropertyGroup>
+      <NosInstructionSet Condition="'$(NosAvx)' == 'ON' or '$(NosAvx)' == 'on' or '$(NosAvx)' == 'true' or '$(NosAvx)' == 'TRUE' or '$(NosAvx)' == '1'">AdvancedVectorExtensions</NosInstructionSet>
+      <NosInstructionSet Condition="'$(NosInstructionSet)' == ''">NotSet</NosInstructionSet>
+    </PropertyGroup>
+    <ItemGroup>
+      <ClCompile>
+        <EnableEnhancedInstructionSet>$(NosInstructionSet)</EnableEnhancedInstructionSet>
+      </ClCompile>
+    </ItemGroup>
+    <Message Importance="high"
+             Text="NoSpherA2 instruction set: $(NosInstructionSet) (NOS_AVX='$(NosAvx)')" />
+  </Target>
+</Project>

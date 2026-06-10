@@ -37,8 +37,8 @@ extern int main(int argc, char** argv);
 //
 // The standard workaround is to split into two helpers:
 //   nos_cpp_dispatch  – handles C++ exceptions (try/catch only, no __try)
-//   nos_seh_dispatch  – handles the SEH heap-corruption signal (__try only,
-//                       no C++ try; all locals must be trivially-destructible)
+//   nos_seh_dispatch  – handles native SEH failures (__try only, no C++ try;
+//                       all locals must be trivially-destructible)
 // ---------------------------------------------------------------------------
 
 // C++ exception layer.  Calls main() and translates C++ exceptions to int
@@ -70,12 +70,9 @@ static int nos_cpp_dispatch(int argc, char** argv,
     }
 }
 
-// SEH layer.  Catches 0xC0000374 (STATUS_HEAP_CORRUPTION) that OCC raises
-// during ~Molecule cleanup after a JsonBasisReader buffer overflow corrupts
-// an adjacent Eigen matrix block.  The SCF computation has already finished
-// successfully at that point; only the destructor chain crashes.  By catching
-// the SEH exception the corrupted block is simply never freed (harmless leak)
-// and the test host continues to run subsequent tests normally.
+// SEH layer.  This remains as a narrow last-resort guard for native cleanup
+// failures so one broken in-process run does not necessarily kill the whole
+// Visual Studio test host.
 //
 // Requirements for __try/__except:
 //   • No C++ try/catch in the same function (C2713).
@@ -97,9 +94,8 @@ static int nos_seh_dispatch(int argc, char** argv,
         // log_file buffer) before writing the diagnostic.
         std::cout.rdbuf(*pSavedCout);
         std::cerr.rdbuf(*pSavedCerr);
-        std::cerr << "[NoSpherA2_run] Warning: OCC internal heap corruption "
-                     "caught during cleanup (0xC0000374). The SCF computation "
-                     "completed successfully; the corrupted Eigen block is leaked.\n";
+        std::cerr << "[NoSpherA2_run] Warning: native cleanup failure caught "
+                     "(0xC0000374).\n";
         result = 0;
     }
     return result;
