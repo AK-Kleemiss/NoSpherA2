@@ -518,10 +518,12 @@ void complete_WFN_basis(WFN& wavy)
     int nex_ = 0;
     vec exponents_;
     ivec types_;
+    ivec centers_;
+    int overall_idx = 0;
     for (int a = 0; a < wavy.get_ncen(); a++) {
 		atom atom_ = wavy.get_atom(a);
         for (int b = 0; b < atom_.get_basis_set_size(); b++) {
-            basis_set_entry bf_ = wavy.get_atom_basis_set_entry(a, b);
+            basis_set_entry bf_ = wavy.get_atom_basis_set_entry(a, b); 
             int temp_type = bf_.get_type();
             double temp_exp = bf_.get_exponent();
             int effective_type = 0;
@@ -549,12 +551,13 @@ void complete_WFN_basis(WFN& wavy)
 			for (int idx = 0; idx < end; idx++, nex_++, effective_type++) {
 				exponents_.push_back(temp_exp);
                 types_.push_back(effective_type);
+                centers_.push_back(a);
 			}
-        }
+        } 
     }
 	wavy.set_exponents(exponents_);
-    wavy.set_nex(nex_);
     wavy.set_types(types_);
+    wavy.set_center(centers_);
 }
 
 void gen_missing_basis_auto_aux(const WFN& orbital_wfn, std::shared_ptr<BasisSet>& current_basis) {

@@ -216,7 +216,7 @@ GridManager::GridManager(const GridConfiguration &config)
 }
 
 void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list,
-    const bvec &needs_grid, const cell &unit_cell, const bool get_g) {
+    const bvec &needs_grid, const cell &unit_cell, const bool get_g, std::ostream& file) {
     if (config_.debug) {
         std::cout << "GridManager: Setting up grids for " << atom_list.size()
             << " atoms with " << config_.getPartitionName() << " partitioning" << std::endl;
@@ -240,11 +240,11 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
         needs_helper_grids_ = true;
 
     // Setup prototype grids for each atom type
-    setupPrototypeGrids(wave, atom_type_list_);
+    setupPrototypeGrids(wave, atom_type_list_, file);
     addTimingPoint("Prototype Grid setup");
 
     // Generate integration grids for each atom
-    generateIntegrationGrids(wave, unit_cell, atom_list);
+    generateIntegrationGrids(wave, unit_cell, atom_list, file);
     addTimingPoint("Atomic Grid setup");
 
     // Calculate Hirshfeld weights if needed
@@ -394,12 +394,12 @@ void GridManager::getIntegrationGrid1D(const WFN &wave, const int atom_1, const 
 }
 
 
-void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
-    std::cout << "GridManager: Setting up prototype grids for atom types..." << std::endl;
+void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types, std::ostream& file) {
+    file << "GridManager: Setting up prototype grids for atom types..." << std::endl;
     prototype_grids_.clear();
     prototype_grids_.reserve(atom_types.size());
 
-    if (config_.debug) std::cout << "Prototype Grid Properties:\n" << "Atom Type | N_Gridpoints | max_l |  alpha_max  | Accuracy | alpha_min (s, p, d, f) \n"
+    if (config_.debug) file << "Prototype Grid Properties:\n" << "Atom Type | N_Gridpoints | max_l |  alpha_max  | Accuracy | alpha_min (s, p, d, f) \n"
         << "-------------------------------------------------------------------------------------------\n";
 
     for (const int atom_type : atom_types) {
@@ -457,23 +457,23 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types) {
             std::cout
         );
         if (config_.debug) {
-            std::cout << std::setw(9) << atom_type << " | "
+            file << std::setw(9) << atom_type << " | "
                 << std::setw(12) << prototype_grids_.back().get_num_grid_points() << " | "
                 << std::setw(5) << max_l_temp << " | "
                 << std::setw(11) << alpha_max << " | "
                 << std::setw(8) << config_.accuracy << " | ";
-            std::cout << std::left;
+            file << std::left;
             for (int l = 0; l <= max_l_temp; l++) {
-                std::cout << std::setw(14) << alpha_min[l];
+                file << std::setw(14) << alpha_min[l];
             }
-            std::cout << std::right << std::endl;
+            file << std::right << std::endl;
         }
     }
 }
 
 void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cell,
-    const ivec &atom_list) {
-    std::cout << "GridManager: Generating integration grids for atoms..." << std::endl;
+    const ivec &atom_list, std::ostream& file) {
+    file << "GridManager: Generating integration grids for atoms..." << std::endl;
     const int ncen = wave.get_ncen();
     const int num_atoms_with_grids = needs_helper_grids_ ? ncen : atom_list.size();
     grid_data_.resizeForAtoms(num_atoms_with_grids, needs_helper_grids_);
@@ -566,14 +566,14 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
             chi_matrix,
             config_.debug
         );
-        if (config_.debug) std::cout << "Generated grid for atom " << i + 1 << "/" << num_atoms_with_grids
+        if (config_.debug) file << "Generated grid for atom " << i + 1 << "/" << num_atoms_with_grids
             << " (Type " << atom_type << ") with " << num_points << " points." << std::endl;
     }
     if (needs_helper_grids_)
         grid_data_.total_points = std::accumulate(grid_data_.helper_num_points_per_atom.begin(), grid_data_.helper_num_points_per_atom.end(), 0);
     else
         grid_data_.total_points = std::accumulate(grid_data_.num_points_per_atom.begin(), grid_data_.num_points_per_atom.end(), 0);
-    std::cout << "GridManager: Generated total of " << grid_data_.total_points << " grid points." << std::endl;
+    file << "GridManager: Generated total of " << grid_data_.total_points << " grid points." << std::endl;
 }
 
 PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const cell &unit_cell) {

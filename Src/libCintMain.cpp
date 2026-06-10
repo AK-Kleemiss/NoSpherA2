@@ -346,7 +346,7 @@ void computeRho(
                     1);
             }
         }
-        pb.update(std::cout);
+        pb.update();
     }
     if (opty) {
         delete opty;

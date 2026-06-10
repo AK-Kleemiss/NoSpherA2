@@ -34,8 +34,10 @@ class cell;
 struct options;
 struct scattering_data {
     double F_obs;
+    double abs_F_obs;
+    double F_obs2;
     double sigma_obs;
-    int positive;
+    double sigma_obs2;
 };
 
 enum GridIndex

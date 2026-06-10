@@ -2941,7 +2941,7 @@ void print_duration(std::ostream &file, const std::string &description, const st
     if (total_duration.has_value())
     {
         double percentage = (double(duration.count()) / total_duration->count()) * 100.0;
-        std::cout << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
+        file << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
     };
     file << std::endl;
     // Disable setfill 0 again
@@ -2956,10 +2956,9 @@ void write_timing_to_file(std::ostream &file,
     // Check if either vector is empty
     if (time_points.empty() || descriptions.empty())
     {
-        std::cout << "Error: Empty vector passed to write_timing_to_file" << endl;
+        file << "Error: Empty vector passed to write_timing_to_file" << endl;
         return;
     }
-
     std::chrono::microseconds total_time = std::chrono::duration_cast<std::chrono::microseconds>(time_points.back() - time_points.front());
     file << "\n\n----------------------------- Time Breakdown! -----------------------------" << endl;
     file << "                                     mm:ss:ms" << endl;
@@ -3554,7 +3553,7 @@ ProgressBar::~ProgressBar()
 {
     progress_ = 100.0f;
     write_progress();
-    std::cout << std::endl;
+    stream_ << std::endl;
 #ifdef _WIN32
     if (taskbarList_)
     {
@@ -3564,7 +3563,7 @@ ProgressBar::~ProgressBar()
 #endif
 }
 
-void ProgressBar::write_progress(std::ostream &os)
+void ProgressBar::write_progress()
 {
     // No need to write once progress is 100%
     if (progress_ > 100.0f)
@@ -3572,28 +3571,28 @@ void ProgressBar::write_progress(std::ostream &os)
 
     // Move cursor to the first position on the same line
     // Check if os is a file stream
-    if (dynamic_cast<std::filebuf *>(std::cout.rdbuf()))
+    if (dynamic_cast<std::filebuf *>(stream_.rdbuf()))
     {
-        os.seekp(linestart); // Is a file stream
+        stream_.seekp(linestart); // Is a file stream
     }
     else
     {
-        os << "\r" << std::flush; // Is not a file stream
+        stream_ << "\r" << std::flush; // Is not a file stream
     }
 
     // Start bar
-    os << "[";
+    stream_ << "[";
 
     const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
     for (size_t i = 0; i <= completed; i++)
     {
-        os << fill_;
+        stream_ << fill_;
     }
 
     // End bar
     if (((progress_ < 100.0f) ? progress_ : 100.0f) == 100)
     {
-        os << "] 100% " << std::flush;
+        stream_ << "] 100% " << std::flush;
 #ifdef _WIN32
         if (taskbarList_)
         {
@@ -3604,7 +3603,7 @@ void ProgressBar::write_progress(std::ostream &os)
         return;
     }
 
-    os << std::flush;
+    stream_ << std::flush;
 
 #ifdef _WIN32
     // Update taskbar progress

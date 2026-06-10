@@ -314,14 +314,14 @@ bool unsaved_files(std::vector<WFN> &wavy);
 
 std::string trim(const std::string &s);
 
-inline void print_centered_text(const std::string &text, int &bar_width)
+inline void print_centered_text(const std::string &text, int &bar_width, std::ostream& file = std::cout)
 {
     const int text_length = static_cast<int>(text.length());
     const int total_padding = bar_width - text_length;
     const int padding_left = total_padding / 2;
     const int padding_right = (total_padding - padding_left) - 1;
 
-    std::cout << "["
+    file << "["
         << std::setw(padding_left) << std::setfill(' ') << ""
         << text
         << std::setw(padding_right) << std::setfill(' ') << ""
@@ -349,13 +349,13 @@ class ProgressBar
 public:
     ~ProgressBar();
 
-    ProgressBar(const unsigned long long &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
-        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize / 100 : 1)
+    ProgressBar(const unsigned long long &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "", std::ostream& stream_ = std::cout)
+		: worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize / 100 : 1), stream_(stream_)
     {
         int bw = bar_width_ + 2;
         // Write status text
-        print_centered_text(status_text_, bw);
-        linestart = std::cout.tellp();
+        print_centered_text(status_text_, bw, stream_);
+        linestart = stream_.tellp();
 #ifdef _WIN32
         initialize_taskbar_progress();
 #endif
@@ -366,7 +366,7 @@ public:
         progress_ = (float)workdone * workpart_;
     }
 
-    void update(std::ostream &os = std::cout)
+    void update()
     {
 #pragma omp critical
         {
@@ -374,14 +374,15 @@ public:
             if (workdone % percent_ == 0)
             {
                 set_progress();
-                write_progress(os);
+                write_progress();
             }
         }
     }
 
-    void write_progress(std::ostream &os = std::cout);
+    void write_progress();
 
 private:
+    std::ostream& stream_;
     const unsigned long long worksize_;
     const float workpart_;
     const unsigned long long percent_;
@@ -637,7 +638,7 @@ public:
     {
         return pow(r, type) * std::exp(-exp * r * r) * coefficient;
 	};
-    double eval_gaussian_unnormalized(const double& rl, const double& r2) const
+    inline double eval_gaussian_unnormalized(const double& rl, const double& r2) const
     {
         return rl * std::exp(-exp * r2) * coefficient;
     };

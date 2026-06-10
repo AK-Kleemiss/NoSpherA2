@@ -50,6 +50,18 @@ void XCW::construct(const options& opt_in) {
 	XCW_log.open("XCW.log");
 }
 
+XCW::convergence_settings XCW::loadSettings() {
+	convergence_settings settings;
+	settings.quant_diff = 1e-6;
+	settings.diis_stop_damping = 0.01;
+	settings.max_diis_error = 1e-5;
+	settings.gradient = 1e-5;
+	settings.MaxP_diff = 1e-7;
+	settings.RMSP_diff = 5e-9;
+	settings.diis_stop_shift = 0.001;
+	return settings;
+}
+
 void XCW::U_frac2U_rec() {
 	// For now only second order ADPs are supported
 	vec norm(3);
@@ -410,28 +422,22 @@ void XCW::eval_scale() {
 	scale = (denominator != 0.0) ? numerator / denominator : 1.0;
 }
 
-void XCW::calc_chi2() {
+void XCW::calc_criteria() {
 	double prefactor = 1.0 / static_cast<double>(nr_small - n_params);
-	double sum = 0;
-#pragma omp parallel for reduction(+:sum)
+	double sum_chi = 0;
+	double sum_goof = 0;
+#pragma omp parallel for reduction(+:sum_chi, sum_goof)
 	for (int i = 0; i < nr_small; i++) {
-		const double diff = (scale * std::abs(F_calc[i]) - std::abs(obs[i].F_obs));
-		const double weighted = diff * diff / obs[i].sigma_obs;
-		sum += weighted;
+		const double scaled_F_calc = scale * std::abs(F_calc[i]);
+		const double diff = scaled_F_calc - obs[i].abs_F_obs;
+		const double diff2 = scaled_F_calc * scaled_F_calc - obs[i].F_obs2;
+		const double weighted_chi = diff * diff / obs[i].sigma_obs;
+		const double weighted_goof = diff2 * diff2 / (obs[i].sigma_obs2 * obs[i].sigma_obs2);
+		sum_chi += weighted_chi;
+		sum_goof += weighted_goof;
 	}
-	chi2 = std::sqrt(prefactor * sum);
-}
-
-void XCW::calc_goof() {
-	double prefactor = 1.0 / static_cast<double>(nr_small - n_params);
-	double sum = 0;
-#pragma omp parallel for reduction(+:sum)
-	for (int i = 0; i < nr_small; i++) {
-		const double diff = (std::pow(scale * std::abs(F_calc[i]), 2) - std::pow(std::abs(obs[i].F_obs), 2));
-		const double weighted = diff * diff / (std::pow(2 * obs[i].sigma_obs * std::abs(obs[i].F_obs), 2));
-		sum += weighted;
-	}
-	GooF = std::sqrt(prefactor * sum);
+	chi2 = prefactor * sum_chi;
+	GooF = std::sqrt(prefactor * sum_goof);
 }
 
 void XCW::create_prims(std::vector<ao_data>& ao_data_shells) {
@@ -563,7 +569,6 @@ size_t XCW::flattened_idx(int r, int mu, int nu) const noexcept {
 void XCW::eval_I(std::vector<ao_data>& ao_data_shells) {
 
 	I.resize(nr_small * (nmo * (nmo + 1)) / 2);
-	//I.resize(nr_small, cvec2(nmo, cvec(nmo, 0)));
 	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
 
 	cvec2 XCW_integral;
@@ -686,7 +691,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 #pragma omp for nowait
 		for (int r = 0; r < nr_small; r++) {
 			const double F_calc_abs = std::abs(F_calc[r]);
-			const cdouble precompute = std::conj(F_calc[r]) * (scale * F_calc_abs - std::abs(obs[r].F_obs)) / (obs[r].sigma_obs * F_calc_abs);
+			const cdouble precompute = std::conj(F_calc[r]) * (scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * F_calc_abs);
 			const size_t base = r * packed_size;
 			for (int mu = 0; mu < nmo; mu++) {
 				size_t offset = base + tri_index(mu, mu);
@@ -745,7 +750,7 @@ void XCW::setup_basis(occ::core::Molecule& mol, std::string& basis_set_name) {
 
 double XCW::dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& current_alpha, const double& e_diff, double& e_diff_mem) {
 	double new_alpha = current_alpha;
-	if (e_diff < e_diff_mem / 10 && current_alpha != 0) {
+	if (e_diff < e_diff_mem / 10) {
 		new_alpha *= 0.75;
 		e_diff_mem = e_diff;
 		if (e_diff < 10 * scf.convergence_settings.energy_threshold) {
@@ -760,6 +765,23 @@ double XCW::dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const
 	}
 	return new_alpha;
 	// closing function
+}
+
+void XCW::apply_level_shift(const occ::Mat& C_old, const occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& F_diis) {
+	const double temp_shift = scf.convergence_settings.effective_level_shift(scf.diis_error);
+	const int nocc = scf.ctx.mo.Cocc.cols();
+	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Restricted) {
+		const occ::Mat SC_virt = scf.ctx.S * C_old.rightCols(nmo - nocc);
+		F_diis.noalias() += temp_shift * SC_virt * SC_virt.transpose();
+	}
+	else {
+		const int nao = C_old.rows() / 2;
+		const auto S_ao = scf.ctx.S.topRows(nao);
+		const occ::Mat SC_virt_a = S_ao * C_old.topRows(nao).rightCols(nmo - nocc);
+		const occ::Mat SC_virt_b = S_ao * C_old.bottomRows(nao).rightCols(nmo - nocc);
+		F_diis.topRows(nao).noalias() += temp_shift * SC_virt_a * SC_virt_a.transpose();
+		F_diis.bottomRows(nao).noalias() += temp_shift * SC_virt_b * SC_virt_b.transpose();
+	}
 }
 
 void XCW::build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMatrix2& dm_ref, const occ::Mat& dm_old) {
@@ -787,7 +809,9 @@ void XCW::build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMat
 
 void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool has_guess) {
 
-	XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) <<  lambda << "\n";
+	settings.clear();
+
+	XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
 	XCW_log << "____________________________________________________________________________\n";
 	XCW_log << " Iteration	Chi^2	GooF	Total Energy	Perturbation	Target quantity \n";
 	XCW_log << "								(Eh)		   (a. u.)			(a. u.)\n";
@@ -803,14 +827,14 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 
 	scf.ctx.H = scf.ctx.T + scf.ctx.V;
 	bool converged;
-	double minimising_quantity;
-	double last_quantity = 0;
+	double quant;
+	double last_quant = 0;
 	double e_diff_mem = 0;
+	occ::Mat dm_last = scf.ctx.mo.D;
 
 	do {
 
-		converged = SCF_iteration(scf, lambda, alpha, e_diff_mem);
-		minimising_quantity = scf.ctx.energy["total"] + lambda * chi2;
+		converged = SCF_iteration(scf, lambda, alpha, e_diff_mem, quant, last_quant, dm_last);
 
 	} while (!converged && scf.iter < scf.maxiter);
 
@@ -819,6 +843,8 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		std::stringstream print_;
 		print_ << "***SCF converged in " << scf.iter + 1 << " iterations***";
 		print_centered_message(print_.str(), 76, XCW_log);
+
+		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << chi2 << "\t" << GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 		create_tscb(scf, lambda);
 	}
@@ -829,70 +855,116 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	// closing function
 }
 
-bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& e_diff_mem) {
+double XCW::compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
+	occ::Mat C = scf.molecular_orbitals().C;
+	occ::Mat Cocc = scf.molecular_orbitals().Cocc;
+	occ::Mat Cvir = C.rightCols(C.cols() - Cocc.cols());
+	occ::Mat G = 2.0 * Cvir.transpose() * scf.ctx.F * Cocc;
+	return G.norm();
+	// closing funciton
+}
+
+void XCW::get_density_criteria(double& RMSP_diff, double& maxP_diff, const occ::Mat& dm, const occ::Mat& dm_last) {
+	occ::Mat difference = dm - dm_last;
+	RMSP_diff = std::sqrt(difference.squaredNorm() / difference.size());
+	maxP_diff = difference.cwiseAbs().maxCoeff();
+	// closing function
+}
+
+bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& e_diff_mem, double& quant, double& last_quant, occ::Mat& dm_last) {
+	// Set up energy values & crystallographic information
 	scf.iter++;
 	const double ehf_last = scf.ctx.energy["electronic"];
 	const occ::Mat dm_old = scf.ctx.mo.D;
-	dMatrix2 dm_ref(nmo, nmo);
-	build_effective_dm(scf, dm_ref, dm_old);
-	calc_F_calc(dm_ref);
+	dMatrix2 dm_eff(nmo, nmo);
+	build_effective_dm(scf, dm_eff, dm_old);
+	calc_F_calc(dm_eff);
 	eval_scale();
-	calc_goof();
-	calc_chi2();
-	
+	calc_criteria();
+
+	// Generates the perturbation matrix
 	occ::Mat perturbation;
 	calc_perturb(perturbation, scf);
 
+	// Build perturbed Fock matrix
 	// Maybe necessary to update the Hamiltoian if a potential changes depending on the density, but that does not happen in normal HF
 	//scf.ctx.H = scf.ctx.T + scf.ctx.V + scf.ctx.Vecp + scf.ctx.V_ext;
-
 	scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H);
 	scf.ctx.F = scf.ctx.H;
 	scf.ctx.F += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
 	scf.update_scf_energy(false);
 	const double ehf = scf.ctx.energy["electronic"];
 	const double e_diff = std::abs(ehf - ehf_last);
+	quant = scf.ctx.energy["total"] + lambda * chi2;
 	scf.ctx.F += perturbation * lambda;
 
-	if (scf.iter == 2) {
-		e_diff_mem = e_diff;
-	}
-	if (scf.iter > 2) {
-		alpha = dynamic_damping(scf, alpha, e_diff, e_diff_mem);
-	}
+	// Prints output line for iteration
+	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << chi2 << "\t" << GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
-	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << chi2 << "\t" << GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * chi2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] + lambda * chi2 << std::endl;
+	// DIIS extrapolation
+	occ::Mat F_diis = scf.convergence_accelerator.update(scf.ctx.mo.kind, scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
+	scf.diis_error = scf.convergence_accelerator.max_error();
+	settings.update(scf.diis_error, XCW_log, alpha);
 
-	if (SCF_convergence_check(e_diff, scf)) {
+	// Convergence check
+	const double gradient = compute_orbital_gradient(scf);
+	const double quant_diff = std::abs(quant - last_quant);
+	if (SCF_convergence_check(quant_diff, gradient, scf, dm_last)) {
 		return true;
 	}
+	last_quant = quant;
 
-	occ::Mat F_diis = scf.convergence_accelerator.update(
-		scf.ctx.mo.kind, scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
-	//scf.diis_error = scf.convergence_accelerator.max_error();
+	// Apply level shift
+	if (settings.apply_shift) {
+		const occ::Mat& C_old = scf.ctx.mo.C;
+		apply_level_shift(C_old, scf, F_diis);
+	}
 
+	// Solves central eigenvalue problem
 	scf.ctx.orthogonalizer.orthogonalize_molecular_orbitals(scf.ctx.mo, F_diis);
 
 	// Apply damping
+	if (settings.apply_damping) {
+		if (scf.iter == 2) {
+			e_diff_mem = e_diff;
+		}
+		if (scf.iter > 2) {
+			alpha = dynamic_damping(scf, alpha, e_diff, e_diff_mem);
+		}
+	}
+
 	scf.ctx.mo.D *= (1 - alpha);
 	scf.ctx.mo.D += alpha * dm_old;
-
+	dm_last = scf.ctx.mo.D;
 	return false;
 
 	//closing function
 }
 
-bool XCW::SCF_convergence_check(const double& e_diff, occ::qm::SCF<occ::qm::HartreeFock>& scf) {
-	bool converged = false;
-	if (e_diff < scf.convergence_settings.energy_threshold) {
-		converged = true;
+bool XCW::SCF_convergence_check(const double& quant_diff, const double& gradient, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last) {
+	double RMSP_diff, maxP_diff;
+	get_density_criteria(RMSP_diff, maxP_diff, scf.ctx.mo.D, dm_last);
+	if (quant_diff < settings.quant_diff) {
+		settings.conv_quant_diff = true;
 	}
-	return converged;
+	if (scf.diis_error < settings.max_diis_error) {
+		settings.conv_max_diis_error = true;
+	}
+	if (gradient < settings.gradient) {
+		settings.conv_gradient = true;
+	}
+	if (RMSP_diff < settings.RMSP_diff) {
+		settings.conv_RMSP_diff = true;
+	}
+	if (maxP_diff < settings.MaxP_diff) {
+		settings.conv_MaxP_diff = true;
+	}
+	return settings.convergence_check();
 	// closing function
 }
 
 void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda) {
-	std::cout << "Creating .tscb file from converged SCF calculation..." << std::endl;
+	XCW_log << "Creating .tscb file from converged SCF calculation..." << std::endl;
 	std::vector<WFN> sf_wave_vec(1, { scf.wavefunction(), false });
 	svec known_atoms_;
 	tsc_block<int, cdouble> result;
@@ -901,11 +973,11 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
 		*opt_,
 		sf_wave_vec,
-		std::cout,
+		XCW_log,
 		known_atoms_,
 		0,
 		&k_pt),
-		std::cout);
+		XCW_log);
 	int value = static_cast<int>(std::round(lambda * 100));
 	std::ostringstream oss;
 	oss << "NA2_" << std::setw(3) << std::setfill('0') << value << ".tscb";
@@ -1031,7 +1103,7 @@ void XCW::run_XCW_fitting() {
 
 	// Configure the XCW routine solver
 	const double starting_alpha = 0.5;
-	const int num_steps = 150;
+	const int num_steps = 10;
 	const double increments = 0.01;
 	occ::qm::HartreeFock hf(occ_basis_set);
 	occ::qm::Wavefunction last_wfn;
@@ -1039,9 +1111,15 @@ void XCW::run_XCW_fitting() {
 	const int maximum_iterations = 100;
 	const int charge = 0;
 	const int multiplicity = 1;
-	const occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
+	const double level_shift = 0.1;
+	const double level_shift_threshold = 0;
+	const occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Unrestricted;
 
-	std::cout << "Continuing output in XCW.log file..." << std::endl;
+	std::cout << "More detailed output in XCW.log file..." << std::endl;
+	std::cout << "____________________________________________________________________________\n";
+	std::cout << " Lambda\t\tChi^2\tGooF\tTotal Energy\tPerturbation\tTarget quantity \n";
+	std::cout << "								(Eh)		   (a. u.)			(a. u.)\n";
+	std::cout << "____________________________________________________________________________\n";
 
 	// Runs the lambda steps for XCW fitting
 	for (int step = 0; step < num_steps; step++) {
@@ -1052,6 +1130,8 @@ void XCW::run_XCW_fitting() {
 		occ::qm::SCF scf(hf, hf_type);
 		scf.set_charge_multiplicity(charge, multiplicity);
 		scf.maxiter = maximum_iterations;
+		scf.convergence_settings.level_shift = level_shift;
+		scf.convergence_settings.level_shift_threshold = level_shift_threshold;
 		scf.update_occupied_orbital_count();
 		scf.convergence_accelerator.set_strategy(scf.convergence_settings.diis_strategy);
 		scf.convergence_accelerator.set_switch_threshold(scf.convergence_settings.diis_switch_threshold);

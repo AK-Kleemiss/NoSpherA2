@@ -1116,7 +1116,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 #ifdef _OPENMP
         omp_set_lock(&l);
 #endif
-        pb.update(std::cout);
+        pb.update();
 #ifdef _OPENMP
         omp_unset_lock(&l);
 #endif

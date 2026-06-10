@@ -252,8 +252,14 @@ int AtomGrid::get_num_grid_points() const { return (int)atom_grid_x_bohr_.size()
 
 int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
-vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
+vec make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
     const int ncen = wfn.get_ncen();
+    const int nmo = wfn.get_nmo();
+    if (nmo == 0) {
+        if (debug)
+            std::cout << "make_chi: No molecular orbitals found, skipping chi calculation." << std::endl;
+        return vec(0); // Default to all pairs being "far apart" if no MOs
+    }
     vec chi(ncen * ncen, 0.0);
     std::vector<std::vector<bool>> neighbours(ncen, bvec(ncen, true));
     double rijx2, rijy2, rijz2, xdist, disth;
@@ -388,8 +394,10 @@ vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
                     // This is helpful to see if the "bcp" evaluation is broken, or one face a nasty scenario that is not yet included in the code...
                     if (debug)
 #pragma omp critical
-                        {std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a * ncen + b] << std::endl;}
-                        
+                    {
+                        std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a * ncen + b] << std::endl;
+                    }
+
                 }
             }
             else {
@@ -528,122 +536,191 @@ constexpr double f(const double &x)
 
 // JCP 139, 071103 (2013) for TFVC
 // JCP 88, 2547 (1988) for Becke
-std::array<double, 2> get_integration_weights(const int &num_centers,
-    const int *proton_charges,
-    const double *x_coordinates_bohr,
-    const double *y_coordinates_bohr,
-    const double *z_coordinates_bohr,
-    const int &center_index,
-    const double &x,
-    const double &y,
-    const double &z,
-    std::vector<double> &pa_b,
-    std::vector<double> &pa_tv,
-    const vec &chi)
+std::array<double, 2> get_integration_weights(const int& num_centers,
+    const int* proton_charges,
+    const double* x_coordinates_bohr,
+    const double* y_coordinates_bohr,
+    const double* z_coordinates_bohr,
+    const int& center_index,
+    const double& x,
+    const double& y,
+    const double& z,
+    std::vector<double>& pa_b,
+    std::vector<double>& pa_tv,
+    const vec& chi)
 {
     double mu_ab, nu_ab, f, dist_ab;
     double dist_a, dist_b;
     double vx, vy, vz;
     double R_a, R_b, chi_becke, u_ab, chi_mod;
-    const double *chi_off, *bragg = constants::bragg_angstrom;
-    double *R_v = new double[num_centers];
-    const double &cut = constants::cutoff;
+    const double* chi_off, * bragg = constants::bragg_angstrom;
+    double* R_v = new double[num_centers];
+    const double& cut = constants::cutoff;
     for (int a = 0; a < num_centers; a++) {
         pa_b[a] = 1.0;
         pa_tv[a] = 1.0;
         R_v[a] = bragg[proton_charges[a]];
     }
 
+    if (chi.size() == 0) [[unlikely]] {
+        for (int a = 0; a < num_centers; a++) {
+            vx = x_coordinates_bohr[a] - x;
+            vy = y_coordinates_bohr[a] - y;
+            vz = z_coordinates_bohr[a] - z;
+            dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
 
-    for (int a = 0; a < num_centers; a++) {
-        vx = x_coordinates_bohr[a] - x;
-        vy = y_coordinates_bohr[a] - y;
-        vz = z_coordinates_bohr[a] - z;
-        dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
+            double& pa_b_a = pa_b[a];
+            double& pa_tv_a = pa_tv[a];
 
-        double &pa_b_a = pa_b[a];
-        double &pa_tv_a = pa_tv[a];
-
-        if (dist_a > constants::far_away) {
-            pa_b_a = 0.0;
-            pa_tv_a = 0.0;
-            continue;
-        }
-
-        R_a = R_v[a];
-        chi_off = chi.data() + a * num_centers;
-
-        for (int b = a + 1; b < num_centers; b++) {
-            double &pa_b_b = pa_b[b];
-            double &pa_tv_b = pa_tv[b];
-
-            vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
-            vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
-            vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
-            dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
-
-            vx = x_coordinates_bohr[b] - x;
-            vy = y_coordinates_bohr[b] - y;
-            vz = z_coordinates_bohr[b] - z;
-            dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
-            R_b = R_v[b];
-
-            // JCP 139, 071103 (2013), eq. 7
-            // JCP 88, 2547 (1988), eq. 11
-            mu_ab = (dist_a - dist_b) / dist_ab;
-
-            chi_mod = *(chi_off + b) * (1.0 - mu_ab);
-
-            nu_ab = 1.0 + mu_ab;
-
-            nu_ab = (nu_ab - chi_mod) / (nu_ab + chi_mod);
-
-            f = 1.0 - f4(nu_ab);
-
-            if (std::abs(f) < cut)
-                pa_tv_a = 0.0;
-            else {
-                //Reduce numerical jittering
-                if (pa_tv_a > 1E-250 || pa_tv_a < -1E-250)
-                    pa_tv_a *= 0.5 * f;
-                else
-                    pa_tv_a = 0.0;
-                if (pa_tv_b > 1E-250 || pa_tv_b < -1E-250)
-                    pa_tv_b *= 0.5 * (2.0 - f);
-                else
-                    pa_tv_b = 0.0;
-            }
-
-
-            if (std::abs(R_a - R_b) > cut) {
-                chi_becke = R_a / R_b;
-                u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
-                u_ab = u_ab / (u_ab * u_ab - 1.0);
-
-                // JCP 88, 2547 (1988), eq. A3
-                if (u_ab > 0.5)
-                    u_ab = 0.5;
-                else if (u_ab < -0.5)
-                    u_ab = -0.5;
-
-                nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
-            }
-            else
-                nu_ab = mu_ab;
-
-            f = 1.0 - f3(nu_ab);
-
-            if (std::abs(f) < cut)
+            if (dist_a > constants::far_away) {
                 pa_b_a = 0.0;
-            else {
-                if (pa_b_a > 1E-250 || pa_b_a < -1E-250)
-                    pa_b_a *= 0.5 * f;
+                pa_tv_a = 0.0;
+                continue;
+            }
+
+            R_a = R_v[a];
+
+            for (int b = a + 1; b < num_centers; b++) {
+                double& pa_b_b = pa_b[b];
+                double& pa_tv_b = pa_tv[b];
+
+                vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
+                vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
+                vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
+                dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
+
+                vx = x_coordinates_bohr[b] - x;
+                vy = y_coordinates_bohr[b] - y;
+                vz = z_coordinates_bohr[b] - z;
+                dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
+                R_b = R_v[b];
+
+                mu_ab = (dist_a - dist_b) / dist_ab;
+
+                if (std::abs(R_a - R_b) > cut) {
+                    chi_becke = R_a / R_b;
+                    u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
+                    u_ab = u_ab / (u_ab * u_ab - 1.0);
+
+                    // JCP 88, 2547 (1988), eq. A3
+                    if (u_ab > 0.5)
+                        u_ab = 0.5;
+                    else if (u_ab < -0.5)
+                        u_ab = -0.5;
+
+                    nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
+                }
                 else
+                    nu_ab = mu_ab;
+
+                f = 1.0 - f3(nu_ab);
+
+                if (std::abs(f) < cut)
                     pa_b_a = 0.0;
-                if (pa_b_b > 1E-250 || pa_b_b < -1E-250)
-                    pa_b_b *= 0.5 * (2.0 - f);
+                else {
+                    if (pa_b_a > 1E-250 || pa_b_a < -1E-250)
+                        pa_b_a *= 0.5 * f;
+                    else
+                        pa_b_a = 0.0;
+                    if (pa_b_b > 1E-250 || pa_b_b < -1E-250)
+                        pa_b_b *= 0.5 * (2.0 - f);
+                    else
+                        pa_b_b = 0.0;
+                }
+            }
+        }
+    }
+    else {
+        for (int a = 0; a < num_centers; a++) {
+            vx = x_coordinates_bohr[a] - x;
+            vy = y_coordinates_bohr[a] - y;
+            vz = z_coordinates_bohr[a] - z;
+            dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
+
+            double& pa_b_a = pa_b[a];
+            double& pa_tv_a = pa_tv[a];
+
+            if (dist_a > constants::far_away) {
+                pa_b_a = 0.0;
+                pa_tv_a = 0.0;
+                continue;
+            }
+
+            R_a = R_v[a];
+            chi_off = chi.data() + a * num_centers;
+
+            for (int b = a + 1; b < num_centers; b++) {
+                double& pa_b_b = pa_b[b];
+                double& pa_tv_b = pa_tv[b];
+
+                vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
+                vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
+                vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
+                dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
+
+                vx = x_coordinates_bohr[b] - x;
+                vy = y_coordinates_bohr[b] - y;
+                vz = z_coordinates_bohr[b] - z;
+                dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
+                R_b = R_v[b];
+
+                // JCP 139, 071103 (2013), eq. 7
+                // JCP 88, 2547 (1988), eq. 11
+                mu_ab = (dist_a - dist_b) / dist_ab;
+
+                chi_mod = *(chi_off + b) * (1.0 - mu_ab);
+
+                nu_ab = 1.0 + mu_ab;
+
+                nu_ab = (nu_ab - chi_mod) / (nu_ab + chi_mod);
+
+                f = 1.0 - f4(nu_ab);
+
+                if (std::abs(f) < cut)
+                    pa_tv_a = 0.0;
+                else {
+                    //Reduce numerical jittering
+                    if (pa_tv_a > 1E-250 || pa_tv_a < -1E-250)
+                        pa_tv_a *= 0.5 * f;
+                    else
+                        pa_tv_a = 0.0;
+                    if (pa_tv_b > 1E-250 || pa_tv_b < -1E-250)
+                        pa_tv_b *= 0.5 * (2.0 - f);
+                    else
+                        pa_tv_b = 0.0;
+                }
+
+
+                if (std::abs(R_a - R_b) > cut) {
+                    chi_becke = R_a / R_b;
+                    u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
+                    u_ab = u_ab / (u_ab * u_ab - 1.0);
+
+                    // JCP 88, 2547 (1988), eq. A3
+                    if (u_ab > 0.5)
+                        u_ab = 0.5;
+                    else if (u_ab < -0.5)
+                        u_ab = -0.5;
+
+                    nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
+                }
                 else
-                    pa_b_b = 0.0;
+                    nu_ab = mu_ab;
+
+                f = 1.0 - f3(nu_ab);
+
+                if (std::abs(f) < cut)
+                    pa_b_a = 0.0;
+                else {
+                    if (pa_b_a > 1E-250 || pa_b_a < -1E-250)
+                        pa_b_a *= 0.5 * f;
+                    else
+                        pa_b_a = 0.0;
+                    if (pa_b_b > 1E-250 || pa_b_b < -1E-250)
+                        pa_b_b *= 0.5 * (2.0 - f);
+                    else
+                        pa_b_b = 0.0;
+                }
             }
         }
     }

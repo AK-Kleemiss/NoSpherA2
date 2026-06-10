@@ -11,6 +11,7 @@ class XCW {
 public:
 	// Constructor
 	XCW(const options& opt_in)
+		: settings(loadSettings())
 	{
 		construct(opt_in);
 	};
@@ -33,10 +34,57 @@ private:
 		std::string identifier;
 		cdouble dispersion;
 	};
+	struct convergence_settings {
+		double quant_diff;
+		bool conv_quant_diff = false;
+		double max_diis_error;
+		bool conv_max_diis_error = false;
+		double gradient;
+		bool conv_gradient = false;
+		double RMSP_diff;
+		bool conv_RMSP_diff = false;
+		double MaxP_diff;
+		bool conv_MaxP_diff = false;
+		double diis_stop_damping;
+		bool apply_shift = true;
+		double diis_stop_shift;
+		bool apply_damping = true;
+
+		void clear() {
+			conv_quant_diff = false;
+			conv_max_diis_error = false;
+			conv_gradient = false;
+			conv_RMSP_diff = false;
+			conv_MaxP_diff = false;
+			apply_shift = true;
+			apply_damping = true;
+		}
+		bool convergence_check() const {
+			if (conv_quant_diff == true && conv_max_diis_error == true && conv_gradient == true && conv_RMSP_diff == true && conv_MaxP_diff == true) {
+				return true;
+			}
+			else {
+				return false;
+			}
+		}
+		void update(const double& diis_error, std::ostream& file, double& alpha) {
+			if (diis_error < diis_stop_damping && apply_damping == true) {
+				apply_damping = false;
+				print_centered_message("***Turned off damping***", 76, file);
+				alpha = 0;
+			}
+			if (diis_error < diis_stop_shift && apply_shift == true) {
+				apply_shift = false;
+				print_centered_message("***Turned off level shift***", 76, file);
+			}
+		}
+	};
 
 
 	// Constructor of the XCW class
 	void construct(const options& opt_in);
+	// Loads the convergence settings
+	convergence_settings loadSettings();
 
 
 	// Methods for evaluating essential crystallographic measures
@@ -52,10 +100,8 @@ private:
 	void eval_anom_disp();
 	// Evaluates the scaling factor for |F_calc| by least squares fitting
 	void eval_scale();
-	// Calculates the chi^2 quality criterion
-	void calc_chi2();
-	// Calculates the GooF just like in Olex2
-	void calc_goof();
+	// Calculates quality criteria like GooF and chi^2
+	void calc_criteria();
 
 
 	// Methods for evaluating elements used for building the XCW perturbation potential
@@ -74,6 +120,9 @@ private:
 	// Calculates the perturbation matrix elements
 	void calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf);
 
+	double compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf);
+	void get_density_criteria(double& RMSP_diff, double& maxP_diff, const occ::Mat& dm, const occ::Mat& dm_last);
+
 
 	// Methods for performing the SCF procedure
 	// Sets up a molecule object from the asym_atoms
@@ -83,13 +132,15 @@ private:
 	// Executes a single SCF solver
 	void do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool has_guess);
 	// Executes a single SCF iteration
-	bool SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& e_diff_mem);
+	bool SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& e_diff_mem, double& quant, double& last_quant, occ::Mat& dm_last);
 	// Checks convergence for SCF cylce
-	bool SCF_convergence_check(const double& e_diff, occ::qm::SCF<occ::qm::HartreeFock>& scf);
+	bool SCF_convergence_check(const double& e_diff, const double& gradient, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last);
 	// Takes the SCF object from occ and creates the tscb file
 	void create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda);
 	// Takes care of dynamic damping (very primitive)
 	double dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& current_alpha, const double& e_diff, double& e_diff_mem);
+	// Applies level shift to fock matrix
+	void apply_level_shift(const occ::Mat& C_old, const occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& F_diis);
 	// Builds the density matrix to use for structure factor calculations
 	void build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMatrix2& dm_ref, const occ::Mat& dm_old);
 
@@ -107,8 +158,8 @@ private:
 	void U_rec2U_cart();
 	// Generates a list that links the symmetry operations to symmetry-generated reflexes for given reflex r
 	ivec generate_asym_lookup(const int r);
-	
-	
+
+
 	// Available lists and variables that are often used
 	int nmo;
 	int ncen;
@@ -140,4 +191,5 @@ private:
 	occ::core::Molecule mol;
 	occ::qm::AOBasis occ_basis_set;
 	std::ofstream XCW_log;
+	convergence_settings settings;
 };
