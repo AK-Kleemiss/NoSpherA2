@@ -42,6 +42,9 @@ void XCW::construct(const options& opt_in) {
 
 	U_iso = read_U_iso_from_CIF(cif, wave, unit_cell, log3, opt_in.debug);
 	unit_cell.eval_symm(asym_atoms);
+	if (grown_structure) {
+		unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms);
+	}
 	nr = hkl_enlarged.size();
 	nr_small = hkl.size();
 	make_k_pts(nr != 0 && hkl.size() == 0, opt_in.save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt_in.debug);

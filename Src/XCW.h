@@ -172,6 +172,7 @@ private:
 	// 1: Refine against F values
 	// 2: Refine against F^2 values
 	int refine_against;
+	bool grown_structure;
 	ivec asym_atom_list;
 	vec U_iso;
 	svec labels;
