@@ -83,6 +83,7 @@ jobs:
               Windows/x64/Release/tbb12.dll
               Windows/x64/Release/mkl_intel_thread.2.dll
               Windows/x64/Release/mkl_core.2.dll
+              Windows/x64/Release/mkl_def.2.dll
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.name }}
@@ -275,6 +276,9 @@ jobs:
               Windows/x64/Release/NoSpherA2.exe
               Windows/x64/Release/libiomp5md.dll
               Windows/x64/Release/tbb12.dll
+              Windows/x64/Release/mkl_intel_thread.2.dll
+              Windows/x64/Release/mkl_core.2.dll
+              Windows/x64/Release/mkl_def.2.dll
             executable-name: NoSpherA2.exe
 
     runs-on: ${{ matrix.os }}

@@ -151,14 +151,14 @@
     <ClCompile>
       <WarningLevel>Level2</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>BUILDING_DLL;NDEBUG;NOSPHERA2DLL_EXPORTS;_WINDOWS;_USRDLL;BUILDING_DLL;SPDLOG_COMPILED_LIB;NOSPHERA2_IN_PROCESS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BUILDING_DLL;_DEBUG;NOSPHERA2DLL_EXPORTS;_WINDOWS;_USRDLL;BUILDING_DLL;SPDLOG_COMPILED_LIB;NOSPHERA2_IN_PROCESS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -181,7 +181,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>..\featomic/featomic_install/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -197,14 +197,14 @@
     <ClCompile>
       <WarningLevel>Level2</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>BUILDING_DLL;_DEBUG;NOSPHERA2DLL_EXPORTS;_WINDOWS;_USRDLL;SPDLOG_COMPILED_LIB;NOSPHERA2_IN_PROCESS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BUILDING_DLL;_DEBUG;NOSPHERA2DLL_EXPORTS;_WINDOWS;_USRDLL;BUILDING_DLL;SPDLOG_COMPILED_LIB;NOSPHERA2_IN_PROCESS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -227,7 +227,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <AdditionalIncludeDirectories>..\featomic/featomic_install/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -460,13 +460,22 @@
   <ItemGroup>
     <ResourceCompile Include="NoSpherA2_DLL.rc" />
   </ItemGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalLibraryDirectories>$(MSBuildProjectDirectory)\..\Lib\occ\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="$(SolutionDir)../Windows/MKL.auto.props" Condition="Exists('$(SolutionDir)../Windows/MKL.auto.props')" />
   <Import Project="$(SolutionDir)../Windows/MKL.props" Condition="Exists('$(SolutionDir)../Windows/MKL.props')" />
   <PropertyGroup>
     <!-- Your stated path -->
     <IompDll>$(MKLROOT)\..\..\compiler\latest\bin\libiomp5md.dll</IompDll>
+    <OccSyncScript>$(MSBuildProjectDirectory)\..\Windows\sync_occ_variant.ps1</OccSyncScript>
   </PropertyGroup>
+  <Target Name="ActivateOccVariant" BeforeTargets="ClCompile">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(OccSyncScript)&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -Configuration &quot;$(Configuration)&quot;" />
+  </Target>
   <Target Name="CopyIntelOpenMP" AfterTargets="Build">
     <!-- Copy if it exists -->
     <Message Text="Copying Intel OpenMP runtime: $(IompDll) -&gt; $(TargetDir)" Importance="High" Condition="Exists('$(IompDll)')" />
@@ -475,10 +484,10 @@
     <Error Condition="!Exists('$(IompDll)')" Text="Could not find libiomp5.dll at $(IompDll). Check MKLROOT or oneAPI compiler install." />
   </Target>
   <Target Name="CopyOccTbb" AfterTargets="Build">
-    <PropertyGroup>
-      <OccTbbDll>$(MSBuildProjectDirectory)\..\Lib\occ\bin\tbb12.dll</OccTbbDll>
-    </PropertyGroup>
-    <Copy SourceFiles="$(OccTbbDll)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(OccTbbDll)')" />
-    <Error Condition="!Exists('$(OccTbbDll)')" Text="Could not find tbb12.dll at $(OccTbbDll). Build and install OCC first." />
+    <ItemGroup>
+      <OccTbbDlls Include="$(MSBuildProjectDirectory)\..\Lib\occ\bin\tbb12*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(OccTbbDlls)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="@(OccTbbDlls) != ''" />
+    <Error Condition="@(OccTbbDlls) == ''" Text="Could not find a TBB runtime DLL under $(MSBuildProjectDirectory)\..\Lib\occ\bin. Build and install OCC first." />
   </Target>
 </Project>

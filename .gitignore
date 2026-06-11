@@ -135,6 +135,5 @@ tests/failed_logs/fractal/sucrose_diff.cube_fractal_plot
 *.pyc
 libiomp5.so
 **/Tests.dll
-**/mkl_intel_thread.2.dll
-**/mkl_core.2.dll
 build_no_tbb**
+**/mkl_*.*.dll

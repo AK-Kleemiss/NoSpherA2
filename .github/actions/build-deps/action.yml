@@ -92,97 +92,8 @@ runs:
 
         Set-Content -Path $propsPath -Value $xml -Encoding UTF8
         Write-Host "Wrote $propsPath"
-
-        #Build featomic
-        if (-not (Test-Path "Lib\featomic_install\lib\metatensor.lib")) {
-          Write-Host "Building featomic for Windows"
-          cd featomic\featomic
-          $buildDir = "build"
-          if (-not (Test-Path $buildDir)) {
-            mkdir $buildDir
-          }
-          cd $buildDir
-          cmake -G "Visual Studio 17 2022" ${{ env.FEATOMIC_CMAKE_FLAGS }} -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
-          msbuild -nologo .\featomic.sln -p:Configuration=Release
-          msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
-        } else {
-          Write-Host "Skipping featomic build, already exists"
-        }
-
-        #Build LibCint
-        $build = Join-Path $env:GITHUB_WORKSPACE "libcint\build"
-        $outDir = Join-Path $env:GITHUB_WORKSPACE "Lib\LibCint\lib"
-
-        if (!(Test-Path $outDir)) {
-          Write-Host "Building LibCint for Windows..."
-
-          New-Item -ItemType Directory -Force -Path $build | Out-Null
-          Push-Location $build
-
-          cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DPYPZPX="ON" -DCMAKE_INSTALL_PREFIX="../../Lib/LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" ..
-          cmake --build . --config RELEASE
-          cmake --install .
-        }
-        else {
-          Write-Host "Skipping LibCint build, $outDir already exists"
-        }
         
-        #Build OCC
-        $OccOut = Join-Path $env:GITHUB_WORKSPACE "Lib\occ\lib\occ_main.lib"
-        if (Test-Path $OccOut) {
-          Write-Host "OCC already built ($OccOut)"
-        } else {
-          Write-Host "Building OCC..."
-          Push-Location $env:GITHUB_WORKSPACE
-          try {
-            cmake --workflow --preset windows-clang-cl
-            cmake --install .\build-windows-clang-cl
-            $tbbLib = Get-ChildItem `
-              -Path (Join-Path $env:GITHUB_WORKSPACE "build-windows-clang-cl") `
-              -Recurse `
-              -Filter "tbb12.lib" `
-              -ErrorAction SilentlyContinue |
-              Select-Object -First 1 -ExpandProperty FullName
-            $tbbDll = Get-ChildItem `
-              -Path (Join-Path $env:GITHUB_WORKSPACE "build-windows-clang-cl") `
-              -Recurse `
-              -Filter "tbb12.dll" `
-              -ErrorAction SilentlyContinue |
-              Select-Object -First 1 -ExpandProperty FullName
-            if (-not $tbbLib) { Write-Error "tbb12.lib not found after OCC build" }
-            if (-not $tbbDll) { Write-Error "tbb12.dll not found after OCC build" }
-            New-Item -ItemType Directory -Force -Path (Join-Path $env:GITHUB_WORKSPACE "Lib\occ\lib") | Out-Null
-            New-Item -ItemType Directory -Force -Path (Join-Path $env:GITHUB_WORKSPACE "Lib\occ\bin") | Out-Null
-            Copy-Item $tbbLib -Destination (Join-Path $env:GITHUB_WORKSPACE "Lib\occ\lib\tbb12.lib") -Force
-            Copy-Item $tbbDll -Destination (Join-Path $env:GITHUB_WORKSPACE "Lib\occ\bin\tbb12.dll") -Force
-          } finally {
-            Pop-Location
-          }
-          if (-not (Test-Path $OccOut)) { Write-Error "OCC build finished but output not found: $OccOut" }
-            Write-Host "OCC OK"
-        }
-
-        #Build BasisSetConverter
-        $converterExe = Join-Path $env:GITHUB_WORKSPACE "Lib/BasisSetConverter.exe"
-        if (Test-Path $converterExe) {
-          Write-Host "BasisSetConverter already built ($converterExe)"
-        } else {
-          $src = Join-Path $env:GITHUB_WORKSPACE "BasisSetGenerator"
-          $bld = Join-Path $src "build"
-          if (-not (Test-Path $bld)) { New-Item -ItemType Directory $bld | Out-Null }
-
-          Push-Location $src
-          try {
-            cmake -S . -B build
-            cmake --build build --config Release
-            cmake --install build --config Release --prefix "../Lib"
-          } finally {
-            Pop-Location
-          }
-
-          if (-not (Test-Path $converterExe)) { Fail "BasisSetConverter build finished but executable not found: $converterExe" }
-          Write-Host "BasisSetConverter OK"
-        }
+        & "Windows\Build_Dependencies\build_deps.ps1" -RepoRoot $env:GITHUB_WORKSPACE -Configuration Release -Platform x64
 
     - name: Prepare library archive layout (Unix)
       if: fromJSON(inputs.upload_libs) && inputs.platform != 'Windows'
@@ -208,7 +119,8 @@ runs:
         New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
 
         Copy-Item -Recurse -Force "Lib/featomic_install" (Join-Path $stageDir "featomic_install_${{ inputs.platform }}")
-        Copy-Item -Recurse -Force "Lib/occ" (Join-Path $stageDir "occ_${{ inputs.platform }}")
+        Copy-Item -Recurse -Force "Lib/occ_release" (Join-Path $stageDir "occ_release_${{ inputs.platform }}")
+        Copy-Item -Recurse -Force "Lib/occ_debug" (Join-Path $stageDir "occ_debug_${{ inputs.platform }}")
         Copy-Item -Recurse -Force "Lib/LibCint" (Join-Path $stageDir "LibCint_${{ inputs.platform }}")
 
     - name: Archive libraries

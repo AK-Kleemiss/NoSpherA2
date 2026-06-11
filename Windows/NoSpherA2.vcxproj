@@ -242,7 +242,7 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;NONSA2DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;NONSA2DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -257,7 +257,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
@@ -321,7 +321,7 @@
       <WarningLevel>Level1</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -356,7 +356,7 @@
       <WarningLevel>Level1</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -559,7 +559,7 @@
       <WarningLevel>Level1</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;NONSA2DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;NONSA2DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -574,7 +574,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -1469,7 +1469,6 @@
     <None Include="..\Linux\makefile" />
     <None Include="..\Mac\makefile" />
     <None Include="..\makefile" />
-    <None Include="..\tests\makefile" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc" />
@@ -1477,6 +1476,11 @@
   <ItemGroup>
     <Image Include="NSA2.ico" />
   </ItemGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalLibraryDirectories>$(MSBuildProjectDirectory)\..\Lib\occ\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="MKL.auto.props" Condition="Exists('MKL.auto.props')" />
   <Import Project="MKL.props" Condition="Exists('MKL.props')" />
@@ -1484,6 +1488,7 @@
     <!-- Candidate paths (absolute or relative) -->
     <IompDllCandidate1>$(MKLROOT)\..\..\compiler\latest\bin\libiomp5md.dll</IompDllCandidate1>
     <IompDllCandidate2>$(MKLROOT)\intelopenmp.redist.win\runtimes\win-x64\native\libiomp5md.dll</IompDllCandidate2>
+    <OccSyncScript>$(MSBuildProjectDirectory)\sync_occ_variant.ps1</OccSyncScript>
   </PropertyGroup>
   <!-- First match wins -->
   <PropertyGroup Condition="Exists('$(IompDllCandidate1)')">
@@ -1498,6 +1503,9 @@
   <Target Name="RunBasisSetConverterIfNeeded" BeforeTargets="PreBuildEvent">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)run_basis_converter_if_needed.ps1&quot; -ConverterExe &quot;$(ProjectDir)..\Lib\BasisSetConverter.exe&quot; -SolutionDir &quot;$(MSBuildProjectDirectory)&quot; -Configuration &quot;$(Configuration)&quot; -Platform &quot;$(Platform)&quot; -PlatformToolset &quot;$(PlatformToolset)&quot; -MSBuildExe &quot;$(MSBuildBinPath)\MSBuild.exe&quot;" />
   </Target>
+  <Target Name="ActivateOccVariant" BeforeTargets="ClCompile">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(OccSyncScript)&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -Configuration &quot;$(Configuration)&quot;" />
+  </Target>
   <Target Name="CopyIntelOpenMP" AfterTargets="Build">
     <!-- Copy if it exists -->
     <Message Text="Copying Intel OpenMP runtime: $(IompDll) -&gt; $(TargetDir)" Importance="High" Condition="Exists('$(IompDll)')" />
@@ -1506,10 +1514,10 @@
     <Error Condition="!Exists('$(IompDll)')" Text="Could not find libiomp5.dll at $(IompDll). Check MKLROOT or oneAPI compiler install." />
   </Target>
   <Target Name="CopyOccTbb" AfterTargets="Build">
-    <PropertyGroup>
-      <OccTbbDll>$(MSBuildProjectDirectory)\..\Lib\occ\bin\tbb12.dll</OccTbbDll>
-    </PropertyGroup>
-    <Copy SourceFiles="$(OccTbbDll)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(OccTbbDll)')" />
-    <Error Condition="!Exists('$(OccTbbDll)')" Text="Could not find tbb12.dll at $(OccTbbDll). Build and install OCC first." />
+    <ItemGroup>
+      <OccTbbDlls Include="$(MSBuildProjectDirectory)\..\Lib\occ\bin\tbb12*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(OccTbbDlls)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="@(OccTbbDlls) != ''" />
+    <Error Condition="@(OccTbbDlls) == ''" Text="Could not find a TBB runtime DLL under $(MSBuildProjectDirectory)\..\Lib\occ\bin. Build and install OCC first." />
   </Target>
 </Project>

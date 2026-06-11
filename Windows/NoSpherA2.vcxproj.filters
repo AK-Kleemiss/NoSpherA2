@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Ressourcendateien\Tests">
-      <UniqueIdentifier>{45d99421-05f7-4085-b74e-695a8a4377e4}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Headerdateien\Rascaline">
       <UniqueIdentifier>{2956515b-99de-4bf4-957b-7289c85b4f7b}</UniqueIdentifier>
     </Filter>
@@ -287,9 +284,6 @@
       <Filter>Ressourcendateien</Filter>
     </None>
     <None Include="..\.github\workflows\codeql-analysis.yml">
-      <Filter>Ressourcendateien</Filter>
-    </None>
-    <None Include="..\tests\makefile">
       <Filter>Ressourcendateien</Filter>
     </None>
     <None Include="..\.github\actions\build-deps\action.yml" />

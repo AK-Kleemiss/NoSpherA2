@@ -39,6 +39,7 @@
       "inherits": "only-occ-options",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_release",
         "CMAKE_C_COMPILER": "clang-cl.exe",
         "CMAKE_CXX_COMPILER": "clang-cl.exe",
         "CMAKE_C_COMPILER_TARGET": "x86_64-pc-windows-msvc",
@@ -63,6 +64,44 @@
       "environment": {
         "CXXFLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MD",
         "CFLAGS": "/EHsc /MD"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      }
+    },
+    {
+      "name": "windows-clang-cl-debug",
+      "displayName": "Windows Clang-CL Debug",
+      "description": "Debug OCC build for Windows using clang-cl and lld-link",
+      "inherits": "only-occ-options",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_debug",
+        "CMAKE_C_COMPILER": "clang-cl.exe",
+        "CMAKE_CXX_COMPILER": "clang-cl.exe",
+        "CMAKE_C_COMPILER_TARGET": "x86_64-pc-windows-msvc",
+        "CMAKE_CXX_COMPILER_TARGET": "x86_64-pc-windows-msvc",
+        "CMAKE_LINKER": "lld-link.exe",
+        "CMAKE_EXE_LINKER_FLAGS": "runtimeobject.lib /machine:X64",
+        "CMAKE_SHARED_LINKER_FLAGS": "runtimeobject.lib /machine:X64",
+        "CMAKE_STATIC_LINKER_FLAGS": "/machine:X64",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebugDLL",
+        "BUILD_SHARED_LIBS": "OFF",
+        "TBB_BUILD_SHARED": "ON",
+        "GG_NO_PRAGMA": "ON",
+        "CPACK_SYSTEM_NAME": "windows",
+        "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MDd",
+        "CMAKE_C_FLAGS": "/EHsc /MDd"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "environment": {
+        "CXXFLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MDd",
+        "CFLAGS": "/EHsc /MDd"
       },
       "architecture": {
         "value": "x64",
@@ -177,6 +216,11 @@
       "targets": "occ"
     },
     {
+      "name": "windows-clang-cl-debug",
+      "configurePreset": "windows-clang-cl-debug",
+      "targets": "occ"
+    },
+    {
       "name": "linux-gcc",
       "configurePreset": "linux-gcc"
     },
@@ -214,6 +258,19 @@
         {
           "type": "build",
           "name": "windows-clang-cl"
+        }
+      ]
+    },
+    {
+      "name": "windows-clang-cl-debug",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "windows-clang-cl-debug"
+        },
+        {
+          "type": "build",
+          "name": "windows-clang-cl-debug"
         }
       ]
     },
