@@ -49,7 +49,7 @@ jobs:
             artifact-path: |
               Mac/NoSpherA2_arm64
               Mac/libomp.dylib
-              Mac/libtbb.dylib
+              Mac/libtbb*.dylib
 
 
           - os: macos-15-intel  # Intel x86_64
@@ -60,7 +60,7 @@ jobs:
             artifact-path: |
               Mac/NoSpherA2_x86_64
               Mac/libomp.dylib
-              Mac/libtbb.dylib
+              Mac/libtbb*.dylib
 
           - os: ubuntu-latest
             name: Linux
@@ -125,6 +125,26 @@ jobs:
         BINARY=${{ matrix.executable-path }}
         cp "$LIBOMP" "$(dirname $BINARY)/libomp.dylib"
         install_name_tool -change "$LIBOMP" "@executable_path/libomp.dylib" "$BINARY"
+
+    - name: Bundle libtbb into binary (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        BINARY=${{ matrix.executable-path }}
+        BINDIR="$(dirname $BINARY)"
+        # Find the TBB dylib referenced by the binary
+        LIBTBB=$(otool -L "$BINARY" | grep libtbb | awk '{print $1}' | head -1)
+        if [ -n "$LIBTBB" ] && [ -f "$LIBTBB" ]; then
+          TBBNAME=$(basename "$LIBTBB")
+          cp "$LIBTBB" "$BINDIR/$TBBNAME"
+          install_name_tool -change "$LIBTBB" "@executable_path/$TBBNAME" "$BINARY"
+          # Ensure both libtbb.dylib and libtbb.12.dylib exist
+          if [ "$TBBNAME" != "libtbb.12.dylib" ] && [ ! -f "$BINDIR/libtbb.12.dylib" ]; then
+            cp "$BINDIR/$TBBNAME" "$BINDIR/libtbb.12.dylib"
+          fi
+          if [ "$TBBNAME" != "libtbb.dylib" ] && [ ! -f "$BINDIR/libtbb.dylib" ]; then
+            cp "$BINDIR/$TBBNAME" "$BINDIR/libtbb.dylib"
+          fi
+        fi
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -191,11 +211,20 @@ jobs:
         # Make executable
         chmod +x ./universal/NoSpherA2_Mac
 
-        # Combine arch-specific TBB dylibs into a universal fat dylib
-        lipo -create \
-          ./arm64/libtbb.dylib \
-          ./x86_64/libtbb.dylib \
-          -output ./universal/libtbb.dylib
+        # Combine arch-specific TBB dylibs into a universal fat dylib.
+        # The binaries reference the versioned install name (libtbb.12.dylib),
+        # so combine each name that exists and keep both files available.
+        for name in libtbb.dylib libtbb.12.dylib; do
+          if [ -f "./arm64/$name" ] && [ -f "./x86_64/$name" ]; then
+            lipo -create "./arm64/$name" "./x86_64/$name" -output "./universal/$name"
+          fi
+        done
+        if [ ! -f ./universal/libtbb.12.dylib ] && [ -f ./universal/libtbb.dylib ]; then
+          cp ./universal/libtbb.dylib ./universal/libtbb.12.dylib
+        fi
+        if [ ! -f ./universal/libtbb.dylib ] && [ -f ./universal/libtbb.12.dylib ]; then
+          cp ./universal/libtbb.12.dylib ./universal/libtbb.dylib
+        fi
 
         # Combine arch-specific libomp dylibs into a universal fat dylib
         lipo -create \
@@ -209,7 +238,7 @@ jobs:
         name: executable_MacOS_Universal
         path: |
           ./universal/NoSpherA2_Mac
-          ./universal/libtbb.dylib
+          ./universal/libtbb*.dylib
           ./universal/libomp.dylib
 
   test:

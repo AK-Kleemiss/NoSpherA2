@@ -100,7 +100,8 @@
       "hidden": true,
       "inherits": "only-occ-options",
       "cacheVariables": {
-        "OpenMP_ROOT": "$env{HOMEBREW_PREFIX}/opt/libomp"
+        "OpenMP_ROOT": "$env{HOMEBREW_PREFIX}/opt/libomp",
+        "TBB_BUILD_SHARED": "ON"
       }
 
     },
