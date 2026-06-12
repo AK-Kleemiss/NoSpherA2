@@ -35,3 +35,28 @@ if (Test-Path $destDir) {
 
 Copy-Item -Recurse -Force $sourceDir $destDir
 Set-Content -Path $destStamp -Value $variant -Encoding ASCII
+
+# TBB debug builds name their artifacts tbb12_debug.{lib,dll}.
+# Normalize to tbb12.{lib,dll} so all project configs can link uniformly.
+if ($variant -eq "debug") {
+  # TBB debug builds name their artifacts tbb12_debug.{lib,dll}.
+  $debugLib = Join-Path $destDir "lib\tbb12_debug.lib"
+  $canonLib = Join-Path $destDir "lib\tbb12.lib"
+  if ((Test-Path $debugLib) -and -not (Test-Path $canonLib)) {
+    Copy-Item $debugLib $canonLib
+  }
+  $debugDll = Join-Path $destDir "bin\tbb12_debug.dll"
+  $canonDll = Join-Path $destDir "bin\tbb12.dll"
+  if ((Test-Path $debugDll) -and -not (Test-Path $canonDll)) {
+    Copy-Item $debugDll $canonDll
+  }
+
+  # fmt and spdlog debug builds use a 'd' suffix.
+  foreach ($pair in @(@("fmtd.lib","fmt.lib"), @("spdlogd.lib","spdlog.lib"))) {
+    $src = Join-Path $destDir ("lib\" + $pair[0])
+    $dst = Join-Path $destDir ("lib\" + $pair[1])
+    if ((Test-Path $src) -and -not (Test-Path $dst)) {
+      Copy-Item $src $dst
+    }
+  }
+}

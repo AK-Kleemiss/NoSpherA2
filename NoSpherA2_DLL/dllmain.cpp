@@ -86,17 +86,17 @@ static int nos_seh_dispatch(int argc, char** argv,
     __try {
         result = nos_cpp_dispatch(argc, argv, *pSavedCout, *pSavedCerr);
     }
-    __except (GetExceptionCode() == 0xC0000374   /* STATUS_HEAP_CORRUPTION */
-              ? EXCEPTION_EXECUTE_HANDLER
-              : EXCEPTION_CONTINUE_SEARCH)
+    __except (EXCEPTION_EXECUTE_HANDLER)
     {
         // Restore streams (they may still be redirected to the now-unwound
-        // log_file buffer) before writing the diagnostic.
+        // log_file buffer) before writing the diagnostic.  Always catch native
+        // SEH exceptions here so that cout is never left pointing at a
+        // destroyed log_file buffer, which would corrupt subsequent tests.
         std::cout.rdbuf(*pSavedCout);
         std::cerr.rdbuf(*pSavedCerr);
-        std::cerr << "[NoSpherA2_run] Warning: native cleanup failure caught "
-                     "(0xC0000374).\n";
-        result = 0;
+        std::cerr << "[NoSpherA2_run] Native exception caught: 0x"
+                  << std::hex << GetExceptionCode() << std::dec << "\n";
+        result = static_cast<int>(GetExceptionCode());
     }
     return result;
 }
