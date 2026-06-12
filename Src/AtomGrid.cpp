@@ -1475,6 +1475,7 @@ double get_h(const double &max_error, const int &l, const double &guess)
     double step = 0.1 * guess;
     double sign = -1.0, sign_old, f, pl, rd0, e0;
     const double cm = constants::TG32 / tgamma((m + 3.0) / 2.0);
+    int no_flip_count = 0;
 
     while (step > cutoff)
     {
@@ -1487,8 +1488,19 @@ double get_h(const double &max_error, const int &l, const double &guess)
         (f > max_error) ? (sign = -1.0) : (sign = 1.0);
         if (h < 0.0)
             sign = 1.0;
-        if (sign != sign_old)
+        if (sign != sign_old) {
             step *= 0.1;
+            no_flip_count = 0;
+        }
+        else
+        {
+            no_flip_count++;
+            if (no_flip_count >= constants::grid_max_no_flip)
+            {
+                step *= 0.1;
+                no_flip_count = 0;
+            }
+        }
 
         h_old = h;
         h += sign * step;

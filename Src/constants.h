@@ -6,7 +6,7 @@ namespace constants
 {
     extern double exp_cutoff;
     static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
-    constexpr int grid_max_no_flip = 30;
+    constexpr int grid_max_no_flip = 50;
     double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
     {
         return curr == prev
