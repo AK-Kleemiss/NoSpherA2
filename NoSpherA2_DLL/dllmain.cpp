@@ -3,6 +3,12 @@
 #include "pch_dll.h"
 #include <direct.h>             // _getcwd, _chdir
 #include <occ/core/data_directory.h>  // occ::set_data_directory
+#ifdef _DEBUG
+#include <crtdbg.h>
+#include <stdlib.h>             // _set_invalid_parameter_handler
+static void nos_invalid_param_handler(const wchar_t*, const wchar_t*, const wchar_t*,
+                                       unsigned int, uintptr_t) {}
+#endif
 
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
@@ -121,6 +127,18 @@ extern "C" DLL_EXPORT int __cdecl NoSpherA2_run(
     char savedDir[MAX_PATH] = {};
     _getcwd(savedDir, MAX_PATH);
     _chdir(workDir);
+
+#ifdef _DEBUG
+    // Redirect CRT assert/error dialogs to stderr so they don't block the test
+    // host with an invisible modal dialog (WaitReason=UserRequest, 0% CPU).
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportMode(_CRT_ERROR,  _CRTDBG_MODE_FILE);
+    _CrtSetReportMode(_CRT_WARN,   _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+    _CrtSetReportFile(_CRT_ERROR,  _CRTDBG_FILE_STDERR);
+    _CrtSetReportFile(_CRT_WARN,   _CRTDBG_FILE_STDERR);
+    _set_invalid_parameter_handler(nos_invalid_param_handler);
+#endif
 
     // The test runner sets OCC_DATA_PATH via SetEnvironmentVariableA (Win32 API).
     // NoSpherA2's ensure_occ_data_path() reads it with _dupenv_s (CRT function).

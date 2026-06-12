@@ -3341,7 +3341,11 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         if (operators == 2) reorderd_coefs_s2 = dMatrix2(dimension, dimension);
 
         dMatrixRef2 coefs_2D_s1_span(coefficients[0].data(), dimension, dimension);
-        dMatrixRef2 coefs_2D_s2_span(coefficients[1].data(), dimension, dimension);
+        // coefficients[1] only exists when operators==2; use a harmless fallback otherwise
+        // to avoid a Debug-mode vector bounds assertion (the span is never accessed for op==1).
+        dMatrixRef2 coefs_2D_s2_span(
+            operators == 2 ? coefficients[1].data() : coefficients[0].data(),
+            dimension, dimension);
         int index = 0;
         for (const atom &_atom : atoms) {
             std::vector<basis_set_entry> basis = _atom.get_basis_set();
