@@ -136,3 +136,10 @@ The `alanine_integrated_occ` test passes in both Release and Debug (21/21) with 
 All `[NOS-DBG]` diagnostic traces and Windows heap-check helpers have been removed from the source.
 
 See `HANDOFF.md` for full details and validation commands.
+
+## Hybrid_mode Debug Fix — Fixed (June 2026)
+
+`Hybrid_mode` Debug vstest now passes (20/21 Debug; only `alanine_integrated_occ` remains as a pre-existing OCC Debug issue). Two issues were resolved:
+
+1. **OOB vector access in `read_gbw`** — `coefs_2D_s2_span` was unconditionally constructed with `coefficients[1].data()` even when `operators==1` (restricted wavefunction). With MSVC IDL=2 this raises a CRT assertion dialog blocking the vstest host (WaitReason=UserRequest, 0% CPU). Fix: use `coefficients[0].data()` as a fallback when `operators!=2`.
+2. **Debug CRT dialog suppression** — `_CrtSetReportMode` + `_set_invalid_parameter_handler` added to `dllmain.cpp` (Debug-only) so future CRT assertions print to stderr rather than showing invisible modal dialogs in the test host.
