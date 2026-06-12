@@ -37,12 +37,15 @@ namespace NoSpherA2IntegrationTests
 
         TEST_METHOD(alanine_integrated_occ)
         {
+            // subprocess=true: OCC's TBB parallel integrals cause heap corruption
+            // when run in-process inside the managed vstest host. The subprocess
+            // path gives process isolation and is exactly what CI (pytest) uses.
             RunTest({
                 "alanine_integrated_occ", "alanine_integrated_occ",
                 "alanine_integrated_occ.good", "",
                 {"-occ","alanine.toml", "-cif","alanine.cif",
                  "-dmin","0.5", "-acc","1", "-all_charges", "-no_date"},
-                false, false
+                false, true
             });
         }
 
