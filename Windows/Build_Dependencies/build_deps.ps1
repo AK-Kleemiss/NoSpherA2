@@ -134,14 +134,31 @@ function Try-Load-MKLFromAutoProps {
 }
 
 function Ensure-MKL {
+  function Get-MKLIncludePath([string]$root) {
+    if (-not $root) { return $null }
+
+    $candidates = @(
+      (Join-Path $root "include\mkl.h"),
+      (Join-Path $root "intelmkl.static.win-x64\build\native\include\mkl.h")
+    )
+
+    foreach ($candidate in $candidates) {
+      if (Test-Path $candidate) {
+        return $candidate
+      }
+    }
+
+    return $null
+  }
+
   # ------------------------------------------------------------
   # Check if it is just loaded
   # ------------------------------------------------------------
   Try-Load-MKLFromAutoProps -RepoRoot $RepoRoot
   if ($env:MKLROOT) {
-    $inc = Join-Path $env:MKLROOT "include\mkl.h"
-    if (Test-Path $inc) {
-      Info "MKL detected via MKLROOT=$env:MKLROOT"
+    $inc = Get-MKLIncludePath $env:MKLROOT
+    if ($inc) {
+      Info "MKL detected via MKLROOT=$env:MKLROOT ($inc)"
       return
     }
   }
@@ -167,11 +184,16 @@ function Ensure-MKL {
   function Test-MKLRoot([string]$root) {
     if (-not $root) { return $false }
 
+    if (Get-MKLIncludePath $root) {
+      $script:FoundMKL = $root
+      return $true
+    }
+
     # If this is the parent "...mkl", try to resolve a child version folder or "latest"
-    if (-not (Test-Path (Join-Path $root "include\mkl.h"))) {
+    if (-not (Get-MKLIncludePath $root)) {
       # Try common subfolders: latest, and the newest-looking version folder
       $latest = Join-Path $root "latest"
-      if (Test-Path (Join-Path $latest "include\mkl.h")) {
+      if (Get-MKLIncludePath $latest) {
         $script:FoundMKL = $latest
         return $true
       }
@@ -180,7 +202,7 @@ function Ensure-MKL {
         $ver = Get-ChildItem -Path $root -Directory -ErrorAction SilentlyContinue |
                Sort-Object Name -Descending |
                Select-Object -First 1
-        if ($ver -and (Test-Path (Join-Path $ver.FullName "include\mkl.h"))) {
+        if ($ver -and (Get-MKLIncludePath $ver.FullName)) {
           $script:FoundMKL = $ver.FullName
           return $true
         }
@@ -215,8 +237,9 @@ function Ensure-MKL {
   Write-Host "This project requires Intel oneMKL (headers + libraries)."
   Write-Host ""
   Write-Host "How MKL is detected:"
-  Write-Host "  - Environment variable MKLROOT, AND"
-  Write-Host "  - The file %MKLROOT%\include\mkl.h must exist"
+  Write-Host "  - Environment variable MKLROOT, AND either"
+  Write-Host "  - The file %MKLROOT%\include\mkl.h must exist, OR"
+  Write-Host "  - The file %MKLROOT%\intelmkl.static.win-x64\build\native\include\mkl.h must exist"
   Write-Host ""
   Write-Host "Fix options:"
   Write-Host "  1) Please install Intel oneAPI oneMKL:"

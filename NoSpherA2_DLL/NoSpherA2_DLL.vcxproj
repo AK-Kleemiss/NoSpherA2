@@ -471,9 +471,15 @@
   <Import Project="$(SolutionDir)../Windows/MKL.auto.props" Condition="Exists('$(SolutionDir)../Windows/MKL.auto.props')" />
   <Import Project="$(SolutionDir)../Windows/MKL.props" Condition="Exists('$(SolutionDir)../Windows/MKL.props')" />
   <PropertyGroup>
-    <!-- Your stated path -->
-    <IompDll>$(MKLROOT)\..\..\compiler\latest\bin\libiomp5md.dll</IompDll>
+    <IompDllCandidate1>$(MKLROOT)\..\..\compiler\latest\bin\libiomp5md.dll</IompDllCandidate1>
+    <IompDllCandidate2>$(MKLROOT)\intelopenmp.redist.win\runtimes\win-x64\native\libiomp5md.dll</IompDllCandidate2>
     <OccSyncScript>$(MSBuildProjectDirectory)\..\Windows\sync_occ_variant.ps1</OccSyncScript>
+  </PropertyGroup>
+  <PropertyGroup Condition="Exists('$(IompDllCandidate1)')">
+    <IompDll>$(IompDllCandidate1)</IompDll>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IompDll)'=='' and Exists('$(IompDllCandidate2)')">
+    <IompDll>$(IompDllCandidate2)</IompDll>
   </PropertyGroup>
   <Target Name="ActivateOccVariant" BeforeTargets="ClCompile">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(OccSyncScript)&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -Configuration &quot;$(Configuration)&quot;" />
