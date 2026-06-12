@@ -2,11 +2,7 @@
 #include "XCW.h"
 #include "convenience.h"
 #include "scattering_factors.h"
-//#include "npy.h"
-//#include "integration_params.h"
-//#include "libCintMain.h"
 #include "nos_math.h"
-//#include "bondwise_analysis.h"
 #include "basis_set.h"
 
 void XCW::construct(const options& opt_in) {
@@ -50,7 +46,7 @@ void XCW::construct(const options& opt_in) {
 	make_k_pts(nr != 0 && hkl.size() == 0, opt_in.save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt_in.debug);
 	//Read U_iso, U_ij, C_ijk and Dijkl from CIF file
 	read_fracs_ADPs_from_CIF(cif, wave, unit_cell, log3, opt_in.debug);
-	DW_fact.resize(ncen, vec(nr, 1.0));
+	DW_fact.resize(ncen, cvec(nr, 1.0));
 	XCW_log.open("XCW.log");
 }
 
@@ -67,7 +63,7 @@ XCW::convergence_settings XCW::loadSettings() {
 }
 
 void XCW::U_frac2U_rec() {
-	// For now only second order ADPs are supported
+	const double scale = constants::ang2bohr(1) / constants::TWO_PI;
 	vec norm(3);
 	vec2 rec_matrix(3, vec(3));
 	for (int i = 0; i < 3; i++) {
@@ -75,73 +71,122 @@ void XCW::U_frac2U_rec() {
 			rec_matrix[i][j] = unit_cell.get_rcm(i, j);
 		}
 	}
-	const double scale = constants::ang2bohr(1) / constants::TWO_PI;
 	std::transform(rec_matrix.begin(), rec_matrix.end(), rec_matrix.begin(), [scale](std::vector<double>& vec) {
 		std::transform(vec.begin(), vec.end(), vec.begin(), [scale](double x) { return x * scale; });
 		return vec; });
-	norm[0] = std::sqrt(rec_matrix[0][0] * rec_matrix[0][0] + rec_matrix[1][0] * rec_matrix[1][0] + rec_matrix[2][0] * rec_matrix[2][0]);
-	norm[1] = std::sqrt(rec_matrix[0][1] * rec_matrix[0][1] + rec_matrix[1][1] * rec_matrix[1][1] + rec_matrix[2][1] * rec_matrix[2][1]);
-	norm[2] = std::sqrt(rec_matrix[0][2] * rec_matrix[0][2] + rec_matrix[1][2] * rec_matrix[1][2] + rec_matrix[2][2] * rec_matrix[2][2]);
-	vec2 transform(3, vec(6));
-	transform[0][0] = norm[0] * norm[0];
-	transform[0][1] = norm[1] * norm[1];
-	transform[0][2] = norm[2] * norm[2];
-	transform[0][3] = norm[0] * norm[1];
-	transform[0][4] = norm[0] * norm[2];
-	transform[0][5] = norm[1] * norm[2];
+	ivec2 basis2 = generate_basis(2);
+	ivec2 basis3 = generate_basis(3);
+	ivec2 basis4 = generate_basis(4);
+	vec2 trans_mat2 = build_transform(rec_matrix, basis2);
+	vec2 trans_mat3 = build_transform(rec_matrix, basis3);
+	vec2 trans_mat4 = build_transform(rec_matrix, basis4);
 	for (int a = 0; a < ncen; a++) {
+		vec2 ADPs = wave.get_atom(a).get_ADPs();
 		if (wave.get_atom(a).get_ADPs()[0].size() > 0) {
-			vec2 ADPs = wave.get_atom(a).get_ADPs();
-			ADPs[0][0] *= transform[0][0];
-			ADPs[0][1] *= transform[0][1];
-			ADPs[0][2] *= transform[0][2];
-			ADPs[0][3] *= transform[0][3];
-			ADPs[0][4] *= transform[0][4];
-			ADPs[0][5] *= transform[0][5];
-			wave.set_atom_ADPs(a, ADPs);
+			//vec2 U_frac(3, vec(3));
+			//U_frac[0][0] = ADPs[0][0];
+			//U_frac[1][1] = ADPs[0][1];
+			//U_frac[2][2] = ADPs[0][2];
+			//U_frac[0][1] = ADPs[0][3];
+			//U_frac[1][0] = U_frac[0][1];
+			//U_frac[0][2] = ADPs[0][4];
+			//U_frac[2][0] = U_frac[0][2];
+			//U_frac[1][2] = ADPs[0][5];
+			//U_frac[2][1] = U_frac[1][2];
+			//const vec2 U_rec = self_dot(self_dot(rec_matrix, U_frac, true, false), rec_matrix, false, false);
+			//ADPs[0][1] = U_rec[0][0];
+			//ADPs[0][2] = U_rec[1][1];
+			//ADPs[0][3] = U_rec[2][2];
+			//ADPs[0][4] = U_rec[0][1];
+			//ADPs[0][5] = U_rec[0][2];
+			//ADPs[0][1] = U_rec[1][2];
+			ADPs[0] = transform_voigt(ADPs[0], trans_mat2);
 		}
+		if (wave.get_atom(a).get_ADPs()[1].size() > 0) {
+			ADPs[1] = transform_voigt(ADPs[1], trans_mat3);
+		}
+		if (wave.get_atom(a).get_ADPs()[2].size() > 0) {
+			ADPs[2] = transform_voigt(ADPs[2], trans_mat4);
+		}
+		wave.set_atom_ADPs(a, ADPs);
 	}
 }
 
 void XCW::U_rec2U_cart() {
-	// For now only second order ADPs are supported
+	const double scale = constants::bohr2ang(1);
+	vec2 cart_matrix(3, vec(3));
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			cart_matrix[i][j] = unit_cell.get_cm(i, j);
+		}
+	}
+	std::transform(cart_matrix.begin(), cart_matrix.end(), cart_matrix.begin(), [scale](std::vector<double>& vec) {
+		std::transform(vec.begin(), vec.end(), vec.begin(), [scale](double x) { return x * scale; });
+		return vec; });
 	for (int a = 0; a < ncen; a++) {
 		vec2 ADPs = wave.get_atom(a).get_ADPs();
 		if (wave.get_atom(a).get_ADPs()[0].size() > 0) {
-			vec2 ADP_matrix(3, vec(3));
-			ADP_matrix[0][0] = ADPs[0][0];
-			ADP_matrix[0][1] = ADPs[0][3];
-			ADP_matrix[0][2] = ADPs[0][4];
-			ADP_matrix[1][0] = ADPs[0][3];
-			ADP_matrix[1][1] = ADPs[0][1];
-			ADP_matrix[1][2] = ADPs[0][5];
-			ADP_matrix[2][0] = ADPs[0][4];
-			ADP_matrix[2][1] = ADPs[0][5];
-			ADP_matrix[2][2] = ADPs[0][2];
-			vec2 cart_matrix(3, vec(3));
-			for (int i = 0; i < 3; i++) {
-				for (int j = 0; j < 3; j++) {
-					cart_matrix[i][j] = unit_cell.get_cm(i, j);
-				}
-			}
-			const double scale = constants::bohr2ang(1);
-			std::transform(cart_matrix.begin(), cart_matrix.end(), cart_matrix.begin(), [scale](std::vector<double>& vec) {
-				std::transform(vec.begin(), vec.end(), vec.begin(), [scale](double x) { return x * scale; });
-				return vec; });
-			ADP_matrix = self_dot(self_dot(cart_matrix, ADP_matrix, true, false), cart_matrix, false, false);
-			ADPs[0][0] = ADP_matrix[0][0];
-			ADPs[0][1] = ADP_matrix[1][1];
-			ADPs[0][2] = ADP_matrix[2][2];
-			ADPs[0][3] = ADP_matrix[1][0];
-			ADPs[0][4] = ADP_matrix[0][2];
-			ADPs[0][5] = ADP_matrix[1][2];
-			wave.set_atom_ADPs(a, ADPs);
+			vec2 U_rec(3, vec(3));
+			U_rec[0][0] = ADPs[0][0];
+			U_rec[0][1] = ADPs[0][3];
+			U_rec[0][2] = ADPs[0][4];
+			U_rec[1][0] = ADPs[0][3];
+			U_rec[1][1] = ADPs[0][1];
+			U_rec[1][2] = ADPs[0][5];
+			U_rec[2][0] = ADPs[0][4];
+			U_rec[2][1] = ADPs[0][5];
+			U_rec[2][2] = ADPs[0][2];
+			vec2 U_cart = self_dot(self_dot(cart_matrix, U_rec, true, false), cart_matrix, false, false);
+			ADPs[0][0] = U_rec[0][0];
+			ADPs[0][1] = U_rec[1][1];
+			ADPs[0][2] = U_rec[2][2];
+			ADPs[0][3] = U_rec[1][0];
+			ADPs[0][4] = U_rec[0][2];
+			ADPs[0][5] = U_rec[1][2];
 		}
+		//if (wave.get_atom(a).get_ADPs()[1].size() > 0) {
+		//	vec2 C_rec(3, vec(3));
+		//	U_rec[0][0] = ADPs[0][0];
+		//	U_rec[0][1] = ADPs[0][3];
+		//	U_rec[0][2] = ADPs[0][4];
+		//	U_rec[1][0] = ADPs[0][3];
+		//	U_rec[1][1] = ADPs[0][1];
+		//	U_rec[1][2] = ADPs[0][5];
+		//	U_rec[2][0] = ADPs[0][4];
+		//	U_rec[2][1] = ADPs[0][5];
+		//	U_rec[2][2] = ADPs[0][2];
+		//	vec2 U_cart = self_dot(self_dot(cart_matrix, U_rec, true, false), cart_matrix, false, false);
+		//	ADPs[0][0] = U_rec[0][0];
+		//	ADPs[0][1] = U_rec[1][1];
+		//	ADPs[0][2] = U_rec[2][2];
+		//	ADPs[0][3] = U_rec[1][0];
+		//	ADPs[0][4] = U_rec[0][2];
+		//	ADPs[0][5] = U_rec[1][2];
+		//}
+		//if (wave.get_atom(a).get_ADPs()[2].size() > 0) {
+		//	vec2 D_rec(3, vec(3));
+		//	U_rec[0][0] = ADPs[0][0];
+		//	U_rec[0][1] = ADPs[0][3];
+		//	U_rec[0][2] = ADPs[0][4];
+		//	U_rec[1][0] = ADPs[0][3];
+		//	U_rec[1][1] = ADPs[0][1];
+		//	U_rec[1][2] = ADPs[0][5];
+		//	U_rec[2][0] = ADPs[0][4];
+		//	U_rec[2][1] = ADPs[0][5];
+		//	U_rec[2][2] = ADPs[0][2];
+		//	vec2 U_cart = self_dot(self_dot(cart_matrix, U_rec, true, false), cart_matrix, false, false);
+		//	ADPs[0][0] = U_rec[0][0];
+		//	ADPs[0][1] = U_rec[1][1];
+		//	ADPs[0][2] = U_rec[2][2];
+		//	ADPs[0][3] = U_rec[1][0];
+		//	ADPs[0][4] = U_rec[0][2];
+		//	ADPs[0][5] = U_rec[1][2];
+		//}
+		wave.set_atom_ADPs(a, ADPs);
 	}
 }
 
 void XCW::eval_DW() {
-	//Setup
 	//Converts angstrom to bohr OR MORE IMPORTANTLY reciprocal bohr to reciprocal angstrom
 	const double angstrom2bohr = constants::ang2bohr(1);
 	const double scale = angstrom2bohr / constants::TWO_PI;
@@ -166,92 +211,16 @@ void XCW::eval_DW() {
 	// Convert ADPs from fractional to Cartesian coordinates
 	U_frac2U_rec();
 	U_rec2U_cart();
-	// Save multiplicative factors for each level
-	// const vec mult3 = {1,1,1,3,3,3,3,3,3,6};
-	// const vec mult4 = {1,1,1,4,4,4,4,4,4,6,6,6,12,12,12};
-	//Eigen::VectorXd mult3(10);
-	//mult3 << 1,1,1,3,3,3,3,3,3,6;
-	//Eigen::VectorXd mult4(15);
-	//mult4 << 1,1,1,4,4,4,4,4,4,6,6,6,12,12,12;
-	// Precompute monomials
-	// Initialize q for future use
 	vec2 q(nr, vec(3));
-	//vec qx(nr);
-	//vec qy(nr);
-	//vec qz(nr);
 	for (int h = 0; h < nr; h++) {
 		q[h][0] = k_pt[0][h];
 		q[h][1] = k_pt[1][h];
 		q[h][2] = k_pt[2][h];
-		//qx[h] = k_pt[0][h];
-		//qy[h] = k_pt[0][h];
-		//qz[h] = k_pt[0][h];
 	}
 	std::transform(q.begin(), q.end(), q.begin(), [scale](std::vector<double>& vec) {
 		std::transform(vec.begin(), vec.end(), vec.begin(), [scale](double x) { return x * scale; });
 		return vec; });
-	// I need to figure out how to get q or if I have to implement it
-	//Eigen::MatrixXd m3(nr, 10);
-	// vec2 m3(nr, vec(10));
-	//Eigen::MatrixXd m4(nr, 15);
-	// vec2 m4(nr, vec(15));
-	// SHOULD BE MERGABLE WITH ABOVE FOR
-	 //for (int h = 0; h < nr; h++) {
-	 //    m3[h][0] = std::pow(qx[h], 3);
-	 //    m3[h][1] = std::pow(qy[h], 3);
-	 //    m3[h][2] = std::pow(qz[h], 3);
-	 //    m3[h][3] = std::pow(qx[h], 2) * qy[h];
-	 //    m3[h][4] = std::pow(qx[h], 2) * qz[h];
-	 //    m3[h][5] = std::pow(qy[h], 2) * qx[h];
-	 //    m3[h][6] = std::pow(qy[h], 2) * qz[h];
-	 //    m3[h][7] = std::pow(qz[h], 2) * qx[h];
-	 //    m3[h][8] = std::pow(qz[h], 2) * qy[h];
-	 //    m3[h][9] = qx[h] * qy[h] * qz[h];
-	 //    m4[h][0] = std::pow(qx[h], 4);
-	 //    m4[h][1] = std::pow(qy[h], 4);
-	 //    m4[h][2] = std::pow(qz[h], 4);
-	 //    m4[h][3] = std::pow(qx[h], 3) * qy[h];
-	 //    m4[h][4] = std::pow(qx[h], 3) * qz[h];
-	 //    m4[h][5] = std::pow(qy[h], 3) * qx[h];
-	 //    m4[h][6] = std::pow(qy[h], 3) * qz[h];
-	 //    m4[h][7] = std::pow(qz[h], 3) * qx[h];
-	 //    m4[h][8] = std::pow(qz[h], 3) * qy[h];
-	 //    m4[h][9] = std::pow(qx[h], 2) * std::pow(qy[h], 2);
-	 //    m4[h][10] = std::pow(qx[h], 2) * std::pow(qz[h], 2);
-	 //    m4[h][11] = std::pow(qy[h], 2) * std::pow(qz[h], 2);
-	 //    m4[h][12] = std::pow(qx[h], 2) * qy[h] * qz[h];
-	 //    m4[h][13] = std::pow(qy[h], 2) * qx[h] * qz[h];
-	 //    m4[h][14] = std::pow(qz[h], 2) * qx[h] * qy[h];
-	 //}
-	//m3.col(0) = (qx.pow(3)).matrix();
-	//m3.col(1) = (qy.pow(3)).matrix();
-	//m3.col(2) = (qz.pow(3)).matrix();
-	//m3.col(3) = (qx.square() * qy).matrix();
-	//m3.col(4) = (qx.square() * qz).matrix();
-	//m3.col(5) = (qy.square() * qx).matrix();
-	//m3.col(6) = (qy.square() * qz).matrix();
-	//m3.col(7) = (qz.square() * qx).matrix();
-	//m3.col(8) = (qz.square() * qy).matrix();
-	//m3.col(9) = (qx * qy * qz).matrix();
-	//m4.col(0) = qx.pow(4);
-	//m4.col(1) = qy.pow(4);
-	//m4.col(2) = qz.pow(4);
-	//m4.col(3) = qx.pow(3) * qy;
-	//m4.col(4) = qx.pow(3) * qz;
-	//m4.col(5) = qy.pow(3) * qx;
-	//m4.col(6) = qy.pow(3) * qz;
-	//m4.col(7) = qz.pow(3) * qx;
-	//m4.col(8) = qz.pow(3) * qy;
-	//m4.col(9) = qx.square() * qy.square();
-	//m4.col(10) = qx.square() * qz.square();
-	//m4.col(11) = qy.square() * qz.square();
-	//m4.col(12) = qx.square() * qy * qz;
-	//m4.col(13) = qy.square() * qx * qz;
-	//m4.col(14) = qz.square() * qx * qy;
-	// Compute Debye-Waller factors
-	//Eigen::MatrixXcd DW(nr, ncen);
-	vec2 DW(ncen, vec(nr));
-	//Eigen::Matrix3d Uij;
+	cvec2 DW(ncen, cvec(nr));
 	for (int a = 0; a < ncen; a++) {
 		vec2 ADPs = wave.get_atom(a).get_ADPs();
 		vec2 Uij;
@@ -259,15 +228,11 @@ void XCW::eval_DW() {
 			Uij = { { ADPs[0][0], ADPs[0][3], ADPs[0][4] },
 						 { ADPs[0][3], ADPs[0][1], ADPs[0][5] },
 						 { ADPs[0][4], ADPs[0][5], ADPs[0][2] } };
-			//Uij << ADPs[0][0], ADPs[0][3], ADPs[0][4],
-			//    ADPs[0][3], ADPs[0][1], ADPs[0][5],
-			//    ADPs[0][4], ADPs[0][5], ADPs[0][2];
 		}
 		switch (level[a]) {
 		case 0: {
 			// Isotropic
-			double U = U_iso[a];
-			double temp;
+			double U = U_iso[a], temp;
 			for (int r = 0; r < nr; r++) {
 				temp = -0.5 * (constants::TWO_PI * constants::TWO_PI) * U * (q[r][0] * q[r][0] + q[r][1] * q[r][1] + q[r][2] * q[r][2]);
 				DW[a][r] = std::exp(temp);
@@ -276,32 +241,46 @@ void XCW::eval_DW() {
 		}
 		case 1: {
 			// Anisotropic U_ij
-			double temp;
+			double temp1;
 			for (int h = 0; h < nr; h++) {
 				vec q_ = { q[h][0], q[h][1], q[h][2] };
-				temp = -0.5 * (constants::TWO_PI * constants::TWO_PI) * dot_BLAS(dot(Uij, q_, true), q_, false);
-				DW[a][h] = std::exp(temp);
+				temp1 = -0.5 * (constants::TWO_PI * constants::TWO_PI) * dot_BLAS(dot(Uij, q_, true), q_, false);
+				DW[a][h] = std::exp(temp1);
 			}
 			break;
 		}
-			  //    case 2: {
-			  //            // Anisotropic C_ijk
-			  //            Eigen::VectorXd GCC = toEigenVector(ADPs[1]);
-			  //            Eigen::VectorXd term2 = -0.5 * (q * Uij).cwiseProduct(q).rowwise().sum();
-			  //            Eigen::VectorXcd term3 = (-std::complex<double>(0, 1) / 6.0) * (m3 * (mult3.array() * GCC.array()).matrix()).cast<std::complex<double>>();
-						  //DW.row(a) = (term2 + term3).array().exp();
-			  //            break;
-			  //        }
-			  //    case 3: {
-			  //            // Anisotropic D_ijkl
-			  //            Eigen::VectorXd GCC = toEigenVector(ADPs[1]);
-			  //            Eigen::VectorXd GCD = toEigenVector(ADPs[2]);
-			  //            Eigen::VectorXd term2 = -0.5 * (q * Uij).cwiseProduct(q).rowwise().sum();
-			  //            Eigen::VectorXcd term3 = (-std::complex<double>(0, 1) / 6.0) * (m3 * (mult3.array() * GCC.array()).matrix()).cast<std::complex<double>>();
-			  //            Eigen::VectorXd term4 = (1.0 / 24.0) * (m4 * (mult4.array() * GCD.array()).matrix());
-						  //DW.row(a) = (term2 + term3 + term4).array().exp();
-			  //            break;
-			  //        }
+		case 2: {
+			// Anisotropic C_ijk
+			double temp1, temp2;
+			for (int h = 0; h < nr; h++) {
+				vec q_ = { q[h][0], q[h][1], q[h][2] };
+				temp1 = -0.5 * (constants::TWO_PI * constants::TWO_PI) * dot_BLAS(dot(Uij, q_, true), q_, false);
+				temp2 = - 1.0 / 6.0 * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
+					+ 3 * ADPs[1][1] * q_[0] * q_[0] * q_[1] + 3 * ADPs[1][2] * q_[0] * q_[0] * q_[2] + 3 * ADPs[1][3] * q_[0] * q_[1] * q_[1] + 3 * ADPs[1][5] * q_[0] * q_[2] * q_[2] + 3 * ADPs[1][7] * q_[1] * q_[1] * q_[2] + 3 * ADPs[1][8] * q_[1] * q_[2] * q_[2]
+					+ 6 * ADPs[1][4] * q_[0] * q_[1] * q_[2]);
+				cdouble temp_(temp1, temp2);
+				DW[a][h] = std::exp(temp_);
+			}
+			break;
+		}
+		case 3: {
+			// Anisotropic D_ijkl
+			double temp1, temp2, temp3;
+			for (int h = 0; h < nr; h++) {
+				vec q_ = { q[h][0], q[h][1], q[h][2] };
+				temp1 = -0.5 * (constants::TWO_PI * constants::TWO_PI) * dot_BLAS(dot(Uij, q_, true), q_, false);
+				temp2 = - 1.0 / 6.0 * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
+					+ 3 * ADPs[1][1] * q_[0] * q_[0] * q_[1] + 3 * ADPs[1][2] * q_[0] * q_[0] * q_[2] + 3 * ADPs[1][3] * q_[0] * q_[1] * q_[1] + 3 * ADPs[1][5] * q_[0] * q_[2] * q_[2] + 3 * ADPs[1][7] * q_[1] * q_[1] * q_[2] + 3 * ADPs[1][8] * q_[1] * q_[2] * q_[2]
+					+ 6 * ADPs[1][4] * q_[0] * q_[1] * q_[2]);
+				temp3 =	-(1.0 / 24.0) * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI * constants::TWO_PI)	* (ADPs[2][0] * q_[0] * q_[0] * q_[0] * q_[0] + 4.0 * ADPs[2][1] * q_[0] * q_[0] * q_[0] * q_[1] + 4.0 * ADPs[2][2] * q_[0] * q_[0] * q_[0] * q_[2]
+						+ 6.0 * ADPs[2][3] * q_[0] * q_[0] * q_[1] * q_[1] + 12.0 * ADPs[2][4] * q_[0] * q_[0] * q_[1] * q_[2] + 6.0 * ADPs[2][5] * q_[0] * q_[0] * q_[2] * q_[2] + 4.0 * ADPs[2][6] * q_[0] * q_[1] * q_[1] * q_[1] + 12.0 * ADPs[2][7] * q_[0] * q_[1] * q_[1] * q_[2]
+						+ 12.0 * ADPs[2][8] * q_[0] * q_[1] * q_[2] * q_[2]	+ 4.0 * ADPs[2][9] * q_[0] * q_[2] * q_[2] * q_[2] + ADPs[2][10] * q_[1] * q_[1] * q_[1] * q_[1] + 4.0 * ADPs[2][11] * q_[1] * q_[1] * q_[1] * q_[2] + 6.0 * ADPs[2][12] * q_[1] * q_[1] * q_[2] * q_[2]
+						+ 4.0 * ADPs[2][13] * q_[1] * q_[2] * q_[2] * q_[2]	+ ADPs[2][14] * q_[2] * q_[2] * q_[2] * q_[2]);
+				cdouble temp_(temp1 + temp3, temp2);
+				DW[a][h] = std::exp(temp_);
+			}
+			break;
+		}
 		}
 	}
 	set_DW(DW);
@@ -570,6 +549,55 @@ size_t XCW::flattened_idx(int r, int mu, int nu) const noexcept {
 	return r * nmo * (nmo + 1) / 2 + tri_index(mu, nu);
 }
 
+vec XCW::transform_voigt(const vec& voigt_matrix, const vec2& trans_mat) {
+	int size = voigt_matrix.size();
+	vec transformed(size, 0.0);
+	for (int a = 0; a < size; a++)
+		for (int b = 0; b < size; b++)
+			transformed[a] += trans_mat[a][b] * voigt_matrix[b];
+	return transformed;
+}
+
+vec2 XCW::build_transform(const vec2& transformation_matrix, const ivec2& basis) {
+	int size = basis.size();
+	vec2 voigt_transform(size, vec(size, 0.0));
+	for (int a = 0; a < size; a++)
+	{
+		const ivec& I = basis[a];
+		for (int b = 0; b < size; b++)
+		{
+			const ivec& J = basis[b];
+			double val = 0.0;
+			double prod = 1.0;
+			for (int t = 0; t < I.size(); t++)
+				prod *= transformation_matrix[I[t]][J[t]];
+			voigt_transform[a][b] = prod;
+		}
+	}
+	return voigt_transform;
+}
+
+void XCW::generate_basis(int rank, int dim,	int start, ivec& current, ivec2& out) {
+	if (current.size() == rank)
+	{
+		out.push_back(current);
+		return;
+	}
+	for (int i = start; i < dim; i++)
+	{
+		current.push_back(i);
+		generate_basis(rank, dim, i, current, out);
+		current.pop_back();
+	}
+}
+
+ivec2 XCW::generate_basis(int rank, int dim) {
+	ivec2 basis;
+	ivec current;
+	generate_basis(rank, dim, 0, current, basis);
+	return basis;
+}
+
 void XCW::eval_I(std::vector<ao_data>& ao_data_shells) {
 
 	I.resize(nr_small * (nmo * (nmo + 1)) / 2);
@@ -649,7 +677,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells) {
 				for (at = 0; at < ncen; at++) {
 					asym_fact = asym_atoms[at].asym_fact;
 					const cvec& XCW_at = XCW_integral[at];
-					const vec& DW_at = DW_fact[at];
+					const cvec& DW_at = DW_fact[at];
 					const cvec& phase_at = phase_fact[at];
 					temp1 = 0;
 					for (r_asym = 0; r_asym < asym_list.size(); r_asym++) {

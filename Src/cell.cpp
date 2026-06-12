@@ -66,25 +66,34 @@ void cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<
 }
 
 ivec cell::find_applied_symmetry(std::vector<asym_atom>& asym_atoms) {
-	ivec applied_symmetry;
-	const int num_sym_ops = sym[0][0].size();
-	const int ncen = asym_atoms.size();
-	for (int a = 0; a < ncen; a++) {
-        const vec pos_temp = { asym_atoms[a].frac_pos[0], asym_atoms[a].frac_pos[1], asym_atoms[a].frac_pos[2] };
-        for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
-			const vec new_pos = apply_symmetry(pos_temp, sym_op);
-			for (int b = a + 1; b < ncen; b++) {
-				const vec pos_temp2 = { asym_atoms[b].frac_pos[0], asym_atoms[b].frac_pos[1], asym_atoms[b].frac_pos[2] };
-				if (check_special(new_pos, pos_temp2)) {
-					applied_symmetry.push_back(sym_op);
-					break;
-				}
-			}
+    ivec applied_symmetry;
+    const int num_sym_ops = sym[0][0].size();
+    const int ncen = asym_atoms.size();
+    auto frac_pos = [&](int i) -> vec {
+        return { asym_atoms[i].frac_pos[0], asym_atoms[i].frac_pos[1], asym_atoms[i].frac_pos[2] };
+        };
+    for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
+        int eligible = 0, matched = 0;
+        for (int a = 0; a < ncen; a++) {
+            if (asym_atoms[a].asym_fact > 0.99)
+                continue;
+            eligible++;
+            const vec new_pos = apply_symmetry(frac_pos(a), sym_op);
+            for (int b = 0; b < ncen; b++) {
+                if (b != a && check_special(new_pos, frac_pos(b))) {
+                    ++matched;
+                    break;
+                }
+            }
         }
-	}
-	
-	return applied_symmetry;
-	//closing function
+        if (eligible == 0)
+            continue;
+        if (matched > 0 && matched < eligible)
+            throw std::runtime_error("Error: Incomplete symmetry found. Structure was not properly grown");
+        if (matched == eligible)
+            applied_symmetry.push_back(sym_op);
+    }
+    return applied_symmetry;
 }
 
 void cell::delete_symmetry(const ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl) {

@@ -80,6 +80,11 @@ private:
 		}
 	};
 
+	vec2 build_transform(const vec2& R, const ivec2& basis);
+	vec transform_voigt(const vec& v, const vec2& M);
+	void generate_basis(int rank, int dim, int start, ivec& current, ivec2& out);
+	ivec2 generate_basis(int rank, int dim = 3);
+
 
 	// Constructor of the XCW class
 	void construct(const options& opt_in);
@@ -149,7 +154,7 @@ private:
 	// Sets the rotational contribution to the phase factors
 	void set_phase(cvec2& phase_in) { phase_fact = phase_in; }
 	// Sets the Debye-Waller factors
-	void set_DW(vec2& DW_in) { DW_fact = DW_in; }
+	void set_DW(cvec2& DW_in) { DW_fact = DW_in; }
 	// Sets the translational contribution to the phase factors
 	void set_translation_phase(cvec2& phase_in) { translation_phase = phase_in; }
 	// Converts a matrix from fractional to reciprocal coordinates
@@ -178,7 +183,7 @@ private:
 	svec labels;
 	bvec needs_grid;
 	vec2 k_pt;
-	vec2 DW_fact;
+	cvec2 DW_fact;
 	cvec anom_corr;
 	cvec F_calc;
 	cvec2 phase_fact;
