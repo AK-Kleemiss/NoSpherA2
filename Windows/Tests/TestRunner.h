@@ -158,12 +158,6 @@ namespace NosTestFramework
         std::string actualFile;
         std::vector<std::string> args; // flat list of CLI tokens
         bool full = false;             // skip when RUN_FULL_TEST not set
-        // subprocess = true: run as a child process instead of in-process.
-        // This is only an opt-in fallback for future cases that need process
-        // isolation; the normal VS Test Explorer path is in-process.
-        // Requires NoSpherA2.exe in the DLL output dir or NOS_EXE env var;
-        // if neither is found the test is marked as skipped, not failed.
-        bool subprocess = false;
     };
 
     // ---------------------------------------------------------------------------
@@ -229,75 +223,13 @@ namespace NosTestFramework
 
         int exitCode = 0;
 
-        if (test.subprocess) {
-            // ---- subprocess path -----------------------------------------------
-            // Optional process-isolation path. If NoSpherA2.exe is not available
-            // the test is skipped.
-            auto dllDir = GetDllDirectory();
-            std::filesystem::path exePath = dllDir / "NoSpherA2.exe";
-            if (!std::filesystem::exists(exePath)) {
-                const char *envExe = std::getenv("NOS_EXE");
-                if (envExe && std::filesystem::exists(std::filesystem::path(envExe)))
-                    exePath = envExe;
-                else {
-                    Logger::WriteMessage(
-                        L"SKIPPED: NoSpherA2.exe not found. "
-                        L"Build the NoSpherA2 project or set NOS_EXE to run this test.");
-                    cleanupTemp();
-                    return;
-                }
-            }
-
-            // Build the command line.
-            std::string cmdLine = "\"" + exePath.string() + "\"";
-            for (const auto &a : test.args)
-                cmdLine += " " + a;
-
-            // Build a Unicode environment block with OCC_DATA_PATH set.
-            std::wstring envBlock;
-            LPWCH envStrings = GetEnvironmentStrings();
-            for (LPWCH p = envStrings; *p; ) {
-                envBlock += p;
-                envBlock += L'\0';
-                p += wcslen(p) + 1;
-            }
-            FreeEnvironmentStrings(envStrings);
-            envBlock += L"OCC_DATA_PATH=" +
-                std::wstring(occDataPath.begin(), occDataPath.end()) + L'\0';
-            envBlock += L'\0'; // double-null terminator
-
-            STARTUPINFOA si = {};
-            si.cb = sizeof(si);
-            PROCESS_INFORMATION pi = {};
-            std::string workDir = tempBase.string();
-
-            BOOL ok = CreateProcessA(
-                nullptr,
-                const_cast<LPSTR>(cmdLine.c_str()),
-                nullptr, nullptr, FALSE,
-                CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
-                reinterpret_cast<LPVOID>(const_cast<wchar_t*>(envBlock.data())),
-                workDir.c_str(),
-                &si, &pi);
-
-            if (!ok) {
-                cleanupTemp();
-                Assert::Fail(
-                    (std::wstring(L"CreateProcess failed: ") +
-                     std::to_wstring(GetLastError())).c_str());
-            }
-
-            WaitForSingleObject(pi.hProcess, INFINITE);
-            DWORD code = 0;
-            GetExitCodeProcess(pi.hProcess, &code);
-            CloseHandle(pi.hProcess);
-            CloseHandle(pi.hThread);
-            exitCode = static_cast<int>(code);
-        }
-        else {
+        {
             // ---- in-process path -----------------------------------------------
+            // All tests run in-process through NoSpherA2_DLL.dll.
             // The VS debugger is already attached to this test host process, so
             // breakpoints in Src/ code are hit directly — no manual attach needed.
+            // Never use subprocess execution to work around in-process failures;
+            // fix the underlying issue instead.
             std::vector<std::string> argStrings;
             // argv[0] = DLL path (used by ensure_occ_data_path fallback logic)
             argStrings.push_back((GetDllDirectory() / "NoSpherA2_DLL.dll").string());

@@ -121,15 +121,18 @@ Do not reintroduce `tbbmalloc_proxy` or `tbbmalloc` linking for NoSpherA2. The b
 - **Submodules**: always clone with `--recursive`. If submodules are missing, run `git submodule update --init --recursive`.
 - **OCC submodule commits**: OCC source fixes must be committed in the `occ` repository first, then the parent NoSpherA2 repo must commit the updated submodule pointer.
 - **CI vs local**: when a test passes locally but fails in CI, compare `.github/workflows/c-cpp_all.yml` step-by-step with your local commands, particularly the `NOS_EXE` and `OCC_DATA_PATH` values.
+- **VS tests are always in-process**: the `subprocess` field has been removed from `TestDef`. Never reintroduce subprocess execution to work around an in-process failure — fix the underlying OCC/libcint issue instead. If a VS test crashes in-process, attach the debugger directly (the managed vstest host already has the debugger attached).
+- **New libcint parallel call sites**: always pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use `three_center_max_cache_size<kind>` + `tbb::enumerable_thread_specific` (see `occ/src/qm/detail/df_kernels.h`).
 
 ## OCC Integration — Fixed (June 2026)
 
-The `alanine_integrated_occ` test passes in both Release and Debug (21/21). Three issues were resolved:
+The `alanine_integrated_occ` test passes in both Release and Debug (21/21) with all tests running in-process. Four issues were resolved:
 
 1. **Heap corruption** — added `IntegralEngineDF::~IntegralEngineDF()` to clear Eigen buffers before libcint engines are destroyed.
 2. **TBB instability** — oneTBB is now built shared (`TBB_BUILD_SHARED=ON`); `tbbmalloc_proxy` is not linked.
 3. **AVX/ABI mismatch** (Debug DLL) — `AdvancedVectorExtensions` enabled for all configs in `NoSpherA2_DLL.vcxproj`.
+4. **In-process heap corruption in TBB parallel integrals** — `compute_three_center_integrals_tbb` and `three_center_aux_kernel` now pre-allocate per-thread libcint scratch buffers so libcint never calls `malloc`/`free` inside the parallel region. This eliminates the `STATUS_HEAP_CORRUPTION` (0xC0000374) fast-fail that occurred under the busy .NET vstest heap.
 
 All `[NOS-DBG]` diagnostic traces and Windows heap-check helpers have been removed from the source.
 
-See `HANDOFF.md` and `INVESTIGATION_STATUS.md` for full details and validation commands.
+See `HANDOFF.md` for full details and validation commands.
