@@ -12,6 +12,8 @@
 - Linux/macOS quick build: `make` (produces `NoSpherA2` at repo root).
 - Windows quick build: `make.exe` in VS developer shell (produces `NoSpherA2.exe`).
 - CMake presets exist for OCC-focused workflows, e.g. `linux-occ-gcc`, `macos-release-*`, `windows-clang-cl`.
+- Windows/OCC integration validation: build `Windows\Tests\Tests.vcxproj` with `SolutionDir` pointing at `Windows\`, then run `vstest.console.exe Windows\x64\Release\Tests.dll /Platform:x64`.
+- OCC uses shared oneTBB at runtime. Artifacts must include `tbb12.dll`, `libtbb.so*`, or `libtbb.dylib`; do not add `tbbmalloc_proxy`.
 
 ## Prompting Rules For This Repo
 
@@ -33,3 +35,4 @@
 - Diff parsers that call `float(line)` can fail when one line has multiple values.
 - Boolean-like workflow/action inputs are stringly typed; avoid truthiness mistakes in conditions.
 - On Windows, architecture/toolchain context matters (x64 dev shell for clang-cl preset flows).
+- `alanine_integrated_occ` should pass in the VS test suite. It runs as a subprocess and should not be debugged by reintroducing static/proxy TBB.

@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## What is NoSpherA2
 
@@ -131,27 +131,17 @@ Do not reintroduce `tbbmalloc_proxy` or `tbbmalloc` linking for NoSpherA2. The b
 - **Submodules**: always clone with `--recursive`. If submodules are missing, run `git submodule update --init --recursive`.
 - **OCC submodule commits**: OCC source fixes must be committed in the `occ` repository first, then the parent NoSpherA2 repo must commit the updated submodule pointer.
 - **CI vs local**: when a test passes locally but fails in CI, compare `.github/workflows/c-cpp_all.yml` step-by-step with your local commands, particularly the `NOS_EXE` and `OCC_DATA_PATH` values.
-- **VS tests are always in-process**: the `subprocess` field has been removed from `TestDef`. Never reintroduce subprocess execution to work around an in-process failure — fix the underlying OCC/libcint issue instead. If a VS test crashes in-process, attach the debugger directly (the managed vstest host already has the debugger attached).
-- **New libcint parallel call sites**: always pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use `three_center_max_cache_size<kind>` + `tbb::enumerable_thread_specific` (see `occ/src/qm/detail/df_kernels.h`).
 
 ## OCC Integration and Windows Tests — Fixed (June 2026)
 
-The `alanine_integrated_occ` test passes in both Release and Debug (21/21) with all tests running in-process. Current fixes include:
+The `alanine_integrated_occ` test passes in both Release and Debug (21/21). Current fixes include:
 
 1. **Heap corruption** — added `IntegralEngineDF::~IntegralEngineDF()` to clear Eigen buffers before libcint engines are destroyed.
 2. **TBB instability** — oneTBB is now built shared (`TBB_BUILD_SHARED=ON`); `tbbmalloc_proxy` is not linked.
 3. **AVX/ABI mismatch** — `Directory.Build.targets` selects the MSBuild instruction set from `NOS_AVX`, keeping NoSpherA2, the DLL, tests, and OCC on the same Eigen ABI.
-4. **In-process heap corruption in TBB parallel integrals** — `compute_three_center_integrals_tbb` and `three_center_aux_kernel` now pre-allocate per-thread libcint scratch buffers so libcint never calls `malloc`/`free` inside the parallel region. This eliminates the `STATUS_HEAP_CORRUPTION` (0xC0000374) fast-fail that occurred under the busy .NET vstest heap.
-5. **MSVC Debug dependency build** — `windows-msvc-debug` now has a workflow preset, matching the CI dependency action and fixing the missing-preset build failure.
-6. **fchk conversion** — `fchk_conversion` now writes and compares `log.fchk`; `Src/fchk.cpp` handles restricted/beta coefficient emission, CMO bounds, virtual orbitals, and G shells correctly.
+4. **MSVC Debug dependency build** — `windows-msvc-debug` now has a workflow preset, matching the CI dependency action.
+5. **fchk conversion** — `fchk_conversion` now writes and compares `log.fchk`; `Src/fchk.cpp` handles the restricted/beta coefficient path and G shells correctly.
 
 All `[NOS-DBG]` diagnostic traces and Windows heap-check helpers have been removed from the source.
 
-See `HANDOFF.md` for full details and validation commands.
-
-## Hybrid_mode Debug Fix — Fixed (June 2026)
-
-`Hybrid_mode` Debug vstest now passes as part of the full 21/21 Debug suite. Two issues were resolved:
-
-1. **OOB vector access in `read_gbw`** — `coefs_2D_s2_span` was unconditionally constructed with `coefficients[1].data()` even when `operators==1` (restricted wavefunction). With MSVC IDL=2 this raises a CRT assertion dialog blocking the vstest host (WaitReason=UserRequest, 0% CPU). Fix: use `coefficients[0].data()` as a fallback when `operators!=2`.
-2. **Debug CRT dialog suppression** — `_CrtSetReportMode` + `_set_invalid_parameter_handler` added to `dllmain.cpp` (Debug-only) so future CRT assertions print to stderr rather than showing invisible modal dialogs in the test host.
+See `HANDOFF.md` and `INVESTIGATION_STATUS.md` for full details and validation commands.

@@ -25,7 +25,7 @@ Generating densities...
 Normal basis functions: 62
 Auxiliary basis functions: 522
 Metric: Coulomb
-Screened out 0 atom pairs due to overlap criteria.
+Screened out 6 atom pairs due to overlap criteria.
 [                   Calculating Eri3c Matrix                  ]
 [#############################################################] 100% 
 Solving unrestrained linear system...
@@ -34,14 +34,14 @@ Solving unrestrained linear system...
                                         ... done!
 Table of Charges in electrons
        Atom  Charge_RI
-        O1    -0.869
-        C2    -0.505
-       H2a     0.439
-       H2b     0.464
-        C3    -0.452
-       H3a     0.497
-       H3b     0.426
-Total number of analytical Electrons: 24.0005
+        O1    -1.001
+        C2    -0.492
+       H2a     0.429
+       H2b     0.449
+        C3    -0.438
+       H3a     0.483
+       H3b     0.411
+Total number of analytical Electrons: 24.1586
 [               Generating scattering factors...              ]
 [#############################################################] 100% 
                                          ... done!

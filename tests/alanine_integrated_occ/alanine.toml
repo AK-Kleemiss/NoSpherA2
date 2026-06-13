@@ -1,4 +1,4 @@
-threads = 4
+threads = 8
 
 [scf]
 input = "alanine.xyz"
@@ -8,3 +8,6 @@ multiplicity = 1
 spherical = true
 output = "fchk"
 df-basis = "def2-universal-jkfit"
+dft_grid_min_angular = 86
+dft_grid_max_angular = 110
+dft_grid_radial_precision = 1e-4
