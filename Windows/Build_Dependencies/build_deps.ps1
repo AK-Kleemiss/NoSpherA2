@@ -270,7 +270,7 @@ function Get-OccVariant([string]$Config) {
 
 function Get-OccPreset([string]$Variant) {
   if ($Variant -eq "debug") {
-    return "windows-clang-cl-debug"
+    return "windows-msvc-debug"
   }
   return "windows-clang-cl"
 }

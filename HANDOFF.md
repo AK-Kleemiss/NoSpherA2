@@ -1,125 +1,145 @@
-# Handoff: OCC dynamic TBB and alanine_integrated_occ fix
+# Handoff: Current Windows/OCC/FCHK Status
 
 ## Current Status: COMPLETE
 
-All crashes are fixed, all diagnostics removed. The full Visual Studio test suite
-(`21/21`) passes in both Release and Debug modes with all tests running in-process.
+Last updated: 2026-06-13
+
+The current branch has the Windows/OCC integration and fchk conversion work fixed
+and validated. Full test results from the latest run:
+
+- Python pytest Release full: `21 passed` in 81.88s, with one tolerated
+  `fchk_conversion` numeric warning at line `261148`
+- Python pytest Debug full: `21 passed` in 1103.46s
+- Visual Studio native Debug full: `21 passed` in 24.4986 minutes
+- Visual Studio native Release full: `21 passed` in 1.3985 minutes
+
+`Release+Copy` was intentionally excluded from the latest requested validation pass.
 
 ---
 
-## What Was Fixed
+## Latest Fixes
 
-### 1. Windows heap corruption / `STATUS_HEAP_CORRUPTION` (Release EXE)
-`IntegralEngineDF` was destroying its Eigen buffers in the wrong order relative to
-the libcint-backed integral engines. Fixed by adding an explicit
-`IntegralEngineDF::~IntegralEngineDF()` that clears `m_split_rij`, `m_integral_store`,
-and `V_LLt` before the member engines go out of scope.
+### 1. MSVC Debug dependency build preset
 
-### 2. TBB runtime instability (all modes)
-Linking `tbbmalloc_proxy` / static TBB caused allocator conflicts. Fixed by building
-oneTBB shared (`TBB_BUILD_SHARED=ON` in all OCC CMake presets) and deploying
-`tbb12.dll` / `libtbb.so*` / `libtbb.dylib` beside the executable.
+The Windows dependency action expected a `windows-msvc-debug` workflow preset, but
+`CMakePresets.json` only had the configure/build presets. Added the missing workflow
+preset so the dependency build no longer fails with:
 
-### 3. AVX / Eigen ABI mismatch (Debug DLL)
-`NoSpherA2_DLL` Debug|x64 lacked `/arch:AVX` while OCC static libs were built with
-AVX. Fixed by adding `AdvancedVectorExtensions` to Debug|x64, Profile|x64, and
-GenCube|x64 in `NoSpherA2_DLL/NoSpherA2_DLL.vcxproj`.
+```text
+No such workflow preset in D:/a/NoSpherA2/NoSpherA2: "windows-msvc-debug"
+```
 
-### 4. In-process `STATUS_HEAP_CORRUPTION` in libcint TBB parallel integrals
-When `compute_three_center_integrals_tbb` passes `cache=nullptr` to libcint, libcint
-allocates scratch memory internally via `malloc`/`free` for every shell triple
-evaluated inside a TBB parallel region. Under a busy multithreaded host (e.g. the
-.NET vstest.console.exe managed process) this heap traffic creates interleaved
-allocations that trigger Windows' heap guard-byte check, fast-failing with
-`0xC0000374`.
+### 2. fchk conversion test and writer
 
-Fixed by pre-computing the maximum libcint scratch size for the given basis
-(`three_center_max_cache_size<kind>`, which calls `int3c2e_sph(nullptr, ...)` — the
-libcint cache-size query path) and pre-allocating one scratch buffer per TBB thread
-using `tbb::enumerable_thread_specific`. The per-thread buffer is passed to every
-libcint call, eliminating all heap operations from the hot parallel path.
+`fchk_conversion` was not actually comparing the generated fchk output. The test now
+generates `log.fchk` and compares it against `good.fchk`.
 
-Both `compute_three_center_integrals_tbb` (used for restricted and most direct-JK
-paths) and `three_center_aux_kernel` (used for the old unrestricted thread_id-based
-path) were updated.
+The writer crash was fixed in `Src/fchk.cpp`:
+
+- Bound Alpha MO coefficient output by the actual `CMO.size()` instead of
+  `nao * wave.get_nmo()`
+- Only write beta coefficient/energy blocks when the wavefunction is genuinely
+  unrestricted (`get_is_unrestricted()` and multiplicity greater than 1)
+- Include virtual orbitals in the restricted alpha CMO path
+- Add consistent G-shell handling during fchk normalization and coefficient assembly
+
+The stale basis typo `dev2-TZVP` was corrected to `def2-TZVP`.
+
+### 3. wfn_reading golden output
+
+The `wfn_reading.good` reference was updated for the current integration output:
+
+- Grid points: `25738` -> `26030`
+- Becke: `135.005819` -> `135.005930`
+- TVFC: `134.990915` -> `134.991026`
 
 ---
 
-## Changed Files
+## OCC / alanine_integrated_occ Status
 
-### OCC submodule (`occ/`)
-- `3rdparty/CMakeLists.txt` — oneTBB built as shared
-- `libocc/CMakeLists.txt` — TBB runtime installed into `Lib/occ`
-- `include/occ/qm/integral_engine_df.h` + `src/qm/integral_engine_df.cpp` — explicit destructor
-- `include/occ/core/log.h` + `src/core/log.cpp` — `close_log_file()` for in-process tests
-- `src/main/occ_scf.cpp` — calls `close_log_file()` from shutdown
-- `include/occ/qm/scf_impl.h` — removed `nos_heapcheck` debug helper and all call sites
-- `src/gto/shell.cpp` — removed `[NOS-DBG]` traces and per-shell HeapValidate loop
-- `src/qm/hf.cpp` — removed `[NOS-DBG]` traces and HeapValidate block
-- `src/driver/single_point.cpp` — removed `[NOS-DBG]` traces
-- `src/main/occ_scf.cpp` — removed `[NOS-DBG]` traces
-- `src/qm/detail/df_kernels.h` — pre-allocated per-thread libcint cache in TBB parallel loops
+`alanine_integrated_occ` passes in both Release and Debug with all Visual Studio tests
+running in-process through `NoSpherA2_DLL.dll`.
 
-### NoSpherA2 parent repo
-- `CMakePresets.json` — `TBB_BUILD_SHARED=ON` for all OCC presets (including `macos-base`)
-- `Windows/NoSpherA2.vcxproj` + `NoSpherA2_DLL/NoSpherA2_DLL.vcxproj`
-  - Link `tbb12.lib`, drop `tbbmalloc*` and allocator proxy
-  - AVX (`AdvancedVectorExtensions`) enabled for all configs in DLL project
-- `Windows/Build_Dependencies/build_deps.ps1` — no longer builds `tbbmalloc_proxy`
-- `Linux/makefile` + `Mac/makefile` — link `Lib/occ/lib/libtbb`, deploy runtime
-- `.github/workflows/c-cpp_all.yml` + `.github/actions/build-deps/action.yml` — CI uses TBB runtime artifacts
-- `Src/NoSpherA2.cpp` — removed `_heapchk` debug call and `<malloc.h>` include
-- `Windows/Tests/TestRunner.h` — unique temp dirs, CWD restore, subprocess removed
-- `Windows/Tests/Tests.cpp` — all tests run in-process; no subprocess field
-- `NoSpherA2_DLL/dllmain.cpp` — cleaned stale heap-corruption wording
+Resolved OCC/Windows issues:
+
+1. **Heap corruption** - `IntegralEngineDF::~IntegralEngineDF()` clears large Eigen
+   buffers before libcint engines are destroyed.
+2. **TBB instability** - oneTBB is built shared (`TBB_BUILD_SHARED=ON`); NoSpherA2
+   links the core TBB runtime only.
+3. **AVX/Eigen ABI mismatch** - `AdvancedVectorExtensions` is enabled for all relevant
+   DLL configurations.
+4. **Parallel libcint heap traffic** - OCC TBB integral kernels pre-allocate per-thread
+   libcint scratch buffers instead of passing `cache=nullptr` inside parallel loops.
+
+All temporary `[NOS-DBG]` traces and Windows heap-check diagnostics have been removed.
+
+---
+
+## Changed Files of Interest
+
+### Parent repo
+
+- `CMakePresets.json` - added `windows-msvc-debug` workflow preset
+- `Src/fchk.cpp` - fixed fchk coefficient output and G-shell handling
+- `Src/test_functions.h` - corrected `def2-TZVP` basis spelling
+- `tests/tests.toml` - `fchk_conversion` now compares generated `log.fchk`
+- `tests/wfn_reading/wfn_reading.good` - updated current reference output
+- `Windows/Tests/Tests.cpp` - native test registration updates
+- `Windows/Tests/TestRunner.h` - in-process Visual Studio test execution
+- `Windows/Build_Dependencies/build_deps.ps1` - Debug dependency preset selection
+- `Windows/sync_occ_variant.ps1` - OCC variant freshness checks
+
+### OCC submodule
+
+- `CMakeLists.txt` - MSVC Debug flags including `_DEBUG` and `/bigobj`
+- `src/qm/detail/df_kernels.h` - per-thread libcint scratch buffers in TBB paths
+- `include/occ/core/element.h` and `src/core/element.cpp` - current OCC changes in this branch
+
+OCC source changes must be committed in the `occ/` repository first, then the parent
+NoSpherA2 repository must commit the updated submodule pointer.
 
 ---
 
 ## Rules Going Forward
 
-- Do **not** reintroduce `tbbmalloc_proxy`, `tbbmalloc`, or `#include <tbb/tbbmalloc_proxy.h>`
-- Do **not** use static TBB inside OCC — keep `TBB_BUILD_SHARED=ON`
-- **Never** use `subprocess=true` (or any process-isolation workaround) in VS tests to
-  hide an in-process failure. If a test crashes in-process, fix the underlying issue.
-  The subprocess path has been removed from `TestDef`/`RunTest` entirely.
-- OCC source changes must be committed inside `occ/` first, then update the submodule pointer in the parent repo
-- When adding new OCC features that own large Eigen buffers, write an explicit destructor to control teardown order relative to libcint engines
-- When adding new parallel libcint call sites, always pre-allocate per-thread scratch
-  buffers (use `three_center_max_cache_size<kind>` + `tbb::enumerable_thread_specific`
-  or a `std::vector<std::vector<double>>(nthreads, ...)` for thread_id-based loops)
-  rather than passing `cache=nullptr` inside a TBB parallel region.
+- Do not reintroduce `tbbmalloc_proxy`, `tbbmalloc`, or
+  `#include <tbb/tbbmalloc_proxy.h>`
+- Keep OCC using shared oneTBB (`TBB_BUILD_SHARED=ON`)
+- Never add subprocess fallbacks for Visual Studio tests. The VS test harness must
+  stay in-process so failures are natively debuggable.
+- When adding OCC/libcint parallel call sites, pre-allocate per-thread scratch buffers;
+  do not pass `cache=nullptr` inside TBB parallel regions.
+- When a test passes locally but fails in CI, compare `.github/workflows/c-cpp_all.yml`
+  and `.github/actions/build-deps` with local commands, especially `NOS_EXE`,
+  `OCC_DATA_PATH`, and the selected CMake preset.
 
 ---
 
 ## Validation Commands
 
 ```powershell
-# Initialize VS environment
-$vcvars = & cmd /c "`"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat`" amd64 && set" 2>&1
-$vcvars | Where-Object { $_ -match '=' } | ForEach-Object {
-    $name, $value = $_ -split '=', 2
-    [System.Environment]::SetEnvironmentVariable($name, $value, 'Process')
-}
+# Python full suite, Release
+$env:RUN_FULL_TEST = '1'
+$env:OCC_DATA_PATH = 'D:\git\NoSpherA2\Lib\occ\share\occ'
+$env:NOS_EXE = 'D:\git\NoSpherA2\Windows\x64\Release\NoSpherA2.exe'
+uv run pytest
 
-# Build OCC and install
-$vscmake = "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-& $vscmake --build build-windows-clang-cl --config Release --target occ_qm occ_driver occ_main
-& $vscmake --install build-windows-clang-cl
+# Python full suite, Debug
+$env:NOS_EXE = 'D:\git\NoSpherA2\Windows\x64\Debug\NoSpherA2.exe'
+uv run pytest
+```
 
-# Build test suite
-$msbuild = "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe"
+```powershell
+# Build native Visual Studio tests
+$msbuild = 'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe'
+& $msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\ /v:minimal
 & $msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\ /v:minimal
 
-# Run full suite
+# Run native Visual Studio tests
 $env:RUN_FULL_TEST = '1'
-$vstest = "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe"
+$env:OCC_DATA_PATH = 'D:\git\NoSpherA2\Lib\occ\share\occ'
+$vstest = 'C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe'
+& $vstest D:\git\NoSpherA2\Windows\x64\Debug\Tests.dll /Platform:x64 /Logger:"console;Verbosity=normal"
 & $vstest D:\git\NoSpherA2\Windows\x64\Release\Tests.dll /Platform:x64 /Logger:"console;Verbosity=normal"
-Remove-Item Env:\RUN_FULL_TEST -ErrorAction SilentlyContinue
 ```
 
-Manual alanine smoke test:
-```powershell
-$env:OCC_DATA_PATH = "D:\git\NoSpherA2\Lib\occ\share\occ"
-cd D:\git\NoSpherA2\tests\alanine_integrated_occ
-& D:\git\NoSpherA2\Windows\x64\Release\NoSpherA2.exe -occ alanine.toml -cif alanine.cif -dmin 0.5 -acc 1 -all_charges -no_date
-```

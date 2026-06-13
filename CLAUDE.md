@@ -20,7 +20,7 @@ make
 
 Output: `NoSpherA2` (or `NoSpherA2.exe` on Windows) at the repo root.
 
-CMake presets also exist for targeted builds: `linux-occ-gcc`, `macos-release-*`, `windows-clang-cl`.
+CMake presets also exist for targeted builds: `linux-occ-gcc`, `macos-release-*`, `windows-clang-cl`, and `windows-msvc-debug`.
 
 ## Running Tests
 
@@ -37,7 +37,7 @@ RUN_FULL_TEST=1 uv run pytest
 
 Key environment variables:
 - `NOS_EXE` — path to the executable (defaults to `NoSpherA2` in PATH)
-- `OCC_DATA_PATH` — must point to `occ/share` for basis set and data files
+- `OCC_DATA_PATH` — must point to OCC data files; on local Windows builds this is normally `D:\git\NoSpherA2\Lib\occ\share\occ`
 - `RUN_FULL_TEST` — set to any truthy value to enable slow integration tests
 
 Tests are golden-file comparisons: the harness runs `NoSpherA2` with args from `tests/tests.toml`, captures stdout, and diffs against `.good` reference files in each test subdirectory.
@@ -51,7 +51,17 @@ msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 
 vstest.console.exe Windows\x64\Release\Tests.dll /Platform:x64
 ```
 
-`alanine_integrated_occ` is intentionally run as a subprocess by the VS test harness. If all tests complete in under a second, the test binary or working directory is probably wrong. The default suite should take tens of seconds; `RUN_FULL_TEST=1` enables the longer cases.
+Visual Studio tests must run in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for failing VS tests, including `alanine_integrated_occ`. If all tests complete in under a second, the test binary or working directory is probably wrong. The default suite should take tens of seconds; `RUN_FULL_TEST=1` enables the longer cases.
+
+### Current Validation Status
+
+As of 2026-06-13, the full suite passes in all actively validated native configurations:
+- Python pytest Release full: `21 passed` (one tolerated `fchk_conversion` numeric warning)
+- Python pytest Debug full: `21 passed`
+- Visual Studio native Debug full: `21 passed`
+- Visual Studio native Release full: `21 passed`
+
+`Release+Copy` was intentionally not rerun in the latest validation pass.
 
 ### Adding a Test
 
@@ -117,21 +127,23 @@ Do not reintroduce `tbbmalloc_proxy` or `tbbmalloc` linking for NoSpherA2. The b
 ## Known Pitfalls
 
 - **Golden-file float parsing**: the diff parser in `tests/run_test.py` can fail when a line contains multiple values. When fixing comparison logic, support scientific notation and multi-value lines without breaking existing thresholds.
-- **Windows toolchain**: use an x64 VS Developer shell for the `windows-clang-cl` CMake preset flows.
+- **Windows toolchain**: use an x64 VS Developer shell for `windows-clang-cl` and `windows-msvc-debug` CMake preset flows.
 - **Submodules**: always clone with `--recursive`. If submodules are missing, run `git submodule update --init --recursive`.
 - **OCC submodule commits**: OCC source fixes must be committed in the `occ` repository first, then the parent NoSpherA2 repo must commit the updated submodule pointer.
 - **CI vs local**: when a test passes locally but fails in CI, compare `.github/workflows/c-cpp_all.yml` step-by-step with your local commands, particularly the `NOS_EXE` and `OCC_DATA_PATH` values.
 - **VS tests are always in-process**: the `subprocess` field has been removed from `TestDef`. Never reintroduce subprocess execution to work around an in-process failure — fix the underlying OCC/libcint issue instead. If a VS test crashes in-process, attach the debugger directly (the managed vstest host already has the debugger attached).
 - **New libcint parallel call sites**: always pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use `three_center_max_cache_size<kind>` + `tbb::enumerable_thread_specific` (see `occ/src/qm/detail/df_kernels.h`).
 
-## OCC Integration — Fixed (June 2026)
+## OCC Integration and Windows Tests — Fixed (June 2026)
 
-The `alanine_integrated_occ` test passes in both Release and Debug (21/21) with all tests running in-process. Four issues were resolved:
+The `alanine_integrated_occ` test passes in both Release and Debug (21/21) with all tests running in-process. Current fixes include:
 
 1. **Heap corruption** — added `IntegralEngineDF::~IntegralEngineDF()` to clear Eigen buffers before libcint engines are destroyed.
 2. **TBB instability** — oneTBB is now built shared (`TBB_BUILD_SHARED=ON`); `tbbmalloc_proxy` is not linked.
 3. **AVX/ABI mismatch** (Debug DLL) — `AdvancedVectorExtensions` enabled for all configs in `NoSpherA2_DLL.vcxproj`.
 4. **In-process heap corruption in TBB parallel integrals** — `compute_three_center_integrals_tbb` and `three_center_aux_kernel` now pre-allocate per-thread libcint scratch buffers so libcint never calls `malloc`/`free` inside the parallel region. This eliminates the `STATUS_HEAP_CORRUPTION` (0xC0000374) fast-fail that occurred under the busy .NET vstest heap.
+5. **MSVC Debug dependency build** — `windows-msvc-debug` now has a workflow preset, matching the CI dependency action and fixing the missing-preset build failure.
+6. **fchk conversion** — `fchk_conversion` now writes and compares `log.fchk`; `Src/fchk.cpp` handles restricted/beta coefficient emission, CMO bounds, virtual orbitals, and G shells correctly.
 
 All `[NOS-DBG]` diagnostic traces and Windows heap-check helpers have been removed from the source.
 
@@ -139,7 +151,7 @@ See `HANDOFF.md` for full details and validation commands.
 
 ## Hybrid_mode Debug Fix — Fixed (June 2026)
 
-`Hybrid_mode` Debug vstest now passes (20/21 Debug; only `alanine_integrated_occ` remains as a pre-existing OCC Debug issue). Two issues were resolved:
+`Hybrid_mode` Debug vstest now passes as part of the full 21/21 Debug suite. Two issues were resolved:
 
 1. **OOB vector access in `read_gbw`** — `coefs_2D_s2_span` was unconditionally constructed with `coefficients[1].data()` even when `operators==1` (restricted wavefunction). With MSVC IDL=2 this raises a CRT assertion dialog blocking the vstest host (WaitReason=UserRequest, 0% CPU). Fix: use `coefficients[0].data()` as a fallback when `operators!=2`.
 2. **Debug CRT dialog suppression** — `_CrtSetReportMode` + `_set_invalid_parameter_handler` added to `dllmain.cpp` (Debug-only) so future CRT assertions print to stderr rather than showing invisible modal dialogs in the test host.

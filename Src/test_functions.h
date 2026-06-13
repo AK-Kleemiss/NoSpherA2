@@ -2014,7 +2014,7 @@ static void profiling_fchk_conversion(const std::filesystem::path &dir)
     opt.no_date = true;
     opt.all_charges = true;
     opt.wfn = "in.ffn";
-    opt.basis_set = "dev2-TZVP";
+    opt.basis_set = "def2-TZVP";
     opt.basis_set_path = "./";
     opt.fchk = "in.fchk";   // explicit output path
     std::vector<WFN> wavy;

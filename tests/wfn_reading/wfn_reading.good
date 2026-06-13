@@ -26,7 +26,7 @@ Selected accuracy: 1
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 25738 grid points.
+GridManager: Generated total of 26030 grid points.
 Starting MBIS iterations...
 MBIS iteration: 1 max change: 0.394844
 MBIS iteration: 2 max change: 0.570213
@@ -151,9 +151,9 @@ Table of Charges in electrons
       H00g     0.075     0.059    -0.109     0.116     0.149
       H00h     0.113     0.064    -0.112     0.152     0.149
 Total number of electrons:
- Becke:     135.005819
+ Becke:     135.005930
  Hirshfeld: 134.999401
- TVFC:      134.990915
+ TVFC:      134.991026
  MBIS:      134.999802
  EMBIS:     135.000121
 [                Calculating Scattering Factors               ]

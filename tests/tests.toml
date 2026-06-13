@@ -205,12 +205,14 @@ wfn = "test.wfn"
 [fchk_conversion]
 directory = "NiP3_fchk"
 good = "good.fchk"
+actual = "log.fchk"
 full = true
 
 [fchk_conversion.args]
-b = "dev2-TZVP"
+b = "def2-TZVP"
 d = "./"
 wfn = "in.ffn"
+fchk = "log.fchk"
 
 [fourier_transform_full]
 directory = "SALTED"

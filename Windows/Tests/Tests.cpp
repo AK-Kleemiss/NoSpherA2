@@ -234,8 +234,9 @@ namespace NoSpherA2IntegrationTests
         TEST_METHOD(fchk_conversion)
         {
             RunTest({
-                "fchk_conversion", "NiP3_fchk", "good.fchk", "",
-                {"-b","dev2-TZVP", "-d","./", "-wfn","in.ffn",
+                "fchk_conversion", "NiP3_fchk", "good.fchk", "log.fchk",
+                {"-b","def2-TZVP", "-d","./", "-wfn","in.ffn",
+                 "-fchk","log.fchk",
                  "-all_charges", "-no_date"},
                 /*full=*/true
             });

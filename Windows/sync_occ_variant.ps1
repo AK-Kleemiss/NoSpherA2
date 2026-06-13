@@ -20,13 +20,20 @@ $sourceDir = Join-Path $RepoRoot ("Lib\occ_" + $variant)
 $destDir = Join-Path $RepoRoot "Lib\occ"
 $destStamp = Join-Path $destDir "occ_variant.stamp"
 $sourceLib = Join-Path $sourceDir "lib\occ_main.lib"
+$sourceLibDir = Join-Path $sourceDir "lib"
 
 if (-not (Test-Path $sourceLib)) {
   throw "Required OCC variant is missing: $sourceLib. Run Windows\\Build_Dependencies\\build_deps.ps1 first."
 }
 
 if ((Test-Path $destStamp) -and ((Get-Content $destStamp -Raw).Trim() -eq $variant)) {
-  return
+  $destStampInfo = Get-Item $destStamp
+  $newestSourceLib = Get-ChildItem -Path $sourceLibDir -Filter *.lib -File |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1
+  if ($null -ne $newestSourceLib -and $destStampInfo.LastWriteTimeUtc -ge $newestSourceLib.LastWriteTimeUtc) {
+    return
+  }
 }
 
 if (Test-Path $destDir) {

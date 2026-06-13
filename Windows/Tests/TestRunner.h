@@ -215,36 +215,29 @@ namespace NosTestFramework
             std::filesystem::copy_options::recursive |
             std::filesystem::copy_options::overwrite_existing);
 
-        // OCC_DATA_PATH — injected for both in-process and subprocess runs.
+        // OCC_DATA_PATH — injected for in-process runs.
         // The prebuilt OCC data lives at Lib/occ/share/occ (not occ/share,
         // which is the gh-pages documentation checkout).
         std::string occDataPath = (repoRoot / "Lib" / "occ" / "share" / "occ").string();
         SetEnvironmentVariableA("OCC_DATA_PATH", occDataPath.c_str());
 
-        int exitCode = 0;
+        // ---- in-process path -----------------------------------------------
+        // All tests run in-process through NoSpherA2_DLL.dll so Visual Studio
+        // can debug Src/ code directly in the test host.
+        std::vector<std::string> argStrings;
+        // argv[0] = DLL path (used by ensure_occ_data_path fallback logic)
+        argStrings.push_back((GetDllDirectory() / "NoSpherA2_DLL.dll").string());
+        for (const auto &a : test.args)
+            argStrings.push_back(a);
+        std::vector<char*> argPtrs;
+        for (auto &s : argStrings)
+            argPtrs.push_back(const_cast<char*>(s.c_str()));
 
-        {
-            // ---- in-process path -----------------------------------------------
-            // All tests run in-process through NoSpherA2_DLL.dll.
-            // The VS debugger is already attached to this test host process, so
-            // breakpoints in Src/ code are hit directly — no manual attach needed.
-            // Never use subprocess execution to work around in-process failures;
-            // fix the underlying issue instead.
-            std::vector<std::string> argStrings;
-            // argv[0] = DLL path (used by ensure_occ_data_path fallback logic)
-            argStrings.push_back((GetDllDirectory() / "NoSpherA2_DLL.dll").string());
-            for (const auto &a : test.args)
-                argStrings.push_back(a);
-            std::vector<char*> argPtrs;
-            for (auto &s : argStrings)
-                argPtrs.push_back(const_cast<char*>(s.c_str()));
-
-            std::string workDirStr = tempBase.string();
-            exitCode = NoSpherA2_run(
-                workDirStr.c_str(),
-                static_cast<int>(argPtrs.size()),
-                argPtrs.data());
-        }
+        std::string workDirStr = tempBase.string();
+        int exitCode = NoSpherA2_run(
+            workDirStr.c_str(),
+            static_cast<int>(argPtrs.size()),
+            argPtrs.data());
 
         if (exitCode != 0) {
             cleanupTemp();

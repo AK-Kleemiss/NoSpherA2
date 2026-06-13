@@ -11,7 +11,6 @@ class BasisSet;
 struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
 
-inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
 void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file = std::cout);
 void not_implemented(const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file);
 #define err_checkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
