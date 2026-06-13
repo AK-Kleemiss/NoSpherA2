@@ -1,6 +1,6 @@
+#include "pch.h"
 #include "convenience.h"
 #include "constants.h"
-#include "atoms.h"
 #include "wfn_class.h"
 #include "tsc_block.h"
 
@@ -12,7 +12,7 @@ const std::string get_wavefunction_loop_header() {
     return "loop_\n_wavefunction.id\n_wavefunction.type\n_wavefunction.radial_type\n_wavefunction.angular_type\n_wavefunction.dict\n";
 }
 
-const std::string get_basis_set_CIF(const int nr, const WFN& wavy)
+const std::string get_basis_set_CIF(const int nr, const WFN &wavy)
 {
     // Make list of unique atom types:
     ivec atom_types;
@@ -78,7 +78,7 @@ const std::string get_basis_set_CIF(const int nr, const WFN& wavy)
     return ss.str();
 }
 
-const std::string get_CIF_table(const int nr, const WFN& wavy)
+const std::string get_CIF_table(const int nr, const WFN &wavy)
 {
     std::stringstream ss;
     int _nr;
@@ -168,7 +168,7 @@ const std::string get_CIF_table(const int nr, const WFN& wavy)
     return ss.str();
 }
 
-void write_wfn_CIF(WFN& wavy, const std::filesystem::path& fileName)
+void write_wfn_CIF(WFN &wavy, const std::filesystem::path &fileName)
 {
     err_checkf(wavy.get_basis_set_name() != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
     std::ofstream file(fileName);
@@ -182,7 +182,7 @@ void write_wfn_CIF(WFN& wavy, const std::filesystem::path& fileName)
     file.close();
 }
 
-void write_wfn_CIF(WFN& wavy, const std::filesystem::path& fileName, tsc_block<int, cdouble>& tsc, options& opt)
+void write_wfn_CIF(WFN &wavy, const std::filesystem::path &fileName, tsc_block<int, cdouble> &tsc, options &opt)
 {
     err_checkf(wavy.get_basis_set_name() != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
     std::ofstream file(fileName);
@@ -200,19 +200,19 @@ void write_wfn_CIF(WFN& wavy, const std::filesystem::path& fileName, tsc_block<i
     file.close();
 }
 
-void write_wfn_CIF(std::vector<WFN>& wavy, const std::filesystem::path& fileName, tsc_block<int, cdouble>& tsc, options& opt)
+void write_wfn_CIF(std::vector<WFN> &wavy, const std::filesystem::path &fileName, tsc_block<int, cdouble> &tsc, options &opt)
 {
     std::ofstream file(fileName);
     std::stringstream ss;
     ss << get_basis_loop_header();
     for (int i = 0; i < wavy.size(); i++) {
         err_checkf(wavy[i].get_basis_set_name() != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
-        ss << get_basis_set_CIF(i+1, wavy[i]);
+        ss << get_basis_set_CIF(i + 1, wavy[i]);
     }
     ss << "\n\n";
     ss << get_wavefunction_loop_header();
     for (int i = 0; i < wavy.size(); i++) {
-        ss << get_CIF_table(i+1, wavy[i]);
+        ss << get_CIF_table(i + 1, wavy[i]);
     }
     if (!tsc.is_empty()) {
         ss << "\n\n";

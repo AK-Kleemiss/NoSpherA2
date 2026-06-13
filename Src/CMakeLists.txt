@@ -96,9 +96,14 @@ else ()
 endif ()
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
-        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
-        $<$<PLATFORM_ID:Windows>:/arch:AVX>
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-msse2 -msse3 -msse4.1 -msse4.2 -ffast-math>
     )
+    if (NOS_USE_AVX)
+        target_compile_options(libnosphera2 PRIVATE
+            $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-mavx>
+            $<$<PLATFORM_ID:Windows>:/arch:AVX>
+        )
+    endif ()
 endif ()
 
 target_link_options(libnosphera2 PUBLIC
@@ -127,7 +132,7 @@ add_executable(NoSpherA2 "${CMAKE_CURRENT_SOURCE_DIR}/NoSpherA2.cpp")
 set_target_properties(NoSpherA2 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
-target_link_libraries(NoSpherA2 PRIVATE libnosphera2 $<$<PLATFORM_ID:Windows>:occ::tbb>)
+target_link_libraries(NoSpherA2 PRIVATE libnosphera2)
 target_include_directories(NoSpherA2 PRIVATE ${MKL_INCLUDE})
 if(WIN32)
     set_target_properties(libnosphera2 PROPERTIES

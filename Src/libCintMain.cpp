@@ -1,4 +1,5 @@
-﻿#include "constants.h"
+﻿#include "pch.h"
+#include "constants.h"
 #include "libCintMain.h"
 #include "libCintKernels.h"
 //
@@ -13,8 +14,8 @@
 // Function to compute three-center two-electron integrals (eri3c)
 template <typename Kernel>
 void computeEri3c(Int_Params &param1,
-                  Int_Params &param2,
-                  vec &eri3c)
+    Int_Params &param2,
+    vec &eri3c)
 {
     int nQM = param1.get_nbas();
     int nAux = param2.get_nbas();
@@ -81,11 +82,11 @@ void computeEri3c(Int_Params &param1,
     }
 }
 template void computeEri3c<Coulomb3C_SPH>(Int_Params &param1,
-                                        Int_Params &param2,
-                                        vec& eri3c);
+    Int_Params &param2,
+    vec &eri3c);
 
 template <typename Kernel>
-void compute2C(Int_Params& params, vec& ret) {
+void compute2C(Int_Params &params, vec &ret) {
     ivec bas = params.get_bas();
     ivec atm = params.get_atm();
     vec env = params.get_env();
@@ -116,18 +117,18 @@ void compute2C(Int_Params& params, vec& ret) {
         }
     }
 }
-template void compute2C<Coulomb2C_SPH>(Int_Params& params, vec& ret);
-template void compute2C<Coulomb2C_CRT>(Int_Params& params, vec& ret);
-template void compute2C<Overlap2C_SPH>(Int_Params& params, vec& ret);
-template void compute2C<Overlap2C_CRT>(Int_Params& params, vec& ret);
+template void compute2C<Coulomb2C_SPH>(Int_Params &params, vec &ret);
+template void compute2C<Coulomb2C_CRT>(Int_Params &params, vec &ret);
+template void compute2C<Overlap2C_SPH>(Int_Params &params, vec &ret);
+template void compute2C<Overlap2C_CRT>(Int_Params &params, vec &ret);
 
 
 void calc_screend_functions_and_max_ij(
-    const std::vector<atom>& atoms,
-    const ivec& aoloc,
-    const ivec& bas_orbital_indices,
-    bvec2& screened,
-    int& max_ij
+    const std::vector<atom> &atoms,
+    const ivec &aoloc,
+    const ivec &bas_orbital_indices,
+    bvec2 &screened,
+    int &max_ij
 ) {
     const int natoms = static_cast<int>(atoms.size());
     if (natoms == 0) {
@@ -177,8 +178,8 @@ void calc_screend_functions_and_max_ij(
 
                 const double crit = -dist2 * (worst_exp[atom_i] + worst_exp[atom_j]);
                 if (crit < exp_cutoff) {
-                //if (false){
-                    //local_output += "Screening atom pair (" + std::to_string(atom_i) + ", " + std::to_string(atom_j) + ") with distance " + std::to_string(dist) + " and criterion " + std::to_string(crit) + " < " + std::to_string(exp_cutoff) + "\n";
+                    //if (false){
+                        //local_output += "Screening atom pair (" + std::to_string(atom_i) + ", " + std::to_string(atom_j) + ") with distance " + std::to_string(dist) + " and criterion " + std::to_string(crit) + " < " + std::to_string(exp_cutoff) + "\n";
                     screened[atom_i][atom_j] = true;
                     continue;
                 }
@@ -197,7 +198,7 @@ void calc_screend_functions_and_max_ij(
                 }
             }
         }
-        #pragma omp critical
+#pragma omp critical
         {
             if (local_max > max_block_ij) {
                 max_block_ij = local_max;
@@ -210,7 +211,7 @@ void calc_screend_functions_and_max_ij(
 
     std::cout << output << std::flush;
     int skipped = std::accumulate(screened.begin(), screened.end(), 0,
-        [](int sum, const bvec& row) {
+        [](int sum, const bvec &row) {
             return sum + std::count(row.begin(), row.end(), true);
         });
     std::cout << "Screened out " << skipped << " atom pairs due to overlap criteria." << std::endl;
@@ -219,7 +220,7 @@ void calc_screend_functions_and_max_ij(
 //Ivec contains the ao indices for the given wave object
 //The list contains (0, n_ao_atom1, last_item + n_ao_atom2, ...)
 //So that ao indices for atom i are in [ao_indices_per_atom[i-1], ao_indices_per_atom[i])
-ivec generate_bas_indices_per_atom(const Int_Params& params)
+ivec generate_bas_indices_per_atom(const Int_Params &params)
 {
     const ivec bas = params.get_bas();
     int nbas = params.get_nbas();
@@ -238,13 +239,13 @@ ivec generate_bas_indices_per_atom(const Int_Params& params)
 
 template <typename Kernel>
 void computeRho(
-    const Int_Params& normal_basis, 
-    const Int_Params& aux_basis,
-    const dMatrix2& dm,
-    vec& rho,
+    const Int_Params &normal_basis,
+    const Int_Params &aux_basis,
+    const dMatrix2 &dm,
+    vec &rho,
     const std::optional<ivec> asym_atm_list)
 {
-    Int_Params combined(normal_basis,aux_basis);
+    Int_Params combined(normal_basis, aux_basis);
 
     ivec bas = combined.get_bas();
     ivec atm = combined.get_atm();
@@ -284,7 +285,7 @@ void computeRho(
         //    pb.update(std::cout);
         //    continue;
         //}
-        double* rho_atom = rho.data() + aoloc[nQM + bas_aux_indices[atm_idx]] - aoloc[nQM];
+        double *rho_atom = rho.data() + aoloc[nQM + bas_aux_indices[atm_idx]] - aoloc[nQM];
         int shl_slice[6] = {
             0, 0,  // i shells
             0,0,  // j shells
@@ -302,7 +303,7 @@ void computeRho(
                 if (screened[atom_i][atom_j]) continue;
                 // Hoist weight calculation before kernel call
                 const double weight = 2.0 - static_cast<double>(atom_i == atom_j);
-                
+
                 shl_slice[2] = bas_orbital_indices[atom_j];
                 shl_slice[3] = bas_orbital_indices[atom_j + 1];
 
@@ -323,7 +324,7 @@ void computeRho(
                 const int row_end = aoloc[shl_slice[3]];
                 const int col_start = aoloc[shl_slice[0]];
                 const int col_end = aoloc[shl_slice[1]];
-                
+
                 int idx = 0;
                 for (int i = row_start; i < row_end; i++) {
                     for (int j = col_start; j < col_end; j++) {
@@ -354,29 +355,29 @@ void computeRho(
     }
 }
 template void computeRho<Coulomb3C_SPH>(
-    const Int_Params& normal_basis,
-    const Int_Params& aux_basis,
-    const dMatrix2& dm,
-    vec& rho,
-    const std::optional<ivec> asym_atm_list );
+    const Int_Params &normal_basis,
+    const Int_Params &aux_basis,
+    const dMatrix2 &dm,
+    vec &rho,
+    const std::optional<ivec> asym_atm_list);
 template void computeRho<Coulomb3C_CRT>(
-    const Int_Params& normal_basis,
-    const Int_Params& aux_basis,
-    const dMatrix2& dm,
-    vec& rho,
-    const std::optional<ivec> asym_atm_list );
+    const Int_Params &normal_basis,
+    const Int_Params &aux_basis,
+    const dMatrix2 &dm,
+    vec &rho,
+    const std::optional<ivec> asym_atm_list);
 template void computeRho<Overlap3C_SPH>(
-    const Int_Params& normal_basis,
-    const Int_Params& aux_basis,
-    const dMatrix2& dm,
-    vec& rho,
+    const Int_Params &normal_basis,
+    const Int_Params &aux_basis,
+    const dMatrix2 &dm,
+    vec &rho,
     const std::optional<ivec> asym_atm_list);
 
 
 template <typename Kernel>
-void compute3C(Int_Params& param1,
-    Int_Params& param2,
-    vec& eri3c) {
+void compute3C(Int_Params &param1,
+    Int_Params &param2,
+    vec &eri3c) {
     int nQM = param1.get_nbas();
     int nAux = param2.get_nbas();
     Int_Params combined(param1, param2);
@@ -397,12 +398,12 @@ void compute3C(Int_Params& param1,
     Kernel::drv(eri3c.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 
 }
-template void compute3C<Coulomb3C_SPH>(Int_Params& param1,
-    Int_Params& param2,
-    vec& eri3c);
-template void compute3C<Overlap3C_SPH>(Int_Params& param1,
-    Int_Params& param2,
-    vec& eri3c);
+template void compute3C<Coulomb3C_SPH>(Int_Params &param1,
+    Int_Params &param2,
+    vec &eri3c);
+template void compute3C<Overlap3C_SPH>(Int_Params &param1,
+    Int_Params &param2,
+    vec &eri3c);
 
 
 
@@ -418,7 +419,7 @@ dMatrix2 cart2sph(const int l, const bool normalized) {
 
     dMatrix2 c_tensor(n_cart, n_cart);
     for (int i = 0; i < n_cart; i++) {
-        c_tensor(i,i) = 1.0;
+        c_tensor(i, i) = 1.0;
     }
 
     if (l == 0 || l == 1) { //For s and p functions, the transformation is trivial
@@ -427,7 +428,7 @@ dMatrix2 cart2sph(const int l, const bool normalized) {
         }
         else {
             double norm_factor = (l == 0) ? 0.282094791773878143 : 0.488602511902919921;
-            for (auto& val : c_tensor.container()) {
+            for (auto &val : c_tensor.container()) {
                 val *= norm_factor;
             }
             return c_tensor;
@@ -452,11 +453,11 @@ dMatrix2 cart2sph(const int l, const bool normalized) {
 
 
 //Returns a n_cart*n_sph matrix used in transforming a cartesian DM to a spherical DM
-dMatrix2 get_cart2sph_matrix(const WFN& cart_wfn, const bool normalized) {
+dMatrix2 get_cart2sph_matrix(const WFN &cart_wfn, const bool normalized) {
     //First collect the complete number of spherical and cartesian functions used in the wavefunction
     int max_l = 0;
     int n_cart = 0, n_sph = 0;
-    for (const atom& a : cart_wfn.get_atoms()) {
+    for (const atom &a : cart_wfn.get_atoms()) {
         int prim = 0;
         for (int shell = 0; shell < a.get_shellcount_size(); shell++) {
             const int type = a.get_basis_set_type(prim) - 1;
@@ -479,11 +480,11 @@ dMatrix2 get_cart2sph_matrix(const WFN& cart_wfn, const bool normalized) {
     std::cout << "Number of cartesian functions: " << n_cart << ", number of spherical functions: " << n_sph << std::endl;
     dMatrix2 c_dm(n_cart, n_sph);
     int cart_idx = 0;
-    for (const atom& a : cart_wfn.get_atoms()) {
+    for (const atom &a : cart_wfn.get_atoms()) {
         int prim = 0;
         for (int shell = 0; shell < a.get_shellcount_size(); shell++) {
             const int type = a.get_basis_set_type(prim) - 1;
-            const dMatrix2& c_sph = conversion_matrices[type];
+            const dMatrix2 &c_sph = conversion_matrices[type];
             const int n_cart_shell = ((type + 1) * (type + 2)) / 2;
             const int n_sph_shell = 2 * type + 1;
             //Fill in the appropriate block in the c_dm matrix

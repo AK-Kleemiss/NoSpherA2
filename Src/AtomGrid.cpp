@@ -6,11 +6,6 @@
 #include "wfn_class.h"
 #include "spherical_density.h"
 
-#ifdef _WIN32
-#include <algorithm>
-#include <io.h>
-#endif
-
 // Helper to describe extrema along a line between two atoms
 struct DensityExtremum
 {
@@ -254,6 +249,12 @@ int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points
 
 vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
     const int ncen = wfn.get_ncen();
+    const int nmo = wfn.get_nmo();
+    if (nmo == 0) {
+        if (debug)
+            std::cout << "make_chi: No molecular orbitals found, skipping chi calculation." << std::endl;
+        return vec(0); // Default to all pairs being "far apart" if no MOs
+    }
     vec chi(ncen * ncen, 0.0);
     std::vector<std::vector<bool>> neighbours(ncen, bvec(ncen, true));
     double rijx2, rijy2, rijz2, xdist, disth;
@@ -388,8 +389,10 @@ vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
                     // This is helpful to see if the "bcp" evaluation is broken, or one face a nasty scenario that is not yet included in the code...
                     if (debug)
 #pragma omp critical
-                        {std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a * ncen + b] << std::endl;}
-                        
+                    {
+                        std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a * ncen + b] << std::endl;
+                    }
+
                 }
             }
             else {
@@ -554,96 +557,165 @@ std::array<double, 2> get_integration_weights(const int &num_centers,
         R_v[a] = bragg[proton_charges[a]];
     }
 
+    if (chi.size() == 0) [[unlikely]] {
+        for (int a = 0; a < num_centers; a++) {
+            vx = x_coordinates_bohr[a] - x;
+            vy = y_coordinates_bohr[a] - y;
+            vz = z_coordinates_bohr[a] - z;
+            dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
 
-    for (int a = 0; a < num_centers; a++) {
-        vx = x_coordinates_bohr[a] - x;
-        vy = y_coordinates_bohr[a] - y;
-        vz = z_coordinates_bohr[a] - z;
-        dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
+            double &pa_b_a = pa_b[a];
+            double &pa_tv_a = pa_tv[a];
 
-        double &pa_b_a = pa_b[a];
-        double &pa_tv_a = pa_tv[a];
-
-        if (dist_a > constants::far_away) {
-            pa_b_a = 0.0;
-            pa_tv_a = 0.0;
-            continue;
-        }
-
-        R_a = R_v[a];
-        chi_off = chi.data() + a * num_centers;
-
-        for (int b = a + 1; b < num_centers; b++) {
-            double &pa_b_b = pa_b[b];
-            double &pa_tv_b = pa_tv[b];
-
-            vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
-            vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
-            vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
-            dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
-
-            vx = x_coordinates_bohr[b] - x;
-            vy = y_coordinates_bohr[b] - y;
-            vz = z_coordinates_bohr[b] - z;
-            dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
-            R_b = R_v[b];
-
-            // JCP 139, 071103 (2013), eq. 7
-            // JCP 88, 2547 (1988), eq. 11
-            mu_ab = (dist_a - dist_b) / dist_ab;
-
-            chi_mod = *(chi_off + b) * (1.0 - mu_ab);
-
-            nu_ab = 1.0 + mu_ab;
-
-            nu_ab = (nu_ab - chi_mod) / (nu_ab + chi_mod);
-
-            f = 1.0 - f4(nu_ab);
-
-            if (std::abs(f) < cut)
-                pa_tv_a = 0.0;
-            else {
-                //Reduce numerical jittering
-                if (pa_tv_a > 1E-250 || pa_tv_a < -1E-250)
-                    pa_tv_a *= 0.5 * f;
-                else
-                    pa_tv_a = 0.0;
-                if (pa_tv_b > 1E-250 || pa_tv_b < -1E-250)
-                    pa_tv_b *= 0.5 * (2.0 - f);
-                else
-                    pa_tv_b = 0.0;
-            }
-
-
-            if (std::abs(R_a - R_b) > cut) {
-                chi_becke = R_a / R_b;
-                u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
-                u_ab = u_ab / (u_ab * u_ab - 1.0);
-
-                // JCP 88, 2547 (1988), eq. A3
-                if (u_ab > 0.5)
-                    u_ab = 0.5;
-                else if (u_ab < -0.5)
-                    u_ab = -0.5;
-
-                nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
-            }
-            else
-                nu_ab = mu_ab;
-
-            f = 1.0 - f3(nu_ab);
-
-            if (std::abs(f) < cut)
+            if (dist_a > constants::far_away) {
                 pa_b_a = 0.0;
-            else {
-                if (pa_b_a > 1E-250 || pa_b_a < -1E-250)
-                    pa_b_a *= 0.5 * f;
+                pa_tv_a = 0.0;
+                continue;
+            }
+
+            R_a = R_v[a];
+
+            for (int b = a + 1; b < num_centers; b++) {
+                double &pa_b_b = pa_b[b];
+                double &pa_tv_b = pa_tv[b];
+
+                vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
+                vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
+                vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
+                dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
+
+                vx = x_coordinates_bohr[b] - x;
+                vy = y_coordinates_bohr[b] - y;
+                vz = z_coordinates_bohr[b] - z;
+                dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
+                R_b = R_v[b];
+
+                mu_ab = (dist_a - dist_b) / dist_ab;
+
+                if (std::abs(R_a - R_b) > cut) {
+                    chi_becke = R_a / R_b;
+                    u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
+                    u_ab = u_ab / (u_ab * u_ab - 1.0);
+
+                    // JCP 88, 2547 (1988), eq. A3
+                    if (u_ab > 0.5)
+                        u_ab = 0.5;
+                    else if (u_ab < -0.5)
+                        u_ab = -0.5;
+
+                    nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
+                }
                 else
+                    nu_ab = mu_ab;
+
+                f = 1.0 - f3(nu_ab);
+
+                if (std::abs(f) < cut)
                     pa_b_a = 0.0;
-                if (pa_b_b > 1E-250 || pa_b_b < -1E-250)
-                    pa_b_b *= 0.5 * (2.0 - f);
+                else {
+                    if (pa_b_a > 1E-250 || pa_b_a < -1E-250)
+                        pa_b_a *= 0.5 * f;
+                    else
+                        pa_b_a = 0.0;
+                    if (pa_b_b > 1E-250 || pa_b_b < -1E-250)
+                        pa_b_b *= 0.5 * (2.0 - f);
+                    else
+                        pa_b_b = 0.0;
+                }
+            }
+        }
+    }
+    else {
+        for (int a = 0; a < num_centers; a++) {
+            vx = x_coordinates_bohr[a] - x;
+            vy = y_coordinates_bohr[a] - y;
+            vz = z_coordinates_bohr[a] - z;
+            dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
+
+            double &pa_b_a = pa_b[a];
+            double &pa_tv_a = pa_tv[a];
+
+            if (dist_a > constants::far_away) {
+                pa_b_a = 0.0;
+                pa_tv_a = 0.0;
+                continue;
+            }
+
+            R_a = R_v[a];
+            chi_off = chi.data() + a * num_centers;
+
+            for (int b = a + 1; b < num_centers; b++) {
+                double &pa_b_b = pa_b[b];
+                double &pa_tv_b = pa_tv[b];
+
+                vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
+                vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
+                vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
+                dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
+
+                vx = x_coordinates_bohr[b] - x;
+                vy = y_coordinates_bohr[b] - y;
+                vz = z_coordinates_bohr[b] - z;
+                dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
+                R_b = R_v[b];
+
+                // JCP 139, 071103 (2013), eq. 7
+                // JCP 88, 2547 (1988), eq. 11
+                mu_ab = (dist_a - dist_b) / dist_ab;
+
+                chi_mod = *(chi_off + b) * (1.0 - mu_ab);
+
+                nu_ab = 1.0 + mu_ab;
+
+                nu_ab = (nu_ab - chi_mod) / (nu_ab + chi_mod);
+
+                f = 1.0 - f4(nu_ab);
+
+                if (std::abs(f) < cut)
+                    pa_tv_a = 0.0;
+                else {
+                    //Reduce numerical jittering
+                    if (pa_tv_a > 1E-250 || pa_tv_a < -1E-250)
+                        pa_tv_a *= 0.5 * f;
+                    else
+                        pa_tv_a = 0.0;
+                    if (pa_tv_b > 1E-250 || pa_tv_b < -1E-250)
+                        pa_tv_b *= 0.5 * (2.0 - f);
+                    else
+                        pa_tv_b = 0.0;
+                }
+
+
+                if (std::abs(R_a - R_b) > cut) {
+                    chi_becke = R_a / R_b;
+                    u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
+                    u_ab = u_ab / (u_ab * u_ab - 1.0);
+
+                    // JCP 88, 2547 (1988), eq. A3
+                    if (u_ab > 0.5)
+                        u_ab = 0.5;
+                    else if (u_ab < -0.5)
+                        u_ab = -0.5;
+
+                    nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
+                }
                 else
-                    pa_b_b = 0.0;
+                    nu_ab = mu_ab;
+
+                f = 1.0 - f3(nu_ab);
+
+                if (std::abs(f) < cut)
+                    pa_b_a = 0.0;
+                else {
+                    if (pa_b_a > 1E-250 || pa_b_a < -1E-250)
+                        pa_b_a *= 0.5 * f;
+                    else
+                        pa_b_a = 0.0;
+                    if (pa_b_b > 1E-250 || pa_b_b < -1E-250)
+                        pa_b_b *= 0.5 * (2.0 - f);
+                    else
+                        pa_b_b = 0.0;
+                }
             }
         }
     }
@@ -1095,7 +1167,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         int j, ind, *ECP_els_j;
         double *d_local;
         vec dx(ncen * 3);
-        double d_cache[6] = {0.0};
+        double d_cache[6] = { 0.0 };
 
 
         for (int point = 0; point < end; point++) {
@@ -1183,12 +1255,12 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
                     const double b_weight_point = b_weight[point];
                     density = b_weight_point * dens[point];
-                    
+
                     // Pre-load grid coordinates once instead of accessing multiple times
                     const double gx_pt = gx[point];
                     const double gy_pt = gy[point];
                     const double gz_pt = gz[point];
-                    
+
                     for (j = 0; j < ncen; j++) {
                         ind = j * 3;
                         d_local = dx.data() + ind;
@@ -1347,7 +1419,7 @@ double get_r_outer(const double &max_error,
     const int &l,
     const double &guess)
 {
-    double cutoff = std::max(9.9999999999999999e-16, constants::cutoff); //double only accurate to around 1e-16
+    double cutoff = constants::cutoff;
     const int m = 2 * l;
     double r = guess;
     double r_old = 1.0e50;
@@ -1355,6 +1427,9 @@ double get_r_outer(const double &max_error,
     double step = 0.5;
     double sign, sign_old;
     double f = 1.0e50;
+
+    int iter = 0;
+    int no_flip_count = 0;
 
     sign = (f > max_error) ? 1.0 : -1.0;
     while (step > cutoff)
@@ -1370,10 +1445,22 @@ double get_r_outer(const double &max_error,
         if (r < 0.0)
             sign = 1.0;
 
-        if (sign != sign_old)
+        if (sign != sign_old) {
             step *= 0.1;
+            no_flip_count = 0;
+        }
+        else
+        {
+            no_flip_count++;
+            if (no_flip_count >= constants::grid_max_no_flip)
+            {
+                step *= 0.1;
+                no_flip_count = 0;
+            }
+        }
 
         r += sign * step;
+        iter++;
     }
     return r;
 }
@@ -1388,6 +1475,7 @@ double get_h(const double &max_error, const int &l, const double &guess)
     double step = 0.1 * guess;
     double sign = -1.0, sign_old, f, pl, rd0, e0;
     const double cm = constants::TG32 / tgamma((m + 3.0) / 2.0);
+    int no_flip_count = 0;
 
     while (step > cutoff)
     {
@@ -1400,8 +1488,19 @@ double get_h(const double &max_error, const int &l, const double &guess)
         (f > max_error) ? (sign = -1.0) : (sign = 1.0);
         if (h < 0.0)
             sign = 1.0;
-        if (sign != sign_old)
+        if (sign != sign_old) {
             step *= 0.1;
+            no_flip_count = 0;
+        }
+        else
+        {
+            no_flip_count++;
+            if (no_flip_count >= constants::grid_max_no_flip)
+            {
+                step *= 0.1;
+                no_flip_count = 0;
+            }
+        }
 
         h_old = h;
         h += sign * step;

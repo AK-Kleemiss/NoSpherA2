@@ -77,8 +77,8 @@ CXXFLAGS_x86_64 := $(CXXFLAGS_COMMON)  -arch x86_64 $(OMPFLAGS_x86_64) -include-
 # Flags without PCH for compiling the PCH itself
 CXXFLAGS_arm64_NO_PCH  := $(CXXFLAGS_COMMON)  -arch arm64  $(OMPFLAGS_arm64)
 CXXFLAGS_x86_64_NO_PCH := $(CXXFLAGS_COMMON)  -arch x86_64 $(OMPFLAGS_x86_64)
-LDFLAGS_arm64   := $(LDFLAGS_COMMON)   -arch arm64  $(OMPLIBS_arm64)
-LDFLAGS_x86_64  := $(LDFLAGS_COMMON)   -arch x86_64 $(OMPLIBS_x86_64)
+LDFLAGS_arm64   := $(LDFLAGS_COMMON)   -arch arm64  $(OMPLIBS_arm64)  -L../Lib/occ_arm64/lib  -ltbb -Wl,-rpath,@executable_path
+LDFLAGS_x86_64  := $(LDFLAGS_COMMON)   -arch x86_64 $(OMPLIBS_x86_64) -L../Lib/occ_x86_64/lib -ltbb -Wl,-rpath,@executable_path
 
 # --------------------------------------------------------------------
 # Targets
@@ -93,6 +93,12 @@ NoSpherA2: NoSpherA2_arm64 NoSpherA2_x86_64
 	@echo "Start making Mac executable"
 	@echo "Lipo → $@"
 	@lipo -create -output $@ NoSpherA2_arm64 NoSpherA2_x86_64
+	@lipo -create -output libtbb.dylib \
+		../Lib/occ_arm64/lib/libtbb.dylib \
+		../Lib/occ_x86_64/lib/libtbb.dylib
+	@lipo -create -output libomp.dylib \
+		$(LIBOMP_PREFIX_arm64)/lib/libomp.dylib \
+		$(LIBOMP_PREFIX_x86_64)/lib/libomp.dylib
 	@cp $@ ../
 	@echo "Done."
 
@@ -101,11 +107,13 @@ NoSpherA2_arm64: $(OBJS_arm64)
 	@echo "Building MAC executable for arm64"
 	@echo "Link (arm64)…"
 	@$(COMP) $^ $(EXTRA_LIBS_ARM) $(LDFLAGS_arm64) -o $@
+	@cp ../Lib/occ_arm64/lib/libtbb*.dylib ./
 
 NoSpherA2_x86_64: $(OBJS_x86_64)
 	@echo "Building MAC executable for x86_64"
 	@echo "Link (x86_64)…"
 	@$(COMP) $^ $(EXTRA_LIBS_x86) $(LDFLAGS_x86_64) -o $@
+	@cp ../Lib/occ_x86_64/lib/libtbb*.dylib ./
 
 # Actually run the converter to generate the file
 $(SRC_DIR)/basis_data.cpp:

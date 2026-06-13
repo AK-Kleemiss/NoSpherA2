@@ -233,11 +233,10 @@ bool ensure_occ_data_path(const char *argv0)
         free(occ_data_path_env);
     }
 #else
-    const char *occ_data_path_env = std::getenv("OCC_DATA_PATH");
-    if (occ_data_path_env != nullptr)
+    const char *tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH");
+    if (tmp_occ_data_path_env != nullptr)
     {
-        std::string occ_data_path_env(tmp_occ_path);
-		free(tmp_occ_path);
+        std::string occ_data_path_env(tmp_occ_data_path_env);
         if (is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
             return true;
         else
@@ -838,7 +837,6 @@ bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
     // To 3P : Z X Y (4 2 3, as in ORCA format)
     //
     p.resize(3);
-#pragma omp parallel for
     for (int i = 0; i < 3; i++)
     {
         p[i].resize(3, 0.0);
@@ -853,7 +851,6 @@ bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
     // XX, YY, ZZ, XY, XZ, YZ
     //
     d.resize(6);
-#pragma omp parallel for
     for (int i = 0; i < 6; i++)
     {
         d[i].resize(5, 0.0);
@@ -878,7 +875,6 @@ bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
     // XXX, YYY, ZZZ, XXY, XXZ, YYZ, XYY, XZZ, YZZ, XYZ (AIMALL order!)
     //
     f.resize(10);
-#pragma omp parallel for
     for (int i = 0; i < 10; i++)
     {
         f[i].resize(7, 0.0);
@@ -910,7 +906,6 @@ bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
     f[9][4] = 1.0;
 
     g.resize(15);
-#pragma omp parallel for
     for (int i = 0; i < 15; i++)
     {
         g[i].resize(9, 0.0);
@@ -967,7 +962,6 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     // XX, YY, ZZ, XY, XZ, YZ
     //
     d.resize(6);
-#pragma omp parallel for
     for (int i = 0; i < 6; i++)
     {
         d[i].resize(5, 0.0);
@@ -991,7 +985,6 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     // XXX, YYY, ZZZ, XYY, XXY, XXZ, XZZ, YZZ, YYZ, XYZ(Gaussian sequence, not identical to Multiwfn)
     //
     f.resize(10);
-#pragma omp parallel for
     for (int i = 0; i < 10; i++)
     {
         f[i].resize(7, 0.0);
@@ -1027,7 +1020,6 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     // XYYY, XXZZ, XXYZ, XXYY, XXXZ, XXXY, XXXX
     //
     g.resize(15);
-#pragma omp parallel for
     for (int i = 0; i < 15; i++)
     {
         g[i].resize(9, 0.0);
@@ -1077,7 +1069,6 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     // XYYYY XXZZZ XXYZZ XXYYZ XXYYY XXXZZ XXXYZ XXXYY XXXXZ XXXXY XXXXX
     //
     h.resize(21);
-#pragma omp parallel for
     for (int i = 0; i < 21; i++)
     {
         h[i].resize(11);
@@ -1459,7 +1450,7 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
     return true;
 };
 
-vec read_U_iso_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug)
+vec read_U_iso_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
 {
     using namespace std;
     vec U_iso;
@@ -1575,7 +1566,7 @@ vec read_U_iso_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, 
     return U_iso;
 }
 
-void swap_sort(ivec order, cvec& v)
+void swap_sort(ivec order, cvec &v)
 {
     int i = 0;
     while (i < v.size() - 1)
@@ -2253,7 +2244,7 @@ void options::digest_options()
             np_descr.fortran_order = false;
             np_descr.shape = { static_cast<unsigned long>(sizes[0]), static_cast<unsigned long>(sizes[1]) };
             npy::write_npy("descriptor.npy", np_descr);
-            
+
             exit(0);
         }
         else if (temp == "-fchk")
@@ -2524,7 +2515,7 @@ void options::digest_options()
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
 
             int nr_coefs = 0;
-            for (const atom& atm : wavy_aux.get_atoms()) {
+            for (const atom &atm : wavy_aux.get_atoms()) {
                 int prim = 0;
                 for (int shell = 0; shell < atm.get_shellcount_size(); shell++) {
                     const int type = atm.get_basis_set_entry(prim).get_type();
@@ -2534,7 +2525,7 @@ void options::digest_options()
             }
 
             std::cout << coefs.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
-            
+
             // First name of coef_file, second name of xyz file
             cube_from_coef_npy(coefs, wavy_aux);
 
@@ -2740,12 +2731,12 @@ void options::digest_options()
         else if (temp == "-do_XCW") {
             do_XCW = true;
         }
-        else if(temp == "-calc_F") {
-			calc_F_calc = true;
-		}
+        else if (temp == "-calc_F") {
+            calc_F_calc = true;
+        }
         else if (temp == "-anom_disp")
         {
-			anom_disp_path = arguments[i + 1];
+            anom_disp_path = arguments[i + 1];
         }
         else if (temp == "-partitioning_test")
         {
@@ -3389,13 +3380,21 @@ double vec_length(const vec &in)
     return sqrt(sum);
 }
 
+namespace {
+std::streambuf *original_coutbuf()
+{
+    static std::streambuf *buf = std::cout.rdbuf();
+    return buf;
+}
+}
+
 void error_check(const bool condition, const std::source_location loc, const std::string &error_message, std::ostream &log_file)
 {
     if (!condition)
     {
         log_file << "Error in " << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << std::endl;
         log_file.flush();
-        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout.rdbuf(original_coutbuf()); // reset to standard output again
         std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " line: " << loc.line() << " " << error_message << std::endl;
         exit(-1);
     }
@@ -3404,7 +3403,7 @@ void not_implemented(const std::source_location loc, const std::string &error_me
 {
     log_file << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << " not yet implemented!" << std::endl;
     log_file.flush();
-    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout.rdbuf(original_coutbuf()); // reset to standard output again
     std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << " not yet implemented!" << std::endl;
     exit(-1);
 };

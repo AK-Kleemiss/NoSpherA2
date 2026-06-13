@@ -7,24 +7,35 @@
 #include <cstdlib>
 
 #ifdef _WIN32
-    #include <windows.h>
-    #include <thread>
-    #include <chrono>
+#include <windows.h>
+#include <thread>
+#include <chrono>
 #else
-    #include <unistd.h>
-    #include <thread>
-    #include <chrono>
-    #include <fstream>
-    #include <string>
-    #include <csignal>
+#include <unistd.h>
+#include <thread>
+#include <chrono>
+#include <fstream>
+#include <string>
+#include <csignal>
 #endif
 
 inline volatile bool g_debug_attached = false;
 
 inline void wait_for_debugger() {
+    // Use the secure CRT version on MSVC; fall back to std::getenv elsewhere
+#ifdef _MSC_VER
+    char* debugWait = nullptr;
+    size_t len = 0;
+    _dupenv_s(&debugWait, &len, "DEBUG_WAIT");
+    if (!debugWait) {
+        return;
+    }
+    free(debugWait);
+#else
     if (!std::getenv("DEBUG_WAIT")) {
         return;
     }
+#endif
 
     std::cout << "\n========================================" << std::endl;
     std::cout << "   WAITING FOR DEBUGGER TO ATTACH" << std::endl;
@@ -63,7 +74,7 @@ inline void wait_for_debugger() {
             }
         }
         return false;
-    };
+        };
 
     // Loop until manual flag is set OR the OS detects the debugger
     while (!g_debug_attached && !is_debugger_present()) {
