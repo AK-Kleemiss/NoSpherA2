@@ -66,8 +66,10 @@ Resolved OCC/Windows issues:
    buffers before libcint engines are destroyed.
 2. **TBB instability** - oneTBB is built shared (`TBB_BUILD_SHARED=ON`); NoSpherA2
    links the core TBB runtime only.
-3. **AVX/Eigen ABI mismatch** - `AdvancedVectorExtensions` is enabled for all relevant
-   DLL configurations.
+3. **AVX/Eigen ABI mismatch** - `NOS_AVX` controls the MSBuild instruction set
+   through `Directory.Build.targets`, so NoSpherA2, the DLL, tests, and OCC use the
+   same Eigen ABI. Do not hardcode `EnableEnhancedInstructionSet` in individual
+   `.vcxproj` files.
 4. **Parallel libcint heap traffic** - OCC TBB integral kernels pre-allocate per-thread
    libcint scratch buffers instead of passing `cache=nullptr` inside parallel loops.
 
@@ -80,12 +82,15 @@ All temporary `[NOS-DBG]` traces and Windows heap-check diagnostics have been re
 ### Parent repo
 
 - `CMakePresets.json` - added `windows-msvc-debug` workflow preset
+- `Directory.Build.targets` - central Windows instruction-set policy from `NOS_AVX`
 - `Src/fchk.cpp` - fixed fchk coefficient output and G-shell handling
 - `Src/test_functions.h` - corrected `def2-TZVP` basis spelling
 - `tests/tests.toml` - `fchk_conversion` now compares generated `log.fchk`
 - `tests/wfn_reading/wfn_reading.good` - updated current reference output
 - `Windows/Tests/Tests.cpp` - native test registration updates
 - `Windows/Tests/TestRunner.h` - in-process Visual Studio test execution
+- `Windows/NoSpherA2.vcxproj` and `NoSpherA2_DLL/NoSpherA2_DLL.vcxproj` - no
+  hardcoded AVX; instruction set comes from `Directory.Build.targets`
 - `Windows/Build_Dependencies/build_deps.ps1` - Debug dependency preset selection
 - `Windows/sync_occ_variant.ps1` - OCC variant freshness checks
 
@@ -142,4 +147,3 @@ $vstest = 'C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\Com
 & $vstest D:\git\NoSpherA2\Windows\x64\Debug\Tests.dll /Platform:x64 /Logger:"console;Verbosity=normal"
 & $vstest D:\git\NoSpherA2\Windows\x64\Release\Tests.dll /Platform:x64 /Logger:"console;Verbosity=normal"
 ```
-

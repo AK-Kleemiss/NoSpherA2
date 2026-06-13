@@ -138,7 +138,7 @@ The `alanine_integrated_occ` test passes in both Release and Debug (21/21). Curr
 
 1. **Heap corruption** — added `IntegralEngineDF::~IntegralEngineDF()` to clear Eigen buffers before libcint engines are destroyed.
 2. **TBB instability** — oneTBB is now built shared (`TBB_BUILD_SHARED=ON`); `tbbmalloc_proxy` is not linked.
-3. **AVX/ABI mismatch** (Debug DLL) — `AdvancedVectorExtensions` enabled for all configs in `NoSpherA2_DLL.vcxproj`.
+3. **AVX/ABI mismatch** — `Directory.Build.targets` selects the MSBuild instruction set from `NOS_AVX`, keeping NoSpherA2, the DLL, tests, and OCC on the same Eigen ABI.
 4. **MSVC Debug dependency build** — `windows-msvc-debug` now has a workflow preset, matching the CI dependency action.
 5. **fchk conversion** — `fchk_conversion` now writes and compares `log.fchk`; `Src/fchk.cpp` handles the restricted/beta coefficient path and G shells correctly.
 

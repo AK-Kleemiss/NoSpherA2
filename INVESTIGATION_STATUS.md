@@ -22,6 +22,8 @@ and fchk conversion investigations are resolved on the current branch.
   has been removed and must not be reintroduced.
 - oneTBB is built and deployed as the shared core runtime. `tbbmalloc_proxy` and
   `tbbmalloc` are not linked.
+- Windows MSBuild projects no longer hardcode AVX. `Directory.Build.targets` applies
+  `NOS_AVX`, matching the OCC dependency build and avoiding Eigen ABI mismatches.
 - MSVC Debug dependency builds have a matching `windows-msvc-debug` workflow preset.
 - `fchk_conversion` now generates and compares `log.fchk`, and the fchk writer handles
   restricted/beta output, coefficient bounds, virtual orbitals, and G shells correctly.
