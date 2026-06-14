@@ -113,11 +113,13 @@
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Tests.cpp" />
+    <ClCompile Include="UnitTests.cpp" />
   </ItemGroup>
   <!-- Header files -->
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="TestRunner.h" />
+    <ClInclude Include="..\..\NoSpherA2_DLL\unit_test_api.h" />
   </ItemGroup>
   <!-- Ensure NoSpherA2_DLL is built before Tests (provides the import lib and the DLL) -->
   <ItemGroup>

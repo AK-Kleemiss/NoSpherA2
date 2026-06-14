@@ -229,6 +229,26 @@ namespace NoSpherA2IntegrationTests
             });
         }
 
+        TEST_METHOD(TFVC)
+        {
+            RunTest({
+                "TFVC", "TFVC", "TFVC.good", "",
+                {"-wfn","water.gbw", "-cif","water.cif",
+                 "-dmin","0.84", "-acc","1",
+                 "-all_charges", "-no_date"}
+            });
+        }
+
+        TEST_METHOD(TFVC_ECP)
+        {
+            RunTest({
+                "TFVC_ECP", "TFVC", "TFVC_ECP.good", "",
+                {"-wfn","Rh.gbw", "-cif","Rh.cif",
+                 "-dmin","0.84", "-acc","1", "-ECP","1",
+                 "-all_charges", "-no_date"}
+            });
+        }
+
         // ---- Full tests (skipped unless RUN_FULL_TEST is set) ---------------
 
         TEST_METHOD(fchk_conversion)

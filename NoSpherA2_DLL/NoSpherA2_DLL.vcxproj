@@ -347,11 +347,17 @@
     <ClInclude Include="..\Src\pch.h" />
     <ClInclude Include="pch_dll.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="unit_test_api.h" />
   </ItemGroup>
   <ItemGroup>
     <!-- Glob all Src/*.cpp: new files added to Src/ are included automatically -->
     <!-- mat_nos_math.cpp and vec_nos_math.cpp are #included directly by nos_math.cpp -->
     <ClCompile Include="..\Src\*.cpp" Exclude="..\Src\pch.cpp;..\Src\mat_nos_math.cpp;..\Src\vec_nos_math.cpp" />
+    <ClCompile Include="unit_test_api.cpp">
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>../Src/pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
+    </ClCompile>
     <ClCompile Include="dllmain.cpp">
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../Src/pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">../Src/pch.h</PrecompiledHeaderFile>

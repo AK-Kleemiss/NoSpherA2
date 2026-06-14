@@ -80,6 +80,30 @@ acc = 0
 
 CLI args are always under `<testname>.args`. The test framework passes these as `--key value` to the executable.
 
+**Also add a `TEST_METHOD` to `Windows/Tests/Tests.cpp`** — every entry in `tests.toml` must have a matching VS test method so both harnesses stay in sync.
+
+After adding a test, update `UNIT_TESTS_STATUS.md` with the new row and its validation result.
+
+## Agent / AI Coding-Assistant Rules
+
+These rules apply to Claude Code, Codex, Copilot, and any other AI agent working in this repo.
+
+### Unit-test documentation is mandatory
+
+Whenever an agent **adds, removes, modifies, or investigates** a test — whether in `tests/tests.toml`, `Windows/Tests/Tests.cpp`, `tests/run_test.py`, `TestRunner.h`, or any `.good` reference file — it **must**:
+
+1. Update `UNIT_TESTS_STATUS.md`:
+   - If a new test is added: add a row to the registered-test table with status `🆕 not yet validated`.
+   - If a test is validated as passing: change its status to `✅ passing` and update the validation-status table at the top.
+   - If a test is found to be failing or crashing: change its status to `❌ failing` or `⚠️ crashing` and add a note to the Known Issues section.
+   - If a test is removed: delete its row and note why in a comment commit message.
+2. Update the "Current Validation Status" block in **this file (`CLAUDE.md`)** if the overall pass count changes.
+3. Never leave `UNIT_TESTS_STATUS.md` stale after making test changes — the file is the single source of truth for test coverage and should be commitworthy on its own.
+
+### Do not break the VS test / pytest parity
+
+`tests/tests.toml` and `Windows/Tests/Tests.cpp` must stay in sync — every test registered in the TOML must have a matching `TEST_METHOD`, and vice versa. Check both files when adding or removing tests.
+
 ## Architecture
 
 ### Source Layout
