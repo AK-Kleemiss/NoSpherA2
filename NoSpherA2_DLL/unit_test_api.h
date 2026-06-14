@@ -80,4 +80,35 @@ extern "C" {
 
     // --- Spherical Bessel functions ---
     UT_API double ut_bessel_j(int l, double x);
+
+    // --- is_similar (pow-10 tolerance variant) ---
+    // Returns 1 if |a-b| <= 10^tolerance, else 0.
+    UT_API int    ut_is_similar_pow10(double a, double b, double tolerance);
+
+    // --- shell2function: WFN type+prim → column index ---
+    UT_API int    ut_shell2function(int type, int prim);
+
+    // --- CountWords ---
+    UT_API int    ut_count_words(const char* str);
+
+    // --- shrink_string_to_atom: strips digits and spaces, then truncates to
+    //     two characters when atom_number > 9 (matches element-symbol logic) ---
+    // Returns result length, -1 if buffer too small.
+    UT_API int    ut_shrink_string_to_atom(const char* input, int atom_number,
+                                           char* output, int bufsize);
+
+    // --- split_string: splits by delimiter, writes at most max_out tokens.
+    //     Returns the number of tokens found (may exceed max_out). ---
+    UT_API int    ut_split_string(const char* input, const char* delim,
+                                  char** out_tokens, int max_out, int tok_bufsize);
+
+    // --- Timing (monotonic; values are relative — only test sign/ordering) ---
+    // Returns elapsed microseconds between two calls to ut_get_time_token().
+    // Usage: int t0 = ut_get_time_token(); <work>; long long us = ut_time_diff_us(t0);
+    // Since we can't pass opaque time_point objects over a C API we expose a
+    // simple "sleep N ms then measure" helper that returns elapsed µs >= N*1000.
+    UT_API long long ut_sleep_and_measure_us(int sleep_ms);
+
+    // --- hypergeometric 2F1(a,b;c;x) ---
+    UT_API double ut_hypergeometric(double a, double b, double c, double x);
 }

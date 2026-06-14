@@ -5,6 +5,8 @@
 #include "../Src/constants.h"
 #include <cstring>
 #include <cmath>
+#include <thread>
+#include <chrono>
 
 extern "C" {
 
@@ -171,6 +173,65 @@ extern "C" {
 
     UT_API double ut_bessel_j(int l, double x) {
         return bessel_first_kind(l, x);
+    }
+
+    // --- is_similar (pow-10 tolerance) ---
+
+    UT_API int ut_is_similar_pow10(double a, double b, double tolerance) {
+        return is_similar(a, b, tolerance) ? 1 : 0;
+    }
+
+    // --- shell2function ---
+
+    UT_API int ut_shell2function(int type, int prim) {
+        return shell2function(type, prim);
+    }
+
+    // --- CountWords ---
+
+    UT_API int ut_count_words(const char* str) {
+        return CountWords(str);
+    }
+
+    // --- shrink_string_to_atom ---
+
+    UT_API int ut_shrink_string_to_atom(const char* input, int atom_number,
+                                         char* output, int bufsize) {
+        std::string s(input);
+        std::string r = shrink_string_to_atom(s, atom_number);
+        if (static_cast<int>(r.size()) >= bufsize)
+            return -1;
+        std::memcpy(output, r.c_str(), r.size() + 1);
+        return static_cast<int>(r.size());
+    }
+
+    // --- split_string ---
+    // Splits input by delim, writes up to max_out tokens into out_tokens[].
+    // Returns total token count (may exceed max_out).
+
+    UT_API int ut_split_string(const char* input, const char* delim,
+                                char** out_tokens, int max_out, int tok_bufsize) {
+        svec tokens = split_string<std::string>(std::string(input), std::string(delim));
+        int written = std::min(static_cast<int>(tokens.size()), max_out);
+        for (int i = 0; i < written; ++i) {
+            strncpy_s(out_tokens[i], tok_bufsize, tokens[i].c_str(), tok_bufsize - 1);
+        }
+        return static_cast<int>(tokens.size());
+    }
+
+    // --- Timing helper ---
+
+    UT_API long long ut_sleep_and_measure_us(int sleep_ms) {
+        auto t0 = get_time();
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+        auto t1 = get_time();
+        return get_musec(t0, t1);
+    }
+
+    // --- hypergeometric ---
+
+    UT_API double ut_hypergeometric(double a, double b, double c, double x) {
+        return hypergeometric(a, b, c, x);
     }
 
 } // extern "C"

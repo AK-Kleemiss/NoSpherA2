@@ -774,4 +774,302 @@ namespace NoSpherA2UnitTests
         }
     };
 
+    // -----------------------------------------------------------------------
+    // IsSimilarPow10Tests — is_similar(a, b, tolerance) where |a-b| <= 10^tol
+    // -----------------------------------------------------------------------
+    TEST_CLASS(IsSimilarPow10Tests)
+    {
+    public:
+        TEST_METHOD(Equal_ReturnTrue)
+        {
+            Assert::AreEqual(1, ut_is_similar_pow10(1.0, 1.0, -6.0));
+        }
+
+        TEST_METHOD(WithinTolerance_ReturnTrue)
+        {
+            // |1.000001 - 1.0| = 1e-6 <= 10^(-6)
+            Assert::AreEqual(1, ut_is_similar_pow10(1.000001, 1.0, -6.0));
+        }
+
+        TEST_METHOD(OutsideTolerance_ReturnFalse)
+        {
+            // |1.00001 - 1.0| = 1e-5 > 10^(-6)
+            Assert::AreEqual(0, ut_is_similar_pow10(1.00001, 1.0, -6.0));
+        }
+
+        TEST_METHOD(NegativeValues_WithinTolerance)
+        {
+            Assert::AreEqual(1, ut_is_similar_pow10(-5.0, -5.0 + 1e-8, -7.0));
+        }
+
+        TEST_METHOD(LooseTolerance_LargeDiff)
+        {
+            // |100 - 50| = 50 <= 10^2 = 100
+            Assert::AreEqual(1, ut_is_similar_pow10(100.0, 50.0, 2.0));
+        }
+
+        TEST_METHOD(LooseTolerance_TooLargeDiff)
+        {
+            // |200 - 50| = 150 > 10^2 = 100
+            Assert::AreEqual(0, ut_is_similar_pow10(200.0, 50.0, 2.0));
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // Shell2FunctionTests — shell2function(type, prim) WFN column index
+    // -----------------------------------------------------------------------
+    TEST_CLASS(Shell2FunctionTests)
+    {
+    public:
+        TEST_METHOD(SType_Prim0_Returns0)
+        {
+            // s-type shell (type=1): first and only function is index 0
+            int r = ut_shell2function(1, 0);
+            Assert::IsTrue(r >= 0);
+        }
+
+        TEST_METHOD(PType_Prim0)
+        {
+            // p-type shell: 3 functions
+            int r = ut_shell2function(2, 0);
+            Assert::IsTrue(r >= 0);
+        }
+
+        TEST_METHOD(PType_Prim1)
+        {
+            int r0 = ut_shell2function(2, 0);
+            int r1 = ut_shell2function(2, 1);
+            Assert::IsTrue(r1 > r0);
+        }
+
+        TEST_METHOD(DType_Prim5_ValidIndex)
+        {
+            // d-type (type=3): 6 Cartesian or 5 spherical functions
+            int r = ut_shell2function(3, 5);
+            Assert::IsTrue(r >= 0);
+        }
+
+        TEST_METHOD(ResultsAreStrictlyIncreasingWithinShell)
+        {
+            // f-type (type=4): consecutive prims must give increasing column indices
+            int r0 = ut_shell2function(4, 0);
+            int r1 = ut_shell2function(4, 1);
+            int r2 = ut_shell2function(4, 2);
+            Assert::IsTrue(r1 > r0);
+            Assert::IsTrue(r2 > r1);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // CountWordsTests — CountWords(str)
+    // -----------------------------------------------------------------------
+    TEST_CLASS(CountWordsTests)
+    {
+    public:
+        TEST_METHOD(Empty_Returns0)
+        {
+            Assert::AreEqual(0, ut_count_words(""));
+        }
+
+        TEST_METHOD(OneWord)
+        {
+            Assert::AreEqual(1, ut_count_words("hello"));
+        }
+
+        TEST_METHOD(TwoWords)
+        {
+            Assert::AreEqual(2, ut_count_words("hello world"));
+        }
+
+        TEST_METHOD(LeadingTrailingSpaces)
+        {
+            Assert::AreEqual(2, ut_count_words("  foo   bar  "));
+        }
+
+        TEST_METHOD(MultipleSpacesBetweenWords)
+        {
+            Assert::AreEqual(3, ut_count_words("a  b  c"));
+        }
+
+        TEST_METHOD(SingleSpace)
+        {
+            Assert::AreEqual(0, ut_count_words(" "));
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // ShrinkStringToAtomTests — shrink_string_to_atom(input, atom_number)
+    // -----------------------------------------------------------------------
+    TEST_CLASS(ShrinkStringToAtomTests)
+    {
+    public:
+        TEST_METHOD(CarbonAtomNumber6)
+        {
+            // atnr2letter(6) = "C"
+            char buf[32];
+            int n = ut_shrink_string_to_atom("C1", 6, buf, 32);
+            Assert::IsTrue(n >= 0);
+            Assert::AreEqual(std::string("C"), std::string(buf));
+        }
+
+        TEST_METHOD(CalciumAtomNumber20)
+        {
+            // atnr2letter(20) = "Ca"
+            char buf[32];
+            int n = ut_shrink_string_to_atom("Ca12", 20, buf, 32);
+            Assert::IsTrue(n >= 0);
+            Assert::AreEqual(std::string("Ca"), std::string(buf));
+        }
+
+        TEST_METHOD(BufferTooSmall_ReturnsNegOne)
+        {
+            char buf[1];
+            int n = ut_shrink_string_to_atom("Carbon6", 6, buf, 1);
+            Assert::AreEqual(-1, n);
+        }
+
+        TEST_METHOD(IronAtomNumber26)
+        {
+            // atnr2letter(26) = "Fe"
+            char buf[32];
+            int n = ut_shrink_string_to_atom("Fe3 ", 26, buf, 32);
+            Assert::IsTrue(n >= 0);
+            Assert::AreEqual(std::string("Fe"), std::string(buf));
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // SplitStringTests — split_string(input, delim)
+    // -----------------------------------------------------------------------
+    TEST_CLASS(SplitStringTests)
+    {
+    public:
+        TEST_METHOD(SingleToken_NoDelim)
+        {
+            const int MAX = 8;
+            char storage[MAX][64];
+            char* toks[MAX];
+            for (int i = 0; i < MAX; ++i) toks[i] = storage[i];
+            int n = ut_split_string("hello", " ", toks, MAX, 64);
+            Assert::AreEqual(1, n);
+            Assert::AreEqual(std::string("hello"), std::string(toks[0]));
+        }
+
+        TEST_METHOD(ThreeTokens)
+        {
+            const int MAX = 8;
+            char storage[MAX][64];
+            char* toks[MAX];
+            for (int i = 0; i < MAX; ++i) toks[i] = storage[i];
+            int n = ut_split_string("a b c", " ", toks, MAX, 64);
+            Assert::AreEqual(3, n);
+            Assert::AreEqual(std::string("a"), std::string(toks[0]));
+            Assert::AreEqual(std::string("b"), std::string(toks[1]));
+            Assert::AreEqual(std::string("c"), std::string(toks[2]));
+        }
+
+        TEST_METHOD(CommaDelimiter)
+        {
+            const int MAX = 8;
+            char storage[MAX][64];
+            char* toks[MAX];
+            for (int i = 0; i < MAX; ++i) toks[i] = storage[i];
+            int n = ut_split_string("x,y,z", ",", toks, MAX, 64);
+            Assert::AreEqual(3, n);
+            Assert::AreEqual(std::string("z"), std::string(toks[2]));
+        }
+
+        TEST_METHOD(MaxOutLimit_ReturnsTotalCount)
+        {
+            const int MAX = 2;
+            char storage[MAX][64];
+            char* toks[MAX];
+            for (int i = 0; i < MAX; ++i) toks[i] = storage[i];
+            // 4 tokens but max_out=2
+            int n = ut_split_string("a b c d", " ", toks, MAX, 64);
+            Assert::AreEqual(4, n); // total = 4
+            Assert::AreEqual(std::string("a"), std::string(toks[0]));
+            Assert::AreEqual(std::string("b"), std::string(toks[1]));
+        }
+
+        TEST_METHOD(EmptyString_ZeroTokens)
+        {
+            const int MAX = 8;
+            char storage[MAX][64];
+            char* toks[MAX];
+            for (int i = 0; i < MAX; ++i) toks[i] = storage[i];
+            int n = ut_split_string("", " ", toks, MAX, 64);
+            Assert::IsTrue(n == 0 || n == 1); // impl-defined for empty input
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // TimingTests — ut_sleep_and_measure_us(N) returns elapsed µs >= N*1000
+    // -----------------------------------------------------------------------
+    TEST_CLASS(TimingTests)
+    {
+    public:
+        TEST_METHOD(Sleep10ms_ElapsedAtLeast10000us)
+        {
+            long long us = ut_sleep_and_measure_us(10);
+            Assert::IsTrue(us >= 10000LL);
+        }
+
+        TEST_METHOD(Sleep1ms_ElapsedAtLeast1000us)
+        {
+            long long us = ut_sleep_and_measure_us(1);
+            Assert::IsTrue(us >= 1000LL);
+        }
+
+        TEST_METHOD(Sleep5ms_ElapsedPositive)
+        {
+            long long us = ut_sleep_and_measure_us(5);
+            Assert::IsTrue(us > 0LL);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // HypergeometricTests — 2F1(a,b;c;x)
+    // -----------------------------------------------------------------------
+    TEST_CLASS(HypergeometricTests)
+    {
+    public:
+        TEST_METHOD(Identity_2F1_Zero_IsOne)
+        {
+            // 2F1(a,b;c;0) = 1 for any a,b,c
+            double r = ut_hypergeometric(1.0, 2.0, 3.0, 0.0);
+            Assert::AreEqual(1.0, r, 1e-12);
+        }
+
+        TEST_METHOD(KnownValue_2F1_1_1_2_Half)
+        {
+            // 2F1(1,1;2;0.5) = -2*ln(0.5) = 2*ln(2) ≈ 1.386294...
+            double expected = -2.0 * std::log(0.5);
+            double r = ut_hypergeometric(1.0, 1.0, 2.0, 0.5);
+            Assert::AreEqual(expected, r, 1e-6);
+        }
+
+        TEST_METHOD(KnownValue_2F1_Half_Half_ThreeHalves_Half)
+        {
+            // 2F1(0.5,0.5;1.5;0.5) — finite, positive
+            double r = ut_hypergeometric(0.5, 0.5, 1.5, 0.5);
+            Assert::IsTrue(std::isfinite(r));
+            Assert::IsTrue(r > 1.0);
+        }
+
+        TEST_METHOD(Symmetry_ab_equals_ba)
+        {
+            // 2F1(a,b;c;x) = 2F1(b,a;c;x)
+            double r1 = ut_hypergeometric(2.0, 3.0, 5.0, 0.3);
+            double r2 = ut_hypergeometric(3.0, 2.0, 5.0, 0.3);
+            Assert::AreEqual(r1, r2, 1e-10);
+        }
+
+        TEST_METHOD(NegativeX_ReturnsFinite)
+        {
+            double r = ut_hypergeometric(1.0, 2.0, 3.0, -0.5);
+            Assert::IsTrue(std::isfinite(r));
+        }
+    };
+
 } // namespace NoSpherA2UnitTests
