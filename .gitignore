@@ -137,3 +137,4 @@ libiomp5.so
 **/Tests.dll
 build_no_tbb**
 **/mkl_*.*.dll
+*.coverage
