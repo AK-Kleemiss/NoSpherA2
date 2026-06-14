@@ -41,4 +41,43 @@ extern "C" {
     // Writes the 64-char lowercase hex digest + NUL into output (need bufsize >= 65).
     // Returns 64 on success, -1 if buffer too small.
     UT_API int    ut_sha256(const char* input, char* output, int bufsize);
+
+    // --- Vector aggregates ---
+    // Pass elements as an array + count. bools encoded as 0/1 ints.
+    UT_API int    ut_vec_sum_bool  (const int* arr, int n);
+    UT_API int    ut_vec_sum_int   (const int* arr, int n);
+    UT_API double ut_vec_sum_double(const double* arr, int n);
+    UT_API double ut_vec_length    (const double* arr, int n);
+
+    // --- Additional string utilities ---
+    UT_API int    ut_trim                   (const char* input, char* output, int bufsize);
+    UT_API char   ut_asciitolower           (char c);
+    UT_API double ut_double_from_esd        (const char* s);   // strips "(esd)"
+    UT_API double ut_decimal_precision_cif  (const char* s);   // uncertainty from "1.234(5)"
+
+    // --- Basis-type helpers ---
+    UT_API int          ut_sht2nbas        (int type);     // shell type → Cartesian/spherical count
+    UT_API unsigned int ut_doublefactorial (int n);        // n!! (double factorial)
+
+    // --- Unit conversions (constants namespace) ---
+    UT_API double ut_bohr2ang       (double inp);
+    UT_API double ut_ang2bohr       (double inp);
+    UT_API double ut_cubic_bohr2ang (double inp);
+    UT_API double ut_cubic_ang2bohr (double inp);
+
+    // --- Constexpr math (constants namespace) ---
+    UT_API int    ut_const_abs     (int x);
+    UT_API double ut_constexpr_pow (double base, int exponent);
+    UT_API double ut_constants_sqrt(double x);
+    UT_API double ut_exp_approx    (double x, int n);
+    UT_API double ut_log_approx    (double x, int n);
+    UT_API long long ut_factorial  (int n);              // n! from lookup table
+
+    // --- Orbital index mappings (constants namespace) ---
+    // orca_2_pySCF: returns index, or -1 when l is out of range.
+    UT_API int          ut_orca_2_pyscf (unsigned int l, int m_idx);
+    UT_API unsigned int ut_type_2_nbo   (int type);
+
+    // --- Spherical Bessel functions ---
+    UT_API double ut_bessel_j(int l, double x);
 }

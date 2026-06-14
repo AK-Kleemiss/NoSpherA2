@@ -1,9 +1,12 @@
 #include "pch.h"
 #include "../../NoSpherA2_DLL/unit_test_api.h"
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <limits>
 #include <string>
+
+static constexpr double PI_VAL = 3.14159265358979323846;
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
@@ -353,6 +356,421 @@ namespace NoSpherA2UnitTests
             char buf[10] = {};
             int result = ut_sha256("abc", buf, sizeof(buf));
             Assert::AreEqual(-1, result);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+
+    TEST_CLASS(VecAggregateTests)
+    {
+    public:
+
+        TEST_METHOD(VecSumBool_MixedValues)
+        {
+            int arr[] = { 1, 0, 1, 1, 0 };
+            Assert::AreEqual(3, ut_vec_sum_bool(arr, 5));
+        }
+
+        TEST_METHOD(VecSumBool_AllFalse)
+        {
+            int arr[] = { 0, 0, 0 };
+            Assert::AreEqual(0, ut_vec_sum_bool(arr, 3));
+        }
+
+        TEST_METHOD(VecSumBool_Empty)
+        {
+            int dummy = 0;
+            Assert::AreEqual(0, ut_vec_sum_bool(&dummy, 0));
+        }
+
+        TEST_METHOD(VecSumInt_Basic)
+        {
+            int arr[] = { 1, 2, 3, 4, 5 };
+            Assert::AreEqual(15, ut_vec_sum_int(arr, 5));
+        }
+
+        TEST_METHOD(VecSumInt_Negative)
+        {
+            int arr[] = { -3, 7, -2 };
+            Assert::AreEqual(2, ut_vec_sum_int(arr, 3));
+        }
+
+        TEST_METHOD(VecSumDouble_Basic)
+        {
+            double arr[] = { 1.5, -0.5, 2.0 };
+            Assert::AreEqual(3.0, ut_vec_sum_double(arr, 3), 1e-12);
+        }
+
+        TEST_METHOD(VecSumDouble_AllZero)
+        {
+            double arr[] = { 0.0, 0.0, 0.0 };
+            Assert::AreEqual(0.0, ut_vec_sum_double(arr, 3), 1e-12);
+        }
+
+        TEST_METHOD(VecLength_345)
+        {
+            double arr[] = { 3.0, 4.0 };
+            Assert::AreEqual(5.0, ut_vec_length(arr, 2), 1e-12);
+        }
+
+        TEST_METHOD(VecLength_Unit)
+        {
+            double arr[] = { 1.0, 0.0, 0.0 };
+            Assert::AreEqual(1.0, ut_vec_length(arr, 3), 1e-12);
+        }
+
+        TEST_METHOD(VecLength_4D)
+        {
+            double arr[] = { 1.0, 1.0, 1.0, 1.0 };
+            Assert::AreEqual(2.0, ut_vec_length(arr, 4), 1e-12);
+        }
+
+        TEST_METHOD(VecLength_Empty)
+        {
+            double dummy = 0.0;
+            Assert::AreEqual(0.0, ut_vec_length(&dummy, 0), 1e-12);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+
+    TEST_CLASS(StringUtilTests2)
+    {
+    public:
+
+        TEST_METHOD(Trim_LeadingTrailingSpaces)
+        {
+            char buf[64];
+            ut_trim("  hello world  ", buf, sizeof(buf));
+            Assert::AreEqual(0, std::strcmp(buf, "hello world"));
+        }
+
+        TEST_METHOD(Trim_NoSpaces)
+        {
+            char buf[64];
+            ut_trim("no_spaces", buf, sizeof(buf));
+            Assert::AreEqual(0, std::strcmp(buf, "no_spaces"));
+        }
+
+        TEST_METHOD(Trim_EmptyString)
+        {
+            char buf[64];
+            int len = ut_trim("", buf, sizeof(buf));
+            Assert::AreEqual(0, len);
+            Assert::AreEqual(0, std::strcmp(buf, ""));
+        }
+
+        TEST_METHOD(Trim_OnlySpaces)
+        {
+            char buf[64];
+            ut_trim("    ", buf, sizeof(buf));
+            Assert::AreEqual(0, std::strcmp(buf, ""));
+        }
+
+        TEST_METHOD(Asciitolower_Uppercase)
+        {
+            Assert::AreEqual('a', ut_asciitolower('A'));
+            Assert::AreEqual('z', ut_asciitolower('Z'));
+            Assert::AreEqual('m', ut_asciitolower('M'));
+        }
+
+        TEST_METHOD(Asciitolower_AlreadyLower)
+        {
+            Assert::AreEqual('a', ut_asciitolower('a'));
+            Assert::AreEqual('z', ut_asciitolower('z'));
+        }
+
+        TEST_METHOD(Asciitolower_NonAlpha)
+        {
+            // Digits and symbols are returned unchanged
+            Assert::AreEqual('5', ut_asciitolower('5'));
+            Assert::AreEqual('_', ut_asciitolower('_'));
+        }
+
+        TEST_METHOD(DoubleFromEsd_Plain)
+        {
+            Assert::AreEqual(3.14159, ut_double_from_esd("3.14159"), 1e-10);
+        }
+
+        TEST_METHOD(DoubleFromEsd_WithEsd)
+        {
+            // "(5)" is stripped; value is 1.234
+            Assert::AreEqual(1.234, ut_double_from_esd("1.234(5)"), 1e-10);
+        }
+
+        TEST_METHOD(DoubleFromEsd_Zero)
+        {
+            Assert::AreEqual(0.0, ut_double_from_esd("0.0"), 1e-12);
+        }
+
+        TEST_METHOD(DecimalPrecisionCif_WithBracketsAndDecimal)
+        {
+            // "1.2345(6)" → 6 × 10⁻⁴ = 0.0006
+            Assert::AreEqual(6e-4, ut_decimal_precision_cif("1.2345(6)"), 1e-10);
+        }
+
+        TEST_METHOD(DecimalPrecisionCif_NoBrackets)
+        {
+            // No brackets → default 0.005
+            Assert::AreEqual(0.005, ut_decimal_precision_cif("1.234"), 1e-10);
+        }
+
+        TEST_METHOD(DecimalPrecisionCif_IntegerWithEsd)
+        {
+            // "100(2)" → no decimal, digit count from bracket positions
+            Assert::AreEqual(0.2, ut_decimal_precision_cif("100(2)"), 1e-10);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+
+    TEST_CLASS(BasisTypeTests)
+    {
+    public:
+
+        TEST_METHOD(Sht2nbas_CartesianShells)
+        {
+            // Cartesian: S=1, P=3, D=6, F=10, G=15
+            Assert::AreEqual(1,  ut_sht2nbas(0));
+            Assert::AreEqual(3,  ut_sht2nbas(1));
+            Assert::AreEqual(6,  ut_sht2nbas(2));
+            Assert::AreEqual(10, ut_sht2nbas(3));
+            Assert::AreEqual(15, ut_sht2nbas(4));
+        }
+
+        TEST_METHOD(Sht2nbas_SphericalShells)
+        {
+            // Negative types → spherical: -2=D(5), -3=F(7), -4=G(9)
+            Assert::AreEqual(5, ut_sht2nbas(-2));
+            Assert::AreEqual(7, ut_sht2nbas(-3));
+            Assert::AreEqual(9, ut_sht2nbas(-4));
+        }
+
+        TEST_METHOD(DoubleFactorial_SmallValues)
+        {
+            Assert::AreEqual(1u,   ut_doublefactorial(0));
+            Assert::AreEqual(1u,   ut_doublefactorial(1));
+            Assert::AreEqual(2u,   ut_doublefactorial(2));
+            Assert::AreEqual(3u,   ut_doublefactorial(3));
+            Assert::AreEqual(8u,   ut_doublefactorial(4));
+            Assert::AreEqual(15u,  ut_doublefactorial(5));
+            Assert::AreEqual(48u,  ut_doublefactorial(6));
+            Assert::AreEqual(105u, ut_doublefactorial(7));
+        }
+    };
+
+    // -----------------------------------------------------------------------
+
+    TEST_CLASS(ConstantsTests)
+    {
+    public:
+
+        TEST_METHOD(ConstAbs_Positive)    { Assert::AreEqual(5,  ut_const_abs(5));  }
+        TEST_METHOD(ConstAbs_Negative)    { Assert::AreEqual(5,  ut_const_abs(-5)); }
+        TEST_METHOD(ConstAbs_Zero)        { Assert::AreEqual(0,  ut_const_abs(0));  }
+
+        TEST_METHOD(ConstexprPow_Integer)
+        {
+            Assert::AreEqual(1024.0, ut_constexpr_pow(2.0, 10), 1e-12);
+            Assert::AreEqual(1.0,    ut_constexpr_pow(10.0, 0), 1e-12);
+            Assert::AreEqual(8.0,    ut_constexpr_pow(2.0, 3),  1e-12);
+        }
+
+        TEST_METHOD(ConstantsSqrt_KnownValues)
+        {
+            Assert::AreEqual(2.0,            ut_constants_sqrt(4.0), 1e-10);
+            Assert::AreEqual(std::sqrt(2.0), ut_constants_sqrt(2.0), 1e-10);
+            Assert::AreEqual(0.0,            ut_constants_sqrt(0.0), 1e-12);
+        }
+
+        TEST_METHOD(ConstantsSqrt_NegativeIsNaN)
+        {
+            double r = ut_constants_sqrt(-1.0);
+            Assert::IsTrue(std::isnan(r));
+        }
+
+        TEST_METHOD(ExpApprox_AtZero)
+        {
+            Assert::AreEqual(1.0, ut_exp_approx(0.0, 25), 1e-12);
+        }
+
+        TEST_METHOD(ExpApprox_AtOne)
+        {
+            // 25-term Taylor series matches std::exp to machine precision
+            Assert::AreEqual(std::exp(1.0), ut_exp_approx(1.0, 25), 1e-12);
+        }
+
+        TEST_METHOD(ExpApprox_AtMinusOne)
+        {
+            Assert::AreEqual(std::exp(-1.0), ut_exp_approx(-1.0, 25), 1e-10);
+        }
+
+        TEST_METHOD(LogApprox_AtOne)
+        {
+            Assert::AreEqual(0.0, ut_log_approx(1.0, 25), 1e-12);
+        }
+
+        TEST_METHOD(LogApprox_AtE)
+        {
+            // Arctanh series converges; 25 iterations accurate to 1e-8 for x=e
+            Assert::AreEqual(1.0, ut_log_approx(std::exp(1.0), 25), 1e-6);
+        }
+
+        TEST_METHOD(LogApprox_NonPositiveReturnsSentinel)
+        {
+            Assert::AreEqual(-1.0, ut_log_approx(0.0, 25), 1e-12);
+            Assert::AreEqual(-1.0, ut_log_approx(-5.0, 25), 1e-12);
+        }
+
+        TEST_METHOD(Bohr2Ang_OneBohr)
+        {
+            // 1 Bohr = a₀ Å = 0.529177210903 Å
+            Assert::AreEqual(0.529177210903, ut_bohr2ang(1.0), 1e-10);
+        }
+
+        TEST_METHOD(Bohr2Ang_Zero)
+        {
+            Assert::AreEqual(0.0, ut_bohr2ang(0.0), 1e-12);
+        }
+
+        TEST_METHOD(Ang2Bohr_OneAngstrom)
+        {
+            Assert::AreEqual(1.0 / 0.529177210903, ut_ang2bohr(1.0), 1e-8);
+        }
+
+        TEST_METHOD(Ang2Bohr_Roundtrip)
+        {
+            // ang2bohr(bohr2ang(x)) ≈ x
+            double x = 2.5;
+            Assert::AreEqual(x, ut_ang2bohr(ut_bohr2ang(x)), 1e-10);
+        }
+
+        TEST_METHOD(CubicBohr2Ang_OneBohr3)
+        {
+            // 1 Bohr³ = a₀³ Å³
+            double expected = 0.529177210903 * 0.529177210903 * 0.529177210903;
+            Assert::AreEqual(expected, ut_cubic_bohr2ang(1.0), 1e-10);
+        }
+
+        TEST_METHOD(CubicAng2Bohr_Roundtrip)
+        {
+            double x = 3.0;
+            Assert::AreEqual(x, ut_cubic_ang2bohr(ut_cubic_bohr2ang(x)), 1e-8);
+        }
+
+        TEST_METHOD(Factorial_SmallValues)
+        {
+            Assert::AreEqual(1LL,       ut_factorial(0));
+            Assert::AreEqual(1LL,       ut_factorial(1));
+            Assert::AreEqual(120LL,     ut_factorial(5));
+            Assert::AreEqual(3628800LL, ut_factorial(10));
+        }
+    };
+
+    // -----------------------------------------------------------------------
+
+    TEST_CLASS(OrbitalIndexTests)
+    {
+    public:
+
+        TEST_METHOD(OrcaToPySCF_SShell)
+        {
+            // S: only one component, m_idx=0 → 0
+            Assert::AreEqual(0, ut_orca_2_pyscf(0, 0));
+        }
+
+        TEST_METHOD(OrcaToPySCF_PShell)
+        {
+            // P ORCA ordering 0,+1,-1 → PySCF map {1,2,0}
+            Assert::AreEqual(1, ut_orca_2_pyscf(1, 0));
+            Assert::AreEqual(2, ut_orca_2_pyscf(1, 1));
+            Assert::AreEqual(0, ut_orca_2_pyscf(1, 2));
+        }
+
+        TEST_METHOD(OrcaToPySCF_DShell_FirstComponent)
+        {
+            // D: map {2,3,1,4,0}, m_idx=0 → 2
+            Assert::AreEqual(2, ut_orca_2_pyscf(2, 0));
+        }
+
+        TEST_METHOD(OrcaToPySCF_OutOfRange)
+        {
+            // l=100 is not in the switch → nullopt → -1
+            Assert::AreEqual(-1, ut_orca_2_pyscf(100, 0));
+        }
+
+        TEST_METHOD(TypeToNbo_SShell)     { Assert::AreEqual(1u,   ut_type_2_nbo(1));  }
+        TEST_METHOD(TypeToNbo_PxShell)    { Assert::AreEqual(101u,  ut_type_2_nbo(2));  }
+        TEST_METHOD(TypeToNbo_DxxShell)   { Assert::AreEqual(201u,  ut_type_2_nbo(5));  }
+        TEST_METHOD(TypeToNbo_FxxxShell)  { Assert::AreEqual(301u,  ut_type_2_nbo(11)); }
+        TEST_METHOD(TypeToNbo_GxxxxShell) { Assert::AreEqual(401u,  ut_type_2_nbo(21)); }
+        TEST_METHOD(TypeToNbo_Unknown)    { Assert::AreEqual(0u,    ut_type_2_nbo(99)); }
+    };
+
+    // -----------------------------------------------------------------------
+
+    TEST_CLASS(BesselTests)
+    {
+    public:
+
+        TEST_METHOD(BesselJ0_AtZero)
+        {
+            // j₀(0) = 1 (limit of sin(x)/x as x→0)
+            Assert::AreEqual(1.0, ut_bessel_j(0, 0.0), 1e-12);
+        }
+
+        TEST_METHOD(BesselJ1_AtZero)
+        {
+            // j_l(0) = 0 for l > 0
+            Assert::AreEqual(0.0, ut_bessel_j(1, 0.0), 1e-12);
+            Assert::AreEqual(0.0, ut_bessel_j(5, 0.0), 1e-12);
+        }
+
+        TEST_METHOD(BesselJ0_AtOne)
+        {
+            // j₀(1) = sin(1)/1
+            Assert::AreEqual(std::sin(1.0), ut_bessel_j(0, 1.0), 1e-12);
+        }
+
+        TEST_METHOD(BesselJ1_AtOne)
+        {
+            // j₁(1) = (sin(1) - cos(1)) / 1
+            double expected = std::sin(1.0) - std::cos(1.0);
+            Assert::AreEqual(expected, ut_bessel_j(1, 1.0), 1e-12);
+        }
+
+        TEST_METHOD(BesselJ2_AtOne)
+        {
+            // j₂(1) = (2·sin(1) - 3·cos(1)) / 1
+            double expected = 2.0 * std::sin(1.0) - 3.0 * std::cos(1.0);
+            Assert::AreEqual(expected, ut_bessel_j(2, 1.0), 1e-12);
+        }
+
+        TEST_METHOD(BesselJ0_AtPi)
+        {
+            // j₀(π) = sin(π)/π ≈ 0
+            Assert::AreEqual(std::sin(PI_VAL) / PI_VAL, ut_bessel_j(0, PI_VAL), 1e-12);
+        }
+
+        TEST_METHOD(BesselJ_HigherOrder_PositiveAndFinite)
+        {
+            // l=7 exercises the continued-fraction fallback path
+            double r = ut_bessel_j(7, 2.0);
+            Assert::IsTrue(std::isfinite(r));
+            Assert::IsTrue(r > 0.0);
+        }
+
+        TEST_METHOD(BesselJ_RecurrenceCheck)
+        {
+            // Recurrence: j_{l-1}(x) + j_{l+1}(x) = (2l+1)/x · j_l(x)
+            double x = 3.0;
+            int l = 3;
+            double jlm1 = ut_bessel_j(l - 1, x);
+            double jl   = ut_bessel_j(l,     x);
+            double jlp1 = ut_bessel_j(l + 1, x);
+            double lhs  = jlm1 + jlp1;
+            double rhs  = (2.0 * l + 1.0) / x * jl;
+            Assert::AreEqual(lhs, rhs, 1e-10);
         }
     };
 

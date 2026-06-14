@@ -35,13 +35,19 @@ They do NOT need a pytest counterpart and must NOT be added to `tests/tests.toml
 
 | Class | Methods | Coverage | Status |
 |-------|---------|----------|--------|
-| `GeometryTests` | `ArrayLength_*` (3), `ArrayDistance_*` (2), `VecDiff_*` (2), `VecCross_*` (3), `VecDot_*` (3) | `array_length`, `vec_diff`, `vec_cross`, `vec_dot` in `convenience.cpp` | 🆕 not yet validated |
+| `GeometryTests` | `ArrayLength_*` (3), `ArrayDistance_*` (2), `VecDiff_*` (2), `VecCross_*` (3), `VecDot_*` (3) | `array_length`, `vec_diff`, `vec_cross`, `vec_dot` | 🆕 not yet validated |
 | `NumericTests` | `IsNan_*` (3), `IsSimilarRel_*` (3), `IsSimilarAbs_*` (2), `FastExpNeg_*` (4) | `is_nan`, `is_similar_rel`, `is_similar_abs`, `fast_exp_neg` | 🆕 not yet validated |
-| `FchkParsingTests` | `ReadFchkInt_*` (3), `ReadFchkDbl_*` (2) | `read_fchk_integer(string)`, `read_fchk_double(string)` in `fchk.cpp` | 🆕 not yet validated |
-| `StringUtilTests` | `EndsWith_*` (5), `ShrinkString_*` (4) | `ends_with`, `shrink_string` in `convenience.cpp` | 🆕 not yet validated |
-| `Sha256Tests` | `Sha256_*` (6) | `sha::sha256` in `convenience.cpp` | 🆕 not yet validated |
+| `FchkParsingTests` | `ReadFchkInt_*` (3), `ReadFchkDbl_*` (2) | `read_fchk_integer(string)`, `read_fchk_double(string)` | 🆕 not yet validated |
+| `StringUtilTests` | `EndsWith_*` (5), `ShrinkString_*` (4) | `ends_with`, `shrink_string` | 🆕 not yet validated |
+| `Sha256Tests` | `Sha256_*` (6) | `sha::sha256` | 🆕 not yet validated |
+| `VecAggregateTests` | `VecSumBool_*` (3), `VecSumInt_*` (2), `VecSumDouble_*` (2), `VecLength_*` (4) | `vec_sum` (all overloads), `vec_length` | 🆕 not yet validated |
+| `StringUtilTests2` | `Trim_*` (4), `Asciitolower_*` (3), `DoubleFromEsd_*` (3), `DecimalPrecisionCif_*` (3) | `trim`, `asciitolower`, `double_from_string_with_esd`, `get_decimal_precision_from_CIF_number` | 🆕 not yet validated |
+| `BasisTypeTests` | `Sht2nbas_*` (2), `DoubleFactorial_*` (1) | `sht2nbas`, `doublefactorial` | 🆕 not yet validated |
+| `ConstantsTests` | `ConstAbs_*` (3), `ConstexprPow_*` (1), `ConstantsSqrt_*` (2), `ExpApprox_*` (3), `LogApprox_*` (3), `Bohr2Ang_*` (2), `Ang2Bohr_*` (2), `CubicBohr2Ang_*` (1), `CubicAng2Bohr_*` (1), `Factorial_*` (1) | `constants::` — `const_abs`, `constexpr_pow`, `sqrt`, `exp_approx`, `log_approx`, `bohr2ang`, `ang2bohr`, `cubic_*`, `ft_fun` | 🆕 not yet validated |
+| `OrbitalIndexTests` | `OrcaToPySCF_*` (4), `TypeToNbo_*` (6) | `constants::orca_2_pySCF`, `constants::type_2_nbo` | 🆕 not yet validated |
+| `BesselTests` | `BesselJ0_*` (2), `BesselJ1_*` (1), `BesselJ2_*` (1), `BesselJ_HigherOrder_*` (1), `BesselJ_RecurrenceCheck` (1), plus more | `bessel_first_kind` (all l branches) | 🆕 not yet validated |
 
-Total: 5 test classes, 34 test methods.  
+Total: 11 test classes, ~90 test methods.  
 Added: 2026-06-14.
 
 ---
