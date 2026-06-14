@@ -423,6 +423,8 @@ double get_lambda_1(double *a);
 
 double get_decimal_precision_from_CIF_number(std::string &given_string);
 
+double bessel_first_kind(int l, double x);
+
 template <typename numtype = int>
 struct hashFunction
 {
