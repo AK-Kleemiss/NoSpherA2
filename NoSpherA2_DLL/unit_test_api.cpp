@@ -234,4 +234,52 @@ extern "C" {
         return hypergeometric(a, b, c, x);
     }
 
+    // --- Atomic number → element symbol ---
+
+    UT_API int ut_atnr2letter(int nr, char* output, int bufsize) {
+        const char* sym = constants::atnr2letter(nr);
+        int len = static_cast<int>(std::strlen(sym));
+        if (len >= bufsize) return -1;
+        std::memcpy(output, sym, len + 1);
+        return len;
+    }
+
+    // --- Cartesian exponent vector from basis type ---
+
+    UT_API void ut_type2vector(int index, int nx_out[1], int ny_out[1], int nz_out[1]) {
+        int v[3];
+        constants::type2vector(index, v);
+        nx_out[0] = v[0];
+        ny_out[0] = v[1];
+        nz_out[0] = v[2];
+    }
+
+    // --- Gaussian normalization constant ---
+
+    UT_API double ut_normgauss(int type, double exponent) {
+        return constants::normgauss(type, exponent);
+    }
+
+    // --- Associated Legendre polynomial P_l^m(x) ---
+
+    UT_API double ut_assoc_legendre(int l, int m, double x) {
+        return constants::associated_legendre_polynomial(l, m, x);
+    }
+
+    // --- Cartesian → spherical coordinates ---
+
+    UT_API void ut_cartesian_to_spherical(double x, double y, double z, double out3[3]) {
+        std::vector<double> r = constants::cartesian_to_spherical(x, y, z);
+        out3[0] = r[0];
+        out3[1] = r[1];
+        out3[2] = r[2];
+    }
+
+    // --- Median eigenvalue of 3x3 symmetric matrix ---
+
+    UT_API double ut_get_lambda_1(const double a[9]) {
+        // get_lambda_1 takes double* and reads a[0..8]
+        return get_lambda_1(const_cast<double*>(a));
+    }
+
 } // extern "C"

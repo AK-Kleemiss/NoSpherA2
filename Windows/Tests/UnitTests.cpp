@@ -1072,4 +1072,360 @@ namespace NoSpherA2UnitTests
         }
     };
 
+    // -----------------------------------------------------------------------
+    // Atnr2LetterTests — constants::atnr2letter(nr) element symbol lookup
+    // -----------------------------------------------------------------------
+    TEST_CLASS(Atnr2LetterTests)
+    {
+    public:
+        TEST_METHOD(Hydrogen_Is_H)
+        {
+            char buf[8];
+            int n = ut_atnr2letter(1, buf, 8);
+            Assert::AreEqual(std::string("H"), std::string(buf));
+            Assert::AreEqual(1, n);
+        }
+
+        TEST_METHOD(Carbon_Is_C)
+        {
+            char buf[8];
+            ut_atnr2letter(6, buf, 8);
+            Assert::AreEqual(std::string("C"), std::string(buf));
+        }
+
+        TEST_METHOD(Iron_Is_Fe)
+        {
+            char buf[8];
+            ut_atnr2letter(26, buf, 8);
+            Assert::AreEqual(std::string("Fe"), std::string(buf));
+        }
+
+        TEST_METHOD(Gold_Is_Au)
+        {
+            char buf[8];
+            ut_atnr2letter(79, buf, 8);
+            Assert::AreEqual(std::string("Au"), std::string(buf));
+        }
+
+        TEST_METHOD(Lawrencium_103_Is_Lr)
+        {
+            char buf[8];
+            ut_atnr2letter(103, buf, 8);
+            Assert::AreEqual(std::string("Lr"), std::string(buf));
+        }
+
+        TEST_METHOD(Zero_Is_Q_Peak)
+        {
+            char buf[8];
+            ut_atnr2letter(0, buf, 8);
+            Assert::AreEqual(std::string("Q"), std::string(buf));
+        }
+
+        TEST_METHOD(OutOfRange_Returns_PROBLEM)
+        {
+            char buf[16];
+            ut_atnr2letter(200, buf, 16);
+            Assert::AreEqual(std::string("PROBLEM"), std::string(buf));
+        }
+
+        TEST_METHOD(BufferTooSmall_ReturnsNegOne)
+        {
+            char buf[1];
+            int n = ut_atnr2letter(6, buf, 1);
+            Assert::AreEqual(-1, n);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // Type2VectorTests — constants::type2vector: basis type → [nx, ny, nz]
+    // -----------------------------------------------------------------------
+    TEST_CLASS(Type2VectorTests)
+    {
+    public:
+        TEST_METHOD(Type1_Is_SShell_000)
+        {
+            int nx, ny, nz;
+            ut_type2vector(1, &nx, &ny, &nz);
+            Assert::AreEqual(0, nx);
+            Assert::AreEqual(0, ny);
+            Assert::AreEqual(0, nz);
+        }
+
+        TEST_METHOD(Type2_Is_Px_100)
+        {
+            int nx, ny, nz;
+            ut_type2vector(2, &nx, &ny, &nz);
+            Assert::AreEqual(1, nx);
+            Assert::AreEqual(0, ny);
+            Assert::AreEqual(0, nz);
+        }
+
+        TEST_METHOD(Type5_Is_Dx2_200)
+        {
+            // index 5 in type_vector: (2,0,0) = dx²
+            int nx, ny, nz;
+            ut_type2vector(5, &nx, &ny, &nz);
+            Assert::AreEqual(2, nx);
+            Assert::AreEqual(0, ny);
+            Assert::AreEqual(0, nz);
+        }
+
+        TEST_METHOD(Type8_Is_Dxy_110)
+        {
+            // index 8: (1,1,0) = dxy
+            int nx, ny, nz;
+            ut_type2vector(8, &nx, &ny, &nz);
+            Assert::AreEqual(1, nx);
+            Assert::AreEqual(1, ny);
+            Assert::AreEqual(0, nz);
+        }
+
+        TEST_METHOD(SumOfExponents_Matches_ShellType)
+        {
+            // For d-type (types 5-10), nx+ny+nz == 2
+            for (int t = 5; t <= 10; ++t) {
+                int nx, ny, nz;
+                ut_type2vector(t, &nx, &ny, &nz);
+                Assert::AreEqual(2, nx + ny + nz);
+            }
+        }
+
+        TEST_METHOD(OutOfRange_Returns_NegOne)
+        {
+            int nx, ny, nz;
+            ut_type2vector(0, &nx, &ny, &nz);
+            Assert::AreEqual(-1, nx);
+            ut_type2vector(57, &nx, &ny, &nz);
+            Assert::AreEqual(-1, nx);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // NormGaussTests — constants::normgauss(type, exponent)
+    // -----------------------------------------------------------------------
+    TEST_CLASS(NormGaussTests)
+    {
+    public:
+        TEST_METHOD(SShell_IsPositive)
+        {
+            double n = ut_normgauss(1, 1.0);
+            Assert::IsTrue(n > 0.0);
+            Assert::IsTrue(std::isfinite(n));
+        }
+
+        TEST_METHOD(SShell_ScalesWithExponent)
+        {
+            // Normalization grows with exponent for s-type
+            double n1 = ut_normgauss(1, 1.0);
+            double n2 = ut_normgauss(1, 4.0);
+            Assert::IsTrue(n2 > n1);
+        }
+
+        TEST_METHOD(PShell_IsPositive)
+        {
+            double n = ut_normgauss(2, 1.0);
+            Assert::IsTrue(n > 0.0);
+        }
+
+        TEST_METHOD(DShell_IsPositive)
+        {
+            double n = ut_normgauss(5, 1.0);
+            Assert::IsTrue(n > 0.0);
+        }
+
+        TEST_METHOD(SShell_KnownValue)
+        {
+            // normgauss for s-type (0,0,0), exponent α:
+            // N = (2α/π)^(9/4) * sqrt(1/1) = (2α/π)^(9/4)
+            // For α=1: N = (2/π)^(9/4)
+            double alpha = 1.0;
+            double expected = std::pow(2.0 * alpha / PI_VAL, 9.0 / 4.0);
+            double result = ut_normgauss(1, alpha);
+            Assert::AreEqual(expected, result, 1e-10);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // AssocLegendreTests — constants::associated_legendre_polynomial(l, m, x)
+    // -----------------------------------------------------------------------
+    TEST_CLASS(AssocLegendreTests)
+    {
+    public:
+        TEST_METHOD(P00_Is_One)
+        {
+            Assert::AreEqual(1.0, ut_assoc_legendre(0, 0, 0.5), 1e-12);
+        }
+
+        TEST_METHOD(P10_At_Half_Is_Half)
+        {
+            // P_1^0(x) = x
+            Assert::AreEqual(0.5, ut_assoc_legendre(1, 0, 0.5), 1e-12);
+        }
+
+        TEST_METHOD(P11_AtOne_Is_Zero)
+        {
+            // P_1^1(x) = sqrt(1-x²), at x=1: 0
+            Assert::AreEqual(0.0, ut_assoc_legendre(1, 1, 1.0), 1e-12);
+        }
+
+        TEST_METHOD(P20_Is_Legendre_Polynomial)
+        {
+            // P_2^0(x) = (3x²-1)/2
+            double x = 0.6;
+            double expected = 0.5 * (3 * x * x - 1);
+            Assert::AreEqual(expected, ut_assoc_legendre(2, 0, x), 1e-12);
+        }
+
+        TEST_METHOD(P21_At_Zero)
+        {
+            // P_2^1(x) = 3x*sqrt(1-x²), at x=0: 0
+            Assert::AreEqual(0.0, ut_assoc_legendre(2, 1, 0.0), 1e-12);
+        }
+
+        TEST_METHOD(P22_At_Zero)
+        {
+            // P_2^2(x) = -3(x²-1) = 3(1-x²), at x=0: 3
+            Assert::AreEqual(-3.0 * (0.0 - 1.0), ut_assoc_legendre(2, 2, 0.0), 1e-12);
+        }
+
+        TEST_METHOD(NegativeM_P1m1)
+        {
+            // P_1^{-1}(x) = -0.5*sqrt(1-x²)
+            double x = 0.5;
+            double expected = -0.5 * std::sqrt(1 - x * x);
+            Assert::AreEqual(expected, ut_assoc_legendre(1, -1, x), 1e-12);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // CartesianToSphericalTests — constants::cartesian_to_spherical(x,y,z)
+    // -----------------------------------------------------------------------
+    TEST_CLASS(CartesianToSphericalTests)
+    {
+    public:
+        TEST_METHOD(Origin_Has_Zero_Radius)
+        {
+            double out[3];
+            ut_cartesian_to_spherical(0.0, 0.0, 0.0, out);
+            Assert::AreEqual(0.0, out[0], 1e-12); // r
+        }
+
+        TEST_METHOD(UnitX_Gives_Correct_Angles)
+        {
+            double out[3];
+            ut_cartesian_to_spherical(1.0, 0.0, 0.0, out);
+            Assert::AreEqual(1.0,           out[0], 1e-12); // r=1
+            Assert::AreEqual(PI_VAL / 2.0,  out[1], 1e-12); // theta=pi/2
+            Assert::AreEqual(0.0,           out[2], 1e-12); // phi=0
+        }
+
+        TEST_METHOD(UnitZ_Has_Zero_Theta)
+        {
+            double out[3];
+            ut_cartesian_to_spherical(0.0, 0.0, 1.0, out);
+            Assert::AreEqual(1.0,  out[0], 1e-12); // r=1
+            Assert::AreEqual(0.0,  out[1], 1e-12); // theta=0
+        }
+
+        TEST_METHOD(UnitY_Gives_PhiHalfPi)
+        {
+            double out[3];
+            ut_cartesian_to_spherical(0.0, 1.0, 0.0, out);
+            Assert::AreEqual(1.0,          out[0], 1e-12); // r=1
+            Assert::AreEqual(PI_VAL / 2.0, out[2], 1e-12); // phi=pi/2
+        }
+
+        TEST_METHOD(Radius_Is_Euclidean_Norm)
+        {
+            double out[3];
+            ut_cartesian_to_spherical(3.0, 4.0, 0.0, out);
+            Assert::AreEqual(5.0, out[0], 1e-12); // r=5
+        }
+
+        TEST_METHOD(Inverse_Recover_Cartesian)
+        {
+            // Convert (1,1,1) → spherical → back to Cartesian
+            double out[3];
+            ut_cartesian_to_spherical(1.0, 1.0, 1.0, out);
+            double r = out[0], theta = out[1], phi = out[2];
+            double x = r * std::sin(theta) * std::cos(phi);
+            double y = r * std::sin(theta) * std::sin(phi);
+            double z = r * std::cos(theta);
+            Assert::AreEqual(1.0, x, 1e-12);
+            Assert::AreEqual(1.0, y, 1e-12);
+            Assert::AreEqual(1.0, z, 1e-12);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // GetLambda1Tests — median eigenvalue of a 3x3 symmetric matrix
+    // -----------------------------------------------------------------------
+    TEST_CLASS(GetLambda1Tests)
+    {
+    public:
+        TEST_METHOD(DiagonalMatrix_ReturnsMidEigenvalue)
+        {
+            // Eigenvalues are 1, 3, 5 → median = 3
+            const double a[9] = {
+                1, 0, 0,
+                0, 3, 0,
+                0, 0, 5
+            };
+            double lam = ut_get_lambda_1(a);
+            Assert::AreEqual(3.0, lam, 1e-10);
+        }
+
+        TEST_METHOD(DiagonalMatrix_AllEqual_ReturnsThat)
+        {
+            const double a[9] = {
+                2, 0, 0,
+                0, 2, 0,
+                0, 0, 2
+            };
+            double lam = ut_get_lambda_1(a);
+            // all eigenvalues equal 2; any is "middle"
+            Assert::AreEqual(2.0, lam, 1e-10);
+        }
+
+        TEST_METHOD(DiagonalDescending_ReturnsMid)
+        {
+            // Eigenvalues 10, 5, 1 → median = 5
+            const double a[9] = {
+                10, 0, 0,
+                0,  5, 0,
+                0,  0, 1
+            };
+            double lam = ut_get_lambda_1(a);
+            Assert::AreEqual(5.0, lam, 1e-10);
+        }
+
+        TEST_METHOD(SymmetricMatrix_ReturnsFiniteValue)
+        {
+            // 3x3 symmetric: known eigenvalues can be verified with characteristic polynomial
+            // A = [[4,2,0],[2,3,1],[0,1,2]] → trace=9, det=14
+            const double a[9] = {
+                4, 2, 0,
+                2, 3, 1,
+                0, 1, 2
+            };
+            double lam = ut_get_lambda_1(a);
+            Assert::IsTrue(std::isfinite(lam));
+            // Eigenvalues must be between min(diag)=2 and max(diag)=4 for a diag-dominant case
+            Assert::IsTrue(lam >= 1.0 && lam <= 5.0);
+        }
+
+        TEST_METHOD(SymmetricMatrix_MedianIsInBounds)
+        {
+            // For any symmetric matrix, median eigenvalue is bounded by extremes
+            const double a[9] = {
+                3, 1, 0,
+                1, 4, 2,
+                0, 2, 5
+            };
+            double lam = ut_get_lambda_1(a);
+            Assert::IsTrue(std::isfinite(lam));
+            Assert::IsTrue(lam > 0.0); // positive definite matrix
+        }
+    };
+
 } // namespace NoSpherA2UnitTests

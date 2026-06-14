@@ -111,4 +111,27 @@ extern "C" {
 
     // --- hypergeometric 2F1(a,b;c;x) ---
     UT_API double ut_hypergeometric(double a, double b, double c, double x);
+
+    // --- Atomic number ↔ element symbol (constants::atnr2letter) ---
+    // Returns element symbol string for atomic number 1–103; "DM" for 0; "PROBLEM" if out of range.
+    // Writes into output (bufsize incl. NUL). Returns string length, -1 if buffer too small.
+    UT_API int ut_atnr2letter(int nr, char* output, int bufsize);
+
+    // --- Cartesian exponent vector from basis type (constants::type2vector) ---
+    // Converts basis-function type index (1–56) to [nx, ny, nz]. Sets all to -1 if out of range.
+    UT_API void ut_type2vector(int index, int nx_out[1], int ny_out[1], int nz_out[1]);
+
+    // --- Gaussian normalization constant (constants::normgauss) ---
+    UT_API double ut_normgauss(int type, double exponent);
+
+    // --- Associated Legendre polynomial P_l^m(x) (constants::associated_legendre_polynomial) ---
+    UT_API double ut_assoc_legendre(int l, int m, double x);
+
+    // --- Cartesian → spherical coordinates (constants::cartesian_to_spherical) ---
+    // Returns [r, theta, phi] written into out3[3].
+    UT_API void ut_cartesian_to_spherical(double x, double y, double z, double out3[3]);
+
+    // --- Median eigenvalue of a 3x3 symmetric matrix (get_lambda_1) ---
+    // Matrix stored row-major: a[0..8]; a[1]=a[3], a[2]=a[6], a[5]=a[7].
+    UT_API double ut_get_lambda_1(const double a[9]);
 }
