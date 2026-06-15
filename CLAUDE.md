@@ -22,6 +22,46 @@ Output: `NoSpherA2` (or `NoSpherA2.exe` on Windows) at the repo root.
 
 CMake presets also exist for targeted builds: `linux-occ-gcc`, `macos-release-*`, `windows-clang-cl`, and `windows-msvc-debug`.
 
+### Building on Windows from an Agent/CLI session (no Developer Shell)
+
+The VS Developer Shell (`VsDevCmd.bat`) cannot be sourced inside the Bash or PowerShell tools because environment variables set by a `call` inside `cmd /c` do not persist to the next tool invocation, and `msbuild` is not on the default PATH.
+
+Use the full path to MSBuild and invoke it from **PowerShell** (not Bash — Bash strips leading `/` from `/p:` switches):
+
+```powershell
+$msbuild = "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe"
+$solDir   = "D:\git\NoSpherA2\Windows\"
+
+# Build the DLL (contains all Src/ production code)
+& $msbuild "D:\git\NoSpherA2\NoSpherA2_DLL\NoSpherA2_DLL.vcxproj" `
+    /p:Configuration=Release /p:Platform=x64 "/p:SolutionDir=$solDir" /v:minimal
+
+# Build the VS unit-test project
+& $msbuild "D:\git\NoSpherA2\Windows\Tests\Tests.vcxproj" `
+    /p:Configuration=Release /p:Platform=x64 "/p:SolutionDir=$solDir" /v:minimal
+```
+
+Replace `Release` with `Debug` for a debug build. Supported configurations: `Debug`, `Release`, `Profile`, `GenCube`, `Release + Copy`.
+
+Run the VS unit tests:
+
+```powershell
+$vstest = "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe"
+& $vstest "D:\git\NoSpherA2\Windows\x64\Release\Tests.dll" /Platform:x64
+```
+
+For code coverage (instruments `NoSpherA2_DLL.dll` + `Tests.dll`):
+
+```powershell
+& $vstest "D:\git\NoSpherA2\Windows\x64\Profile\Tests.dll" /Platform:x64 `
+    /Settings:"D:\git\NoSpherA2\Windows\coverage.runsettings" /EnableCodeCoverage
+```
+
+**Key pitfalls:**
+- `NoSpherA2_DLL.vcxproj` lives at `NoSpherA2_DLL\` (repo root), **not** under `Windows\`.
+- Always pass `/p:SolutionDir=` so relative paths inside the vcxproj resolve correctly.
+- Never use `Bash` for MSBuild invocations — the `/p:` flag prefix is silently stripped.
+
 ## Running Tests
 
 ```sh
@@ -46,8 +86,10 @@ Tests are golden-file comparisons: the harness runs `NoSpherA2` with args from `
 
 The repository also has a Visual Studio test project under `Windows/Tests`. Prefer this path when validating Windows/OCC integration issues:
 
-```ps
-msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\
+```powershell
+# See "Building on Windows from an Agent/CLI session" above for the full invocation.
+# Quick reference (run from a VS Developer PowerShell where msbuild is on PATH):
+msbuild Windows\Tests\Tests.vcxproj /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\
 vstest.console.exe Windows\x64\Release\Tests.dll /Platform:x64
 ```
 
