@@ -223,16 +223,32 @@ public:
 
     void set_system()
     {
-        if (beta != 90.0)
-        {
-            crystal_system = "triclinic";
-            return;
-        }
+        const double tol = 1e-6;
+        auto eq = [tol](double x, double y) { return std::abs(x - y) < tol; };
+
+        bool a_eq_b = eq(a, b);
+        bool b_eq_c = eq(b, c);
+        bool a90 = eq(alpha, 90.0);
+        bool b90 = eq(beta,  90.0);
+        bool g90 = eq(gamma, 90.0);
+        bool g120 = eq(gamma, 120.0);
+
+        if (a_eq_b && b_eq_c && a90 && b90 && g90)
+            crystal_system = "cubic";
+        else if (a_eq_b && !b_eq_c && a90 && b90 && g90)
+            crystal_system = "tetragonal";
+        else if (!a_eq_b && !b_eq_c && a90 && b90 && g90)
+            crystal_system = "orthorhombic";
+        else if (a_eq_b && !b_eq_c && a90 && b90 && g120)
+            crystal_system = "hexagonal";
+        else if (a_eq_b && b_eq_c && !a90 && eq(alpha, beta) && eq(beta, gamma))
+            crystal_system = "trigonal";
+        else if (a90 && g90 && !b90)
+            crystal_system = "monoclinic";
+        else if (a90 && b90 && g90)
+            crystal_system = "orthorhombic";
         else
-        {
-            if (alpha == beta && alpha == 90.0)
-                crystal_system = "monoclinic";
-        }
+            crystal_system = "triclinic";
     }
 
     std::string get_crystal_system() const

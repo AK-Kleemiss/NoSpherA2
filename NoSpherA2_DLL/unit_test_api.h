@@ -233,4 +233,63 @@ extern "C" {
     // -----------------------------------------------------------------------
     UT_API double ut_atom_distance(double x1, double y1, double z1,
                                    double x2, double y2, double z2);
+
+    // -----------------------------------------------------------------------
+    // cell handle-based API
+    // -----------------------------------------------------------------------
+    UT_API void*  ut_cell_create(double a, double b, double c,
+                                 double alpha, double beta, double gamma);
+    UT_API void   ut_cell_destroy(void* h);
+    UT_API double ut_cell_get_a(void* h);
+    UT_API double ut_cell_get_b(void* h);
+    UT_API double ut_cell_get_c(void* h);
+    UT_API double ut_cell_get_angle(void* h, int i);   // 0=alpha,1=beta,2=gamma (degrees)
+    UT_API double ut_cell_get_volume(void* h);
+    UT_API double ut_cell_get_cm(void* h, int i, int j);
+    UT_API void   ut_cell_frac_to_cart(void* h, double fx, double fy, double fz,
+                                       double out3[3], int in_bohr);
+    UT_API double ut_cell_d_spacing_hkl(void* h, int hh, int kk, int ll);
+    UT_API double ut_cell_stl_hkl(void* h, int hh, int kk, int ll);
+    UT_API int    ut_cell_get_crystal_system(void* h, char* out, int bufsize);
+
+    // -----------------------------------------------------------------------
+    // MO handle-based API
+    // -----------------------------------------------------------------------
+    UT_API void*  ut_mo_create(int nr, double occ, double energy);
+    UT_API void   ut_mo_destroy(void* h);
+    UT_API void   ut_mo_push_coef(void* h, double val);
+    UT_API double ut_mo_get_coef(void* h, int nr);
+    UT_API int    ut_mo_get_primitive_count(void* h);
+    UT_API int    ut_mo_hdr(void* h, char* out, int bufsize);
+    UT_API double ut_mo_get_occ(void* h);
+    UT_API double ut_mo_get_energy(void* h);
+
+    // -----------------------------------------------------------------------
+    // lebedev_sphere quadrature
+    // Returns actual number of points; writes at most max_pts into x/y/z/w.
+    // -----------------------------------------------------------------------
+    UT_API int    ut_lebedev_order(int order,
+                                   double* x_out, double* y_out,
+                                   double* z_out, double* w_out,
+                                   int max_pts);
+
+    // -----------------------------------------------------------------------
+    // AtomGrid handle-based API
+    // -----------------------------------------------------------------------
+    UT_API void*  ut_atomgrid_create(double radial_precision,
+                                     int min_angular, int max_angular,
+                                     int proton_charge,
+                                     double alpha_max, int max_l,
+                                     const double* alpha_min, int n_alpha_min);
+    UT_API void   ut_atomgrid_destroy(void* h);
+    UT_API int    ut_atomgrid_get_num_points(void* h);
+    UT_API int    ut_atomgrid_get_num_radial_points(void* h);
+    // Radial grid (r and w arrays must each have at least get_num_radial_points() elements)
+    UT_API void   ut_atomgrid_get_radial_grid(void* h, double* r_out, double* w_out);
+
+    // -----------------------------------------------------------------------
+    // WFN density evaluation (uses existing wfn handle from ut_wfn_create)
+    // -----------------------------------------------------------------------
+    UT_API double ut_wfn_compute_dens(void* h, double x, double y, double z);
+    UT_API double ut_wfn_compute_mo(void* h, double x, double y, double z, int mo_idx);
 }

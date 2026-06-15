@@ -6,6 +6,10 @@
 #include "../Src/wfn_class.h"
 #include "../Src/tsc_block.h"
 #include "../Src/atoms.h"
+#include "../Src/cell.h"
+#include "../Src/mo_class.h"
+#include "../Src/sphere_lebedev_rule.h"
+#include "../Src/AtomGrid.h"
 #include <cstring>
 #include <cmath>
 #include <thread>
@@ -569,6 +573,166 @@ extern "C" {
         atom a("A", "0", 1, x1, y1, z1, 0);
         atom b("B", "0", 2, x2, y2, z2, 0);
         return a.distance_to(b);
+    }
+
+    // -----------------------------------------------------------------------
+    // cell handle-based API
+    // -----------------------------------------------------------------------
+
+    UT_API void* ut_cell_create(double a, double b, double c,
+                                double alpha, double beta, double gamma) {
+        return new cell(a, b, c, alpha, beta, gamma);
+    }
+
+    UT_API void ut_cell_destroy(void* h) { delete static_cast<cell*>(h); }
+
+    UT_API double ut_cell_get_a(void* h) { return static_cast<cell*>(h)->get_a(); }
+    UT_API double ut_cell_get_b(void* h) { return static_cast<cell*>(h)->get_b(); }
+    UT_API double ut_cell_get_c(void* h) { return static_cast<cell*>(h)->get_c(); }
+
+    UT_API double ut_cell_get_angle(void* h, int i) {
+        return static_cast<cell*>(h)->get_angle(i);
+    }
+
+    UT_API double ut_cell_get_volume(void* h) {
+        return static_cast<cell*>(h)->get_V();
+    }
+
+    UT_API double ut_cell_get_cm(void* h, int i, int j) {
+        return static_cast<cell*>(h)->get_cm(i, j);
+    }
+
+    UT_API void ut_cell_frac_to_cart(void* h, double fx, double fy, double fz,
+                                     double out3[3], int in_bohr) {
+        static_cast<cell*>(h)->make_coords_cartesian(out3, fx, fy, fz, in_bohr != 0);
+    }
+
+    UT_API double ut_cell_d_spacing_hkl(void* h, int hh, int kk, int ll) {
+        std::array<int, 3> hkl{ hh, kk, ll };
+        return static_cast<cell*>(h)->get_d_of_hkl(hkl);
+    }
+
+    UT_API double ut_cell_stl_hkl(void* h, int hh, int kk, int ll) {
+        std::array<int, 3> hkl{ hh, kk, ll };
+        return static_cast<cell*>(h)->get_stl_of_hkl(hkl);
+    }
+
+    UT_API int ut_cell_get_crystal_system(void* h, char* out, int bufsize) {
+        std::string sys = static_cast<cell*>(h)->get_crystal_system();
+        if ((int)sys.size() + 1 > bufsize) return -1;
+        strncpy_s(out, bufsize, sys.c_str(), sys.size());
+        return (int)sys.size();
+    }
+
+    // -----------------------------------------------------------------------
+    // MO handle-based API
+    // -----------------------------------------------------------------------
+
+    UT_API void* ut_mo_create(int nr, double occ, double energy) {
+        return new MO(nr, occ, energy);
+    }
+
+    UT_API void ut_mo_destroy(void* h) { delete static_cast<MO*>(h); }
+
+    UT_API void ut_mo_push_coef(void* h, double val) {
+        static_cast<MO*>(h)->push_back_coef(val);
+    }
+
+    UT_API double ut_mo_get_coef(void* h, int nr) {
+        return static_cast<MO*>(h)->get_coefficient(nr);
+    }
+
+    UT_API int ut_mo_get_primitive_count(void* h) {
+        return static_cast<MO*>(h)->get_primitive_count();
+    }
+
+    UT_API int ut_mo_hdr(void* h, char* out, int bufsize) {
+        std::string s = static_cast<MO*>(h)->hdr();
+        if ((int)s.size() + 1 > bufsize) return -1;
+        strncpy_s(out, bufsize, s.c_str(), s.size());
+        return (int)s.size();
+    }
+
+    UT_API double ut_mo_get_occ(void* h) {
+        return static_cast<MO*>(h)->get_occ();
+    }
+
+    UT_API double ut_mo_get_energy(void* h) {
+        return static_cast<MO*>(h)->get_energy();
+    }
+
+    // -----------------------------------------------------------------------
+    // lebedev_sphere quadrature
+    // -----------------------------------------------------------------------
+
+    UT_API int ut_lebedev_order(int order,
+                                double* x_out, double* y_out,
+                                double* z_out, double* w_out,
+                                int max_pts) {
+        // Allocate enough for any order (max is 5810)
+        const int MAX_PTS = 5810;
+        static double xs[MAX_PTS], ys[MAX_PTS], zs[MAX_PTS], ws[MAX_PTS];
+        lebedev_sphere sph;
+        sph.ld_by_order(order, xs, ys, zs, ws);
+        // Figure out actual point count by matching known order → npts mapping
+        // The lebedev API fills arrays based on order; we trust the caller asked
+        // for a valid order and copy min(max_pts, actual) points.
+        // Use order as npts directly (they're equal for Lebedev grids).
+        int npts = order;
+        int copy = (npts < max_pts) ? npts : max_pts;
+        for (int i = 0; i < copy; ++i) {
+            x_out[i] = xs[i]; y_out[i] = ys[i];
+            z_out[i] = zs[i]; w_out[i] = ws[i];
+        }
+        return npts;
+    }
+
+    // -----------------------------------------------------------------------
+    // AtomGrid handle-based API
+    // -----------------------------------------------------------------------
+
+    UT_API void* ut_atomgrid_create(double radial_precision,
+                                    int min_angular, int max_angular,
+                                    int proton_charge,
+                                    double alpha_max, int max_l,
+                                    const double* alpha_min, int n_alpha_min) {
+        std::ostringstream log;
+        // alpha_min must be an array of length max_l+1
+        std::vector<double> am(alpha_min, alpha_min + n_alpha_min);
+        try {
+            return new AtomGrid(radial_precision, min_angular, max_angular,
+                                proton_charge, alpha_max, max_l, am.data(), log);
+        } catch (...) {
+            return nullptr;
+        }
+    }
+
+    UT_API void ut_atomgrid_destroy(void* h) { delete static_cast<AtomGrid*>(h); }
+
+    UT_API int ut_atomgrid_get_num_points(void* h) {
+        return static_cast<AtomGrid*>(h)->get_num_grid_points();
+    }
+
+    UT_API int ut_atomgrid_get_num_radial_points(void* h) {
+        return static_cast<AtomGrid*>(h)->get_num_radial_grid_points();
+    }
+
+    UT_API void ut_atomgrid_get_radial_grid(void* h, double* r_out, double* w_out) {
+        static_cast<AtomGrid*>(h)->get_radial_grid(r_out, w_out);
+    }
+
+    // -----------------------------------------------------------------------
+    // WFN density evaluation
+    // -----------------------------------------------------------------------
+
+    UT_API double ut_wfn_compute_dens(void* h, double x, double y, double z) {
+        d3 pos{ x, y, z };
+        return static_cast<WFN*>(h)->compute_dens(pos);
+    }
+
+    UT_API double ut_wfn_compute_mo(void* h, double x, double y, double z, int mo_idx) {
+        d3 pos{ x, y, z };
+        return static_cast<WFN*>(h)->computeMO(pos, mo_idx);
     }
 
 } // extern "C"

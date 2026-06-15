@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <vector>
 
 static constexpr double PI_VAL = 3.14159265358979323846;
 
@@ -1869,6 +1870,430 @@ namespace NoSpherA2UnitTests
             Assert::AreEqual(2, ut_tsc_scatterer_size(dst.h));
             // Original "C" SF unchanged
             Assert::AreEqual(1.0, ut_tsc_get_sf_real(dst.h, 0, 0), 1e-12);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // CellTests — unit cell geometry
+    // -----------------------------------------------------------------------
+    TEST_CLASS(CellTests)
+    {
+        struct CellGuard {
+            void* h;
+            explicit CellGuard(double a, double b, double c,
+                               double alpha, double beta, double gamma)
+                : h(ut_cell_create(a, b, c, alpha, beta, gamma)) {}
+            ~CellGuard() { ut_cell_destroy(h); }
+        };
+
+    public:
+        TEST_METHOD(CubicCell_Parameters)
+        {
+            // Simple cubic: a=b=c=5, all angles 90
+            CellGuard g(5.0, 5.0, 5.0, 90.0, 90.0, 90.0);
+            Assert::AreEqual(5.0, ut_cell_get_a(g.h), 1e-12);
+            Assert::AreEqual(5.0, ut_cell_get_b(g.h), 1e-12);
+            Assert::AreEqual(5.0, ut_cell_get_c(g.h), 1e-12);
+            Assert::AreEqual(90.0, ut_cell_get_angle(g.h, 0), 1e-10);
+            Assert::AreEqual(90.0, ut_cell_get_angle(g.h, 1), 1e-10);
+            Assert::AreEqual(90.0, ut_cell_get_angle(g.h, 2), 1e-10);
+        }
+
+        TEST_METHOD(CubicCell_Volume)
+        {
+            // V = 5^3 = 125 Å³
+            CellGuard g(5.0, 5.0, 5.0, 90.0, 90.0, 90.0);
+            Assert::AreEqual(125.0, ut_cell_get_volume(g.h), 1e-8);
+        }
+
+        TEST_METHOD(CubicCell_CrystalSystem)
+        {
+            CellGuard g(5.0, 5.0, 5.0, 90.0, 90.0, 90.0);
+            char sys[32] = {};
+            ut_cell_get_crystal_system(g.h, sys, 32);
+            Assert::AreEqual(std::string("cubic"), std::string(sys));
+        }
+
+        TEST_METHOD(TetragonalCell_CrystalSystem)
+        {
+            CellGuard g(5.0, 5.0, 8.0, 90.0, 90.0, 90.0);
+            char sys[32] = {};
+            ut_cell_get_crystal_system(g.h, sys, 32);
+            Assert::AreEqual(std::string("tetragonal"), std::string(sys));
+        }
+
+        TEST_METHOD(OrthorhombicCell_CrystalSystem)
+        {
+            CellGuard g(4.0, 5.0, 7.0, 90.0, 90.0, 90.0);
+            char sys[32] = {};
+            ut_cell_get_crystal_system(g.h, sys, 32);
+            Assert::AreEqual(std::string("orthorhombic"), std::string(sys));
+        }
+
+        TEST_METHOD(HexagonalCell_CrystalSystem)
+        {
+            CellGuard g(4.0, 4.0, 7.0, 90.0, 90.0, 120.0);
+            char sys[32] = {};
+            ut_cell_get_crystal_system(g.h, sys, 32);
+            Assert::AreEqual(std::string("hexagonal"), std::string(sys));
+        }
+
+        TEST_METHOD(MonoclinicCell_CrystalSystem)
+        {
+            CellGuard g(5.0, 7.0, 9.0, 90.0, 110.0, 90.0);
+            char sys[32] = {};
+            ut_cell_get_crystal_system(g.h, sys, 32);
+            Assert::AreEqual(std::string("monoclinic"), std::string(sys));
+        }
+
+        TEST_METHOD(TriclinicCell_CrystalSystem)
+        {
+            CellGuard g(4.0, 5.0, 6.0, 80.0, 85.0, 75.0);
+            char sys[32] = {};
+            ut_cell_get_crystal_system(g.h, sys, 32);
+            Assert::AreEqual(std::string("triclinic"), std::string(sys));
+        }
+
+        TEST_METHOD(OrthorhombicCell_DSpacing_100)
+        {
+            // Orthorhombic: a=5, b=6, c=7, angles=90; d(1,0,0) = a = 5
+            CellGuard g(5.0, 6.0, 7.0, 90.0, 90.0, 90.0);
+            double d = ut_cell_d_spacing_hkl(g.h, 1, 0, 0);
+            Assert::AreEqual(5.0, d, 1e-8);
+        }
+
+        TEST_METHOD(OrthorhombicCell_DSpacing_010)
+        {
+            CellGuard g(5.0, 6.0, 7.0, 90.0, 90.0, 90.0);
+            double d = ut_cell_d_spacing_hkl(g.h, 0, 1, 0);
+            Assert::AreEqual(6.0, d, 1e-8);
+        }
+
+        TEST_METHOD(OrthorhombicCell_StlHkl)
+        {
+            // sin(theta)/lambda = 1/(2*d)
+            CellGuard g(5.0, 6.0, 7.0, 90.0, 90.0, 90.0);
+            double stl = ut_cell_stl_hkl(g.h, 1, 0, 0);
+            Assert::AreEqual(1.0 / (2.0 * 5.0), stl, 1e-10);
+        }
+
+        TEST_METHOD(CubicCell_FracToCart_Origin)
+        {
+            // (0,0,0) → (0,0,0) in any cell
+            CellGuard g(5.0, 5.0, 5.0, 90.0, 90.0, 90.0);
+            double cart[3];
+            ut_cell_frac_to_cart(g.h, 0.0, 0.0, 0.0, cart, 0); // in_bohr=0 → Angstrom
+            Assert::AreEqual(0.0, cart[0], 1e-12);
+            Assert::AreEqual(0.0, cart[1], 1e-12);
+            Assert::AreEqual(0.0, cart[2], 1e-12);
+        }
+
+        TEST_METHOD(CubicCell_FracToCart_UnitFrac)
+        {
+            // Cubic 5Å: (1,0,0) frac → (5,0,0) Å
+            CellGuard g(5.0, 5.0, 5.0, 90.0, 90.0, 90.0);
+            double cart[3];
+            ut_cell_frac_to_cart(g.h, 1.0, 0.0, 0.0, cart, 0);
+            Assert::AreEqual(5.0, cart[0], 1e-10);
+            Assert::AreEqual(0.0, cart[1], 1e-10);
+            Assert::AreEqual(0.0, cart[2], 1e-10);
+        }
+
+        TEST_METHOD(MonoclinicCell_VolumePositive)
+        {
+            // Monoclinic: a=5, b=7, c=9, alpha=90, beta=110, gamma=90
+            CellGuard g(5.0, 7.0, 9.0, 90.0, 110.0, 90.0);
+            double V = ut_cell_get_volume(g.h);
+            Assert::IsTrue(V > 0.0);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // MoTests — MO class standalone handle
+    // -----------------------------------------------------------------------
+    TEST_CLASS(MoTests)
+    {
+        struct MoGuard {
+            void* h;
+            explicit MoGuard(int nr, double occ, double energy)
+                : h(ut_mo_create(nr, occ, energy)) {}
+            ~MoGuard() { ut_mo_destroy(h); }
+        };
+
+    public:
+        TEST_METHOD(Create_OccAndEnergy)
+        {
+            MoGuard g(1, 2.0, -0.5);
+            Assert::AreEqual(2.0, ut_mo_get_occ(g.h), 1e-12);
+            Assert::AreEqual(-0.5, ut_mo_get_energy(g.h), 1e-12);
+        }
+
+        TEST_METHOD(PushCoef_IncreasesCount)
+        {
+            MoGuard g(1, 2.0, -0.5);
+            Assert::AreEqual(0, ut_mo_get_primitive_count(g.h));
+            ut_mo_push_coef(g.h, 0.707);
+            Assert::AreEqual(1, ut_mo_get_primitive_count(g.h));
+            ut_mo_push_coef(g.h, 0.293);
+            Assert::AreEqual(2, ut_mo_get_primitive_count(g.h));
+        }
+
+        TEST_METHOD(GetCoef_RoundTrip)
+        {
+            MoGuard g(1, 2.0, -0.5);
+            ut_mo_push_coef(g.h, 1.23);
+            ut_mo_push_coef(g.h, -4.56);
+            Assert::AreEqual(1.23,  ut_mo_get_coef(g.h, 0), 1e-12);
+            Assert::AreEqual(-4.56, ut_mo_get_coef(g.h, 1), 1e-12);
+        }
+
+        TEST_METHOD(Hdr_ContainsMO)
+        {
+            MoGuard g(1, 2.0, -0.5);
+            char buf[256] = {};
+            int n = ut_mo_hdr(g.h, buf, 256);
+            Assert::IsTrue(n > 0);
+            // Header line should start with "MO"
+            Assert::IsTrue(std::string(buf).find("MO") != std::string::npos);
+        }
+
+        TEST_METHOD(MultipleCoefs_AllAccessible)
+        {
+            MoGuard g(2, 1.0, -0.25);
+            for (int i = 0; i < 5; ++i)
+                ut_mo_push_coef(g.h, i * 0.1);
+            for (int i = 0; i < 5; ++i)
+                Assert::AreEqual(i * 0.1, ut_mo_get_coef(g.h, i), 1e-12);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // LebedevTests — spherical quadrature
+    // -----------------------------------------------------------------------
+    TEST_CLASS(LebedevTests)
+    {
+    public:
+        TEST_METHOD(Order6_CorrectPointCount)
+        {
+            double x[6], y[6], z[6], w[6];
+            int n = ut_lebedev_order(6, x, y, z, w, 6);
+            Assert::AreEqual(6, n);
+        }
+
+        TEST_METHOD(Order6_WeightsSumToOne)
+        {
+            // Lebedev weights sum to 1.0 (integral of 1 over unit sphere / 4π)
+            double x[6], y[6], z[6], w[6];
+            ut_lebedev_order(6, x, y, z, w, 6);
+            double sum = 0.0;
+            for (int i = 0; i < 6; ++i) sum += w[i];
+            Assert::AreEqual(1.0, sum, 1e-10);
+        }
+
+        TEST_METHOD(Order14_WeightsSumToOne)
+        {
+            double x[14], y[14], z[14], w[14];
+            ut_lebedev_order(14, x, y, z, w, 14);
+            double sum = 0.0;
+            for (int i = 0; i < 14; ++i) sum += w[i];
+            Assert::AreEqual(1.0, sum, 1e-10);
+        }
+
+        TEST_METHOD(Order26_WeightsSumToOne)
+        {
+            double x[26], y[26], z[26], w[26];
+            ut_lebedev_order(26, x, y, z, w, 26);
+            double sum = 0.0;
+            for (int i = 0; i < 26; ++i) sum += w[i];
+            Assert::AreEqual(1.0, sum, 1e-10);
+        }
+
+        TEST_METHOD(Order6_PointsOnUnitSphere)
+        {
+            // All quadrature points should lie on the unit sphere
+            double x[6], y[6], z[6], w[6];
+            ut_lebedev_order(6, x, y, z, w, 6);
+            for (int i = 0; i < 6; ++i) {
+                double r2 = x[i]*x[i] + y[i]*y[i] + z[i]*z[i];
+                Assert::AreEqual(1.0, r2, 1e-12);
+            }
+        }
+
+        TEST_METHOD(Order6_AllWeightsPositive)
+        {
+            double x[6], y[6], z[6], w[6];
+            ut_lebedev_order(6, x, y, z, w, 6);
+            for (int i = 0; i < 6; ++i)
+                Assert::IsTrue(w[i] > 0.0);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // AtomGridTests — radial/angular DFT integration grid
+    // -----------------------------------------------------------------------
+    TEST_CLASS(AtomGridTests)
+    {
+        // Construct a minimal grid for hydrogen (Z=1) with one s-type function
+        static void* make_h_grid() {
+            double alpha_min[1] = { 0.5 };  // min exponent for l=0
+            return ut_atomgrid_create(
+                1e-5,   // radial_precision
+                6,      // min_angular (6-point Lebedev)
+                6,      // max_angular
+                1,      // proton_charge (H)
+                10.0,   // alpha_max
+                0,      // max_l (s only)
+                alpha_min, 1);
+        }
+
+    public:
+        TEST_METHOD(Create_NotNull)
+        {
+            void* h = make_h_grid();
+            Assert::IsNotNull(h);
+            ut_atomgrid_destroy(h);
+        }
+
+        TEST_METHOD(NumPoints_Positive)
+        {
+            void* h = make_h_grid();
+            Assert::IsNotNull(h);
+            int n = ut_atomgrid_get_num_points(h);
+            Assert::IsTrue(n > 0);
+            ut_atomgrid_destroy(h);
+        }
+
+        TEST_METHOD(NumRadialPoints_Positive)
+        {
+            void* h = make_h_grid();
+            Assert::IsNotNull(h);
+            int nr = ut_atomgrid_get_num_radial_points(h);
+            Assert::IsTrue(nr > 0);
+            ut_atomgrid_destroy(h);
+        }
+
+        TEST_METHOD(NumPoints_GeRadialTimesAngular)
+        {
+            void* h = make_h_grid();
+            Assert::IsNotNull(h);
+            int total = ut_atomgrid_get_num_points(h);
+            int radial = ut_atomgrid_get_num_radial_points(h);
+            // total >= radial * 6 (min angular = 6)
+            Assert::IsTrue(total >= radial * 6);
+            ut_atomgrid_destroy(h);
+        }
+
+        TEST_METHOD(RadialGrid_WeightsPositive)
+        {
+            void* h = make_h_grid();
+            Assert::IsNotNull(h);
+            int nr = ut_atomgrid_get_num_radial_points(h);
+            std::vector<double> r(nr), w(nr);
+            ut_atomgrid_get_radial_grid(h, r.data(), w.data());
+            for (int i = 0; i < nr; ++i)
+                Assert::IsTrue(w[i] > 0.0);
+            ut_atomgrid_destroy(h);
+        }
+
+        TEST_METHOD(RadialGrid_RDistancesPositive)
+        {
+            void* h = make_h_grid();
+            Assert::IsNotNull(h);
+            int nr = ut_atomgrid_get_num_radial_points(h);
+            std::vector<double> r(nr), w(nr);
+            ut_atomgrid_get_radial_grid(h, r.data(), w.data());
+            for (int i = 0; i < nr; ++i)
+                Assert::IsTrue(r[i] > 0.0);
+            ut_atomgrid_destroy(h);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // WfnDensityTests — density evaluation on synthetic 1s hydrogen wavefunction
+    // -----------------------------------------------------------------------
+    TEST_CLASS(WfnDensityTests)
+    {
+        // Builds a minimal hydrogen-like 1s WFN in memory.
+        //   One H atom at origin, one s-type primitive (alpha=1.0),
+        //   one occupied MO (occ=2.0) with coef=1.0 and norm_const=1.0.
+        static void* make_h1s_wfn() {
+            void* h = ut_wfn_create();
+            // Atom: H at origin, Z=1
+            ut_wfn_push_atom(h, "H", 0.0, 0.0, 0.0, 1);
+            // MO: occupied, occ=2.0
+            ut_wfn_push_mo(h, 1, 2.0, -0.5);
+            // Primitive: center=1 (1-based), type=1 (s), exponent=1.0, coef=1.0
+            double coef = 1.0;
+            ut_wfn_add_primitive(h, 1, 1, 1.0, &coef, 1);
+            return h;
+        }
+
+    public:
+        TEST_METHOD(Density_AtOrigin_IsPositive)
+        {
+            void* h = make_h1s_wfn();
+            double rho = ut_wfn_compute_dens(h, 0.0, 0.0, 0.0);
+            ut_wfn_destroy(h);
+            Assert::IsTrue(rho > 0.0);
+            Assert::IsTrue(std::isfinite(rho));
+        }
+
+        TEST_METHOD(Density_AtOrigin_ExceedsFarPoint)
+        {
+            // Density should be larger at origin than at r=5 Bohr
+            void* h = make_h1s_wfn();
+            double rho0 = ut_wfn_compute_dens(h, 0.0, 0.0, 0.0);
+            double rho5 = ut_wfn_compute_dens(h, 5.0, 0.0, 0.0);
+            ut_wfn_destroy(h);
+            Assert::IsTrue(rho0 > rho5);
+        }
+
+        TEST_METHOD(Density_FarPoint_IsSmall)
+        {
+            // At r=10 Bohr, 1s density should be tiny
+            void* h = make_h1s_wfn();
+            double rho = ut_wfn_compute_dens(h, 10.0, 0.0, 0.0);
+            ut_wfn_destroy(h);
+            Assert::IsTrue(rho >= 0.0);
+            Assert::IsTrue(rho < 1e-3);
+        }
+
+        TEST_METHOD(Density_Spherical_SameAtEquidistantPoints)
+        {
+            // s-type WFN: density should be equal at same distance in any direction
+            void* h = make_h1s_wfn();
+            double rho_x = ut_wfn_compute_dens(h,  1.0, 0.0, 0.0);
+            double rho_y = ut_wfn_compute_dens(h,  0.0, 1.0, 0.0);
+            double rho_z = ut_wfn_compute_dens(h,  0.0, 0.0, 1.0);
+            ut_wfn_destroy(h);
+            Assert::AreEqual(rho_x, rho_y, 1e-10);
+            Assert::AreEqual(rho_x, rho_z, 1e-10);
+        }
+
+        TEST_METHOD(MoValue_AtOrigin_IsFinite)
+        {
+            void* h = make_h1s_wfn();
+            double mo0 = ut_wfn_compute_mo(h, 0.0, 0.0, 0.0, 0);
+            ut_wfn_destroy(h);
+            Assert::IsTrue(std::isfinite(mo0));
+        }
+
+        TEST_METHOD(MoValue_DecaysWithDistance)
+        {
+            void* h = make_h1s_wfn();
+            double mo0 = std::abs(ut_wfn_compute_mo(h, 0.0, 0.0, 0.0, 0));
+            double mo5 = std::abs(ut_wfn_compute_mo(h, 5.0, 0.0, 0.0, 0));
+            ut_wfn_destroy(h);
+            Assert::IsTrue(mo0 > mo5);
+        }
+
+        TEST_METHOD(NrElectrons_MatchesOccupation)
+        {
+            // count_nr_electrons sums MO occupations: one MO occ=2 → 2 electrons
+            void* h = make_h1s_wfn();
+            double nel = ut_wfn_count_nr_electrons(h);
+            ut_wfn_destroy(h);
+            Assert::AreEqual(2.0, nel, 1e-10);
         }
     };
 
