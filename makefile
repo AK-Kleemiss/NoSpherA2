@@ -185,6 +185,7 @@ occ: LibCint
 	else \
 		echo 'Skipping OCC build, Lib/occ/lib/libocc_main.a already exists'; \
 	fi
+
 endif
 
 
@@ -192,7 +193,7 @@ ifeq ($(NAME),WINDOWS)
 WIN_SLN  ?= Windows/NoSpherA2.sln
 WIN_CFG  ?= Release
 WIN_PLAT ?= x64
-WIN_VCTOOLSVERSION ?= 14.50.35717
+WIN_VCTOOLSVERSION ?= 14.51.36231
 NoSpherA2: 
 	echo Building $(WIN_SLN) ($(WIN_CFG) $(WIN_PLAT)) 
 	msbuild $(WIN_SLN) /p:Configuration=$(WIN_CFG) /p:Platform=$(WIN_PLAT) /p:VCToolsVersion=$(WIN_VCTOOLSVERSION)

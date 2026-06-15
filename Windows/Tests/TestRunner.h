@@ -11,6 +11,13 @@
 #include <cstdlib>
 #include "CppUnitTest.h"
 
+// In-process entry point exported by NoSpherA2_DLL.dll.
+// Linked via the import library; the DLL must be in the same output directory.
+extern "C" __declspec(dllimport) int __cdecl NoSpherA2_run(
+    const char* workDir,
+    int         argc,
+    char**      argv);
+
 namespace NosTestFramework
 {
     using namespace Microsoft::VisualStudio::CppUnitTestFramework;
@@ -168,19 +175,8 @@ namespace NosTestFramework
             }
         }
 
-        // Find NoSpherA2.exe (same output dir as this DLL)
-        auto dllDir = GetDllDirectory();
-        auto exePath = dllDir / "NoSpherA2.exe";
-        if (!std::filesystem::exists(exePath)) {
-            // Also try NOS_EXE env var
-            const char *envExe = std::getenv("NOS_EXE");
-            if (envExe && std::filesystem::exists(envExe))
-                exePath = envExe;
-            else
-                Assert::Fail(L"NoSpherA2.exe not found. Build it first or set NOS_EXE.");
-        }
-
         auto repoRoot = GetRepoRoot();
+        auto originalCwd = std::filesystem::current_path();
         auto testSrcDir = repoRoot / "tests" / test.directory;
         if (!std::filesystem::exists(testSrcDir)) {
             auto msg = std::wstring(L"Test directory not found: ") +
@@ -188,89 +184,67 @@ namespace NosTestFramework
             Assert::Fail(msg.c_str());
         }
 
-        // Create isolated temp work directory
-        auto tempBase = std::filesystem::temp_directory_path() / "NosTests" / test.name;
-        std::error_code ec;
-        std::filesystem::remove_all(tempBase, ec);
+        // Create isolated temp work directory. Include process/run identity so
+        // a stale Visual Studio test host cannot lock the next run's folder.
+        auto tempRoot = std::filesystem::temp_directory_path() / "NosTests";
+        auto tempBase = tempRoot /
+            (test.name + "_" + std::to_string(GetCurrentProcessId()) + "_" +
+             std::to_string(GetTickCount64()));
+        auto cleanupTemp = [&]() {
+            std::error_code ignored;
+            std::filesystem::current_path(originalCwd, ignored);
+            SetCurrentDirectoryW(originalCwd.wstring().c_str());
+
+            std::error_code cleanupEc;
+            std::filesystem::remove_all(tempBase, cleanupEc);
+            if (cleanupEc) {
+                auto cleanupMessage = cleanupEc.message();
+                auto msg = std::wstring(L"Warning: could not clean temp test directory: ") +
+                    tempBase.wstring() + L" (" +
+                    std::wstring(cleanupMessage.begin(), cleanupMessage.end()) +
+                    L")";
+                Logger::WriteMessage(msg.c_str());
+            }
+        };
+        {
+            std::error_code ignored;
+            std::filesystem::remove_all(tempRoot / test.name, ignored);
+        }
         std::filesystem::create_directories(tempBase);
         std::filesystem::copy(testSrcDir, tempBase,
             std::filesystem::copy_options::recursive |
             std::filesystem::copy_options::overwrite_existing);
 
-        // Build command line string
-        std::string cmdLine = "\"" + exePath.string() + "\"";
+        // OCC_DATA_PATH — injected for in-process runs.
+        // The prebuilt OCC data lives at Lib/occ/share/occ (not occ/share,
+        // which is the gh-pages documentation checkout).
+        std::string occDataPath = (repoRoot / "Lib" / "occ" / "share" / "occ").string();
+        SetEnvironmentVariableA("OCC_DATA_PATH", occDataPath.c_str());
+
+        // ---- in-process path -----------------------------------------------
+        // All tests run in-process through NoSpherA2_DLL.dll so Visual Studio
+        // can debug Src/ code directly in the test host.
+        std::vector<std::string> argStrings;
+        // argv[0] = DLL path (used by ensure_occ_data_path fallback logic)
+        argStrings.push_back((GetDllDirectory() / "NoSpherA2_DLL.dll").string());
         for (const auto &a : test.args)
-            cmdLine += " " + a;
+            argStrings.push_back(a);
+        std::vector<char*> argPtrs;
+        for (auto &s : argStrings)
+            argPtrs.push_back(const_cast<char*>(s.c_str()));
 
-        // Set OCC_DATA_PATH in the child environment
-        std::string occDataPath = (repoRoot / "occ" / "share").string();
-        std::wstring envBlock;
-        // Collect current environment
-        LPWCH envStrings = GetEnvironmentStrings();
-        for (LPWCH p = envStrings; *p; ) {
-            envBlock += p;
-            envBlock += wchar_t('\0');
-            p += wcslen(p) + 1;
-        }
-        FreeEnvironmentStrings(envStrings);
-        // Override/add OCC_DATA_PATH
-        envBlock += L"OCC_DATA_PATH=" + std::wstring(occDataPath.begin(), occDataPath.end()) + L'\0';
-        // When VS debugger is attached to this test host, tell the child to wait
-        // so you can attach to it too (Debug → Attach to Process, use the PID
-        // printed in the Test Explorer output window).
-        bool debuggerPresent = IsDebuggerPresent() != 0;
-        if (debuggerPresent) {
-            envBlock += L"DEBUG_WAIT=1";
-            envBlock += L'\0';
-        }
-        envBlock += L'\0'; // double-null terminator
-
-        // Launch process
-        STARTUPINFOA si = {};
-        si.cb = sizeof(si);
-        si.dwFlags = STARTF_USESTDHANDLES;
-        si.hStdInput = INVALID_HANDLE_VALUE;
-        si.hStdOutput = INVALID_HANDLE_VALUE;
-        si.hStdError = INVALID_HANDLE_VALUE;
-
-        PROCESS_INFORMATION pi = {};
-        std::string workDir = tempBase.string();
-
-        BOOL ok = CreateProcessA(
-            nullptr,
-            const_cast<LPSTR>(cmdLine.c_str()),
-            nullptr, nullptr, FALSE,
-            CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
-            reinterpret_cast<LPVOID>(const_cast<wchar_t *>(envBlock.data())),
-            workDir.c_str(),
-            &si, &pi);
-
-        if (!ok) {
-            auto err = std::to_wstring(GetLastError());
-            Assert::Fail((std::wstring(L"CreateProcess failed: ") + err).c_str());
-        }
-
-        if (debuggerPresent) {
-            // Child is spinning in wait_for_debugger(). Attach now:
-            //   Debug → Attach to Process (Ctrl+Alt+P) → PID shown below
-            auto pidMsg = std::wstring(L"[DEBUG] NoSpherA2.exe PID: ") +
-                std::to_wstring(pi.dwProcessId) +
-                L" — attach with Debug → Attach to Process (Ctrl+Alt+P)";
-            Logger::WriteMessage(pidMsg.c_str());
-        }
-
-        WaitForSingleObject(pi.hProcess, INFINITE);
-        DWORD exitCode = 0;
-        GetExitCodeProcess(pi.hProcess, &exitCode);
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
+        std::string workDirStr = tempBase.string();
+        int exitCode = NoSpherA2_run(
+            workDirStr.c_str(),
+            static_cast<int>(argPtrs.size()),
+            argPtrs.data());
 
         if (exitCode != 0) {
-            std::filesystem::remove_all(tempBase);
-            auto msg = std::wstring(L"NoSpherA2 exited with code ") +
-                std::to_wstring(exitCode) + L" for test " +
-                std::wstring(test.name.begin(), test.name.end());
-            Assert::Fail(msg.c_str());
+            cleanupTemp();
+            Assert::Fail(
+                (std::wstring(L"NoSpherA2 exited with code ") +
+                 std::to_wstring(exitCode) + L" for test " +
+                 std::wstring(test.name.begin(), test.name.end())).c_str());
         }
 
         // Determine actual output file path
@@ -292,20 +266,20 @@ namespace NosTestFramework
         }
 
         if (!std::filesystem::exists(actualPath)) {
-            std::filesystem::remove_all(tempBase);
+            cleanupTemp();
             auto msg = std::wstring(L"Output file not found: ") + actualPath.wstring();
             Assert::Fail(msg.c_str());
         }
 
         auto goodPath = testSrcDir / test.goodFile;
         if (!std::filesystem::exists(goodPath)) {
-            std::filesystem::remove_all(tempBase);
+            cleanupTemp();
             auto msg = std::wstring(L"Good file not found: ") + goodPath.wstring();
             Assert::Fail(msg.c_str());
         }
 
         auto diffResult = CompareFiles(goodPath, actualPath);
-        std::filesystem::remove_all(tempBase);
+        cleanupTemp();
 
         if (!diffResult.empty()) {
             auto wmsg = std::wstring(diffResult.begin(), diffResult.end());

@@ -89,6 +89,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include <shobjidl.h>
+#include <algorithm>
 #else
 #define GetCurrentDir getcwd
 #include <optional>
@@ -101,6 +102,10 @@
 #include <mach-o/dyld.h>
 #endif
 #endif
+
+
+// Must be last: redefines exit() as a throw when NOSPHERA2_IN_PROCESS is set.
+#include "early_exit.h"
 
 #endif // NOSPHERA2_PCH_H
 

@@ -205,12 +205,35 @@ wfn = "test.wfn"
 [fchk_conversion]
 directory = "NiP3_fchk"
 good = "good.fchk"
+actual = "log.fchk"
 full = true
 
 [fchk_conversion.args]
-b = "dev2-TZVP"
+b = "def2-TZVP"
 d = "./"
 wfn = "in.ffn"
+fchk = "log.fchk"
+
+[TFVC]
+directory = "TFVC"
+good = "TFVC.good"
+
+[TFVC.args]
+wfn = "water.gbw"
+cif = "water.cif"
+dmin = 0.84
+acc = 1
+
+[TFVC_ECP]
+directory = "TFVC"
+good = "TFVC_ECP.good"
+
+[TFVC_ECP.args]
+wfn = "Rh.gbw"
+cif = "Rh.cif"
+dmin = 0.84
+acc = 1
+ECP = 1
 
 [fourier_transform_full]
 directory = "SALTED"

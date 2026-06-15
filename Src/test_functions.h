@@ -1554,6 +1554,7 @@ static void profiling_alanine_integrated_occ(const std::filesystem::path &dir)
     occ::log::set_log_file("NoSpherA2_OCC.log");
     occ::parallel::set_num_threads(config.runtime.threads);
     wavy.emplace_back(occ::main::run_scf_external(config, true));
+    occ::main::shutdown();
     wavy[0].set_multi(opt.mult);
     wavy[0].set_charge(opt.charge);
     opt.groups[0].push_back(0);
@@ -2013,7 +2014,7 @@ static void profiling_fchk_conversion(const std::filesystem::path &dir)
     opt.no_date = true;
     opt.all_charges = true;
     opt.wfn = "in.ffn";
-    opt.basis_set = "dev2-TZVP";
+    opt.basis_set = "def2-TZVP";
     opt.basis_set_path = "./";
     opt.fchk = "in.fchk";   // explicit output path
     std::vector<WFN> wavy;

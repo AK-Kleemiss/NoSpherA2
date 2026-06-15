@@ -4,6 +4,7 @@ Attack safety is not the top priority, but speed and robustness, as well as sani
 
 Copilot prompt and triage notes are kept in `.github/copilot-memory/`.
 Start with `.github/copilot-memory/README.md` for an index.
+Recent OCC integration work fixed `alanine_integrated_occ` by using shared oneTBB and clearing DF integral buffers during teardown; do not reintroduce `tbbmalloc_proxy`.
 Use these files for focused guidance:
 - `.github/copilot-memory/nosphera2-copilot.md`
 - `.github/copilot-memory/nosphera2-cpp-prompts.md`

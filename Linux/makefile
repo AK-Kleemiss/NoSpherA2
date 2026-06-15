@@ -4,7 +4,7 @@ RM := rm -f
 COMP   := g++
 C_COMP := gcc
 
-LIBS := -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lpthread -lm -lc -lquadmath
+LIBS := -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -L../Lib/occ/lib -ltbb -Wl,-rpath,'$$ORIGIN' -lpthread -lm -lc -lquadmath
 
 # oneAPI env (source setvars.sh before each compile/link)
 SETVARS ?= ../Lib/MKL/setvars.sh
@@ -26,12 +26,22 @@ LIBRASCALINE   := ../Lib/featomic_install/lib/libfeatomic.a
 LIBRASCALINE   += ../Lib/featomic_install/lib/libmetatensor.a
 LIBRASCALINE_I := ../Lib/featomic_install/include
 
+# ---- Vector instructions ----
+# NOS_AVX=ON/OFF overrides (CI sets OFF for max compatibility); unset = detect host.
+# Must match the setting OCC was built with (Eigen ABI differs with AVX).
+NOS_AVX ?= $(shell grep -q avx /proc/cpuinfo 2>/dev/null && echo ON || echo OFF)
+ifeq ($(NOS_AVX),OFF)
+  VEC_OPTS := -msse2 -msse3 -msse4.1 -msse4.2
+else
+  VEC_OPTS := -msse2 -msse3 -msse4.1 -msse4.2 -mavx -mfma
+endif
+
 # ---- Compiler flags (no -fopenmp at link time; only at compile time) ----
 GCC_OPTS       := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP \
-                  -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math \
-                  -include pch.h -mfma
+                  $(VEC_OPTS) -ffast-math \
+                  -include pch.h
 GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP \
-                  -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math \
+                  $(VEC_OPTS) -ffast-math \
                   -include pch.h -mfma
 
 # Include directories
@@ -83,7 +93,7 @@ all: NoSpherA2
 # Actually run the converter to generate the file
 $(SRC_DIR)/basis_data.cpp:
 	@echo "Running BasisSetConverter..."
-	@./../Lib//BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
+	@./../Lib/BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
 	@echo "basis_data.cpp generated"
 
 # Flags without -include pch.h for compiling the PCH itself
@@ -127,6 +137,7 @@ NoSpherA2: ${OBJS}
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2 ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
+	cp -P ../Lib/occ/lib/libtbb.so* ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d}
@@ -134,6 +145,7 @@ NoSpherA2_Debug: ${OBJS_d}
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) $(LIBCINT) ../Lib/occ/lib/libocc.a ${LIBS}
 	cp NoSpherA2_Debug ../
 	cp ../Lib/MKL/compiler/latest/lib/libiomp5.so ../
+	cp -P ../Lib/occ/lib/libtbb.so* ../
 	@echo 'Done building Debug version of NoSpherA2'
 
 clean:
