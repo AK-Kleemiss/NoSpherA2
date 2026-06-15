@@ -134,4 +134,103 @@ extern "C" {
     // --- Median eigenvalue of a 3x3 symmetric matrix (get_lambda_1) ---
     // Matrix stored row-major: a[0..8]; a[1]=a[3], a[2]=a[6], a[5]=a[7].
     UT_API double ut_get_lambda_1(const double a[9]);
+
+    // -----------------------------------------------------------------------
+    // WFN handle-based API  (opaque void* owns a heap-allocated WFN object)
+    // -----------------------------------------------------------------------
+    UT_API void*  ut_wfn_create();
+    UT_API void   ut_wfn_destroy(void* h);
+
+    // Atoms
+    UT_API int    ut_wfn_push_atom(void* h, const char* label,
+                                   double x, double y, double z, int charge);
+    UT_API int    ut_wfn_get_ncen(void* h);
+    UT_API double ut_wfn_get_atom_x(void* h, int nr);
+    UT_API double ut_wfn_get_atom_y(void* h, int nr);
+    UT_API double ut_wfn_get_atom_z(void* h, int nr);
+    UT_API int    ut_wfn_get_atom_charge(void* h, int nr);
+    UT_API int    ut_wfn_get_atom_label(void* h, int nr, char* out, int bufsize);
+    // Distance between atoms a and b (Euclidean in whatever units atoms are stored)
+    UT_API double ut_wfn_atom_distance(void* h, int a, int b);
+
+    // Primitives
+    UT_API int    ut_wfn_add_exp(void* h, int cent, int type, double exp);
+    UT_API int    ut_wfn_get_nex(void* h);
+
+    // Molecular orbitals
+    UT_API int    ut_wfn_push_mo(void* h, int nr, double occ, double energy);
+    UT_API int    ut_wfn_get_nmo(void* h);
+    UT_API double ut_wfn_get_mo_energy(void* h, int mo);
+    UT_API double ut_wfn_get_mo_occ(void* h, int mo);
+    UT_API int    ut_wfn_set_mo_coef(void* h, int mo, int prim, double val);
+    UT_API double ut_wfn_get_mo_coef(void* h, int mo, int prim);
+    // Add a full primitive (center, type, exponent) with one coefficient per MO.
+    // coefs must have at least nmo elements. Returns 1 on success.
+    UT_API int    ut_wfn_add_primitive(void* h, int cent, int type, double exp,
+                                       const double* coefs, int n_coefs);
+    // Remove virtual MOs (occ==0); returns nmo after deletion.
+    UT_API int    ut_wfn_delete_unoccupied_mos(void* h);
+
+    // Metadata
+    UT_API void   ut_wfn_assign_charge(void* h, int charge);
+    UT_API int    ut_wfn_get_charge(void* h);
+    UT_API void   ut_wfn_assign_multi(void* h, int multi);
+    UT_API int    ut_wfn_get_multi(void* h);
+    UT_API int    ut_wfn_set_method(void* h, const char* method);
+    UT_API int    ut_wfn_get_method(void* h, char* out, int bufsize);
+    UT_API int    ut_wfn_set_basis_set_name(void* h, const char* name);
+    UT_API int    ut_wfn_get_basis_set_name(void* h, char* out, int bufsize);
+
+    // Electron counts (require atoms pushed with real Z values)
+    UT_API int    ut_wfn_get_nr_electrons(void* h);
+    UT_API double ut_wfn_count_nr_electrons(void* h);
+
+    // Density matrix (upper-triangular flat storage)
+    UT_API void   ut_wfn_resize_dm(void* h, int size);
+    UT_API int    ut_wfn_set_dm(void* h, int nr, double val);
+    UT_API double ut_wfn_get_dm(void* h, int nr);
+    UT_API int    ut_wfn_get_dm_size(void* h);
+
+    // -----------------------------------------------------------------------
+    // tsc_block<int,cdouble> handle-based API
+    // -----------------------------------------------------------------------
+    // Create an empty block or a populated block.
+    // sf_real/sf_imag are flat [n_scatterers * n_reflections] row-major arrays.
+    // h_arr/k_arr/l_arr are integer arrays of length n_reflections.
+    UT_API void*  ut_tsc_create_empty();
+    UT_API void*  ut_tsc_create(int n_scatterers, const char** labels,
+                                int n_reflections,
+                                const int* h_arr, const int* k_arr, const int* l_arr,
+                                const double* sf_real, const double* sf_imag);
+    UT_API void   ut_tsc_destroy(void* h);
+
+    UT_API int    ut_tsc_is_empty(void* h);
+    UT_API int    ut_tsc_scatterer_size(void* h);
+    UT_API int    ut_tsc_reflection_size(void* h);
+    UT_API int    ut_tsc_get_scatterer(void* h, int nr, char* out, int bufsize);
+    UT_API int    ut_tsc_scatterers_string(void* h, char* out, int bufsize);
+    // Real and imaginary part of form factor [scatterer][reflection]
+    UT_API double ut_tsc_get_sf_real(void* h, int scatterer, int reflection);
+    UT_API double ut_tsc_get_sf_imag(void* h, int scatterer, int reflection);
+    // Miller index: dim=0→h, 1→k, 2→l
+    UT_API int    ut_tsc_get_index(void* h, int dim, int refl);
+    UT_API void   ut_tsc_set_ad(void* h, int val);
+    UT_API int    ut_tsc_get_ad(void* h);
+    // Merge src into dst; returns 0 on success, -1 on error.
+    UT_API int    ut_tsc_append(void* h_dst, void* h_src);
+
+    // -----------------------------------------------------------------------
+    // primitive evaluation (standalone — no handle needed)
+    // -----------------------------------------------------------------------
+    // eval_gaussian(type, exp, coef, norm_const, r) = r^type * exp(-exp*r²) * (norm*coef)
+    UT_API double ut_primitive_eval(int type, double alpha, double coef,
+                                    double norm_const, double r);
+    // Unnormalized variant (no norm_const applied)
+    UT_API double ut_primitive_eval_unnorm(int type, double alpha, double coef, double r);
+
+    // -----------------------------------------------------------------------
+    // atom::distance_to — standalone, no WFN handle needed
+    // -----------------------------------------------------------------------
+    UT_API double ut_atom_distance(double x1, double y1, double z1,
+                                   double x2, double y2, double z2);
 }

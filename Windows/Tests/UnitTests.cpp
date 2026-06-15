@@ -1428,4 +1428,448 @@ namespace NoSpherA2UnitTests
         }
     };
 
+    // -----------------------------------------------------------------------
+    // PrimitiveEvalTests — Gaussian primitive evaluation
+    // -----------------------------------------------------------------------
+    TEST_CLASS(PrimitiveEvalTests)
+    {
+    public:
+        TEST_METHOD(SType_AtOrigin_IsCoefTimesNorm)
+        {
+            // r=0: r^0 * exp(0) * norm*coef = norm*coef
+            double val = ut_primitive_eval(0, 1.0, 0.5, 2.0, 0.0);
+            Assert::AreEqual(0.5 * 2.0, val, 1e-12);
+        }
+
+        TEST_METHOD(SType_KnownGaussian)
+        {
+            // s-type (type=0): r^0 * exp(-alpha*r^2) * norm*coef
+            double alpha = 2.0, coef = 1.0, norm = 1.0, r = 1.0;
+            double expected = std::exp(-alpha * r * r) * norm * coef;
+            Assert::AreEqual(expected, ut_primitive_eval(0, alpha, coef, norm, r), 1e-12);
+        }
+
+        TEST_METHOD(PType_AtHalf_IncludesRFactor)
+        {
+            // p-type (type=1): r^1 * exp(-alpha*r^2) * norm*coef
+            double alpha = 1.0, coef = 1.0, norm = 1.0, r = 0.5;
+            double expected = r * std::exp(-alpha * r * r) * norm * coef;
+            Assert::AreEqual(expected, ut_primitive_eval(1, alpha, coef, norm, r), 1e-12);
+        }
+
+        TEST_METHOD(DType_AtUnit_IncludesR2Factor)
+        {
+            // d-type (type=2): r^2 * exp(-alpha*r^2) * norm*coef
+            double alpha = 0.5, coef = 2.0, norm = 1.5, r = 1.0;
+            double expected = r * r * std::exp(-alpha) * norm * coef;
+            Assert::AreEqual(expected, ut_primitive_eval(2, alpha, coef, norm, r), 1e-12);
+        }
+
+        TEST_METHOD(Unnormalized_IgnoresNorm)
+        {
+            // Unnormalized uses coefficient only, no norm_const
+            double alpha = 1.0, coef = 3.0, r = 0.5;
+            double expected = r * std::exp(-alpha * r * r) * coef; // type=1
+            Assert::AreEqual(expected, ut_primitive_eval_unnorm(1, alpha, coef, r), 1e-12);
+        }
+
+        TEST_METHOD(LargeR_DecaysToNearZero)
+        {
+            double val = ut_primitive_eval(0, 5.0, 1.0, 1.0, 100.0);
+            Assert::IsTrue(std::abs(val) < 1e-200);
+        }
+
+        TEST_METHOD(ZeroExponent_DecaysSlower)
+        {
+            // alpha=0: constant along r (for type=0)
+            double val = ut_primitive_eval(0, 0.0, 1.0, 1.0, 50.0);
+            Assert::AreEqual(1.0, val, 1e-12);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // AtomDistanceTests — atom::distance_to standalone
+    // -----------------------------------------------------------------------
+    TEST_CLASS(AtomDistanceTests)
+    {
+    public:
+        TEST_METHOD(SamePoint_IsZero)
+        {
+            double d = ut_atom_distance(1.0, 2.0, 3.0, 1.0, 2.0, 3.0);
+            Assert::AreEqual(0.0, d, 1e-12);
+        }
+
+        TEST_METHOD(UnitX_Separation)
+        {
+            double d = ut_atom_distance(0.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+            Assert::AreEqual(1.0, d, 1e-12);
+        }
+
+        TEST_METHOD(Pythagorean_3_4_5)
+        {
+            double d = ut_atom_distance(0.0, 0.0, 0.0, 3.0, 4.0, 0.0);
+            Assert::AreEqual(5.0, d, 1e-12);
+        }
+
+        TEST_METHOD(ThreeD_UnitCube_Diagonal)
+        {
+            double d = ut_atom_distance(0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
+            Assert::AreEqual(std::sqrt(3.0), d, 1e-12);
+        }
+
+        TEST_METHOD(Symmetric_AtoB_EqualsBtoA)
+        {
+            double d1 = ut_atom_distance(1.0, 2.0, 3.0, 4.0, 6.0, 3.0);
+            double d2 = ut_atom_distance(4.0, 6.0, 3.0, 1.0, 2.0, 3.0);
+            Assert::AreEqual(d1, d2, 1e-12);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // WfnTests — WFN object built fully in memory (no file I/O)
+    // -----------------------------------------------------------------------
+    TEST_CLASS(WfnTests)
+    {
+        // RAII guard so handles are always released even on assertion failure
+        struct WfnGuard {
+            void* h;
+            explicit WfnGuard() : h(ut_wfn_create()) {}
+            ~WfnGuard() { ut_wfn_destroy(h); }
+        };
+
+    public:
+        TEST_METHOD(EmptyWfn_NcenIsZero)
+        {
+            WfnGuard g;
+            Assert::AreEqual(0, ut_wfn_get_ncen(g.h));
+        }
+
+        TEST_METHOD(PushAtom_IncreasesNcen)
+        {
+            WfnGuard g;
+            ut_wfn_push_atom(g.h, "C", 0.0, 0.0, 0.0, 6);
+            Assert::AreEqual(1, ut_wfn_get_ncen(g.h));
+            ut_wfn_push_atom(g.h, "H", 1.1, 0.0, 0.0, 1);
+            Assert::AreEqual(2, ut_wfn_get_ncen(g.h));
+        }
+
+        TEST_METHOD(AtomCoordinates_RoundTrip)
+        {
+            WfnGuard g;
+            ut_wfn_push_atom(g.h, "O", 1.5, -2.3, 0.7, 8);
+            Assert::AreEqual(1.5,  ut_wfn_get_atom_x(g.h, 0), 1e-12);
+            Assert::AreEqual(-2.3, ut_wfn_get_atom_y(g.h, 0), 1e-12);
+            Assert::AreEqual(0.7,  ut_wfn_get_atom_z(g.h, 0), 1e-12);
+        }
+
+        TEST_METHOD(AtomCharge_RoundTrip)
+        {
+            WfnGuard g;
+            ut_wfn_push_atom(g.h, "N", 0.0, 0.0, 0.0, 7);
+            Assert::AreEqual(7, ut_wfn_get_atom_charge(g.h, 0));
+        }
+
+        TEST_METHOD(AtomLabel_RoundTrip)
+        {
+            WfnGuard g;
+            ut_wfn_push_atom(g.h, "Fe", 0.0, 0.0, 0.0, 26);
+            char buf[8];
+            int n = ut_wfn_get_atom_label(g.h, 0, buf, 8);
+            Assert::IsTrue(n > 0);
+            Assert::AreEqual(std::string("Fe"), std::string(buf));
+        }
+
+        TEST_METHOD(AtomDistance_TwoAtoms)
+        {
+            WfnGuard g;
+            ut_wfn_push_atom(g.h, "C", 0.0, 0.0, 0.0, 6);
+            ut_wfn_push_atom(g.h, "H", 3.0, 4.0, 0.0, 1);
+            double d = ut_wfn_atom_distance(g.h, 0, 1);
+            Assert::AreEqual(5.0, d, 1e-12);
+        }
+
+        TEST_METHOD(PushMO_IncreasesNmo)
+        {
+            WfnGuard g;
+            ut_wfn_push_mo(g.h, 1, 2.0, -10.5);
+            Assert::AreEqual(1, ut_wfn_get_nmo(g.h));
+            ut_wfn_push_mo(g.h, 2, 2.0, -7.3);
+            ut_wfn_push_mo(g.h, 3, 0.0,  2.1); // virtual
+            Assert::AreEqual(3, ut_wfn_get_nmo(g.h));
+        }
+
+        TEST_METHOD(MO_EnergyAndOcc_RoundTrip)
+        {
+            WfnGuard g;
+            ut_wfn_push_mo(g.h, 1, 2.0, -10.5);
+            Assert::AreEqual(-10.5, ut_wfn_get_mo_energy(g.h, 0), 1e-12);
+            Assert::AreEqual(2.0,   ut_wfn_get_mo_occ(g.h, 0),    1e-12);
+        }
+
+        TEST_METHOD(MO_Coefficient_AddAndGet)
+        {
+            WfnGuard g;
+            // MO coefficient vectors are populated via add_primitive (one coef per MO).
+            ut_wfn_push_atom(g.h, "H", 0.0, 0.0, 0.0, 1);
+            ut_wfn_push_mo(g.h, 1, 2.0, -5.0);          // 1 MO
+            const double coef = 0.707;
+            ut_wfn_add_primitive(g.h, 1, 1, 1.0, &coef, 1); // adds prim + fills coef
+            Assert::AreEqual(0.707, ut_wfn_get_mo_coef(g.h, 0, 0), 1e-12);
+            // Overwrite with set_mo_coef now that slot 0 exists
+            ut_wfn_set_mo_coef(g.h, 0, 0, 0.5);
+            Assert::AreEqual(0.5, ut_wfn_get_mo_coef(g.h, 0, 0), 1e-12);
+        }
+
+        TEST_METHOD(AddPrimitive_IncreasesNex)
+        {
+            WfnGuard g;
+            ut_wfn_push_atom(g.h, "C", 0.0, 0.0, 0.0, 6);
+            ut_wfn_add_exp(g.h, 1, 1, 2.0);
+            Assert::AreEqual(1, ut_wfn_get_nex(g.h));
+            ut_wfn_add_exp(g.h, 1, 2, 0.5);
+            Assert::AreEqual(2, ut_wfn_get_nex(g.h));
+        }
+
+        TEST_METHOD(DeleteUnoccupiedMOs_RemovesVirtuals)
+        {
+            WfnGuard g;
+            ut_wfn_push_mo(g.h, 1, 2.0, -10.0); // occupied
+            ut_wfn_push_mo(g.h, 2, 2.0,  -5.0); // occupied
+            ut_wfn_push_mo(g.h, 3, 0.0,   2.0); // virtual
+            ut_wfn_push_mo(g.h, 4, 0.0,   4.0); // virtual
+            int nmo = ut_wfn_delete_unoccupied_mos(g.h);
+            Assert::AreEqual(2, nmo);
+        }
+
+        TEST_METHOD(ChargeAndMultiplicity_RoundTrip)
+        {
+            WfnGuard g;
+            ut_wfn_assign_charge(g.h, -1);
+            ut_wfn_assign_multi(g.h, 2);
+            Assert::AreEqual(-1, ut_wfn_get_charge(g.h));
+            Assert::AreEqual(2,  ut_wfn_get_multi(g.h));
+        }
+
+        TEST_METHOD(Method_RoundTrip)
+        {
+            WfnGuard g;
+            ut_wfn_set_method(g.h, "B3LYP");
+            char buf[32];
+            ut_wfn_get_method(g.h, buf, 32);
+            Assert::AreEqual(std::string("B3LYP"), std::string(buf));
+        }
+
+        TEST_METHOD(BasisSetName_RoundTrip)
+        {
+            WfnGuard g;
+            ut_wfn_set_basis_set_name(g.h, "def2-TZVP");
+            char buf[32];
+            ut_wfn_get_basis_set_name(g.h, buf, 32);
+            Assert::AreEqual(std::string("def2-TZVP"), std::string(buf));
+        }
+
+        TEST_METHOD(NrElectrons_MatchesSumOfZ)
+        {
+            WfnGuard g;
+            // H2O: O(8) + H(1) + H(1) = 10 electrons
+            ut_wfn_push_atom(g.h, "O", 0.0, 0.0, 0.0, 8);
+            ut_wfn_push_atom(g.h, "H", 0.9, 0.0, 0.0, 1);
+            ut_wfn_push_atom(g.h, "H",-0.9, 0.0, 0.0, 1);
+            ut_wfn_assign_charge(g.h, 0);
+            Assert::AreEqual(10, ut_wfn_get_nr_electrons(g.h));
+        }
+
+        TEST_METHOD(CountNrElectrons_SumsOccupations)
+        {
+            WfnGuard g;
+            ut_wfn_push_mo(g.h, 1, 2.0, -10.0);
+            ut_wfn_push_mo(g.h, 2, 2.0,  -5.0);
+            ut_wfn_push_mo(g.h, 3, 1.0,  -1.0); // singly occupied
+            // Total = 5.0
+            Assert::AreEqual(5.0, ut_wfn_count_nr_electrons(g.h), 1e-12);
+        }
+
+        TEST_METHOD(DensityMatrix_SetAndGet)
+        {
+            WfnGuard g;
+            ut_wfn_resize_dm(g.h, 6);
+            Assert::AreEqual(6, ut_wfn_get_dm_size(g.h));
+            ut_wfn_set_dm(g.h, 0, 1.5);
+            ut_wfn_set_dm(g.h, 5, -0.3);
+            Assert::AreEqual(1.5,  ut_wfn_get_dm(g.h, 0), 1e-12);
+            Assert::AreEqual(-0.3, ut_wfn_get_dm(g.h, 5), 1e-12);
+        }
+
+        TEST_METHOD(DensityMatrix_DefaultIsZero)
+        {
+            WfnGuard g;
+            ut_wfn_resize_dm(g.h, 3);
+            for (int i = 0; i < 3; ++i)
+                Assert::AreEqual(0.0, ut_wfn_get_dm(g.h, i), 1e-12);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // TscBlockTests — tsc_block<int,cdouble> built in memory (no file I/O)
+    // -----------------------------------------------------------------------
+    TEST_CLASS(TscBlockTests)
+    {
+        // Helpers to build canonical test data
+        // 2 scatterers ("C","H"), 3 reflections
+        // SF[C][0]=1+0i, SF[C][1]=2+1i, SF[C][2]=3-1i
+        // SF[H][0]=0.5+0i, SF[H][1]=0.8+0.2i, SF[H][2]=0.6-0.1i
+        // h=[0,1,1] k=[0,0,1] l=[0,0,0]
+        struct TscGuard {
+            void* h;
+            TscGuard() {
+                static const char* labels[] = { "C", "H" };
+                static const int   hv[] = { 0, 1, 1 };
+                static const int   kv[] = { 0, 0, 1 };
+                static const int   lv[] = { 0, 0, 0 };
+                // sf_real/imag: row=scatterer, col=reflection
+                static const double sr[] = { 1.0, 2.0, 3.0,  0.5, 0.8, 0.6 };
+                static const double si[] = { 0.0, 1.0,-1.0,  0.0, 0.2,-0.1 };
+                h = ut_tsc_create(2, labels, 3, hv, kv, lv, sr, si);
+            }
+            ~TscGuard() { ut_tsc_destroy(h); }
+        };
+
+    public:
+        TEST_METHOD(EmptyBlock_IsEmpty)
+        {
+            void* h = ut_tsc_create_empty();
+            Assert::AreEqual(1, ut_tsc_is_empty(h));
+            ut_tsc_destroy(h);
+        }
+
+        TEST_METHOD(PopulatedBlock_IsNotEmpty)
+        {
+            TscGuard g;
+            Assert::AreEqual(0, ut_tsc_is_empty(g.h));
+        }
+
+        TEST_METHOD(ScattererSize_IsCorrect)
+        {
+            TscGuard g;
+            Assert::AreEqual(2, ut_tsc_scatterer_size(g.h));
+        }
+
+        TEST_METHOD(ReflectionSize_IsCorrect)
+        {
+            TscGuard g;
+            Assert::AreEqual(3, ut_tsc_reflection_size(g.h));
+        }
+
+        TEST_METHOD(GetScatterer_Labels)
+        {
+            TscGuard g;
+            char buf[8];
+            ut_tsc_get_scatterer(g.h, 0, buf, 8);
+            Assert::AreEqual(std::string("C"), std::string(buf));
+            ut_tsc_get_scatterer(g.h, 1, buf, 8);
+            Assert::AreEqual(std::string("H"), std::string(buf));
+        }
+
+        TEST_METHOD(ScatterersString_SpaceSeparated)
+        {
+            TscGuard g;
+            char buf[32];
+            ut_tsc_scatterers_string(g.h, buf, 32);
+            Assert::AreEqual(std::string("C H"), std::string(buf));
+        }
+
+        TEST_METHOD(GetSF_Real_FirstScatterer)
+        {
+            TscGuard g;
+            Assert::AreEqual(1.0, ut_tsc_get_sf_real(g.h, 0, 0), 1e-12);
+            Assert::AreEqual(2.0, ut_tsc_get_sf_real(g.h, 0, 1), 1e-12);
+            Assert::AreEqual(3.0, ut_tsc_get_sf_real(g.h, 0, 2), 1e-12);
+        }
+
+        TEST_METHOD(GetSF_Imag_FirstScatterer)
+        {
+            TscGuard g;
+            Assert::AreEqual( 0.0, ut_tsc_get_sf_imag(g.h, 0, 0), 1e-12);
+            Assert::AreEqual( 1.0, ut_tsc_get_sf_imag(g.h, 0, 1), 1e-12);
+            Assert::AreEqual(-1.0, ut_tsc_get_sf_imag(g.h, 0, 2), 1e-12);
+        }
+
+        TEST_METHOD(GetSF_SecondScatterer)
+        {
+            TscGuard g;
+            Assert::AreEqual(0.5, ut_tsc_get_sf_real(g.h, 1, 0), 1e-12);
+            Assert::AreEqual(0.8, ut_tsc_get_sf_real(g.h, 1, 1), 1e-12);
+        }
+
+        TEST_METHOD(GetMillerIndices)
+        {
+            TscGuard g;
+            // h: [0,1,1]
+            Assert::AreEqual(0, ut_tsc_get_index(g.h, 0, 0));
+            Assert::AreEqual(1, ut_tsc_get_index(g.h, 0, 1));
+            // k: [0,0,1]
+            Assert::AreEqual(0, ut_tsc_get_index(g.h, 1, 0));
+            Assert::AreEqual(1, ut_tsc_get_index(g.h, 1, 2));
+            // l: [0,0,0]
+            Assert::AreEqual(0, ut_tsc_get_index(g.h, 2, 0));
+        }
+
+        TEST_METHOD(AnomalousDispersion_DefaultFalse)
+        {
+            TscGuard g;
+            Assert::AreEqual(0, ut_tsc_get_ad(g.h));
+        }
+
+        TEST_METHOD(AnomalousDispersion_SetTrue)
+        {
+            TscGuard g;
+            ut_tsc_set_ad(g.h, 1);
+            Assert::AreEqual(1, ut_tsc_get_ad(g.h));
+        }
+
+        TEST_METHOD(Append_AddsNewScatterer)
+        {
+            // Build a second block with a new scatterer "O"
+            static const char* labels2[] = { "O" };
+            static const int   hv[] = { 0, 1, 1 };
+            static const int   kv[] = { 0, 0, 1 };
+            static const int   lv[] = { 0, 0, 0 };
+            static const double sr2[] = { 4.0, 5.0, 6.0 };
+            static const double si2[] = { 0.0, 0.0, 0.0 };
+
+            TscGuard dst;
+            void* src = ut_tsc_create(1, labels2, 3, hv, kv, lv, sr2, si2);
+
+            int rc = ut_tsc_append(dst.h, src);
+            ut_tsc_destroy(src);
+
+            Assert::AreEqual(0, rc);                           // success
+            Assert::AreEqual(3, ut_tsc_scatterer_size(dst.h)); // C + H + O
+            // "O" SF should be accessible
+            Assert::AreEqual(4.0, ut_tsc_get_sf_real(dst.h, 2, 0), 1e-12);
+        }
+
+        TEST_METHOD(Append_DuplicateScatterer_IsSkipped)
+        {
+            // Appending a block with "C" (already in dst) should not duplicate it
+            TscGuard dst;
+
+            static const char* labels2[] = { "C" };
+            static const int   hv[] = { 0, 1, 1 };
+            static const int   kv[] = { 0, 0, 1 };
+            static const int   lv[] = { 0, 0, 0 };
+            static const double sr2[] = { 9.0, 9.0, 9.0 };
+            static const double si2[] = { 0.0, 0.0, 0.0 };
+
+            void* src = ut_tsc_create(1, labels2, 3, hv, kv, lv, sr2, si2);
+            ut_tsc_append(dst.h, src);
+            ut_tsc_destroy(src);
+
+            // Still 2 scatterers — duplicate "C" was ignored
+            Assert::AreEqual(2, ut_tsc_scatterer_size(dst.h));
+            // Original "C" SF unchanged
+            Assert::AreEqual(1.0, ut_tsc_get_sf_real(dst.h, 0, 0), 1e-12);
+        }
+    };
+
 } // namespace NoSpherA2UnitTests

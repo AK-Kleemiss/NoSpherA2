@@ -3,10 +3,14 @@
 #include "../Src/convenience.h"
 #include "../Src/fchk.h"
 #include "../Src/constants.h"
+#include "../Src/wfn_class.h"
+#include "../Src/tsc_block.h"
+#include "../Src/atoms.h"
 #include <cstring>
 #include <cmath>
 #include <thread>
 #include <chrono>
+#include <sstream>
 
 extern "C" {
 
@@ -278,8 +282,293 @@ extern "C" {
     // --- Median eigenvalue of 3x3 symmetric matrix ---
 
     UT_API double ut_get_lambda_1(const double a[9]) {
-        // get_lambda_1 takes double* and reads a[0..8]
         return get_lambda_1(const_cast<double*>(a));
+    }
+
+    // -----------------------------------------------------------------------
+    // WFN handle-based API
+    // -----------------------------------------------------------------------
+
+    UT_API void* ut_wfn_create() {
+        return new WFN();
+    }
+
+    UT_API void ut_wfn_destroy(void* h) {
+        delete static_cast<WFN*>(h);
+    }
+
+    UT_API int ut_wfn_push_atom(void* h, const char* label,
+                                double x, double y, double z, int charge) {
+        auto* w = static_cast<WFN*>(h);
+        return w->push_back_atom(std::string(label), x, y, z, charge) ? 1 : 0;
+    }
+
+    UT_API int ut_wfn_get_ncen(void* h) {
+        return static_cast<WFN*>(h)->get_ncen();
+    }
+
+    UT_API double ut_wfn_get_atom_x(void* h, int nr) {
+        return static_cast<WFN*>(h)->get_atom_coordinate(nr, 0);
+    }
+
+    UT_API double ut_wfn_get_atom_y(void* h, int nr) {
+        return static_cast<WFN*>(h)->get_atom_coordinate(nr, 1);
+    }
+
+    UT_API double ut_wfn_get_atom_z(void* h, int nr) {
+        return static_cast<WFN*>(h)->get_atom_coordinate(nr, 2);
+    }
+
+    UT_API int ut_wfn_get_atom_charge(void* h, int nr) {
+        return static_cast<WFN*>(h)->get_atom_charge(nr);
+    }
+
+    UT_API int ut_wfn_get_atom_label(void* h, int nr, char* out, int bufsize) {
+        std::string s = static_cast<WFN*>(h)->get_atom_label(nr);
+        if (static_cast<int>(s.size()) >= bufsize) return -1;
+        std::memcpy(out, s.c_str(), s.size() + 1);
+        return static_cast<int>(s.size());
+    }
+
+    UT_API double ut_wfn_atom_distance(void* h, int a, int b) {
+        auto* w = static_cast<WFN*>(h);
+        atom at_a = w->get_atom(a);
+        atom at_b = w->get_atom(b);
+        return at_a.distance_to(at_b);
+    }
+
+    UT_API int ut_wfn_add_exp(void* h, int cent, int type, double e) {
+        return static_cast<WFN*>(h)->add_exp(cent, type, e) ? 1 : 0;
+    }
+
+    UT_API int ut_wfn_get_nex(void* h) {
+        return static_cast<WFN*>(h)->get_nex();
+    }
+
+    UT_API int ut_wfn_push_mo(void* h, int nr, double occ, double energy) {
+        return static_cast<WFN*>(h)->push_back_MO(nr, occ, energy) ? 1 : 0;
+    }
+
+    UT_API int ut_wfn_get_nmo(void* h) {
+        return static_cast<WFN*>(h)->get_nmo();
+    }
+
+    UT_API double ut_wfn_get_mo_energy(void* h, int mo) {
+        return static_cast<WFN*>(h)->get_MO_energy(mo);
+    }
+
+    UT_API double ut_wfn_get_mo_occ(void* h, int mo) {
+        return static_cast<WFN*>(h)->get_MO_occ(mo);
+    }
+
+    UT_API int ut_wfn_set_mo_coef(void* h, int mo, int prim, double val) {
+        return static_cast<WFN*>(h)->set_MO_coef(mo, prim, val) ? 1 : 0;
+    }
+
+    UT_API double ut_wfn_get_mo_coef(void* h, int mo, int prim) {
+        return static_cast<WFN*>(h)->get_MO_coef(mo, prim);
+    }
+
+    UT_API int ut_wfn_add_primitive(void* h, int cent, int type, double e,
+                                    const double* coefs, int n_coefs) {
+        // add_primitive takes double* and uses nmo entries from it
+        auto* w = static_cast<WFN*>(h);
+        vec vals(coefs, coefs + n_coefs);
+        return w->add_primitive(cent, type, e, vals.data()) ? 1 : 0;
+    }
+
+    UT_API int ut_wfn_delete_unoccupied_mos(void* h) {
+        auto* w = static_cast<WFN*>(h);
+        w->delete_unoccupied_MOs();
+        return w->get_nmo();
+    }
+
+    UT_API void ut_wfn_assign_charge(void* h, int charge) {
+        static_cast<WFN*>(h)->assign_charge(charge);
+    }
+
+    UT_API int ut_wfn_get_charge(void* h) {
+        return static_cast<WFN*>(h)->get_charge();
+    }
+
+    UT_API void ut_wfn_assign_multi(void* h, int multi) {
+        static_cast<WFN*>(h)->assign_multi(multi);
+    }
+
+    UT_API int ut_wfn_get_multi(void* h) {
+        return static_cast<int>(static_cast<WFN*>(h)->get_multi());
+    }
+
+    UT_API int ut_wfn_set_method(void* h, const char* method) {
+        static_cast<WFN*>(h)->set_method(std::string(method));
+        return 0;
+    }
+
+    UT_API int ut_wfn_get_method(void* h, char* out, int bufsize) {
+        std::string s = static_cast<WFN*>(h)->get_method();
+        if (static_cast<int>(s.size()) >= bufsize) return -1;
+        std::memcpy(out, s.c_str(), s.size() + 1);
+        return static_cast<int>(s.size());
+    }
+
+    UT_API int ut_wfn_set_basis_set_name(void* h, const char* name) {
+        static_cast<WFN*>(h)->set_basis_set_name(std::string(name));
+        return 0;
+    }
+
+    UT_API int ut_wfn_get_basis_set_name(void* h, char* out, int bufsize) {
+        std::string s = static_cast<WFN*>(h)->get_basis_set_name();
+        if (static_cast<int>(s.size()) >= bufsize) return -1;
+        std::memcpy(out, s.c_str(), s.size() + 1);
+        return static_cast<int>(s.size());
+    }
+
+    UT_API int ut_wfn_get_nr_electrons(void* h) {
+        return static_cast<int>(static_cast<WFN*>(h)->get_nr_electrons());
+    }
+
+    UT_API double ut_wfn_count_nr_electrons(void* h) {
+        return static_cast<WFN*>(h)->count_nr_electrons();
+    }
+
+    UT_API void ut_wfn_resize_dm(void* h, int size) {
+        static_cast<WFN*>(h)->resize_DM(size);
+    }
+
+    UT_API int ut_wfn_set_dm(void* h, int nr, double val) {
+        return static_cast<WFN*>(h)->set_DM(nr, val) ? 1 : 0;
+    }
+
+    UT_API double ut_wfn_get_dm(void* h, int nr) {
+        return static_cast<WFN*>(h)->get_DM(nr);
+    }
+
+    UT_API int ut_wfn_get_dm_size(void* h) {
+        return static_cast<WFN*>(h)->get_DM_size();
+    }
+
+    // -----------------------------------------------------------------------
+    // tsc_block<int, cdouble> handle-based API
+    // -----------------------------------------------------------------------
+
+    using TscBlock = tsc_block<int, cdouble>;
+
+    UT_API void* ut_tsc_create_empty() {
+        return new TscBlock();
+    }
+
+    UT_API void* ut_tsc_create(int n_scatterers, const char** labels,
+                               int n_reflections,
+                               const int* h_arr, const int* k_arr, const int* l_arr,
+                               const double* sf_real, const double* sf_imag) {
+        svec scatterers(labels, labels + n_scatterers);
+        cvec2 sf(n_scatterers, cvec(n_reflections));
+        for (int s = 0; s < n_scatterers; ++s)
+            for (int r = 0; r < n_reflections; ++r)
+                sf[s][r] = cdouble(sf_real[s * n_reflections + r],
+                                   sf_imag[s * n_reflections + r]);
+        std::vector<std::vector<int>> idx(3, std::vector<int>(n_reflections));
+        for (int r = 0; r < n_reflections; ++r) {
+            idx[0][r] = h_arr[r];
+            idx[1][r] = k_arr[r];
+            idx[2][r] = l_arr[r];
+        }
+        return new TscBlock(sf, scatterers, idx);
+    }
+
+    UT_API void ut_tsc_destroy(void* h) {
+        delete static_cast<TscBlock*>(h);
+    }
+
+    UT_API int ut_tsc_is_empty(void* h) {
+        return static_cast<TscBlock*>(h)->is_empty() ? 1 : 0;
+    }
+
+    UT_API int ut_tsc_scatterer_size(void* h) {
+        return static_cast<int>(static_cast<TscBlock*>(h)->scatterer_size());
+    }
+
+    UT_API int ut_tsc_reflection_size(void* h) {
+        return static_cast<int>(static_cast<TscBlock*>(h)->reflection_size());
+    }
+
+    UT_API int ut_tsc_get_scatterer(void* h, int nr, char* out, int bufsize) {
+        std::string s = static_cast<TscBlock*>(h)->get_scatterer(nr);
+        if (static_cast<int>(s.size()) >= bufsize) return -1;
+        std::memcpy(out, s.c_str(), s.size() + 1);
+        return static_cast<int>(s.size());
+    }
+
+    UT_API int ut_tsc_scatterers_string(void* h, char* out, int bufsize) {
+        std::string s = static_cast<TscBlock*>(h)->scatterers_string();
+        if (static_cast<int>(s.size()) >= bufsize) return -1;
+        std::memcpy(out, s.c_str(), s.size() + 1);
+        return static_cast<int>(s.size());
+    }
+
+    UT_API double ut_tsc_get_sf_real(void* h, int scatterer, int reflection) {
+        cvec v = static_cast<TscBlock*>(h)->get_sf_for_scatterer(scatterer);
+        return v[reflection].real();
+    }
+
+    UT_API double ut_tsc_get_sf_imag(void* h, int scatterer, int reflection) {
+        cvec v = static_cast<TscBlock*>(h)->get_sf_for_scatterer(scatterer);
+        return v[reflection].imag();
+    }
+
+    UT_API int ut_tsc_get_index(void* h, int dim, int refl) {
+        return static_cast<TscBlock*>(h)->get_index(dim, refl);
+    }
+
+    UT_API void ut_tsc_set_ad(void* h, int val) {
+        static_cast<TscBlock*>(h)->set_AD(val != 0);
+    }
+
+    UT_API int ut_tsc_get_ad(void* h) {
+        return static_cast<TscBlock*>(h)->get_AD() ? 1 : 0;
+    }
+
+    UT_API int ut_tsc_append(void* h_dst, void* h_src) {
+        std::ostringstream log;
+        try {
+            static_cast<TscBlock*>(h_dst)->append(*static_cast<TscBlock*>(h_src), log);
+            return 0;
+        } catch (...) {
+            return -1;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // primitive evaluation
+    // -----------------------------------------------------------------------
+
+    UT_API double ut_primitive_eval(int type, double alpha, double coef,
+                                    double norm_const, double r) {
+        primitive p;
+        p.set_type(type);
+        p.set_exp(alpha);
+        p.set_coef(coef);
+        p.set_norm_const(norm_const);
+        return p.eval_gaussian(r);
+    }
+
+    UT_API double ut_primitive_eval_unnorm(int type, double alpha, double coef, double r) {
+        primitive p;
+        p.set_type(type);
+        p.set_exp(alpha);
+        p.set_coef(coef);
+        return p.eval_gaussian_unnormalized(r);
+    }
+
+    // -----------------------------------------------------------------------
+    // atom::distance_to (standalone)
+    // -----------------------------------------------------------------------
+
+    UT_API double ut_atom_distance(double x1, double y1, double z1,
+                                   double x2, double y2, double z2) {
+        atom a("A", "0", 1, x1, y1, z1, 0);
+        atom b("B", "0", 2, x2, y2, z2, 0);
+        return a.distance_to(b);
     }
 
 } // extern "C"
