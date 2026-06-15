@@ -214,7 +214,7 @@ std::string build_date = ("This Executable was built on: " + std::string(__DATE_
 bool ensure_occ_data_path(const char *argv0)
 {
 #ifdef _WIN32
-    char *occ_data_path_env = nullptr;
+    char* occ_data_path_env = nullptr;
     size_t len = 0;
     errno_t err = _dupenv_s(&occ_data_path_env, &len, "OCC_DATA_PATH");
 
@@ -233,20 +233,14 @@ bool ensure_occ_data_path(const char *argv0)
         free(occ_data_path_env);
     }
 #else
-    const char *occ_data_path_env = std::getenv("OCC_DATA_PATH");
-    if (occ_data_path_env != nullptr)
+    const char* tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH");
+    if (tmp_occ_data_path_env != nullptr)
     {
-        std::filesystem::path path(occ_data_path_env);
-        free(occ_data_path_env);
-
-        if (is_valid_occ_data_path(path))
+        std::string occ_data_path_env(tmp_occ_data_path_env);
+        if (is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
             return true;
         else
             std::cout << "OCC DATA PATH is invalid!" << std::endl;
-    }
-    else if (occ_data_path_env != nullptr)
-    {
-        free(occ_data_path_env);
     }
 #endif
 

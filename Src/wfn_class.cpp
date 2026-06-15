@@ -133,7 +133,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     // Only works with restricted WFNs for now
     using namespace Eigen;
     using occ::gto::num_subshells;
-    origin = e_origin::OCC;
+    set_origin(e_origin::OCC);
     basis_set_name = occ_WF.basis.name();
     has_ECPs = occ_WF.basis.have_ecps();
     charge = occ_WF.charge();
@@ -278,17 +278,27 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     }
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
 
-    set_origin(e_origin::OCC);
     d_f_switch = false;
-    int nmo_ = occ_WF.mo.D.rows();
+    int nmo_ = occ_WF.mo.D.cols();
     DM = dMatrix2(nmo_, nmo_);
-    for (int i = 0; i < nmo_; i++) {
-        DM(i, i) = 2 * occ_WF.mo.D(i, i);
-        for (int j = i + 1; j < nmo_; j++) {
-            DM(i, j) = 2 * occ_WF.mo.D(i, j);
-            DM(j, i) = DM(i, j);
+    if (occ_WF.mo.kind == occ::qm::Restricted) {
+        for (int i = 0; i < nmo_; i++) {
+            DM(i, i) = 2 * occ_WF.mo.D(i, i);
+            for (int j = i + 1; j < nmo_; j++) {
+                DM(i, j) = 2 * occ_WF.mo.D(i, j);
+                DM(j, i) = DM(i, j);
+            }
         }
     }
+	else if (occ_WF.mo.kind == occ::qm::Unrestricted) {
+		for (int i = 0; i < nmo_; i++) {
+			DM(i, i) = occ_WF.mo.D(i, i) + occ_WF.mo.D(i + nmo_, i);
+			for (int j = i + 1; j < nmo_; j++) {
+				DM(i, j) = occ_WF.mo.D(i, j) + occ_WF.mo.D(i + nmo_, j);
+				DM(j, i) = DM(i, j);
+			}
+		}
+	}
 }
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string &ID)
