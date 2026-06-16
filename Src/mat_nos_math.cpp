@@ -693,16 +693,6 @@ void make_Eigenvalues(vec& A, vec& W) {
         W.data(),
         work.data(), (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
     err_checkf(info == 0, "The algorithm failed to compute eigenvalues.", std::cout);
-
-    // Accelerate's Fortran LAPACK writes eigenvectors in column-major order.
-    // The rest of NoSpherA2 stores flat matrices in row-major order and reads
-    // eigenvectors from columns, matching LAPACKE_ROW_MAJOR on other platforms.
-    // Transpose the storage view so Mac follows the same convention.
-    for (int i = 0; i < n; ++i) {
-        for (int j = i + 1; j < n; ++j) {
-            std::swap(A[i * n + j], A[j * n + i]);
-        }
-    }
 #else
     err_checkf(LAPACKE_dsyev(
         LAPACK_ROW_MAJOR,
