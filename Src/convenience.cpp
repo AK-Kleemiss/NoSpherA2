@@ -2444,6 +2444,15 @@ void options::digest_options()
             properties.rdg = true;
         else if (temp == "-rgbi")
             rgbi = true;
+        else if (temp == "-rgbi-groups") {
+            int n = 1;
+            while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
+                rgbi_groups.push_back(split_string<int>(arguments[i + n], ","));
+                n++;
+            }
+            i += n - 1;
+            rgbi = true;
+        }
         else if (temp.find("-rkpts") < 1)
             read_k_pts = true;
         else if (temp == "-rho_cube")

@@ -734,6 +734,7 @@ struct options
     bool do_XCW = false;
     bool calc_F_calc = false;
     bool rgbi = false;
+    ivec2 rgbi_groups;
     bool fract = false;
     bool profiling = false;
     bool get_g = false;

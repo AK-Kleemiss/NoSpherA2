@@ -249,6 +249,24 @@ namespace NoSpherA2IntegrationTests
             });
         }
 
+        TEST_METHOD(RGBI_Groups_NH3BH3)
+        {
+            RunTest({
+                "RGBI_Groups_NH3BH3", "RGBI_groups", "NH3BH3.good", "",
+                {"-wfn","nh3bh3.gbw", "-rgbi","", "-rgbi-groups", "0,4,5,7", "1,2,3,6",
+                 "-all_charges", "-no_date"}
+            });
+        }
+
+        TEST_METHOD(RGBI_Groups_NH3BH3)
+        {
+            RunTest({
+                "RGBI_Groups_NH3Li", "RGBI_groups", "NH3Li.good", "",
+                {"-wfn","nh3li.gbw", "-rgbi","", "-rgbi-groups", "0,1,2,3", "4",
+                 "-all_charges", "-no_date"}
+                    });
+        }
+
         // ---- Full tests (skipped unless RUN_FULL_TEST is set) ---------------
 
         TEST_METHOD(fchk_conversion)

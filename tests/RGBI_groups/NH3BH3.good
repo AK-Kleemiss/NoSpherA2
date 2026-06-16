@@ -1,0 +1,65 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                                 "nh3bh3.gbw" done!
+Number of atoms in Wavefunction file: 8 Number of MOs: 98
+Calculating NAOs for all atoms...                  ...done!
+Calculating Population for all atoms...            ...done.
+
+Total Population: 17.9582
+
+[      Calculating Atomic Populations     ]
+[-----------------------------------------] 100% 
+Population of atom 0: 9.28627
+Population of atom 1: 8.38718
+Population of atom 2: 1.77358
+Population of atom 3: 1.77522
+Population of atom 4: 1.46847
+Population of atom 5: 1.467
+Population of atom 6: 1.7721
+Population of atom 7: 1.46514
+[       Calculating Bond Populations      ]
+[-----------------------------------------] 100% 
+
+Roby-Gould Bond Indices (RGBI) Analysis
+----------------------------------------------
+Number of electrons in system:         18
+Number of electrons in Roby Analysis:  17.9582
+Percentage of electrons accounted for: 99.77 %
+----------------------------------------------
+
+
+Atom Nr        Els       n_A     n_B    n_AB    s_AB    Cov.    Ion.    Tot.   Pyth.   Arak.
+--------------------------------------------------------------------------------------------
+   0 -   1    N -  B   9.286   8.387  16.453   1.221   1.015   0.492   1.128  80.975  71.266
+   0 -   4    N -  H   9.286   1.468   9.504   1.251   0.933   0.251   0.966  93.247  83.265
+   0 -   5    N -  H   9.286   1.467   9.504   1.249   0.932   0.251   0.965  93.256  83.275
+   0 -   7    N -  H   9.286   1.465   9.504   1.247   0.931   0.250   0.964  93.263  83.284
+   1 -   2    B -  H   8.387   1.774   8.709   1.452   0.946  -0.006   0.946  99.996  99.598
+   1 -   3    B -  H   8.387   1.775   8.709   1.453   0.946  -0.006   0.946  99.996  99.606
+   1 -   6    B -  H   8.387   1.772   8.709   1.451   0.946  -0.006   0.946  99.996  99.596
+--------------------------------------------------------------------------------------------
+
+
+Roby-Gould Bond Indices (RGBI) - Group Analysis
+----------------------------------------------
+Groups defined:
+  G0: atoms 0(N), 4(H), 5(H), 7(H)
+  G1: atoms 1(B), 2(H), 3(H), 6(H)
+----------------------------------------------
+
+Group populations:
+  Population of G0 (NH3)                9.95184
+  Population of G1 (BH3)                9.35017
+----------------------------------------------
+
+Group             n_G1    n_G2  n_G1G2  s_G1G2    Cov.    Ion.    Tot.   Pyth.   Arak.
+------------------------------------------------------------------------------------------
+G0 - G1          9.952   9.350  14.827   4.475   1.186   1.264   1.733  46.793  47.957
+------------------------------------------------------------------------------------------

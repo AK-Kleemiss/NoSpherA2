@@ -138,3 +138,5 @@ libiomp5.so
 build_no_tbb**
 **/mkl_*.*.dll
 *.coverage
+**/static_covrun*.dll
+**/Tests.dll*
