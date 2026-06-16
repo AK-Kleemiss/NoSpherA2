@@ -258,7 +258,7 @@ namespace NoSpherA2IntegrationTests
             });
         }
 
-        TEST_METHOD(RGBI_Groups_NH3BH3)
+        TEST_METHOD(RGBI_Groups_NH3Li)
         {
             RunTest({
                 "RGBI_Groups_NH3Li", "RGBI_groups", "NH3Li.good", "",

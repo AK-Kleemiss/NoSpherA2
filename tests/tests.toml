@@ -246,7 +246,7 @@ rgbi-groups = ["0,4,5,7","1,2,3,6"]
 
 [RGBI_Groups_NH3Li]
 directory = "RGBI_groups"
-good = "NH3Li.good"
+good = "nh3li.good"
 
 [RGBI_Groups_NH3Li.args]
 wfn = "nh3li.gbw"
