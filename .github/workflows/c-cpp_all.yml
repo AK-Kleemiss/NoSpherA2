@@ -119,6 +119,36 @@ jobs:
     - name: Build NoSpherA2
       run: ${{ matrix.build-script }}
 
+    - name: Run VS Unit Tests (Windows)
+      if: runner.os == 'Windows'
+      id: vstest
+      continue-on-error: true
+      shell: pwsh
+      run: |
+        $vstest = Get-ChildItem "C:\Program Files\Microsoft Visual Studio" -Recurse -Filter "vstest.console.exe" -ErrorAction SilentlyContinue |
+                  Select-Object -First 1 -ExpandProperty FullName
+        if (-not $vstest) { Write-Error "vstest.console.exe not found"; exit 1 }
+        New-Item -ItemType Directory -Force -Path "Windows\TestResults" | Out-Null
+        & $vstest "Windows\x64\Release\Tests.dll" /Platform:x64 `
+            "/TestCaseFilter:FullyQualifiedName~NoSpherA2UnitTests" `
+            "/logger:trx;LogFileName=UnitTests.trx" `
+            /ResultsDirectory:"Windows\TestResults"
+
+    - name: Upload VS Unit Test Results (Windows)
+      if: runner.os == 'Windows' && always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: VS-UnitTest-Results-Windows
+        path: Windows/TestResults/
+        if-no-files-found: ignore
+
+    - name: Fail build if VS unit tests failed
+      if: runner.os == 'Windows' && steps.vstest.outcome == 'failure'
+      shell: pwsh
+      run: |
+        Write-Error "VS unit tests failed — see artifact VS-UnitTest-Results-Windows for the TRX report"
+        exit 1
+
     - name: Bundle libomp into binary (macOS)
       if: runner.os == 'macOS'
       run: |

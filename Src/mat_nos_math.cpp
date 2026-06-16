@@ -478,7 +478,7 @@ void get_submatrix(const T2& full,
     const ivec& vec_indices) {
     const int n1 = static_cast<int>(val_indices.size());
     const int n2 = static_cast<int>(vec_indices.size());
-    err_checkf(n2 > 0, "Val indices list is empty.", std::cout);
+    err_checkf(n1 > 0, "Val indices list is empty.", std::cout);
     err_checkf(n2 > 0, "Vec indices list is empty.", std::cout);
     err_checkf(sub.size() == n1 * n2, "Submatrix has incorrect size.", std::cout);
 

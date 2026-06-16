@@ -1206,11 +1206,15 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 
     // Helper: collect BF indices for a list of atom indices in the given order.
     // Caller must pass atoms in sorted order so BF ordering matches the ionic-operator layout.
+    // Scans NAOs by atom_index rather than using direct array indexing, so the result is
+    // correct regardless of the order atoms were processed in computeAllAtomicNAOs.
     auto collect_bf_indices = [&](const ivec &atoms, ivec &bf_out) {
         bf_out.clear();
         for (int ai : atoms)
-            for (int idx : NAOs[ai].matrix_elements)
-                bf_out.push_back(idx);
+            for (const auto &NAO : NAOs)
+                if (NAO.atom_index == ai)
+                    for (int idx : NAO.matrix_elements)
+                        bf_out.push_back(idx);
     };
 
     // Pre-compute per-group data: sorted atoms, BF indices, NAO indices, projection, population
