@@ -24,6 +24,7 @@ Environment variables:
 | Python pytest Debug | full (21 tests) | **passing** |
 | VS Tests Debug | full (21 tests) | **passing** |
 | VS Tests Release | full (21 tests) | **passing** |
+| Python pytest macOS | `RGBI_Groups_NH3BH3`, `RGBI_Groups_NH3Li` targeted | **passing** (validated 2026-06-17) |
 
 ---
 
@@ -68,6 +69,8 @@ Added: 2026-06-14.
 | properties | sucrose_fchk_SF | properties.good | no | ✅ passing |
 | reading_SALTED | SALTED | reading_SALTED.good | no | ✅ passing |
 | ri_fit | epoxide_gbw | ri_fit.good | no | ✅ passing |
+| RGBI_Groups_NH3BH3 | RGBI_groups | NH3BH3.good | no | ✅ passing (macOS targeted 2026-06-17) |
+| RGBI_Groups_NH3Li | RGBI_groups | nh3li.good | no | ✅ passing (macOS targeted 2026-06-17) |
 | rubredoxin_cmtc | rubredoxin_cmtc | rubredoxin_cmtc.good | no | ✅ passing |
 | SALTED | SALTED | SALTED.good | no | ✅ passing |
 | sucrose_IAM | sucrose_IAM_SF | sucrose_IAM.good | no | ✅ passing |

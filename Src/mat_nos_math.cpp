@@ -617,28 +617,50 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
     // use 'S' for jobu/jobvt to compute the "thin" SVD (only the first k columns/rows)
 #ifdef __APPLE__
     // Use Accelerate framework on macOS for SVD computation
+    vec A_col_major(m * n);
+    for (int row = 0; row < m; ++row)
+        for (int col = 0; col < n; ++col)
+            A_col_major[col * m + row] = A(row, col);
+
     __LAPACK_int info = 0;
     __LAPACK_int lwork = -1;
     double work_query = 0.0;
+    const __LAPACK_int lapack_m = static_cast<__LAPACK_int>(m);
+    const __LAPACK_int lapack_n = static_cast<__LAPACK_int>(n);
+    const __LAPACK_int lapack_k = static_cast<__LAPACK_int>(k);
 
     // Query optimal work size
-    dgesvd_((char*)"S", (char*)"S", (__LAPACK_int*)&m, (__LAPACK_int*)&n,
-        A_copy.data(), (__LAPACK_int*)&n,
+    dgesvd_((char*)"S", (char*)"S", (__LAPACK_int*)&lapack_m, (__LAPACK_int*)&lapack_n,
+        A_col_major.data(), (__LAPACK_int*)&lapack_m,
         S.data(),
-        U.data(), (__LAPACK_int*)&k,
-        Vt.data(), (__LAPACK_int*)&n,
+        U.data(), (__LAPACK_int*)&lapack_m,
+        Vt.data(), (__LAPACK_int*)&lapack_k,
         &work_query, (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
+    err_checkf(info == 0, "Accelerate dgesvd workspace query failed.", std::cout);
 
     lwork = static_cast<__LAPACK_int>(work_query);
     vec work(lwork);
 
     // Perform SVD: A = U * S * Vt
-    dgesvd_((char*)"S", (char*)"S", (__LAPACK_int*)&m, (__LAPACK_int*)&n,
-        A_copy.data(), (__LAPACK_int*)&n,
+    dgesvd_((char*)"S", (char*)"S", (__LAPACK_int*)&lapack_m, (__LAPACK_int*)&lapack_n,
+        A_col_major.data(), (__LAPACK_int*)&lapack_m,
         S.data(),
-        U.data(), (__LAPACK_int*)&k,
-        Vt.data(), (__LAPACK_int*)&n,
+        U.data(), (__LAPACK_int*)&lapack_m,
+        Vt.data(), (__LAPACK_int*)&lapack_k,
         work.data(), (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
+    err_checkf(info == 0, "Accelerate dgesvd failed with info unequal 0!", std::cout);
+
+    vec U_row_major(m * k);
+    for (int row = 0; row < m; ++row)
+        for (int col = 0; col < k; ++col)
+            U_row_major[row * k + col] = U[col * m + row];
+    U.swap(U_row_major);
+
+    vec Vt_row_major(k * n);
+    for (int row = 0; row < k; ++row)
+        for (int col = 0; col < n; ++col)
+            Vt_row_major[row * n + col] = Vt[col * k + row];
+    Vt.swap(Vt_row_major);
 #else
     err_checkf(LAPACKE_dgesvd(
         LAPACK_ROW_MAJOR,
@@ -709,6 +731,17 @@ vec mat_sqrt(vec& A, vec& W, const double cutoff) {
     vec Temp(n * n, 0.0);
 
     make_Eigenvalues(A, W);
+#ifdef __APPLE__
+    {
+        // Accelerate's dsyev_ stores eigenvectors in Fortran column-major order.
+        // The reconstruction below treats A as a row-major matrix.
+        vec A_row_major(n * n);
+        for (int row = 0; row < n; ++row)
+            for (int col = 0; col < n; ++col)
+                A_row_major[row * n + col] = A[col * n + row];
+        A.swap(A_row_major);
+    }
+#endif
 
     for (int i = 0; i < n; ++i)
         W[i] = abs(W[i]) < cutoff ? 0.0 : std::sqrt(abs(W[i]));

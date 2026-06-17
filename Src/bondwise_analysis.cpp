@@ -515,6 +515,16 @@ std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN &wavy) {
     return bonds;
 }
 
+#ifdef __APPLE__
+static void eigenvectors_to_row_major(vec &matrix, const int n) {
+    vec row_major(n * n);
+    for (int row = 0; row < n; ++row)
+        for (int col = 0; col < n; ++col)
+            row_major[row * n + col] = matrix[col * n + row];
+    matrix.swap(row_major);
+}
+#endif
+
 //Assuming square matrices
 vec change_basis_sq(const vec &in, const vec &transformation, int size) {
 
@@ -613,6 +623,11 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     err_checkf(isSymmetricViaEigenvalues<vec>(P, n), "Transformed matrix not symmetric!", std::cout);
 #endif
     make_Eigenvalues(P, occu);
+#ifdef __APPLE__
+    // Accelerate's dsyev_ returns eigenvectors in Fortran column-major layout.
+    // The NAO back-projection below consumes P through row-major CBLAS.
+    eigenvectors_to_row_major(P, n);
+#endif
 #ifdef NSA2DEBUG
     std::cout << "Eigenvalues of projected density P:\n";
     for (int i = 0; i < n; i++) {
@@ -788,6 +803,20 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
     int atom = -1;
     //dMatrix2 D = reshape<dMatrix2>(D_Sub, Shape2D(n, n));
 
+    auto zero_projection = [&]() {
+        dMatrix2 zero(n, n);
+        for (int r = 0; r < n; ++r)
+            for (int c = 0; c < n; ++c)
+                zero(r, c) = 0.0;
+        if (atom >= 0 && proj_out == nullptr) {
+            projection_matrices.push_back(zero);
+            overlap_matrices.push_back(S);
+        }
+        if (proj_out != nullptr)
+            *proj_out = zero;
+        return 0.0;
+    };
+
     dMatrix2 NAOs;
     // When an explicit NAO matrix is provided together with row/col selectors,
     // use it directly — this takes priority over the full-system shortcut below.
@@ -797,7 +826,12 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
         vec NAO_sub(n1 * n2);
         get_submatrix(*given_NAO, NAO_sub, eigvals, eigvecs);
         NAOs = reshape<dMatrix2>(NAO_sub, Shape2D(n1, n2));
-    } else if (n == total_NAOs.extent(1)) {
+    } else if (given_NAO == nullptr && eigvals.empty() && eigvecs.empty()
+        && n == static_cast<int>(overlap_matrix.extent(0))) {
+        err_checkf(static_cast<int>(total_NAOs.extent(1)) == n,
+            "RGBI total NAO matrix column count (" + std::to_string(total_NAOs.extent(1)) +
+            ") does not match the basis-function count (" + std::to_string(n) + ").",
+            std::cout);
         NAOs = total_NAOs;
     } else {
         //TODO: assign subspace NAOs from NAOResults for a given atom
@@ -814,6 +848,8 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
     if (NAOs.size() == 0) {
         const int n1 = eigvals.size();
         const int n2 = eigvecs.size();
+        if (n1 == 0 || n2 == 0)
+            return zero_projection();
         vec NAO_sub(n1 * n2);
         if (given_NAO == nullptr)
             given_NAO = &total_NAOs;
@@ -865,10 +901,10 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
 double Roby_information::Roby_population_analysis(const ivec atoms) {
     ivec bf_indices;
     if (atoms.size() == 0) {
-        for (NAOResult &NAO : NAOs) {
-            for (auto index : NAO.matrix_elements)
-                bf_indices.push_back(index);
-        }
+        const int n_basis_functions = static_cast<int>(overlap_matrix.extent(0));
+        bf_indices.reserve(n_basis_functions);
+        for (int index = 0; index < n_basis_functions; ++index)
+            bf_indices.push_back(index);
     }
     else {
         bf_indices = atoms;
@@ -1126,6 +1162,8 @@ dMatrix2 Roby_information::build_group_PAS(const ivec &group_atom_indices, const
                 for (int idx : NAO.matrix_elements)
                     group_bf.push_back(idx);
     const int n_G = static_cast<int>(group_bf.size());
+    err_checkf(n_G > 0, "RGBI group PAS has no basis functions for the requested atom group.", std::cout);
+    err_checkf(n_ab > 0, "RGBI group PAS has no pair basis functions.", std::cout);
     vec sub_S(n_G * n_ab, 0.0);
     get_submatrix(overlap_matrix, sub_S, group_bf, bond_bf_indices);
     dMatrix2 S_G = reshape<dMatrix2>(sub_S, Shape2D(n_G, n_ab));
@@ -1206,17 +1244,16 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
     auto collect_nao_indices = [&](const ivec &atoms, ivec &eigenvals_out, ivec &eigenvecs_out) {
         eigenvals_out.clear();
         eigenvecs_out.clear();
-        int start_val = 0, start_vec = 0;
+        int start_val = 0;
         for (const auto &NAO : NAOs) {
             bool wanted = std::find(atoms.begin(), atoms.end(), NAO.atom_index) != atoms.end();
             if (wanted) {
                 for (int i = 0; i < static_cast<int>(NAO.eigenvalues.size()); i++)
                     eigenvals_out.push_back(start_val + i);
-                for (int i = 0; i < static_cast<int>(NAO.matrix_elements.size()); i++)
-                    eigenvecs_out.push_back(start_vec + i);
+                for (int idx : NAO.matrix_elements)
+                    eigenvecs_out.push_back(idx);
             }
             start_val += static_cast<int>(NAO.eigenvalues.size());
-            start_vec += static_cast<int>(NAO.matrix_elements.size());
         }
     };
 
@@ -1231,6 +1268,16 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
                 if (NAO.atom_index == ai)
                     for (int idx : NAO.matrix_elements)
                         bf_out.push_back(idx);
+    };
+
+    auto atom_list_string = [](const ivec &atoms) {
+        std::string result;
+        for (int i = 0; i < static_cast<int>(atoms.size()); ++i) {
+            if (i > 0)
+                result += ",";
+            result += std::to_string(atoms[i]);
+        }
+        return result;
     };
 
     // Pre-compute per-group data: sorted atoms, BF indices, NAO indices, projection, population
@@ -1249,6 +1296,9 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
         std::sort(gdata[gi].sorted_atoms.begin(), gdata[gi].sorted_atoms.end());
         collect_bf_indices(gdata[gi].sorted_atoms, gdata[gi].bf);
         collect_nao_indices(gdata[gi].sorted_atoms, gdata[gi].nao_evals, gdata[gi].nao_evecs);
+        err_checkf(!gdata[gi].bf.empty(),
+            "RGBI group G" + std::to_string(gi) + " has no basis functions for atoms " +
+            atom_list_string(gdata[gi].sorted_atoms) + ".", std::cout);
         gdata[gi].pop = projection_matrix_and_expectation(
             gdata[gi].bf, gdata[gi].nao_evals, gdata[gi].nao_evecs, nullptr, &gdata[gi].P);
         {
@@ -1311,7 +1361,16 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
             ivec bond_evals = gdata[gi].nao_evals, bond_evecs = gdata[gi].nao_evecs;
             bond_evals.insert(bond_evals.end(), gdata[gj].nao_evals.begin(), gdata[gj].nao_evals.end());
             bond_evecs.insert(bond_evecs.end(), gdata[gj].nao_evecs.begin(), gdata[gj].nao_evecs.end());
-            const double pair_pop = projection_matrix_and_expectation(bond_bf, bond_evals, bond_evecs);
+            err_checkf(!bond_bf.empty(),
+                "RGBI group pair G" + std::to_string(gi) + "-G" + std::to_string(gj) +
+                " has no basis functions.", std::cout);
+            const bool pair_spans_full_basis =
+                static_cast<int>(bond_bf.size()) == static_cast<int>(overlap_matrix.extent(0));
+            // Full-basis group pairs use the same projection path as the total RGBI population.
+            // This preserves the requested group BF ordering used by the established references.
+            const double pair_pop = pair_spans_full_basis
+                ? projection_matrix_and_expectation(bond_bf)
+                : projection_matrix_and_expectation(bond_bf, bond_evals, bond_evecs);
 
             // Build ionic operator [P_GA | 0; 0 | -P_GB] using dense group projections
             const int n_a  = static_cast<int>(ga_bf.size());
@@ -1340,6 +1399,9 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
             auto X = change_basis_general(Ionic_Operator, transpose(A), true);
             vec ionic_eigenvals(X.extent(0));
             make_Eigenvalues(X.container(), ionic_eigenvals);
+#ifdef __APPLE__
+            eigenvectors_to_row_major(X.container(), static_cast<int>(X.extent(0)));
+#endif
 
             auto EVC = dot<dMatrix2>(SI, X);
 
@@ -1456,6 +1518,7 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets) {
     computeAllAtomicNAOs(wavy);
     std::cout << " ...done!" << std::endl;
     Shape2D NAOs_size;
+    NAOs_size.cols = static_cast<int>(overlap_matrix.extent(0));
     for (size_t atom_idx = 0; atom_idx < NAOs.size(); atom_idx++) {
 #ifdef NSA2DEBUG
         std::cout << "Atom " << atom_idx + 1 << " NAO Occupancies:\n";
@@ -1466,10 +1529,6 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets) {
 #endif
             NAOs_size.rows++;
         }
-        const int cols = NAOs[atom_idx].eigenvalues.empty()
-            ? 0
-            : static_cast<int>(NAOs[atom_idx].eigenvectors.size() / NAOs[atom_idx].eigenvalues.size());
-        NAOs_size.cols += cols;
 #ifdef NSA2DEBUG
         std::cout << std::endl;
 #endif
@@ -1485,12 +1544,11 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets) {
             const int row = temp.rows + i;
             for (int j = 0; j < ME; j++) {
                 const int index_eigenvector = i * ME + j;
-                const int col = temp.cols + j;
+                const int col = NAO.matrix_elements[j];
                 total_NAOs(row, col) = NAO.eigenvectors[index_eigenvector];
             }
         }
         temp.rows += NAO.eigenvalues.size();
-        temp.cols += NAO.matrix_elements.size();
     }
 #ifdef NSA2DEBUG
     print_dmatrix2(total_NAOs, "Global NAO Matrix");
@@ -1541,19 +1599,16 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets) {
         std::sort(bond_indices.begin(), bond_indices.end());
 
         //now determine the bond atom NAO indices
-        int start_vec = 0, start_val = 0;
+        int start_val = 0;
         for (auto NAO : NAOs) {
             if (NAO.atom_index == bond.first || NAO.atom_index == bond.second) {
                 const int n1 = NAO.eigenvalues.size();
-                const int n2 = n1 == 0 ? 0 : static_cast<int>(NAO.eigenvectors.size() / n1);
                 for (int i = 0; i < n1; i++) {
                     bond_eigenvals.push_back(start_val + i);
                 }
-                for (int i = 0; i < n2; i++) {
-                    bond_eigenvecs.push_back(start_vec + i);
-                }
+                for (int idx : NAO.matrix_elements)
+                    bond_eigenvecs.push_back(idx);
             }
-            start_vec += NAO.matrix_elements.size();
             start_val += NAO.eigenvalues.size();
         }
 
@@ -1612,6 +1667,9 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets) {
         // solve symmetric eigenproblem of X
         vec ionic_eigenvals(X.extent(0));
         make_Eigenvalues(X.container(), ionic_eigenvals);
+#ifdef __APPLE__
+        eigenvectors_to_row_major(X.container(), static_cast<int>(X.extent(0)));
+#endif
 
 #ifdef NSA2DEBUG
         std::cout << "Ionic eigenvalues between atom " << bond.first + 1 << " and atom " << bond.second + 1 << ":\n";
