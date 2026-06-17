@@ -108,6 +108,57 @@ namespace {
         return {};
     }
 
+    ivec parse_rgbi_group_indices(const std::string &spec)
+    {
+        ivec indices;
+        for (const auto &raw_part : split_string<std::string>(spec, ","))
+        {
+            const std::string part = trim(raw_part);
+            if (part.empty())
+                continue;
+
+            const size_t range_pos = part.find('-', 1);
+            if (range_pos == std::string::npos)
+            {
+                indices.push_back(std::stoi(part));
+                continue;
+            }
+
+            const std::string first_text = trim(part.substr(0, range_pos));
+            const std::string last_text = trim(part.substr(range_pos + 1));
+            err_checkf(!first_text.empty() && !last_text.empty(),
+                "Invalid RGBI atom index range: " + part, std::cout);
+
+            const int first = std::stoi(first_text);
+            const int last = std::stoi(last_text);
+            const int step = first <= last ? 1 : -1;
+            for (int atom_index = first;; atom_index += step)
+            {
+                indices.push_back(atom_index);
+                if (atom_index == last)
+                    break;
+            }
+        }
+        return indices;
+    }
+
+    void validate_rgbi_group_set(const ivec2 &group_set)
+    {
+        std::map<int, int> assigned_group;
+        for (int group_index = 0; group_index < static_cast<int>(group_set.size()); ++group_index)
+        {
+            for (int atom_index : group_set[group_index])
+            {
+                auto [it, inserted] = assigned_group.emplace(atom_index, group_index);
+                err_checkf(inserted,
+                    "Invalid RGBI groups: atom index " + std::to_string(atom_index) +
+                    " is assigned to both group " + std::to_string(it->second) +
+                    " and group " + std::to_string(group_index) + ".",
+                    std::cout);
+            }
+        }
+    }
+
 }
 
 std::string help_message =
@@ -144,7 +195,7 @@ std::string help_message =
     "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
     "   -TFVC                                    Use the Topological Fuzzy Voronoi Cells (TFVC) partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -rgbi                                    Run Roby-Gould Bond Index analysis.\n"
-    "   -rgbi-groups    <GROUP> <GROUP> [...]    Run RGBI group analysis for comma-separated atom index groups. Repeat this option for multiple groupings.\n"
+    "   -rgbi-groups    <GROUP> <GROUP> [...]    Run RGBI group analysis for comma-separated atom index groups/ranges, e.g. 0-5,7. Repeat for multiple groupings.\n"
     "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
     "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
@@ -2450,11 +2501,13 @@ void options::digest_options()
             int n = 1;
             ivec2 group_set;
             while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
-                group_set.push_back(split_string<int>(arguments[i + n], ","));
+                group_set.push_back(parse_rgbi_group_indices(arguments[i + n]));
                 n++;
             }
-            if (!group_set.empty())
+            if (!group_set.empty()) {
+                validate_rgbi_group_set(group_set);
                 rgbi_group_sets.push_back(group_set);
+            }
             i += n - 1;
             rgbi = true;
         }
