@@ -143,6 +143,8 @@ std::string help_message =
     "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.\n"
     "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
     "   -TFVC                                    Use the Topological Fuzzy Voronoi Cells (TFVC) partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
+    "   -rgbi                                    Run Roby-Gould Bond Index analysis.\n"
+    "   -rgbi-groups    <GROUP> <GROUP> [...]    Run RGBI group analysis for comma-separated atom index groups. Repeat this option for multiple groupings.\n"
     "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
     "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
@@ -2446,10 +2448,13 @@ void options::digest_options()
             rgbi = true;
         else if (temp == "-rgbi-groups") {
             int n = 1;
+            ivec2 group_set;
             while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
-                rgbi_groups.push_back(split_string<int>(arguments[i + n], ","));
+                group_set.push_back(split_string<int>(arguments[i + n], ","));
                 n++;
             }
+            if (!group_set.empty())
+                rgbi_group_sets.push_back(group_set);
             i += n - 1;
             rgbi = true;
         }

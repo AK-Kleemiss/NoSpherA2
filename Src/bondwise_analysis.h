@@ -87,7 +87,7 @@ public:
     Roby_information() = default;
     ~Roby_information() = default;
     Roby_information(const Roby_information&) = default;
-    Roby_information(WFN& wavy, const ivec2& group_defs = {});
+    Roby_information(WFN& wavy, const ivec3& group_sets = {});
 
 
 
