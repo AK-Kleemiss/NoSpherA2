@@ -6,7 +6,9 @@
 *.user
 *.obj
 *.ifc
-
+*.so
+*.dylib
+__pycache__
 
 #Explicit Files to ignore
 tests/alanine_integrated_occ/alanine.owf.fchk
@@ -45,6 +47,7 @@ Mac/NoSpherA2_Debug
 *.dll
 
 checkpoint.txt
+/intel-onemkl*.sh
 
 /Windows/Windows_utils/Build_Dependencies/deps.stamp
 /Windows/Windows_utils/MKL.auto.props

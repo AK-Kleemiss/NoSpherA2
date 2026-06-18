@@ -8822,12 +8822,12 @@ const double WFN::computeMO(
         iat = get_center(j) - 1;
         // if (iat != atom) continue;
         constants::type2vector(get_type(j), l);
-        temp = -get_exponent(j) * d[3][iat];
+        temp = -get_exponent(j) * d[iat][3];
         if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
-            ex *= pow(d[k][iat], l[k]);
+            ex *= pow(d[iat][k], l[k]);
         result += MOs[mo].get_coefficient_f(j) * ex; // build MO values at this point
     }
     shrink_vector<vec>(d);

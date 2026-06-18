@@ -40,6 +40,21 @@ private:
         std::pair<int, int> atom_element_nr;
     };
 
+    struct group_bond_index_result {
+        double covalent;
+        double ionic;
+        double total;
+        double percent_covalent_Pyth;
+        double percent_covalent_Arakai;
+        double pair_population;
+        double population_first;
+        double population_second;
+        int group_index_first;
+        int group_index_second;
+        ivec atoms_first;
+        ivec atoms_second;
+    };
+
     std::vector<NAOResult> NAOs;
     dMatrix2 overlap_matrix;
     dMatrix2 density_matrix;
@@ -47,8 +62,9 @@ private:
     std::vector<dMatrix2> projection_matrices;
     std::vector<dMatrix2> overlap_matrices;
     std::vector<bond_index_result> RGBI;
+    std::vector<group_bond_index_result> RGBI_groups;
     NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full, const std::vector<int>& atom_indices);
-    double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr);
+    double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
     void computeAllAtomicNAOs(WFN& wavy);
     ivec find_eigenvalue_pairs(const vec& eigvals, const double tolerance = 1E-4);
     void transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& EVC,
@@ -57,6 +73,11 @@ private:
         const int index_a,
         const int index_b,
         const ivec& pair_matrix_indices);
+    dMatrix2 build_group_PAS(const ivec& group_atom_indices, const ivec& bond_bf_indices, const dMatrix2& P_G);
+    void transform_group_Ionic_orbitals(dMatrix2& EVC, const vec& eigvals,
+        const ivec& pairs, const ivec& group_a_atoms, const ivec& group_b_atoms,
+        const ivec& bond_bf_indices, const dMatrix2& P_GA, const dMatrix2& P_GB);
+    void computeGroupAnalysis(const ivec2& group_defs, const vec& atom_pops, const ivec& atom_charges);
     std::map<char, dMatrix2> make_covalent_from_ionic(
         const dMatrix2& theta_I,
         const vec& eigvals,
@@ -66,7 +87,7 @@ public:
     Roby_information() = default;
     ~Roby_information() = default;
     Roby_information(const Roby_information&) = default;
-    Roby_information(WFN& wavy);
+    Roby_information(WFN& wavy, const ivec3& group_sets = {});
 
 
 
