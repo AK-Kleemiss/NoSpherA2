@@ -1,0 +1,1330 @@
+<Playlist Version="2.0">
+  <Rule Name="Includes" Match="Any">
+    <Rule Match="All">
+      <Property Name="Solution" />
+      <Rule Match="Any">
+        <Rule Match="All">
+          <Property Name="Project" Value="Tests" />
+          <Rule Match="Any">
+            <Rule Match="All">
+              <Property Name="Namespace" Value="NoSpherA2Integration" />
+              <Rule Match="Any">
+                <Rule Match="All">
+                  <Property Name="Class" Value="TomlIntegrationTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::AlanineIntegratedOcc" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="AlanineIntegratedOcc" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::AlanineOcc" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="AlanineOcc" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::DisorderTHPP" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DisorderTHPP" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::Fractal" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Fractal" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::GrownWater" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="GrownWater" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::HybridMode" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="HybridMode" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::MalbacSfEcp" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="MalbacSfEcp" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::Properties" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Properties" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::RiFit" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="RiFit" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::RubredoxinCmtc" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="RubredoxinCmtc" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::SALTED" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SALTED" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::SucroseIAM" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SucroseIAM" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::SucrosePtb" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SucrosePtb" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::SucroseSF" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SucroseSF" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::SucroseTwin" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SucroseTwin" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::TFVC" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="TFVC" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::TFVCEcp" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="TFVCEcp" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2Integration::TomlIntegrationTests::WfnReading" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="WfnReading" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+              </Rule>
+            </Rule>
+            <Rule Match="All">
+              <Property Name="Namespace" Value="NoSpherA2UnitTests" />
+              <Rule Match="Any">
+                <Rule Match="All">
+                  <Property Name="Class" Value="AssocLegendreTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::AssocLegendreTests::NegativeM_P1m1" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="NegativeM_P1m1" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::AssocLegendreTests::P00_Is_One" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="P00_Is_One" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::AssocLegendreTests::P10_At_Half_Is_Half" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="P10_At_Half_Is_Half" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::AssocLegendreTests::P11_AtOne_Is_Zero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="P11_AtOne_Is_Zero" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::AssocLegendreTests::P20_Is_Legendre_Polynomial" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="P20_Is_Legendre_Polynomial" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::AssocLegendreTests::P21_At_Zero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="P21_At_Zero" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::AssocLegendreTests::P22_At_Zero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="P22_At_Zero" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="Atnr2LetterTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Atnr2LetterTests::BufferTooSmall_ReturnsNegOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BufferTooSmall_ReturnsNegOne" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Atnr2LetterTests::Carbon_Is_C" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Carbon_Is_C" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Atnr2LetterTests::Gold_Is_Au" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Gold_Is_Au" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Atnr2LetterTests::Hydrogen_Is_H" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Hydrogen_Is_H" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Atnr2LetterTests::Iron_Is_Fe" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Iron_Is_Fe" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Atnr2LetterTests::Lawrencium_103_Is_Lr" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Lawrencium_103_Is_Lr" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Atnr2LetterTests::OutOfRange_Returns_PROBLEM" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="OutOfRange_Returns_PROBLEM" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Atnr2LetterTests::Zero_Is_Q_Peak" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Zero_Is_Q_Peak" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="BasisTypeTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BasisTypeTests::DoubleFactorial_SmallValues" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DoubleFactorial_SmallValues" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BasisTypeTests::Sht2nbas_CartesianShells" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sht2nbas_CartesianShells" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BasisTypeTests::Sht2nbas_SphericalShells" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sht2nbas_SphericalShells" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="BesselTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BesselTests::AnalyticFourier" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="AnalyticFourier" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BesselTests::BesselJ_HigherOrder_PositiveAndFinite" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BesselJ_HigherOrder_PositiveAndFinite" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BesselTests::BesselJ_RecurrenceCheck" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BesselJ_RecurrenceCheck" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BesselTests::BesselJ0_AtOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BesselJ0_AtOne" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BesselTests::BesselJ0_AtPi" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BesselJ0_AtPi" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BesselTests::BesselJ0_AtZero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BesselJ0_AtZero" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BesselTests::BesselJ1_AtOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BesselJ1_AtOne" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BesselTests::BesselJ1_AtZero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BesselJ1_AtZero" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::BesselTests::BesselJ2_AtOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BesselJ2_AtOne" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="CartesianToSphericalTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CartesianToSphericalTests::Inverse_Recover_Cartesian" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Inverse_Recover_Cartesian" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CartesianToSphericalTests::Origin_Has_Zero_Radius" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Origin_Has_Zero_Radius" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CartesianToSphericalTests::Radius_Is_Euclidean_Norm" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Radius_Is_Euclidean_Norm" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CartesianToSphericalTests::UnitX_Gives_Correct_Angles" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="UnitX_Gives_Correct_Angles" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CartesianToSphericalTests::UnitY_Gives_PhiHalfPi" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="UnitY_Gives_PhiHalfPi" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CartesianToSphericalTests::UnitZ_Has_Zero_Theta" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="UnitZ_Has_Zero_Theta" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="ConstantsTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::Ang2Bohr_OneAngstrom" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Ang2Bohr_OneAngstrom" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::Ang2Bohr_Roundtrip" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Ang2Bohr_Roundtrip" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::Bohr2Ang_OneBohr" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Bohr2Ang_OneBohr" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::Bohr2Ang_Zero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Bohr2Ang_Zero" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::ConstAbs_Negative" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ConstAbs_Negative" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::ConstAbs_Positive" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ConstAbs_Positive" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::ConstAbs_Zero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ConstAbs_Zero" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::ConstantsSqrt_KnownValues" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ConstantsSqrt_KnownValues" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::ConstantsSqrt_NegativeIsNaN" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ConstantsSqrt_NegativeIsNaN" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::ConstexprPow_Integer" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ConstexprPow_Integer" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::CubicAng2Bohr_Roundtrip" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="CubicAng2Bohr_Roundtrip" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::CubicBohr2Ang_OneBohr3" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="CubicBohr2Ang_OneBohr3" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::ExpApprox_AtMinusOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ExpApprox_AtMinusOne" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::ExpApprox_AtOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ExpApprox_AtOne" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::ExpApprox_AtZero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ExpApprox_AtZero" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::Factorial_SmallValues" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Factorial_SmallValues" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::LogApprox_AtE" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="LogApprox_AtE" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::LogApprox_AtOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="LogApprox_AtOne" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ConstantsTests::LogApprox_NonPositiveReturnsSentinel" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="LogApprox_NonPositiveReturnsSentinel" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="CountWordsTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CountWordsTests::Empty_Returns0" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Empty_Returns0" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CountWordsTests::LeadingTrailingSpaces" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="LeadingTrailingSpaces" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CountWordsTests::MultipleSpacesBetweenWords" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="MultipleSpacesBetweenWords" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CountWordsTests::OneWord" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="OneWord" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CountWordsTests::SingleSpace" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SingleSpace" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::CountWordsTests::TwoWords" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="TwoWords" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="FchkParsingTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::FchkParsingTests::ReadFchkDbl_NegativeScientific" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ReadFchkDbl_NegativeScientific" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::FchkParsingTests::ReadFchkDbl_PositiveScientific" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ReadFchkDbl_PositiveScientific" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::FchkParsingTests::ReadFchkInt_LargeValue" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ReadFchkInt_LargeValue" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::FchkParsingTests::ReadFchkInt_NegativeValue" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ReadFchkInt_NegativeValue" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::FchkParsingTests::ReadFchkInt_PositiveValue" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ReadFchkInt_PositiveValue" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="GeometryTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GeometryTests::ArrayDistance_SamePoint" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ArrayDistance_SamePoint" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GeometryTests::ArrayDistance_UnitCubeDiagonal" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ArrayDistance_UnitCubeDiagonal" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GeometryTests::VecCross_AntiCommutative" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecCross_AntiCommutative" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GeometryTests::VecCross_BasisVectors" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecCross_BasisVectors" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GeometryTests::VecCross_ParallelVectors" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecCross_ParallelVectors" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GeometryTests::VecDiff_Basic" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecDiff_Basic" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GeometryTests::VecDiff_ZeroResult" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecDiff_ZeroResult" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GeometryTests::VecDot_KnownValue" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecDot_KnownValue" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GeometryTests::VecDot_Parallel" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecDot_Parallel" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GeometryTests::VecDot_Perpendicular" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecDot_Perpendicular" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="GetLambda1Tests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GetLambda1Tests::DiagonalDescending_ReturnsMid" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DiagonalDescending_ReturnsMid" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GetLambda1Tests::DiagonalMatrix_AllEqual_ReturnsThat" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DiagonalMatrix_AllEqual_ReturnsThat" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GetLambda1Tests::DiagonalMatrix_ReturnsMidEigenvalue" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DiagonalMatrix_ReturnsMidEigenvalue" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GetLambda1Tests::SymmetricMatrix_MedianIsInBounds" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SymmetricMatrix_MedianIsInBounds" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::GetLambda1Tests::SymmetricMatrix_ReturnsFiniteValue" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SymmetricMatrix_ReturnsFiniteValue" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="HypergeometricTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::HypergeometricTests::Identity_2F1_Zero_IsOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Identity_2F1_Zero_IsOne" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::HypergeometricTests::KnownValue_2F1_1_1_2_Half" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="KnownValue_2F1_1_1_2_Half" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::HypergeometricTests::KnownValue_2F1_Half_Half_ThreeHalves_Half" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="KnownValue_2F1_Half_Half_ThreeHalves_Half" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::HypergeometricTests::NegativeX_ReturnsFinite" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="NegativeX_ReturnsFinite" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::HypergeometricTests::Symmetry_ab_equals_ba" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Symmetry_ab_equals_ba" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="IsSimilarPow10Tests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::IsSimilarPow10Tests::Equal_ReturnTrue" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Equal_ReturnTrue" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::IsSimilarPow10Tests::LooseTolerance_LargeDiff" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="LooseTolerance_LargeDiff" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::IsSimilarPow10Tests::LooseTolerance_TooLargeDiff" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="LooseTolerance_TooLargeDiff" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::IsSimilarPow10Tests::NegativeValues_WithinTolerance" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="NegativeValues_WithinTolerance" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::IsSimilarPow10Tests::OutsideTolerance_ReturnFalse" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="OutsideTolerance_ReturnFalse" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::IsSimilarPow10Tests::WithinTolerance_ReturnTrue" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="WithinTolerance_ReturnTrue" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="NormGaussTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NormGaussTests::DShell_IsPositive" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DShell_IsPositive" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NormGaussTests::PShell_IsPositive" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="PShell_IsPositive" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NormGaussTests::SShell_IsPositive" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SShell_IsPositive" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NormGaussTests::SShell_KnownValue" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SShell_KnownValue" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NormGaussTests::SShell_ScalesWithExponent" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SShell_ScalesWithExponent" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="NumericTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::BLAS_tests" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BLAS_tests" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::FastExpNeg_AtMinusOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="FastExpNeg_AtMinusOne" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::FastExpNeg_AtMinusTen" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="FastExpNeg_AtMinusTen" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::FastExpNeg_AtZero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="FastExpNeg_AtZero" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::FastExpNeg_BeyondCutoff" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="FastExpNeg_BeyondCutoff" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::IsSimilarAbs_OutsideTolerance" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="IsSimilarAbs_OutsideTolerance" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::IsSimilarAbs_WithinTolerance" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="IsSimilarAbs_WithinTolerance" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::IsSimilarRel_EqualValues" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="IsSimilarRel_EqualValues" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::IsSimilarRel_OutsideTolerance" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="IsSimilarRel_OutsideTolerance" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::IsSimilarRel_WithinTolerance" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="IsSimilarRel_WithinTolerance" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::NumericTests::SolveLinearEquations" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SolveLinearEquations" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="OrbitalIndexTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::OrbitalIndexTests::OrcaToPySCF_DShell_FirstComponent" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="OrcaToPySCF_DShell_FirstComponent" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::OrbitalIndexTests::OrcaToPySCF_OutOfRange" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="OrcaToPySCF_OutOfRange" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::OrbitalIndexTests::OrcaToPySCF_PShell" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="OrcaToPySCF_PShell" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::OrbitalIndexTests::OrcaToPySCF_SShell" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="OrcaToPySCF_SShell" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::OrbitalIndexTests::TypeToNbo_DxxShell" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="TypeToNbo_DxxShell" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::OrbitalIndexTests::TypeToNbo_FxxxShell" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="TypeToNbo_FxxxShell" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::OrbitalIndexTests::TypeToNbo_GxxxxShell" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="TypeToNbo_GxxxxShell" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::OrbitalIndexTests::TypeToNbo_PxShell" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="TypeToNbo_PxShell" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::OrbitalIndexTests::TypeToNbo_SShell" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="TypeToNbo_SShell" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::OrbitalIndexTests::TypeToNbo_Unknown" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="TypeToNbo_Unknown" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="SALTEDTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::SALTEDTests::ReadingSALTEDBinaryFile" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ReadingSALTEDBinaryFile" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="Sha256Tests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Sha256Tests::Sha256_BufferTooSmall" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sha256_BufferTooSmall" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Sha256Tests::Sha256_Deterministic" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sha256_Deterministic" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Sha256Tests::Sha256_DifferentInputsDifferentOutputs" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sha256_DifferentInputsDifferentOutputs" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Sha256Tests::Sha256_EmptyString" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sha256_EmptyString" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Sha256Tests::Sha256_KnownVector_Abc" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sha256_KnownVector_Abc" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Sha256Tests::Sha256_OutputLength" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sha256_OutputLength" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="Shell2FunctionTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Shell2FunctionTests::DType_Prim5_ValidIndex" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DType_Prim5_ValidIndex" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Shell2FunctionTests::PType_Prim0" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="PType_Prim0" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Shell2FunctionTests::PType_Prim1" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="PType_Prim1" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Shell2FunctionTests::ResultsAreStrictlyIncreasingWithinShell" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ResultsAreStrictlyIncreasingWithinShell" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Shell2FunctionTests::SType_Prim0_Returns0" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SType_Prim0_Returns0" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="ShrinkStringToAtomTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ShrinkStringToAtomTests::BufferTooSmall_ReturnsNegOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="BufferTooSmall_ReturnsNegOne" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ShrinkStringToAtomTests::CalciumAtomNumber20" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="CalciumAtomNumber20" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ShrinkStringToAtomTests::CarbonAtomNumber6" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="CarbonAtomNumber6" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::ShrinkStringToAtomTests::IronAtomNumber26" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="IronAtomNumber26" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="SplitStringTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::SplitStringTests::CommaDelimiter" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="CommaDelimiter" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::SplitStringTests::EmptyString_ZeroTokens" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="EmptyString_ZeroTokens" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::SplitStringTests::MaxOutLimit_ReturnsTotalCount" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="MaxOutLimit_ReturnsTotalCount" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::SplitStringTests::SingleToken_NoDelim" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SingleToken_NoDelim" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::SplitStringTests::ThreeTokens" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ThreeTokens" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="StringUtilTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests::EndsWith_EmptySuffix" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="EndsWith_EmptySuffix" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests::EndsWith_ExactMatch" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="EndsWith_ExactMatch" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests::EndsWith_MatchingSuffix" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="EndsWith_MatchingSuffix" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests::EndsWith_NonMatchingSuffix" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="EndsWith_NonMatchingSuffix" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests::EndsWith_Suffix_LongerThanString" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="EndsWith_Suffix_LongerThanString" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests::ShrinkString_BufferTooSmall" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ShrinkString_BufferTooSmall" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests::ShrinkString_PureLettersUnchanged" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ShrinkString_PureLettersUnchanged" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests::ShrinkString_RemovesDigits" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ShrinkString_RemovesDigits" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests::ShrinkString_RemovesSpacesAndDigits" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="ShrinkString_RemovesSpacesAndDigits" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="StringUtilTests2" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::Asciitolower_AlreadyLower" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Asciitolower_AlreadyLower" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::Asciitolower_NonAlpha" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Asciitolower_NonAlpha" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::Asciitolower_Uppercase" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Asciitolower_Uppercase" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::DecimalPrecisionCif_IntegerWithEsd" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DecimalPrecisionCif_IntegerWithEsd" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::DecimalPrecisionCif_NoBrackets" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DecimalPrecisionCif_NoBrackets" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::DecimalPrecisionCif_WithBracketsAndDecimal" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DecimalPrecisionCif_WithBracketsAndDecimal" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::DoubleFromEsd_Plain" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DoubleFromEsd_Plain" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::DoubleFromEsd_WithEsd" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DoubleFromEsd_WithEsd" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::DoubleFromEsd_Zero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="DoubleFromEsd_Zero" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::Trim_EmptyString" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Trim_EmptyString" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::Trim_LeadingTrailingSpaces" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Trim_LeadingTrailingSpaces" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::Trim_NoSpaces" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Trim_NoSpaces" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::StringUtilTests2::Trim_OnlySpaces" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Trim_OnlySpaces" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="TimingTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::TimingTests::Sleep10ms_ElapsedAtLeast10000us" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sleep10ms_ElapsedAtLeast10000us" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::TimingTests::Sleep1ms_ElapsedAtLeast1000us" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sleep1ms_ElapsedAtLeast1000us" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::TimingTests::Sleep5ms_ElapsedPositive" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Sleep5ms_ElapsedPositive" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="Type2VectorTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Type2VectorTests::OutOfRange_Returns_NegOne" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="OutOfRange_Returns_NegOne" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Type2VectorTests::SumOfExponents_Matches_ShellType" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="SumOfExponents_Matches_ShellType" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Type2VectorTests::Type1_Is_SShell_000" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Type1_Is_SShell_000" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Type2VectorTests::Type2_Is_Px_100" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Type2_Is_Px_100" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Type2VectorTests::Type5_Is_Dx2_200" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Type5_Is_Dx2_200" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::Type2VectorTests::Type8_Is_Dxy_110" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="Type8_Is_Dxy_110" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+                <Rule Match="All">
+                  <Property Name="Class" Value="VecAggregateTests" />
+                  <Rule Match="Any">
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecLength_345" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecLength_345" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecLength_4D" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecLength_4D" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecLength_Empty" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecLength_Empty" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecLength_Unit" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecLength_Unit" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecSumBool_AllFalse" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecSumBool_AllFalse" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecSumBool_Empty" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecSumBool_Empty" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecSumBool_MixedValues" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecSumBool_MixedValues" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecSumDouble_AllZero" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecSumDouble_AllZero" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecSumDouble_Basic" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecSumDouble_Basic" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecSumInt_Basic" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecSumInt_Basic" />
+                      </Rule>
+                    </Rule>
+                    <Rule Match="All">
+                      <Property Name="TestWithNormalizedFullyQualifiedName" Value="NoSpherA2UnitTests::VecAggregateTests::VecSumInt_Negative" />
+                      <Rule Match="Any">
+                        <Property Name="DisplayName" Value="VecSumInt_Negative" />
+                      </Rule>
+                    </Rule>
+                  </Rule>
+                </Rule>
+              </Rule>
+            </Rule>
+          </Rule>
+        </Rule>
+      </Rule>
+    </Rule>
+  </Rule>
+</Playlist>

@@ -21,7 +21,7 @@
       <NosAvx Condition="'$(NOS_AVX)' != ''">$(NOS_AVX)</NosAvx>
     </PropertyGroup>
     <Exec Condition="'$(NosAvx)' == ''"
-          Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)Windows\detect_avx.ps1&quot;"
+          Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(SolutionDir)..\Windows_utils\detect_avx.ps1&quot;"
           ConsoleToMSBuild="true" StandardOutputImportance="low" EchoOff="true">
       <Output TaskParameter="ConsoleOutput" PropertyName="NosAvx" />
     </Exec>
