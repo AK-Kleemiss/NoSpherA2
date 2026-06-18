@@ -603,7 +603,18 @@ public:
         const int rc = run_inprocess_test(repo_root, "TFVC_ECP");
         Assert::AreEqual(0, rc);
     }
-    
+
+    TEST_METHOD(RGBI_Groups_NH3BH3)
+    {
+        const int rc = run_inprocess_test(repo_root, "RGBI_Groups_NH3BH3");
+        Assert::AreEqual(0, rc);
+    }
+
+    TEST_METHOD(RGBI_Groups_NH3Li)
+    {
+        const int rc = run_inprocess_test(repo_root, "RGBI_Groups_NH3Li");
+        Assert::AreEqual(0, rc);
+    }
 };
 
 std::filesystem::path TomlIntegrationTests::repo_root;
