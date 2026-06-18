@@ -21,6 +21,9 @@
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <ImportGroup Label="GlobalPropertySheets">
+    <Import Project="..\NoSpherA2_universal.props" />
+  </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Utility</ConfigurationType>
     <PlatformToolset>v145</PlatformToolset>

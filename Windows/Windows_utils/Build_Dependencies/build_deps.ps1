@@ -4,6 +4,23 @@ param(
   [string]$Platform = "x64"
 )
 
+## Helper to run a native command and check its exit code, since many tools we call don't have good error reporting via PowerShell exceptions.
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory=$true)]
+        [scriptblock]$Command,
+
+        [Parameter(Mandatory=$true)]
+        [string]$Description
+    )
+
+    & $Command
+
+    if ($LASTEXITCODE -ne 0) {
+        Fail "$Description failed with exit code $LASTEXITCODE"
+    }
+}
+
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
@@ -355,10 +372,10 @@ function Get-OccRepoFingerprint([string]$Variant) {
 
 function Get-WindowsRuntimeOutputDirs {
   return @(
-    (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug"),
-    (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Profile"),
-    (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Release"),
-    (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Release + Copy")
+    (Join-Path $RepoRoot "build\Debug_x64"),
+    (Join-Path $RepoRoot "build\Profile_x64"),
+    (Join-Path $RepoRoot "build\Release_x64"),
+    (Join-Path $RepoRoot "build\Release_x64 + Copy")
   )
 }
 
@@ -402,8 +419,8 @@ function Ensure-OccVariantBuilt([string]$Variant) {
   Info "Building OCC ($Variant)..."
   Push-Location $RepoRoot
   try {
-    cmake --workflow --preset $preset
-    cmake --install $buildDir
+    Invoke-Native {cmake --workflow --preset $preset} "Configuring OCC with CMake"
+    Invoke-Native {cmake --install $buildDir} "Installing OCC"
 
     $tbbLib = Get-ChildItem $buildDir -Recurse -Include "tbb12.lib","tbb12_debug.lib" `
       -ErrorAction SilentlyContinue |
@@ -477,14 +494,22 @@ $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer
 if (-not (Test-Path $vswhere)) { Fail "vswhere.exe not found at: $vswhere" }
 
 $vsPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+
 if ([string]::IsNullOrWhiteSpace($vsPath)) { Fail "Visual Studio installation not found (vswhere returned empty)." }
 
 $vsdev = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
 
 $vsArch = $Platform
-if ($vsArch -ieq "Win32") { $vsArch = "x86" }
 Import-VsDevCmdEnvironment -VsDevCmdBat $vsdev -Arch $vsArch
 
+Info "Using Visual Studio environment from: $vsdev"
+$clOutput = cmd.exe /d /c "cl.exe 2>&1"
+
+$clVersion = $clOutput |
+    Select-String -Pattern 'Compiler Version' |
+    Select-Object -First 1
+
+Info ("cl.exe version: " + $clVersion.Line.Trim())
 
 # -----------------------------
 # 0) Tool checks
@@ -517,6 +542,14 @@ Info "Found MKLROOT=$env:MKLROOT"
 # -----------------------------
 # 2) Build featomic (if needed)
 # -----------------------------
+#Sadly the new MSVC 14.5 generator does not work with cmake correctly, so we have to FORCE Ninja here.... Remove when this is fixed!
+$env:CMAKE_GENERATOR = "Ninja"
+$env:CMAKE_GENERATOR_x86_64_pc_windows_msvc = "Ninja"
+[Environment]::SetEnvironmentVariable(
+    "CMAKE_GENERATOR_x86_64-pc-windows-msvc",
+    "Ninja",
+    [EnvironmentVariableTarget]::Process
+)
 $FeatomicOut = Join-Path $LibDir "featomic_install\lib\metatensor.lib"
 if (Test-Path $FeatomicOut) {
   Info "featomic already built ($FeatomicOut)"
@@ -529,9 +562,9 @@ if (Test-Path $FeatomicOut) {
   New-Item -ItemType Directory $bld | Out-Null
   Push-Location $bld
   try {
-    cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
-    cmake --build . --config $Configuration --parallel
-    cmake --install . --config $Configuration
+    Invoke-Native {cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="$RepoRoot\Lib\featomic_install" ..} "Configuring featomic with CMake"
+    Invoke-Native {cmake --build . --config $Configuration --parallel} "Building featomic"
+    Invoke-Native {cmake --install . --config $Configuration} "Installing featomic"
   } finally {
     Pop-Location
   }
@@ -554,9 +587,9 @@ if (Test-Path $LibCintOut) {
 
   Push-Location $bld
   try {
-    cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DPYPZPX="ON" -DCMAKE_INSTALL_PREFIX="..\..\Lib\LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreadedDLL" ..
-    cmake --build . --config RELEASE
-    cmake --install .
+    Invoke-Native {cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DPYPZPX="ON" -DCMAKE_INSTALL_PREFIX="$RepoRoot\Lib\LibCint" -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreadedDLL" ..} "Configuring LibCint with CMake"
+    Invoke-Native {cmake --build . --config RELEASE} "Building LibCint"
+    Invoke-Native {cmake --install .} "Installing LibCint"
   } finally {
     Pop-Location
   }
@@ -610,9 +643,9 @@ if (Test-Path $converterExe) {
 
   Push-Location $src
   try {
-    cmake -S . -B build
-    cmake --build build --config Release
-    cmake --install build --config Release --prefix "../Lib"
+    Invoke-Native {cmake -S . -B build} "Configuring BasisSetConverter with CMake"
+    Invoke-Native {cmake --build build --config Release} "Building BasisSetConverter"
+    Invoke-Native {cmake --install build --config Release --prefix "../Lib"} "Installing BasisSetConverter"
   } finally {
     Pop-Location
   }
