@@ -1,15 +1,22 @@
 #pragma once
 
-#ifdef _WIN32
-#ifdef BUILDING_DLL
-#define DLL_EXPORT __declspec(dllexport)
+#if defined(_WIN32)
+    #ifdef BUILDING_DLL
+        #define NOS_API __declspec(dllexport)
+    #else
+        #define NOS_API __declspec(dllimport)
+    #endif
+    #define NOS_CALLCONV __cdecl
 #else
-#define DLL_EXPORT __declspec(dllimport)
-#endif
-#else
-#define DLL_EXPORT
+    // Export symbols on ELF platforms.
+    #if defined(__GNUC__)
+        #define NOS_API __attribute__((visibility("default")))
+    #else
+        #define NOS_API
+    #endif
+    #define NOS_CALLCONV
 #endif
 
 extern "C" {
-    DLL_EXPORT int __cdecl nosphera2_run(int argc, char** argv);
+    NOS_API int NOS_CALLCONV nosphera2_run(int argc, char** argv);
 }

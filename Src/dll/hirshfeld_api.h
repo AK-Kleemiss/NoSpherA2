@@ -28,7 +28,7 @@ using bvec = std::vector<bool>;
 using svec = std::vector<std::string>;
 using pathvec = std::vector<std::filesystem::path>;
 
-DLL_EXPORT std::vector<Triangle> __cdecl compute_Hirshfeld_suface_i(
+NOS_API std::vector<Triangle> NOS_CALLCONV compute_Hirshfeld_suface_i(
     const std::filesystem::path& fn1,
     const std::filesystem::path& fn2,
     double resolution,

@@ -12,5 +12,13 @@
 #include <string>
 #include <chrono>
 #include <thread>
+#include <filesystem>
+#include <fstream>
+#include <regex>
+#include <sstream>
+#include <optional>
+#include <cstdlib>
+#include <vector>
+
 
 #endif //PCH_H

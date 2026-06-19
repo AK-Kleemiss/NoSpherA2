@@ -1,18 +1,36 @@
 #include "pch.h"
-#include "CppUnitTest.h"
 
 #include "../core/NoSpherA2.h"
 
-#include <Windows.h>
-#include <filesystem>
-#include <fstream>
-#include <regex>
-#include <sstream>
-#include <optional>
-#include <string>
-#include <vector>
+#if defined(_WIN32)
+	#include "CppUnitTest.h"
+    #include <Windows.h>
+	using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+#else
+    #define CATCH_CONFIG_MAIN
+	#include "CppUnitTest_shim.h"
+#endif
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+
+inline std::filesystem::path nos_test_repo_root()
+    {
+        if (const char* env = std::getenv("NOS_REPO_ROOT")) {
+            return std::filesystem::path(env);
+        }
+
+        auto p = std::filesystem::current_path();
+        for (int i = 0; i < 8; ++i) {
+            if (std::filesystem::exists(p / "tests" / "tests.toml")) {
+                return p;
+            }
+            if (!p.has_parent_path()) {
+                break;
+            }
+            p = p.parent_path();
+        }
+        return std::filesystem::current_path();
+    }
+
 namespace {
 
 static const std::regex kNumberPattern(R"([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)");
@@ -120,19 +138,6 @@ static std::string compare_files_numeric(const std::filesystem::path& good_path,
         }
     }
     return bad ? failures.str() : std::string{};
-}
-
-static std::filesystem::path get_repo_root_from_module()
-{
-    HMODULE hMod = nullptr;
-    GetModuleHandleExA(
-        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-        reinterpret_cast<LPCSTR>(&get_repo_root_from_module), &hMod);
-    char buf[MAX_PATH] = {};
-    GetModuleFileNameA(hMod, buf, MAX_PATH);
-    auto dll_dir = std::filesystem::path(buf).parent_path();
-    // Windows/x64/<Config>/ → repo root
-    return dll_dir.parent_path().parent_path().parent_path();
 }
 
 struct TomlTestDef {
@@ -391,7 +396,11 @@ static int run_inprocess_test(const std::filesystem::path& repo_root,
 
     // Inject OCC_DATA_PATH for in-process runs.
     const std::string occDataPath = (repo_root / "Lib" / "occ" / "share" / "occ").string();
+#ifdef _WIN32
     SetEnvironmentVariableA("OCC_DATA_PATH", occDataPath.c_str());
+#else
+    setenv("OCC_DATA_PATH", occDataPath.c_str(), 1);
+#endif
 
     // Build argv: NoSpherA2 -key value...
     std::vector<std::string> argv_storage;
@@ -436,7 +445,8 @@ static int run_inprocess_test(const std::filesystem::path& repo_root,
     if (!std::filesystem::exists(out_file)) {
         return -2;
     }
-    Logger::WriteMessage(std::wstring(L"Log file: " + out_file.wstring()).c_str());
+
+    Logger::WriteMessage((std::string("Log file: ") + out_file.string()).c_str());
 
     const std::string good_name = def_opt->goodFile.empty() ? (test_name + ".good") : def_opt->goodFile;
     const auto good_path = test_src_dir / good_name;
@@ -447,176 +457,156 @@ static int run_inprocess_test(const std::filesystem::path& repo_root,
 
     const auto diff = compare_files_numeric(good_path, out_file, 0.01);
     if (!diff.empty()) {
+    #ifdef _WIN32
         Logger::WriteMessage(std::wstring(diff.begin(), diff.end()).c_str());
+    #else
+        Logger::WriteMessage(diff.c_str());
+    #endif
         return -3;
     }
 
     return 0;
 }
 
-static std::filesystem::path guess_repo_root()
-{
-    // Prefer a path derived from the test module location (stable under vstest).
-    auto root = get_repo_root_from_module();
-    if (std::filesystem::exists(root / "tests" / "tests.toml")) {
-        return root;
-    }
-
-    // Fallback: walk up from CWD.
-    auto p = std::filesystem::current_path();
-    for (int i = 0; i < 8; ++i) {
-        if (std::filesystem::exists(p / "tests" / "tests.toml")) {
-            return p;
-        }
-        if (!p.has_parent_path()) {
-            break;
-        }
-        p = p.parent_path();
-    }
-    return std::filesystem::current_path();
-}
-
 } // namespace
 
 namespace NoSpherA2Integration {
 
+static std::filesystem::path repo_root;
+std::filesystem::path get_repo_root()
+{
+    if (repo_root.empty()) {
+        repo_root = nos_test_repo_root();
+    }
+    return repo_root;
+}
+
 TEST_CLASS(TomlIntegrationTests)
 {
-public:
-    static std::filesystem::path repo_root;
-
-    TEST_CLASS_INITIALIZE(ClassInitialize)
-    {
-        repo_root = guess_repo_root();
-    }
-
     TEST_METHOD(AlanineOcc)
     {
-        const int rc = run_inprocess_test(repo_root, "alanine_occ");
+        const int rc = run_inprocess_test(get_repo_root(), "alanine_occ");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(AlanineIntegratedOcc)
     {
-        const int rc = run_inprocess_test(repo_root, "alanine_integrated_occ");
+        const int rc = run_inprocess_test(get_repo_root(), "alanine_integrated_occ");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(DisorderTHPP)
     {
-        const int rc = run_inprocess_test(repo_root, "disorder_THPP");
+        const int rc = run_inprocess_test(get_repo_root(), "disorder_THPP");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(Fractal)
     {
-        const int rc = run_inprocess_test(repo_root, "fractal");
+        const int rc = run_inprocess_test(get_repo_root(), "fractal");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(GrownWater)
     {
-        const int rc = run_inprocess_test(repo_root, "grown_water");
+        const int rc = run_inprocess_test(get_repo_root(), "grown_water");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(HybridMode)
     {
-        const int rc = run_inprocess_test(repo_root, "Hybrid_mode");
+        const int rc = run_inprocess_test(get_repo_root(), "Hybrid_mode");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(MalbacSfEcp)
     {
-        const int rc = run_inprocess_test(repo_root, "malbac_SF_ECP");
+        const int rc = run_inprocess_test(get_repo_root(), "malbac_SF_ECP");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(Properties)
     {
-        const int rc = run_inprocess_test(repo_root, "properties");
+        const int rc = run_inprocess_test(get_repo_root(), "properties");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(RiFit)
     {
-        const int rc = run_inprocess_test(repo_root, "ri_fit");
+        const int rc = run_inprocess_test(get_repo_root(), "ri_fit");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(RubredoxinCmtc)
     {
-        const int rc = run_inprocess_test(repo_root, "rubredoxin_cmtc");
+        const int rc = run_inprocess_test(get_repo_root(), "rubredoxin_cmtc");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(SALTED)
     {
-        const int rc = run_inprocess_test(repo_root, "SALTED");
+        const int rc = run_inprocess_test(get_repo_root(), "SALTED");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(SucroseIAM)
     {
-        const int rc = run_inprocess_test(repo_root, "sucrose_IAM");
+        const int rc = run_inprocess_test(get_repo_root(), "sucrose_IAM");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(SucrosePtb)
     {
-        const int rc = run_inprocess_test(repo_root, "sucrose_ptb");
+        const int rc = run_inprocess_test(get_repo_root(), "sucrose_ptb");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(SucroseSF)
     {
-        const int rc = run_inprocess_test(repo_root, "sucrose_SF");
+        const int rc = run_inprocess_test(get_repo_root(), "sucrose_SF");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(SucroseTwin)
     {
-        const int rc = run_inprocess_test(repo_root, "sucrose_twin");
+        const int rc = run_inprocess_test(get_repo_root(), "sucrose_twin");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(WfnReading)
     {
-        const int rc = run_inprocess_test(repo_root, "wfn_reading");
+        const int rc = run_inprocess_test(get_repo_root(), "wfn_reading");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(FchkConversion)
     {
-        const int rc = run_inprocess_test(repo_root, "fchk_conversion");
+        const int rc = run_inprocess_test(get_repo_root(), "fchk_conversion");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(TFVC)
     {
-        const int rc = run_inprocess_test(repo_root, "TFVC");
+        const int rc = run_inprocess_test(get_repo_root(), "TFVC");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(TFVCEcp)
     {
-        const int rc = run_inprocess_test(repo_root, "TFVC_ECP");
+        const int rc = run_inprocess_test(get_repo_root(), "TFVC_ECP");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(RGBI_Groups_NH3BH3)
     {
-        const int rc = run_inprocess_test(repo_root, "RGBI_Groups_NH3BH3");
+        const int rc = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3");
         Assert::AreEqual(0, rc);
     }
 
     TEST_METHOD(RGBI_Groups_NH3Li)
     {
-        const int rc = run_inprocess_test(repo_root, "RGBI_Groups_NH3Li");
+        const int rc = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3Li");
         Assert::AreEqual(0, rc);
     }
 };
-
-std::filesystem::path TomlIntegrationTests::repo_root;
-
 }

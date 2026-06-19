@@ -9,6 +9,8 @@
 *.so
 *.dylib
 __pycache__
+*.exe
+*.dll
 
 #Explicit Files to ignore
 tests/alanine_integrated_occ/alanine.owf.fchk
@@ -36,15 +38,6 @@ tests/SALTED/temp_rascaline.xyz
 tests/grown/temp_wavefunction.wfn
 /tests/RI_Test_2
 Src/basis_data.cpp
-
-#Executables
-/NoSpherA2
-/NoSpherA2_Debug
-Linux/NoSpherA2
-Mac/NoSpherA2_Debug
-
-*.exe
-*.dll
 
 checkpoint.txt
 /intel-onemkl*.sh

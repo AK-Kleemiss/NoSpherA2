@@ -1,6 +1,12 @@
 
 #include "pch.h"
-#include "CppUnitTest.h"
+
+#if defined(_WIN32)
+	#include "CppUnitTest.h"
+	using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+#else
+	#include "CppUnitTest_shim.h"
+#endif
 
 #include "../core/convenience.h"
 #include "../core/constants.h"
@@ -12,7 +18,6 @@
 
 static constexpr double PI_VAL = 3.14159265358979323846;
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 namespace {
     int test_analytical_fourier(bool full)
     {
@@ -406,7 +411,6 @@ namespace NoSpherA2UnitTests
 {
     TEST_CLASS(SALTEDTests)
     {
-    public:
         TEST_METHOD(ReadingSALTEDBinaryFile) {
             test_reading_SALTED_binary_file();
         }
@@ -416,7 +420,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(GeometryTests)
     {
-    public:
         TEST_METHOD(ArrayDistance_UnitCubeDiagonal)
         {
             double d = array_length(d3{ 0.0, 0.0, 0.0 }, d3{ 1.0, 1.0, 1.0 });
@@ -491,8 +494,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(NumericTests)
     {
-    public:
-
         TEST_METHOD(IsSimilarRel_WithinTolerance)
         {
             // 1.0 vs 1.005: relative diff ≈ 0.5 %, within 1 %
@@ -564,7 +565,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(FchkParsingTests)
     {
-    public:
 
         // FCHK format: 40-char label + type char + value starting at position 49
         // We pad to exactly 49 chars then append the value.
@@ -607,8 +607,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(StringUtilTests)
     {
-    public:
-
         TEST_METHOD(EndsWith_MatchingSuffix)
         {
             Assert::AreEqual(1, ends_with(std::string("molecule.wfx"), std::string(".wfx")) ? 1 : 0);
@@ -678,7 +676,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(Sha256Tests)
     {
-    public:
 
         TEST_METHOD(Sha256_OutputLength)
         {
@@ -728,7 +725,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(VecAggregateTests)
     {
-    public:
 
         TEST_METHOD(VecSumBool_MixedValues)
         {
@@ -803,7 +799,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(StringUtilTests2)
     {
-    public:
 
         TEST_METHOD(Trim_LeadingTrailingSpaces)
         {
@@ -896,7 +891,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(BasisTypeTests)
     {
-    public:
 
         TEST_METHOD(Sht2nbas_CartesianShells)
         {
@@ -933,7 +927,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(ConstantsTests)
     {
-    public:
 
         TEST_METHOD(ConstAbs_Positive) { Assert::AreEqual(5, constants::const_abs(5)); }
         TEST_METHOD(ConstAbs_Negative) { Assert::AreEqual(5, constants::const_abs(-5)); }
@@ -1041,7 +1034,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(OrbitalIndexTests)
     {
-    public:
 
         TEST_METHOD(OrcaToPySCF_SShell)
         {
@@ -1083,7 +1075,6 @@ namespace NoSpherA2UnitTests
 
     TEST_CLASS(BesselTests)
     {
-    public:
 
         TEST_METHOD(BesselJ0_AtZero)
         {
@@ -1164,7 +1155,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(IsSimilarPow10Tests)
     {
-    public:
         TEST_METHOD(Equal_ReturnTrue)
         {
             Assert::AreEqual(1, is_similar(1.0, 1.0, -6.0) ? 1 : 0);
@@ -1205,7 +1195,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(Shell2FunctionTests)
     {
-    public:
         TEST_METHOD(SType_Prim0_Returns0)
         {
             // s-type shell (type=1): first and only function is index 0
@@ -1250,12 +1239,11 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(CountWordsTests)
     {
-    public:
         TEST_METHOD(Empty_Returns0)
         {
             Assert::AreEqual(0, CountWords(""));
         }
-
+        
         TEST_METHOD(OneWord)
         {
             Assert::AreEqual(1, CountWords("hello"));
@@ -1287,7 +1275,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(ShrinkStringToAtomTests)
     {
-    public:
         TEST_METHOD(CarbonAtomNumber6)
         {
             // atnr2letter(6) = "C"
@@ -1331,7 +1318,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(SplitStringTests)
     {
-    public:
         TEST_METHOD(SingleToken_NoDelim)
         {
             svec toks = split_string<std::string>(std::string("hello"), " ");
@@ -1376,7 +1362,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(TimingTests)
     {
-    public:
         TEST_METHOD(Sleep10ms_ElapsedAtLeast10000us)
         {
             auto t0 = get_time();
@@ -1410,7 +1395,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(HypergeometricTests)
     {
-    public:
         TEST_METHOD(Identity_2F1_Zero_IsOne)
         {
             // 2F1(a,b;c;0) = 1 for any a,b,c
@@ -1454,7 +1438,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(Atnr2LetterTests)
     {
-    public:
         TEST_METHOD(Hydrogen_Is_H)
         {
             char buf[8];
@@ -1510,7 +1493,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(Type2VectorTests)
     {
-    public:
         TEST_METHOD(Type1_Is_SShell_000)
         {
             int nx, ny, nz;
@@ -1585,7 +1567,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(NormGaussTests)
     {
-    public:
         TEST_METHOD(SShell_IsPositive)
         {
             double n = constants::normgauss(1, 1.0);
@@ -1630,7 +1611,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(AssocLegendreTests)
     {
-    public:
         TEST_METHOD(P00_Is_One)
         {
             Assert::AreEqual(1.0, constants::associated_legendre_polynomial(0, 0, 0.5), 1e-12);
@@ -1682,7 +1662,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(CartesianToSphericalTests)
     {
-    public:
         TEST_METHOD(Origin_Has_Zero_Radius)
         {
             double out[3];
@@ -1748,7 +1727,6 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     TEST_CLASS(GetLambda1Tests)
     {
-    public:
         TEST_METHOD(DiagonalMatrix_ReturnsMidEigenvalue)
         {
             // Eigenvalues are 1, 3, 5 → median = 3

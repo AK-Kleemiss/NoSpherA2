@@ -28,38 +28,11 @@ export CMAKE_OSX_DEPLOYMENT_TARGET=13.3
 export RUSTFLAGS=-C link-arg=-mmacosx-version-min=13.3
 endif
 
+BUILD_TESTS ?= 0
+
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 all: NoSpherA2
-
-ifeq ($(NAME),MAC)
-copy_runtime_libs:
-	@echo Copying macOS runtime dylibs to repository root
-	@find Lib/occ_$(NATIVE_ARCH)/lib Lib/occ_$(NATIVE_ARCH)/lib64 -maxdepth 1 \( -type f -o -type l \) -name 'libtbb*.dylib' -exec cp -fP {} . \; 2>/dev/null || true
-	@if command -v brew >/dev/null 2>&1; then \
-		libomp="$$(brew --prefix libomp 2>/dev/null)/lib/libomp.dylib"; \
-		if [ -f "$$libomp" ]; then cp -fP "$$libomp" ./; fi; \
-	fi
-	@find Lib/featomic_install_$(NATIVE_ARCH)/lib -maxdepth 1 \( -type f -o -type l \) -name '*.dylib' -exec cp -fP {} . \; 2>/dev/null || true
-
-copy_universal_runtime_libs:
-	@echo Copying universal macOS runtime dylibs to repository root
-	@find Mac -maxdepth 1 \( -type f -o -type l \) \( -name 'libtbb*.dylib' -o -name 'libomp.dylib' \) -exec cp -fP {} . \; 2>/dev/null || true
-endif
-
-ifeq ($(NAME),LINUX)
-copy_runtime_libs:
-	@echo Copying Linux runtime shared libraries to repository root
-	@find Lib/occ/lib Lib/occ/lib64 -maxdepth 1 \( -type f -o -type l \) \( -name 'libtbb.so' -o -name 'libtbb.so.*' \) -exec cp -fP {} . \; 2>/dev/null || true
-	@if [ -f Lib/MKL/compiler/latest/lib/libiomp5.so ]; then cp -fP Lib/MKL/compiler/latest/lib/libiomp5.so ./; fi
-	@find Lib/featomic_install/lib Lib/featomic_install/lib64 -maxdepth 1 \( -type f -o -type l \) \( -name '*.so' -o -name '*.so.*' \) -exec cp -fP {} . \; 2>/dev/null || true
-endif
-
-ifeq ($(NAME),WINDOWS)
-copy_runtime_libs:
-	@echo Copying Windows executable and runtime DLLs to repository root
-	powershell -NoProfile -ExecutionPolicy Bypass -Command "$$out = 'Windows\\$(WIN_PLAT)\\$(WIN_CFG)'; if (Test-Path $$out) { Copy-Item (Join-Path $$out 'NoSpherA2.exe') . -Force -ErrorAction SilentlyContinue; Get-ChildItem $$out -Filter '*.dll' -File -ErrorAction SilentlyContinue | Copy-Item -Destination . -Force }"
-endif
 
 # --- Cross-platform rust check ---
 check_rust:
@@ -226,7 +199,6 @@ WIN_VCTOOLSVERSION ?= 14.51.36231
 NoSpherA2: 
 	echo Building $(WIN_SLN) ($(WIN_CFG) $(WIN_PLAT)) 
 	msbuild $(WIN_SLN) /p:Configuration=$(WIN_CFG) /p:Platform=$(WIN_PLAT) /p:VCToolsVersion=$(WIN_VCTOOLSVERSION)
-	@$(MAKE) copy_runtime_libs
 
 NoSpherA2_Debug:
 	@echo Building NoSpherA2_Debug for $(NAME)
@@ -239,15 +211,11 @@ endif
 ifeq ($(NAME),LINUX)
 NoSpherA2: IntelMKL featomic LibCint occ BasisSetConverter
 	@echo Start making Linux executable
-	@rm -f NoSpherA2
-	@cd Linux && rm -f NoSpherA2 && make all -j
-	@$(MAKE) copy_runtime_libs
+	@cd Linux && $(MAKE) all -j BUILD_TESTS=$(BUILD_TESTS)
 
 NoSpherA2_Debug: IntelMKL featomic LibCint occ BasisSetConverter
 	@echo Building NoSpherA2_Debug for $(NAME)
-	@rm -f NoSpherA2_Debug
-	@cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
-	@$(MAKE) copy_runtime_libs
+	@cd Linux && $(MAKE) NoSpherA2_Debug -j BUILD_TESTS=$(BUILD_TESTS)
 
 clean:
 	@cd Linux && make clean
@@ -258,25 +226,21 @@ NoSpherA2: IntelMKL featomic LibCint occ BasisSetConverter
 	@echo Start making Mac $(NATIVE_ARCH) executable
 	@rm -f NoSpherA2_$(NATIVE_ARCH)
 	@cd Mac && rm -f NoSpherA2_$(NATIVE_ARCH) && make NoSpherA2_$(NATIVE_ARCH) -j && cp NoSpherA2_$(NATIVE_ARCH) ../NoSpherA2
-	@$(MAKE) copy_runtime_libs
 
 NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint_arm64 occ_arm64 BasisSetConverter_arm64
 	@echo Start making Mac arm64 executable
 	@rm -f NoSpherA2_arm64
 	@cd Mac && rm -f NoSpherA2_arm64 && make NoSpherA2_arm64 -j && cp NoSpherA2_arm64 ../NoSpherA2
-	@$(MAKE) NATIVE_ARCH=arm64 copy_runtime_libs
 
 NoSpherA2_x86_64: IntelMKL featomic_x86_64 LibCint_x86_64 occ_x86_64 BasisSetConverter_x86_64
 	@echo Start making Mac x86_64 executable
 	@rm -f NoSpherA2_x86_64
 	@cd Mac && rm -f NoSpherA2_x86_64 && make NoSpherA2_x86_64 -j && cp NoSpherA2_x86_64 ../NoSpherA2_x86_64
-	@$(MAKE) NATIVE_ARCH=x86_64 copy_runtime_libs
 
 NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint_arm64 LibCint_x86_64 LibCint_x86_64 occ_x86_64 occ_arm64 BasisSetConverter_arm64 BasisSetConverter_x86_64
 	@echo Start making Mac universal executable
 	@rm -f NoSpherA2
 	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j
-	@$(MAKE) copy_universal_runtime_libs
 
 clean:
 	@cd Mac && make clean
@@ -288,4 +252,4 @@ tests: NoSpherA2
 	make -C tests all -k -B
 
 
-.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust LibCint copy_runtime_libs copy_universal_runtime_libs
+.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust LibCint
