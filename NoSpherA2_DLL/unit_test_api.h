@@ -59,6 +59,13 @@ extern "C" {
     UT_API int          ut_sht2nbas        (int type);     // shell type → Cartesian/spherical count
     UT_API unsigned int ut_doublefactorial (int n);        // n!! (double factorial)
 
+    // --- Atomic O_h symmetrization ---
+    // matrix is a row-major n x n array and is replaced in place.
+    // Returns 1 on success, 0 for invalid dimensions or shell metadata.
+    UT_API int ut_symmetrize_atomic_matrix_oh(double* matrix, int n,
+                                               const int* shell_l, int n_shells,
+                                               int spherical);
+
     // --- Unit conversions (constants namespace) ---
     UT_API double ut_bohr2ang       (double inp);
     UT_API double ut_ang2bohr       (double inp);

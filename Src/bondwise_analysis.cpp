@@ -8,6 +8,235 @@
 #include "integration_params.h"
 #include "b2c.h"
 
+namespace {
+struct OhOperation {
+    std::array<int, 3> permutation;
+    std::array<int, 3> signs;
+};
+
+struct CartesianTransform {
+    ivec destination;
+    ivec signs;
+};
+
+int cartesian_shell_size(const int l) {
+    return (l + 1) * (l + 2) / 2;
+}
+
+const std::vector<OhOperation>& oh_operations() {
+    static const std::vector<OhOperation> operations = [] {
+        std::vector<OhOperation> result;
+        result.reserve(48);
+        std::array<int, 3> permutation{ 0, 1, 2 };
+        do {
+            for (int mask = 0; mask < 8; ++mask) {
+                result.push_back({
+                    permutation,
+                    { (mask & 1) ? -1 : 1,
+                      (mask & 2) ? -1 : 1,
+                      (mask & 4) ? -1 : 1 }
+                    });
+            }
+        } while (std::next_permutation(permutation.begin(), permutation.end()));
+        return result;
+        }();
+    return operations;
+}
+
+std::vector<std::array<int, 3>> cartesian_exponents(const int l) {
+    const int size = cartesian_shell_size(l);
+    // constants::type_vector currently contains Cartesian components through h.
+    const int first_type = l * (l + 1) * (l + 2) / 6 + 1;
+    std::vector<std::array<int, 3>> result(size);
+    for (int component = 0; component < size; ++component) {
+        int exponent[3];
+        constants::type2vector(first_type + component, exponent);
+        err_checkf(exponent[0] >= 0 && exponent[0] + exponent[1] + exponent[2] == l,
+            "Cartesian O_h symmetrization does not support angular momentum l=" +
+            std::to_string(l) + ".", std::cout);
+        result[component] = { exponent[0], exponent[1], exponent[2] };
+    }
+    return result;
+}
+
+std::vector<std::array<int, 3>> libcint_cartesian_exponents(const int l) {
+    std::vector<std::array<int, 3>> result;
+    result.reserve(cartesian_shell_size(l));
+    for (int lx = l; lx >= 0; --lx) {
+        for (int ly = l - lx; ly >= 0; --ly)
+            result.push_back({ lx, ly, l - lx - ly });
+    }
+    return result;
+}
+
+CartesianTransform cartesian_transform_from_exponents(
+    const std::vector<std::array<int, 3>>& exponents,
+    const OhOperation& operation) {
+    CartesianTransform transform{ ivec(exponents.size()), ivec(exponents.size(), 1) };
+
+    for (int source = 0; source < static_cast<int>(exponents.size()); ++source) {
+        std::array<int, 3> transformed{ 0, 0, 0 };
+        int sign = 1;
+        for (int axis = 0; axis < 3; ++axis) {
+            transformed[operation.permutation[axis]] = exponents[source][axis];
+            if (operation.signs[axis] < 0 && (exponents[source][axis] & 1))
+                sign = -sign;
+        }
+
+        const auto destination = std::find(exponents.begin(), exponents.end(), transformed);
+        err_checkf(destination != exponents.end(),
+            "O_h operation produced an unknown Cartesian component.", std::cout);
+        transform.destination[source] = static_cast<int>(destination - exponents.begin());
+        transform.signs[source] = sign;
+    }
+    return transform;
+}
+
+dMatrix2 cartesian_transform_matrix(const int l, const OhOperation& operation,
+    const bool libcint_order = false) {
+    const auto exponents = libcint_order
+        ? libcint_cartesian_exponents(l)
+        : cartesian_exponents(l);
+    const auto sparse = cartesian_transform_from_exponents(exponents, operation);
+    const int size = cartesian_shell_size(l);
+    dMatrix2 result(size, size);
+    std::fill(result.container().begin(), result.container().end(), 0.0);
+    for (int source = 0; source < size; ++source)
+        result(sparse.destination[source], source) = sparse.signs[source];
+    return result;
+}
+
+dMatrix2 spherical_transform_matrix(const int l, const OhOperation& operation) {
+    const dMatrix2 cart_to_spherical = cart2sph(l, true);
+    const dMatrix2 cart_transform = cartesian_transform_matrix(l, operation, true);
+    const int n_cart = cartesian_shell_size(l);
+    const int n_spherical = 2 * l + 1;
+
+    // Columns of C contain the real spherical functions in the Cartesian basis.
+    // Solve T_cart C = C T_sph using the left pseudoinverse of C.  This keeps
+    // libcint's real-spherical ordering and phase convention authoritative.
+    dMatrix2 gram(n_spherical, n_spherical);
+    for (int i = 0; i < n_spherical; ++i)
+        for (int j = 0; j < n_spherical; ++j)
+            for (int cart = 0; cart < n_cart; ++cart)
+                gram(i, j) += cart_to_spherical(cart, i) * cart_to_spherical(cart, j);
+    const dMatrix2 inverse_gram = LAPACKE_invert(gram, 1E-12);
+
+    dMatrix2 transformed_cart(n_cart, n_spherical);
+    for (int i = 0; i < n_cart; ++i)
+        for (int j = 0; j < n_spherical; ++j)
+            for (int cart = 0; cart < n_cart; ++cart)
+                transformed_cart(i, j) += cart_transform(i, cart) * cart_to_spherical(cart, j);
+
+    dMatrix2 result(n_spherical, n_spherical);
+    for (int i = 0; i < n_spherical; ++i) {
+        for (int j = 0; j < n_spherical; ++j) {
+            for (int k = 0; k < n_spherical; ++k) {
+                for (int cart = 0; cart < n_cart; ++cart) {
+                    result(i, j) += inverse_gram(i, k) *
+                        cart_to_spherical(cart, k) * transformed_cart(cart, j);
+                }
+            }
+            if (std::abs(result(i, j)) < 1E-12)
+                result(i, j) = 0.0;
+        }
+    }
+    return result;
+}
+} // namespace
+
+void symmetrize_atomic_matrix_oh(dMatrix2& matrix, const ivec& shell_angular_momenta,
+    const bool spherical) {
+    const bool square = matrix.extent(0) == matrix.extent(1);
+    err_checkf(square, "Cannot O_h-symmetrize a non-square atomic matrix.", std::cout);
+    if (!square)
+        return;
+
+    ivec shell_offsets(shell_angular_momenta.size() + 1, 0);
+    for (int shell = 0; shell < static_cast<int>(shell_angular_momenta.size()); ++shell) {
+        const int l = shell_angular_momenta[shell];
+        const bool supported = l >= 0 && l <= 5;
+        err_checkf(supported,
+            "O_h symmetrization supports shells from s through h.", std::cout);
+        if (!supported)
+            return;
+        shell_offsets[shell + 1] = shell_offsets[shell] +
+            (spherical ? 2 * l + 1 : cartesian_shell_size(l));
+    }
+
+    const bool correct_size = shell_offsets.back() == static_cast<int>(matrix.extent(0));
+    err_checkf(correct_size,
+        "Atomic matrix size does not match its Cartesian shell description.", std::cout);
+    if (!correct_size)
+        return;
+
+    dMatrix2 symmetrized(matrix.extent(0), matrix.extent(1));
+    std::fill(symmetrized.container().begin(), symmetrized.container().end(), 0.0);
+
+    const auto& operations = oh_operations();
+    for (const auto& operation : operations) {
+        if (spherical) {
+            std::vector<dMatrix2> transforms;
+            transforms.reserve(shell_angular_momenta.size());
+            for (const int l : shell_angular_momenta)
+                transforms.push_back(spherical_transform_matrix(l, operation));
+
+            for (int shell_a = 0; shell_a < static_cast<int>(shell_angular_momenta.size()); ++shell_a) {
+                const int first_a = shell_offsets[shell_a];
+                const int size_a = 2 * shell_angular_momenta[shell_a] + 1;
+                for (int shell_b = 0; shell_b < static_cast<int>(shell_angular_momenta.size()); ++shell_b) {
+                    const int first_b = shell_offsets[shell_b];
+                    const int size_b = 2 * shell_angular_momenta[shell_b] + 1;
+                    for (int transformed_a = 0; transformed_a < size_a; ++transformed_a) {
+                        for (int transformed_b = 0; transformed_b < size_b; ++transformed_b) {
+                            for (int a = 0; a < size_a; ++a) {
+                                for (int b = 0; b < size_b; ++b) {
+                                    symmetrized(first_a + transformed_a, first_b + transformed_b) +=
+                                        transforms[shell_a](transformed_a, a) *
+                                        matrix(first_a + a, first_b + b) *
+                                        transforms[shell_b](transformed_b, b);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
+        std::vector<CartesianTransform> transforms;
+        transforms.reserve(shell_angular_momenta.size());
+        for (const int l : shell_angular_momenta)
+            transforms.push_back(cartesian_transform_from_exponents(
+                cartesian_exponents(l), operation));
+
+        for (int shell_a = 0; shell_a < static_cast<int>(shell_angular_momenta.size()); ++shell_a) {
+            const int first_a = shell_offsets[shell_a];
+            const int size_a = cartesian_shell_size(shell_angular_momenta[shell_a]);
+            const auto& transform_a = transforms[shell_a];
+            for (int shell_b = 0; shell_b < static_cast<int>(shell_angular_momenta.size()); ++shell_b) {
+                const int first_b = shell_offsets[shell_b];
+                const int size_b = cartesian_shell_size(shell_angular_momenta[shell_b]);
+                const auto& transform_b = transforms[shell_b];
+                for (int a = 0; a < size_a; ++a) {
+                    const int transformed_a = first_a + transform_a.destination[a];
+                    for (int b = 0; b < size_b; ++b) {
+                        const int transformed_b = first_b + transform_b.destination[b];
+                        symmetrized(transformed_a, transformed_b) +=
+                            transform_a.signs[a] * transform_b.signs[b] *
+                            matrix(first_a + a, first_b + b);
+                    }
+                }
+            }
+        }
+    }
+
+    const double inverse_order = 1.0 / static_cast<double>(operations.size());
+    for (auto& value : symmetrized.container())
+        value *= inverse_order;
+    matrix = std::move(symmetrized);
+}
+
 #ifdef NSA2DEBUG
 void print_dmatrix2(const dMatrix2 &EVC2, const std::string name) {
     std::cout << std::endl << name << ":\n";
@@ -588,7 +817,9 @@ dMatrix2 change_basis_general(const dMatrix2 &in, const dMatrix2 &transformation
  */
 Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 &D_full,
     const dMatrix2 &S_full,
-    const std::vector<int> &atom_indices) {
+    const std::vector<int> &atom_indices,
+    const ivec &shell_angular_momenta,
+    const bool spherical) {
 
     err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
     err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
@@ -601,6 +832,15 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     vec D_sub(n * n, 0.0); // called P in tonto
     vec S_sub(n * n, 0.0); // called S in tonto
     get_submatrices(D_full, S_full, D_sub, S_sub, atom_indices);
+
+    // Tonto's atomic spherical averaging applies the local point group to the
+    // atom-centred density before the ANOs are constructed.  O_h is used here
+    // because it averages all Cartesian directions without mixing radial shells.
+    if (!shell_angular_momenta.empty()) {
+        dMatrix2 atomic_density = reshape<dMatrix2>(D_sub, Shape2D(n, n));
+        symmetrize_atomic_matrix_oh(atomic_density, shell_angular_momenta, spherical);
+        D_sub = atomic_density.container();
+    }
     vec Rho(n * n);        // To store target density
 
     vec V = S_sub;
@@ -695,7 +935,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 
     for (int i = 0; i < n; i++) {
         int original_idx = idx[i];
-        if (result.eigenvalues[original_idx] < 0.075)
+        if (result.eigenvalues[original_idx] < 0.17)
             continue;
         sorted_evals.emplace_back(result.eigenvalues[original_idx]);
 
@@ -913,7 +1153,7 @@ double Roby_information::Roby_population_analysis(const ivec atoms) {
     return P;
 }
 
-void Roby_information::computeAllAtomicNAOs(WFN &wavy) {
+void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize) {
     const int N_atoms = wavy.get_ncen();
     const std::vector<atom> ats = wavy.get_atoms();
     NAOs.reserve(N_atoms);
@@ -939,12 +1179,16 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy) {
     ivec2 indices(wavy.get_ncen());
     for (auto &a : ats) {
         indices[a.get_nr() - 1].reserve(density_matrix.extent(0) / N_atoms); // Rough estimate
+        ivec shell_angular_momenta;
         int current_shell = -1;
         int nr_indices = 0;
         std::vector<basis_set_entry> basis_set = a.get_basis_set();
         for (auto &bf : basis_set) {
             if (bf.get_shell() != current_shell) {
                 current_shell++;
+                shell_angular_momenta.push_back(wavy.get_origin() == e_origin::OCC
+                    ? static_cast<int>(bf.get_type())
+                    : static_cast<int>(bf.get_type()) - 1);
                 switch (wavy.get_origin()) {
                 case(e_origin::tonto):
                     bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 6 : nr_indices = 10));
@@ -982,8 +1226,17 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy) {
             }
         }
 
+        // The GBW reader converts ORCA components to PySCF/libcint order and
+        // groups an atom's shells by increasing angular momentum.  Mirror that
+        // layout here so each symmetry block describes the corresponding DM rows.
+        if (wavy.get_origin() == e_origin::gbw)
+            std::stable_sort(shell_angular_momenta.begin(), shell_angular_momenta.end());
+
         //pNAO.eigenvectors = orthogonalizePNAOs(pNAO.eigenvectors, S_full, static_cast<int>(indices[a.get_nr()].size()));
-        NAOs.emplace_back(calculateAtomicNAO(density_matrix, overlap_matrix, indices[a.get_nr() - 1]));
+        NAOs.emplace_back(calculateAtomicNAO(density_matrix, overlap_matrix,
+            indices[a.get_nr() - 1],
+            symmetrize ? shell_angular_momenta : ivec{},
+            !wavy.get_d_f_switch()));
         NAOs.back().atom_index = a.get_nr() - 1;
     }
 #ifdef NSA2DEBUG
@@ -1512,10 +1765,10 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
     std::cout << sep << "\n";
 }
 
-Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets) {
+Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize) {
     auto bonds = get_bonded_atom_pairs(wavy);
     std::cout << "Calculating NAOs for all atoms...                 " << std::flush;
-    computeAllAtomicNAOs(wavy);
+    computeAllAtomicNAOs(wavy, symmetrize);
     std::cout << " ...done!" << std::endl;
     Shape2D NAOs_size;
     NAOs_size.cols = static_cast<int>(overlap_matrix.extent(0));

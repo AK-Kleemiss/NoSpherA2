@@ -10,6 +10,7 @@
 #include "../Src/mo_class.h"
 #include "../Src/sphere_lebedev_rule.h"
 #include "../Src/AtomGrid.h"
+#include "../Src/bondwise_analysis.h"
 #include <cstring>
 #include <cmath>
 #include <thread>
@@ -17,6 +18,28 @@
 #include <sstream>
 
 extern "C" {
+
+    UT_API int ut_symmetrize_atomic_matrix_oh(double* matrix, int n,
+                                               const int* shell_l, int n_shells,
+                                               int spherical) {
+        if (matrix == nullptr || shell_l == nullptr || n <= 0 || n_shells <= 0)
+            return 0;
+        ivec angular_momenta(shell_l, shell_l + n_shells);
+        int expected_size = 0;
+        for (const int l : angular_momenta) {
+            if (l < 0 || l > 5)
+                return 0;
+            expected_size += spherical ? 2 * l + 1 : (l + 1) * (l + 2) / 2;
+        }
+        if (expected_size != n)
+            return 0;
+
+        dMatrix2 input(n, n);
+        std::copy(matrix, matrix + n * n, input.container().begin());
+        symmetrize_atomic_matrix_oh(input, angular_momenta, spherical != 0);
+        std::copy(input.container().begin(), input.container().end(), matrix);
+        return 1;
+    }
 
     UT_API double ut_array_length3(double x, double y, double z) {
         return std::hypot(x, y, z);

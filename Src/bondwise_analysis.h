@@ -4,6 +4,13 @@
 #include <vector>
 
 class WFN;
+
+// Average an atom-centred AO matrix over the 48 operations of O_h.
+// Shells must be contiguous. Cartesian matrices use constants::type_vector;
+// spherical matrices use the libcint real-spherical ordering and phases.
+void symmetrize_atomic_matrix_oh(dMatrix2& matrix, const ivec& shell_angular_momenta,
+    bool spherical = false);
+
 struct bond {
     std::string label_1;
     std::string label_2;
@@ -63,9 +70,11 @@ private:
     std::vector<dMatrix2> overlap_matrices;
     std::vector<bond_index_result> RGBI;
     std::vector<group_bond_index_result> RGBI_groups;
-    NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full, const std::vector<int>& atom_indices);
+    NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
+        const std::vector<int>& atom_indices, const ivec& shell_angular_momenta = {},
+        bool spherical = false);
     double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
-    void computeAllAtomicNAOs(WFN& wavy);
+    void computeAllAtomicNAOs(WFN& wavy, bool symmetrize);
     ivec find_eigenvalue_pairs(const vec& eigvals, const double tolerance = 1E-4);
     void transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& EVC,
         const vec& eigvals,
@@ -87,7 +96,7 @@ public:
     Roby_information() = default;
     ~Roby_information() = default;
     Roby_information(const Roby_information&) = default;
-    Roby_information(WFN& wavy, const ivec3& group_sets = {});
+    Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true);
 
 
 

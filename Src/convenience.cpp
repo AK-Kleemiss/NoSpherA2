@@ -195,6 +195,7 @@ std::string help_message =
     "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
     "   -TFVC                                    Use the Topological Fuzzy Voronoi Cells (TFVC) partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -rgbi                                    Run Roby-Gould Bond Index analysis.\n"
+    "   -rgbi_no_sym                             Run RGBI without atomic O_h symmetrization.\n"
     "   -rgbi-groups    <GROUP> <GROUP> [...]    Run RGBI group analysis for comma-separated atom index groups/ranges, e.g. 0-5,7. Repeat for multiple groupings.\n"
     "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
@@ -2497,6 +2498,10 @@ void options::digest_options()
             properties.rdg = true;
         else if (temp == "-rgbi")
             rgbi = true;
+        else if (temp == "-rgbi_no_sym") {
+            rgbi = true;
+            rgbi_no_sym = true;
+        }
         else if (temp == "-rgbi-groups") {
             int n = 1;
             ivec2 group_set;

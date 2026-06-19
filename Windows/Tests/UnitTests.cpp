@@ -18,6 +18,92 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace NoSpherA2UnitTests
 {
+    TEST_CLASS(AtomicSymmetrizationTests)
+    {
+    public:
+        TEST_METHOD(Oh_PShellBecomesIsotropic)
+        {
+            double matrix[9] = {
+                1.0, 4.0, 5.0,
+                4.0, 2.0, 6.0,
+                5.0, 6.0, 3.0
+            };
+            const int shells[1] = { 1 };
+            Assert::AreEqual(1, ut_symmetrize_atomic_matrix_oh(matrix, 3, shells, 1, 0));
+            for (int row = 0; row < 3; ++row) {
+                for (int col = 0; col < 3; ++col)
+                    Assert::AreEqual(row == col ? 2.0 : 0.0,
+                        matrix[row * 3 + col], 1e-12);
+            }
+        }
+
+        TEST_METHOD(Oh_DShellPreservesEgAndT2gBlocks)
+        {
+            double matrix[36] = {};
+            for (int i = 0; i < 6; ++i)
+                matrix[i * 6 + i] = static_cast<double>(i + 1);
+            const int shells[1] = { 2 };
+            Assert::AreEqual(1, ut_symmetrize_atomic_matrix_oh(matrix, 6, shells, 1, 0));
+            for (int i = 0; i < 6; ++i)
+                Assert::AreEqual(i < 3 ? 2.0 : 5.0, matrix[i * 6 + i], 1e-12);
+            for (int row = 0; row < 6; ++row) {
+                for (int col = 0; col < 6; ++col) {
+                    if (row != col)
+                        Assert::AreEqual(0.0, matrix[row * 6 + col], 1e-12);
+                }
+            }
+        }
+
+        TEST_METHOD(Oh_SymmetrizationIsIdempotent)
+        {
+            double matrix[16] = {
+                3.0, 1.0, 2.0, 3.0,
+                1.0, 4.0, 5.0, 6.0,
+                2.0, 5.0, 7.0, 8.0,
+                3.0, 6.0, 8.0, 9.0
+            };
+            const int shells[2] = { 0, 1 };
+            Assert::AreEqual(1, ut_symmetrize_atomic_matrix_oh(matrix, 4, shells, 2, 0));
+            double once[16];
+            std::copy(matrix, matrix + 16, once);
+            Assert::AreEqual(1, ut_symmetrize_atomic_matrix_oh(matrix, 4, shells, 2, 0));
+            for (int i = 0; i < 16; ++i)
+                Assert::AreEqual(once[i], matrix[i], 1e-12);
+        }
+
+        TEST_METHOD(Oh_SphericalPShellBecomesIsotropic)
+        {
+            double matrix[9] = {
+                1.0, 4.0, 5.0,
+                4.0, 2.0, 6.0,
+                5.0, 6.0, 3.0
+            };
+            const int shells[1] = { 1 };
+            Assert::AreEqual(1, ut_symmetrize_atomic_matrix_oh(matrix, 3, shells, 1, 1));
+            for (int row = 0; row < 3; ++row) {
+                for (int col = 0; col < 3; ++col)
+                    Assert::AreEqual(row == col ? 2.0 : 0.0,
+                        matrix[row * 3 + col], 1e-11);
+            }
+        }
+
+        TEST_METHOD(Oh_SphericalSymmetrizationIsIdempotent)
+        {
+            double matrix[36] = {};
+            for (int row = 0; row < 6; ++row) {
+                for (int col = 0; col < 6; ++col)
+                    matrix[row * 6 + col] = static_cast<double>((row + 1) * (col + 1));
+            }
+            const int shells[2] = { 0, 2 };
+            Assert::AreEqual(1, ut_symmetrize_atomic_matrix_oh(matrix, 6, shells, 2, 1));
+            double once[36];
+            std::copy(matrix, matrix + 36, once);
+            Assert::AreEqual(1, ut_symmetrize_atomic_matrix_oh(matrix, 6, shells, 2, 1));
+            for (int i = 0; i < 36; ++i)
+                Assert::AreEqual(once[i], matrix[i], 1e-10);
+        }
+    };
+
     TEST_CLASS(GeometryTests)
     {
     public:
