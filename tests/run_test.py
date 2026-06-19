@@ -282,8 +282,8 @@ def test_nos(test, exe_path, tmp_path, request):
         pytest.fail(
             "Execution failed.\n"
             f"Stdout:\n{e.stdout}\n"
-            f"Stderr:\n{e.stderr}"
-            f"Stderr:\n{e.stderr}\n",
+            f"Stderr:\n{e.stderr}\n"
+            f"NoSpherA2.log:\n{log_text}",
             pytrace=False,
         )
 

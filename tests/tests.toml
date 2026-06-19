@@ -244,6 +244,15 @@ wfn = "nh3bh3.gbw"
 rgbi_no_sym = ""
 rgbi-groups = ["0,4,5,7","1,2,3,6"]
 
+[RGBI_Groups_NH3BH3_sym]
+directory = "RGBI_groups"
+good = "NH3BH3_sym.good"
+
+[RGBI_Groups_NH3BH3_sym.args]
+wfn = "nh3bh3.gbw"
+rgbi = ""
+rgbi-groups = ["0,4,5,7","1,2,3,6"]
+
 [RGBI_Groups_NH3Li]
 directory = "RGBI_groups"
 good = "nh3li.good"
