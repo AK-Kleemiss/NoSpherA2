@@ -23,6 +23,10 @@ int cartesian_shell_size(const int l) {
     return (l + 1) * (l + 2) / 2;
 }
 
+int atomic_shell_size(const int l, const bool cartesian) {
+    return cartesian ? cartesian_shell_size(l) : 2 * l + 1;
+}
+
 const std::vector<OhOperation>& oh_operations() {
     static const std::vector<OhOperation> operations = [] {
         std::vector<OhOperation> result;
@@ -1186,26 +1190,20 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize) {
         for (auto &bf : basis_set) {
             if (bf.get_shell() != current_shell) {
                 current_shell++;
-                shell_angular_momenta.push_back(wavy.get_origin() == e_origin::OCC
+                const int l = wavy.get_origin() == e_origin::OCC
                     ? static_cast<int>(bf.get_type())
-                    : static_cast<int>(bf.get_type()) - 1);
-                switch (wavy.get_origin()) {
-                case(e_origin::tonto):
-                    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 6 : nr_indices = 10));
-					if (bf.get_type() == 3) {
-						//2 - 4; 3 - 6; 5 - 6
-						swap_rows_cols_symm(overlap_matrix, last_index + 1, last_index + 3);
-						swap_rows_cols_symm(overlap_matrix, last_index + 2, last_index + 5);
-						swap_rows_cols_symm(overlap_matrix, last_index + 4, last_index + 5);
-					}
-                    break;
-                case(e_origin::OCC):
-                    bf.get_type() == 0 ? nr_indices = 1 : (bf.get_type() == 1 ? nr_indices = 3 : (bf.get_type() == 2 ? nr_indices = 5 : nr_indices = 7));
-                    break;
-                default:
-                    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 5 : nr_indices = 7));
-                    break;
-                }
+                    : static_cast<int>(bf.get_type()) - 1;
+                err_checkf(l >= 0,
+                    "Encountered an invalid shell angular momentum while building RGBI atomic NAOs.",
+                    std::cout);
+                shell_angular_momenta.push_back(l);
+                nr_indices = atomic_shell_size(l, wavy.get_d_f_switch());
+                if (wavy.get_origin() == e_origin::tonto && bf.get_type() == 3) {
+					// 2 - 4; 3 - 6; 5 - 6
+					swap_rows_cols_symm(overlap_matrix, last_index + 1, last_index + 3);
+					swap_rows_cols_symm(overlap_matrix, last_index + 2, last_index + 5);
+					swap_rows_cols_symm(overlap_matrix, last_index + 4, last_index + 5);
+				}
 
                 //if (wavy.get_origin() != e_origin::tonto && wavy.get_origin() != e_origin::OCC)
                 //    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 5 : nr_indices = 7));
