@@ -257,6 +257,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst. 2024, 57, 161 - 174.\n");
         t.append("ECP correction functions at : Kleemiss et al. J. Appl. Cryst. 2025, 58, 374 - 382.\n");
+        t.append("Aux basis /RI partitioning  : Seifert et al. Z. Krist. - Cryst. Mat. 2026, 10.1515/zkri-2026-0013.\n");
         t.append("TFVC partitioning at        : Gimferrer et al. TBA.\n");
         t.append("MBIS/EMBIS partitioning at  : Nielsen et al. TBA.\n");
     }
@@ -3453,11 +3454,11 @@ double vec_length(const vec &in)
 }
 
 namespace {
-std::streambuf *original_coutbuf()
-{
-    static std::streambuf *buf = std::cout.rdbuf();
-    return buf;
-}
+    std::streambuf *original_coutbuf()
+    {
+        static std::streambuf *buf = std::cout.rdbuf();
+        return buf;
+    }
 }
 
 void error_check(const bool condition, const std::source_location loc, const std::string &error_message, std::ostream &log_file)
