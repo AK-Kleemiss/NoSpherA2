@@ -200,7 +200,7 @@ std::string help_message =
     "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
     "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
-    "                                            If there is more than a single twin law to be used, use the twin command multiple times.\n"
+    "                                            If there is more than a single twin law to be used, use the twin command multiple times (and good luck with that structure...).\n"
     "   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n"
     "   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n"
     "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
@@ -214,7 +214,16 @@ std::string help_message =
     "   -profiling      [tests_root]             Runs the internal profiling suite (all test paths). Optional root defaults to ./tests\n"
     "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
     "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
-    "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
+   "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
+    "   -qtaim_eli  <rho.cube> <eli.cube> <atoms> [bg]  QTAIM basin masking of an ELI cube:\n"
+    "                                            Runs QTAIM topological analysis on <rho.cube>, keeps ELI values only for voxels\n"
+    "                                            in the basins of the specified atoms, sets all other voxels to <bg> (default 0),\n"
+    "                                            and shrinks the output grid to the tight bounding box of the selected region.\n"
+    "                                            <atoms>: comma-separated 0-based atom indices, e.g. 0,3,7\n"
+    "                                            <bg>:    background value for non-selected voxels (default 0)\n"
+    "                                            Output:  <eli_stem>_qtaim_masked.cube next to the input ELI file.\n"
+    "               Alternative (WFN mode):      -qtaim_eli <wfn_file> <atoms> [resolution] [radius] [bg]\n"
+    "                                            Computes rho and ELI grids from the wavefunction, then applies masking.\n"
     "   -cmtc            <List of .wfns + parts> Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
     "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
     "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
@@ -2242,6 +2251,65 @@ void options::digest_options()
             properties.resolution = stod(arguments[i + 2]);
             properties.radius = stod(arguments[i + 3]);
             ELI_analysis(wfn, *this);
+            exit(0);
+        }
+        else if (temp == "-qtaim_eli") {
+            // Cube-files mode:  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [<bg_value>]
+            // WFN mode:         -qtaim_eli <wfn_file> <atoms_csv> [<resolution>] [<radius>] [<bg_value>]
+            err_checkf(i + 2 < argc,
+                "Usage:\n"
+                "  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [bg_value]\n"
+                "  -qtaim_eli <wfn_file> <atoms_csv> [resolution] [radius] [bg_value]\n"
+                "atoms_csv: comma-separated 0-based atom indices, e.g. 0,3,7\n"
+                "bg_value:  value assigned to non-selected voxels (default 0)",
+                std::cout);
+
+            std::filesystem::path arg1 = arguments[i + 1];
+            const bool cube_mode = (arg1.extension() == ".cube");
+
+            std::filesystem::path rho_path, eli_path_arg;
+            std::string atoms_csv;
+            double bg_val = 0.0;
+
+            if (cube_mode) {
+                err_checkf(i + 3 < argc,
+                    "Cube mode requires: -qtaim_eli <rho.cube> <eli.cube> <atoms_csv>", std::cout);
+                rho_path     = arg1;
+                eli_path_arg = arguments[i + 2];
+                atoms_csv    = arguments[i + 3];
+                if (i + 4 < argc) bg_val = stod(arguments[i + 4]);
+            } else {
+                rho_path  = arg1;  // wfn path
+                atoms_csv = arguments[i + 2];
+                if (i + 3 < argc && !std::filesystem::path(arguments[i + 3]).has_extension())
+                    ; // next arg looks like atoms_csv already consumed; nothing extra
+                if (i + 3 < argc) {
+                    try { properties.resolution = stod(arguments[i + 3]); }
+                    catch (...) { /* optional — might be bg_val */ }
+                }
+                if (i + 4 < argc) {
+                    try { properties.radius = stod(arguments[i + 4]); }
+                    catch (...) {}
+                }
+                if (i + 5 < argc) {
+                    try { bg_val = stod(arguments[i + 5]); }
+                    catch (...) {}
+                }
+            }
+
+            // Parse comma-separated 0-based atom indices
+            std::vector<int> indices;
+            {
+                std::stringstream ss(atoms_csv);
+                std::string tok;
+                while (std::getline(ss, tok, ',')) {
+                    std::string t = trim(tok);
+                    if (!t.empty()) indices.push_back(std::stoi(t));
+                }
+            }
+            err_checkf(!indices.empty(), "No atom indices parsed from: " + atoms_csv, std::cout);
+
+            run_QTAIM_ELI_mask(rho_path, eli_path_arg, indices, bg_val, *this, log_file);
             exit(0);
         }
         else if (temp == "-elf")

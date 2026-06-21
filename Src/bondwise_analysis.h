@@ -109,4 +109,33 @@ int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, con
 void bondwise_laplacian_plots(std::filesystem::path &wfn_name);
 void ELI_analysis(const WFN &wavy, const options &opt);
 
+// QTAIM-guided ELI masking:
+//   Run QTAIM basin analysis on `rho`, keep ELI values only for voxels in the
+//   basins of `selected_indices` (0-based atom indices), set everything else to
+//   `background_value`, shrink the output grid to the tight bounding box of the
+//   selected region, and write the result to `output_path`.
+void QTAIM_ELI_mask(
+    cube& rho,
+    cube& eli,
+    WFN& parent_wfn,
+    const std::vector<atom>& atoms,
+    const std::vector<int>& selected_indices,
+    double background_value,
+    const std::filesystem::path& output_path,
+    bool debug,
+    std::ostream& log
+);
+
+// Dispatch helper: reads (or computes) rho/eli cubes then calls QTAIM_ELI_mask.
+//   If `eli_path` is empty, `rho_or_wfn` is treated as a wavefunction file and
+//   the cubes are generated on the fly.
+void run_QTAIM_ELI_mask(
+    const std::filesystem::path& rho_or_wfn,
+    const std::filesystem::path& eli_path,
+    const std::vector<int>& selected_indices,
+    double background_value,
+    const options& opt,
+    std::ostream& log
+);
+
 #include "wfn_class.h"
