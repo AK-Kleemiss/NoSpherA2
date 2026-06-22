@@ -565,7 +565,9 @@ int main(int argc, char **argv)
             xcw.run_XCW_fitting();
         }
         if (opt.calc_F_calc) {
-            xcw.calc_F_calc_fast();
+			std::cout << "Currently not implemented..." << std::endl;
+            exit(0);
+            //xcw.calc_F_calc_fast();
         }
         exit(0);
     }

@@ -1142,7 +1142,7 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     return true;
 }
 
-bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug)
 {
     using namespace std;
     vec2 Uij, Cijk, Dijkl;
@@ -1456,6 +1456,217 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
         wavy.set_atom_ADPs(i, { Uij[i], Cijk[i], Dijkl[i] });
 
     return true;
+};
+
+bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, std::ofstream &log3, bool debug)
+{
+    using namespace std;
+    vec2 Uij, Cijk, Dijkl;
+    ifstream asym_cif_input(cif, std::ios::in);
+    asym_cif_input.clear();
+    asym_cif_input.seekg(0, asym_cif_input.beg);
+    string line;
+    const int ncen = wavy.get_ncen();
+    svec labels(ncen);
+
+    for (int i = 0; i < ncen; i++) {
+        labels[i] = wavy.get_atoms()[i].get_label();
+    }
+
+    while (getline(asym_cif_input, line)) {
+        if (!line.starts_with("loop_")) {
+            if (debug)
+                log3 << "This is not part of a loop. Moving on.";
+            continue;
+        }
+        if (debug)
+            log3 << "Found a loop!";
+        getline(asym_cif_input, line);
+        if (line.find("_atom_site_aniso_label") != string::npos) {
+            if (debug) {
+                log3 << "This loop contains anisotropic displacement parameters.";
+            }
+            ivec fields;
+            while (line.find("_atom_site_aniso") != string::npos && line.length() > 3) {
+                getline(asym_cif_input, line);
+                if (line.find("U_11") != string::npos)
+					fields.push_back(0);
+				else if (line.find("U_22") != string::npos)
+					fields.push_back(1);
+				else if (line.find("U_33") != string::npos)
+					fields.push_back(2);
+				else if (line.find("U_12") != string::npos)
+					fields.push_back(3);
+				else if (line.find("U_13") != string::npos)
+					fields.push_back(4);
+				else if (line.find("U_23") != string::npos)
+					fields.push_back(5);	
+            }
+            while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
+                std::vector<std::string> entries;
+                std::istringstream iss(line);
+                std::string token;
+                while (entries.size() < 7 && iss >> token)
+                    entries.push_back(token);
+                while (entries.size() < 7 && std::getline(asym_cif_input, line)) {
+                    std::istringstream nextLine(line);
+                    while (entries.size() < 7 && nextLine >> token)
+                        entries.push_back(token);
+                }
+                bool atom_found = false;
+                for (int a = 0; a < ncen; a++) {
+                    if (entries[0] == wavy.get_atom(a).get_label()) {
+						vec2 ADPs = wavy.get_atom(a).get_ADPs();
+                        if (ADPs.size() != 3)
+                            ADPs.resize(3);
+                        ADPs[0].resize(6);
+                        for (int i = 0; i < 6; i++) {
+							ADPs[0][fields[i]] = stof(entries[i + 1]);
+                        }
+                        wavy.set_atom_ADPs(a, ADPs);
+                        atom_found = true;
+                        break;
+                    }
+                }
+                if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
+                getline(asym_cif_input, line);
+            }
+        }
+        else if (line.find("_atom_site_anharm_GC_C_label") != string::npos) {
+			if (debug)
+				log3 << "This loop contains anharmonic Gram-Charlier coefficients C.";
+            ivec fields;
+            while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
+                getline(asym_cif_input, line);
+                if (line.find("C_111") != string::npos)
+                    fields.push_back(0);
+                else if (line.find("C_112") != string::npos)
+                    fields.push_back(1);
+                else if (line.find("C_113") != string::npos)
+                    fields.push_back(2);
+                else if (line.find("C_122") != string::npos)
+                    fields.push_back(3);
+                else if (line.find("C_123") != string::npos)
+                    fields.push_back(4);
+                else if (line.find("C_133") != string::npos)
+                    fields.push_back(5);
+                else if (line.find("C_222") != string::npos)
+                    fields.push_back(6);
+                else if (line.find("C_223") != string::npos)
+                    fields.push_back(7);
+                else if (line.find("C_233") != string::npos)
+                    fields.push_back(8);
+                else if (line.find("C_333") != string::npos)
+                    fields.push_back(9);   
+            }
+            while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
+                std::vector<std::string> entries;
+                std::istringstream iss(line);
+                std::string token;
+                while (entries.size() < 11 && iss >> token) {
+                    const int pos = token.find('(');
+                    entries.push_back(token);
+                }
+                while (entries.size() < 11 && std::getline(asym_cif_input, line)) {
+                    std::istringstream nextLine(line);
+                    while (entries.size() < 11 && nextLine >> token) {
+                        entries.push_back(token);
+                    }
+                }
+                bool atom_found = false;
+                for (int a = 0; a < ncen; a++) {
+                    if (entries[0] == wavy.get_atom(a).get_label()) {
+                        vec2 ADPs = wavy.get_atom(a).get_ADPs();
+                        if (ADPs.size() != 3)
+                            ADPs.resize(3);
+                        ADPs[1].resize(10);
+                        for (int i = 0; i < 10; i++) {
+                            ADPs[1][fields[i]] = stof(entries[i + 1]);
+                        }
+                        wavy.set_atom_ADPs(a, ADPs);
+                        atom_found = true;
+                        break;
+                    }
+                }
+                if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
+                getline(asym_cif_input, line);
+            }
+        }
+        else if (line.find("_atom_site_anharm_GC_D_label") != string::npos) {
+			if (debug)
+				log3 << "This loop contains anharmonic Gram-Charlier coefficients D.";
+            ivec fields;
+            while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
+                getline(asym_cif_input, line);
+                if (line.find("D_1111") != string::npos)
+                    fields.push_back(0);
+                else if (line.find("D_1112") != string::npos)
+                    fields.push_back(1);
+                else if (line.find("D_1113") != string::npos)
+                    fields.push_back(2);
+                else if (line.find("D_1122") != string::npos)
+                    fields.push_back(3);
+                else if (line.find("D_1123") != string::npos)
+                    fields.push_back(4);
+                else if (line.find("D_1133") != string::npos)
+                    fields.push_back(5);
+                else if (line.find("D_1222") != string::npos)
+                    fields.push_back(6);
+                else if (line.find("D_1223") != string::npos)
+                    fields.push_back(7);
+                else if (line.find("D_1233") != string::npos)
+                    fields.push_back(8);
+                else if (line.find("D_1333") != string::npos)
+                    fields.push_back(9);
+                else if (line.find("D_2222") != string::npos)
+                    fields.push_back(10);
+                else if (line.find("D_2223") != string::npos)
+                    fields.push_back(11);
+                else if (line.find("D_2233") != string::npos)
+                    fields.push_back(12);
+                else if (line.find("D_2333") != string::npos)
+                    fields.push_back(13);
+                else if (line.find("D_3333") != string::npos)
+                    fields.push_back(14);
+            }
+            while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
+                std::vector<std::string> entries;
+                std::istringstream iss(line);
+                std::string token;
+                while (entries.size() < 16 && iss >> token)
+                    entries.push_back(token);
+                while (entries.size() < 16 && std::getline(asym_cif_input, line)) {
+                    std::istringstream nextLine(line);
+                    while (entries.size() < 16 && nextLine >> token)
+                        entries.push_back(token);
+                }
+                bool atom_found = false;
+                for (int a = 0; a < ncen; a++) {
+                    if (entries[0] == wavy.get_atom(a).get_label()) {
+                        vec2 ADPs = wavy.get_atom(a).get_ADPs();
+                        if (ADPs.size() != 3)
+                            ADPs.resize(3);
+                        ADPs[2].resize(15);
+                        for (int i = 0; i < 15; i++) {
+                            ADPs[2][fields[i]] = stof(entries[i + 1]);
+                        }                
+                        wavy.set_atom_ADPs(a, ADPs);
+                        atom_found = true;
+                        break;
+                    }
+                }
+                if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
+                getline(asym_cif_input, line);
+            }
+        }
+        else {
+            if (debug)
+                log3 << "This was not the right loop. Moving on.";
+            continue;
+        }
+    }
+    return true;
+    // closing function
 };
 
 vec read_U_iso_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)

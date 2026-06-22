@@ -12,58 +12,69 @@ void XCW::construct(const options& opt_in) {
 	std::ifstream cif_input(cif.c_str(), std::ios::in);
 	unit_cell = cell(cif, std::cout, opt_in.debug, opt_in.do_XCW);
 	hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt_in.twin_law, unit_cell, std::cout, obs, opt_in.debug);
-	svec empty({});
-	ivec atom_type_list;
-	ivec asym_atom_to_type_list;
-	bvec constant_atoms;
 	std::ofstream log3("log3.txt", std::ios::out);
-	read_atoms_from_CIF(cif_input, unit_cell, ncen, needs_grid, asym_atoms, opt_in.debug);
+	bvec needs_grid;
+	read_atoms_from_CIF(cif_input, unit_cell, cryst.ncen, needs_grid, asym_atoms, opt_in.debug);
 
 	// Generate WFN object from asym_atoms
-	wave.assign_charge(opt->charge);
-	wave.assign_multi(opt->mult);
-	for (int at = 0; at < ncen; at++) {
+	dummy_wave.assign_charge(opt->charge);
+	dummy_wave.assign_multi(opt->mult);
+	for (int at = 0; at < cryst.ncen; at++) {
 		asym_atom_list.push_back(at);
 		atom temp_atom;
 		temp_atom.set_coordinate(0, asym_atoms[at].pos[0]);
 		temp_atom.set_coordinate(1, asym_atoms[at].pos[1]);
 		temp_atom.set_coordinate(2, asym_atoms[at].pos[2]);
 		temp_atom.set_charge(asym_atoms[at].type);
-		wave.push_back_atom(temp_atom);
+		dummy_wave.push_back_atom(temp_atom);
 	}
-	std::string test_name = "def2-svp_basis";
-	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(test_name);
-	load_basis_into_WFN(wave, basis, false);
-	complete_WFN_basis(wave);
+	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(settings.basis_set_name);
+	load_basis_into_WFN(dummy_wave, basis, false, true);
 
-	U_iso = read_U_iso_from_CIF(cif, wave, unit_cell, log3, opt_in.debug);
+	cryst.U_iso = read_U_iso_from_CIF(cif, dummy_wave, unit_cell, log3, opt_in.debug);
 	unit_cell.eval_symm(asym_atoms);
-	if (grown_structure) {
+	if (settings.grown) {
 		unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms);
 	}
-	nr = hkl_enlarged.size();
-	nr_small = hkl.size();
-	make_k_pts(nr != 0 && hkl.size() == 0, opt_in.save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt_in.debug);
-	//Read U_iso, U_ij, C_ijk and Dijkl from CIF file
-	read_fracs_ADPs_from_CIF(cif, wave, unit_cell, log3, opt_in.debug);
-	DW_fact.resize(ncen, cvec(nr, 1.0));
+	cryst.nr = hkl_enlarged.size();
+	cryst.nr_small = hkl.size();
+	make_k_pts(cryst.nr != 0 && hkl.size() == 0, opt_in.save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt_in.debug);
+	read_fracs_ADPs_from_CIF(cif, dummy_wave, log3, opt_in.debug);
 	XCW_log.open("XCW.log");
+	cryst.inv_scale = 1.0 / (cryst.nr_small - settings.n_params);
+	F_calc.resize(2);
+	for (int i = 0; i < 2; i++) {
+		F_calc[i].resize(cryst.nr_small, 0);
+	}
 }
 
-XCW::convergence_settings XCW::loadSettings() {
-	convergence_settings settings;
+XCW::SCF_settings XCW::loadSettings() {
+	SCF_settings settings;
 	settings.quant_diff = 1e-6;
 	settings.diis_stop_damping = 0.01;
 	settings.max_diis_error = 1e-5;
 	settings.gradient = 1e-5;
 	settings.MaxP_diff = 1e-7;
 	settings.RMSP_diff = 5e-9;
-	settings.diis_stop_shift = 0.001;
+	settings.diis_stop_shift = 0.01;
+	settings.basis_set_name = "def2-svp";
+	settings.grown = false;
+	settings.n_params = 161;
+	// 1: Refine against F values
+	// 2: Refine against F^2 values
+	settings.refine_against = 1;
+	settings.hf_type = occ::qm::SpinorbitalKind::Restricted;
+	settings.alpha = 0.5;
+	settings.level_shift = 0.0;
+	settings.num_xcw_steps = 10;
+	settings.xcw_step_size = 0.01;
+	settings.max_scf_iterations = 100;
+	settings.charge = 0;
+	settings.multiplicity = 1;
 	return settings;
 }
 
-void XCW::U_frac2U_rec() {
-	const double scale = constants::ang2bohr(1) / constants::TWO_PI;
+void XCW::U_cif2U_star() {
 	vec norm(3);
 	vec2 rec_matrix(3, vec(3));
 	for (int i = 0; i < 3; i++) {
@@ -71,48 +82,34 @@ void XCW::U_frac2U_rec() {
 			rec_matrix[i][j] = unit_cell.get_rcm(i, j);
 		}
 	}
+	const double scale = constants::ang2bohr(1) / constants::TWO_PI;
 	std::transform(rec_matrix.begin(), rec_matrix.end(), rec_matrix.begin(), [scale](std::vector<double>& vec) {
 		std::transform(vec.begin(), vec.end(), vec.begin(), [scale](double x) { return x * scale; });
 		return vec; });
-	ivec2 basis2 = generate_basis(2);
-	ivec2 basis3 = generate_basis(3);
-	ivec2 basis4 = generate_basis(4);
-	vec2 trans_mat2 = build_transform(rec_matrix, basis2);
-	vec2 trans_mat3 = build_transform(rec_matrix, basis3);
-	vec2 trans_mat4 = build_transform(rec_matrix, basis4);
-	for (int a = 0; a < ncen; a++) {
-		vec2 ADPs = wave.get_atom(a).get_ADPs();
-		if (wave.get_atom(a).get_ADPs()[0].size() > 0) {
-			//vec2 U_frac(3, vec(3));
-			//U_frac[0][0] = ADPs[0][0];
-			//U_frac[1][1] = ADPs[0][1];
-			//U_frac[2][2] = ADPs[0][2];
-			//U_frac[0][1] = ADPs[0][3];
-			//U_frac[1][0] = U_frac[0][1];
-			//U_frac[0][2] = ADPs[0][4];
-			//U_frac[2][0] = U_frac[0][2];
-			//U_frac[1][2] = ADPs[0][5];
-			//U_frac[2][1] = U_frac[1][2];
-			//const vec2 U_rec = self_dot(self_dot(rec_matrix, U_frac, true, false), rec_matrix, false, false);
-			//ADPs[0][1] = U_rec[0][0];
-			//ADPs[0][2] = U_rec[1][1];
-			//ADPs[0][3] = U_rec[2][2];
-			//ADPs[0][4] = U_rec[0][1];
-			//ADPs[0][5] = U_rec[0][2];
-			//ADPs[0][1] = U_rec[1][2];
-			ADPs[0] = transform_voigt(ADPs[0], trans_mat2);
+	norm[0] = std::sqrt(rec_matrix[0][0] * rec_matrix[0][0] + rec_matrix[1][0] * rec_matrix[1][0] + rec_matrix[2][0] * rec_matrix[2][0]);
+	norm[1] = std::sqrt(rec_matrix[0][1] * rec_matrix[0][1] + rec_matrix[1][1] * rec_matrix[1][1] + rec_matrix[2][1] * rec_matrix[2][1]);
+	norm[2] = std::sqrt(rec_matrix[0][2] * rec_matrix[0][2] + rec_matrix[1][2] * rec_matrix[1][2] + rec_matrix[2][2] * rec_matrix[2][2]);
+	vec transform(6);
+
+	transform[0] = norm[0] * norm[0];
+	transform[1] = norm[1] * norm[1];
+	transform[2] = norm[2] * norm[2];
+	transform[3] = norm[0] * norm[1];
+	transform[4] = norm[0] * norm[2];
+	transform[5] = norm[1] * norm[2];
+
+	for (int a = 0; a < cryst.ncen; a++) {
+		if (dummy_wave.get_atom(a).get_ADPs()[0].size() > 0) {
+			vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
+			for (int i = 0; i < 6; i++) {
+				ADPs[0][i] *= transform[i];
+			}
+			dummy_wave.set_atom_ADPs(a, ADPs);
 		}
-		if (wave.get_atom(a).get_ADPs()[1].size() > 0) {
-			ADPs[1] = transform_voigt(ADPs[1], trans_mat3);
-		}
-		if (wave.get_atom(a).get_ADPs()[2].size() > 0) {
-			ADPs[2] = transform_voigt(ADPs[2], trans_mat4);
-		}
-		wave.set_atom_ADPs(a, ADPs);
 	}
 }
 
-void XCW::U_rec2U_cart() {
+void XCW::U_star2U_cart() {
 	const double scale = constants::bohr2ang(1);
 	vec2 cart_matrix(3, vec(3));
 	for (int i = 0; i < 3; i++) {
@@ -123,79 +120,128 @@ void XCW::U_rec2U_cart() {
 	std::transform(cart_matrix.begin(), cart_matrix.end(), cart_matrix.begin(), [scale](std::vector<double>& vec) {
 		std::transform(vec.begin(), vec.end(), vec.begin(), [scale](double x) { return x * scale; });
 		return vec; });
-	for (int a = 0; a < ncen; a++) {
-		vec2 ADPs = wave.get_atom(a).get_ADPs();
-		if (wave.get_atom(a).get_ADPs()[0].size() > 0) {
-			vec2 U_rec(3, vec(3));
-			U_rec[0][0] = ADPs[0][0];
-			U_rec[0][1] = ADPs[0][3];
-			U_rec[0][2] = ADPs[0][4];
-			U_rec[1][0] = ADPs[0][3];
-			U_rec[1][1] = ADPs[0][1];
-			U_rec[1][2] = ADPs[0][5];
-			U_rec[2][0] = ADPs[0][4];
-			U_rec[2][1] = ADPs[0][5];
-			U_rec[2][2] = ADPs[0][2];
-			vec2 U_cart = self_dot(self_dot(cart_matrix, U_rec, true, false), cart_matrix, false, false);
-			ADPs[0][0] = U_rec[0][0];
-			ADPs[0][1] = U_rec[1][1];
-			ADPs[0][2] = U_rec[2][2];
-			ADPs[0][3] = U_rec[1][0];
-			ADPs[0][4] = U_rec[0][2];
-			ADPs[0][5] = U_rec[1][2];
+	for (int a = 0; a < cryst.ncen; a++) {
+		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
+		if (dummy_wave.get_atom(a).get_ADPs()[0].size() > 0) {
+			vec2 U_star(3, vec(3));
+			U_star[0][0] = ADPs[0][0];
+			U_star[0][1] = ADPs[0][3];
+			U_star[0][2] = ADPs[0][4];
+			U_star[1][0] = ADPs[0][3];
+			U_star[1][1] = ADPs[0][1];
+			U_star[1][2] = ADPs[0][5];
+			U_star[2][0] = ADPs[0][4];
+			U_star[2][1] = ADPs[0][5];
+			U_star[2][2] = ADPs[0][2];
+			U_star = self_dot(self_dot(cart_matrix, U_star, true, false), cart_matrix, false, false);
+			ADPs[0][0] = U_star[0][0];
+			ADPs[0][1] = U_star[1][1];
+			ADPs[0][2] = U_star[2][2];
+			ADPs[0][3] = U_star[0][1];
+			ADPs[0][4] = U_star[0][2];
+			ADPs[0][5] = U_star[1][2];
+			dummy_wave.set_atom_ADPs(a, ADPs);
 		}
-		//if (wave.get_atom(a).get_ADPs()[1].size() > 0) {
-		//	vec2 C_rec(3, vec(3));
-		//	U_rec[0][0] = ADPs[0][0];
-		//	U_rec[0][1] = ADPs[0][3];
-		//	U_rec[0][2] = ADPs[0][4];
-		//	U_rec[1][0] = ADPs[0][3];
-		//	U_rec[1][1] = ADPs[0][1];
-		//	U_rec[1][2] = ADPs[0][5];
-		//	U_rec[2][0] = ADPs[0][4];
-		//	U_rec[2][1] = ADPs[0][5];
-		//	U_rec[2][2] = ADPs[0][2];
-		//	vec2 U_cart = self_dot(self_dot(cart_matrix, U_rec, true, false), cart_matrix, false, false);
-		//	ADPs[0][0] = U_rec[0][0];
-		//	ADPs[0][1] = U_rec[1][1];
-		//	ADPs[0][2] = U_rec[2][2];
-		//	ADPs[0][3] = U_rec[1][0];
-		//	ADPs[0][4] = U_rec[0][2];
-		//	ADPs[0][5] = U_rec[1][2];
-		//}
-		//if (wave.get_atom(a).get_ADPs()[2].size() > 0) {
-		//	vec2 D_rec(3, vec(3));
-		//	U_rec[0][0] = ADPs[0][0];
-		//	U_rec[0][1] = ADPs[0][3];
-		//	U_rec[0][2] = ADPs[0][4];
-		//	U_rec[1][0] = ADPs[0][3];
-		//	U_rec[1][1] = ADPs[0][1];
-		//	U_rec[1][2] = ADPs[0][5];
-		//	U_rec[2][0] = ADPs[0][4];
-		//	U_rec[2][1] = ADPs[0][5];
-		//	U_rec[2][2] = ADPs[0][2];
-		//	vec2 U_cart = self_dot(self_dot(cart_matrix, U_rec, true, false), cart_matrix, false, false);
-		//	ADPs[0][0] = U_rec[0][0];
-		//	ADPs[0][1] = U_rec[1][1];
-		//	ADPs[0][2] = U_rec[2][2];
-		//	ADPs[0][3] = U_rec[1][0];
-		//	ADPs[0][4] = U_rec[0][2];
-		//	ADPs[0][5] = U_rec[1][2];
-		//}
-		wave.set_atom_ADPs(a, ADPs);
+		if (dummy_wave.get_atom(a).get_ADPs()[1].size() > 0) {
+			int running_idx = 0;
+			vec C_cart(10);
+			for (int i = 0; i < 3; i++) {
+				for (int j = i; j < 3; j++) {
+					for (int k = j; k < 3; k++) {
+						double sum = 0;
+						for (int p = 0; p < 3; p++) {
+							for (int q = 0; q < 3; q++) {
+								for (int r = 0; r < 3; r++) {
+									ivec sorted_idx = { p, q, r };
+									std::sort(sorted_idx.begin(), sorted_idx.end());
+									int ADP_idx;
+									get_voigt_index(sorted_idx, ADP_idx);
+									sum += cart_matrix[p][i] * cart_matrix[q][j] * cart_matrix[r][k] * ADPs[1][ADP_idx];
+								}
+							}
+						}
+						C_cart[running_idx] = sum;
+						running_idx++;
+					}
+				}
+			}
+			for (int i = 0; i < 10; i++) {
+				ADPs[1][i] = C_cart[i];
+			}
+			dummy_wave.set_atom_ADPs(a, ADPs);
+		}
+		if (dummy_wave.get_atom(a).get_ADPs()[2].size() > 0) {
+			int running_idx = 0;
+			vec D_cart(15);
+			for (int i = 0; i < 3; i++) {
+				for (int j = i; j < 3; j++) {
+					for (int k = j; k < 3; k++) {
+						for (int l = k; l < 3; l++) {
+							double sum = 0;
+							for (int p = 0; p < 3; p++) {
+								for (int q = 0; q < 3; q++) {
+									for (int r = 0; r < 3; r++) {
+										for (int s = 0; s < 3; s++) {
+											ivec sorted_idx = { p, q, r, s };
+											std::sort(sorted_idx.begin(), sorted_idx.end());
+											int ADP_idx;
+											get_voigt_index(sorted_idx, ADP_idx);
+											sum += cart_matrix[p][i] * cart_matrix[q][j] * cart_matrix[r][k] * cart_matrix[s][l] * ADPs[2][ADP_idx];
+										}
+									}
+								}
+							}
+							D_cart[running_idx] = sum;
+							running_idx++;
+						}
+					}
+				}
+			}
+			for (int i = 0; i < 15; i++) {
+				ADPs[2][i] = D_cart[i];
+			}
+			dummy_wave.set_atom_ADPs(a, ADPs);
+		}
 	}
 }
 
-void XCW::eval_DW() {
+void XCW::get_voigt_index(const ivec& indices, int& ADP_idx) {
+	ivec2 map3, map4;
+	ivec mult3, mult4;
+	map3 = { { 0, 0, 0 }, { 0, 0, 1 }, { 0, 0, 2 }, { 0, 1, 1 }, {0, 1, 2}, {0, 2, 2}, {1, 1, 1}, { 1, 1, 2 }, { 1, 2, 2 }, { 2, 2, 2 } };
+	map4 = { { 0, 0, 0, 0 }, { 0, 0, 0, 1 }, { 0, 0, 0, 2 }, { 0, 0, 1, 1 }, { 0, 0, 1, 2 }, { 0, 0, 2, 2 }, { 0, 1, 1, 1 }, { 0, 1, 1, 2 }, { 0, 1, 2, 2 }, { 0, 2, 2, 2 }, { 1, 1, 1, 1 }, { 1, 1, 1, 2 }, { 1, 1, 2, 2 }, { 1, 2, 2, 2 }, { 2, 2, 2, 2 } };
+	if (indices.size() == 3) {
+		int idx = 0;
+		while (indices != map3[idx]) {
+			idx++;
+		}
+		ADP_idx = idx;
+	}
+	if (indices.size() == 4) {
+		int idx = 0;
+		while (indices != map4[idx]) {
+			idx++;
+		}
+		ADP_idx = idx;
+	}
+}
+
+void XCW::eval_DW(cvec2& DW_fact) {
+	DW_fact.resize(cryst.ncen, cvec(cryst.nr, 0));
 	//Converts angstrom to bohr OR MORE IMPORTANTLY reciprocal bohr to reciprocal angstrom
 	const double angstrom2bohr = constants::ang2bohr(1);
 	const double scale = angstrom2bohr / constants::TWO_PI;
 	std::vector<int> level;
-	level.reserve(ncen);
+	level.reserve(cryst.ncen);
 	//Figure out which level of anisotropic displacements parameters are avaialable
-	for (int a = 0; a < ncen; a++) {
-		vec2 ADPs = wave.get_atom(a).get_ADPs();
-		if (ADPs[2].size() != 0) {
+	for (int a = 0; a < cryst.ncen; a++) {
+		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
+		if (ADPs.size() != 3) {
+			ADPs.resize(3);
+			dummy_wave.set_atom_ADPs(a, ADPs);
+			level.emplace_back(0);
+		}
+		else if (ADPs[2].size() != 0) {
 			level.emplace_back(3);
 		}
 		else if (ADPs[1].size() != 0) {
@@ -208,11 +254,11 @@ void XCW::eval_DW() {
 			level.emplace_back(0);
 		}
 	}
-	// Convert ADPs from fractional to Cartesian coordinates
-	U_frac2U_rec();
-	U_rec2U_cart();
-	vec2 q(nr, vec(3));
-	for (int h = 0; h < nr; h++) {
+	// Convert ADPs from cif format to Cartesian coordinates
+	U_cif2U_star();
+	U_star2U_cart();
+	vec2 q(cryst.nr, vec(3));
+	for (int h = 0; h < cryst.nr; h++) {
 		q[h][0] = k_pt[0][h];
 		q[h][1] = k_pt[1][h];
 		q[h][2] = k_pt[2][h];
@@ -220,9 +266,8 @@ void XCW::eval_DW() {
 	std::transform(q.begin(), q.end(), q.begin(), [scale](std::vector<double>& vec) {
 		std::transform(vec.begin(), vec.end(), vec.begin(), [scale](double x) { return x * scale; });
 		return vec; });
-	cvec2 DW(ncen, cvec(nr));
-	for (int a = 0; a < ncen; a++) {
-		vec2 ADPs = wave.get_atom(a).get_ADPs();
+	for (int a = 0; a < cryst.ncen; a++) {
+		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
 		vec2 Uij;
 		if (level[a] > 0) {
 			Uij = { { ADPs[0][0], ADPs[0][3], ADPs[0][4] },
@@ -232,88 +277,84 @@ void XCW::eval_DW() {
 		switch (level[a]) {
 		case 0: {
 			// Isotropic
-			double U = U_iso[a], temp;
-			for (int r = 0; r < nr; r++) {
+			double U = cryst.U_iso[a], temp;
+			for (int r = 0; r < cryst.nr; r++) {
 				temp = -0.5 * (constants::TWO_PI * constants::TWO_PI) * U * (q[r][0] * q[r][0] + q[r][1] * q[r][1] + q[r][2] * q[r][2]);
-				DW[a][r] = std::exp(temp);
+				DW_fact[a][r] = std::exp(temp);
 			}
 			break;
 		}
 		case 1: {
 			// Anisotropic U_ij
 			double temp1;
-			for (int h = 0; h < nr; h++) {
+			for (int h = 0; h < cryst.nr; h++) {
 				vec q_ = { q[h][0], q[h][1], q[h][2] };
 				temp1 = -0.5 * (constants::TWO_PI * constants::TWO_PI) * dot_BLAS(dot(Uij, q_, true), q_, false);
-				DW[a][h] = std::exp(temp1);
+				DW_fact[a][h] = std::exp(temp1);
 			}
 			break;
 		}
 		case 2: {
 			// Anisotropic C_ijk
 			double temp1, temp2;
-			for (int h = 0; h < nr; h++) {
+			for (int h = 0; h < cryst.nr; h++) {
 				vec q_ = { q[h][0], q[h][1], q[h][2] };
 				temp1 = -0.5 * (constants::TWO_PI * constants::TWO_PI) * dot_BLAS(dot(Uij, q_, true), q_, false);
-				temp2 = - 1.0 / 6.0 * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
+				temp2 = -1.0 / 6.0 * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
 					+ 3 * ADPs[1][1] * q_[0] * q_[0] * q_[1] + 3 * ADPs[1][2] * q_[0] * q_[0] * q_[2] + 3 * ADPs[1][3] * q_[0] * q_[1] * q_[1] + 3 * ADPs[1][5] * q_[0] * q_[2] * q_[2] + 3 * ADPs[1][7] * q_[1] * q_[1] * q_[2] + 3 * ADPs[1][8] * q_[1] * q_[2] * q_[2]
 					+ 6 * ADPs[1][4] * q_[0] * q_[1] * q_[2]);
-				cdouble temp_(temp1, temp2);
-				DW[a][h] = std::exp(temp_);
+				DW_fact[a][h] = std::exp(temp1) * cdouble(1, temp2);
 			}
 			break;
 		}
 		case 3: {
 			// Anisotropic D_ijkl
 			double temp1, temp2, temp3;
-			for (int h = 0; h < nr; h++) {
+			for (int h = 0; h < cryst.nr; h++) {
 				vec q_ = { q[h][0], q[h][1], q[h][2] };
 				temp1 = -0.5 * (constants::TWO_PI * constants::TWO_PI) * dot_BLAS(dot(Uij, q_, true), q_, false);
-				temp2 = - 1.0 / 6.0 * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
+				temp2 = -1.0 / 6.0 * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
 					+ 3 * ADPs[1][1] * q_[0] * q_[0] * q_[1] + 3 * ADPs[1][2] * q_[0] * q_[0] * q_[2] + 3 * ADPs[1][3] * q_[0] * q_[1] * q_[1] + 3 * ADPs[1][5] * q_[0] * q_[2] * q_[2] + 3 * ADPs[1][7] * q_[1] * q_[1] * q_[2] + 3 * ADPs[1][8] * q_[1] * q_[2] * q_[2]
 					+ 6 * ADPs[1][4] * q_[0] * q_[1] * q_[2]);
-				temp3 =	-(1.0 / 24.0) * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI * constants::TWO_PI)	* (ADPs[2][0] * q_[0] * q_[0] * q_[0] * q_[0] + 4.0 * ADPs[2][1] * q_[0] * q_[0] * q_[0] * q_[1] + 4.0 * ADPs[2][2] * q_[0] * q_[0] * q_[0] * q_[2]
-						+ 6.0 * ADPs[2][3] * q_[0] * q_[0] * q_[1] * q_[1] + 12.0 * ADPs[2][4] * q_[0] * q_[0] * q_[1] * q_[2] + 6.0 * ADPs[2][5] * q_[0] * q_[0] * q_[2] * q_[2] + 4.0 * ADPs[2][6] * q_[0] * q_[1] * q_[1] * q_[1] + 12.0 * ADPs[2][7] * q_[0] * q_[1] * q_[1] * q_[2]
-						+ 12.0 * ADPs[2][8] * q_[0] * q_[1] * q_[2] * q_[2]	+ 4.0 * ADPs[2][9] * q_[0] * q_[2] * q_[2] * q_[2] + ADPs[2][10] * q_[1] * q_[1] * q_[1] * q_[1] + 4.0 * ADPs[2][11] * q_[1] * q_[1] * q_[1] * q_[2] + 6.0 * ADPs[2][12] * q_[1] * q_[1] * q_[2] * q_[2]
-						+ 4.0 * ADPs[2][13] * q_[1] * q_[2] * q_[2] * q_[2]	+ ADPs[2][14] * q_[2] * q_[2] * q_[2] * q_[2]);
-				cdouble temp_(temp1 + temp3, temp2);
-				DW[a][h] = std::exp(temp_);
+				temp3 = (1.0 / 24.0) * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[2][0] * q_[0] * q_[0] * q_[0] * q_[0] + 4.0 * ADPs[2][1] * q_[0] * q_[0] * q_[0] * q_[1] + 4.0 * ADPs[2][2] * q_[0] * q_[0] * q_[0] * q_[2]
+					+ 6.0 * ADPs[2][3] * q_[0] * q_[0] * q_[1] * q_[1] + 12.0 * ADPs[2][4] * q_[0] * q_[0] * q_[1] * q_[2] + 6.0 * ADPs[2][5] * q_[0] * q_[0] * q_[2] * q_[2] + 4.0 * ADPs[2][6] * q_[0] * q_[1] * q_[1] * q_[1] + 12.0 * ADPs[2][7] * q_[0] * q_[1] * q_[1] * q_[2]
+					+ 12.0 * ADPs[2][8] * q_[0] * q_[1] * q_[2] * q_[2] + 4.0 * ADPs[2][9] * q_[0] * q_[2] * q_[2] * q_[2] + ADPs[2][10] * q_[1] * q_[1] * q_[1] * q_[1] + 4.0 * ADPs[2][11] * q_[1] * q_[1] * q_[1] * q_[2] + 6.0 * ADPs[2][12] * q_[1] * q_[1] * q_[2] * q_[2]
+					+ 4.0 * ADPs[2][13] * q_[1] * q_[2] * q_[2] * q_[2] + ADPs[2][14] * q_[2] * q_[2] * q_[2] * q_[2]);
+				DW_fact[a][h] = std::exp(temp1) * cdouble(1 + temp3, temp2);
 			}
 			break;
 		}
 		}
 	}
-	set_DW(DW);
 	// closing function
 }
 
-void XCW::eval_phase() {
+void XCW::eval_phase(cvec2& phase_fact) {
+	phase_fact.resize(cryst.ncen, cvec(cryst.nr, 0));
 	const double bohr2angstrom = constants::bohr2ang(1);
 	const double angstrom2bohr = constants::ang2bohr(1);
 	const double scale = angstrom2bohr / constants::TWO_PI;
 	cdouble exponent;
-	cvec2 phase(ncen, cvec(nr));
-
 	vec2 cm = { { unit_cell.get_cm(0,0), unit_cell.get_cm(0,1), unit_cell.get_cm(0,2)},
 							{ unit_cell.get_cm(1,0), unit_cell.get_cm(1,1), unit_cell.get_cm(1,2)},
 							{ unit_cell.get_cm(2,0), unit_cell.get_cm(2,1), unit_cell.get_cm(2,2)} };
 	std::transform(cm.begin(), cm.end(), cm.begin(), [bohr2angstrom](std::vector<double>& vec) {
 		std::transform(vec.begin(), vec.end(), vec.begin(), [bohr2angstrom](double x) { return x * bohr2angstrom; });
 		return vec; });
-	for (int at = 0; at < ncen; at++) {
+	for (int at = 0; at < cryst.ncen; at++) {
 		vec pos_frac = { asym_atoms[at].frac_pos[0], asym_atoms[at].frac_pos[1], asym_atoms[at].frac_pos[2] };
 		vec new_pos_cart = dot(cm, pos_frac, true);
-		for (int r = 0; r < nr; r++) {
+		for (int r = 0; r < cryst.nr; r++) {
 			vec q = { k_pt[0][r], k_pt[1][r], k_pt[2][r] };
 			std::transform(q.begin(), q.end(), q.begin(), [scale](double x) { return x * scale; });
 			exponent = cdouble(0, constants::TWO_PI * dot_BLAS(q, new_pos_cart, false));
-			phase[at][r] = std::exp(exponent);
+			phase_fact[at][r] = std::exp(exponent);
 		}
 	}
-	set_phase(phase);
 }
 
-void XCW::eval_translation_phase() {
+void XCW::eval_translation_phase(cvec2& translation_phase) {
+	translation_phase.resize(cryst.nr_small, cvec(unit_cell.get_trans()[0].size(), 0));
 	const double angstrom2bohr = constants::ang2bohr(1);
 	const double bohr2angstrom = constants::bohr2ang(1);
 	const double scale = angstrom2bohr / constants::TWO_PI;
@@ -324,8 +365,7 @@ void XCW::eval_translation_phase() {
 	std::transform(cm.begin(), cm.end(), cm.begin(), [bohr2angstrom](std::vector<double>& vec) {
 		std::transform(vec.begin(), vec.end(), vec.begin(), [bohr2angstrom](double x) { return x * bohr2angstrom; });
 		return vec; });
-	cvec2 phase(nr_small, cvec(trans[0].size(), 0));
-	for (int r = 0; r < nr_small; r++) {
+	for (int r = 0; r < cryst.nr_small; r++) {
 		ivec asym_list = generate_asym_lookup(r);
 		vec q_temp = { k_pt[0][asym_list[0]], k_pt[1][asym_list[0]], k_pt[2][asym_list[0]] };
 		std::transform(q_temp.begin(), q_temp.end(), q_temp.begin(), [scale](double x) { return x * scale; });
@@ -333,10 +373,9 @@ void XCW::eval_translation_phase() {
 			vec trans_temp = { trans[0][t], trans[1][t], trans[2][t] };
 			trans_temp = dot(cm, trans_temp, true);
 			cdouble exponent(0, constants::TWO_PI * dot_BLAS(q_temp, trans_temp, false));
-			phase[r][t] = std::exp(exponent);
+			translation_phase[r][t] = std::exp(exponent);
 		}
 	}
-	set_translation_phase(phase);
 	// closing function
 }
 
@@ -360,12 +399,11 @@ void XCW::parse_anom_atoms(std::vector<anom_atom>& anom_atoms) {
 	}
 }
 
-void XCW::eval_anom_disp() {
+void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase) {
 	std::vector<anom_atom> anom_atoms;
 	parse_anom_atoms(anom_atoms);
-	cvec corr(nr_small, 0);
 	int r, at, r_asym;
-	for (int at = 0; at < ncen; at++) {
+	for (int at = 0; at < cryst.ncen; at++) {
 		const char* symbol = constants::atnr2letter(asym_atoms[at].type);
 		for (const anom_atom& anom_atom : anom_atoms) {
 			if (symbol == anom_atom.identifier) {
@@ -374,21 +412,20 @@ void XCW::eval_anom_disp() {
 			}
 		}
 	}
-	std::vector<ivec> asym_lookup(nr_small);
-	for (r = 0; r < nr_small; r++) {
+	std::vector<ivec> asym_lookup(cryst.nr_small);
+	for (r = 0; r < cryst.nr_small; r++) {
 		asym_lookup[r] = generate_asym_lookup(r);
 	}
-	for (r = 0; r < nr_small; r++) {
+	for (r = 0; r < cryst.nr_small; r++) {
 		const ivec& lookup = asym_lookup[r];
-		for (at = 0; at < ncen; at++) {
+		for (at = 0; at < cryst.ncen; at++) {
 			cdouble temp1 = 0;
 			for (r_asym = 0; r_asym < lookup.size(); r_asym++) {
 				temp1 += phase_fact[at][lookup[r_asym]] * DW_fact[at][lookup[r_asym]] * translation_phase[r][r_asym];
 			}
-			corr[r] += temp1 * asym_atoms[at].asym_fact * asym_atoms[at].anom;
+			F_calc[1][r] += temp1 * asym_atoms[at].asym_fact * asym_atoms[at].anom;
 		}
 	}
-	anom_corr = corr;
 }
 
 void XCW::eval_scale() {
@@ -396,22 +433,22 @@ void XCW::eval_scale() {
 	double denominator = 0.0;
 
 #pragma omp parallel for reduction(+:numerator, denominator)
-	for (int i = 0; i < nr_small; ++i) {
-		const double calc = std::abs(F_calc[i]);
+	for (int i = 0; i < cryst.nr_small; ++i) {
+		const double calc = std::abs(F_calc[0][i]);
 		numerator += calc * obs[i].F_obs;
 		denominator += calc * calc;
 	}
 
-	scale = (denominator != 0.0) ? numerator / denominator : 1.0;
+	cryst.F_scale = (denominator != 0.0) ? numerator / denominator : 1.0;
 }
 
 void XCW::calc_criteria() {
-	double prefactor = 1.0 / static_cast<double>(nr_small - n_params);
+	double prefactor = 1.0 / static_cast<double>(cryst.nr_small - settings.n_params);
 	double sum_chi = 0;
 	double sum_goof = 0;
 #pragma omp parallel for reduction(+:sum_chi, sum_goof)
-	for (int i = 0; i < nr_small; i++) {
-		const double scaled_F_calc = scale * std::abs(F_calc[i]);
+	for (int i = 0; i < cryst.nr_small; i++) {
+		const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
 		const double diff = scaled_F_calc - obs[i].abs_F_obs;
 		const double diff2 = scaled_F_calc * scaled_F_calc - obs[i].F_obs2;
 		const double weighted_chi = diff * diff / obs[i].sigma_obs;
@@ -419,12 +456,12 @@ void XCW::calc_criteria() {
 		sum_chi += weighted_chi;
 		sum_goof += weighted_goof;
 	}
-	chi2 = prefactor * sum_chi;
-	GooF = std::sqrt(prefactor * sum_goof);
+	cryst.chi2 = prefactor * sum_chi;
+	cryst.GooF = std::sqrt(prefactor * sum_goof);
 }
 
-void XCW::create_prims(std::vector<ao_data>& ao_data_shells) {
-	for (int atm = 0; atm < ncen; atm++) {
+void XCW::create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set) {
+	for (int atm = 0; atm < cryst.ncen; atm++) {
 		d3 pos = { occ_basis_set.atoms()[atm].x, occ_basis_set.atoms()[atm].y, occ_basis_set.atoms()[atm].z };
 		const int first_shell = *occ_basis_set.atom_to_shell()[atm].begin();
 		const int last_shell = occ_basis_set.atom_to_shell()[atm].back();
@@ -442,7 +479,7 @@ void XCW::create_prims(std::vector<ao_data>& ao_data_shells) {
 			}
 		}
 	}
-	nmo = ao_data_shells.size();
+	cryst.nmo = ao_data_shells.size();
 }
 
 ivec XCW::generate_asym_lookup(const int r) {
@@ -501,7 +538,7 @@ cvec2 XCW::calculateXCWintegral(GridManager& grid_manager, const ao_data& mu_dat
 				*(d_mu_ptr + 1) = y_ptr[p] - mp1;
 				*(d_mu_ptr + 2) = z_ptr[p] - mp2;
 				*(d_mu_ptr + 3) = std::hypot(*(d_mu_ptr), *(d_mu_ptr + 1), *(d_mu_ptr + 2));
-				mu_vals[g][p] = wave.eval_ao(d_mu, mu_prims, mu_data.m);
+				mu_vals[g][p] = dummy_wave.eval_ao(d_mu, mu_prims, mu_data.m);
 				overlap_ptr[p] = std::pow(mu_vals[g][p], 2);
 			}
 		}
@@ -527,14 +564,14 @@ cvec2 XCW::calculateXCWintegral(GridManager& grid_manager, const ao_data& mu_dat
 				*(d_nu_ptr + 1) = y_ptr[p] - np1;
 				*(d_nu_ptr + 2) = z_ptr[p] - np2;
 				*(d_nu_ptr + 3) = std::hypot(*(d_nu_ptr), *(d_nu_ptr + 1), *(d_nu_ptr + 2));
-				overlap_ptr[p] = (*d_mu_ptr + 3) > 12 || (*d_nu_ptr + 3) > 12 ? 0 : mu_vals[g][p] * wave.eval_ao(d_nu, nu_prims, nu_data.m);
+				overlap_ptr[p] = (*d_mu_ptr + 3) > 12 || (*d_nu_ptr + 3) > 12 ? 0 : mu_vals[g][p] * dummy_wave.eval_ao(d_nu, nu_prims, nu_data.m);
 			}
 		}
 	}
 	vec2 d1, d2, d3, dens;
 	std::vector<_time_point> time_points({ get_time() });
 	_time_point end;
-	grid_manager.getDensityVectors(wave, asym_atom_list, d1, d2, d3, dens);
+	grid_manager.getDensityVectors(dummy_wave, asym_atom_list, d1, d2, d3, dens);
 	const int points_ = grid_manager.getTotalGridPoints();
 	cvec2 sf;
 	calc_SF(points_, k_pt, d1, d2, d3, dens, sf, std::cout, time_points.front(), end, opt->debug, true, true);
@@ -542,65 +579,44 @@ cvec2 XCW::calculateXCWintegral(GridManager& grid_manager, const ao_data& mu_dat
 }
 
 size_t XCW::tri_index(int mu, int nu) const noexcept {
-	return mu * nmo - (mu * (mu - 1)) / 2 + (nu - mu);
+	return mu * cryst.nmo - (mu * (mu - 1)) / 2 + (nu - mu);
 }
 
 size_t XCW::flattened_idx(int r, int mu, int nu) const noexcept {
-	return r * nmo * (nmo + 1) / 2 + tri_index(mu, nu);
+	return r * cryst.nmo * (cryst.nmo + 1) / 2 + tri_index(mu, nu);
 }
 
-vec XCW::transform_voigt(const vec& voigt_matrix, const vec2& trans_mat) {
-	int size = voigt_matrix.size();
-	vec transformed(size, 0.0);
-	for (int a = 0; a < size; a++)
-		for (int b = 0; b < size; b++)
-			transformed[a] += trans_mat[a][b] * voigt_matrix[b];
-	return transformed;
-}
-
-vec2 XCW::build_transform(const vec2& transformation_matrix, const ivec2& basis) {
-	int size = basis.size();
-	vec2 voigt_transform(size, vec(size, 0.0));
-	for (int a = 0; a < size; a++)
-	{
-		const ivec& I = basis[a];
-		for (int b = 0; b < size; b++)
-		{
-			const ivec& J = basis[b];
-			double val = 0.0;
-			double prod = 1.0;
-			for (int t = 0; t < I.size(); t++)
-				prod *= transformation_matrix[I[t]][J[t]];
-			voigt_transform[a][b] = prod;
-		}
+void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
+	cvec2 DW_fact, phase_fact, translation_phase;
+	eval_phase(phase_fact);
+	eval_DW(DW_fact);
+	eval_translation_phase(translation_phase);
+	if (read) {
+		std::ifstream in("I_tensor", std::ios::binary);
+		if (!in)
+			throw std::runtime_error("Cannot open file for reading");
+		int nr_safe;
+		int nmo_safe;
+		int num_elements_safe;
+		int total_size_safe;
+		in.read(reinterpret_cast<char*>(&nr_safe), sizeof(nr_safe));
+		in.read(reinterpret_cast<char*>(&nmo_safe), sizeof(nmo_safe));
+		in.read(reinterpret_cast<char*>(&num_elements_safe), sizeof(num_elements_safe));
+		in.read(reinterpret_cast<char*>(&total_size_safe), sizeof(total_size_safe));
+		I.resize(total_size_safe);
+		in.read(reinterpret_cast<char*>(I.data()),
+			total_size_safe * sizeof(cdouble));
 	}
-	return voigt_transform;
-}
-
-void XCW::generate_basis(int rank, int dim,	int start, ivec& current, ivec2& out) {
-	if (current.size() == rank)
-	{
-		out.push_back(current);
-		return;
+	else {
+		eval_I(ao_data_shells, DW_fact, phase_fact, translation_phase);
 	}
-	for (int i = start; i < dim; i++)
-	{
-		current.push_back(i);
-		generate_basis(rank, dim, i, current, out);
-		current.pop_back();
-	}
+	eval_anom_disp(DW_fact, phase_fact, translation_phase);
+	// closing function
 }
 
-ivec2 XCW::generate_basis(int rank, int dim) {
-	ivec2 basis;
-	ivec current;
-	generate_basis(rank, dim, 0, current, basis);
-	return basis;
-}
+void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase) {
 
-void XCW::eval_I(std::vector<ao_data>& ao_data_shells) {
-
-	I.resize(nr_small * (nmo * (nmo + 1)) / 2);
+	I.resize(cryst.nr_small * (cryst.nmo * (cryst.nmo + 1)) / 2);
 	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
 
 	cvec2 XCW_integral;
@@ -613,25 +629,24 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells) {
 	config.debug = opt->debug;
 	config.all_charges = opt->all_charges;
 	GridManager grid_manager(config);
-	WFN temp = wave;
-	temp.delete_unoccupied_MOs();
-	grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell);
+	dummy_wave.delete_unoccupied_MOs();
+	bvec needs_grid(cryst.ncen, true);
+	grid_manager.setup3DGridsForMolecule(dummy_wave, asym_atom_list, needs_grid, unit_cell);
 	int cofs;
-	// Computes I as a three dimensional tensor mu x nu x hkl
 	bool equal = false;
 	double cutoff = 0;
-	std::vector<ivec> asym_lookup(nr_small);
-	for (r = 0; r < nr_small; r++) {
+	std::vector<ivec> asym_lookup(cryst.nr_small);
+	for (r = 0; r < cryst.nr_small; r++) {
 		asym_lookup[r] = generate_asym_lookup(r);
 	}
-	for (mu = 0; mu < nmo; mu++) {
+	for (mu = 0; mu < cryst.nmo; mu++) {
 		vec2 mu_vals;
 		const ao_data& mu_prims = ao_data_shells[mu];
 		const std::vector<primitive>& mu_primitives = mu_prims.prims;
 		const double& mp0 = mu_prims.pos[0];
 		const double& mp1 = mu_prims.pos[1];
 		const double& mp2 = mu_prims.pos[2];
-		for (nu = mu; nu < nmo; nu++) {
+		for (nu = mu; nu < cryst.nmo; nu++) {
 			if (nu == mu) {
 				equal = true;
 			}
@@ -671,10 +686,10 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells) {
 			double asym_fact;
 			int idx;
 			XCW_integral = calculateXCWintegral(grid_manager, mu_prims, nu_prims, asym_atom_list, k_pt, equal, mu_vals);
-			for (r = 0; r < nr_small; r++) {
+			for (r = 0; r < cryst.nr_small; r++) {
 				const cvec& translation_phase_r = translation_phase[r];
 				const ivec& asym_list = asym_lookup[r];
-				for (at = 0; at < ncen; at++) {
+				for (at = 0; at < cryst.ncen; at++) {
 					asym_fact = asym_atoms[at].asym_fact;
 					const cvec& XCW_at = XCW_integral[at];
 					const cvec& DW_at = DW_fact[at];
@@ -685,7 +700,6 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells) {
 						temp1 += XCW_at[idx] * DW_at[idx] * phase_at[idx] * translation_phase_r[r_asym];
 					}
 					I[flattened_idx(r, mu, nu)] += temp1 * asym_fact;
-					//I[r][mu][nu] += temp1 * asym_fact;
 				}
 			}
 		}
@@ -696,40 +710,39 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells) {
 
 void XCW::calc_F_calc(const dMatrix2& D) {
 	// Density matrix from occ is half of what I need, so times 2 and times (2x2)=4
-	F_calc.assign(nr_small, 0.0);
 #pragma omp parallel for schedule(static)
-	for (int r = 0; r < nr_small; ++r) {
-		cdouble sum = anom_corr[r];
-		size_t base = r * (nmo * (nmo + 1)) / 2;
-		for (int mu = 0; mu < nmo; mu++) {
+	for (int r = 0; r < cryst.nr_small; ++r) {
+		cdouble sum = F_calc[1][r];
+		size_t base = r * (cryst.nmo * (cryst.nmo + 1)) / 2;
+		for (int mu = 0; mu < cryst.nmo; mu++) {
 			sum += 2.0 * I[base] * D(mu, mu);
 			base++;
-			for (int nu = mu + 1; nu < nmo; nu++, base++) {
+			for (int nu = mu + 1; nu < cryst.nmo; nu++, base++) {
 				sum += 4.0 * I[base] * D(mu, nu);
 			}
 		}
-		F_calc[r] = sum;
+		F_calc[0][r] = sum;
 	}
 }
 
 void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
-	switch (refine_against) {
+	switch (settings.refine_against) {
 	case 1: {
-		perturb.setZero(nmo, nmo);
-		const double prefactor = 2.0 * scale / (nr_small - n_params);
-		const int packed_size = nmo * (nmo + 1) / 2;
+		perturb.setZero(cryst.nmo, cryst.nmo);
+		const double prefactor = 2.0 * cryst.F_scale / (cryst.nr_small - settings.n_params);
+		const int packed_size = cryst.nmo * (cryst.nmo + 1) / 2;
 #pragma omp parallel
 		{
-			occ::Mat local = occ::Mat::Zero(nmo, nmo);
+			occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
 #pragma omp for nowait
-			for (int r = 0; r < nr_small; r++) {
-				const double F_calc_abs = std::abs(F_calc[r]);
+			for (int r = 0; r < cryst.nr_small; r++) {
+				const double F_calc_abs = std::abs(F_calc[0][r]);
 				// There should be another sigma but somehow that does not seem to work
-				const cdouble precompute = std::conj(F_calc[r]) * (scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * F_calc_abs);
+				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * F_calc_abs);
 				const size_t base = r * packed_size;
-				for (int mu = 0; mu < nmo; mu++) {
+				for (int mu = 0; mu < cryst.nmo; mu++) {
 					size_t offset = base + tri_index(mu, mu);
-					for (int nu = mu; nu < nmo; ++nu) {
+					for (int nu = mu; nu < cryst.nmo; ++nu) {
 						const double temp = std::real(precompute * I[offset]);
 						local(mu, nu) += temp;
 						++offset;
@@ -742,34 +755,34 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			}
 		}
 		perturb *= prefactor;
-		for (int mu = 0; mu < nmo; mu++) {
-			for (int nu = mu + 1; nu < nmo; nu++) {
+		for (int mu = 0; mu < cryst.nmo; mu++) {
+			for (int nu = mu + 1; nu < cryst.nmo; nu++) {
 				perturb(nu, mu) = perturb(mu, nu);
 			}
 		}
 		if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
-			perturb.conservativeResize(2 * nmo, Eigen::NoChange);
-			perturb.bottomRows(nmo) = perturb.topRows(nmo);
+			perturb.conservativeResize(2 * cryst.nmo, Eigen::NoChange);
+			perturb.bottomRows(cryst.nmo) = perturb.topRows(cryst.nmo);
 		}
 		break;
 	}
 	case 2: {
-		perturb.setZero(nmo, nmo);
-		const double scale_sq = scale * scale;
-		const double prefactor = 4.0 * scale_sq / (nr_small - n_params);
-		const int packed_size = nmo * (nmo + 1) / 2;
+		perturb.setZero(cryst.nmo, cryst.nmo);
+		const double scale_sq = cryst.F_scale * cryst.F_scale;
+		const double prefactor = 4.0 * scale_sq / (cryst.nr_small - settings.n_params);
+		const int packed_size = cryst.nmo * (cryst.nmo + 1) / 2;
 #pragma omp parallel
 		{
-			occ::Mat local = occ::Mat::Zero(nmo, nmo);
+			occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
 #pragma omp for nowait
-			for (int r = 0; r < nr_small; r++) {
-				const double F_calc_abs = std::abs(F_calc[r]);
+			for (int r = 0; r < cryst.nr_small; r++) {
+				const double F_calc_abs = std::abs(F_calc[0][r]);
 				// There should be another sigma but somehow that does not seem to work
-				const cdouble precompute = std::conj(F_calc[r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2);
+				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2);
 				const size_t base = r * packed_size;
-				for (int mu = 0; mu < nmo; mu++) {
+				for (int mu = 0; mu < cryst.nmo; mu++) {
 					size_t offset = base + tri_index(mu, mu);
-					for (int nu = mu; nu < nmo; ++nu) {
+					for (int nu = mu; nu < cryst.nmo; ++nu) {
 						const double temp = std::real(precompute * I[offset]);
 						local(mu, nu) += temp;
 						++offset;
@@ -782,14 +795,14 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			}
 		}
 		perturb *= prefactor;
-		for (int mu = 0; mu < nmo; mu++) {
-			for (int nu = mu + 1; nu < nmo; nu++) {
+		for (int mu = 0; mu < cryst.nmo; mu++) {
+			for (int nu = mu + 1; nu < cryst.nmo; nu++) {
 				perturb(nu, mu) = perturb(mu, nu);
 			}
 		}
 		if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
-			perturb.conservativeResize(2 * nmo, Eigen::NoChange);
-			perturb.bottomRows(nmo) = perturb.topRows(nmo);
+			perturb.conservativeResize(2 * cryst.nmo, Eigen::NoChange);
+			perturb.bottomRows(cryst.nmo) = perturb.topRows(cryst.nmo);
 		}
 		break;
 	}
@@ -802,16 +815,16 @@ void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
 	double bohr2angstrom = constants::bohr2ang(1);
 	std::ostringstream init_stream;
 
-	init_stream << ncen << "\n\n";
+	init_stream << cryst.ncen << "\n\n";
 
-	for (int i = 0; i < ncen; ++i) {
+	for (int i = 0; i < cryst.ncen; ++i) {
 		init_stream
 			<< constants::atnr2letter(asym_atoms[i].type) << " "
 			<< asym_atoms[i].pos[0] * bohr2angstrom << " "
 			<< asym_atoms[i].pos[1] * bohr2angstrom << " "
 			<< asym_atoms[i].pos[2] * bohr2angstrom;
 
-		if (i != ncen - 1)
+		if (i != cryst.ncen - 1)
 			init_stream << "\n";
 	}
 
@@ -821,7 +834,7 @@ void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
 	mol.set_multiplicity(opt->mult);
 }
 
-void XCW::setup_basis(occ::core::Molecule& mol, std::string& basis_set_name) {
+void XCW::setup_basis(occ::core::Molecule& mol, std::string& basis_set_name, occ::qm::AOBasis& occ_basis_set) {
 	std::shared_ptr<BasisSet> basis_set = BasisSetLibrary::get_basis_set(basis_set_name);
 	occ_basis_set = basis_set->to_AOBasis(mol.atoms());
 }
@@ -849,14 +862,14 @@ void XCW::apply_level_shift(const occ::Mat& C_old, const occ::qm::SCF<occ::qm::H
 	const double temp_shift = scf.convergence_settings.effective_level_shift(scf.diis_error);
 	const int nocc = scf.ctx.mo.Cocc.cols();
 	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Restricted) {
-		const occ::Mat SC_virt = scf.ctx.S * C_old.rightCols(nmo - nocc);
+		const occ::Mat SC_virt = scf.ctx.S * C_old.rightCols(cryst.nmo - nocc);
 		F_diis.noalias() += temp_shift * SC_virt * SC_virt.transpose();
 	}
 	else {
 		const int nao = C_old.rows() / 2;
 		const auto S_ao = scf.ctx.S.topRows(nao);
-		const occ::Mat SC_virt_a = S_ao * C_old.topRows(nao).rightCols(nmo - nocc);
-		const occ::Mat SC_virt_b = S_ao * C_old.bottomRows(nao).rightCols(nmo - nocc);
+		const occ::Mat SC_virt_a = S_ao * C_old.topRows(nao).rightCols(cryst.nmo - nocc);
+		const occ::Mat SC_virt_b = S_ao * C_old.bottomRows(nao).rightCols(cryst.nmo - nocc);
 		F_diis.topRows(nao).noalias() += temp_shift * SC_virt_a * SC_virt_a.transpose();
 		F_diis.bottomRows(nao).noalias() += temp_shift * SC_virt_b * SC_virt_b.transpose();
 	}
@@ -864,20 +877,20 @@ void XCW::apply_level_shift(const occ::Mat& C_old, const occ::qm::SCF<occ::qm::H
 
 void XCW::build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMatrix2& dm_ref, const occ::Mat& dm_old) {
 	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
-		for (int i = 0; i < nmo; i++) {
+		for (int i = 0; i < cryst.nmo; i++) {
 			dm_ref(i, i) = dm_old(i, i);
-			dm_ref(i, i) += dm_old(i + nmo, i);
-			for (int j = i + 1; j < nmo; j++) {
+			dm_ref(i, i) += dm_old(i + cryst.nmo, i);
+			for (int j = i + 1; j < cryst.nmo; j++) {
 				dm_ref(i, j) = dm_old(i, j);
-				dm_ref(i, j) += dm_old(i + nmo, j);
+				dm_ref(i, j) += dm_old(i + cryst.nmo, j);
 				dm_ref(j, i) = dm_ref(i, j);
 			}
 		}
 	}
 	else {
-		for (int i = 0; i < nmo; i++) {
+		for (int i = 0; i < cryst.nmo; i++) {
 			dm_ref(i, i) = dm_old(i, i);
-			for (int j = i + 1; j < nmo; j++) {
+			for (int j = i + 1; j < cryst.nmo; j++) {
 				dm_ref(i, j) = dm_old(i, j);
 				dm_ref(j, i) = dm_ref(i, j);
 			}
@@ -885,7 +898,7 @@ void XCW::build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMat
 	}
 }
 
-void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool has_guess) {
+void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess) {
 
 	settings.clear();
 
@@ -899,7 +912,10 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	if (has_guess) {
 		scf.set_initial_guess_from_wfn(last_wfn);
 	}
-	scf.compute_initial_guess();
+	else {
+		scf.compute_initial_guess();
+		has_guess = true;
+	}
 	scf.ctx.K = scf.m_procedure.compute_schwarz_ints();
 	scf.update_scf_energy(false);
 
@@ -922,7 +938,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		print_ << "***SCF converged in " << scf.iter + 1 << " iterations***";
 		print_centered_message(print_.str(), 76, XCW_log);
 
-		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << chi2 << "\t" << GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
+		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << cryst.chi2 << "\t" << cryst.GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 		create_tscb(scf, lambda);
 	}
@@ -954,7 +970,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.iter++;
 	const double ehf_last = scf.ctx.energy["electronic"];
 	const occ::Mat dm_old = scf.ctx.mo.D;
-	dMatrix2 dm_eff(nmo, nmo);
+	dMatrix2 dm_eff(cryst.nmo, cryst.nmo);
 	build_effective_dm(scf, dm_eff, dm_old);
 	calc_F_calc(dm_eff);
 	eval_scale();
@@ -973,11 +989,11 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.update_scf_energy(false);
 	const double ehf = scf.ctx.energy["electronic"];
 	const double e_diff = std::abs(ehf - ehf_last);
-	quant = scf.ctx.energy["total"] + lambda * chi2;
+	quant = scf.ctx.energy["total"] + lambda * cryst.chi2;
 	scf.ctx.F += perturbation * lambda;
 
 	// Prints output line for iteration
-	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << chi2 << "\t" << GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
+	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << cryst.chi2 << "\t" << cryst.GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 	// DIIS extrapolation
 	occ::Mat F_diis = scf.convergence_accelerator.update(scf.ctx.mo.kind, scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
@@ -1068,133 +1084,107 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	//Roby_information Roby(sf_wave_vec[0]);
 }
 
-void XCW::calc_F_calc_fast() {
-	eval_phase();
-	//eval_DW();
-	eval_translation_phase();
-	eval_anom_disp();
-
-	cvec2 atomic_scattering_factors(ncen, cvec(nr, 0));
-	F_calc.resize(nr_small, 0);
-
-	// Calculate atomic scattering factors for each atom and symmetry generated reflexes
-	GridConfiguration config;
-	config.accuracy = opt->accuracy;
-	config.partition_type = opt->partition_type;
-	config.pbc = opt->pbc;
-	config.no_density_eval = false;
-	config.debug = opt->debug;
-	config.all_charges = opt->all_charges;
-	GridManager grid_manager(config);
-	WFN temp = wave;
-	vec2 d1, d2, d3, dens;
-	std::vector<_time_point> time_points({ get_time() });
-	_time_point end;
-	temp.delete_unoccupied_MOs();
-	grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell);
-	grid_manager.calculateNonSphericalDensities(temp, unit_cell);
-	svec time_descriptions;
-	grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
-	PartitionResults results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
-	grid_manager.printChargeTable(labels, temp, asym_atom_list, std::cout, results);
-	time_points.push_back(get_time());
-	time_descriptions.push_back("calculate charges");
-	grid_manager.getDensityVectors(temp, asym_atom_list, d1, d2, d3, dens);
-	const int points = grid_manager.getTotalGridPoints();
-	calc_SF(points, k_pt, d1, d2, d3, dens, atomic_scattering_factors, std::cout, time_points.front(), end, opt->debug, true, true);
-	// Calculate F_calc
-#pragma omp parallel for
-	for (int r = 0; r < nr_small; r++) {
-		const ivec& lookup = generate_asym_lookup(r);
-		for (int at = 0; at < ncen; at++) {
-			for (int r_asym = 0; r_asym < lookup.size(); r_asym++) {
-				F_calc[r] += atomic_scattering_factors[at][lookup[r_asym]] * DW_fact[at][lookup[r_asym]] * phase_fact[at][lookup[r_asym]] * translation_phase[r][r_asym] * asym_atoms[at].asym_fact;
-			}
-		}
-		// Add anomalous dispersion correction
-		F_calc[r] += anom_corr[r];
-		//std::cout << std::fixed << std::setprecision(5) << std::pow(std::abs(F_calc[r]), 2) << std::endl;
+occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read, bool safe) {
+	std::vector<ao_data> ao_data_shells;
+	occ::core::Molecule mol;
+	setup_SCF_mol(mol);
+	occ::qm::AOBasis occ_basis_set;
+	setup_basis(mol, settings.basis_set_name, occ_basis_set);
+	occ::qm::HartreeFock hf(occ_basis_set);
+	create_prims(ao_data_shells, occ_basis_set);
+	eval_I_anom_disp(ao_data_shells, read);
+	if (safe) {
+		std::ofstream out("I_tensor", std::ios::binary);
+		if (!out)
+			throw std::runtime_error("Cannot open file for writing");
+		int nr_safe = cryst.nr_small;
+		int nmo_safe = cryst.nmo;
+		int num_elements_safe = (cryst.nmo * (cryst.nmo + 1)) / 2;
+		int total_size_safe = static_cast<int>(I.size());
+		out.write(reinterpret_cast<const char*>(&nr_safe), sizeof(nr_safe));
+		out.write(reinterpret_cast<const char*>(&nmo_safe), sizeof(nmo_safe));
+		out.write(reinterpret_cast<const char*>(&num_elements_safe), sizeof(num_elements_safe));
+		out.write(reinterpret_cast<const char*>(&total_size_safe), sizeof(total_size_safe));
+		out.write(reinterpret_cast<const char*>(I.data()),
+			total_size_safe * sizeof(cdouble));
 	}
-	//dump F_calc values as binary file called F_calc
-
-	std::ofstream fout("F_calc.bin", std::ios::out | std::ios::binary);
-	//First byte is the number of bytes per double, the next one is the size of a compelx double, to understand how to read the data.
-	//After that an int64 (8 byte) of the number of F.calc values to be expected after that.
-	//Finally, the dump of all F_calc values as cdouble (A,B)
-	char size = sizeof(double);
-	fout.write(reinterpret_cast<const char*>(&size), sizeof(size));
-	size = sizeof(cdouble);
-	fout.write(reinterpret_cast<const char*>(&size), sizeof(size));
-	size_t vec_size = F_calc.size();
-	fout.write(reinterpret_cast<const char*>(&vec_size), sizeof(size_t));
-	fout.write(reinterpret_cast<const char*>(F_calc.data()), vec_size * sizeof(cdouble));
-	fout.close();
-
+	return hf;
+	// closing function
 }
+
+// Needs rework
+//void XCW::calc_F_calc_fast() {
+//	eval_phase();
+//	//eval_DW();
+//	eval_translation_phase();
+//	eval_anom_disp();
+//
+//	cvec2 atomic_scattering_factors(ncen, cvec(nr, 0));
+//	F_calc.resize(nr_small, 0);
+//
+//	// Calculate atomic scattering factors for each atom and symmetry generated reflexes
+//	GridConfiguration config;
+//	config.accuracy = opt->accuracy;
+//	config.partition_type = opt->partition_type;
+//	config.pbc = opt->pbc;
+//	config.no_density_eval = false;
+//	config.debug = opt->debug;
+//	config.all_charges = opt->all_charges;
+//	GridManager grid_manager(config);
+//	WFN temp = wave;
+//	vec2 d1, d2, d3, dens;
+//	std::vector<_time_point> time_points({ get_time() });
+//	_time_point end;
+//	temp.delete_unoccupied_MOs();
+//	grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell);
+//	grid_manager.calculateNonSphericalDensities(temp, unit_cell);
+//	svec time_descriptions;
+//	grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
+//	PartitionResults results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
+//	grid_manager.printChargeTable(labels, temp, asym_atom_list, std::cout, results);
+//	time_points.push_back(get_time());
+//	time_descriptions.push_back("calculate charges");
+//	grid_manager.getDensityVectors(temp, asym_atom_list, d1, d2, d3, dens);
+//	const int points = grid_manager.getTotalGridPoints();
+//	calc_SF(points, k_pt, d1, d2, d3, dens, atomic_scattering_factors, std::cout, time_points.front(), end, opt->debug, true, true);
+//	// Calculate F_calc
+//#pragma omp parallel for
+//	for (int r = 0; r < nr_small; r++) {
+//		const ivec& lookup = generate_asym_lookup(r);
+//		for (int at = 0; at < ncen; at++) {
+//			for (int r_asym = 0; r_asym < lookup.size(); r_asym++) {
+//				F_calc[r] += atomic_scattering_factors[at][lookup[r_asym]] * DW_fact[at][lookup[r_asym]] * phase_fact[at][lookup[r_asym]] * translation_phase[r][r_asym] * asym_atoms[at].asym_fact;
+//			}
+//		}
+//		// Add anomalous dispersion correction
+//		F_calc[r] += anom_corr[r];
+//		//std::cout << std::fixed << std::setprecision(5) << std::pow(std::abs(F_calc[r]), 2) << std::endl;
+//	}
+//	//dump F_calc values as binary file called F_calc
+//
+//	std::ofstream fout("F_calc.bin", std::ios::out | std::ios::binary);
+//	//First byte is the number of bytes per double, the next one is the size of a compelx double, to understand how to read the data.
+//	//After that an int64 (8 byte) of the number of F.calc values to be expected after that.
+//	//Finally, the dump of all F_calc values as cdouble (A,B)
+//	char size = sizeof(double);
+//	fout.write(reinterpret_cast<const char*>(&size), sizeof(size));
+//	size = sizeof(cdouble);
+//	fout.write(reinterpret_cast<const char*>(&size), sizeof(size));
+//	size_t vec_size = F_calc.size();
+//	fout.write(reinterpret_cast<const char*>(&vec_size), sizeof(size_t));
+//	fout.write(reinterpret_cast<const char*>(F_calc.data()), vec_size * sizeof(cdouble));
+//	fout.close();
+//
+//}
 
 void XCW::run_XCW_fitting() {
 
-	setup_SCF_mol(mol);
-	std::string test_name = "def2-svp_basis";
-	setup_basis(mol, test_name);
-
-	eval_phase();
-	eval_DW();
-	eval_translation_phase();
-	std::vector<ao_data> ao_data_shells;
-	create_prims(ao_data_shells);
-
-	n_params = 161;
-
-	eval_I(ao_data_shells);
-
-	// Safe flattened I
-	std::ofstream out("I_tensor", std::ios::binary);
-	if (!out)
-		throw std::runtime_error("Cannot open file for writing");
-	int nr_safe = nr_small;
-	int nmo_safe = nmo;
-	int num_elements_safe = (nmo * (nmo + 1)) / 2;
-	int total_size_safe = static_cast<int>(I.size());
-	out.write(reinterpret_cast<const char*>(&nr_safe), sizeof(nr_safe));
-	out.write(reinterpret_cast<const char*>(&nmo_safe), sizeof(nmo_safe));
-	out.write(reinterpret_cast<const char*>(&num_elements_safe), sizeof(num_elements_safe));
-	out.write(reinterpret_cast<const char*>(&total_size_safe), sizeof(total_size_safe));
-	out.write(reinterpret_cast<const char*>(I.data()),
-		total_size_safe * sizeof(cdouble));
-
-	// Read flattened I
-	//std::ifstream in("I_tensor", std::ios::binary);
-	//if (!in)
-	//	throw std::runtime_error("Cannot open file for reading");
-	//int nr_safe;
-	//int nmo_safe;
-	//int num_elements_safe;
-	//int total_size_safe;
-	//in.read(reinterpret_cast<char*>(&nr_safe), sizeof(nr_safe));
-	//in.read(reinterpret_cast<char*>(&nmo_safe), sizeof(nmo_safe));
-	//in.read(reinterpret_cast<char*>(&num_elements_safe), sizeof(num_elements_safe));
-	//in.read(reinterpret_cast<char*>(&total_size_safe), sizeof(total_size_safe));
-	//I.resize(total_size_safe);
-	//in.read(reinterpret_cast<char*>(I.data()),
-	//	total_size_safe * sizeof(cdouble));
-
-	eval_anom_disp();
-
-	// Configure the XCW routine solver
-	const double starting_alpha = 0.5;
-	const int num_steps = 10;
-	const double increments = 0.01;
-	occ::qm::HartreeFock hf(occ_basis_set);
+	bool read = true;
+	bool safe = false;
+	occ::qm::HartreeFock hf = setup_XCW_procedure(read, safe);
+	occ::qm::SCF scf(hf, settings.hf_type);
 	occ::qm::Wavefunction last_wfn;
 	bool has_guess = false;
-	const int maximum_iterations = 100;
-	const int charge = 0;
-	const int multiplicity = 1;
-	const double level_shift = 0.1;
-	const double level_shift_threshold = 0;
-	const occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
-	refine_against = 1;
 
 	std::cout << "More detailed output in XCW.log file..." << std::endl;
 	std::cout << "____________________________________________________________________________\n";
@@ -1203,23 +1193,20 @@ void XCW::run_XCW_fitting() {
 	std::cout << "____________________________________________________________________________\n";
 
 	// Runs the lambda steps for XCW fitting
-	for (int step = 0; step < num_steps; step++) {
+	for (int step = 0; step < settings.num_xcw_steps; step++) {
 
-		double alpha = starting_alpha;
-		const double lambda = step * increments;
-
-		occ::qm::SCF scf(hf, hf_type);
-		scf.set_charge_multiplicity(charge, multiplicity);
-		scf.maxiter = maximum_iterations;
-		scf.convergence_settings.level_shift = level_shift;
-		scf.convergence_settings.level_shift_threshold = level_shift_threshold;
+		occ::qm::SCF scf(hf, settings.hf_type);
+		double alpha = settings.alpha;
+		const double lambda = step * settings.xcw_step_size;
+		scf.set_charge_multiplicity(settings.charge, settings.multiplicity);
+		scf.maxiter = settings.max_scf_iterations;
+		scf.convergence_settings.level_shift = settings.level_shift;
+		scf.convergence_settings.level_shift_threshold = 0;
 		scf.update_occupied_orbital_count();
 		scf.convergence_accelerator.set_strategy(scf.convergence_settings.diis_strategy);
 		scf.convergence_accelerator.set_switch_threshold(scf.convergence_settings.diis_switch_threshold);
-
-		do_SCF(lambda, alpha, scf, last_wfn, has_guess);
+ 		do_SCF(lambda, alpha, scf, last_wfn, has_guess);
 		last_wfn = scf.wavefunction();
-		has_guess = true;
 	}
 
 	std::cout << "Finished XCW fitting procedure." << std::endl;

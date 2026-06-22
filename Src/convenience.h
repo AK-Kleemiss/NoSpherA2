@@ -412,6 +412,8 @@ void readxyzMinMax_fromCIF(
 
 bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
 
+bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, std::ofstream& log3, bool debug);
+
 vec read_U_iso_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug);
 
 double double_from_string_with_esd(std::string in);

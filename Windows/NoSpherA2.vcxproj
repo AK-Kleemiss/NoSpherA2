@@ -240,7 +240,7 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <Optimization>Disabled</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;NONSA2DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
