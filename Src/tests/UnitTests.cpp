@@ -917,8 +917,12 @@ namespace NoSpherA2UnitTests
 
     TEST(ConstantsTests, ConstantsSqrt_NegativeIsNaN)
     {
-        double r = constants::sqrt(-1.0);
-        EXPECT_TRUE(std::isnan(r));
+#if defined(__FAST_MATH__)
+    GTEST_SKIP() << "Skipping NaN test under -ffast-math";
+#else
+    double r = constants::sqrt(-1.0);
+    EXPECT_TRUE(std::isnan(r));
+#endif
     }
 
     TEST(ConstantsTests, ExpApprox_AtZero)

@@ -209,13 +209,13 @@ clean:
 endif
 
 ifeq ($(NAME),LINUX)
+CONFIG ?= Release
 NoSpherA2: IntelMKL featomic LibCint occ BasisSetConverter
-	@echo Start making Linux executable
-	@cd Linux && $(MAKE) all -j BUILD_TESTS=$(BUILD_TESTS)
+	@echo Building NoSpherA2 for $(NAME) with $(CONFIG) configuration
+	@cd Linux && $(MAKE) all -j BUILD_TESTS=$(BUILD_TESTS) CONFIG=$(CONFIG) 
 
-NoSpherA2_Debug: IntelMKL featomic LibCint occ BasisSetConverter
-	@echo Building NoSpherA2_Debug for $(NAME)
-	@cd Linux && $(MAKE) NoSpherA2_Debug -j BUILD_TESTS=$(BUILD_TESTS)
+NoSpherA2_Debug: 
+	@$(MAKE) BUILD_TESTS=$(BUILD_TESTS) CONFIG=Debug NoSpherA2 
 
 clean:
 	@cd Linux && make clean

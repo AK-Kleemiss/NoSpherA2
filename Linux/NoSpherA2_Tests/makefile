@@ -40,7 +40,7 @@ $(OUT_DIR)/%.o: $(SRC_DIR)/%.cpp $(PCH_GCH_ACTIVE)
 
 LIB_NOS ?= $(BUILD_DIR)/lib/libnosphera2.a
 
-LIBS := -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -L$(REPO_ROOT)/Lib/occ/lib -ltbb -Wl,-rpath,'$$ORIGIN' -lpthread -lm -lc -lquadmath
+LIBS := -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -L$(REPO_ROOT)/Lib/occ/lib -ltbb -Wl,-rpath,'$$ORIGIN' -lpthread -lm -lc -lquadmath -lgtest
 
 all: NoSpherA2_Tests
 
