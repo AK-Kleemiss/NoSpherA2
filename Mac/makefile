@@ -1,158 +1,57 @@
-# === macOS Makefile (Accelerate + libomp, universal) ===
-SHELL := /bin/bash
+include common.mk
 
-RM   := rm -f
-COMP ?= clang++
-APP  ?= NoSpherA2
+# High-level build entrypoint for macOS builds.
+# Mirrors Linux/makefile structure:
+#   - static : build core static library
+#   - NoSpherA2 : build CLI executable
+#   - tests : build native test binary (if present/usable)
+#   - lipo : build universal binary (arm64 + x86_64)
 
-# Build both architectures for universal binary
-ARCHS := arm64 x86_64
+REPO_ROOT ?= ..
+CONFIG ?= Release
 
-# Source & include roots
-SRC_DIR := ../Src
-USER_INC_DIRS := ../Src ../Lib ../Src/occ
-SYSTEM_INC_DIRS := ../Lib/featomic_install_arm64/include ../Lib/featomic_install_x86_64/include ../Lib/LibCint_arm64/include ../Lib/LibCint_x86_64/include ../Lib/occ_x86_64/include ../Lib/occ_arm64/include
-LIB_OCC := ../Lib/occ/lib/libocc.a
+BUILD_DIR ?= $(REPO_ROOT)/build/$(CONFIG)
 
-# Local static libs (adjust as needed)
-EXTRA_LIBS_ARM := ../Lib/featomic_install_arm64/lib/libfeatomic.a \
-     ../Lib/featomic_install_arm64/lib/libmetatensor.a \
-     ../Lib/LibCint_arm64/lib/libcint.a ../Lib/occ_arm64/lib/libocc.a
+STATIC_DIR := NoSpherA2_STATIC
+EXE_DIR := NoSpherA2
+TEST_DIR := NoSpherA2_Tests
 
-EXTRA_LIBS_x86 := ../Lib/featomic_install_x86_64/lib/libfeatomic.a \
-    ../Lib/featomic_install_x86_64/lib/libmetatensor.a \
-    ../Lib/LibCint_x86_64/lib/libcint.a ../Lib/occ_x86_64/lib/libocc.a
-
-# Sources - automatically discover all .cpp files in SRC_DIR
-SRCS := $(wildcard $(SRC_DIR)/*.cpp)
-ifneq ($(filter $(SRC_DIR)/basis_data.cpp,$(SRCS)), $(SRC_DIR)/basis_data.cpp)
-  SRCS += $(SRC_DIR)/basis_data.cpp
-endif
-
-#remove mat_nos_math.cpp and vec_nos_math.cpp from SRCS
-SRCS := $(filter-out $(SRC_DIR)/mat_nos_math.cpp $(SRC_DIR)/vec_nos_math.cpp, $(SRCS))
-
-# Per-arch objects
-OBJS_arm64  := $(patsubst $(SRC_DIR)/%.cpp, build/arm64/%.o,  $(SRCS))
-OBJS_x86_64 := $(patsubst $(SRC_DIR)/%.cpp, build/x86_64/%.o, $(SRCS))
-
-# Common compile settings
-CXXSTD    := -std=c++20 -DACCELERATE_NEW_LAPACK
-OPTFLAGS  := -O3 -fvisibility=hidden
-WARNFLAGS := -fmessage-length=0
-DEPFLAGS  := -MMD -MP
-INCLUDES  := $(addprefix -I,$(USER_INC_DIRS)) $(foreach d,$(SYSTEM_INC_DIRS),-isystem $(d))
-
-# macOS SDK and deployment target
-SDKROOT := $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null)
-SYSROOT := $(if $(SDKROOT),-isysroot $(SDKROOT),)
-# Set deployment target to 15.0 to match featomic prebuilt library requirements
-DEPLOYMENT_TARGET := -mmacosx-version-min=15.0
-
-# ---- OpenMP via libomp (Homebrew) ----
-# Override these if your Homebrew lives elsewhere.
-LIBOMP_PREFIX_arm64  ?= /opt/homebrew/opt/libomp
-LIBOMP_PREFIX_x86_64 ?= /usr/local/opt/libomp
-
-# Compile flags to enable OpenMP with Apple clang
-OMPFLAGS_arm64  := -Xpreprocessor -fopenmp -I$(LIBOMP_PREFIX_arm64)/include
-OMPFLAGS_x86_64 := -Xpreprocessor -fopenmp -I$(LIBOMP_PREFIX_x86_64)/include
-
-# Linker flags for libomp (+rpath so users don't need DYLD_LIBRARY_PATH)
-OMPLIBS_arm64   := -L$(LIBOMP_PREFIX_arm64)/lib   -Wl,-rpath,$(LIBOMP_PREFIX_arm64)/lib   -lomp
-OMPLIBS_x86_64  := -L$(LIBOMP_PREFIX_x86_64)/lib  -Wl,-rpath,$(LIBOMP_PREFIX_x86_64)/lib  -lomp
-
-# Common flags
-CXXFLAGS_COMMON := $(CXXSTD) $(OPTFLAGS) $(WARNFLAGS) $(DEPFLAGS) $(INCLUDES) $(SYSROOT) $(DEPLOYMENT_TARGET)
-LDFLAGS_COMMON  := $(SYSROOT) $(DEPLOYMENT_TARGET) -framework Accelerate
-
-# ---- Precompiled headers ----
-# Clang uses -include-pch to explicitly load a precompiled header.
-PCH_arm64  := build/arm64/pch.h.pch
-PCH_x86_64 := build/x86_64/pch.h.pch
-
-# Per-arch final flags (PCH flags added after PCH is built, referenced in pattern rules)
-CXXFLAGS_arm64  := $(CXXFLAGS_COMMON)  -arch arm64  $(OMPFLAGS_arm64)  -include-pch $(PCH_arm64)
-CXXFLAGS_x86_64 := $(CXXFLAGS_COMMON)  -arch x86_64 $(OMPFLAGS_x86_64) -include-pch $(PCH_x86_64)
-# Flags without PCH for compiling the PCH itself
-CXXFLAGS_arm64_NO_PCH  := $(CXXFLAGS_COMMON)  -arch arm64  $(OMPFLAGS_arm64)
-CXXFLAGS_x86_64_NO_PCH := $(CXXFLAGS_COMMON)  -arch x86_64 $(OMPFLAGS_x86_64)
-LDFLAGS_arm64   := $(LDFLAGS_COMMON)   -arch arm64  $(OMPLIBS_arm64)  -L../Lib/occ_arm64/lib  -ltbb -Wl,-rpath,@executable_path
-LDFLAGS_x86_64  := $(LDFLAGS_COMMON)   -arch x86_64 $(OMPLIBS_x86_64) -L../Lib/occ_x86_64/lib -ltbb -Wl,-rpath,@executable_path
-
-# --------------------------------------------------------------------
-# Targets
-# --------------------------------------------------------------------
-
-# Default target is universal binary
 all: NoSpherA2
 
-# Universal binary (both architectures)
-NoSpherA2: NoSpherA2_arm64 NoSpherA2_x86_64
-	@echo "Building MAC executable"
-	@echo "Start making Mac executable"
-	@echo "Lipo → $@"
-	@lipo -create -output $@ NoSpherA2_arm64 NoSpherA2_x86_64
-	@lipo -create -output libtbb.dylib \
-		../Lib/occ_arm64/lib/libtbb.dylib \
-		../Lib/occ_x86_64/lib/libtbb.dylib
-	@lipo -create -output libomp.dylib \
-		$(LIBOMP_PREFIX_arm64)/lib/libomp.dylib \
-		$(LIBOMP_PREFIX_x86_64)/lib/libomp.dylib
-	@cp $@ ../
-	@echo "Done."
+# ---- Per-arch builds ----
+static:
+	@$(MAKE) -C $(STATIC_DIR) REPO_ROOT=../.. CONFIG=$(CONFIG) NATIVE_ARCH=$(ARCH) all -j
 
-# Single architecture builds
-NoSpherA2_arm64: $(OBJS_arm64)
-	@echo "Building MAC executable for arm64"
-	@echo "Link (arm64)…"
-	@$(COMP) $^ $(EXTRA_LIBS_ARM) $(LDFLAGS_arm64) -o $@
-	@cp ../Lib/occ_arm64/lib/libtbb*.dylib ./
+NoSpherA2: static
+	@$(MAKE) -C $(EXE_DIR) REPO_ROOT=../.. CONFIG=$(CONFIG) NATIVE_ARCH=$(ARCH) all -j
+	@echo 'Done building NoSpherA2 (see build/$(CONFIG)/bin)'
 
-NoSpherA2_x86_64: $(OBJS_x86_64)
-	@echo "Building MAC executable for x86_64"
-	@echo "Link (x86_64)…"
-	@$(COMP) $^ $(EXTRA_LIBS_x86) $(LDFLAGS_x86_64) -o $@
-	@cp ../Lib/occ_x86_64/lib/libtbb*.dylib ./
+tests: static
+	@$(MAKE) -C $(TEST_DIR) REPO_ROOT=../.. CONFIG=$(CONFIG) NATIVE_ARCH=$(ARCH) all -j
 
-# Actually run the converter to generate the file
-$(SRC_DIR)/basis_data.cpp:
-	@echo "Running BasisSetConverter..."
-	@file ../Lib/BasisSetConverter
-	@../Lib/BasisSetConverter ../BasisSetGenerator/basis_sets ../Src
-	@echo "basis_data.cpp generated"
+# ---- Universal binary (arm64 + x86_64) ----
+# This produces build/<CONFIG>/bin/NoSpherA2 as a universal binary.
+# It expects both per-arch outputs to exist.
 
-# ---- Precompiled header build rules ----
-$(PCH_arm64): $(SRC_DIR)/pch.h | build/arm64
-	@echo "Building precompiled header (arm64)..."
-	@$(COMP) $(CXXFLAGS_arm64_NO_PCH) -x c++-header -o "$@" "$<"
+lipo: NoSpherA2_arm64 NoSpherA2_x86_64
+	@echo 'Lipo → build/$(CONFIG)/bin/NoSpherA2'
+	@mkdir -p "$(BUILD_DIR)/bin"
+	@lipo -create -output "$(BUILD_DIR)/bin/NoSpherA2" \
+	  "$(BUILD_DIR)/bin/NoSpherA2_arm64" \
+	  "$(BUILD_DIR)/bin/NoSpherA2_x86_64"
 
-$(PCH_x86_64): $(SRC_DIR)/pch.h | build/x86_64
-	@echo "Building precompiled header (x86_64)..."
-	@$(COMP) $(CXXFLAGS_x86_64_NO_PCH) -x c++-header -o "$@" "$<"
+NoSpherA2_arm64:
+	@$(MAKE) ARCH=arm64 NoSpherA2
+	@cp -f "$(BUILD_DIR)/bin/NoSpherA2" "$(BUILD_DIR)/bin/NoSpherA2_arm64"
 
-# Pattern rules
-build/arm64/%.o: $(SRC_DIR)/%.cpp $(PCH_arm64) | build/arm64
-	@echo "Compiling (arm64): $<"
-	@$(COMP) $(CXXFLAGS_arm64) -c $< -o $@
-
-build/x86_64/%.o: $(SRC_DIR)/%.cpp $(PCH_x86_64) | build/x86_64
-	@echo "Compiling (x86_64): $<"
-	@$(COMP) $(CXXFLAGS_x86_64) -c $< -o $@
-
-build/arm64  build/x86_64:
-	@mkdir -p $@
-
-# Debug variant
-debug: OPTFLAGS := -O0 -g
-debug: clean NoSpherA2_arm64
+NoSpherA2_x86_64:
+	@$(MAKE) ARCH=x86_64 NoSpherA2
+	@cp -f "$(BUILD_DIR)/bin/NoSpherA2" "$(BUILD_DIR)/bin/NoSpherA2_x86_64"
 
 clean:
-	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2
-	@echo "Cleaned."
+	@$(MAKE) -C $(STATIC_DIR) clean
+	@$(MAKE) -C $(EXE_DIR) clean
+	@$(MAKE) -C $(TEST_DIR) clean
+	-@echo ' '
 
-.PHONY: all clean debug NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64
-
-# Include generated dependency files for correct incremental rebuilds
--include $(wildcard build/arm64/*.d) $(wildcard build/x86_64/*.d)
-
+.PHONY: all static tests clean NoSpherA2 lipo NoSpherA2_arm64 NoSpherA2_x86_64

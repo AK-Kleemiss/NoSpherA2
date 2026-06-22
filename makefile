@@ -23,12 +23,13 @@ endif
 
 #Set some environemt variables for macOS builds
 ifeq ($(NAME),MAC)
-export MACOSX_DEPLOYMENT_TARGET=13.3
-export CMAKE_OSX_DEPLOYMENT_TARGET=13.3
-export RUSTFLAGS=-C link-arg=-mmacosx-version-min=13.3
+export MACOSX_DEPLOYMENT_TARGET=15.0
+export CMAKE_OSX_DEPLOYMENT_TARGET=15.0
+export RUSTFLAGS=-C link-arg=-mmacosx-version-min=15.0
 endif
 
 BUILD_TESTS ?= 0
+CONFIG ?= Release
 
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
@@ -209,7 +210,6 @@ clean:
 endif
 
 ifeq ($(NAME),LINUX)
-CONFIG ?= Release
 NoSpherA2: IntelMKL featomic LibCint occ BasisSetConverter
 	@echo Building NoSpherA2 for $(NAME) with $(CONFIG) configuration
 	@cd Linux && $(MAKE) all -j BUILD_TESTS=$(BUILD_TESTS) CONFIG=$(CONFIG) 
@@ -222,25 +222,23 @@ clean:
 endif
 
 ifeq ($(NAME),MAC)
+MAC_OUT_DIR := build/$(CONFIG)/bin
+
 NoSpherA2: IntelMKL featomic LibCint occ BasisSetConverter
-	@echo Start making Mac $(NATIVE_ARCH) executable
-	@rm -f NoSpherA2_$(NATIVE_ARCH)
-	@cd Mac && rm -f NoSpherA2_$(NATIVE_ARCH) && make NoSpherA2_$(NATIVE_ARCH) -j && cp NoSpherA2_$(NATIVE_ARCH) ../NoSpherA2
+	@echo Building NoSpherA2 for $(NAME) with $(CONFIG) configuration
+	@cd Mac && $(MAKE) NoSpherA2 -j CONFIG=$(CONFIG) ARCH=$(NATIVE_ARCH)
+	@echo 'Done building NoSpherA2 (see $(MAC_OUT_DIR))'
 
 NoSpherA2_arm64: IntelMKL featomic_arm64 LibCint_arm64 occ_arm64 BasisSetConverter_arm64
-	@echo Start making Mac arm64 executable
-	@rm -f NoSpherA2_arm64
-	@cd Mac && rm -f NoSpherA2_arm64 && make NoSpherA2_arm64 -j && cp NoSpherA2_arm64 ../NoSpherA2
+	@$(MAKE) NATIVE_ARCH=arm64 NoSpherA2
 
 NoSpherA2_x86_64: IntelMKL featomic_x86_64 LibCint_x86_64 occ_x86_64 BasisSetConverter_x86_64
-	@echo Start making Mac x86_64 executable
-	@rm -f NoSpherA2_x86_64
-	@cd Mac && rm -f NoSpherA2_x86_64 && make NoSpherA2_x86_64 -j && cp NoSpherA2_x86_64 ../NoSpherA2_x86_64
+	@$(MAKE) NATIVE_ARCH=x86_64 NoSpherA2
 
-NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64 LibCint_arm64 LibCint_x86_64 LibCint_x86_64 occ_x86_64 occ_arm64 BasisSetConverter_arm64 BasisSetConverter_x86_64
-	@echo Start making Mac universal executable
-	@rm -f NoSpherA2
-	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j
+NoSpherA2_lipo: NoSpherA2_arm64 NoSpherA2_x86_64
+	@echo Building universal NoSpherA2 for $(NAME)
+	@cd Mac && $(MAKE) lipo -j CONFIG=$(CONFIG)
+	@echo 'Done building NoSpherA2 (see $(MAC_OUT_DIR))'
 
 clean:
 	@cd Mac && make clean

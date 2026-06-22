@@ -11,6 +11,8 @@
 __pycache__
 *.exe
 *.dll
+*.d
+*.o
 
 #Explicit Files to ignore
 tests/alanine_integrated_occ/alanine.owf.fchk
