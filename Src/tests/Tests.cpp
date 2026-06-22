@@ -1,18 +1,7 @@
 #include "pch.h"
-#if defined(_WIN32)
-	#include "CppUnitTest.h"
-	using namespace Microsoft::VisualStudio::CppUnitTestFramework;
-#else
-	#include "CppUnitTest_shim.h"
-#endif
 
-namespace Tests
+int main(int argc, char** argv)
 {
-	TEST_CLASS(Tests)
-	{
-		
-		TEST_METHOD(TestMethod1)
-		{
-		}
-	};
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }

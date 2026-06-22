@@ -2,16 +2,6 @@
 
 #include "../core/NoSpherA2.h"
 
-#if defined(_WIN32)
-	#include "CppUnitTest.h"
-    #include <Windows.h>
-	using namespace Microsoft::VisualStudio::CppUnitTestFramework;
-#else
-    #define CATCH_CONFIG_MAIN
-	#include "CppUnitTest_shim.h"
-#endif
-
-
 inline std::filesystem::path nos_test_repo_root()
     {
         if (const char* env = std::getenv("NOS_REPO_ROOT")) {
@@ -32,6 +22,11 @@ inline std::filesystem::path nos_test_repo_root()
     }
 
 namespace {
+
+struct UT_Result {
+    bool success;
+    std::string message;
+};
 
 static const std::regex kNumberPattern(R"([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)");
 
@@ -380,24 +375,24 @@ static std::optional<TomlTestDef> load_test_def_from_toml(const std::filesystem:
     return def;
 }
 
-static int run_inprocess_test(const std::filesystem::path& repo_root,
+static UT_Result run_inprocess_test(const std::filesystem::path& repo_root,
     const std::string& test_name)
 {
     const auto toml_path = repo_root / "tests" / "tests.toml";
     auto def_opt = load_test_def_from_toml(toml_path, test_name);
     if (!def_opt.has_value()) {
-        return -1;
+        return UT_Result{false, "Test definition not found for test '" + test_name + "'"};
     }
 
     const auto test_src_dir = repo_root / "tests" / def_opt->directory;
     if (!std::filesystem::exists(test_src_dir)) {
-        return -2;
+        return UT_Result{false, "Test source directory does not exist: " + test_src_dir.string()};
     }
 
     // Inject OCC_DATA_PATH for in-process runs.
     const std::string occDataPath = (repo_root / "Lib" / "occ" / "share" / "occ").string();
 #ifdef _WIN32
-    SetEnvironmentVariableA("OCC_DATA_PATH", occDataPath.c_str());
+    _putenv_s("OCC_DATA_PATH", occDataPath.c_str());
 #else
     setenv("OCC_DATA_PATH", occDataPath.c_str(), 1);
 #endif
@@ -434,7 +429,7 @@ static int run_inprocess_test(const std::filesystem::path& repo_root,
     int rc = run_app(static_cast<int>(argv_storage.size()), argv.data());
     std::filesystem::current_path(old_cwd);
     if (rc != 0) {
-        return rc;
+        return UT_Result{false, "Test failed with error code: " + std::to_string(rc)};
     }
 
     std::filesystem::path out_file = test_src_dir / "NoSpherA2.log";
@@ -443,29 +438,22 @@ static int run_inprocess_test(const std::filesystem::path& repo_root,
     }
 
     if (!std::filesystem::exists(out_file)) {
-        return -2;
+        return UT_Result{false, "Output file does not exist: " + out_file.string()};
     }
-
-    Logger::WriteMessage((std::string("Log file: ") + out_file.string()).c_str());
 
     const std::string good_name = def_opt->goodFile.empty() ? (test_name + ".good") : def_opt->goodFile;
     const auto good_path = test_src_dir / good_name;
 
     if (!std::filesystem::exists(good_path)) {
-        return -2;
+        return UT_Result{false, "Good file does not exist: " + good_path.string()};
     }
 
     const auto diff = compare_files_numeric(good_path, out_file, 0.01);
     if (!diff.empty()) {
-    #ifdef _WIN32
-        Logger::WriteMessage(std::wstring(diff.begin(), diff.end()).c_str());
-    #else
-        Logger::WriteMessage(diff.c_str());
-    #endif
-        return -3;
+        return UT_Result{false, "Logfile location: " + out_file.string() + "\nFiles differ: " + diff};
     }
 
-    return 0;
+    return UT_Result{true, ""};
 }
 
 } // namespace
@@ -480,133 +468,129 @@ std::filesystem::path get_repo_root()
     }
     return repo_root;
 }
-
-TEST_CLASS(TomlIntegrationTests)
+TEST(TomlIntegrationTests, AlanineOcc)
 {
-    TEST_METHOD(AlanineOcc)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "alanine_occ");
-        Assert::AreEqual(0, rc);
-    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "alanine_occ");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(AlanineIntegratedOcc)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "alanine_integrated_occ");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, AlanineIntegratedOcc)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "alanine_integrated_occ");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(DisorderTHPP)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "disorder_THPP");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, DisorderTHPP)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "disorder_THPP");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(Fractal)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "fractal");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, Fractal)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "fractal");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(GrownWater)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "grown_water");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, GrownWater)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "grown_water");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(HybridMode)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "Hybrid_mode");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, HybridMode)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "Hybrid_mode");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(MalbacSfEcp)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "malbac_SF_ECP");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, MalbacSfEcp)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "malbac_SF_ECP");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(Properties)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "properties");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, Properties)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "properties");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(RiFit)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "ri_fit");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, RiFit)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(RubredoxinCmtc)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "rubredoxin_cmtc");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, RubredoxinCmtc)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "rubredoxin_cmtc");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(SALTED)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "SALTED");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, SALTED)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(SucroseIAM)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "sucrose_IAM");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, SucroseIAM)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_IAM");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(SucrosePtb)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "sucrose_ptb");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, SucrosePtb)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_ptb");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(SucroseSF)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "sucrose_SF");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, SucroseSF)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(SucroseTwin)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "sucrose_twin");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, SucroseTwin)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_twin");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(WfnReading)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "wfn_reading");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, WfnReading)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "wfn_reading");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(FchkConversion)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "fchk_conversion");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, FchkConversion)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "fchk_conversion");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(TFVC)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "TFVC");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, TFVC)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "TFVC");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(TFVCEcp)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "TFVC_ECP");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, TFVCEcp)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "TFVC_ECP");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(RGBI_Groups_NH3BH3)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3");
-        Assert::AreEqual(0, rc);
-    }
+TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3");
+    EXPECT_TRUE(result.success) << result.message;
+}
 
-    TEST_METHOD(RGBI_Groups_NH3Li)
-    {
-        const int rc = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3Li");
-        Assert::AreEqual(0, rc);
-    }
-};
+TEST(TomlIntegrationTests, RGBI_Groups_NH3Li)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3Li");
+    EXPECT_TRUE(result.success) << result.message;
+}
 }

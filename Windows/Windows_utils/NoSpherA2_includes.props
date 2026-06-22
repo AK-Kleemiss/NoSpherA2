@@ -19,7 +19,6 @@
     </Lib>
     <ClCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MKLROOT)\include;..\..\Lib\lahva;..\..\Lib\featomic_install\include;..\..\Lib\LibCint\include;..\..\Lib\occ\include</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);_CONSOLE;_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup />

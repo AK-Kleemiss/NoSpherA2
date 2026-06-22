@@ -20,5 +20,6 @@
 #include <cstdlib>
 #include <vector>
 
+#include "gtest/gtest.h"
 
 #endif //PCH_H

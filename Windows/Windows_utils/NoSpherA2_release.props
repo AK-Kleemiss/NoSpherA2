@@ -12,6 +12,8 @@
       <SDLCheck>false</SDLCheck>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IntelJCCErratum>true</IntelJCCErratum>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);_CONSOLE;_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB;NDEBUG;X64</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>false</GenerateDebugInformation>
