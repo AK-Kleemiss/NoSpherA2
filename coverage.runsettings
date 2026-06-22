@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  VS Test / vstest.console code-coverage settings for NoSpherA2.
+
+  IDE usage:
+    Test > Configure Run Settings > Select Solution-Wide runsettings File
+    → pick this file, then "Analyze Code Coverage for All Tests".
+
+  Command-line usage (Profile|x64 configuration required):
+    vstest.console.exe Windows\x64\Profile\Tests.dll /Platform:x64 \
+        /Settings:Windows\coverage.runsettings /EnableCodeCoverage
+
+  Only NoSpherA2_DLL.dll (all Src/ production code) and Tests.dll are
+  instrumented. Third-party libraries are excluded by ModulePath patterns.
+  The Sources filters ensure the report shows only our own source files.
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector
+        friendlyName="Code Coverage"
+        uri="datacollector://microsoft/CodeCoverage/2.0"
+        assemblyQualifiedName="Microsoft.VisualStudio.Coverage.DynamicCoverageDataCollector, Microsoft.VisualStudio.TraceCollector, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+        <Configuration>
+          <CodeCoverage>
+            <!--
+              ModulePaths: controls which DLLs/EXEs are instrumented.
+              Use loose patterns (no path-separator assumption) so the regex
+              matches regardless of whether VS uses '/' or '\' internally.
+              NoSpherA2_DLL.dll contains all Src/ production code.
+              Tests.dll contains the test harness and test classes.
+            -->
+            <ModulePaths>
+              <Include>
+                <ModulePath>.*NoSpherA2_DLL.*</ModulePath>
+                <ModulePath>.*Tests.*</ModulePath>
+              </Include>
+              <Exclude>
+                <!-- Third-party runtimes — never instrument these -->
+                <ModulePath>.*tbb.*</ModulePath>
+                <ModulePath>.*mkl.*</ModulePath>
+                <ModulePath>.*libiomp.*</ModulePath>
+                <ModulePath>.*featomic.*</ModulePath>
+                <ModulePath>.*metatensor.*</ModulePath>
+                <ModulePath>.*vstest.*</ModulePath>
+                <ModulePath>.*testhost.*</ModulePath>
+                <ModulePath>.*clrjit.*</ModulePath>
+                <ModulePath>.*mscor.*</ModulePath>
+              </Exclude>
+            </ModulePaths>
+
+            <!--
+              Sources: filter which source files appear in the coverage report.
+              Show only our Src/, NoSpherA2_DLL/, and Windows/Tests/ trees.
+            -->
+            <Sources>
+              <Include>
+                <Source>.*[/\\]Src[/\\].*</Source>
+                <Source>.*[/\\]NoSpherA2_DLL[/\\].*</Source>
+                <Source>.*[/\\]Windows[/\\]Tests[/\\].*</Source>
+              </Include>
+              <Exclude>
+                <Source>.*[/\\]occ[/\\].*</Source>
+                <Source>.*[/\\]featomic[/\\].*</Source>
+                <Source>.*[/\\]libcint[/\\].*</Source>
+                <Source>.*[/\\]mdspan[/\\].*</Source>
+                <Source>.*[/\\]Lib[/\\].*</Source>
+                <Source>.*[/\\]_deps[/\\].*</Source>
+              </Exclude>
+            </Sources>
+
+            <!-- Required for native C++ DLL instrumentation -->
+            <UseVerifiableInstrumentation>False</UseVerifiableInstrumentation>
+            <AllowLowIntegrityProcesses>True</AllowLowIntegrityProcesses>
+            <CollectFromChildProcesses>True</CollectFromChildProcesses>
+            <CollectAspDotNet>false</CollectAspDotNet>
+          </CodeCoverage>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+
+  <RunConfiguration>
+    <ResultsDirectory>.\TestResults</ResultsDirectory>
+    <TargetPlatform>x64</TargetPlatform>
+  </RunConfiguration>
+</RunSettings>

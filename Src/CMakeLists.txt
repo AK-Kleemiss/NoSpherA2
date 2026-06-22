@@ -96,9 +96,14 @@ else ()
 endif ()
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
-        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
-        $<$<PLATFORM_ID:Windows>:/arch:AVX>
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-msse2 -msse3 -msse4.1 -msse4.2 -ffast-math>
     )
+    if (NOS_USE_AVX)
+        target_compile_options(libnosphera2 PRIVATE
+            $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-mavx>
+            $<$<PLATFORM_ID:Windows>:/arch:AVX>
+        )
+    endif ()
 endif ()
 
 target_link_options(libnosphera2 PUBLIC

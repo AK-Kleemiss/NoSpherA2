@@ -11,7 +11,6 @@ class BasisSet;
 struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
 
-inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
 void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file = std::cout);
 void not_implemented(const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file);
 #define err_checkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
@@ -427,6 +426,8 @@ double get_lambda_1(double *a);
 
 double get_decimal_precision_from_CIF_number(std::string &given_string);
 
+double bessel_first_kind(int l, double x);
+
 template <typename numtype = int>
 struct hashFunction
 {
@@ -736,6 +737,8 @@ struct options
     bool do_XCW = false;
     bool calc_F_calc = false;
     bool rgbi = false;
+    bool rgbi_no_sym = false;
+    ivec3 rgbi_group_sets;
     bool fract = false;
     bool profiling = false;
     bool get_g = false;

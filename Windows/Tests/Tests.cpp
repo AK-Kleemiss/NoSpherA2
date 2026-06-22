@@ -6,15 +6,16 @@ using namespace NosTestFramework;
 
 // ---------------------------------------------------------------------------
 // Integration tests: each method mirrors one entry in tests/tests.toml.
-// The test copies the test directory to a temp folder, runs NoSpherA2.exe,
-// then compares the output log against the corresponding .good file using the
-// same 1% relative numeric tolerance as the Python pytest harness.
+// The test copies the test directory to a temp folder, runs NoSpherA2 in-process
+// through NoSpherA2_DLL.dll, then compares the output log against the
+// corresponding .good file using the same 1% relative numeric tolerance as the
+// Python pytest harness.
 //
 // Prerequisites:
-//   - NoSpherA2.exe must be built (it lives in the same output directory as
-//     this DLL: Windows/x64/<Config>/).
+//   - NoSpherA2_DLL.dll must be built (it lives in the same output directory as
+//     this test DLL: Windows/x64/<Config>/).
 //   - MKLROOT / OCC_DATA_PATH are set automatically; OCC_DATA_PATH is
-//     injected per-process from <repo>/occ/share.
+//     injected per-process from <repo>/Lib/occ/share/occ.
 //   - Full tests (fchk_conversion, fourier_transform_full) are skipped
 //     unless the environment variable RUN_FULL_TEST is set.
 // ---------------------------------------------------------------------------
@@ -229,13 +230,52 @@ namespace NoSpherA2IntegrationTests
             });
         }
 
+        TEST_METHOD(TFVC)
+        {
+            RunTest({
+                "TFVC", "TFVC", "TFVC.good", "",
+                {"-wfn","water.gbw", "-cif","water.cif",
+                 "-dmin","0.84", "-acc","1",
+                 "-all_charges", "-no_date"}
+            });
+        }
+
+        TEST_METHOD(TFVC_ECP)
+        {
+            RunTest({
+                "TFVC_ECP", "TFVC", "TFVC_ECP.good", "",
+                {"-wfn","Rh.gbw", "-cif","Rh.cif",
+                 "-dmin","0.84", "-acc","1", "-ECP","1",
+                 "-all_charges", "-no_date"}
+            });
+        }
+
+        TEST_METHOD(RGBI_Groups_NH3BH3)
+        {
+            RunTest({
+                "RGBI_Groups_NH3BH3", "RGBI_groups", "NH3BH3.good", "",
+                {"-wfn","nh3bh3.gbw", "-rgbi_no_sym", "-rgbi-groups", "0,4,5,7", "1,2,3,6",
+                 "-all_charges", "-no_date"}
+            });
+        }
+
+        TEST_METHOD(RGBI_Groups_NH3Li)
+        {
+            RunTest({
+                "RGBI_Groups_NH3Li", "RGBI_groups", "NH3Li.good", "",
+                {"-wfn","nh3li.gbw", "-rgbi_no_sym", "-rgbi-groups", "0,1,2,3", "4",
+                 "-all_charges", "-no_date"}
+                    });
+        }
+
         // ---- Full tests (skipped unless RUN_FULL_TEST is set) ---------------
 
         TEST_METHOD(fchk_conversion)
         {
             RunTest({
-                "fchk_conversion", "NiP3_fchk", "good.fchk", "",
-                {"-b","dev2-TZVP", "-d","./", "-wfn","in.ffn",
+                "fchk_conversion", "NiP3_fchk", "good.fchk", "log.fchk",
+                {"-b","def2-TZVP", "-d","./", "-wfn","in.ffn",
+                 "-fchk","log.fchk",
                  "-all_charges", "-no_date"},
                 /*full=*/true
             });

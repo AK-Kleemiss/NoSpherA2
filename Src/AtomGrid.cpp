@@ -564,8 +564,8 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             vz = z_coordinates_bohr[a] - z;
             dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
 
-            double& pa_b_a = pa_b[a];
-            double& pa_tv_a = pa_tv[a];
+            double &pa_b_a = pa_b[a];
+            double &pa_tv_a = pa_tv[a];
 
             if (dist_a > constants::far_away) {
                 pa_b_a = 0.0;
@@ -576,8 +576,8 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             R_a = R_v[a];
 
             for (int b = a + 1; b < num_centers; b++) {
-                double& pa_b_b = pa_b[b];
-                double& pa_tv_b = pa_tv[b];
+                double &pa_b_b = pa_b[b];
+                double &pa_tv_b = pa_tv[b];
 
                 vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
                 vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
@@ -632,8 +632,8 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             vz = z_coordinates_bohr[a] - z;
             dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
 
-            double& pa_b_a = pa_b[a];
-            double& pa_tv_a = pa_tv[a];
+            double &pa_b_a = pa_b[a];
+            double &pa_tv_a = pa_tv[a];
 
             if (dist_a > constants::far_away) {
                 pa_b_a = 0.0;
@@ -645,8 +645,8 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             chi_off = chi.data() + a * num_centers;
 
             for (int b = a + 1; b < num_centers; b++) {
-                double& pa_b_b = pa_b[b];
-                double& pa_tv_b = pa_tv[b];
+                double &pa_b_b = pa_b[b];
+                double &pa_tv_b = pa_tv[b];
 
                 vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
                 vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
@@ -1475,6 +1475,7 @@ double get_h(const double &max_error, const int &l, const double &guess)
     double step = 0.1 * guess;
     double sign = -1.0, sign_old, f, pl, rd0, e0;
     const double cm = constants::TG32 / tgamma((m + 3.0) / 2.0);
+    int no_flip_count = 0;
 
     while (step > cutoff)
     {
@@ -1487,8 +1488,19 @@ double get_h(const double &max_error, const int &l, const double &guess)
         (f > max_error) ? (sign = -1.0) : (sign = 1.0);
         if (h < 0.0)
             sign = 1.0;
-        if (sign != sign_old)
+        if (sign != sign_old) {
             step *= 0.1;
+            no_flip_count = 0;
+        }
+        else
+        {
+            no_flip_count++;
+            if (no_flip_count >= constants::grid_max_no_flip)
+            {
+                step *= 0.1;
+                no_flip_count = 0;
+            }
+        }
 
         h_old = h;
         h += sign * step;

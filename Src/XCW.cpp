@@ -379,24 +379,24 @@ void XCW::eval_translation_phase(cvec2& translation_phase) {
 	// closing function
 }
 
-void XCW::parse_anom_atoms(std::vector<anom_atom>& anom_atoms) {
-	std::ifstream file(opt->anom_disp_path);
-	if (!file) {
-		std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
-	}
-	std::string line;
-	while (std::getline(file, line)) {
-		if (line.empty())
-			continue;
-		std::istringstream iss(line);
-		std::string symbol;
-		double real_part, imag_part;
-		if (iss >> symbol >> real_part >> imag_part) {
-			if (!symbol.empty() && symbol[0] != '_' && symbol != "loop_") {
-				anom_atoms.push_back({ symbol, cdouble(real_part, imag_part) });
-			}
-		}
-	}
+void XCW::parse_anom_atoms(std::vector<anom_atom> &anom_atoms) {
+    std::ifstream file(opt->anom_disp_path);
+    if (!file) {
+        std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty())
+            continue;
+        std::istringstream iss(line);
+        std::string symbol;
+        double real_part, imag_part;
+        if (iss >> symbol >> real_part >> imag_part) {
+            if (!symbol.empty() && symbol[0] != '_' && symbol != "loop_") {
+                anom_atoms.push_back({ symbol, cdouble(real_part, imag_part) });
+            }
+        }
+    }
 }
 
 void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase) {
@@ -429,8 +429,8 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 }
 
 void XCW::eval_scale() {
-	double numerator = 0.0;
-	double denominator = 0.0;
+    double numerator = 0.0;
+    double denominator = 0.0;
 
 #pragma omp parallel for reduction(+:numerator, denominator)
 	for (int i = 0; i < cryst.nr_small; ++i) {
@@ -483,53 +483,53 @@ void XCW::create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& o
 }
 
 ivec XCW::generate_asym_lookup(const int r) {
-	ivec asym_list;
-	auto it = hkl.begin();
-	std::advance(it, r);
-	ivec3 rots = unit_cell.get_sym();
-	i3 tempv;
-	const i3& hkl_temp = *it;
-	for (int s = 0; s < rots[0][0].size(); s++) {
-		tempv = { 0, 0, 0 };
-		for (int h = 0; h < 3; h++) {
-			for (int j = 0; j < 3; j++) {
-				tempv[j] += hkl_temp[h] * rots[j][h][s];
-			}
-		}
-		int idx_ = 0;
-		auto idx = hkl_enlarged.find(tempv);
-		if (idx != hkl_enlarged.end()) {
-			idx_ = std::distance(hkl_enlarged.begin(), idx);
-		}
-		asym_list.push_back(idx_);
-	}
-	return asym_list;
-	// closing function
+    ivec asym_list;
+    auto it = hkl.begin();
+    std::advance(it, r);
+    ivec3 rots = unit_cell.get_sym();
+    i3 tempv;
+    const i3 &hkl_temp = *it;
+    for (int s = 0; s < rots[0][0].size(); s++) {
+        tempv = { 0, 0, 0 };
+        for (int h = 0; h < 3; h++) {
+            for (int j = 0; j < 3; j++) {
+                tempv[j] += hkl_temp[h] * rots[j][h][s];
+            }
+        }
+        int idx_ = 0;
+        auto idx = hkl_enlarged.find(tempv);
+        if (idx != hkl_enlarged.end()) {
+            idx_ = std::distance(hkl_enlarged.begin(), idx);
+        }
+        asym_list.push_back(idx_);
+    }
+    return asym_list;
+    // closing function
 }
 
-cvec2 XCW::calculateXCWintegral(GridManager& grid_manager, const ao_data& mu_data, const ao_data& nu_data, const ivec& asym_atom_list, vec2& k_pt, bool& equal, vec2& mu_vals) {
-	GridData& GD = grid_manager.getGridData();
-	vec2* grids = grid_manager.getNeedsHelper() ? GD.helper_grids.data() : GD.atomic_grids.data();
-	const int n_grids = grid_manager.getNeedsHelper() ? GD.helper_grids.size() : GD.atomic_grids.size();
-	const int* points = grid_manager.getNeedsHelper() ? GD.helper_num_points_per_atom.data() : GD.num_points_per_atom.data();
-	const double mp0 = mu_data.pos[0];
-	const double mp1 = mu_data.pos[1];
-	const double mp2 = mu_data.pos[2];
-	const double np0 = nu_data.pos[0];
-	const double np1 = nu_data.pos[1];
-	const double np2 = nu_data.pos[2];
-	const std::vector<primitive> mu_prims = mu_data.prims;
-	const std::vector<primitive> nu_prims = nu_data.prims;
-	if (equal) {
-		mu_vals.resize(n_grids);
-		for (int g = 0; g < n_grids; g++) {
-			const int num_points = points[g];
-			mu_vals[g].resize(num_points);
-			vec2& atom_grid = grids[g];
-			const double* x_ptr = atom_grid[GridData::GridIndex::X].data();
-			const double* y_ptr = atom_grid[GridData::GridIndex::Y].data();
-			const double* z_ptr = atom_grid[GridData::GridIndex::Z].data();
-			double* overlap_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
+cvec2 XCW::calculateXCWintegral(GridManager &grid_manager, const ao_data &mu_data, const ao_data &nu_data, const ivec &asym_atom_list, vec2 &k_pt, bool &equal, vec2 &mu_vals) {
+    GridData &GD = grid_manager.getGridData();
+    vec2 *grids = grid_manager.getNeedsHelper() ? GD.helper_grids.data() : GD.atomic_grids.data();
+    const int n_grids = grid_manager.getNeedsHelper() ? GD.helper_grids.size() : GD.atomic_grids.size();
+    const int *points = grid_manager.getNeedsHelper() ? GD.helper_num_points_per_atom.data() : GD.num_points_per_atom.data();
+    const double mp0 = mu_data.pos[0];
+    const double mp1 = mu_data.pos[1];
+    const double mp2 = mu_data.pos[2];
+    const double np0 = nu_data.pos[0];
+    const double np1 = nu_data.pos[1];
+    const double np2 = nu_data.pos[2];
+    const std::vector<primitive> mu_prims = mu_data.prims;
+    const std::vector<primitive> nu_prims = nu_data.prims;
+    if (equal) {
+        mu_vals.resize(n_grids);
+        for (int g = 0; g < n_grids; g++) {
+            const int num_points = points[g];
+            mu_vals[g].resize(num_points);
+            vec2 &atom_grid = grids[g];
+            const double *x_ptr = atom_grid[GridData::GridIndex::X].data();
+            const double *y_ptr = atom_grid[GridData::GridIndex::Y].data();
+            const double *z_ptr = atom_grid[GridData::GridIndex::Z].data();
+            double *overlap_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
 #pragma omp parallel for schedule(dynamic, 4)
 			for (int p = 0; p < num_points; p++) {
 				std::array<double, 4> d_mu;
@@ -619,7 +619,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	I.resize(cryst.nr_small * (cryst.nmo * (cryst.nmo + 1)) / 2);
 	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
 
-	cvec2 XCW_integral;
+    cvec2 XCW_integral;
 
 	GridConfiguration config;
 	config.accuracy = opt->accuracy;
@@ -811,9 +811,9 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	}
 }
 
-void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
-	double bohr2angstrom = constants::bohr2ang(1);
-	std::ostringstream init_stream;
+void XCW::setup_SCF_mol(occ::core::Molecule &mol) {
+    double bohr2angstrom = constants::bohr2ang(1);
+    std::ostringstream init_stream;
 
 	init_stream << cryst.ncen << "\n\n";
 
@@ -828,10 +828,10 @@ void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
 			init_stream << "\n";
 	}
 
-	std::string init = init_stream.str();
-	mol = occ::io::molecule_from_xyz_string(init);
-	mol.set_charge(opt->charge);
-	mol.set_multiplicity(opt->mult);
+    std::string init = init_stream.str();
+    mol = occ::io::molecule_from_xyz_string(init);
+    mol.set_charge(opt->charge);
+    mol.set_multiplicity(opt->mult);
 }
 
 void XCW::setup_basis(occ::core::Molecule& mol, std::string& basis_set_name, occ::qm::AOBasis& occ_basis_set) {
@@ -926,17 +926,17 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	double e_diff_mem = 0;
 	occ::Mat dm_last = scf.ctx.mo.D;
 
-	do {
+    do {
 
 		converged = SCF_iteration(scf, lambda, alpha, e_diff_mem, quant, last_quant, dm_last);
 
-	} while (!converged && scf.iter < scf.maxiter);
+    } while (!converged && scf.iter < scf.maxiter);
 
-	if (converged) {
-		XCW_log << "____________________________________________________________________________\n";
-		std::stringstream print_;
-		print_ << "***SCF converged in " << scf.iter + 1 << " iterations***";
-		print_centered_message(print_.str(), 76, XCW_log);
+    if (converged) {
+        XCW_log << "____________________________________________________________________________\n";
+        std::stringstream print_;
+        print_ << "***SCF converged in " << scf.iter + 1 << " iterations***";
+        print_centered_message(print_.str(), 76, XCW_log);
 
 		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << cryst.chi2 << "\t" << cryst.GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
@@ -1032,9 +1032,13 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	dm_last = scf.ctx.mo.D;
 	return false;
 
-	return false;
+    // Apply damping
+    scf.ctx.mo.D *= (1 - alpha);
+    scf.ctx.mo.D += alpha * dm_old;
 
-	//closing function
+    return false;
+
+    //closing function
 }
 
 bool XCW::SCF_convergence_check(const double& quant_diff, const double& gradient, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last) {
@@ -1209,7 +1213,7 @@ void XCW::run_XCW_fitting() {
 		last_wfn = scf.wavefunction();
 	}
 
-	std::cout << "Finished XCW fitting procedure." << std::endl;
-	exit(0);
+    std::cout << "Finished XCW fitting procedure." << std::endl;
+    exit(0);
 
 }

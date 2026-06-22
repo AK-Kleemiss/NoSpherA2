@@ -990,7 +990,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 #endif
     for (int x = 0; x < size_x; x++) {
         for (int y = 0; y < size_y; y++) {
-            int *orml = radius_mask[x][y].data(); // Cache radius mask row for performance
+            int *orml = use_radius_mask ? radius_mask[x][y].data() : nullptr;
             for (int z = 0; z < size_z; z++) {
                 GradientDirection &gd = gradient_field[x][y][z];
                 gd.next_x = -1;
@@ -1013,7 +1013,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                     if (ix < 0 || ix >= size_x) continue;
                     for (int iy = y - 1; iy <= y + 1; iy++) {
                         if (iy < 0 || iy >= size_y) continue;
-                        int *rml = radius_mask[ix][iy].data(); // Cache radius mask row for performance
+                        int *rml = use_radius_mask ? radius_mask[ix][iy].data() : nullptr;
                         for (int iz = z - 1; iz <= z + 1; iz++) {
                             if (ix == x && iy == y && iz == z) continue;
                             if (iz < 0 || iz >= size_z) continue;

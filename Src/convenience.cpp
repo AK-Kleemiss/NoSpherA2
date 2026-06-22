@@ -108,6 +108,57 @@ namespace {
         return {};
     }
 
+    ivec parse_rgbi_group_indices(const std::string &spec)
+    {
+        ivec indices;
+        for (const auto &raw_part : split_string<std::string>(spec, ","))
+        {
+            const std::string part = trim(raw_part);
+            if (part.empty())
+                continue;
+
+            const size_t range_pos = part.find('-', 1);
+            if (range_pos == std::string::npos)
+            {
+                indices.push_back(std::stoi(part));
+                continue;
+            }
+
+            const std::string first_text = trim(part.substr(0, range_pos));
+            const std::string last_text = trim(part.substr(range_pos + 1));
+            err_checkf(!first_text.empty() && !last_text.empty(),
+                "Invalid RGBI atom index range: " + part, std::cout);
+
+            const int first = std::stoi(first_text);
+            const int last = std::stoi(last_text);
+            const int step = first <= last ? 1 : -1;
+            for (int atom_index = first;; atom_index += step)
+            {
+                indices.push_back(atom_index);
+                if (atom_index == last)
+                    break;
+            }
+        }
+        return indices;
+    }
+
+    void validate_rgbi_group_set(const ivec2 &group_set)
+    {
+        std::map<int, int> assigned_group;
+        for (int group_index = 0; group_index < static_cast<int>(group_set.size()); ++group_index)
+        {
+            for (int atom_index : group_set[group_index])
+            {
+                auto [it, inserted] = assigned_group.emplace(atom_index, group_index);
+                err_checkf(inserted,
+                    "Invalid RGBI groups: atom index " + std::to_string(atom_index) +
+                    " is assigned to both group " + std::to_string(it->second) +
+                    " and group " + std::to_string(group_index) + ".",
+                    std::cout);
+            }
+        }
+    }
+
 }
 
 std::string help_message =
@@ -143,10 +194,13 @@ std::string help_message =
     "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.\n"
     "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
     "   -TFVC                                    Use the Topological Fuzzy Voronoi Cells (TFVC) partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
+    "   -rgbi                                    Run Roby-Gould Bond Index analysis.\n"
+    "   -rgbi_no_sym                             Run RGBI without atomic O_h symmetrization.\n"
+    "   -rgbi-groups    <GROUP> <GROUP> [...]    Run RGBI group analysis for comma-separated atom index groups/ranges, e.g. 0-5,7. Repeat for multiple groupings.\n"
     "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
     "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
-    "                                            If there is more than a single twin law to be used, use the twin command multiple times.\n"
+    "                                            If there is more than a single twin law to be used, use the twin command multiple times (and good luck with that structure...).\n"
     "   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n"
     "   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n"
     "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
@@ -160,7 +214,16 @@ std::string help_message =
     "   -profiling      [tests_root]             Runs the internal profiling suite (all test paths). Optional root defaults to ./tests\n"
     "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
     "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
-    "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
+   "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
+    "   -qtaim_eli  <rho.cube> <eli.cube> <atoms> [bg]  QTAIM basin masking of an ELI cube:\n"
+    "                                            Runs QTAIM topological analysis on <rho.cube>, keeps ELI values only for voxels\n"
+    "                                            in the basins of the specified atoms, sets all other voxels to <bg> (default 0),\n"
+    "                                            and shrinks the output grid to the tight bounding box of the selected region.\n"
+    "                                            <atoms>: comma-separated 0-based atom indices, e.g. 0,3,7\n"
+    "                                            <bg>:    background value for non-selected voxels (default 0)\n"
+    "                                            Output:  <eli_stem>_qtaim_masked.cube next to the input ELI file.\n"
+    "               Alternative (WFN mode):      -qtaim_eli <wfn_file> <atoms> [resolution] [radius] [bg]\n"
+    "                                            Computes rho and ELI grids from the wavefunction, then applies masking.\n"
     "   -cmtc            <List of .wfns + parts> Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
     "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
     "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
@@ -203,6 +266,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst. 2024, 57, 161 - 174.\n");
         t.append("ECP correction functions at : Kleemiss et al. J. Appl. Cryst. 2025, 58, 374 - 382.\n");
+        t.append("Aux basis /RI partitioning  : Seifert et al. Z. Krist. - Cryst. Mat. 2026, 10.1515/zkri-2026-0013.\n");
         t.append("TFVC partitioning at        : Gimferrer et al. TBA.\n");
         t.append("MBIS/EMBIS partitioning at  : Nielsen et al. TBA.\n");
     }
@@ -837,7 +901,6 @@ bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
     // To 3P : Z X Y (4 2 3, as in ORCA format)
     //
     p.resize(3);
-#pragma omp parallel for
     for (int i = 0; i < 3; i++)
     {
         p[i].resize(3, 0.0);
@@ -852,7 +915,6 @@ bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
     // XX, YY, ZZ, XY, XZ, YZ
     //
     d.resize(6);
-#pragma omp parallel for
     for (int i = 0; i < 6; i++)
     {
         d[i].resize(5, 0.0);
@@ -877,7 +939,6 @@ bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
     // XXX, YYY, ZZZ, XXY, XXZ, YYZ, XYY, XZZ, YZZ, XYZ (AIMALL order!)
     //
     f.resize(10);
-#pragma omp parallel for
     for (int i = 0; i < 10; i++)
     {
         f[i].resize(7, 0.0);
@@ -909,7 +970,6 @@ bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
     f[9][4] = 1.0;
 
     g.resize(15);
-#pragma omp parallel for
     for (int i = 0; i < 15; i++)
     {
         g[i].resize(9, 0.0);
@@ -966,7 +1026,6 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     // XX, YY, ZZ, XY, XZ, YZ
     //
     d.resize(6);
-#pragma omp parallel for
     for (int i = 0; i < 6; i++)
     {
         d[i].resize(5, 0.0);
@@ -990,7 +1049,6 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     // XXX, YYY, ZZZ, XYY, XXY, XXZ, XZZ, YZZ, YYZ, XYZ(Gaussian sequence, not identical to Multiwfn)
     //
     f.resize(10);
-#pragma omp parallel for
     for (int i = 0; i < 10; i++)
     {
         f[i].resize(7, 0.0);
@@ -1026,7 +1084,6 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     // XYYY, XXZZ, XXYZ, XXYY, XXXZ, XXXY, XXXX
     //
     g.resize(15);
-#pragma omp parallel for
     for (int i = 0; i < 15; i++)
     {
         g[i].resize(9, 0.0);
@@ -1076,7 +1133,6 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     // XYYYY XXZZZ XXYZZ XXYYZ XXYYY XXXZZ XXXYZ XXXYY XXXXZ XXXXY XXXXX
     //
     h.resize(21);
-#pragma omp parallel for
     for (int i = 0; i < 21; i++)
     {
         h[i].resize(11);
@@ -2408,6 +2464,65 @@ void options::digest_options()
             ELI_analysis(wfn, *this);
             exit(0);
         }
+        else if (temp == "-qtaim_eli") {
+            // Cube-files mode:  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [<bg_value>]
+            // WFN mode:         -qtaim_eli <wfn_file> <atoms_csv> [<resolution>] [<radius>] [<bg_value>]
+            err_checkf(i + 2 < argc,
+                "Usage:\n"
+                "  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [bg_value]\n"
+                "  -qtaim_eli <wfn_file> <atoms_csv> [resolution] [radius] [bg_value]\n"
+                "atoms_csv: comma-separated 0-based atom indices, e.g. 0,3,7\n"
+                "bg_value:  value assigned to non-selected voxels (default 0)",
+                std::cout);
+
+            std::filesystem::path arg1 = arguments[i + 1];
+            const bool cube_mode = (arg1.extension() == ".cube");
+
+            std::filesystem::path rho_path, eli_path_arg;
+            std::string atoms_csv;
+            double bg_val = 0.0;
+
+            if (cube_mode) {
+                err_checkf(i + 3 < argc,
+                    "Cube mode requires: -qtaim_eli <rho.cube> <eli.cube> <atoms_csv>", std::cout);
+                rho_path     = arg1;
+                eli_path_arg = arguments[i + 2];
+                atoms_csv    = arguments[i + 3];
+                if (i + 4 < argc) bg_val = stod(arguments[i + 4]);
+            } else {
+                rho_path  = arg1;  // wfn path
+                atoms_csv = arguments[i + 2];
+                if (i + 3 < argc && !std::filesystem::path(arguments[i + 3]).has_extension())
+                    ; // next arg looks like atoms_csv already consumed; nothing extra
+                if (i + 3 < argc) {
+                    try { properties.resolution = stod(arguments[i + 3]); }
+                    catch (...) { /* optional — might be bg_val */ }
+                }
+                if (i + 4 < argc) {
+                    try { properties.radius = stod(arguments[i + 4]); }
+                    catch (...) {}
+                }
+                if (i + 5 < argc) {
+                    try { bg_val = stod(arguments[i + 5]); }
+                    catch (...) {}
+                }
+            }
+
+            // Parse comma-separated 0-based atom indices
+            std::vector<int> indices;
+            {
+                std::stringstream ss(atoms_csv);
+                std::string tok;
+                while (std::getline(ss, tok, ',')) {
+                    std::string t = trim(tok);
+                    if (!t.empty()) indices.push_back(std::stoi(t));
+                }
+            }
+            err_checkf(!indices.empty(), "No atom indices parsed from: " + atoms_csv, std::cout);
+
+            run_QTAIM_ELI_mask(rho_path, eli_path_arg, indices, bg_val, *this, log_file);
+            exit(0);
+        }
         else if (temp == "-elf")
             properties.elf = true;
         else if (temp == "-embis" || temp == "-EMBIS")
@@ -2662,6 +2777,24 @@ void options::digest_options()
             properties.rdg = true;
         else if (temp == "-rgbi")
             rgbi = true;
+        else if (temp == "-rgbi_no_sym") {
+            rgbi = true;
+            rgbi_no_sym = true;
+        }
+        else if (temp == "-rgbi-groups") {
+            int n = 1;
+            ivec2 group_set;
+            while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
+                group_set.push_back(parse_rgbi_group_indices(arguments[i + n]));
+                n++;
+            }
+            if (!group_set.empty()) {
+                validate_rgbi_group_set(group_set);
+                rgbi_group_sets.push_back(group_set);
+            }
+            i += n - 1;
+            rgbi = true;
+        }
         else if (temp.find("-rkpts") < 1)
             read_k_pts = true;
         else if (temp == "-rho_cube")
@@ -3597,13 +3730,21 @@ double vec_length(const vec &in)
     return sqrt(sum);
 }
 
+namespace {
+    std::streambuf *original_coutbuf()
+    {
+        static std::streambuf *buf = std::cout.rdbuf();
+        return buf;
+    }
+}
+
 void error_check(const bool condition, const std::source_location loc, const std::string &error_message, std::ostream &log_file)
 {
     if (!condition)
     {
         log_file << "Error in " << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << std::endl;
         log_file.flush();
-        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout.rdbuf(original_coutbuf()); // reset to standard output again
         std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " line: " << loc.line() << " " << error_message << std::endl;
         exit(-1);
     }
@@ -3612,7 +3753,7 @@ void not_implemented(const std::source_location loc, const std::string &error_me
 {
     log_file << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << " not yet implemented!" << std::endl;
     log_file.flush();
-    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout.rdbuf(original_coutbuf()); // reset to standard output again
     std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << " not yet implemented!" << std::endl;
     exit(-1);
 };

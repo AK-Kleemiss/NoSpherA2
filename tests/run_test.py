@@ -273,7 +273,19 @@ def test_nos(test, exe_path, tmp_path, request):
             env=run_env,
         )
     except subprocess.CalledProcessError as e:
-        pytest.fail(f"Execution failed.\nStderr: {e.stderr}", pytrace=False)
+        log_path = work_dir / "NoSpherA2.log"
+        log_text = ""
+        if log_path.exists():
+            log_text = log_path.read_text(errors="replace")
+        print("NoSpherA2.log from failed run:")
+        print(log_text)
+        pytest.fail(
+            "Execution failed.\n"
+            f"Stdout:\n{e.stdout}\n"
+            f"Stderr:\n{e.stderr}\n"
+            f"NoSpherA2.log:\n{log_text}",
+            pytrace=False,
+        )
 
     good_path = os.path.join(work_dir, test.good)
     actual_gen = os.path.join(work_dir, test.actual)

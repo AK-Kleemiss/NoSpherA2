@@ -92,40 +92,6 @@ runs:
 
         Set-Content -Path $propsPath -Value $xml -Encoding UTF8
         Write-Host "Wrote $propsPath"
-
-        #Build featomic
-        if (-not (Test-Path "Lib\featomic_install\lib\metatensor.lib")) {
-          Write-Host "Building featomic for Windows"
-          cd featomic\featomic
-          $buildDir = "build"
-          if (-not (Test-Path $buildDir)) {
-            mkdir $buildDir
-          }
-          cd $buildDir
-          cmake -G "Visual Studio 17 2022" ${{ env.FEATOMIC_CMAKE_FLAGS }} -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
-          msbuild -nologo .\featomic.sln -p:Configuration=Release
-          msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
-        } else {
-          Write-Host "Skipping featomic build, already exists"
-        }
-
-        #Build LibCint
-        $build = Join-Path $env:GITHUB_WORKSPACE "libcint\build"
-        $outDir = Join-Path $env:GITHUB_WORKSPACE "Lib\LibCint\lib"
-
-        if (!(Test-Path $outDir)) {
-          Write-Host "Building LibCint for Windows..."
-
-          New-Item -ItemType Directory -Force -Path $build | Out-Null
-          Push-Location $build
-
-          cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_BUILD_TYPE=RELEASE -DPYPZPX="ON" -DCMAKE_INSTALL_PREFIX="../../Lib/LibCint" -DCMAKE_C_COMPILER=cl -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" ..
-          cmake --build . --config RELEASE
-          cmake --install .
-        }
-        else {
-          Write-Host "Skipping LibCint build, $outDir already exists"
-        }
         
         #Build OCC
         $OccOut = Join-Path $env:GITHUB_WORKSPACE "Lib\occ\lib\occ_main.lib"
@@ -208,7 +174,8 @@ runs:
         New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
 
         Copy-Item -Recurse -Force "Lib/featomic_install" (Join-Path $stageDir "featomic_install_${{ inputs.platform }}")
-        Copy-Item -Recurse -Force "Lib/occ" (Join-Path $stageDir "occ_${{ inputs.platform }}")
+        Copy-Item -Recurse -Force "Lib/occ_release" (Join-Path $stageDir "occ_release_${{ inputs.platform }}")
+        Copy-Item -Recurse -Force "Lib/occ_debug" (Join-Path $stageDir "occ_debug_${{ inputs.platform }}")
         Copy-Item -Recurse -Force "Lib/LibCint" (Join-Path $stageDir "LibCint_${{ inputs.platform }}")
 
     - name: Archive libraries

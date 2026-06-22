@@ -8,6 +8,239 @@
 #include "integration_params.h"
 #include "b2c.h"
 
+namespace {
+    struct OhOperation {
+        std::array<int, 3> permutation;
+        std::array<int, 3> signs;
+    };
+
+    struct CartesianTransform {
+        ivec destination;
+        ivec signs;
+    };
+
+    int cartesian_shell_size(const int l) {
+        return (l + 1) * (l + 2) / 2;
+    }
+
+    int atomic_shell_size(const int l, const bool cartesian) {
+        return cartesian ? cartesian_shell_size(l) : 2 * l + 1;
+    }
+
+    const std::vector<OhOperation> &oh_operations() {
+        static const std::vector<OhOperation> operations = [] {
+            std::vector<OhOperation> result;
+            result.reserve(48);
+            std::array<int, 3> permutation{ 0, 1, 2 };
+            do {
+                for (int mask = 0; mask < 8; ++mask) {
+                    result.push_back({
+                        permutation,
+                        { (mask & 1) ? -1 : 1,
+                          (mask & 2) ? -1 : 1,
+                          (mask & 4) ? -1 : 1 }
+                        });
+                }
+            } while (std::next_permutation(permutation.begin(), permutation.end()));
+            return result;
+            }();
+        return operations;
+    }
+
+    std::vector<std::array<int, 3>> cartesian_exponents(const int l) {
+        const int size = cartesian_shell_size(l);
+        // constants::type_vector currently contains Cartesian components through h.
+        const int first_type = l * (l + 1) * (l + 2) / 6 + 1;
+        std::vector<std::array<int, 3>> result(size);
+        for (int component = 0; component < size; ++component) {
+            int exponent[3];
+            constants::type2vector(first_type + component, exponent);
+            err_checkf(exponent[0] >= 0 && exponent[0] + exponent[1] + exponent[2] == l,
+                "Cartesian O_h symmetrization does not support angular momentum l=" +
+                std::to_string(l) + ".", std::cout);
+            result[component] = { exponent[0], exponent[1], exponent[2] };
+        }
+        return result;
+    }
+
+    std::vector<std::array<int, 3>> libcint_cartesian_exponents(const int l) {
+        std::vector<std::array<int, 3>> result;
+        result.reserve(cartesian_shell_size(l));
+        for (int lx = l; lx >= 0; --lx) {
+            for (int ly = l - lx; ly >= 0; --ly)
+                result.push_back({ lx, ly, l - lx - ly });
+        }
+        return result;
+    }
+
+    CartesianTransform cartesian_transform_from_exponents(
+        const std::vector<std::array<int, 3>> &exponents,
+        const OhOperation &operation) {
+        CartesianTransform transform{ ivec(exponents.size()), ivec(exponents.size(), 1) };
+
+        for (int source = 0; source < static_cast<int>(exponents.size()); ++source) {
+            std::array<int, 3> transformed{ 0, 0, 0 };
+            int sign = 1;
+            for (int axis = 0; axis < 3; ++axis) {
+                transformed[operation.permutation[axis]] = exponents[source][axis];
+                if (operation.signs[axis] < 0 && (exponents[source][axis] & 1))
+                    sign = -sign;
+            }
+
+            const auto destination = std::find(exponents.begin(), exponents.end(), transformed);
+            err_checkf(destination != exponents.end(),
+                "O_h operation produced an unknown Cartesian component.", std::cout);
+            transform.destination[source] = static_cast<int>(destination - exponents.begin());
+            transform.signs[source] = sign;
+        }
+        return transform;
+    }
+
+    dMatrix2 cartesian_transform_matrix(const int l, const OhOperation &operation,
+        const bool libcint_order = false) {
+        const auto exponents = libcint_order
+            ? libcint_cartesian_exponents(l)
+            : cartesian_exponents(l);
+        const auto sparse = cartesian_transform_from_exponents(exponents, operation);
+        const int size = cartesian_shell_size(l);
+        dMatrix2 result(size, size);
+        std::fill(result.container().begin(), result.container().end(), 0.0);
+        for (int source = 0; source < size; ++source)
+            result(sparse.destination[source], source) = sparse.signs[source];
+        return result;
+    }
+
+    dMatrix2 spherical_transform_matrix(const int l, const OhOperation &operation) {
+        const dMatrix2 cart_to_spherical = cart2sph(l, true);
+        const dMatrix2 cart_transform = cartesian_transform_matrix(l, operation, true);
+        const int n_cart = cartesian_shell_size(l);
+        const int n_spherical = 2 * l + 1;
+
+        // Columns of C contain the real spherical functions in the Cartesian basis.
+        // Solve T_cart C = C T_sph using the left pseudoinverse of C.  This keeps
+        // libcint's real-spherical ordering and phase convention authoritative.
+        dMatrix2 gram(n_spherical, n_spherical);
+        for (int i = 0; i < n_spherical; ++i)
+            for (int j = 0; j < n_spherical; ++j)
+                for (int cart = 0; cart < n_cart; ++cart)
+                    gram(i, j) += cart_to_spherical(cart, i) * cart_to_spherical(cart, j);
+        const dMatrix2 inverse_gram = LAPACKE_invert(gram, 1E-12);
+
+        dMatrix2 transformed_cart(n_cart, n_spherical);
+        for (int i = 0; i < n_cart; ++i)
+            for (int j = 0; j < n_spherical; ++j)
+                for (int cart = 0; cart < n_cart; ++cart)
+                    transformed_cart(i, j) += cart_transform(i, cart) * cart_to_spherical(cart, j);
+
+        dMatrix2 result(n_spherical, n_spherical);
+        for (int i = 0; i < n_spherical; ++i) {
+            for (int j = 0; j < n_spherical; ++j) {
+                for (int k = 0; k < n_spherical; ++k) {
+                    for (int cart = 0; cart < n_cart; ++cart) {
+                        result(i, j) += inverse_gram(i, k) *
+                            cart_to_spherical(cart, k) * transformed_cart(cart, j);
+                    }
+                }
+                if (std::abs(result(i, j)) < 1E-12)
+                    result(i, j) = 0.0;
+            }
+        }
+        return result;
+    }
+} // namespace
+
+void symmetrize_atomic_matrix_oh(dMatrix2 &matrix, const ivec &shell_angular_momenta,
+    const bool spherical) {
+    const bool square = matrix.extent(0) == matrix.extent(1);
+    err_checkf(square, "Cannot O_h-symmetrize a non-square atomic matrix.", std::cout);
+    if (!square)
+        return;
+
+    ivec shell_offsets(shell_angular_momenta.size() + 1, 0);
+    for (int shell = 0; shell < static_cast<int>(shell_angular_momenta.size()); ++shell) {
+        const int l = shell_angular_momenta[shell];
+        const bool supported = l >= 0 && l <= 5;
+        err_checkf(supported,
+            "O_h symmetrization supports shells from s through h.", std::cout);
+        if (!supported)
+            return;
+        shell_offsets[shell + 1] = shell_offsets[shell] +
+            (spherical ? 2 * l + 1 : cartesian_shell_size(l));
+    }
+
+    const bool correct_size = shell_offsets.back() == static_cast<int>(matrix.extent(0));
+    err_checkf(correct_size,
+        "Atomic matrix size does not match its Cartesian shell description.", std::cout);
+    if (!correct_size)
+        return;
+
+    dMatrix2 symmetrized(matrix.extent(0), matrix.extent(1));
+    std::fill(symmetrized.container().begin(), symmetrized.container().end(), 0.0);
+
+    const auto &operations = oh_operations();
+    for (const auto &operation : operations) {
+        if (spherical) {
+            std::vector<dMatrix2> transforms;
+            transforms.reserve(shell_angular_momenta.size());
+            for (const int l : shell_angular_momenta)
+                transforms.push_back(spherical_transform_matrix(l, operation));
+
+            for (int shell_a = 0; shell_a < static_cast<int>(shell_angular_momenta.size()); ++shell_a) {
+                const int first_a = shell_offsets[shell_a];
+                const int size_a = 2 * shell_angular_momenta[shell_a] + 1;
+                for (int shell_b = 0; shell_b < static_cast<int>(shell_angular_momenta.size()); ++shell_b) {
+                    const int first_b = shell_offsets[shell_b];
+                    const int size_b = 2 * shell_angular_momenta[shell_b] + 1;
+                    for (int transformed_a = 0; transformed_a < size_a; ++transformed_a) {
+                        for (int transformed_b = 0; transformed_b < size_b; ++transformed_b) {
+                            for (int a = 0; a < size_a; ++a) {
+                                for (int b = 0; b < size_b; ++b) {
+                                    symmetrized(first_a + transformed_a, first_b + transformed_b) +=
+                                        transforms[shell_a](transformed_a, a) *
+                                        matrix(first_a + a, first_b + b) *
+                                        transforms[shell_b](transformed_b, b);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
+        std::vector<CartesianTransform> transforms;
+        transforms.reserve(shell_angular_momenta.size());
+        for (const int l : shell_angular_momenta)
+            transforms.push_back(cartesian_transform_from_exponents(
+                cartesian_exponents(l), operation));
+
+        for (int shell_a = 0; shell_a < static_cast<int>(shell_angular_momenta.size()); ++shell_a) {
+            const int first_a = shell_offsets[shell_a];
+            const int size_a = cartesian_shell_size(shell_angular_momenta[shell_a]);
+            const auto &transform_a = transforms[shell_a];
+            for (int shell_b = 0; shell_b < static_cast<int>(shell_angular_momenta.size()); ++shell_b) {
+                const int first_b = shell_offsets[shell_b];
+                const int size_b = cartesian_shell_size(shell_angular_momenta[shell_b]);
+                const auto &transform_b = transforms[shell_b];
+                for (int a = 0; a < size_a; ++a) {
+                    const int transformed_a = first_a + transform_a.destination[a];
+                    for (int b = 0; b < size_b; ++b) {
+                        const int transformed_b = first_b + transform_b.destination[b];
+                        symmetrized(transformed_a, transformed_b) +=
+                            transform_a.signs[a] * transform_b.signs[b] *
+                            matrix(first_a + a, first_b + b);
+                    }
+                }
+            }
+        }
+    }
+
+    const double inverse_order = 1.0 / static_cast<double>(operations.size());
+    for (auto &value : symmetrized.container())
+        value *= inverse_order;
+    matrix = std::move(symmetrized);
+}
+
 #ifdef NSA2DEBUG
 void print_dmatrix2(const dMatrix2 &EVC2, const std::string name) {
     std::cout << std::endl << name << ":\n";
@@ -515,6 +748,16 @@ std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN &wavy) {
     return bonds;
 }
 
+#ifdef __APPLE__
+static void eigenvectors_to_row_major(vec &matrix, const int n) {
+    vec row_major(n * n);
+    for (int row = 0; row < n; ++row)
+        for (int col = 0; col < n; ++col)
+            row_major[row * n + col] = matrix[col * n + row];
+    matrix.swap(row_major);
+}
+#endif
+
 //Assuming square matrices
 vec change_basis_sq(const vec &in, const vec &transformation, int size) {
 
@@ -578,7 +821,9 @@ dMatrix2 change_basis_general(const dMatrix2 &in, const dMatrix2 &transformation
  */
 Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 &D_full,
     const dMatrix2 &S_full,
-    const std::vector<int> &atom_indices) {
+    const std::vector<int> &atom_indices,
+    const ivec &shell_angular_momenta,
+    const bool spherical) {
 
     err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
     err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
@@ -591,6 +836,15 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     vec D_sub(n * n, 0.0); // called P in tonto
     vec S_sub(n * n, 0.0); // called S in tonto
     get_submatrices(D_full, S_full, D_sub, S_sub, atom_indices);
+
+    // Tonto's atomic spherical averaging applies the local point group to the
+    // atom-centred density before the ANOs are constructed.  O_h is used here
+    // because it averages all Cartesian directions without mixing radial shells.
+    if (!shell_angular_momenta.empty()) {
+        dMatrix2 atomic_density = reshape<dMatrix2>(D_sub, Shape2D(n, n));
+        symmetrize_atomic_matrix_oh(atomic_density, shell_angular_momenta, spherical);
+        D_sub = atomic_density.container();
+    }
     vec Rho(n * n);        // To store target density
 
     vec V = S_sub;
@@ -613,6 +867,11 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     err_checkf(isSymmetricViaEigenvalues<vec>(P, n), "Transformed matrix not symmetric!", std::cout);
 #endif
     make_Eigenvalues(P, occu);
+#ifdef __APPLE__
+    // Accelerate's dsyev_ returns eigenvectors in Fortran column-major layout.
+    // The NAO back-projection below consumes P through row-major CBLAS.
+    eigenvectors_to_row_major(P, n);
+#endif
 #ifdef NSA2DEBUG
     std::cout << "Eigenvalues of projected density P:\n";
     for (int i = 0; i < n; i++) {
@@ -680,7 +939,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 
     for (int i = 0; i < n; i++) {
         int original_idx = idx[i];
-        if (result.eigenvalues[original_idx] < 0.075)
+        if (result.eigenvalues[original_idx] < 0.17)
             continue;
         sorted_evals.emplace_back(result.eigenvalues[original_idx]);
 
@@ -779,7 +1038,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
  }
  */
 
-double Roby_information::projection_matrix_and_expectation(const ivec &indices, const ivec &eigvals, const ivec &eigvecs, dMatrix2 *given_NAO) {
+double Roby_information::projection_matrix_and_expectation(const ivec &indices, const ivec &eigvals, const ivec &eigvecs, dMatrix2 *given_NAO, dMatrix2 *proj_out) {
     const int n = indices.size();
     //vec D_Sub(n * n, 0.0);
     vec S_Sub(n * n, 0.0);
@@ -788,22 +1047,55 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
     int atom = -1;
     //dMatrix2 D = reshape<dMatrix2>(D_Sub, Shape2D(n, n));
 
+    auto zero_projection = [&]() {
+        dMatrix2 zero(n, n);
+        for (int r = 0; r < n; ++r)
+            for (int c = 0; c < n; ++c)
+                zero(r, c) = 0.0;
+        if (atom >= 0 && proj_out == nullptr) {
+            projection_matrices.push_back(zero);
+            overlap_matrices.push_back(S);
+        }
+        if (proj_out != nullptr)
+            *proj_out = zero;
+        return 0.0;
+        };
+
     dMatrix2 NAOs;
-    if (n == total_NAOs.extent(1))
+    // When an explicit NAO matrix is provided together with row/col selectors,
+    // use it directly — this takes priority over the full-system shortcut below.
+    if (given_NAO != nullptr && !eigvals.empty() && !eigvecs.empty()) {
+        const int n1 = eigvals.size();
+        const int n2 = eigvecs.size();
+        vec NAO_sub(n1 * n2);
+        get_submatrix(*given_NAO, NAO_sub, eigvals, eigvecs);
+        NAOs = reshape<dMatrix2>(NAO_sub, Shape2D(n1, n2));
+    }
+    else if (given_NAO == nullptr && eigvals.empty() && eigvecs.empty()
+        && n == static_cast<int>(overlap_matrix.extent(0))) {
+        err_checkf(static_cast<int>(total_NAOs.extent(1)) == n,
+            "RGBI total NAO matrix column count (" + std::to_string(total_NAOs.extent(1)) +
+            ") does not match the basis-function count (" + std::to_string(n) + ").",
+            std::cout);
         NAOs = total_NAOs;
+    }
     else {
         //TODO: assign subspace NAOs from NAOResults for a given atom
         for (auto NAO : this->NAOs) {
             // if matrix_elemnts of this NAO are identical to indices, resahpe NAO.eigenvectors to the correct shape
-            if (NAO.matrix_elements == indices)
+            if (NAO.matrix_elements == indices) {
                 NAOs = reshape<dMatrix2>(NAO.eigenvectors, Shape2D(NAO.eigenvalues.size(), n));
-            atom = NAO.atom_index;
+                atom = NAO.atom_index;
+                break;
+            }
         }
     }
     //For atom groups we can use submatrices of total_NAOs
     if (NAOs.size() == 0) {
         const int n1 = eigvals.size();
         const int n2 = eigvecs.size();
+        if (n1 == 0 || n2 == 0)
+            return zero_projection();
         vec NAO_sub(n1 * n2);
         if (given_NAO == nullptr)
             given_NAO = &total_NAOs;
@@ -830,10 +1122,12 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
     print_dmatrix2(X, "Backtransformed X");
 #endif
 
-    if (atom >= 0) {
+    if (atom >= 0 && proj_out == nullptr) {
         projection_matrices.push_back(X);
         overlap_matrices.push_back(S);
     }
+    if (proj_out != nullptr)
+        *proj_out = X;
 
     dMatrix2 S_rect = get_rectangle(overlap_matrix, indices);
 #ifdef NSA2DEBUG
@@ -853,10 +1147,10 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
 double Roby_information::Roby_population_analysis(const ivec atoms) {
     ivec bf_indices;
     if (atoms.size() == 0) {
-        for (NAOResult &NAO : NAOs) {
-            for (auto index : NAO.matrix_elements)
-                bf_indices.push_back(index);
-        }
+        const int n_basis_functions = static_cast<int>(overlap_matrix.extent(0));
+        bf_indices.reserve(n_basis_functions);
+        for (int index = 0; index < n_basis_functions; ++index)
+            bf_indices.push_back(index);
     }
     else {
         bf_indices = atoms;
@@ -865,7 +1159,7 @@ double Roby_information::Roby_population_analysis(const ivec atoms) {
     return P;
 }
 
-void Roby_information::computeAllAtomicNAOs(WFN &wavy) {
+void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize) {
     const int N_atoms = wavy.get_ncen();
     const std::vector<atom> ats = wavy.get_atoms();
     NAOs.reserve(N_atoms);
@@ -891,28 +1185,26 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy) {
     ivec2 indices(wavy.get_ncen());
     for (auto &a : ats) {
         indices[a.get_nr() - 1].reserve(density_matrix.extent(0) / N_atoms); // Rough estimate
+        ivec shell_angular_momenta;
         int current_shell = -1;
         int nr_indices = 0;
         std::vector<basis_set_entry> basis_set = a.get_basis_set();
         for (auto &bf : basis_set) {
             if (bf.get_shell() != current_shell) {
                 current_shell++;
-                switch (wavy.get_origin()) {
-                case(e_origin::tonto):
-                    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 6 : nr_indices = 10));
-					if (bf.get_type() == 3) {
-						//2 - 4; 3 - 6; 5 - 6
-						swap_rows_cols_symm(overlap_matrix, last_index + 1, last_index + 3);
-						swap_rows_cols_symm(overlap_matrix, last_index + 2, last_index + 5);
-						swap_rows_cols_symm(overlap_matrix, last_index + 4, last_index + 5);
-					}
-                    break;
-                case(e_origin::OCC):
-                    bf.get_type() == 0 ? nr_indices = 1 : (bf.get_type() == 1 ? nr_indices = 3 : (bf.get_type() == 2 ? nr_indices = 5 : nr_indices = 7));
-                    break;
-                default:
-                    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 5 : nr_indices = 7));
-                    break;
+                const int l = wavy.get_origin() == e_origin::OCC
+                    ? static_cast<int>(bf.get_type())
+                    : static_cast<int>(bf.get_type()) - 1;
+                err_checkf(l >= 0,
+                    "Encountered an invalid shell angular momentum while building RGBI atomic NAOs.",
+                    std::cout);
+                shell_angular_momenta.push_back(l);
+                nr_indices = atomic_shell_size(l, wavy.get_d_f_switch());
+                if (wavy.get_origin() == e_origin::tonto && bf.get_type() == 3) {
+                    // 2 - 4; 3 - 6; 5 - 6
+                    swap_rows_cols_symm(overlap_matrix, last_index + 1, last_index + 3);
+                    swap_rows_cols_symm(overlap_matrix, last_index + 2, last_index + 5);
+                    swap_rows_cols_symm(overlap_matrix, last_index + 4, last_index + 5);
                 }
 
                 //if (wavy.get_origin() != e_origin::tonto && wavy.get_origin() != e_origin::OCC)
@@ -934,8 +1226,17 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy) {
             }
         }
 
+        // The GBW reader converts ORCA components to PySCF/libcint order and
+        // groups an atom's shells by increasing angular momentum.  Mirror that
+        // layout here so each symmetry block describes the corresponding DM rows.
+        if (wavy.get_origin() == e_origin::gbw)
+            std::stable_sort(shell_angular_momenta.begin(), shell_angular_momenta.end());
+
         //pNAO.eigenvectors = orthogonalizePNAOs(pNAO.eigenvectors, S_full, static_cast<int>(indices[a.get_nr()].size()));
-        NAOs.emplace_back(calculateAtomicNAO(density_matrix, overlap_matrix, indices[a.get_nr() - 1]));
+        NAOs.emplace_back(calculateAtomicNAO(density_matrix, overlap_matrix,
+            indices[a.get_nr() - 1],
+            symmetrize ? shell_angular_momenta : ivec{},
+            !wavy.get_d_f_switch()));
         NAOs.back().atom_index = a.get_nr() - 1;
     }
 #ifdef NSA2DEBUG
@@ -986,12 +1287,23 @@ void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(
     dMatrix1 EVC_column(n_ab);
     dMatrix2 PAS(n_a, n_ab), PBS(n_b, n_ab);
 
+    const ivec *indices_a = nullptr;
+    const ivec *indices_b = nullptr;
+    for (const auto &NAO : NAOs) {
+        if (NAO.atom_index == index_a)
+            indices_a = &NAO.matrix_elements;
+        if (NAO.atom_index == index_b)
+            indices_b = &NAO.matrix_elements;
+    }
+    err_checkf(indices_a != nullptr, "No NAO data found for atom " + std::to_string(index_a), std::cout);
+    err_checkf(indices_b != nullptr, "No NAO data found for atom " + std::to_string(index_b), std::cout);
+
     vec Sub_overlap(n_a * n_ab);
-    get_submatrix(overlap_matrix, Sub_overlap, NAOs[index_a].matrix_elements, pair_matrix_indices);
+    get_submatrix(overlap_matrix, Sub_overlap, *indices_a, pair_matrix_indices);
     dMatrix2 Sa = reshape<dMatrix2>(Sub_overlap, Shape2D(n_a, n_ab));
     PAS = dot<dMatrix2>(projection_matrices[index_a], Sa, false, false);
     Sub_overlap.clear(); Sub_overlap.resize(n_b * n_ab);
-    get_submatrix(overlap_matrix, Sub_overlap, NAOs[index_b].matrix_elements, pair_matrix_indices);
+    get_submatrix(overlap_matrix, Sub_overlap, *indices_b, pair_matrix_indices);
     dMatrix2 Sb = reshape<dMatrix2>(Sub_overlap, Shape2D(n_b, n_ab));
     PBS = dot<dMatrix2>(projection_matrices[index_b], Sb, false, false);
 #ifdef NSA2DEBUG
@@ -1090,12 +1402,376 @@ std::map<char, dMatrix2> Roby_information::make_covalent_from_ionic(
     return res;
 }
 
-Roby_information::Roby_information(WFN &wavy) {
+// Assembles the block-projected PAS matrix for a group: each atom's projection matrix
+// is multiplied by the rectangular overlap block (atom bf rows × bond bf cols) and
+// the results are stacked vertically.  Result shape: n_bf_G × n_ab.
+dMatrix2 Roby_information::build_group_PAS(const ivec &group_atom_indices, const ivec &bond_bf_indices, const dMatrix2 &P_G) {
+    const int n_ab = static_cast<int>(bond_bf_indices.size());
+    // Collect group BF indices in the same sorted-atom order as P_G was built
+    ivec group_bf;
+    for (int ai : group_atom_indices)
+        for (const auto &NAO : NAOs)
+            if (NAO.atom_index == ai)
+                for (int idx : NAO.matrix_elements)
+                    group_bf.push_back(idx);
+    const int n_G = static_cast<int>(group_bf.size());
+    err_checkf(n_G > 0, "RGBI group PAS has no basis functions for the requested atom group.", std::cout);
+    err_checkf(n_ab > 0, "RGBI group PAS has no pair basis functions.", std::cout);
+    vec sub_S(n_G * n_ab, 0.0);
+    get_submatrix(overlap_matrix, sub_S, group_bf, bond_bf_indices);
+    dMatrix2 S_G = reshape<dMatrix2>(sub_S, Shape2D(n_G, n_ab));
+    // PAS = P_G (n_G × n_G) × S_G (n_G × n_ab) → (n_G × n_ab)
+    return dot<dMatrix2>(P_G, S_G, false, false);
+}
+
+// Group-aware version of transform_Ionic_eigenvectors_to_Ionic_orbitals.
+// Builds PAS/PBS from block-assembled group projection matrices, then applies
+// the same bonding/antibonding rotation as the single-atom version.
+void Roby_information::transform_group_Ionic_orbitals(
+    dMatrix2 &EVC,
+    const vec &eigvals,
+    const ivec &pairs,
+    const ivec &group_a_atoms,
+    const ivec &group_b_atoms,
+    const ivec &bond_bf_indices,
+    const dMatrix2 &P_GA,
+    const dMatrix2 &P_GB)
+{
+    const int n_ab = EVC.extent(0);
+    const int n_eigvals = static_cast<int>(eigvals.size());
+
+    dMatrix2 PAS = build_group_PAS(group_a_atoms, bond_bf_indices, P_GA);
+    dMatrix2 PBS = build_group_PAS(group_b_atoms, bond_bf_indices, P_GB);
+
+    const int n_a = static_cast<int>(PAS.extent(0));
+    const int n_b = static_cast<int>(PBS.extent(0));
+    err_checkf(n_ab == n_a + n_b, "Inconsistent group sizes in transform_group_Ionic_orbitals", std::cout);
+
+    dMatrix1 A(n_a), B(n_b);
+    dMatrix1 EVC_column(n_ab);
+
+    for (int i = 0; i < n_eigvals; i++) {
+        if (pairs[i] < 0) continue;
+        if (pairs[i] == i) continue;
+        if (eigvals[i] < eigvals[pairs[i]]) continue;
+
+        for (int a = 0; a < n_ab; a++)
+            EVC_column(a) = EVC(a, i);
+
+        const double s = eigvals[i];
+        const double s2 = s * s;
+        const double c = (abs(s2 - 1.0) < 1E-8) ? 0.0 : sqrt(1.0 - s2);
+
+        const double fm = sqrt(1.0 - c) / s;
+        const double fp = sqrt(1.0 + c) / s;
+        double fa = 0.5 * ((fm + fp) + c * (fm - fp));
+        double fb = 0.5 * (c * (fm + fp) + (fm - fp));
+
+        if (abs(fa - 1.0) > 1E-8) {
+            A = dot_BLAS<dMatrix1, dMatrix2>(PAS, EVC_column, false);
+            for (int a = 0; a < n_a; a++)
+                A(a) /= fa;
+        }
+        if (abs(fb - 1.0) > 1E-8) {
+            B = dot_BLAS<dMatrix1, dMatrix2>(PBS, EVC_column, false);
+            for (int b = 0; b < n_b; b++)
+                B(b) /= fb;
+        }
+
+        // Build antibonding partner in column pairs[i]
+        fa = 0.5 * (fm - fp);
+        fb = 0.5 * (fm + fp);
+
+        for (int a = 0; a < n_a; a++)
+            EVC(a, pairs[i]) = fa * A(a);
+        for (int b = n_a; b < n_ab; b++)
+            EVC(b, pairs[i]) = fb * B(b - n_a);
+    }
+}
+
+void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &atom_pops, const ivec &atom_charges) {
+    RGBI_groups.clear();
+    const int n_groups = static_cast<int>(group_defs.size());
+
+    // Helper: build NAO row/col index sets for a list of sorted atom indices
+    auto collect_nao_indices = [&](const ivec &atoms, ivec &eigenvals_out, ivec &eigenvecs_out) {
+        eigenvals_out.clear();
+        eigenvecs_out.clear();
+        int start_val = 0;
+        for (const auto &NAO : NAOs) {
+            bool wanted = std::find(atoms.begin(), atoms.end(), NAO.atom_index) != atoms.end();
+            if (wanted) {
+                for (int i = 0; i < static_cast<int>(NAO.eigenvalues.size()); i++)
+                    eigenvals_out.push_back(start_val + i);
+                for (int idx : NAO.matrix_elements)
+                    eigenvecs_out.push_back(idx);
+            }
+            start_val += static_cast<int>(NAO.eigenvalues.size());
+        }
+        };
+
+    // Helper: collect BF indices for a list of atom indices in the given order.
+    // Caller must pass atoms in sorted order so BF ordering matches the ionic-operator layout.
+    // Scans NAOs by atom_index rather than using direct array indexing, so the result is
+    // correct regardless of the order atoms were processed in computeAllAtomicNAOs.
+    auto collect_bf_indices = [&](const ivec &atoms, ivec &bf_out) {
+        bf_out.clear();
+        for (int ai : atoms)
+            for (const auto &NAO : NAOs)
+                if (NAO.atom_index == ai)
+                    for (int idx : NAO.matrix_elements)
+                        bf_out.push_back(idx);
+        };
+
+    auto atom_list_string = [](const ivec &atoms) {
+        std::string result;
+        for (int i = 0; i < static_cast<int>(atoms.size()); ++i) {
+            if (i > 0)
+                result += ",";
+            result += std::to_string(atoms[i]);
+        }
+        return result;
+        };
+
+    // Pre-compute per-group data: sorted atoms, BF indices, NAO indices, projection, population
+    struct GroupData {
+        ivec sorted_atoms;
+        ivec bf;
+        ivec nao_evals;
+        ivec nao_evecs;
+        dMatrix2 P;
+        double pop = 0.0;
+        std::string elem_list; // e.g. "N,H,H,H"
+    };
+    std::vector<GroupData> gdata(n_groups);
+    for (int gi = 0; gi < n_groups; gi++) {
+        gdata[gi].sorted_atoms = group_defs[gi];
+        std::sort(gdata[gi].sorted_atoms.begin(), gdata[gi].sorted_atoms.end());
+        collect_bf_indices(gdata[gi].sorted_atoms, gdata[gi].bf);
+        collect_nao_indices(gdata[gi].sorted_atoms, gdata[gi].nao_evals, gdata[gi].nao_evecs);
+        err_checkf(!gdata[gi].bf.empty(),
+            "RGBI group G" + std::to_string(gi) + " has no basis functions for atoms " +
+            atom_list_string(gdata[gi].sorted_atoms) + ".", std::cout);
+        gdata[gi].pop = projection_matrix_and_expectation(
+            gdata[gi].bf, gdata[gi].nao_evals, gdata[gi].nao_evecs, nullptr, &gdata[gi].P);
+        {
+            std::map<int, int> charge_count;
+            for (int ai : gdata[gi].sorted_atoms)
+                charge_count[atom_charges[ai]]++;
+            std::vector<std::pair<int, int>> by_charge(charge_count.begin(), charge_count.end());
+            std::sort(by_charge.begin(), by_charge.end(), [](const auto &a, const auto &b) {
+                return a.first > b.first; // heaviest element first
+                });
+            for (const auto &[charge, count] : by_charge) {
+                gdata[gi].elem_list += constants::atnr2letter(charge);
+                if (count > 1) gdata[gi].elem_list += std::to_string(count);
+            }
+        }
+    }
+
+    // ---- Header ----
+    std::cout << "\n\nRoby-Gould Bond Indices (RGBI) - Group Analysis\n";
+    std::cout << "----------------------------------------------\n";
+    std::cout << "Groups defined:\n";
+    for (int g = 0; g < n_groups; g++) {
+        std::cout << "  G" << g << ": atoms ";
+        for (int k = 0; k < static_cast<int>(gdata[g].sorted_atoms.size()); k++) {
+            if (k > 0) std::cout << ", ";
+            const int ai = gdata[g].sorted_atoms[k];
+            std::cout << ai << "(" << constants::atnr2letter(atom_charges[ai]) << ")";
+        }
+        std::cout << "\n";
+    }
+    std::cout << "----------------------------------------------\n";
+
+    // ---- Group populations ----
+    std::cout << "\nGroup populations:\n";
+    for (int g = 0; g < n_groups; g++) {
+        const std::string label = "G" + std::to_string(g) + " (" + gdata[g].elem_list + ")";
+        std::cout << "  Population of " << std::left << std::setw(24) << label
+            << std::right << std::fixed << std::setprecision(5) << gdata[g].pop << "\n";
+    }
+    std::cout << "----------------------------------------------\n";
+
+    // ---- Pair analysis ----
+    for (int gi = 0; gi < n_groups; gi++) {
+        for (int gj = gi + 1; gj < n_groups; gj++) {
+            const ivec &ga_sorted = gdata[gi].sorted_atoms;
+            const ivec &gb_sorted = gdata[gj].sorted_atoms;
+            const ivec &ga_bf = gdata[gi].bf;
+            const ivec &gb_bf = gdata[gj].bf;
+            const dMatrix2 &P_GA = gdata[gi].P;
+            const dMatrix2 &P_GB = gdata[gj].P;
+            const double pop_ga = gdata[gi].pop;
+            const double pop_gb = gdata[gj].pop;
+
+            // bond_bf: ga's BFs first, gb's second — order MUST match ionic operator layout
+            ivec bond_bf;
+            bond_bf.insert(bond_bf.end(), ga_bf.begin(), ga_bf.end());
+            bond_bf.insert(bond_bf.end(), gb_bf.begin(), gb_bf.end());
+
+            // Pair population
+            ivec bond_evals = gdata[gi].nao_evals, bond_evecs = gdata[gi].nao_evecs;
+            bond_evals.insert(bond_evals.end(), gdata[gj].nao_evals.begin(), gdata[gj].nao_evals.end());
+            bond_evecs.insert(bond_evecs.end(), gdata[gj].nao_evecs.begin(), gdata[gj].nao_evecs.end());
+            err_checkf(!bond_bf.empty(),
+                "RGBI group pair G" + std::to_string(gi) + "-G" + std::to_string(gj) +
+                " has no basis functions.", std::cout);
+            const bool pair_spans_full_basis =
+                static_cast<int>(bond_bf.size()) == static_cast<int>(overlap_matrix.extent(0));
+            // Full-basis group pairs use the same projection path as the total RGBI population.
+            // This preserves the requested group BF ordering used by the established references.
+            const double pair_pop = pair_spans_full_basis
+                ? projection_matrix_and_expectation(bond_bf)
+                : projection_matrix_and_expectation(bond_bf, bond_evals, bond_evecs);
+
+            // Build ionic operator [P_GA | 0; 0 | -P_GB] using dense group projections
+            const int n_a = static_cast<int>(ga_bf.size());
+            const int n_b = static_cast<int>(gb_bf.size());
+            const int n_ab = n_a + n_b;
+            dMatrix2 Ionic_Operator(n_ab, n_ab);
+            for (int r = 0; r < n_ab; r++)
+                for (int c = 0; c < n_ab; c++)
+                    Ionic_Operator(r, c) = 0.0;
+            for (int r = 0; r < n_a; r++)
+                for (int c = 0; c < n_a; c++)
+                    Ionic_Operator(r, c) = P_GA(r, c);
+            for (int r = 0; r < n_b; r++)
+                for (int c = 0; c < n_b; c++)
+                    Ionic_Operator(n_a + r, n_a + c) = -P_GB(r, c);
+
+            // Sub-overlap → sqrt → solve eigenproblem
+            vec S_Sub(n_ab * n_ab, 0.0);
+            get_submatrix(overlap_matrix, S_Sub, bond_bf);
+            vec V = S_Sub;
+            vec W(n_ab);
+            const vec Temp = mat_sqrt(V, W);
+            dMatrix2 A = reshape<dMatrix2>(Temp, Shape2D(n_ab, n_ab));
+            dMatrix2 SI = LAPACKE_invert(A);
+
+            auto X = change_basis_general(Ionic_Operator, transpose(A), true);
+            vec ionic_eigenvals(X.extent(0));
+            make_Eigenvalues(X.container(), ionic_eigenvals);
+#ifdef __APPLE__
+            eigenvectors_to_row_major(X.container(), static_cast<int>(X.extent(0)));
+#endif
+
+            auto EVC = dot<dMatrix2>(SI, X);
+
+            // Prune near-zero eigenvalues
+            ivec non_zero;
+            for (int i = 0; i < static_cast<int>(ionic_eigenvals.size()); i++)
+                if (abs(ionic_eigenvals[i]) > 1E-5)
+                    non_zero.push_back(i);
+
+            vec pruned_eigvals;
+            for (int idx : non_zero)
+                pruned_eigvals.push_back(ionic_eigenvals[idx]);
+
+            EVC = transpose(EVC);
+            auto EVC2 = transpose(get_rectangle(EVC, non_zero));
+            EVC.container().clear();
+
+            const int n0 = static_cast<int>(pruned_eigvals.size());
+            auto pairs = find_eigenvalue_pairs(pruned_eigvals);
+
+            transform_group_Ionic_orbitals(EVC2, pruned_eigvals, pairs, ga_sorted, gb_sorted, bond_bf, P_GA, P_GB);
+
+            auto covalent_info = make_covalent_from_ionic(EVC2, pruned_eigvals, pairs);
+
+            // Per-orbital populations
+            vec covalent_popul(n0), ionic_popul(n0);
+            ivec vals;
+            for (int i = 0; i < static_cast<int>(EVC2.extent(0)); i++)
+                vals.emplace_back(i);
+            for (int i = 0; i < n0; i++) {
+                auto temp = transpose(covalent_info['T']);
+                covalent_popul[i] = projection_matrix_and_expectation(bond_bf, { i }, vals, &temp);
+                temp = transpose(EVC2);
+                ionic_popul[i] = projection_matrix_and_expectation(bond_bf, { i }, vals, &temp);
+            }
+
+            const double zero_angle_cutoff = 1E-2 * constants::INV_PI_180;
+            group_bond_index_result result;
+            result.group_index_first = gi;
+            result.group_index_second = gj;
+            result.atoms_first = ga_sorted;
+            result.atoms_second = gb_sorted;
+            result.pair_population = pair_pop;
+            result.population_first = pop_ga;
+            result.population_second = pop_gb;
+            result.covalent = 0.0;
+            result.ionic = 0.0;
+
+            // Lone-pair orbitals localized almost entirely within one group have
+            // eigvals near ±1.  In the group basis the inter-group contamination
+            // can push these to ~0.996 rather than exactly 1, so they evade the
+            // angle cutoff (84.6° < 89.99°) and corrupt the ionic index with large
+            // contributions of the wrong sign.  Exclude any pair whose positive
+            // eigval exceeds this threshold.
+            constexpr double lone_pair_eigval_threshold = 0.99;
+            for (int i = 0; i < n0; i++) {
+                if (covalent_info['A'](i, 0) < zero_angle_cutoff || covalent_info['A'](i, 0) > 90.0 - zero_angle_cutoff)
+                    continue;
+                if (pruned_eigvals[i] < pruned_eigvals[pairs[i]])
+                    continue;
+                if (pruned_eigvals[i] > lone_pair_eigval_threshold)
+                    continue;
+                if (pairs[i] != i) {
+                    result.covalent += 0.5 * (covalent_popul[i] - covalent_popul[pairs[i]]);
+                    result.ionic += 0.5 * (ionic_popul[i] - ionic_popul[pairs[i]]);
+                }
+            }
+
+            const double b2 = result.covalent * result.covalent + result.ionic * result.ionic;
+            result.percent_covalent_Pyth = (b2 > 1E-12) ? 100.0 * (result.covalent * result.covalent / b2) : 0.0;
+            const double b = sqrt(b2);
+            result.total = b;
+            result.percent_covalent_Arakai = (b > 1E-12) ? 200.0 * abs(asin(result.covalent / b)) / constants::PI : 0.0;
+
+            RGBI_groups.push_back(result);
+        }
+    }
+
+    // ---- Results table ----
+    const std::string sep(90, '-');
+    std::cout << "\n" << std::left << std::setw(14) << "Group" << std::right
+        << std::setw(8) << "n_G1"
+        << std::setw(8) << "n_G2"
+        << std::setw(8) << "n_G1G2"
+        << std::setw(8) << "s_G1G2"
+        << std::setw(8) << "Cov."
+        << std::setw(8) << "Ion."
+        << std::setw(8) << "Tot."
+        << std::setw(8) << "Pyth."
+        << std::setw(8) << "Arak."
+        << "\n" << sep << "\n";
+    for (const auto &res : RGBI_groups) {
+        const std::string label = "G" + std::to_string(res.group_index_first)
+            + " - G" + std::to_string(res.group_index_second);
+        std::cout << std::left << std::setw(14) << label << std::right
+            << std::fixed << std::setprecision(3)
+            << std::setw(8) << res.population_first
+            << std::setw(8) << res.population_second
+            << std::setw(8) << res.pair_population
+            << std::setw(8) << (res.population_first + res.population_second - res.pair_population)
+            << std::setw(8) << res.covalent
+            << std::setw(8) << res.ionic
+            << std::setw(8) << res.total
+            << std::setw(8) << res.percent_covalent_Pyth
+            << std::setw(8) << res.percent_covalent_Arakai
+            << "\n";
+    }
+    std::cout << sep << "\n";
+}
+
+Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize) {
     auto bonds = get_bonded_atom_pairs(wavy);
     std::cout << "Calculating NAOs for all atoms...                 " << std::flush;
-    computeAllAtomicNAOs(wavy);
+    computeAllAtomicNAOs(wavy, symmetrize);
     std::cout << " ...done!" << std::endl;
     Shape2D NAOs_size;
+    NAOs_size.cols = static_cast<int>(overlap_matrix.extent(0));
     for (size_t atom_idx = 0; atom_idx < NAOs.size(); atom_idx++) {
 #ifdef NSA2DEBUG
         std::cout << "Atom " << atom_idx + 1 << " NAO Occupancies:\n";
@@ -1106,8 +1782,6 @@ Roby_information::Roby_information(WFN &wavy) {
 #endif
             NAOs_size.rows++;
         }
-        const int cols = NAOs[atom_idx].eigenvectors.size() / NAOs[atom_idx].eigenvalues.size();
-        NAOs_size.cols += cols;
 #ifdef NSA2DEBUG
         std::cout << std::endl;
 #endif
@@ -1123,12 +1797,11 @@ Roby_information::Roby_information(WFN &wavy) {
             const int row = temp.rows + i;
             for (int j = 0; j < ME; j++) {
                 const int index_eigenvector = i * ME + j;
-                const int col = temp.cols + j;
+                const int col = NAO.matrix_elements[j];
                 total_NAOs(row, col) = NAO.eigenvectors[index_eigenvector];
             }
         }
         temp.rows += NAO.eigenvalues.size();
-        temp.cols += NAO.matrix_elements.size();
     }
 #ifdef NSA2DEBUG
     print_dmatrix2(total_NAOs, "Global NAO Matrix");
@@ -1140,11 +1813,17 @@ Roby_information::Roby_information(WFN &wavy) {
     std::cout << " ...done." << std::endl;
     std::cout << std::endl << "Total Population: " << all_atom_population << "\n\n";
     vec atom_pops(NAOs.size(), 0.0);
+    projection_matrices.clear();
+    projection_matrices.resize(NAOs.size());
+    overlap_matrices.clear();
+    overlap_matrices.resize(NAOs.size());
 #ifndef NSA2DEBUG
     ProgressBar *pb = new ProgressBar(NAOs.size(), 40, "-", " ", "Calculating Atomic Populations");
 #endif
     for (auto NAO : NAOs) {
-        atom_pops[NAO.atom_index] = Roby_population_analysis(NAO.matrix_elements);
+        dMatrix2 P;
+        atom_pops[NAO.atom_index] = projection_matrix_and_expectation(NAO.matrix_elements, {}, {}, nullptr, &P);
+        projection_matrices[NAO.atom_index] = P;
 #ifndef NSA2DEBUG
         pb->update();
 #endif
@@ -1164,27 +1843,25 @@ Roby_information::Roby_information(WFN &wavy) {
         //std::cout << std::endl << "---------------------------- Atom Pair: " << bond.first << " " << bond.second << " ----------------------\n";
         ivec bond_indices, bond_eigenvecs, bond_eigenvals;
         //gather basis function indices for both atoms
-        for (auto idx : NAOs[bond.first].matrix_elements)
-            bond_indices.push_back(idx);
-        for (auto idx : NAOs[bond.second].matrix_elements)
-            bond_indices.push_back(idx);
+        for (const auto &NAO : NAOs) {
+            if (NAO.atom_index == bond.first || NAO.atom_index == bond.second)
+                for (auto idx : NAO.matrix_elements)
+                    bond_indices.push_back(idx);
+        }
         //just in case: sort bond indices, easy since each atom's indices are already assumed sorted and each basis function belongs to only one atom once
         std::sort(bond_indices.begin(), bond_indices.end());
 
         //now determine the bond atom NAO indices
-        int start_vec = 0, start_val = 0;
+        int start_val = 0;
         for (auto NAO : NAOs) {
             if (NAO.atom_index == bond.first || NAO.atom_index == bond.second) {
                 const int n1 = NAO.eigenvalues.size();
-                const int n2 = NAO.eigenvectors.size() / n1;
                 for (int i = 0; i < n1; i++) {
                     bond_eigenvals.push_back(start_val + i);
                 }
-                for (int i = 0; i < n2; i++) {
-                    bond_eigenvecs.push_back(start_vec + i);
-                }
+                for (int idx : NAO.matrix_elements)
+                    bond_eigenvecs.push_back(idx);
             }
-            start_vec += NAO.matrix_elements.size();
             start_val += NAO.eigenvalues.size();
         }
 
@@ -1243,6 +1920,9 @@ Roby_information::Roby_information(WFN &wavy) {
         // solve symmetric eigenproblem of X
         vec ionic_eigenvals(X.extent(0));
         make_Eigenvalues(X.container(), ionic_eigenvals);
+#ifdef __APPLE__
+        eigenvectors_to_row_major(X.container(), static_cast<int>(X.extent(0)));
+#endif
 
 #ifdef NSA2DEBUG
         std::cout << "Ionic eigenvalues between atom " << bond.first + 1 << " and atom " << bond.second + 1 << ":\n";
@@ -1421,6 +2101,14 @@ Roby_information::Roby_information(WFN &wavy) {
     }
     std::cout << "--------------------------------------------------------------------------------------------\n";
 
+    if (!group_sets.empty()) {
+        const int N_atoms = wavy.get_ncen();
+        ivec atom_charges(N_atoms);
+        for (int i = 0; i < N_atoms; i++)
+            atom_charges[i] = wavy.get_atom_charge(i);
+        for (const auto &group_defs : group_sets)
+            computeGroupAnalysis(group_defs, atom_pops, atom_charges);
+    }
 }
 
 void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
@@ -1513,9 +2201,9 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
         std::cout << "  Atom " << a << ": (" << atoms[a].get_coordinate(0) << ", " << atoms[a].get_coordinate(1) << ", " << atoms[a].get_coordinate(2) << ")\n";
     }
 
-    vec stepsizes{(prop_opt.MinMax[3] - prop_opt.MinMax[0]) / prop_opt.NbSteps[0],
+    vec stepsizes{ (prop_opt.MinMax[3] - prop_opt.MinMax[0]) / prop_opt.NbSteps[0],
                   (prop_opt.MinMax[4] - prop_opt.MinMax[1]) / prop_opt.NbSteps[1],
-                  (prop_opt.MinMax[5] - prop_opt.MinMax[2]) / prop_opt.NbSteps[2]};
+                  (prop_opt.MinMax[5] - prop_opt.MinMax[2]) / prop_opt.NbSteps[2] };
 
     for (int i = 0; i < 3; i++)
     {
@@ -1585,47 +2273,47 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
             }
 
             std::cout << "\n  CP " << std::right << std::setw(3) << i + 1
-                      << "  [" << std::left << std::setw(12) << cp.type << "]  "
-                      << (cp.converged ? "converged" : "NOT converged")
-                      << ownership_info << "\n";
+                << "  [" << std::left << std::setw(12) << cp.type << "]  "
+                << (cp.converged ? "converged" : "NOT converged")
+                << ownership_info << "\n";
             std::cout << std::fixed << std::setprecision(4) << std::right;
             std::cout << "    Position  :"
-                      << std::setw(nw) << cp.position[0]
-                      << std::setw(nw) << cp.position[1]
-                      << std::setw(nw) << cp.position[2] << "\n";
+                << std::setw(nw) << cp.position[0]
+                << std::setw(nw) << cp.position[1]
+                << std::setw(nw) << cp.position[2] << "\n";
             std::cout << "    Rho       :" << std::setw(nw) << cp.density << "\n";
             std::cout << "    GradRho   :"
-                      << std::setw(nw) << cp.gradient[0]
-                      << std::setw(nw) << cp.gradient[1]
-                      << std::setw(nw) << cp.gradient[2]
-                      << "   |GradRho| :" << std::setw(nw) << cp.gradient_norm << "\n";
+                << std::setw(nw) << cp.gradient[0]
+                << std::setw(nw) << cp.gradient[1]
+                << std::setw(nw) << cp.gradient[2]
+                << "   |GradRho| :" << std::setw(nw) << cp.gradient_norm << "\n";
             std::cout << "    HessRho_EigVals:"
-                      << std::scientific << std::setprecision(4)
-                      << std::setw(nw) << cp.hessian_eigenvalues[0]
-                      << std::setw(nw) << cp.hessian_eigenvalues[1]
-                      << std::setw(nw) << cp.hessian_eigenvalues[2]
-                      << std::fixed << std::setprecision(4) << "\n";
+                << std::scientific << std::setprecision(4)
+                << std::setw(nw) << cp.hessian_eigenvalues[0]
+                << std::setw(nw) << cp.hessian_eigenvalues[1]
+                << std::setw(nw) << cp.hessian_eigenvalues[2]
+                << std::fixed << std::setprecision(4) << "\n";
             std::cout << "    HessRho_EigVecs v1:"
-                      << std::setw(nw) << cp.hessian_eigenvectors[0][0]
-                      << std::setw(nw) << cp.hessian_eigenvectors[0][1]
-                      << std::setw(nw) << cp.hessian_eigenvectors[0][2] << "\n";
+                << std::setw(nw) << cp.hessian_eigenvectors[0][0]
+                << std::setw(nw) << cp.hessian_eigenvectors[0][1]
+                << std::setw(nw) << cp.hessian_eigenvectors[0][2] << "\n";
             std::cout << "                    v2:"
-                      << std::setw(nw) << cp.hessian_eigenvectors[1][0]
-                      << std::setw(nw) << cp.hessian_eigenvectors[1][1]
-                      << std::setw(nw) << cp.hessian_eigenvectors[1][2] << "\n";
+                << std::setw(nw) << cp.hessian_eigenvectors[1][0]
+                << std::setw(nw) << cp.hessian_eigenvectors[1][1]
+                << std::setw(nw) << cp.hessian_eigenvectors[1][2] << "\n";
             std::cout << "                    v3:"
-                      << std::setw(nw) << cp.hessian_eigenvectors[2][0]
-                      << std::setw(nw) << cp.hessian_eigenvectors[2][1]
-                      << std::setw(nw) << cp.hessian_eigenvectors[2][2] << "\n";
+                << std::setw(nw) << cp.hessian_eigenvectors[2][0]
+                << std::setw(nw) << cp.hessian_eigenvectors[2][1]
+                << std::setw(nw) << cp.hessian_eigenvectors[2][2] << "\n";
             std::cout << "    DelSqRho  :" << std::setw(nw) << cp.laplacian << "\n";
             if (std::isfinite(cp.ellipticity))
                 std::cout << "    Bond Ellipticity:" << std::setw(nw) << cp.ellipticity << "\n";
             if (std::isfinite(cp.virial_field) || std::isfinite(cp.kinetic_lagrangian) || std::isfinite(cp.kinetic_hamiltonian) || std::isfinite(cp.lagrangian_density)) {
                 std::cout << "   V         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.virial_field
-                          << "   G         :" << std::fixed << std::setprecision(4) << std::setw(nw) << cp.kinetic_lagrangian
-                          << "   K         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.kinetic_hamiltonian
-                          << "   L         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.lagrangian_density
-                          << std::fixed << std::setprecision(4) << "\n";
+                    << "   G         :" << std::fixed << std::setprecision(4) << std::setw(nw) << cp.kinetic_lagrangian
+                    << "   K         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.kinetic_hamiltonian
+                    << "   L         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.lagrangian_density
+                    << std::fixed << std::setprecision(4) << "\n";
             }
         }
         std::cout << "\n";
@@ -1642,4 +2330,195 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     std::cout << "\n\nELI Analysis:\n";
     integrate_values_in_basins(&rho, &(eli_results.first), eli_labels, opt.debug);
 
+}
+
+// ---------------------------------------------------------------------------
+// QTAIM_ELI_mask
+// ---------------------------------------------------------------------------
+
+void QTAIM_ELI_mask(
+    cube& rho,
+    cube& eli,
+    WFN& parent_wfn,
+    const std::vector<atom>& atoms,
+    const std::vector<int>& selected_indices,
+    double background_value,
+    const std::filesystem::path& output_path,
+    bool debug,
+    std::ostream& log
+) {
+    err_checkf(!atoms.empty(), "QTAIM_ELI_mask: no atoms available.", log);
+    err_checkf(rho.get_size(0) == eli.get_size(0) &&
+               rho.get_size(1) == eli.get_size(1) &&
+               rho.get_size(2) == eli.get_size(2),
+               "QTAIM_ELI_mask: rho and eli grids have different dimensions.", log);
+
+    // Validate atom indices
+    for (int idx : selected_indices) {
+        err_checkf(idx >= 0 && idx < (int)atoms.size(),
+            "QTAIM_ELI_mask: atom index " + std::to_string(idx) +
+            " is out of range (0.." + std::to_string((int)atoms.size() - 1) + ").", log);
+    }
+
+    log << "Running QTAIM topological analysis on density grid..." << std::endl;
+    const double density_floor = std::max(1e-8, rho.max_value() * 1e-6);
+    auto [basin_cube, maxima] = topological_cube_analysis(&rho, atoms, debug, false, density_floor);
+    svec labels = assign_labels_to_basins(maxima, atoms, debug, 0);
+
+    // Map selected atom indices → set of 1-based basin IDs
+    // Label format: element + atom_index, e.g. "C0", "H3"
+    std::set<int> selected_basins;
+    for (int b = 0; b < (int)labels.size(); b++) {
+        const std::string& lbl = labels[b];
+        // Extract trailing digit sequence (the atom index)
+        auto it = std::find_if(lbl.rbegin(), lbl.rend(),
+                               [](char c) { return !std::isdigit(static_cast<unsigned char>(c)); });
+        if (it == lbl.rend()) continue; // entire string is digits — skip
+        const std::string num_str(it.base(), lbl.end());
+        if (num_str.empty()) continue;
+        int atom_idx = std::stoi(num_str);
+        if (std::find(selected_indices.begin(), selected_indices.end(), atom_idx)
+                != selected_indices.end()) {
+            selected_basins.insert(b + 1); // basin IDs in cubei are 1-indexed
+            if (debug)
+                log << "  Basin " << (b + 1) << " (\"" << lbl << "\") selected.\n";
+        }
+    }
+
+    if (selected_basins.empty()) {
+        log << "Warning: no QTAIM basins matched the requested atom indices. "
+               "Output will contain only the background value.\n";
+    }
+
+    const int nx = eli.get_size(0);
+    const int ny = eli.get_size(1);
+    const int nz = eli.get_size(2);
+
+    // Pass 1: find tight bounding box of selected voxels
+    int xmin = nx, xmax = -1, ymin = ny, ymax = -1, zmin = nz, zmax = -1;
+    for (int x = 0; x < nx; x++)
+        for (int y = 0; y < ny; y++)
+            for (int z = 0; z < nz; z++) {
+                if (selected_basins.count(basin_cube.get_value(x, y, z))) {
+                    xmin = std::min(xmin, x); xmax = std::max(xmax, x);
+                    ymin = std::min(ymin, y); ymax = std::max(ymax, y);
+                    zmin = std::min(zmin, z); zmax = std::max(zmax, z);
+                }
+            }
+
+    if (xmax < 0) {
+        // No selected voxels — write a 1×1×1 cube with background value
+        xmin = xmax = 0; ymin = ymax = 0; zmin = zmax = 0;
+    }
+
+    log << "Bounding box of selected basins: ["
+        << xmin << ".." << xmax << "] x ["
+        << ymin << ".." << ymax << "] x ["
+        << zmin << ".." << zmax << "]\n";
+
+    // Pass 2: build shrunk cube
+    const std::array<int, 3> new_size = {xmax - xmin + 1, ymax - ymin + 1, zmax - zmin + 1};
+    cube shrunk(new_size, (int)atoms.size(), true);
+    shrunk.give_parent_wfn(parent_wfn);
+
+    const auto new_origin = eli.get_pos(xmin, ymin, zmin);
+    for (int i = 0; i < 3; i++) {
+        shrunk.set_origin(i, new_origin[i]);
+        for (int j = 0; j < 3; j++)
+            shrunk.set_vector(i, j, eli.get_vector(i, j));
+    }
+    shrunk.calc_dv();
+
+    for (int x = xmin; x <= xmax; x++)
+        for (int y = ymin; y <= ymax; y++)
+            for (int z = zmin; z <= zmax; z++) {
+                double val = selected_basins.count(basin_cube.get_value(x, y, z))
+                             ? eli.get_value(x, y, z)
+                             : background_value;
+                shrunk.set_value(x - xmin, y - ymin, z - zmin, val);
+            }
+
+    shrunk.set_comment1("QTAIM-masked ELI");
+    shrunk.set_comment2("Selected atoms: " + [&]() {
+        std::string s;
+        for (int i = 0; i < (int)selected_indices.size(); i++) {
+            if (i) s += ',';
+            s += std::to_string(selected_indices[i]);
+        }
+        return s;
+    }());
+    shrunk.set_path(output_path);
+
+    log << "Writing masked ELI cube to " << output_path.string() << " ..." << std::endl;
+    err_checkf(shrunk.write_file(true), "QTAIM_ELI_mask: failed to write output cube.", log);
+    log << "Done.\n";
+}
+
+// ---------------------------------------------------------------------------
+// run_QTAIM_ELI_mask  (dispatch: cube-files mode vs WFN mode)
+// ---------------------------------------------------------------------------
+
+void run_QTAIM_ELI_mask(
+    const std::filesystem::path& rho_or_wfn,
+    const std::filesystem::path& eli_path,
+    const std::vector<int>& selected_indices,
+    double background_value,
+    const options& opt,
+    std::ostream& log
+) {
+    if (!eli_path.empty()) {
+        // ---- Cube-files mode ----
+        log << "Reading density cube: " << rho_or_wfn.string() << std::endl;
+        WFN dummy;
+        cube rho(rho_or_wfn, true, dummy, log);
+        log << "Reading ELI cube:     " << eli_path.string() << std::endl;
+        cube eli(eli_path, true, dummy, log);
+        rho.give_parent_wfn(dummy);
+        eli.give_parent_wfn(dummy);
+
+        const std::vector<atom> atoms = rho.get_parent_wfn_atoms();
+        const std::filesystem::path out =
+            eli_path.parent_path() / (eli_path.stem().string() + "_qtaim_masked.cube");
+
+        QTAIM_ELI_mask(rho, eli, dummy, atoms, selected_indices, background_value, out, opt.debug, log);
+    } else {
+        // ---- WFN mode: compute rho and eli cubes first ----
+        log << "Loading wavefunction: " << rho_or_wfn.string() << std::endl;
+        WFN wavy(rho_or_wfn, opt.debug);
+        wavy.delete_unoccupied_MOs();
+
+        properties_options prop_opt = opt.properties;
+        readxyzMinMax_fromWFN(wavy, prop_opt, true);
+
+        log << "Calculating density and ELI grid ("
+            << prop_opt.NbSteps[0] << " x " << prop_opt.NbSteps[1] << " x " << prop_opt.NbSteps[2]
+            << ") ..." << std::endl;
+
+        cube rho(prop_opt.NbSteps, wavy.get_ncen(), true);
+        cube eli(prop_opt.NbSteps, wavy.get_ncen(), true);
+        rho.give_parent_wfn(wavy);
+        eli.give_parent_wfn(wavy);
+
+        const vec stepsizes{
+            (prop_opt.MinMax[3] - prop_opt.MinMax[0]) / prop_opt.NbSteps[0],
+            (prop_opt.MinMax[4] - prop_opt.MinMax[1]) / prop_opt.NbSteps[1],
+            (prop_opt.MinMax[5] - prop_opt.MinMax[2]) / prop_opt.NbSteps[2]
+        };
+        for (int i = 0; i < 3; i++) {
+            rho.set_origin(i, prop_opt.MinMax[i]);
+            rho.set_vector(i, i, stepsizes[i]);
+            eli.set_origin(i, prop_opt.MinMax[i]);
+            eli.set_vector(i, i, stepsizes[i]);
+        }
+        rho.calc_dv();
+        eli.calc_dv();
+
+        Calc_RhoEli(rho, eli, wavy, prop_opt.radius);
+
+        const std::vector<atom> atoms = wavy.get_atoms();
+        const std::filesystem::path out =
+            rho_or_wfn.parent_path() / "eli_qtaim_masked.cube";
+
+        QTAIM_ELI_mask(rho, eli, wavy, atoms, selected_indices, background_value, out, opt.debug, log);
+    }
 }

@@ -2927,7 +2927,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         int at = 0;
         rf.read((char *)&at, constants::soi);
         double geo_vals[6]{ 0, 0, 0, 0, 0, 0 }; // x,y,z, ch, exp_fin_nuc, mass
-        int geo_ints[5]{ 0, 0, 0, 0, 0 };
+        // Use int64_t to safely hold soi-sized reads (soi may be 4 or 8 bytes)
+        int64_t geo_ints[5]{ 0, 0, 0, 0, 0 };
         for (int a = 0; a < at; a++)
         {
             for (int i = 0; i < 6; i++)
@@ -2937,16 +2938,17 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             }
             for (int i = 0; i < geo_int_lim; i++)
             {
+                geo_ints[i] = 0;
                 rf.read((char *)&(geo_ints[i]), soi);
                 err_checkf(rf.good(), "Error reading geo_int", file);
             }
-            string temp = constants::atnr2letter(geo_ints[0]);
+            string temp = constants::atnr2letter(static_cast<int>(geo_ints[0]));
             err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
             err_checkf(push_back_atom(temp,
                 geo_vals[0],
                 geo_vals[1],
                 geo_vals[2],
-                geo_ints[0]),
+                static_cast<int>(geo_ints[0])),
                 "Error pushing back atom", file);
         }
         if (debug)
@@ -3070,11 +3072,13 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         if (debug)
             file << "I read the pointer of MOs successfully" << endl;
         rf.seekg(MOs_start, ios::beg);
-        int operators = 0, dimension = 0;
+        int operators = 0;
+        int64_t dimension_i64 = 0;
         rf.read((char *)&operators, constants::soi);
         err_checkf(rf.good(), "Error reading operators", file);
-        rf.read((char *)&dimension, soi);
+        rf.read((char *)&dimension_i64, soi);
         err_checkf(rf.good(), "Error reading dimnesion", file);
+        int dimension = static_cast<int>(dimension_i64);
         size_t coef_nr = size_t(dimension) * size_t(dimension);
         vec2 coefficients(operators);
         vec2 occupations(operators);
@@ -3347,7 +3351,11 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         if (operators == 2) reorderd_coefs_s2 = dMatrix2(dimension, dimension);
 
         dMatrixRef2 coefs_2D_s1_span(coefficients[0].data(), dimension, dimension);
-        dMatrixRef2 coefs_2D_s2_span(coefficients[1].data(), dimension, dimension);
+        // coefficients[1] only exists when operators==2; use a harmless fallback otherwise
+        // to avoid a Debug-mode vector bounds assertion (the span is never accessed for op==1).
+        dMatrixRef2 coefs_2D_s2_span(
+            operators == 2 ? coefficients[1].data() : coefficients[0].data(),
+            dimension, dimension);
         int index = 0;
         for (const atom &_atom : atoms) {
             std::vector<basis_set_entry> basis = _atom.get_basis_set();
@@ -8824,12 +8832,12 @@ const double WFN::computeMO(
         iat = get_center(j) - 1;
         // if (iat != atom) continue;
         constants::type2vector(get_type(j), l);
-        temp = -get_exponent(j) * d[3][iat];
+        temp = -get_exponent(j) * d[iat][3];
         if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
-            ex *= pow(d[k][iat], l[k]);
+            ex *= pow(d[iat][k], l[k]);
         result += MOs[mo].get_coefficient_f(j) * ex; // build MO values at this point
     }
     shrink_vector<vec>(d);

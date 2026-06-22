@@ -205,12 +205,62 @@ wfn = "test.wfn"
 [fchk_conversion]
 directory = "NiP3_fchk"
 good = "good.fchk"
+actual = "log.fchk"
 full = true
 
 [fchk_conversion.args]
-b = "dev2-TZVP"
+b = "def2-TZVP"
 d = "./"
 wfn = "in.ffn"
+fchk = "log.fchk"
+
+[TFVC]
+directory = "TFVC"
+good = "TFVC.good"
+
+[TFVC.args]
+wfn = "water.gbw"
+cif = "water.cif"
+dmin = 0.84
+acc = 1
+
+[TFVC_ECP]
+directory = "TFVC"
+good = "TFVC_ECP.good"
+
+[TFVC_ECP.args]
+wfn = "Rh.gbw"
+cif = "Rh.cif"
+dmin = 0.84
+acc = 1
+ECP = 1
+
+[RGBI_Groups_NH3BH3]
+directory = "RGBI_groups"
+good = "NH3BH3.good"
+
+[RGBI_Groups_NH3BH3.args]
+wfn = "nh3bh3.gbw"
+rgbi_no_sym = ""
+rgbi-groups = ["0,4,5,7","1,2,3,6"]
+
+[RGBI_Groups_NH3BH3_sym]
+directory = "RGBI_groups"
+good = "NH3BH3_sym.good"
+
+[RGBI_Groups_NH3BH3_sym.args]
+wfn = "nh3bh3.gbw"
+rgbi = ""
+rgbi-groups = ["0,4,5,7","1,2,3,6"]
+
+[RGBI_Groups_NH3Li]
+directory = "RGBI_groups"
+good = "nh3li.good"
+
+[RGBI_Groups_NH3Li.args]
+wfn = "nh3li.gbw"
+rgbi_no_sym = ""
+rgbi-groups = ["0,1,2,3","4"]
 
 [fourier_transform_full]
 directory = "SALTED"

@@ -60,6 +60,7 @@ void compute3C(Int_Params& param1,
 
 
 dMatrix2 get_cart2sph_matrix(const WFN& cart_wfn, const bool normalized);
+dMatrix2 cart2sph(const int l, const bool normalized);
 
 
 vec eval_GTO_sph(Int_Params& params, vec2& grid, ivec& shl_slice);

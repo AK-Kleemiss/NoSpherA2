@@ -165,7 +165,7 @@ int main(int argc, char **argv)
         std::cout << "Total volume: " << volume << endl;
         writeColourObj("Hirshfeld_surface_i.obj", triangles_i);
         writeColourObj("Hirshfeld_surface_e.obj", triangles_e);
-        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         return 0;
     }
@@ -376,7 +376,7 @@ int main(int argc, char **argv)
                 write_wfn_CIF(wavy, "test.wfn_cif", result, opt);
         }
         log_file.flush();
-        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         return 0;
     }
@@ -410,7 +410,7 @@ int main(int argc, char **argv)
         if (opt.write_CIF)
             write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
         log_file.flush();
-        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         return 0;
     }
@@ -460,7 +460,7 @@ int main(int argc, char **argv)
         log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
         if (opt.rgbi) {
-            Roby_information Roby(wavy[0]);
+            Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym);
         }
 
         // this one is for generation of an fchk file

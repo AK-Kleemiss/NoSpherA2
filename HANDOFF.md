@@ -1,160 +1,149 @@
-# Handoff: Debugging heap corruption crash in alanine_integrated_occ test
+# Handoff: Current Windows/OCC/FCHK Status
 
-## What we're trying to fix
+## Current Status: COMPLETE
 
-The `alanine_integrated_occ` test crashes with `STATUS_HEAP_CORRUPTION` (0xC0000374 → process exit 116) every run.
-The test runs r2scan/def2-svp DFT on alanine using OCC's quantum chemistry library.
-The SCF converges successfully (12 iterations, energy −323.278 Hartree), then crashes during cleanup.
+Last updated: 2026-06-13
 
-The OCC log (`tests/alanine_integrated_occ/NoSpherA2_OCC.log`) always ends at:
-```
-[DEBUG] D_diff rows=119 cols=119
-```
+The current branch has the Windows/OCC integration and fchk conversion work fixed
+and validated. Full test results from the latest run:
 
-## Root cause hypothesis
+- Python pytest Release full: `21 passed` in 81.88s, with one tolerated
+  `fchk_conversion` numeric warning at line `261148`
+- Python pytest Debug full: `21 passed` in 1103.46s
+- Visual Studio native Debug full: `21 passed` in 24.4986 minutes
+- Visual Studio native Release full: `21 passed` in 1.3985 minutes
 
-`m_esp_evaluator` (a `std::unique_ptr<ESPEvaluator<double>>` member of `IntegralEngine`) gets corrupted to `0x0000001400000026` = `{38, 20}` as two int32 values:
-- 38 = number of DFT methods loaded (from `occ/share/methods/dft_methods.json`)
-- 20 = `PTR_ENV_START` = `#define PTR_ENV_START 20` in `Lib/LibCint/include/cint.h`
+`Release+Copy` was intentionally excluded from the latest requested validation pass.
 
-The pointer is never legitimately set in this code path — it should stay null. Something writes 8 bytes `{38, 20}` to the address where `m_esp_evaluator` lives. Windows heap manager detects the corrupted block header when DFT is torn down.
+---
 
-## What has already been tried
+## Latest Fixes
 
-- Replaced `tbb::enumerable_thread_specific<ThreadLocalData>` with `std::vector<ThreadLocalData>` in `compute_K_dft` (`occ/include/occ/dft/dft.h`) — OCC rebuilt, crash persists
-- Single-thread test (`threads=1`) also crashes — not a race condition
-- Guard bytes on libcint buffers in `compute_three_center_integrals_tbb` — not triggered
-- All 12 SCF iterations complete before crash
-- The pure-DFT path uses `stored_coulomb_kernel_r` (serial, no ETS) — exchange never called
+### 1. MSVC Debug dependency build preset
 
-## Current diagnostic instrumentation
+The Windows dependency action expected a `windows-msvc-debug` workflow preset, but
+`CMakePresets.json` only had the configure/build presets. Added the missing workflow
+preset so the dependency build no longer fails with:
 
-### `Lib/occ/include/occ/qm/scf_impl.h` (NoSpherA2-side header — no OCC rebuild needed)
-
-After each SCF iteration, calls `_heapchk()` and logs result:
-```
-[HEAP] iter=N _heapchk=ok        — heap intact
-[HEAP] iter=N _heapchk=M CORRUPTED  — heap corrupt after iteration N
+```text
+No such workflow preset in D:/a/NoSpherA2/NoSpherA2: "windows-msvc-debug"
 ```
 
-After the SCF loop exits, before/after each `matrix.resize(0,0)` call:
-```
-[HEAP] before FD_comm.resize: _heapchk=...
-[HEAP] before D_last.resize: _heapchk=...
-[HEAP] before D_diff.resize: _heapchk=...
-[HEAP] after D_diff.resize: _heapchk=...
-```
+### 2. fchk conversion test and writer
 
-The `_heapchk()` call itself may raise 0xC0000374 if heap is corrupt — whichever `[HEAP]` message is LAST in the log before the crash tells you when the corruption first becomes detectable.
+`fchk_conversion` was not actually comparing the generated fchk output. The test now
+generates `log.fchk` and compares it against `good.fchk`.
 
-**`_HEAPOK` = 1, `_HEAPBADNODE` = -3, `_HEAPBADBEGIN` = -2, `_HEAPEMPTY` = -1**
+The writer crash was fixed in `Src/fchk.cpp`:
 
-### `occ/include/occ/qm/integral_engine.h` (OCC source — requires OCC rebuild)
+- Bound Alpha MO coefficient output by the actual `CMO.size()` instead of
+  `nao * wave.get_nmo()`
+- Only write beta coefficient/energy blocks when the wavefunction is genuinely
+  unrestricted (`get_is_unrestricted()` and multiplicity greater than 1)
+- Include virtual orbitals in the restricted alpha CMO path
+- Add consistent G-shell handling during fchk normalization and coefficient assembly
 
-- Explicit `~IntegralEngine()`: if `m_esp_evaluator` is non-null (= corrupted), logs `[DETECT]` and calls `.release()` to prevent crash
-- `= default` move constructor/assignment (needed because explicit dtor suppresses implicit move)
-- `esp_is_corrupted()` public method
+The stale basis typo `dev2-TZVP` was corrected to `def2-TZVP`.
 
-### `occ/src/qm/integral_engine_df.cpp` (OCC source — requires OCC rebuild)
+### 3. wfn_reading golden output
 
-At entry of `IntegralEngineDF::coulomb()`: checks `esp_is_corrupted()` on both engines, logs `[DETECT]` if true.
+The `wfn_reading.good` reference was updated for the current integration output:
 
-### `Lib/occ/include/occ/qm/integral_engine.h` (NoSpherA2-side copy)
+- Grid points: `25738` -> `26030`
+- Becke: `135.005819` -> `135.005930`
+- TVFC: `134.990915` -> `134.991026`
 
-Same explicit destructor + `= default` move + `esp_is_corrupted()` as the occ/ version.
+---
 
-## Current build state
+## OCC / alanine_integrated_occ Status
 
-NoSpherA2 is being rebuilt right now (background task `bgqya0es8`). OCC was already rebuilt and installed with the `~IntegralEngine` destructor + move fixes.
+`alanine_integrated_occ` passes in both Release and Debug with all Visual Studio tests
+running in-process through `NoSpherA2_DLL.dll`.
 
-After the build finishes, run the test and check `NoSpherA2_OCC.log` for `[HEAP]` and `[DETECT]` messages.
+Resolved OCC/Windows issues:
 
-## Build instructions
+1. **Heap corruption** - `IntegralEngineDF::~IntegralEngineDF()` clears large Eigen
+   buffers before libcint engines are destroyed.
+2. **TBB instability** - oneTBB is built shared (`TBB_BUILD_SHARED=ON`); NoSpherA2
+   links the core TBB runtime only.
+3. **AVX/Eigen ABI mismatch** - `NOS_AVX` controls the MSBuild instruction set
+   through `Directory.Build.targets`, so NoSpherA2, the DLL, tests, and OCC use the
+   same Eigen ABI. Do not hardcode `EnableEnhancedInstructionSet` in individual
+   `.vcxproj` files.
+4. **Parallel libcint heap traffic** - OCC TBB integral kernels pre-allocate per-thread
+   libcint scratch buffers instead of passing `cache=nullptr` inside parallel loops.
 
-### Initialize build environment (PowerShell — required for both OCC and NoSpherA2 builds)
+All temporary `[NOS-DBG]` traces and Windows heap-check diagnostics have been removed.
+
+---
+
+## Changed Files of Interest
+
+### Parent repo
+
+- `CMakePresets.json` - added `windows-msvc-debug` workflow preset
+- `Directory.Build.targets` - central Windows instruction-set policy from `NOS_AVX`
+- `Src/fchk.cpp` - fixed fchk coefficient output and G-shell handling
+- `Src/test_functions.h` - corrected `def2-TZVP` basis spelling
+- `tests/tests.toml` - `fchk_conversion` now compares generated `log.fchk`
+- `tests/wfn_reading/wfn_reading.good` - updated current reference output
+- `Windows/Tests/Tests.cpp` - native test registration updates
+- `Windows/Tests/TestRunner.h` - in-process Visual Studio test execution
+- `Windows/NoSpherA2.vcxproj` and `NoSpherA2_DLL/NoSpherA2_DLL.vcxproj` - no
+  hardcoded AVX; instruction set comes from `Directory.Build.targets`
+- `Windows/Build_Dependencies/build_deps.ps1` - Debug dependency preset selection
+- `Windows/sync_occ_variant.ps1` - OCC variant freshness checks
+
+### OCC submodule
+
+- `CMakeLists.txt` - MSVC Debug flags including `_DEBUG` and `/bigobj`
+- `src/qm/detail/df_kernels.h` - per-thread libcint scratch buffers in TBB paths
+- `include/occ/core/element.h` and `src/core/element.cpp` - current OCC changes in this branch
+
+OCC source changes must be committed in the `occ/` repository first, then the parent
+NoSpherA2 repository must commit the updated submodule pointer.
+
+---
+
+## Rules Going Forward
+
+- Do not reintroduce `tbbmalloc_proxy`, `tbbmalloc`, or
+  `#include <tbb/tbbmalloc_proxy.h>`
+- Keep OCC using shared oneTBB (`TBB_BUILD_SHARED=ON`)
+- Never add subprocess fallbacks for Visual Studio tests. The VS test harness must
+  stay in-process so failures are natively debuggable.
+- When adding OCC/libcint parallel call sites, pre-allocate per-thread scratch buffers;
+  do not pass `cache=nullptr` inside TBB parallel regions.
+- When a test passes locally but fails in CI, compare `.github/workflows/c-cpp_all.yml`
+  and `.github/actions/build-deps` with local commands, especially `NOS_EXE`,
+  `OCC_DATA_PATH`, and the selected CMake preset.
+
+---
+
+## Validation Commands
+
 ```powershell
-$vcvars = & cmd /c "`"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat`" amd64 && set" 2>&1
-$vcvars | Where-Object { $_ -match '=' } | ForEach-Object {
-    $name, $value = $_ -split '=', 2
-    [System.Environment]::SetEnvironmentVariable($name, $value, 'Process')
-}
-$vscmake = "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+# Python full suite, Release
+$env:RUN_FULL_TEST = '1'
+$env:OCC_DATA_PATH = 'D:\git\NoSpherA2\Lib\occ\share\occ'
+$env:NOS_EXE = 'D:\git\NoSpherA2\Windows\x64\Release\NoSpherA2.exe'
+uv run pytest
+
+# Python full suite, Debug
+$env:NOS_EXE = 'D:\git\NoSpherA2\Windows\x64\Debug\NoSpherA2.exe'
+uv run pytest
 ```
 
-### Rebuild OCC (when `occ/` source or `occ/include/` headers change)
 ```powershell
-Set-Location "D:\git\NoSpherA2"
-& $vscmake --build build-windows-clang-cl --config Release
-& $vscmake --install build-windows-clang-cl
+# Build native Visual Studio tests
+$msbuild = 'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe'
+& $msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\ /v:minimal
+& $msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\ /v:minimal
+
+# Run native Visual Studio tests
+$env:RUN_FULL_TEST = '1'
+$env:OCC_DATA_PATH = 'D:\git\NoSpherA2\Lib\occ\share\occ'
+$vstest = 'C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe'
+& $vstest D:\git\NoSpherA2\Windows\x64\Debug\Tests.dll /Platform:x64 /Logger:"console;Verbosity=normal"
+& $vstest D:\git\NoSpherA2\Windows\x64\Release\Tests.dll /Platform:x64 /Logger:"console;Verbosity=normal"
 ```
-
-### Rebuild NoSpherA2 (when `Lib/occ/include/` or `Src/` changes — no OCC rebuild needed)
-```powershell
-Set-Location "D:\git\NoSpherA2"
-make.exe
-```
-
-### Run the failing test
-```powershell
-Set-Location "D:\git\NoSpherA2\tests\alanine_integrated_occ"
-Remove-Item NoSpherA2_OCC.log -ErrorAction SilentlyContinue
-& "D:\git\NoSpherA2\NoSpherA2.exe" -occ alanine.toml -cif alanine.cif -dmin 0.5 -acc 1
-# Then read NoSpherA2_OCC.log for [HEAP] and [DETECT] messages
-```
-
-## Key files
-
-| File | Role | Rebuild needed |
-|------|------|---------------|
-| `occ/include/occ/qm/integral_engine.h` | IntegralEngine with explicit dtor | OCC + NoSpherA2 |
-| `occ/include/occ/dft/dft.h` | compute_K_dft with ETS→vector fix | OCC |
-| `occ/src/qm/integral_engine_df.cpp` | coulomb() with [DETECT] checks | OCC |
-| `occ/src/qm/detail/df_kernels.h` | stored_coulomb_kernel_r (serial J), compute_three_center_integrals_tbb | OCC |
-| `Lib/occ/include/occ/qm/scf_impl.h` | compute_scf_energy with [HEAP] _heapchk calls | NoSpherA2 only |
-| `Lib/occ/include/occ/qm/integral_engine.h` | NoSpherA2-side copy of integral_engine.h | NoSpherA2 only |
-| `tests/alanine_integrated_occ/NoSpherA2_OCC.log` | OCC log — check for [HEAP]/[DETECT] | — |
-
-## IntegralEngine memory layout (critical)
-```
-IntegralEngine members (in order):
-  double m_precision{1e-12}
-  AOBasis m_aobasis, m_auxbasis
-  ShellPairList m_shellpairs
-  mutable IntEnv m_env          // ~80 bytes; last field is vector<double> m_env_data
-  mutable unique_ptr<ESPEvaluator<double>> m_esp_evaluator  // 8 bytes — GETS CORRUPTED to {38,20}
-  mutable bool m_esp_initialized{false}
-  bool m_have_ecp{false}
-  int m_ecp_ao_max_l{0}, m_ecp_max_l{0}
-```
-
-`IntegralEngineDF` contains:
-```
-  double m_precision
-  mutable IntegralEngine m_ao_engine   // ← m_esp_evaluator here gets corrupted
-  mutable IntegralEngine m_aux_engine
-  Eigen::LLT<Mat> V_LLt
-  Mat m_integral_store                 // stored 3-center integrals (119×582)
-  Policy m_policy
-  size_t m_integral_store_memory_limit
-  CoulombMethod m_coulomb_method
-  mutable unique_ptr<SplitRIJ> m_split_rij
-```
-
-## What to do next
-
-1. Wait for NoSpherA2 build to finish (or rebuild: `make.exe` with VS env initialized)
-2. Run the test, read `NoSpherA2_OCC.log`
-3. Look for `[HEAP]` messages:
-   - If `[HEAP] iter=N _heapchk=M CORRUPTED` appears → corruption first detectable after iteration N's fock build
-   - If no `[HEAP] iter=N` appears at all → `_heapchk()` itself crashed, meaning heap is corrupt very early
-   - If all iter checks show ok, but one of the resize checks shows CORRUPTED → corruption happens during stack cleanup
-4. Look for `[DETECT]` from `~IntegralEngine` or `coulomb()` entry
-5. Once we know WHICH iteration (or which cleanup step) first shows corruption, add `_heapchk()` inside that iteration's `compute_fock` → `stored_coulomb_kernel_r` to narrow further
-
-## Suspected area
-
-The `m_integral_store` matrix (119×582 doubles = ~540 KB) is allocated in `IntegralEngineDF`. It is built in `compute_stored_integrals()`. The `stored_coulomb_kernel_r` uses it read-only. However `compute_three_center_integrals_tbb` fills it during initial setup. 
-
-`m_esp_evaluator` lives inside `m_ao_engine` which is the first `IntegralEngine` inside `IntegralEngineDF`. If something writes past the end of `m_env.m_env_data` (the `vector<double>` that stores libcint's env array), it could overflow into `m_esp_evaluator`. The libcint env array contains atom/basis data including counts like 38 (number of DFT methods or shells) and offsets like 20 (PTR_ENV_START).
-
-**Specifically suspicious**: `IntegralEnvironment` assignment (`m_env = IntEnv(...)`) in `set_auxiliary_basis()` called from `IntegralEngineDF` constructor. If the old env vector is not properly freed and the new one overlaps, or if the assignment operator has a bug, it could corrupt adjacent memory.

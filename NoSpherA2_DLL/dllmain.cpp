@@ -3,6 +3,12 @@
 #include "pch_dll.h"
 #include <direct.h>             // _getcwd, _chdir
 #include <occ/core/data_directory.h>  // occ::set_data_directory
+#ifdef _DEBUG
+#include <crtdbg.h>
+#include <stdlib.h>             // _set_invalid_parameter_handler
+static void nos_invalid_param_handler(const wchar_t*, const wchar_t*, const wchar_t*,
+                                       unsigned int, uintptr_t) {}
+#endif
 
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
@@ -37,8 +43,8 @@ extern int main(int argc, char** argv);
 //
 // The standard workaround is to split into two helpers:
 //   nos_cpp_dispatch  – handles C++ exceptions (try/catch only, no __try)
-//   nos_seh_dispatch  – handles the SEH heap-corruption signal (__try only,
-//                       no C++ try; all locals must be trivially-destructible)
+//   nos_seh_dispatch  – handles native SEH failures (__try only, no C++ try;
+//                       all locals must be trivially-destructible)
 // ---------------------------------------------------------------------------
 
 // C++ exception layer.  Calls main() and translates C++ exceptions to int
@@ -70,12 +76,9 @@ static int nos_cpp_dispatch(int argc, char** argv,
     }
 }
 
-// SEH layer.  Catches 0xC0000374 (STATUS_HEAP_CORRUPTION) that OCC raises
-// during ~Molecule cleanup after a JsonBasisReader buffer overflow corrupts
-// an adjacent Eigen matrix block.  The SCF computation has already finished
-// successfully at that point; only the destructor chain crashes.  By catching
-// the SEH exception the corrupted block is simply never freed (harmless leak)
-// and the test host continues to run subsequent tests normally.
+// SEH layer.  This remains as a narrow last-resort guard for native cleanup
+// failures so one broken in-process run does not necessarily kill the whole
+// Visual Studio test host.
 //
 // Requirements for __try/__except:
 //   • No C++ try/catch in the same function (C2713).
@@ -89,18 +92,17 @@ static int nos_seh_dispatch(int argc, char** argv,
     __try {
         result = nos_cpp_dispatch(argc, argv, *pSavedCout, *pSavedCerr);
     }
-    __except (GetExceptionCode() == 0xC0000374   /* STATUS_HEAP_CORRUPTION */
-              ? EXCEPTION_EXECUTE_HANDLER
-              : EXCEPTION_CONTINUE_SEARCH)
+    __except (EXCEPTION_EXECUTE_HANDLER)
     {
         // Restore streams (they may still be redirected to the now-unwound
-        // log_file buffer) before writing the diagnostic.
+        // log_file buffer) before writing the diagnostic.  Always catch native
+        // SEH exceptions here so that cout is never left pointing at a
+        // destroyed log_file buffer, which would corrupt subsequent tests.
         std::cout.rdbuf(*pSavedCout);
         std::cerr.rdbuf(*pSavedCerr);
-        std::cerr << "[NoSpherA2_run] Warning: OCC internal heap corruption "
-                     "caught during cleanup (0xC0000374). The SCF computation "
-                     "completed successfully; the corrupted Eigen block is leaked.\n";
-        result = 0;
+        std::cerr << "[NoSpherA2_run] Native exception caught: 0x"
+                  << std::hex << GetExceptionCode() << std::dec << "\n";
+        result = static_cast<int>(GetExceptionCode());
     }
     return result;
 }
@@ -125,6 +127,18 @@ extern "C" DLL_EXPORT int __cdecl NoSpherA2_run(
     char savedDir[MAX_PATH] = {};
     _getcwd(savedDir, MAX_PATH);
     _chdir(workDir);
+
+#ifdef _DEBUG
+    // Redirect CRT assert/error dialogs to stderr so they don't block the test
+    // host with an invisible modal dialog (WaitReason=UserRequest, 0% CPU).
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportMode(_CRT_ERROR,  _CRTDBG_MODE_FILE);
+    _CrtSetReportMode(_CRT_WARN,   _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+    _CrtSetReportFile(_CRT_ERROR,  _CRTDBG_FILE_STDERR);
+    _CrtSetReportFile(_CRT_WARN,   _CRTDBG_FILE_STDERR);
+    _set_invalid_parameter_handler(nos_invalid_param_handler);
+#endif
 
     // The test runner sets OCC_DATA_PATH via SetEnvironmentVariableA (Win32 API).
     // NoSpherA2's ensure_occ_data_path() reads it with _dupenv_s (CRT function).

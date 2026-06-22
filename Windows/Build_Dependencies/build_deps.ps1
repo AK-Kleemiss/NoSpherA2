@@ -134,14 +134,31 @@ function Try-Load-MKLFromAutoProps {
 }
 
 function Ensure-MKL {
+  function Get-MKLIncludePath([string]$root) {
+    if (-not $root) { return $null }
+
+    $candidates = @(
+      (Join-Path $root "include\mkl.h"),
+      (Join-Path $root "intelmkl.static.win-x64\build\native\include\mkl.h")
+    )
+
+    foreach ($candidate in $candidates) {
+      if (Test-Path $candidate) {
+        return $candidate
+      }
+    }
+
+    return $null
+  }
+
   # ------------------------------------------------------------
   # Check if it is just loaded
   # ------------------------------------------------------------
   Try-Load-MKLFromAutoProps -RepoRoot $RepoRoot
   if ($env:MKLROOT) {
-    $inc = Join-Path $env:MKLROOT "include\mkl.h"
-    if (Test-Path $inc) {
-      Info "MKL detected via MKLROOT=$env:MKLROOT"
+    $inc = Get-MKLIncludePath $env:MKLROOT
+    if ($inc) {
+      Info "MKL detected via MKLROOT=$env:MKLROOT ($inc)"
       return
     }
   }
@@ -167,11 +184,16 @@ function Ensure-MKL {
   function Test-MKLRoot([string]$root) {
     if (-not $root) { return $false }
 
+    if (Get-MKLIncludePath $root) {
+      $script:FoundMKL = $root
+      return $true
+    }
+
     # If this is the parent "...mkl", try to resolve a child version folder or "latest"
-    if (-not (Test-Path (Join-Path $root "include\mkl.h"))) {
+    if (-not (Get-MKLIncludePath $root)) {
       # Try common subfolders: latest, and the newest-looking version folder
       $latest = Join-Path $root "latest"
-      if (Test-Path (Join-Path $latest "include\mkl.h")) {
+      if (Get-MKLIncludePath $latest) {
         $script:FoundMKL = $latest
         return $true
       }
@@ -180,7 +202,7 @@ function Ensure-MKL {
         $ver = Get-ChildItem -Path $root -Directory -ErrorAction SilentlyContinue |
                Sort-Object Name -Descending |
                Select-Object -First 1
-        if ($ver -and (Test-Path (Join-Path $ver.FullName "include\mkl.h"))) {
+        if ($ver -and (Get-MKLIncludePath $ver.FullName)) {
           $script:FoundMKL = $ver.FullName
           return $true
         }
@@ -215,8 +237,9 @@ function Ensure-MKL {
   Write-Host "This project requires Intel oneMKL (headers + libraries)."
   Write-Host ""
   Write-Host "How MKL is detected:"
-  Write-Host "  - Environment variable MKLROOT, AND"
-  Write-Host "  - The file %MKLROOT%\include\mkl.h must exist"
+  Write-Host "  - Environment variable MKLROOT, AND either"
+  Write-Host "  - The file %MKLROOT%\include\mkl.h must exist, OR"
+  Write-Host "  - The file %MKLROOT%\intelmkl.static.win-x64\build\native\include\mkl.h must exist"
   Write-Host ""
   Write-Host "Fix options:"
   Write-Host "  1) Please install Intel oneAPI oneMKL:"
@@ -235,6 +258,217 @@ function Ensure-MKL {
   Write-Host "  %USERPROFILE%\Intel\oneAPI\mkl\latest"
   Write-Host ""
   exit 1
+}
+
+function Get-OccVariant([string]$Config) {
+  switch ($Config.ToLowerInvariant()) {
+    "debug" { return "debug" }
+    "profile" { return "debug" }
+    default { return "release" }
+  }
+}
+
+function Get-OccPreset([string]$Variant) {
+  if ($Variant -eq "debug") {
+    return "windows-msvc-debug"
+  }
+  return "windows-clang-cl"
+}
+
+function Get-OccInstallDir([string]$Variant) {
+  return Join-Path $LibDir ("occ_" + $Variant)
+}
+
+function Get-OccRuntimeStamp([string]$Variant) {
+  if ($Variant -eq "debug") {
+    return "MDd"
+  }
+  return "MD"
+}
+
+function Get-OccBuildDir([string]$Preset) {
+  return Join-Path $RepoRoot ("build-" + $Preset)
+}
+
+function Get-OccFingerprintFile([string]$Variant) {
+  return Join-Path (Get-OccInstallDir $Variant) "occ_inputs.sha256"
+}
+
+function Get-Sha256Hex([string]$Path) {
+  if (Get-Command Get-FileHash -ErrorAction SilentlyContinue) {
+    return (Get-FileHash $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+
+  $stream = [System.IO.File]::OpenRead($Path)
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    return ([System.BitConverter]::ToString($sha.ComputeHash($stream))).Replace("-", "").ToLowerInvariant()
+  } finally {
+    $sha.Dispose()
+    $stream.Dispose()
+  }
+}
+
+function Get-OccRepoFingerprint([string]$Variant) {
+  $hashInputs = New-Object System.Collections.Generic.List[string]
+  $hashInputs.Add("variant=$Variant")
+  $hashInputs.Add("preset=$(Get-OccPreset $Variant)")
+  $hashInputs.Add("runtime=$(Get-OccRuntimeStamp $Variant)")
+  $hashInputs.Add("platform=$Platform")
+  $hashInputs.Add("nos_avx=$env:NOS_AVX")
+
+  $inputPaths = @(
+    (Join-Path $RepoRoot "occ"),
+    (Join-Path $RepoRoot "CMakeLists.txt"),
+    (Join-Path $RepoRoot "CMakePresets.json"),
+    (Join-Path $RepoRoot "Windows\Build_Dependencies\build_deps.ps1")
+  )
+
+  foreach ($path in $inputPaths) {
+    if (-not (Test-Path $path)) {
+      continue
+    }
+
+    $item = Get-Item $path
+    if ($item.PSIsContainer) {
+      $files = Get-ChildItem $path -Recurse -File | Sort-Object FullName
+    } else {
+      $files = @($item)
+    }
+
+    foreach ($file in $files) {
+      $relativePath = $file.FullName.Substring($RepoRoot.Length).TrimStart('\')
+      $fileHash = Get-Sha256Hex $file.FullName
+      $hashInputs.Add("$relativePath=$fileHash")
+    }
+  }
+
+  $combined = [string]::Join("`n", $hashInputs)
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes($combined)
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    return ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace("-", "").ToLowerInvariant()
+  } finally {
+    $sha.Dispose()
+  }
+}
+
+function Get-WindowsRuntimeOutputDirs {
+  return @(
+    (Join-Path $RepoRoot "Windows\x64\Debug"),
+    (Join-Path $RepoRoot "Windows\x64\Profile"),
+    (Join-Path $RepoRoot "Windows\x64\Release"),
+    (Join-Path $RepoRoot "Windows\x64\Release + Copy"),
+    (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug")
+  )
+}
+
+function Ensure-OccVariantBuilt([string]$Variant) {
+  $preset = Get-OccPreset $Variant
+  $installDir = Get-OccInstallDir $Variant
+  $buildDir = Get-OccBuildDir $preset
+  $occOut = Join-Path $installDir "lib\occ_main.lib"
+  $crtStamp = Join-Path $installDir "lib\occ_crt.stamp"
+  $fingerprintFile = Get-OccFingerprintFile $Variant
+  $expectedRuntime = Get-OccRuntimeStamp $Variant
+  $expectedFingerprint = Get-OccRepoFingerprint $Variant
+  $currentFingerprint = if (Test-Path $fingerprintFile) {
+    (Get-Content $fingerprintFile -ErrorAction SilentlyContinue | Out-String).Trim()
+  } else {
+    ""
+  }
+  $tbbImportLib = Join-Path $installDir "lib\tbb12.lib"
+  $tbbRuntimeDlls = @(Get-ChildItem (Join-Path $installDir "bin") -Filter "tbb12*.dll" -ErrorAction SilentlyContinue)
+  $occNeedsBuild = (-not (Test-Path $occOut)) -or
+                   (-not (Test-Path $crtStamp)) -or
+                   ((Get-Content $crtStamp -ErrorAction SilentlyContinue) -ne $expectedRuntime) -or
+                   (-not (Test-Path $fingerprintFile)) -or
+                   ($currentFingerprint -ne $expectedFingerprint) -or
+                   (-not (Test-Path $tbbImportLib)) -or
+                   ($tbbRuntimeDlls.Count -eq 0)
+
+  if (-not $occNeedsBuild) {
+    Info "OCC $Variant already built for current inputs ($occOut)"
+    return
+  }
+
+  if (Test-Path $installDir) {
+    Remove-Item -Recurse -Force $installDir
+  }
+  if (Test-Path $buildDir) {
+    Info "Removing stale OCC build cache ($buildDir)..."
+    Remove-Item -Recurse -Force $buildDir
+  }
+
+  Info "Building OCC ($Variant)..."
+  Push-Location $RepoRoot
+  try {
+    cmake --workflow --preset $preset
+    cmake --install $buildDir
+
+    $tbbLib = Get-ChildItem $buildDir -Recurse -Include "tbb12.lib","tbb12_debug.lib" `
+      -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -notmatch "CMakeFiles" } |
+      Select-Object -First 1 -ExpandProperty FullName
+    $tbbDll = Get-ChildItem $buildDir -Recurse -Include "tbb12.dll","tbb12_debug.dll" `
+      -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -notmatch "CMakeFiles" } |
+      Select-Object -First 1 -ExpandProperty FullName
+    if (-not $tbbLib) { Fail "tbb12.lib not found after OCC $Variant build" }
+    if (-not $tbbDll) { Fail "tbb12.dll not found after OCC $Variant build" }
+
+    New-Item -ItemType Directory -Force (Join-Path $installDir "lib") | Out-Null
+    New-Item -ItemType Directory -Force (Join-Path $installDir "bin") | Out-Null
+    Copy-Item $tbbLib -Destination (Join-Path $installDir "lib\tbb12.lib") -Force
+    Copy-Item $tbbDll -Destination (Join-Path $installDir ("bin\" + [System.IO.Path]::GetFileName($tbbDll))) -Force
+
+    # Keep MSBuild project files stable by providing generic import-lib names
+    # that point at the debug variants when OCC was built in debug mode.
+    if ($Variant -eq "debug") {
+      $debugAliases = @(
+        @{ Source = "fmtd.lib"; Alias = "fmt.lib" },
+        @{ Source = "spdlogd.lib"; Alias = "spdlog.lib" }
+      )
+      foreach ($entry in $debugAliases) {
+        $srcLib = Join-Path $installDir ("lib\" + $entry.Source)
+        $dstLib = Join-Path $installDir ("lib\" + $entry.Alias)
+        if ((Test-Path $srcLib) -and (-not (Test-Path $dstLib))) {
+          Copy-Item $srcLib -Destination $dstLib -Force
+        }
+      }
+    }
+
+    foreach ($d in (Get-WindowsRuntimeOutputDirs)) {
+      New-Item -ItemType Directory -Force $d | Out-Null
+      Copy-Item $tbbDll -Destination $d -Force
+    }
+  } finally {
+    Pop-Location
+  }
+
+  if (-not (Test-Path $occOut)) { Fail "OCC $Variant build finished but output not found: $occOut" }
+  Set-Content -Path $crtStamp -Value $expectedRuntime -Encoding ASCII
+  Set-Content -Path (Join-Path $installDir "occ_variant.stamp") -Value $Variant -Encoding ASCII
+  Set-Content -Path $fingerprintFile -Value $expectedFingerprint -Encoding ASCII
+  Info "OCC $Variant OK"
+}
+
+function Sync-ActiveOccVariant([string]$Variant) {
+  $sourceDir = Get-OccInstallDir $Variant
+  $destDir = Join-Path $LibDir "occ"
+  $sourceLib = Join-Path $sourceDir "lib\occ_main.lib"
+
+  if (-not (Test-Path $sourceLib)) {
+    Fail "Cannot activate OCC ${Variant}: missing $sourceLib"
+  }
+
+  if (Test-Path $destDir) {
+    Remove-Item -Recurse -Force $destDir
+  }
+
+  Copy-Item -Recurse -Force $sourceDir $destDir
+  Set-Content -Path (Join-Path $destDir "occ_variant.stamp") -Value $Variant -Encoding ASCII
+  Info "Activated OCC $Variant at $destDir"
 }
 
 # -----------------------------
@@ -333,82 +567,21 @@ if (Test-Path $LibCintOut) {
   Info "LibCint OK"
 }
 # -----------------------------
-# 4) Build OCC (if needed)
+# 4) Build OCC variants and activate the requested one
 # -----------------------------
-# $OccCrtStamp records which CRT the OCC libs were built with (/MT or /MD).
-# If the stamp is absent or doesn't say "MD", force a full rebuild so that
-# OCC and the host exe share the same heap (/MD throughout).
-$OccOut      = Join-Path $LibDir "occ\lib\occ_main.lib"
-$OccCrtStamp = Join-Path $LibDir "occ\lib\occ_crt.stamp"
-$occNeedsBuild = (-not (Test-Path $OccOut)) -or
-                 (-not (Test-Path $OccCrtStamp)) -or
-                 ((Get-Content $OccCrtStamp -ErrorAction SilentlyContinue) -ne "MD")
-if (-not $occNeedsBuild) {
-  Info "OCC already built with /MD ($OccOut)"
-} else {
-  # Remove stale libs AND the cmake build cache.
-  # Changing /MT → /MD requires a clean configure; an incremental cmake build
-  # will leave stale /MT object files that cause loader failures in the DLL.
-  if (Test-Path (Join-Path $LibDir "occ\lib")) {
-    Remove-Item -Recurse -Force (Join-Path $LibDir "occ\lib")
-  }
-  $occBuildDir = Join-Path $RepoRoot "build-windows-clang-cl"
-  if (Test-Path $occBuildDir) {
-    Info "Removing stale OCC build cache ($occBuildDir)..."
-    Remove-Item -Recurse -Force $occBuildDir
-  }
-  Info "Building OCC..."
-  Push-Location $RepoRoot
-  try {
-    cmake --workflow --preset windows-clang-cl
-    cmake --install .\build-windows-clang-cl
-
-    # Copy the TBB import lib and runtime DLL produced by the OCC CMake build.
-    $tbbBldDir = Join-Path $RepoRoot "build-windows-clang-cl"
-    $tbbLib = Get-ChildItem $tbbBldDir -Recurse -Filter "tbb12.lib" `
-        -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notmatch "CMakeFiles" } |
-        Select-Object -First 1 -ExpandProperty FullName
-    $tbbDll = Get-ChildItem $tbbBldDir -Recurse -Filter "tbb12.dll" `
-        -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notmatch "CMakeFiles" } |
-        Select-Object -First 1 -ExpandProperty FullName
-    if (-not $tbbLib) { Fail "tbb12.lib not found after OCC build" }
-    if (-not $tbbDll) { Fail "tbb12.dll not found after OCC build" }
-    New-Item -ItemType Directory -Force (Join-Path $LibDir "occ\lib") | Out-Null
-    New-Item -ItemType Directory -Force (Join-Path $LibDir "occ\bin") | Out-Null
-    Copy-Item $tbbLib -Destination (Join-Path $LibDir "occ\lib\tbb12.lib") -Force
-    Copy-Item $tbbDll -Destination (Join-Path $LibDir "occ\bin\tbb12.dll") -Force
-    $outDirs = @(
-      (Join-Path $RepoRoot "Windows\x64\Release"),
-      (Join-Path $RepoRoot "Windows\x64\Debug"),
-      (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug")
-    )
-    foreach ($d in $outDirs) {
-      New-Item -ItemType Directory -Force $d | Out-Null
-      Copy-Item $tbbDll -Destination $d -Force
-    }
-  } finally {
-    Pop-Location
-  }
-  if (-not (Test-Path $OccOut)) { Fail "OCC build finished but output not found: $OccOut" }
-  Set-Content -Path $OccCrtStamp -Value "MD" -Encoding ASCII
-  Info "OCC OK"
-}
+Ensure-OccVariantBuilt "release"
+Ensure-OccVariantBuilt "debug"
+Sync-ActiveOccVariant (Get-OccVariant $Configuration)
 
 # -----------------------------
 # 4a) Deploy MKL runtime DLLs (needed when OCC is built with /MD)
 # -----------------------------
-# With /MD, the MKL static threading layer emits a dynamic dependency on
-# mkl_intel_thread.2.dll and mkl_core.2.dll.  Deploy them alongside the other
-# runtime DLLs so the test runner can find them.
+# With /MD, the MKL threading/runtime layer can pull in additional MKL runtime
+# DLLs at load time. Deploy the known transitive dependencies alongside the
+# other runtime DLLs so the test runner can find them.
 $mklBinDir = Join-Path $env:MKLROOT "bin"
-$mklDllsNeeded = @("mkl_intel_thread.2.dll", "mkl_core.2.dll")
-$outDirsMkl = @(
-  (Join-Path $RepoRoot "Windows\x64\Release"),
-  (Join-Path $RepoRoot "Windows\x64\Debug"),
-  (Join-Path $RepoRoot "Windows\NoSpherA2\x64\Debug")
-)
+$mklDllsNeeded = @("mkl_intel_thread.2.dll", "mkl_core.2.dll", "mkl_def.2.dll")
+$outDirsMkl = Get-WindowsRuntimeOutputDirs
 foreach ($mklDll in $mklDllsNeeded) {
   $src = Join-Path $mklBinDir $mklDll
   if (-not (Test-Path $src)) {
