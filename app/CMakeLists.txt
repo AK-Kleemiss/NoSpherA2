@@ -17,6 +17,13 @@ target_compile_features(
         cxx_std_20
 )
 
+target_link_options(
+    NoSpherA2
+    PRIVATE
+        -static-libstdc++
+        -static-libgcc
+)
+
 target_link_libraries(
     NoSpherA2
     PRIVATE

@@ -164,64 +164,64 @@ add_subdirectory(
 function(nosphera2_copy_runtime_libraries target)
     if(NOT TARGET "${target}")
         message(FATAL_ERROR
-            "nosphera2_copy_runtime_libraries(): target '${target}' does not exist"
+            "nosphera2_copy_runtime_libraries(): "
+            "target '${target}' does not exist"
         )
     endif()
 
     if(WIN32)
-        add_custom_command(
-            TARGET "${target}"
-            POST_BUILD
-            COMMAND
-                "${CMAKE_COMMAND}" -E copy_if_different
-                $<TARGET_RUNTIME_DLLS:${target}>
-                "$<TARGET_FILE_DIR:${target}>"
-            COMMAND_EXPAND_LISTS
-            VERBATIM
-        )
-
-        find_file(
-            NOSPHERA2_INTEL_OPENMP_DLL
-            NAMES
-                libiomp5md.dll
-                libiomp5.dll
-            PATHS
-                "${MICROMAMBA_ENV_PREFIX}/Library/bin"
-                "${MICROMAMBA_ENV_PREFIX}/bin"
-            NO_DEFAULT_PATH
-            REQUIRED
-        )
-
-        add_custom_command(
-            TARGET "${target}"
-            POST_BUILD
-            COMMAND
-                "${CMAKE_COMMAND}" -E copy_if_different
-                "${NOSPHERA2_INTEL_OPENMP_DLL}"
-                "$<TARGET_FILE_DIR:${target}>"
-            COMMENT
-                "Copying Intel OpenMP runtime for ${target}"
-            VERBATIM
+        set(_runtime_libraries
+            "${MICROMAMBA_ENV_PREFIX}/Library/bin/tbb12.dll"
+            "${MICROMAMBA_ENV_PREFIX}/Library/bin/libiomp5md.dll"
         )
 
     elseif(APPLE)
+        set(_runtime_libraries
+            "${MICROMAMBA_ENV_PREFIX}/lib/libtbb.12.dylib"
+            "${MICROMAMBA_ENV_PREFIX}/lib/libiomp5.dylib"
+        )
+
         set_target_properties(
             "${target}"
             PROPERTIES
-                BUILD_RPATH "${MICROMAMBA_ENV_PREFIX}/lib"
+                BUILD_RPATH "@loader_path"
                 INSTALL_RPATH "@loader_path"
-                INSTALL_RPATH_USE_LINK_PATH TRUE
+                INSTALL_RPATH_USE_LINK_PATH FALSE
         )
 
     elseif(UNIX)
+        set(_runtime_libraries
+            "${MICROMAMBA_ENV_PREFIX}/lib/libtbb.so.12"
+            "${MICROMAMBA_ENV_PREFIX}/lib/libiomp5.so"
+        )
+
         set_target_properties(
             "${target}"
             PROPERTIES
-                BUILD_RPATH "${MICROMAMBA_ENV_PREFIX}/lib"
                 INSTALL_RPATH "$ORIGIN"
-                INSTALL_RPATH_USE_LINK_PATH TRUE
+                BUILD_WITH_INSTALL_RPATH TRUE
+                INSTALL_RPATH_USE_LINK_PATH FALSE
         )
     endif()
+
+    foreach(_runtime_library IN LISTS _runtime_libraries)
+        if(NOT EXISTS "${_runtime_library}")
+            message(FATAL_ERROR
+                "Required runtime library not found:\n"
+                "  ${_runtime_library}"
+            )
+        endif()
+
+        add_custom_command(
+            TARGET "${target}"
+            POST_BUILD
+            COMMAND
+                "${CMAKE_COMMAND}" -E copy_if_different
+                "${_runtime_library}"
+                "$<TARGET_FILE_DIR:${target}>"
+            VERBATIM
+        )
+    endforeach()
 endfunction()
 
 add_subdirectory(Src/core)

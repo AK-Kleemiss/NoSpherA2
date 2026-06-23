@@ -6,6 +6,12 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cxx"
 )
 
+list(
+    FILTER NOSPHERA2_CORE_SOURCES
+    EXCLUDE
+    REGEX "[/\\\\](vec_nos_math|mat_nos_math)\\.cpp$"
+)
+
 file(
     GLOB_RECURSE NOSPHERA2_CORE_HEADERS
     CONFIGURE_DEPENDS
