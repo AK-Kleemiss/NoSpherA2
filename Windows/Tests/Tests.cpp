@@ -268,6 +268,15 @@ namespace NoSpherA2IntegrationTests
                     });
         }
 
+        TEST_METHOD(P1_XWR)
+        {
+            RunTest({
+                "P1_XWR", "P1_test", "", "",
+                {"-acc","2", "-cif", "P1_test_NA2.cif", "-hkl", "P1_test.hkl", "-anom_disp",
+                 "anom_disp.txt", "-do_XCW"}
+                });
+        }
+
         // ---- Full tests (skipped unless RUN_FULL_TEST is set) ---------------
 
         TEST_METHOD(fchk_conversion)

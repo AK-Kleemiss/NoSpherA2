@@ -43,9 +43,8 @@ void XCW::construct(const options& opt_in) {
 	XCW_log.open("XCW.log");
 	cryst.inv_scale = 1.0 / (cryst.nr_small - settings.n_params);
 	F_calc.resize(2);
-	for (int i = 0; i < 2; i++) {
-		F_calc[i].resize(cryst.nr_small, 0);
-	}
+	F_calc[0].resize(cryst.nr_small, 0);
+	F_calc[1].resize(cryst.nr_small, 0);
 }
 
 XCW::SCF_settings XCW::loadSettings() {
@@ -665,11 +664,21 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			const double dist = std::sqrt(dist0 * dist0 + dist1 * dist1 + dist2 * dist2);
 			if (!equal) {
 				double c_tot = 0;
-				for (cofs = 0; cofs < mu_primitives.size(); cofs++) {
-					double alpha = mu_primitives[cofs].get_exp();
-					double beta = nu_primitives[cofs].get_exp();
-					double alpha_k_l = alpha * beta / (alpha + beta);
-					c_tot += std::abs(mu_primitives[cofs].get_coef()) * std::abs(nu_primitives[cofs].get_coef()) * std::pow(constants::PI / alpha_k_l, 1.5);
+				//for (cofs = 0; cofs < mu_primitives.size(); cofs++) {
+				//	double alpha = mu_primitives[cofs].get_exp();
+				//	double beta = nu_primitives[cofs].get_exp();
+				//	double alpha_k_l = alpha * beta / (alpha + beta);
+				//	c_tot += std::abs(mu_primitives[cofs].get_coef()) * std::abs(nu_primitives[cofs].get_coef()) * std::pow(constants::PI / alpha_k_l, 1.5);
+				//}
+				for (size_t i = 0; i < mu_primitives.size(); ++i) {
+					double alpha = mu_primitives[i].get_exp();
+					for (size_t j = 0; j < nu_primitives.size(); ++j) {
+						double beta = nu_primitives[j].get_exp();
+						double alpha_k_l = alpha * beta / (alpha + beta);
+						c_tot += std::abs(mu_primitives[i].get_coef())
+							* std::abs(nu_primitives[j].get_coef())
+							* std::pow(constants::PI / alpha_k_l, 1.5);
+					}
 				}
 				c_tot *= std::sqrt((2 * mu_primitives[0].get_type() + 1) * (2 * nu_primitives[0].get_type() + 1) / (constants::TWO_PI * constants::TWO_PI));
 				double alpha_min = mu_primitives[mu_primitives.size() - 1].get_exp();
@@ -679,7 +688,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				cutoff = std::sqrt(a_min * std::log(c_tot / screen));
 			}
 			if (dist > cutoff && !equal) {
-				continue;
+				//continue;
 			}
 
 			cdouble temp1;
@@ -937,6 +946,11 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
         std::stringstream print_;
         print_ << "***SCF converged in " << scf.iter + 1 << " iterations***";
         print_centered_message(print_.str(), 76, XCW_log);
+
+		std::cout << "F_calcs:" << std::endl;
+		for (int i = 0; i < cryst.nr_small; i++) {
+			std::cout << std::fixed << std::setprecision(3) << std::pow(std::abs(F_calc[0][i]), 2) << std::endl;
+		}
 
 		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << cryst.chi2 << "\t" << cryst.GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 

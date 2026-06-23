@@ -64,7 +64,6 @@ occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms)
 
 	std::vector<int> ecp_electrons(atoms.size(), 0);
 	//int nsh_ecp = 0;
-
 	for (size_t a = 0; a < atoms.size(); ++a) {
 		std::array<double, 3> origin = { atoms[a].x, atoms[a].y, atoms[a].z };
 		const std::size_t Z = atoms[a].atomic_number - 1;
@@ -74,15 +73,14 @@ occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms)
 			int l = primitives[primitive_idx].type;
 			std::vector<double> exponents;
 			std::vector<double> coefficients;
-			while (shell_nr == primitives[primitive_idx].shell) {
+			while (primitive_idx < primitives.size() && shell_nr == primitives[primitive_idx].shell) {
 				exponents.push_back(primitives[primitive_idx].exp);
 				coefficients.push_back(primitives[primitive_idx].coefficient);
 				primitive_idx++;
 			}
-			occ::gto::Shell shell(l, exponents, { coefficients }, origin);
-			shell.kind = occ::gto::Shell::Kind::Spherical;
-			shell.incorporate_shell_norm();
-			shells.push_back(shell);
+			shells.emplace_back(l, exponents, vec2(1,coefficients), origin);
+			shells.back().kind = occ::gto::Shell::Kind::Spherical;
+			shells.back().incorporate_shell_norm();
 		}
 		// TODO: Handle ECPs if needed, currently not supported
 		//if (element_basis.ecp_electrons > 0) {
