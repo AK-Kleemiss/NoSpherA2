@@ -39,7 +39,9 @@ tests/cytidine_tonto/temp_wavefunction.wfn
 tests/SALTED/temp_rascaline.xyz
 tests/grown/temp_wavefunction.wfn
 /tests/RI_Test_2
+tests/NiP3_fchk/log.fchk
 Src/basis_data.cpp
+.mambaenv
 
 checkpoint.txt
 /intel-onemkl*.sh
@@ -55,5 +57,3 @@ checkpoint.txt
 
 #Libs
 /Lib/*
-
-

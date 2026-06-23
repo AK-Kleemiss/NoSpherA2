@@ -27,20 +27,30 @@ git submodule update --init --recursive
 
 ---
 
+### Micromamba bootstrap details
+
+To bootstrap the micromamba environment please run
+
+```ps
+cmake -P scripts/BootstrapMicromamba.cmake
+```
+
+---
+
 ### Windows Build Instructions
 #### **Prerequisites**
 - **Visual Studio 2022** with C++ build tools
-- GNU Make for Windows (for example from [here](https://gnuwin32.sourceforge.net/packages/make.htm))
 - cargo for compilation of rust (required for featomic) [download](https://www.rust-lang.org/tools/install)
 
 #### **Building NoSpherA2**
-Run inside a developers command prompt or power shell (making sure make.exe is on your PATH):
+Run from a Developer PowerShell / terminal:
 
 ```ps
-make.exe
+cmake --preset windows-msvc-release-full
+cmake --build --preset windows-msvc-release-full
 ```
 
-✅ **The executable will be located in the main folder:** `NoSpherA2.exe`.
+✅ **The executable will be located in:** `build-windows-msvc-release-full/NoSpherA2.exe`.
 
 ---
 
@@ -57,10 +67,11 @@ sudo <apt/dnf/yum> update && sudo <apt/dnf/yum> install -y build-essential cargo
 Inside the NoSpherA2 directory, simply run:
 
 ```sh
-make
+cmake --preset linux-gcc
+cmake --build --preset linux-gcc
 ```
 
-✅ **The executable will be located in the main folder:** `NoSpherA2`.
+✅ **The executable will be located in:** `build-linux-gcc/NoSpherA2`.
 
 ---
 
@@ -74,10 +85,11 @@ make
 #### **Building NoSpherA2**
 
 ```sh
-make
+cmake --preset macos-release-full-arm64
+cmake --build --preset macos-release-full-arm64
 ```
 
-✅ **The executable will be located in the main folder:** `NoSpherA2`.
+✅ **The executable will be located in:** `build-macos-release-full-arm64/NoSpherA2`.
 
 ---
 
@@ -122,7 +134,7 @@ make
    acc = 0
    ```
 5. Command line arguments are always passed in the block <testname>.args.
-6. **Run `pytest` or make test** to ensure your test runs.
+6. **Run `pytest` (or `ctest`)** to ensure your test runs.
 7. **Document your test** if needed and mention it in your Pull Request.
 
 ---

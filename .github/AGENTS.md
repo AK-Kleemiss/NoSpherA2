@@ -3,14 +3,15 @@
 ## Quick overview
 - **Project**: **NoSpherA2** – a C++ CLI tool that generates `.tsc` files and property grids from quantum‑chemistry wavefunctions.
 - **Key submodules**: `occ/` (quantum‑chemistry core), `featomic/` (Rust ML features), `libcint/`, `mdspan/`.
-- **Build system**: top‑level `Makefile` dispatches to platform‑specific builds (Windows via MSBuild, Linux/macOS via make). Most dependencies are built statically and placed under `Lib/`; TBB is deployed as a runtime library beside the executable.
+- **Build system**: CMake presets are the primary build entrypoint across platforms. Dependencies are handled via a micromamba bootstrap step during configure.
 
 ## Build & test commands (agents can run these automatically)
 | Platform | Command | What it does |
 |----------|---------|--------------|
-| **Windows** | `make.exe` (or `make` from a VS 2022 Developer PowerShell) | Builds the solution (`Windows/NoSpherA2.sln`) and produces `NoSpherA2.exe` at the repo root. |
-| **Linux / macOS** | `make` | Invokes the appropriate makefile in `Linux/` or `Mac/` and produces the executable. |
-| **All** | `make test` or `make tests` | Builds the executable (if needed) and runs the Python pytest harness (`uv run pytest`). |
+| **Windows** | `cmake --preset windows-msvc-release-full && cmake --build --preset windows-msvc-release-full` | Configures + builds full NoSpherA2 (and bootstraps deps by default). |
+| **Linux** | `cmake --preset linux-gcc && cmake --build --preset linux-gcc` | Configures + builds full NoSpherA2. |
+| **macOS** | `cmake --preset macos-release-full-arm64 && cmake --build --preset macos-release-full-arm64` | Configures + builds full NoSpherA2 for a specific arch. |
+| **All** | `ctest --test-dir build-<preset> --output-on-failure` | Runs the Python pytest harness through CTest integration. |
 | **Windows native tests** | `vstest.console.exe Windows\x64\<Config>\Tests.dll /Platform:x64` | Use Visual Studio test tools for native/in-process debugging. Ensure the test binaries are built and the appropriate test adapter is installed.
 
 ## Important build notes for AI agents
@@ -22,11 +23,11 @@
 - **Windows CMake presets**: `windows-clang-cl` and `windows-msvc-debug` are both valid targeted flows. The `windows-msvc-debug` workflow preset is required by the Windows dependency build action.
 - **Test execution on Windows**: Use Visual Studio test tools (`vstest.console.exe`) when debugging native/OCC behavior. Also keep the Python pytest harness passing because CI and golden-file coverage depend on it.
   - Visual Studio tests must run NoSpherA2 in-process through `NoSpherA2_DLL.dll`. Do not add subprocess fallbacks for failing VS tests, including `alanine_integrated_occ`; keep them natively debuggable in the VSTest host and fix the underlying in-process issue.
- - **OCC build process**: The OCC source resides in `occ/`. Building OCC is performed in a dedicated `build*` directory at the repository root (e.g., `build-macos-release-arm64`, `build-linux-occ-gcc`). After running CMake configuration and `make install`, the resulting libraries are installed into `Lib/occ/`. Whenever OCC source files are modified, the full configure‑build‑install cycle must be rerun to update the binaries in `Lib/occ/` before rebuilding NoSpherA2.
+ - **OCC build process**: The OCC source resides in `occ/`. Build it via CMake presets (e.g. `linux-occ-gcc`) or as part of the full-build presets.
 
 ## Common pitfalls (agents should warn the user)
 - Golden‑file test parsing can fail on lines with multiple floating‑point values or scientific notation. See `tests/run_test.py` for the parser.
-- On macOS, the `NATIVE_ARCH` detection may pick the wrong architecture; ensure `make` is invoked with the correct `NATIVE_ARCH` if you need a specific binary.
+- On macOS, build per-arch using `macos-release-full-arm64` / `macos-release-full-x86_64`.
 - Windows builds require the VS 2022 Developer PowerShell (or the appropriate environment) so that `msbuild` and the C++ toolchain are on `PATH`.
 - Current validated status as of 2026-06-13: Python pytest Release full `21 passed` with one tolerated `fchk_conversion` numeric warning; Python pytest Debug full `21 passed`; Visual Studio native Debug full `21 passed`; Visual Studio native Release full `21 passed`. `Release+Copy` was intentionally not rerun in the latest pass.
 
