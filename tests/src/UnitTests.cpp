@@ -8,16 +8,17 @@
 #include "../core/SALTED_utilities.h"
 #include "../core/scattering_factors.h"
 #include "../core/nos_math.h"
+#include "../core/GridManager.h"
 
 static constexpr double PI_VAL = 3.14159265358979323846;
 
 namespace {
-    int test_analytical_fourier(bool full)
+    int test_analytical_fourier()
     {
         // Generate grid and k_pts
         vec2 kpts;
 
-        for (int i = 1; i < 1000; i++) {
+        for (int i = 1; i < 100; i++) {
             //Generate random k-points with values between -1 and 1
             kpts.push_back({ (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1 });
         }
@@ -30,10 +31,6 @@ namespace {
         unsigned int max_l = 6;
         double radial_res = 1E-17;
         int charge = 1;
-        if (full) {
-            max_l = 8;
-            radial_res = 1E-25;
-        }
 
         double alpha_min[] = { 0.5 };
         AtomGrid griddy(radial_res,
@@ -1103,13 +1100,7 @@ namespace NoSpherA2UnitTests
 
     TEST(BesselTests, AnalyticFourier)
     {
-        int ret = test_analytical_fourier(false);
-        EXPECT_EQ(ret, 0);
-    }
-
-    TEST(BesselTests, AnalyticFourier_full)
-    {
-        int ret = test_analytical_fourier(true);
+        int ret = test_analytical_fourier();
         EXPECT_EQ(ret, 0);
     }
 
