@@ -6,6 +6,7 @@ message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
 option(NOSPHERA2_BUILD_DLL "Build the NoSpherA2 DLL" OFF)
 option(NOSPHERA2_BUILD_TESTS "Build NoSpherA2 tests" OFF)
+option(NOSPHERA2_DEPENDENCIES_ONLY "Build dependencies without building NoSpherA2" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -166,10 +167,14 @@ add_subdirectory(
     "${CMAKE_BINARY_DIR}/tools/BasisSetConverter"
 )
 
-
 # ---------------------------------------------------------------------------
 # NoSpherA2 targets
 # ---------------------------------------------------------------------------
+if(WIN32 AND NOSPHERA2_DEPENDENCIES_ONLY)
+    include(cmake/InstallWindowsDependencies.cmake)
+    return()
+endif()
+
 add_subdirectory(Src/core)
 add_subdirectory(app)
 

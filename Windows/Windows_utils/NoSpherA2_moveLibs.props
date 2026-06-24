@@ -3,44 +3,33 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <NosMainFolder>$(SolutionDir)..\..\</NosMainFolder>
-    <WindowsUtilsDir>$(NosMainFolder)Windows\Windows_utils\</WindowsUtilsDir>
-    <SrcDir>$(NosMainFolder)Src\</SrcDir>
-    <output_dir>$(NosMainFolder)\build</output_dir>
-    <!-- Candidate paths (absolute or relative) -->
-    <IompDllCandidate1>$(MKLROOT)\..\..\compiler\latest\bin\libiomp5md.dll</IompDllCandidate1>
-    <IompDllCandidate2>$(MKLROOT)\intelopenmp.redist.win\runtimes\win-x64\native\libiomp5md.dll</IompDllCandidate2>
-    <OccSyncScript>$(WindowsUtilsDir)\sync_occ_variant.ps1</OccSyncScript>
-  </PropertyGroup>
-  <!-- First match wins -->
-  <PropertyGroup Condition="Exists('$(IompDllCandidate1)')">
-    <IompDll>$(IompDllCandidate1)</IompDll>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(IompDll)'=='' and Exists('$(IompDllCandidate2)')">
-    <IompDll>$(IompDllCandidate2)</IompDll>
-  </PropertyGroup>
-  <PropertyGroup>
     <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <deps_install_dir>$(NosMainFolder)deps-install-debug</deps_install_dir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Profile'">
+    <deps_install_dir>$(NosMainFolder)deps-install-debug</deps_install_dir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <deps_install_dir>$(NosMainFolder)deps-install-release</deps_install_dir>
+  </PropertyGroup>
   <Target Name="RunBasisSetConverterIfNeeded" BeforeTargets="PreBuildEvent">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(WindowsUtilsDir)run_basis_converter_if_needed.ps1&quot; -ConverterExe &quot;$(NosMainFolder)Lib\BasisSetConverter.exe&quot; -Configuration &quot;$(Configuration)&quot; -Platform &quot;$(Platform)&quot; -PlatformToolset &quot;$(PlatformToolset)&quot; -MSBuildExe &quot;$(MSBuildBinPath)\MSBuild.exe&quot;" />
-  </Target>
-  <Target Name="ActivateOccVariant" BeforeTargets="ClCompile">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(OccSyncScript)&quot; -RepoRoot &quot;$(SolutionDir)..\..&quot; -Configuration &quot;$(Configuration)&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(WindowsUtilsDir)run_basis_converter_if_needed.ps1&quot; -ConverterExe &quot;$(deps_install_dir)\BasisSetConverter.exe&quot; -Configuration &quot;$(Configuration)&quot; -Platform &quot;$(Platform)&quot; -PlatformToolset &quot;$(PlatformToolset)&quot; -MSBuildExe &quot;$(MSBuildBinPath)\MSBuild.exe&quot;" />
   </Target>
   <Target Name="CopyIntelOpenMP" AfterTargets="Build">
-    <!-- Copy if it exists -->
-    <Message Text="Copying Intel OpenMP runtime: $(IompDll) -&gt; $(TargetDir)" Importance="High" Condition="Exists('$(IompDll)')" />
-    <Copy SourceFiles="$(IompDll)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(IompDll)')" />
-    <!-- If missing, fail with a clear message (optional but recommended) -->
-    <Error Condition="!Exists('$(IompDll)')" Text="Could not find libiomp5.dll at $(IompDll). Check MKLROOT or oneAPI compiler install." />
+    <ItemGroup>
+      <IntelOpenMPDlls Include="$(deps_install_dir)\bin\libiomp5md.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(IntelOpenMPDlls)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="@(IntelOpenMPDlls) != ''" />
+    <Error Condition="@(IntelOpenMPDlls) == ''" Text="Could not find Intel OpenMP runtime DLL under $(NosMainFolder)deps-install\lib. Build and install OCC first." />
   </Target>
   <Target Name="CopyOccTbb" AfterTargets="Build">
     <ItemGroup>
-      <OccTbbDlls Include="$(NosMainFolder)Lib\occ\bin\tbb12*.dll" />
+      <OccTbbDlls Include="$(deps_install_dir)\bin\tbb12*.dll" />
     </ItemGroup>
     <Copy SourceFiles="@(OccTbbDlls)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="@(OccTbbDlls) != ''" />
-    <Error Condition="@(OccTbbDlls) == ''" Text="Could not find a TBB runtime DLL under $(MSBuildProjectDirectory)\..\Lib\occ\bin. Build and install OCC first." />
+    <Error Condition="@(OccTbbDlls) == ''" Text="Could not find a TBB runtime DLL under $(NosMainFolder)deps-install\lib. Build and install OCC first." />
   </Target>
   <!-- <Target Name="CopyFinalOutput" AfterTargets="Build">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(output_dir)\$(Configuration)_$(Platform)\" SkipUnchangedFiles="true" />

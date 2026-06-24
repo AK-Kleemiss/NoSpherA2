@@ -13,6 +13,7 @@ Olex2 is free for use by OlexSys Ltd. (www.olxsys.org)
 The software is provided as-is under the BSD-2 licence. Please see [LICENSE](./LICENSE) for further details!
 
 ## Building NoSpherA2
+
 NoSpherA2 relies heavily on the submodule [featomic](https://github.com/metatensor/featomic) and the [mdSpan](https://github.com/kokkos/mdspan/tree/d34b447fbfdddfad63d2204923917e889ebe2e20) reference implementation. To clone this repository with all of it's dependencies do:
 
 ```sh
@@ -25,71 +26,58 @@ If you already cloned it without submodules, update them manually:
 git submodule update --init --recursive
 ```
 
----
+#### **Prerequisites**
 
-### Micromamba bootstrap details
+- **Cmake**  (min 6.3.25)
+- ***C++20 compiler** (MSVC 19.35, GCC 12.2, Clang 15.0)
 
-To bootstrap the micromamba environment please run
+#### Step 1: Bootstrap the micromamba environment
 
-```ps
+Please run the following command to bootstrap the micromamba environment. This will download and install micromamba, and create a local environment with all dependencies needed to build NoSpherA2.
+
+```bash
 cmake -P scripts/BootstrapMicromamba.cmake
 ```
+
+#### Step 2: Configure the project
+
+NoSpherA2 uses CMake presets to simplify the build process.
+
+```sh
+cmake --preset <buildtype>-<platform>
+```
+
+Where `<platform>` is one of `windows-msvc`, `linux-gcc`, or `macos-release-full-arm64`, and `<buildtype>` is either `release` or `debug`.
+
+##### Configuration Options:
+
+`NOSPHERA2_BUILD_TESTS` (default: `OFF`) - Build the test suite.
+
+#### Step 3: Build the project
+
+```sh
+cmake --build --preset <buildtype>-<platform>
+```
+
+The final executable will be located in the build directory, e.g. `build/release-xxxx/bin/NoSpherA2`
 
 ---
 
 ### Windows Build Instructions
+
+If you want to develop NoSpherA2 on Windows using Visual Studio please also initialize the micromamba environment as described above. Then you **have** to run the following command in a Developer PowerShell / terminal to install the dependencies:
+
 #### **Prerequisites**
+
 - **Visual Studio 2022** with C++ build tools
-- cargo for compilation of rust (required for featomic) [download](https://www.rust-lang.org/tools/install)
 
-#### **Building NoSpherA2**
-Run from a Developer PowerShell / terminal:
+### **Command**
 
-```ps
-cmake --preset windows-msvc-release-full
-cmake --build --preset windows-msvc-release-full
+```powershell
+cmake --preset release-windows -DNOSPHERA2_DEPENDENCIES_ONLY=ON -DNOSPHERA2_BUILD_TESTS=ON
+cmake --build --preset release-windows --parallel
+cmake --install build/release-windows --config Release --prefix "deps-install-release"
 ```
-
-✅ **The executable will be located in:** `build-windows-msvc-release-full/NoSpherA2.exe`.
-
----
-
-### Linux Build Instructions
-
-#### **Prerequisites**
-Ensure `build-essential` and `cargo` are installed (select package manager according to your distro):
-
-```sh
-sudo <apt/dnf/yum> update && sudo <apt/dnf/yum> install -y build-essential cargo
-```
-
-#### **Building NoSpherA2**
-Inside the NoSpherA2 directory, simply run:
-
-```sh
-cmake --preset linux-gcc
-cmake --build --preset linux-gcc
-```
-
-✅ **The executable will be located in:** `build-linux-gcc/NoSpherA2`.
-
----
-
-### macOS Build Instructions
-
-#### **Prerequisites**
-- **Xcode Command Line Tools**
-- **CMake** (install via Homebrew if needed: `brew install cmake`)
-- **rustup** (install via Homebrew: `brew install rustup-init && rustup-init`; might requrie restarting the terminal to load properly)
-
-#### **Building NoSpherA2**
-
-```sh
-cmake --preset macos-release-full-arm64
-cmake --build --preset macos-release-full-arm64
-```
-
-✅ **The executable will be located in:** `build-macos-release-full-arm64/NoSpherA2`.
 
 ---
 
@@ -97,7 +85,7 @@ cmake --build --preset macos-release-full-arm64
 
 ### Creating a Pull Request
 
-1. **Fork the repository** and create a new branch for your feature or bugfix.
+1. **Fork the repository** and create a new branch for your feature or bugfix.ö
 2. **Write clear, concise commit messages** describing your changes.
 3. **Ensure your code builds and passes all tests** on your platform.
 4. **Push your branch** to your fork and open a Pull Request (PR) against the `main` branch of this repository.
@@ -109,20 +97,23 @@ cmake --build --preset macos-release-full-arm64
 1. **Locate the appropriate test file or directory** (commonly in the `tests/` folder or as specified in the codebase).
 2. **Add your test** following the style of existing tests. For C++ code, this may be a new `.cpp` file or a new function in `Src/test_functions.h` file.
 3. **Register your test in the tests.toml file:**
-    - Open the `tests.toml` in the test subdirectory.
-    - Add your test executable or call to the list of tests, as appropriate.
-    - Example (a test calculating a tsc file for sucrose reading in an hkl file and wfn):
-    ```toml
-    [sucrose_SF]
-    directory = "sucrose_fchk_SF"
 
-    [sucrose_SF.args]
-    cif = "sucrose.cif"
-    hkl = "olex2/Wfn_job/sucrose.hkl"
-    wfn = "olex2/Wfn_job/sucrose.wfx"
-    acc = 0
-    ```
+   - Open the `tests.toml` in the test subdirectory.
+   - Add your test executable or call to the list of tests, as appropriate.
+   - Example (a test calculating a tsc file for sucrose reading in an hkl file and wfn):
+
+   ```toml
+   [sucrose_SF]
+   directory = "sucrose_fchk_SF"
+
+   [sucrose_SF.args]
+   cif = "sucrose.cif"
+   hkl = "olex2/Wfn_job/sucrose.hkl"
+   wfn = "olex2/Wfn_job/sucrose.wfx"
+   acc = 0
+   ```
 4. If your test requires a different output file from the test name, you can add the good parameter:
+
    ```toml
    [disorder_THPP]
    directory = "disorder"
@@ -133,7 +124,7 @@ cmake --build --preset macos-release-full-arm64
    hkl = "thpp.hkl"
    acc = 0
    ```
-5. Command line arguments are always passed in the block <testname>.args.
+5. Command line arguments are always passed in the block `<testname>`.args.
 6. **Run `pytest` (or `ctest`)** to ensure your test runs.
 7. **Document your test** if needed and mention it in your Pull Request.
 

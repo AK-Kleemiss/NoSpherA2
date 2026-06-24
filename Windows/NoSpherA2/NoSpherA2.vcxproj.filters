@@ -20,7 +20,7 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Src\exe\main.cpp">
+    <ClCompile Include="..\..\app\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

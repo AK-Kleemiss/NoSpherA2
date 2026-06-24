@@ -1,14 +1,14 @@
 
 #include "pch.h"
 
-#include "../core/convenience.h"
-#include "../core/constants.h"
-#include "../core/fchk.h"
-#include "../core/AtomGrid.h"
-#include "../core/SALTED_utilities.h"
-#include "../core/scattering_factors.h"
-#include "../core/nos_math.h"
-#include "../core/GridManager.h"
+#include "core/convenience.h"
+#include "core/constants.h"
+#include "core/fchk.h"
+#include "core/AtomGrid.h"
+#include "core/SALTED_utilities.h"
+#include "core/scattering_factors.h"
+#include "core/nos_math.h"
+#include "core/GridManager.h"
 
 static constexpr double PI_VAL = 3.14159265358979323846;
 

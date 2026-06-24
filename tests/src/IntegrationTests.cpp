@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "../core/NoSpherA2.h"
+#include "core/NoSpherA2.h"
 
 inline std::filesystem::path nos_test_repo_root()
     {

@@ -14,10 +14,17 @@
       <IntelJCCErratum>true</IntelJCCErratum>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);_CONSOLE;_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB;NDEBUG;X64</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NosMainFolder)deps-install-release/include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>false</GenerateDebugInformation>
+    <AdditionalLibraryDirectories>$(NosMainFolder)deps-install-release/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    <AdditionalDependencies>fmt.lib;spdlog.lib;tbb12.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <Lib>
+        <AdditionalLibraryDirectories>$(NosMainFolder)deps-install-release/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+        <AdditionalDependencies>fmt.lib;spdlog.lib;tbb12.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemGroup />
 </Project>
