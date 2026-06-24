@@ -152,7 +152,7 @@ install(
 )
 
 file(GLOB_RECURSE FEATOMIC_LIBS "${CMAKE_BINARY_DIR}/_deps/featomic/target/*/*.lib")
-file(GLOB_RECURSE METATENSOR_LIBS "${CMAKE_BINARY_DIR}/_deps/metatensor-build/target/*/*.lib")
+file(GLOB_RECURSE METATENSOR_LIBS "${CMAKE_BINARY_DIR}/_deps/metatensor-build/target/*/*/*.lib")
 install(
     FILES
         ${FEATOMIC_LIBS}

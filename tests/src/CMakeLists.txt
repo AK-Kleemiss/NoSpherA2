@@ -62,6 +62,13 @@ gtest_discover_tests(
             "OCC_DATA_PATH=${NOSPHERA2_OCC_DATA_PATH}"
 )
 
+set_property(
+    DIRECTORY
+    APPEND
+    PROPERTY TEST_INCLUDE_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/SetIntegrationTestLocks.cmake"
+)
+
 set_target_properties(
     NoSpherA2_Tests
     PROPERTIES
