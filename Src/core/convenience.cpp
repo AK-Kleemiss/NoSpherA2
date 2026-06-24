@@ -279,7 +279,7 @@ bool ensure_occ_data_path(const char *argv0)
         if (is_valid_occ_data_path(path))
             return true;
         else
-            std::cout << "OCC DATA PATH is invalid!" << std::endl;
+            std::cerr << "OCC DATA PATH is invalid!" << std::endl;
     }
     else if (occ_data_path_env != nullptr)
     {

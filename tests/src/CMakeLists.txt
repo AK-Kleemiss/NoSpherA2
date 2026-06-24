@@ -70,3 +70,23 @@ set_target_properties(
 )
 
 nosphera2_copy_runtime_libraries(NoSpherA2_Tests)
+
+if(WIN32)
+    if(NOT TARGET GTest::gtest)
+        message(FATAL_ERROR
+            "GTest::gtest target is unavailable; cannot copy the GTest runtime DLL"
+        )
+    endif()
+
+    add_custom_command(
+        TARGET NoSpherA2_Tests
+        POST_BUILD
+        COMMAND
+            "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:GTest::gtest>"
+            "$<TARGET_FILE_DIR:NoSpherA2_Tests>"
+        COMMENT
+            "Copying GTest runtime DLL for NoSpherA2_Tests"
+        VERBATIM
+    )
+endif()
