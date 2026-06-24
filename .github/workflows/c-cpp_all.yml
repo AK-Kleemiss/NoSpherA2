@@ -10,245 +10,245 @@ on:
   workflow_dispatch:
 
 concurrency:
-group: ci-${{ github.workflow }}-${{ github.ref }}
-cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  CTEST_PARALLEL_LEVEL: 4
+  CARGO_TERM_COLOR: always
 
 jobs:
   build:
-  name: ${{ matrix.name }}
+    name: ${{ matrix.name }}
 
-  strategy:
-    fail-fast: false
-    matrix:
-      include:
-        - name: Linux Release
-          os: ubuntu-24.04
-          configure-preset: release-linux
-          build-preset: release-linux
-          test-preset: release-linux
-          build-directory: build/release-linux
-          environment-directory: .mambaenv/env
-          architecture: x86_64
-          shell: bash
-          artifact-path: artifacts/NoSpherA2-linux-x86_64.tar.gz
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux Release
+            os: ubuntu-24.04
+            configure-preset: release-linux
+            build-preset: release-linux
+            test-preset: release-linux
+            build-directory: build/release-linux
+            environment-directory: .mambaenv/env
+            architecture: x86_64
+            shell: bash
+            artifact-path: artifacts/NoSpherA2-linux-x86_64.tar.gz
 
-        - name: Windows Release
-          os: windows-2022
-          configure-preset: release-windows
-          build-preset: release-windows
-          test-preset: release-windows
-          build-directory: build/release-windows
-          environment-directory: .mambaenv/env
-          architecture: x86_64
-          shell: pwsh
-          artifact-path: artifacts/NoSpherA2-windows-x64.zip
+          - name: Windows Release
+            os: windows-2022
+            configure-preset: release-windows
+            build-preset: release-windows
+            test-preset: release-windows
+            build-directory: build/release-windows
+            environment-directory: .mambaenv/env
+            architecture: x86_64
+            shell: pwsh
+            artifact-path: artifacts/NoSpherA2-windows-x64.zip
 
-        - name: macOS arm64 Release
-          os: macos-14
-          configure-preset: release-macos-arm64
-          build-preset: release-macos-arm64
-          test-preset: release-macos-arm64
-          build-directory: build/release-macos-arm64
-          environment-directory: .mambaenv/env-arm64
-          architecture: arm64
-          shell: bash
-          artifact-path: artifacts/NoSpherA2-macos-arm64.tar.gz
+          - name: macOS arm64 Release
+            os: macos-14
+            configure-preset: release-macos-arm64
+            build-preset: release-macos-arm64
+            test-preset: release-macos-arm64
+            build-directory: build/release-macos-arm64
+            environment-directory: .mambaenv/env-arm64
+            architecture: arm64
+            shell: bash
+            artifact-path: artifacts/NoSpherA2-macos-arm64.tar.gz
 
-        - name: macOS x86_64 Release
-          os: macos-15-intel
-          configure-preset: release-macos-x86_64
-          build-preset: release-macos-x86_64
-          test-preset: release-macos-x86_64
-          build-directory: build/release-macos-x86_64
-          environment-directory: .mambaenv/env-x86_64
-          architecture: x86_64
-          shell: bash
-          artifact-path: artifacts/NoSpherA2-macos-x86_64.tar.gz
+          - name: macOS x86_64 Release
+            os: macos-15-intel
+            configure-preset: release-macos-x86_64
+            build-preset: release-macos-x86_64
+            test-preset: release-macos-x86_64
+            build-directory: build/release-macos-x86_64
+            environment-directory: .mambaenv/env-x86_64
+            architecture: x86_64
+            shell: bash
+            artifact-path: artifacts/NoSpherA2-macos-x86_64.tar.gz
 
-  runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
 
-  defaults:
-    run:
-      shell: ${{ matrix.shell }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
-  env:
-    CMAKE_BUILD_PARALLEL_LEVEL: 4
-    CTEST_PARALLEL_LEVEL: 4
-    CARGO_TERM_COLOR: always
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
 
-  steps:
-    - name: Check out repository
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 1
+      # Ninja uses whichever compiler environment is active. On Windows,
+      # initialize the x64 MSVC environment before configuring CMake.
+      - name: Initialize MSVC x64 environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
-    # Ninja uses whichever compiler environment is active. On Windows,
-    # initialize the x64 MSVC environment before configuring CMake.
-    - name: Initialize MSVC x64 environment
-      if: runner.os == 'Windows'
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
+      - name: Show toolchain
+        run: |
+          cmake --version
+          ninja --version
+          git --version
 
-    - name: Show toolchain
-      run: |
-        cmake --version
-        ninja --version
-        git --version
+      - name: Show MSVC compiler
+        if: runner.os == 'Windows'
+        run: |
+          where.exe cl
+          cl
+        continue-on-error: true
 
-    - name: Show MSVC compiler
-      if: runner.os == 'Windows'
-      run: |
-        where.exe cl
-        cl
-      continue-on-error: true
+      # Cache micromamba's downloaded package cache. The actual environment is
+      # recreated or validated by BootstrapMicromamba.cmake.
+      - name: Cache micromamba packages
+        uses: actions/cache@v5
+        with:
+          path: |
+            .mambaenv/root/pkgs
+            .mambaenv/bootstrap
+          key: >-
+            mamba-${{ runner.os }}-${{ matrix.architecture }}-
+            ${{ hashFiles('environment.yaml', 'environment-macos.yaml',
+                          'cmake/MicromambaEnvironment.cmake',
+                          'scripts/BootstrapMicromamba.cmake') }}
+          restore-keys: |
+            mamba-${{ runner.os }}-${{ matrix.architecture }}-
 
-    # Cache micromamba's downloaded package cache. The actual environment is
-    # recreated or validated by BootstrapMicromamba.cmake.
-    - name: Cache micromamba packages
-      uses: actions/cache@v5
-      with:
-        path: |
-          .mambaenv/root/pkgs
-          .mambaenv/bootstrap
-        key: >-
-          mamba-${{ runner.os }}-${{ matrix.architecture }}-
-          ${{ hashFiles('environment.yaml', 'environment-macos.yaml',
-                        'cmake/MicromambaEnvironment.cmake',
-                        'scripts/BootstrapMicromamba.cmake') }}
-        restore-keys: |
-          mamba-${{ runner.os }}-${{ matrix.architecture }}-
+      - name: Bootstrap micromamba environments
+        run: cmake -P scripts/BootstrapMicromamba.cmake
 
-    - name: Bootstrap micromamba environments
-      run: cmake -P scripts/BootstrapMicromamba.cmake
+      - name: Verify Windows environment architecture
+        if: runner.os == 'Windows'
+        run: |
+          & "${{ matrix.environment-directory }}\python.exe" -c "import struct; print('Python bits:', struct.calcsize('P') * 8)"
+          & "${{ matrix.environment-directory }}\Library\bin\rustc.exe" -vV
 
-    - name: Verify Windows environment architecture
-      if: runner.os == 'Windows'
-      run: |
-        & "${{ matrix.environment-directory }}\python.exe" -c "import struct; print('Python bits:', struct.calcsize('P') * 8)"
-        & "${{ matrix.environment-directory }}\Library\bin\rustc.exe" -vV
+      - name: Verify Unix environment architecture
+        if: runner.os != 'Windows'
+        run: |
+          file "${{ matrix.environment-directory }}/bin/python"
+          "${{ matrix.environment-directory }}/bin/rustc" -vV
 
-    - name: Verify Unix environment architecture
-      if: runner.os != 'Windows'
-      run: |
-        file "${{ matrix.environment-directory }}/bin/python"
-        "${{ matrix.environment-directory }}/bin/rustc" -vV
+      # This is the requested _deps cache. It is deliberately isolated by OS,
+      # architecture, preset, compiler metadata and dependency source hashes.
+      - name: Restore CMake dependency build cache
+        id: cmake-deps-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ${{ matrix.build-directory }}/_deps
+            ${{ matrix.build-directory }}/appleclang_*_release
+            ${{ matrix.build-directory }}/gnu_*_release
+            ${{ matrix.build-directory }}/msvc_*_release
+          key: >-
+            cmake-deps-v1-${{ runner.os }}-${{ matrix.architecture }}-
+            ${{ matrix.configure-preset }}-
+            ${{ hashFiles(
+              'CMakeLists.txt',
+              'CMakePresets.json',
+              'cmake/**/*.cmake',
+              'environment*.yaml',
+              'occ/**/CMakeLists.txt',
+              'occ/**/*.cmake',
+              'libcint/**/CMakeLists.txt',
+              'libcint/**/*.cmake',
+              'featomic/**/Cargo.toml',
+              'featomic/**/Cargo.lock',
+              'featomic/**/CMakeLists.txt',
+              'mdspan/**/CMakeLists.txt'
+            ) }}
+          restore-keys: |
+            cmake-deps-v1-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-
+            cmake-deps-v1-${{ runner.os }}-${{ matrix.architecture }}-
 
-    # This is the requested _deps cache. It is deliberately isolated by OS,
-    # architecture, preset, compiler metadata and dependency source hashes.
-    - name: Restore CMake dependency build cache
-      id: cmake-deps-cache
-      uses: actions/cache@v5
-      with:
-        path: |
-          ${{ matrix.build-directory }}/_deps
-          ${{ matrix.build-directory }}/appleclang_*_release
-          ${{ matrix.build-directory }}/gnu_*_release
-          ${{ matrix.build-directory }}/msvc_*_release
-        key: >-
-          cmake-deps-v1-${{ runner.os }}-${{ matrix.architecture }}-
-          ${{ matrix.configure-preset }}-
-          ${{ hashFiles(
-            'CMakeLists.txt',
-            'CMakePresets.json',
-            'cmake/**/*.cmake',
-            'environment*.yaml',
-            'occ/**/CMakeLists.txt',
-            'occ/**/*.cmake',
-            'libcint/**/CMakeLists.txt',
-            'libcint/**/*.cmake',
-            'featomic/**/Cargo.toml',
-            'featomic/**/Cargo.lock',
-            'featomic/**/CMakeLists.txt',
-            'mdspan/**/CMakeLists.txt'
-          ) }}
-        restore-keys: |
-          cmake-deps-v1-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-
-          cmake-deps-v1-${{ runner.os }}-${{ matrix.architecture }}-
+      # Cargo stores downloaded crates outside build/_deps, so cache those too.
+      - name: Cache Cargo downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: >-
+            cargo-${{ runner.os }}-${{ matrix.architecture }}-
+            ${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ matrix.architecture }}-
 
-    # Cargo stores downloaded crates outside build/_deps, so cache those too.
-    - name: Cache Cargo downloads
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-        key: >-
-          cargo-${{ runner.os }}-${{ matrix.architecture }}-
-          ${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          cargo-${{ runner.os }}-${{ matrix.architecture }}-
+      - name: Configure
+        run: cmake --preset "${{ matrix.configure-preset }}"
 
-    - name: Configure
-      run: cmake --preset "${{ matrix.configure-preset }}"
+      - name: Build
+        run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
 
-    - name: Build
-      run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
+      - name: Run tests
+        run: ctest --preset "${{ matrix.test-preset }}" --output-on-failure
 
-    - name: Run tests
-      run: ctest --preset "${{ matrix.test-preset }}" --output-on-failure
+      - name: Inspect Linux runtime dependencies
+        if: runner.os == 'Linux'
+        run: |
+          executable="${{ matrix.build-directory }}/bin/NoSpherA2"
+          file "$executable"
+          ldd "$executable"
 
-    - name: Inspect Linux runtime dependencies
-      if: runner.os == 'Linux'
-      run: |
-        executable="${{ matrix.build-directory }}/bin/NoSpherA2"
-        file "$executable"
-        ldd "$executable"
+      - name: Inspect macOS runtime dependencies
+        if: runner.os == 'macOS'
+        run: |
+          executable="${{ matrix.build-directory }}/bin/NoSpherA2"
+          file "$executable"
+          lipo -archs "$executable"
+          otool -L "$executable"
 
-    - name: Inspect macOS runtime dependencies
-      if: runner.os == 'macOS'
-      run: |
-        executable="${{ matrix.build-directory }}/bin/NoSpherA2"
-        file "$executable"
-        lipo -archs "$executable"
-        otool -L "$executable"
+          find "${{ matrix.build-directory }}/bin" \
+            -maxdepth 1 \
+            -name '*.dylib' \
+            -exec file {} \;
 
-        find "${{ matrix.build-directory }}/bin" \
-          -maxdepth 1 \
-          -name '*.dylib' \
-          -exec file {} \;
+      - name: Inspect Windows output
+        if: runner.os == 'Windows'
+        run: |
+          Get-ChildItem "${{ matrix.build-directory }}\bin" -Recurse |
+            Select-Object FullName, Length
 
-    - name: Inspect Windows output
-      if: runner.os == 'Windows'
-      run: |
-        Get-ChildItem "${{ matrix.build-directory }}\bin" -Recurse |
-          Select-Object FullName, Length
+      - name: Package Unix artifacts
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p artifacts
+          tar \
+            -czf "artifacts/${{ matrix.artifact-name }}.tar.gz" \
+            -C "${{ matrix.build-directory }}/bin" \
+            .
 
-    - name: Package Unix artifacts
-      if: runner.os != 'Windows'
-      run: |
-        mkdir -p artifacts
-        tar \
-          -czf "artifacts/${{ matrix.artifact-name }}.tar.gz" \
-          -C "${{ matrix.build-directory }}/bin" \
-          .
+      - name: Package Windows artifacts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
 
-    - name: Package Windows artifacts
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: |
-        New-Item -ItemType Directory -Force artifacts | Out-Null
+          Compress-Archive `
+            -Path "${{ matrix.build-directory }}\bin\*" `
+            -DestinationPath "artifacts\${{ matrix.artifact-name }}.zip" `
+            -Force
 
-        Compress-Archive `
-          -Path "${{ matrix.build-directory }}\bin\*" `
-          -DestinationPath "artifacts\${{ matrix.artifact-name }}.zip" `
-          -Force
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: NoSpherA2-${{ runner.os }}-${{ matrix.architecture }}
+          path: ${{ matrix.artifact-path }}
+          if-no-files-found: error
 
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        name: NoSpherA2-${{ runner.os }}-${{ matrix.architecture }}
-        path: ${{ matrix.artifact-path }}
-        if-no-files-found: error
-
-    - name: Upload test logs after failure
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-logs-${{ runner.os }}-${{ matrix.architecture }}
-        if-no-files-found: ignore
-        path: |
-          ${{ matrix.build-directory }}/Testing/Temporary
-          ${{ matrix.build-directory }}/CMakeFiles/CMakeConfigureLog.yaml
-          ${{ matrix.build-directory }}/CMakeCache.txt
+      - name: Upload test logs after failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ runner.os }}-${{ matrix.architecture }}
+          if-no-files-found: ignore
+          path: |
+            ${{ matrix.build-directory }}/Testing/Temporary
+            ${{ matrix.build-directory }}/CMakeFiles/CMakeConfigureLog.yaml
+            ${{ matrix.build-directory }}/CMakeCache.txt
