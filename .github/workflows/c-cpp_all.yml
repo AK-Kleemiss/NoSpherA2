@@ -36,6 +36,7 @@ jobs:
             architecture: x86_64
             shell: bash
             artifact-path: artifacts/NoSpherA2-linux-x86_64.tar.gz
+            artifact-name: NoSpherA2-linux-x86_64
 
           - name: Windows Release
             os: windows-2022
@@ -47,6 +48,7 @@ jobs:
             architecture: x86_64
             shell: pwsh
             artifact-path: artifacts/NoSpherA2-windows-x64.zip
+            artifact-name: NoSpherA2-windows-x64
 
           - name: macOS arm64 Release
             os: macos-14
@@ -58,6 +60,7 @@ jobs:
             architecture: arm64
             shell: bash
             artifact-path: artifacts/NoSpherA2-macos-arm64.tar.gz
+            artifact-name: NoSpherA2-macos-arm64
 
           - name: macOS x86_64 Release
             os: macos-15-intel
@@ -69,6 +72,7 @@ jobs:
             architecture: x86_64
             shell: bash
             artifact-path: artifacts/NoSpherA2-macos-x86_64.tar.gz
+            artifact-name: NoSpherA2-macos-x86_64
 
     runs-on: ${{ matrix.os }}
 
@@ -181,7 +185,7 @@ jobs:
             cargo-${{ runner.os }}-${{ matrix.architecture }}-
 
       - name: Configure
-        run: cmake --preset "${{ matrix.configure-preset }}"
+        run: cmake --preset "${{ matrix.configure-preset }}" -DNOSPHERA2_BUILD_TESTS=1
 
       - name: Build
         run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
@@ -219,26 +223,32 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           mkdir -p artifacts
+
           tar \
-            -czf "artifacts/${{ matrix.artifact-name }}.tar.gz" \
+            -czf "${{ matrix.artifact-path }}" \
             -C "${{ matrix.build-directory }}/bin" \
             .
 
+          echo "Created artifact:"
+          ls -lah artifacts
+
       - name: Package Windows artifacts
         if: runner.os == 'Windows'
-        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force artifacts | Out-Null
 
           Compress-Archive `
             -Path "${{ matrix.build-directory }}\bin\*" `
-            -DestinationPath "artifacts\${{ matrix.artifact-name }}.zip" `
+            -DestinationPath "${{ matrix.artifact-path }}" `
             -Force
+
+          Write-Host "Created artifact:"
+          Get-ChildItem artifacts
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: NoSpherA2-${{ runner.os }}-${{ matrix.architecture }}
+          name: ${{ matrix.artifact-name }}
           path: ${{ matrix.artifact-path }}
           if-no-files-found: error
 

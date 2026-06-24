@@ -339,6 +339,15 @@ namespace {
 
     void test_reading_SALTED_binary_file() {
         std::filesystem::path path("../../../tests/SALTED/Model/model.salted");
+        if (!std::filesystem::exists(path)) {
+            path = std::filesystem::path("tests/SALTED/Model/model.salted");
+        }
+        if (!std::filesystem::exists(path)) {
+            path = std::filesystem::path("Model/model.salted");
+        }
+        if (!std::filesystem::exists(path)) {
+            path = std::filesystem::path("../SALTED/Model/model.salted");
+        }
         SALTED_BINARY_FILE file = SALTED_BINARY_FILE(path, true);
         Config config;
         file.populate_config(config);

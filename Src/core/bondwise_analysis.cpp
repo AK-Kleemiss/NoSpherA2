@@ -1752,7 +1752,7 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets) {
 
         vec cov_index(n0, 0.0), ion_index(n0, 0.0);
         double b_ab = 0;
-        bond_index_result results(0, 0, 0, 0, 0, 0, 0, 0, {});
+        bond_index_result results{};
         for (int i = 0; i < n0; i++) {
             if (covalent_info['A'](i, 0) < zero_angle_cutoff || covalent_info['A'](i, 0) > 90 - zero_angle_cutoff)
                 continue; // skip lone pairs
