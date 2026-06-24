@@ -17,12 +17,15 @@ target_compile_features(
         cxx_std_20
 )
 
-target_link_options(
-    NoSpherA2
-    PRIVATE
-        -static-libstdc++
-        -static-libgcc
-)
+if (NOT APPLE)
+    target_link_options(
+        NoSpherA2
+        PRIVATE
+            -static-libstdc++
+            -static-libgcc
+    )
+else()
+endif()
 
 target_link_libraries(
     NoSpherA2
@@ -36,5 +39,6 @@ set_target_properties(
         RUNTIME_OUTPUT_DIRECTORY
             "${CMAKE_BINARY_DIR}/bin"
 )
+
 
 nosphera2_copy_runtime_libraries(NoSpherA2)

@@ -96,11 +96,37 @@ target_precompile_headers(
         "${CMAKE_CURRENT_SOURCE_DIR}/pch.h"
 )
 
+if(APPLE)
+    find_library(
+        NOSPHERA2_ACCELERATE_FRAMEWORK
+        Accelerate
+        REQUIRED
+    )
+    target_link_libraries(
+        NoSpherA2Core
+        PRIVATE
+            ${NOSPHERA2_ACCELERATE_FRAMEWORK}
+        PUBLIC
+            OpenMP::OpenMP_CXX
+    )
+
+    target_compile_definitions(
+        NoSpherA2Core
+        PRIVATE
+            ACCELERATE_NEW_LAPACK
+    )
+else()
+    target_link_libraries(
+        NoSpherA2Core
+        PUBLIC
+            MKL::MKL
+    )
+endif()
+
 target_link_libraries(
     NoSpherA2Core
     PUBLIC
         libcint::libcint
         occ_main
         featomic::static
-        MKL::MKL
 )

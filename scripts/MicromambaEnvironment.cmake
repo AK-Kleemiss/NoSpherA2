@@ -20,6 +20,8 @@ include_guard(GLOBAL)
 #   DOWNLOAD_DIRECTORY Micromamba executable directory
 #   MICROMAMBA_VERSION Version such as "2.3.0"; defaults to "latest"
 #   FORCE_UPDATE       Always run micromamba install
+#   MAMBA_PLATFORM     Platform to build the env for
+#   EXPORT_PREFIX_VARIABLE Used in MacOS builds featuring different architectures
 #
 # Exported cache variables:
 #
@@ -43,6 +45,8 @@ function(setup_micromamba_environment)
         ROOT_PREFIX
         DOWNLOAD_DIRECTORY
         MICROMAMBA_VERSION
+        PLATFORM
+        EXPORT_PREFIX_VARIABLE
     )
 
     cmake_parse_arguments(
@@ -151,35 +155,36 @@ function(setup_micromamba_environment)
     endif()
 
     # -----------------------------------------------------------------------
-    # Determine the micromamba platform identifier
+    # Determine the platform of the micromamba executable
     # -----------------------------------------------------------------------
 
-    string(TOLOWER
+    string(
+        TOLOWER
         "${CMAKE_HOST_SYSTEM_PROCESSOR}"
         host_processor
     )
 
     if(WIN32)
         if(host_processor MATCHES "^(arm64|aarch64)$")
-            set(micromamba_platform "win-arm64")
+            set(micromamba_executable_platform "win-arm64")
         else()
-            set(micromamba_platform "win-64")
+            set(micromamba_executable_platform "win-64")
         endif()
 
     elseif(APPLE)
         if(host_processor MATCHES "^(arm64|aarch64)$")
-            set(micromamba_platform "osx-arm64")
+            set(micromamba_executable_platform "osx-arm64")
         else()
-            set(micromamba_platform "osx-64")
+            set(micromamba_executable_platform "osx-64")
         endif()
 
     elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
         if(host_processor MATCHES "^(arm64|aarch64)$")
-            set(micromamba_platform "linux-aarch64")
+            set(micromamba_executable_platform "linux-aarch64")
         elseif(host_processor MATCHES "^(ppc64le|powerpc64le)$")
-            set(micromamba_platform "linux-ppc64le")
+            set(micromamba_executable_platform "linux-ppc64le")
         else()
-            set(micromamba_platform "linux-64")
+            set(micromamba_executable_platform "linux-64")
         endif()
 
     else()
@@ -189,6 +194,19 @@ function(setup_micromamba_environment)
             "  Processor: ${CMAKE_HOST_SYSTEM_PROCESSOR}"
         )
     endif()
+
+    if(micromamba_executable_platform STREQUAL "")
+        message(FATAL_ERROR
+            "Could not determine the micromamba executable platform.\n"
+            "Host system: ${CMAKE_HOST_SYSTEM_NAME}\n"
+            "Host processor: ${CMAKE_HOST_SYSTEM_PROCESSOR}"
+        )
+    endif()
+
+    message(STATUS
+        "Micromamba executable platform: "
+        "${micromamba_executable_platform}"
+    )
 
     # -----------------------------------------------------------------------
     # Determine executable and archive paths
@@ -211,13 +229,13 @@ function(setup_micromamba_environment)
     if(MAMBA_MICROMAMBA_VERSION)
         string(CONCAT micromamba_url
             "https://micro.mamba.pm/api/micromamba/"
-            "${micromamba_platform}/"
+            "${micromamba_executable_platform}/"
             "${MAMBA_MICROMAMBA_VERSION}"
         )
     else()
         string(CONCAT micromamba_url
             "https://micro.mamba.pm/api/micromamba/"
-            "${micromamba_platform}/latest"
+            "${micromamba_executable_platform}/latest"
         )
     endif()
 
@@ -227,7 +245,7 @@ function(setup_micromamba_environment)
 
     if(NOT EXISTS "${micromamba_executable}")
         message(STATUS
-            "Downloading micromamba for ${micromamba_platform}"
+            "Downloading micromamba for ${micromamba_executable_platform}"
         )
         message(STATUS
             "Micromamba URL: ${micromamba_url}"
@@ -302,13 +320,51 @@ function(setup_micromamba_environment)
     endif()
 
     # -----------------------------------------------------------------------
+    # Determine the environment package platform
+    # -----------------------------------------------------------------------
+
+    if(MAMBA_PLATFORM)
+        set(micromamba_environment_platform
+            "${MAMBA_PLATFORM}"
+        )
+    else()
+        set(micromamba_environment_platform
+            "${micromamba_executable_platform}"
+        )
+    endif()
+
+    set(_supported_micromamba_platforms
+        win-64
+        win-arm64
+        osx-64
+        osx-arm64
+        linux-64
+        linux-aarch64
+        linux-ppc64le
+    )
+
+    if(NOT micromamba_environment_platform
+    IN_LIST _supported_micromamba_platforms)
+        message(FATAL_ERROR
+            "Unsupported micromamba environment platform:\n"
+            "  ${micromamba_environment_platform}"
+        )
+    endif()
+
+    # -----------------------------------------------------------------------
     # Check whether environment.yaml changed
     # -----------------------------------------------------------------------
 
     file(
         SHA256
         "${environment_file}"
+        environment_file_hash
+    )
+
+    string(
+        SHA256
         current_environment_hash
+        "${environment_file_hash};${micromamba_environment_platform}"
     )
 
     set(environment_hash_file
@@ -373,6 +429,7 @@ function(setup_micromamba_environment)
                 "${micromamba_executable}"
                 "${micromamba_operation}"
                 --yes
+                --platform "${micromamba_environment_platform}"
                 --prefix "${environment_prefix}"
                 --file "${environment_file}"
             RESULT_VARIABLE environment_result
@@ -425,21 +482,38 @@ function(setup_micromamba_environment)
         FORCE
     )
 
-    set(
-        MICROMAMBA_ENV_PREFIX
-        "${environment_prefix}"
-        CACHE PATH
-        "Micromamba environment prefix"
-        FORCE
-    )
-
     mark_as_advanced(
         MICROMAMBA_EXECUTABLE
         MICROMAMBA_ROOT_PREFIX
-        MICROMAMBA_ENV_PREFIX
     )
 
+    if(MAMBA_EXPORT_PREFIX_VARIABLE)
+        set(
+            "${MAMBA_EXPORT_PREFIX_VARIABLE}"
+            "${environment_prefix}"
+            CACHE PATH
+            "Micromamba environment prefix"
+            FORCE
+        )
+
+        mark_as_advanced(
+            "${MAMBA_EXPORT_PREFIX_VARIABLE}"
+        )
+    else()
+        set(
+            MICROMAMBA_ENV_PREFIX
+            "${environment_prefix}"
+            CACHE PATH
+            "Micromamba environment prefix"
+            FORCE
+        )
+
+        mark_as_advanced(
+            MICROMAMBA_ENV_PREFIX
+        )
+    endif()
+
     message(STATUS
-        "Micromamba environment: ${MICROMAMBA_ENV_PREFIX}"
+        "Micromamba environment: ${environment_prefix}"
     )
 endfunction()

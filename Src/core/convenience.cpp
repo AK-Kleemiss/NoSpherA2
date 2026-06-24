@@ -293,7 +293,7 @@ bool ensure_occ_data_path(const char *argv0)
         if (is_valid_occ_data_path(std::filesystem::path(occ_data_path_env)))
             return true;
         else
-            std::cout << "OCC DATA PATH is invalid!" << std::endl;
+            std::cerr << "OCC DATA PATH is invalid!" << std::endl;
     }
 #endif
 
@@ -318,7 +318,7 @@ bool ensure_occ_data_path(const char *argv0)
         return false;
     }
 
-    std::cout << "OCC_DATA_PATH not set or invalid. Using: " << selected_path << std::endl;
+    std::cerr << "OCC_DATA_PATH not set or invalid. Using: " << selected_path << std::endl;
     return true;
 }
 

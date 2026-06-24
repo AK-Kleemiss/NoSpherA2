@@ -34,9 +34,10 @@ list(PREPEND CMAKE_MODULE_PATH
 
 include(NoSpherA2Avx)
 include(NoSpherA2Sanitizers)
-include(NoSpherA2Deps)
+include(ValidateMambaEnvironemt)
+include(CopyRuntimeLibraries)
 
-nosphera2_setup_dependencies()
+validate_micromamba_environment()
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +146,16 @@ else()
     )
 endif()
 
-find_package(MKL CONFIG REQUIRED)
+if(APPLE)
+    find_library(
+        NOSPHERA2_ACCELERATE_FRAMEWORK
+        Accelerate
+        REQUIRED
+    )
+    find_package(OpenMP REQUIRED COMPONENTS CXX)
+else()
+    find_package(MKL CONFIG REQUIRED)
+endif()
 
 
 # ---------------------------------------------------------------------------
@@ -160,70 +170,6 @@ add_subdirectory(
 # ---------------------------------------------------------------------------
 # NoSpherA2 targets
 # ---------------------------------------------------------------------------
-
-function(nosphera2_copy_runtime_libraries target)
-    if(NOT TARGET "${target}")
-        message(FATAL_ERROR
-            "nosphera2_copy_runtime_libraries(): "
-            "target '${target}' does not exist"
-        )
-    endif()
-
-    if(WIN32)
-        set(_runtime_libraries
-            "${MICROMAMBA_ENV_PREFIX}/Library/bin/tbb12.dll"
-            "${MICROMAMBA_ENV_PREFIX}/Library/bin/libiomp5md.dll"
-        )
-
-    elseif(APPLE)
-        set(_runtime_libraries
-            "${MICROMAMBA_ENV_PREFIX}/lib/libtbb.12.dylib"
-            "${MICROMAMBA_ENV_PREFIX}/lib/libiomp5.dylib"
-        )
-
-        set_target_properties(
-            "${target}"
-            PROPERTIES
-                BUILD_RPATH "@loader_path"
-                INSTALL_RPATH "@loader_path"
-                INSTALL_RPATH_USE_LINK_PATH FALSE
-        )
-
-    elseif(UNIX)
-        set(_runtime_libraries
-            "${MICROMAMBA_ENV_PREFIX}/lib/libtbb.so.12"
-            "${MICROMAMBA_ENV_PREFIX}/lib/libiomp5.so"
-        )
-
-        set_target_properties(
-            "${target}"
-            PROPERTIES
-                INSTALL_RPATH "$ORIGIN"
-                BUILD_WITH_INSTALL_RPATH TRUE
-                INSTALL_RPATH_USE_LINK_PATH FALSE
-        )
-    endif()
-
-    foreach(_runtime_library IN LISTS _runtime_libraries)
-        if(NOT EXISTS "${_runtime_library}")
-            message(FATAL_ERROR
-                "Required runtime library not found:\n"
-                "  ${_runtime_library}"
-            )
-        endif()
-
-        add_custom_command(
-            TARGET "${target}"
-            POST_BUILD
-            COMMAND
-                "${CMAKE_COMMAND}" -E copy_if_different
-                "${_runtime_library}"
-                "$<TARGET_FILE_DIR:${target}>"
-            VERBATIM
-        )
-    endforeach()
-endfunction()
-
 add_subdirectory(Src/core)
 add_subdirectory(app)
 
@@ -257,3 +203,21 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     endif()
 endif()
 
+if(APPLE)
+    add_custom_target(
+        NoSpherA2Universal
+
+        COMMAND
+            "${CMAKE_COMMAND}"
+            "-DARM64_DIRECTORY=${PROJECT_SOURCE_DIR}/build/release-macos-arm64/bin"
+            "-DX86_64_DIRECTORY=${PROJECT_SOURCE_DIR}/build/release-macos-x86_64/bin"
+            "-DOUTPUT_DIRECTORY=${PROJECT_SOURCE_DIR}/build/release-macos-universal/bin"
+            -P
+            "${PROJECT_SOURCE_DIR}/cmake/CreateMacOSUniversal.cmake"
+
+        COMMENT
+            "Creating universal macOS binaries"
+
+        VERBATIM
+    )
+endif()

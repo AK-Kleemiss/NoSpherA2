@@ -5,39 +5,120 @@
     "minor": 25,
     "patch": 0
   },
+
   "configurePresets": [
+    {
+      "name": "common-base",
+      "hidden": true,
+      "generator": "Ninja"
+    },
+    {
+      "name": "release-base",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "debug-base",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+
     {
       "name": "windows-base",
       "hidden": true,
-      "generator": "Ninja",
-
+      "inherits": "common-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
       "environment": {
         "PATH": "${sourceDir}/.mambaenv/env;${sourceDir}/.mambaenv/env/Library/bin;${sourceDir}/.mambaenv/env/Scripts;$penv{PATH}",
-
         "CMAKE_PREFIX_PATH": "${sourceDir}/.mambaenv/env",
         "PKG_CONFIG_PATH": "${sourceDir}/.mambaenv/env/Library/lib/pkgconfig;${sourceDir}/.mambaenv/env/Library/share/pkgconfig",
-
         "RUSTC": "${sourceDir}/.mambaenv/env/Library/bin/rustc.exe",
 
         "CMAKE_GENERATOR": "Ninja",
         "CMAKE_GENERATOR_x86_64_pc_windows_msvc": "Ninja",
         "CMAKE_GENERATOR_x86_64-pc-windows-msvc": "Ninja"
       },
-
       "cacheVariables": {
+        "MICROMAMBA_ENV_PREFIX": "${sourceDir}/.mambaenv/env",
         "CMAKE_MAKE_PROGRAM": "${sourceDir}/.mambaenv/env/Library/bin/ninja.exe",
-
         "Python3_EXECUTABLE": "${sourceDir}/.mambaenv/env/python.exe",
         "Python_EXECUTABLE": "${sourceDir}/.mambaenv/env/python.exe",
-
         "PKG_CONFIG_EXECUTABLE": "${sourceDir}/.mambaenv/env/Library/bin/pkg-config.exe",
         "CARGO_EXE": "${sourceDir}/.mambaenv/env/Library/bin/cargo.exe"
       }
     },
     {
+      "name": "macos-arm64-base",
+      "hidden": true,
+      "inherits": "common-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "environment": {
+        "PATH": "${sourceDir}/.mambaenv/env-arm64/bin:$penv{PATH}",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/.mambaenv/env-arm64",
+        "PKG_CONFIG_PATH": "${sourceDir}/.mambaenv/env-arm64/lib/pkgconfig:${sourceDir}/.mambaenv/env-arm64/share/pkgconfig",
+        "RUSTC": "${sourceDir}/.mambaenv/env-arm64/bin/rustc"
+      },
+      "cacheVariables": {
+        "MICROMAMBA_ENV_PREFIX": "${sourceDir}/.mambaenv/env-arm64",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/.mambaenv/env-arm64/bin/ninja",
+        "Python3_EXECUTABLE": "${sourceDir}/.mambaenv/env-arm64/bin/python",
+        "Python_EXECUTABLE": "${sourceDir}/.mambaenv/env-arm64/bin/python",
+        "PKG_CONFIG_EXECUTABLE": "${sourceDir}/.mambaenv/env-arm64/bin/pkg-config",
+        "CARGO_EXE": "${sourceDir}/.mambaenv/env-arm64/bin/cargo",
+
+        "OpenMP_CXX_FLAGS": "-Xpreprocessor -fopenmp",
+        "OpenMP_CXX_INCLUDE_DIR": "${sourceDir}/.mambaenv/env-arm64/include",
+        "OpenMP_CXX_LIB_NAMES": "omp",
+        "OpenMP_omp_LIBRARY": "${sourceDir}/.mambaenv/env-arm64/lib/libomp.dylib"
+      }
+    },
+    {
+      "name": "macos-x86_64-base",
+      "hidden": true,
+      "inherits": "common-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "environment": {
+        "PATH": "${sourceDir}/.mambaenv/env-x86_64/bin:$penv{PATH}",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/.mambaenv/env-x86_64",
+        "PKG_CONFIG_PATH": "${sourceDir}/.mambaenv/env-x86_64/lib/pkgconfig:${sourceDir}/.mambaenv/env-x86_64/share/pkgconfig",
+        "RUSTC": "${sourceDir}/.mambaenv/env-x86_64/bin/rustc"
+      },
+      "cacheVariables": {
+        "MICROMAMBA_ENV_PREFIX": "${sourceDir}/.mambaenv/env-x86_64",
+        "CMAKE_OSX_ARCHITECTURES": "x86_64",
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/.mambaenv/env-x86_64/bin/ninja",
+        "Python3_EXECUTABLE": "${sourceDir}/.mambaenv/env-x86_64/bin/python",
+        "Python_EXECUTABLE": "${sourceDir}/.mambaenv/env-x86_64/bin/python",
+        "PKG_CONFIG_EXECUTABLE": "${sourceDir}/.mambaenv/env-x86_64/bin/pkg-config",
+        "CARGO_EXE": "${sourceDir}/.mambaenv/env-x86_64/bin/cargo",
+        
+        "OpenMP_CXX_FLAGS": "-Xpreprocessor -fopenmp",
+        "OpenMP_CXX_INCLUDE_DIR": "${sourceDir}/.mambaenv/env-x86_64/include",
+        "OpenMP_CXX_LIB_NAMES": "omp",
+        "OpenMP_omp_LIBRARY": "${sourceDir}/.mambaenv/env-x86_64/lib/libomp.dylib"
+      }
+    },
+    {
       "name": "unix-base",
       "hidden": true,
-      "generator": "Ninja",
+      "inherits": "common-base",
       "condition": {
         "type": "notEquals",
         "lhs": "${hostSystemName}",
@@ -50,6 +131,7 @@
         "RUSTC": "${sourceDir}/.mambaenv/env/bin/rustc"
       },
       "cacheVariables": {
+        "MICROMAMBA_ENV_PREFIX": "${sourceDir}/.mambaenv/env",
         "CMAKE_MAKE_PROGRAM": "${sourceDir}/.mambaenv/env/bin/ninja",
         "Python3_EXECUTABLE": "${sourceDir}/.mambaenv/env/bin/python",
         "Python_EXECUTABLE": "${sourceDir}/.mambaenv/env/bin/python",
@@ -57,97 +139,200 @@
         "CARGO_EXE": "${sourceDir}/.mambaenv/env/bin/cargo"
       }
     },
+
     {
       "name": "release-windows",
-      "displayName": "Release (Windows)",
-      "inherits": "windows-base",
-      "binaryDir": "${sourceDir}/build/release",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
+      "displayName": "Release — Windows",
+      "inherits": [
+        "windows-base",
+        "release-base"
+      ],
+      "binaryDir": "${sourceDir}/build/release-windows"
     },
     {
       "name": "debug-windows",
-      "displayName": "Debug (Windows)",
-      "inherits": "windows-base",
-      "binaryDir": "${sourceDir}/build/debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
+      "displayName": "Debug — Windows",
+      "inherits": [
+        "windows-base",
+        "debug-base"
+      ],
+      "binaryDir": "${sourceDir}/build/debug-windows"
+    },
+
+    {
+      "name": "release-linux",
+      "displayName": "Release — Linux",
+      "inherits": [
+        "unix-base",
+        "release-base"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "binaryDir": "${sourceDir}/build/release-linux"
     },
     {
-      "name": "release-unix",
-      "displayName": "Release (Linux/macOS)",
-      "inherits": "unix-base",
-      "binaryDir": "${sourceDir}/build/release",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
+      "name": "debug-linux",
+      "displayName": "Debug — Linux",
+      "inherits": [
+        "unix-base",
+        "debug-base"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "binaryDir": "${sourceDir}/build/debug-linux"
+    },
+
+    {
+      "name": "release-macos-arm64",
+      "displayName": "Release — macOS arm64",
+      "inherits": [
+        "macos-arm64-base",
+        "release-base"
+      ],
+      "binaryDir": "${sourceDir}/build/release-macos-arm64"
     },
     {
-      "name": "debug-unix",
-      "displayName": "Debug (Linux/macOS)",
-      "inherits": "unix-base",
-      "binaryDir": "${sourceDir}/build/debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
+      "name": "release-macos-x86_64",
+      "displayName": "Release — macOS x86_64",
+      "inherits": [
+        "macos-x86_64-base",
+        "release-base"
+      ],
+      "binaryDir": "${sourceDir}/build/release-macos-x86_64"
+    },
+    {
+      "name": "debug-macos-arm64",
+      "displayName": "Debug — macOS arm64",
+      "inherits": [
+        "macos-arm64-base",
+        "debug-base"
+      ],
+      "binaryDir": "${sourceDir}/build/debug-macos-arm64"
+    },
+    {
+      "name": "debug-macos-x86_64",
+      "displayName": "Debug — macOS x86_64",
+      "inherits": [
+        "macos-x86_64-base",
+        "debug-base"
+      ],
+      "binaryDir": "${sourceDir}/build/debug-macos-x86_64"
     }
   ],
+
   "buildPresets": [
     {
-      "name": "release-windows",
-      "configurePreset": "release-windows",
+      "name": "build-base",
+      "hidden": true,
       "inheritConfigureEnvironment": true
+    },
+
+    {
+      "name": "release-windows",
+      "inherits": "build-base",
+      "configurePreset": "release-windows"
     },
     {
       "name": "debug-windows",
-      "configurePreset": "debug-windows",
-      "inheritConfigureEnvironment": true
+      "inherits": "build-base",
+      "configurePreset": "debug-windows"
     },
     {
-      "name": "release-unix",
-      "configurePreset": "release-unix",
-      "inheritConfigureEnvironment": true
+      "name": "release-linux",
+      "inherits": "build-base",
+      "configurePreset": "release-linux"
     },
     {
-      "name": "debug-unix",
-      "configurePreset": "debug-unix",
-      "inheritConfigureEnvironment": true
+      "name": "debug-linux",
+      "inherits": "build-base",
+      "configurePreset": "debug-linux"
+    },
+    {
+      "name": "release-macos-arm64",
+      "inherits": "build-base",
+      "configurePreset": "release-macos-arm64"
+    },
+    {
+      "name": "release-macos-x86_64",
+      "inherits": "build-base",
+      "configurePreset": "release-macos-x86_64"
+    },
+    {
+      "name": "debug-macos-arm64",
+      "inherits": "build-base",
+      "configurePreset": "debug-macos-arm64"
+    },
+    {
+      "name": "debug-macos-x86_64",
+      "inherits": "build-base",
+      "configurePreset": "debug-macos-x86_64"
+    },
+    {
+      "name": "release-macos-universal",
+      "displayName": "Release — macOS Universal",
+      "inherits": "build-base",
+      "configurePreset": "release-macos-arm64",
+      "targets": [
+        "NoSpherA2Universal"
+      ]
     }
   ],
+
   "testPresets": [
     {
-      "name": "release-windows",
-      "configurePreset": "release-windows",
+      "name": "test-base",
+      "hidden": true,
       "inheritConfigureEnvironment": true,
       "output": {
         "outputOnFailure": true
       }
+    },
+
+    {
+      "name": "release-windows",
+      "inherits": "test-base",
+      "configurePreset": "release-windows"
     },
     {
       "name": "debug-windows",
-      "configurePreset": "debug-windows",
-      "inheritConfigureEnvironment": true,
-      "output": {
-        "outputOnFailure": true
-      }
+      "inherits": "test-base",
+      "configurePreset": "debug-windows"
     },
     {
-      "name": "release-unix",
-      "configurePreset": "release-unix",
-      "inheritConfigureEnvironment": true,
-      "output": {
-        "outputOnFailure": true
-      }
+      "name": "release-linux",
+      "inherits": "test-base",
+      "configurePreset": "release-linux"
     },
     {
-      "name": "debug-unix",
-      "configurePreset": "debug-unix",
-      "inheritConfigureEnvironment": true,
-      "output": {
-        "outputOnFailure": true
-      }
+      "name": "debug-linux",
+      "inherits": "test-base",
+      "configurePreset": "debug-linux"
+    },
+    {
+      "name": "release-macos-arm64",
+      "inherits": "test-base",
+      "configurePreset": "release-macos-arm64"
+    },
+    {
+      "name": "release-macos-x86_64",
+      "inherits": "test-base",
+      "configurePreset": "release-macos-x86_64"
+    },
+    {
+      "name": "debug-macos-arm64",
+      "inherits": "test-base",
+      "configurePreset": "debug-macos-arm64"
+    },
+    {
+      "name": "debug-macos-x86_64",
+      "inherits": "test-base",
+      "configurePreset": "debug-macos-x86_64"
     }
   ]
 }

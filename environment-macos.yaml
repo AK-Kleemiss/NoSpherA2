@@ -1,6 +1,5 @@
 name: mambaenv
 channels:
-   - https://software.repos.intel.com/python/conda
    - conda-forge
 dependencies:
    # Explicit Python version ensures the interpreter is present for featomic's CMake checks.
@@ -11,6 +10,4 @@ dependencies:
    - rust
    - gtest
 
-   - mkl-devel
-   - mkl-static
-   - intel-openmp
+   - llvm-openmp

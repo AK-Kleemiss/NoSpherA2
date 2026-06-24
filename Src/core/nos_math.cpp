@@ -115,7 +115,11 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
             A_col_major[j * n + i] = A[i * n + j]; // Transpose
         }
     }
-    dgesv_(&n, &nrhs, A_col_major.data(), &lda, ipiv.data(), b.data(), &n, &info);
+    int n_copy = n;
+    int nrhs_copy = nrhs;
+    int lda_copy = n;
+    int ldb_copy = n;
+    dgesv_(&n_copy, &nrhs_copy, A_col_major.data(), &lda_copy, ipiv.data(), b.data(), &ldb_copy, &info);
 #else
     // MKL/LAPACKE: C interface, row-major
     info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, (lapack_int*)ipiv.data(), b.data(), ldb);

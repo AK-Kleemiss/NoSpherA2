@@ -504,15 +504,15 @@ bool isSymmetricViaEigenvalues(const T& A, int n, double tol) {
     {
 #ifdef __APPLE__
         // Use Accelerate framework on macOS for eigenvalue computation
-        __LAPACK_int info = 0;
-        __LAPACK_int n_clpk = static_cast<__LAPACK_int>(n);
-        __LAPACK_int lda = static_cast<__LAPACK_int>(n);
+        int info = 0;
+        int n_clpk = static_cast<int>(n);
+        int lda = static_cast<int>(n);
         // When jobvl/jobvr = 'N', ldvl/ldvr can be 1
-        __LAPACK_int ldvl  = 1;
-        __LAPACK_int ldvr  = 1;
+        int ldvl  = 1;
+        int ldvr  = 1;
 
         // Workspace query
-        __LAPACK_int lwork = -1;
+        int lwork = -1;
         double work_query = 0.0;
 
         // dgeev_ signature requires a work buffer and lwork
@@ -526,7 +526,7 @@ bool isSymmetricViaEigenvalues(const T& A, int n, double tol) {
                &work_query, &lwork,
                &info);
 
-        lwork = static_cast<__LAPACK_int>(work_query);
+        lwork = static_cast<int>(work_query);
         std::vector<double> work(static_cast<size_t>(lwork));
 
         dgeev_("N", "N",
@@ -622,32 +622,32 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
         for (int col = 0; col < n; ++col)
             A_col_major[col * m + row] = A(row, col);
 
-    __LAPACK_int info = 0;
-    __LAPACK_int lwork = -1;
+    int info = 0;
+    int lwork = -1;
     double work_query = 0.0;
-    const __LAPACK_int lapack_m = static_cast<__LAPACK_int>(m);
-    const __LAPACK_int lapack_n = static_cast<__LAPACK_int>(n);
-    const __LAPACK_int lapack_k = static_cast<__LAPACK_int>(k);
+    const int lapack_m = static_cast<int>(m);
+    const int lapack_n = static_cast<int>(n);
+    const int lapack_k = static_cast<int>(k);
 
     // Query optimal work size
-    dgesvd_((char*)"S", (char*)"S", (__LAPACK_int*)&lapack_m, (__LAPACK_int*)&lapack_n,
-        A_col_major.data(), (__LAPACK_int*)&lapack_m,
+    dgesvd_((char*)"S", (char*)"S", (int*)&lapack_m, (int*)&lapack_n,
+        A_col_major.data(), (int*)&lapack_m,
         S.data(),
-        U.data(), (__LAPACK_int*)&lapack_m,
-        Vt.data(), (__LAPACK_int*)&lapack_k,
-        &work_query, (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
+        U.data(), (int*)&lapack_m,
+        Vt.data(), (int*)&lapack_k,
+        &work_query, (int*)&lwork, (int*)&info);
     err_checkf(info == 0, "Accelerate dgesvd workspace query failed.", std::cout);
 
-    lwork = static_cast<__LAPACK_int>(work_query);
+    lwork = static_cast<int>(work_query);
     vec work(lwork);
 
     // Perform SVD: A = U * S * Vt
-    dgesvd_((char*)"S", (char*)"S", (__LAPACK_int*)&lapack_m, (__LAPACK_int*)&lapack_n,
-        A_col_major.data(), (__LAPACK_int*)&lapack_m,
+    dgesvd_((char*)"S", (char*)"S", (int*)&lapack_m, (int*)&lapack_n,
+        A_col_major.data(), (int*)&lapack_m,
         S.data(),
-        U.data(), (__LAPACK_int*)&lapack_m,
-        Vt.data(), (__LAPACK_int*)&lapack_k,
-        work.data(), (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
+        U.data(), (int*)&lapack_m,
+        Vt.data(), (int*)&lapack_k,
+        work.data(), (int*)&lwork, (int*)&info);
     err_checkf(info == 0, "Accelerate dgesvd failed with info unequal 0!", std::cout);
 
     vec U_row_major(m * k);
@@ -699,21 +699,21 @@ void make_Eigenvalues(vec& A, vec& W) {
     const int n = static_cast<int>(W.size());
 #ifdef __APPLE__
     // Use Accelerate framework on macOS for eigenvalue computation
-    __LAPACK_int info = 0;
-    __LAPACK_int lwork = -1;
+    int info = 0;
+    int lwork = -1;
     double work_query = 0.0;
     // Query optimal work size
-    dsyev_((char*)"V", (char*)"U", (__LAPACK_int*)&n,
-        A.data(), (__LAPACK_int*)&n,
+    dsyev_((char*)"V", (char*)"U", (int*)&n,
+        A.data(), (int*)&n,
         W.data(),
-        &work_query, (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
-    lwork = static_cast<__LAPACK_int>(work_query);
+        &work_query, (int*)&lwork, (int*)&info);
+    lwork = static_cast<int>(work_query);
     vec work(lwork);
     // Perform eigenvalue decomposition
-    dsyev_((char*)"V", (char*)"U", (__LAPACK_int*)&n,
-        A.data(), (__LAPACK_int*)&n,
+    dsyev_((char*)"V", (char*)"U", (int*)&n,
+        A.data(), (int*)&n,
         W.data(),
-        work.data(), (__LAPACK_int*)&lwork, (__LAPACK_int*)&info);
+        work.data(), (int*)&lwork, (int*)&info);
     err_checkf(info == 0, "The algorithm failed to compute eigenvalues.", std::cout);
 #else
     err_checkf(LAPACKE_dsyev(
