@@ -170,8 +170,8 @@ add_subdirectory(
 # ---------------------------------------------------------------------------
 # NoSpherA2 targets
 # ---------------------------------------------------------------------------
-if(WIN32 AND NOSPHERA2_DEPENDENCIES_ONLY)
-    include(cmake/InstallWindowsDependencies.cmake)
+if(NOSPHERA2_DEPENDENCIES_ONLY)
+    include(cmake/InstallDependenciesOnly.cmake)
     return()
 endif()
 

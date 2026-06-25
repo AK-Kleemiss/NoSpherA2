@@ -1,7 +1,3 @@
-if(NOT WIN32)
-    return()
-endif()
-
 add_custom_target(NoSpherA2WindowsDependencies ALL
     DEPENDS
         cint
@@ -10,6 +6,10 @@ add_custom_target(NoSpherA2WindowsDependencies ALL
         BasisSetConverter
         cargo-build-featomic
 )
+
+if(NOT WIN32)
+    return()
+endif()
 
 install(
     TARGETS
