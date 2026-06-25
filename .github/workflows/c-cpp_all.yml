@@ -51,7 +51,7 @@ jobs:
             artifact-name: NoSpherA2-windows-x64
 
           - name: macOS arm64 Release
-            os: macos-14
+            os: macos-15
             configure-preset: release-macos-arm64
             build-preset: release-macos-arm64
             test-preset: release-macos-arm64

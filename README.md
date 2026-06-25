@@ -79,6 +79,13 @@ cmake --build --preset release-windows --parallel
 cmake --install build/release-windows --config Release --prefix "deps-install-release"
 ```
 
+### Run Tests
+After building the project using the `NOSPHERA2_BUILD_TESTS` Flag, you can run the tests using `ctest`.
+
+```bash
+ctest --preset <buildtype>-<platform> --output-on-failure
+```
+
 ---
 
 ## Contributing: Pull Requests & Adding Tests
