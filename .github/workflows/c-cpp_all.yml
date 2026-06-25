@@ -162,14 +162,11 @@ jobs:
       # to the main NoSpherA2 sources.
       - name: Configure dependencies 
         if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
-        run: >-
-          cmake --preset "${{ matrix.configure-preset }}"
-            -DNOSPHERA2_DEPENDENCIES_ONLY=ON
+        run: cmake --preset "${{ matrix.configure-preset }}" -DNOSPHERA2_DEPENDENCIES_ONLY=ON
 
       - name: Build dependencies
         if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
-        run: >-
-          cmake --build --preset "${{ matrix.build-preset }}" --parallel 4 
+        run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4 
 
       # Save immediately after the dependency-only build so that the Ninja
       # metadata does not contain entries from the application build.
@@ -180,7 +177,8 @@ jobs:
           path: |
             ${{ matrix.build-directory }}/_deps
             ${{ matrix.build-directory }}/appleclang_*_release
-            ${{ matrix.build-directory }}/gnu_*_release ${{ matrix.build-directory }}/msvc_*_release
+            ${{ matrix.build-directory }}/gnu_*_release
+            ${{ matrix.build-directory }}/msvc_*_release
             ${{ matrix.build-directory }}/.ninja_log
             ${{ matrix.build-directory }}/.ninja_deps
           key: ${{ steps.cmake-deps-cache.outputs.cache-primary-key }}
