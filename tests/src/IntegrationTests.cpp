@@ -588,6 +588,12 @@ TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_sym)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_sym");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, RGBI_Groups_NH3Li)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3Li");
