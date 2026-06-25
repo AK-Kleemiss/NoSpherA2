@@ -4,6 +4,13 @@
 #include <vector>
 
 class WFN;
+
+// Average an atom-centred AO matrix over the 48 operations of O_h.
+// Shells must be contiguous. Cartesian matrices use constants::type_vector;
+// spherical matrices use the libcint real-spherical ordering and phases.
+void symmetrize_atomic_matrix_oh(dMatrix2& matrix, const ivec& shell_angular_momenta,
+    bool spherical = false);
+
 struct bond {
     std::string label_1;
     std::string label_2;
@@ -63,9 +70,11 @@ private:
     std::vector<dMatrix2> overlap_matrices;
     std::vector<bond_index_result> RGBI;
     std::vector<group_bond_index_result> RGBI_groups;
-    NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full, const std::vector<int>& atom_indices);
+    NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
+        const std::vector<int>& atom_indices, const ivec& shell_angular_momenta = {},
+        bool spherical = false);
     double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
-    void computeAllAtomicNAOs(WFN& wavy);
+    void computeAllAtomicNAOs(WFN& wavy, bool symmetrize);
     ivec find_eigenvalue_pairs(const vec& eigvals, const double tolerance = 1E-4);
     void transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& EVC,
         const vec& eigvals,
@@ -87,7 +96,7 @@ public:
     Roby_information() = default;
     ~Roby_information() = default;
     Roby_information(const Roby_information&) = default;
-    Roby_information(WFN& wavy, const ivec3& group_sets = {});
+    Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true);
 
 
 
@@ -99,5 +108,34 @@ int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, con
 
 void bondwise_laplacian_plots(std::filesystem::path &wfn_name);
 void ELI_analysis(const WFN &wavy, const options &opt);
+
+// QTAIM-guided ELI masking:
+//   Run QTAIM basin analysis on `rho`, keep ELI values only for voxels in the
+//   basins of `selected_indices` (0-based atom indices), set everything else to
+//   `background_value`, shrink the output grid to the tight bounding box of the
+//   selected region, and write the result to `output_path`.
+void QTAIM_ELI_mask(
+    cube& rho,
+    cube& eli,
+    WFN& parent_wfn,
+    const std::vector<atom>& atoms,
+    const std::vector<int>& selected_indices,
+    double background_value,
+    const std::filesystem::path& output_path,
+    bool debug,
+    std::ostream& log
+);
+
+// Dispatch helper: reads (or computes) rho/eli cubes then calls QTAIM_ELI_mask.
+//   If `eli_path` is empty, `rho_or_wfn` is treated as a wavefunction file and
+//   the cubes are generated on the fly.
+void run_QTAIM_ELI_mask(
+    const std::filesystem::path& rho_or_wfn,
+    const std::filesystem::path& eli_path,
+    const std::vector<int>& selected_indices,
+    double background_value,
+    const options& opt,
+    std::ostream& log
+);
 
 #include "wfn_class.h"
