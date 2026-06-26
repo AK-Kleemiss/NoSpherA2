@@ -275,7 +275,12 @@ jobs:
             echo "Universal NoSpherA2 executable not found" >&2
             exit 1
           fi
-          lipo -verify_arch arm64 x86_64 "${main_executable}"
+          
+          echo "Verifying universal executable: ${main_executable}"
+          lipo -info "${main_executable}"
+          lipo "${main_executable}" -verify_arch arm64 x86_64
+
+          echo "Universal executable contains both arm64 and x86_64."
 
       - name: Package universal macOS artifact
         shell: bash
