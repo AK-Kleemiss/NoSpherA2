@@ -9,7 +9,6 @@ dependencies:
    - pkgconfig
    - ninja
    - rust
-   - gtest
 
    - mkl-devel
    - mkl-static

@@ -11,6 +11,8 @@ add_executable(
     ${NOSPHERA2_APP_SOURCES}
 )
 
+nosphera2_enable_optimizations(NoSpherA2)
+
 target_compile_features(
     NoSpherA2
     PRIVATE

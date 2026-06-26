@@ -8,6 +8,5 @@ dependencies:
    - pkgconfig
    - ninja
    - rust
-   - gtest
 
    - llvm-openmp

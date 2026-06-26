@@ -22,6 +22,8 @@ add_library(
         ${NOSPHERA2_DLL_HEADERS}
 )
 
+nosphera2_enable_optimizations(NoSpherA2Dll)
+
 add_library(
     NoSpherA2::Dll
     ALIAS

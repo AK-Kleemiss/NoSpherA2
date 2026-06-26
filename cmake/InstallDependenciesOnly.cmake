@@ -1,8 +1,11 @@
+enable_googletests()
+
 add_custom_target(NoSpherA2WindowsDependencies ALL
     DEPENDS
         cint
         tbb
-        occ
+        occ_main
+        gtest
         BasisSetConverter
         cargo-build-featomic
 )
@@ -23,6 +26,7 @@ install(
         scn
         _subprocess
         libecpint_static
+        gtest
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
@@ -30,7 +34,6 @@ install(
 
 install(
     TARGETS
-    occ
     occ_cg
     occ_core
     occ_crystal
@@ -135,6 +138,15 @@ install(
         PATTERN "*.hpp"
 )
 
+install(
+    DIRECTORY
+        "${googletest_SOURCE_DIR}/googletest/include/"
+    DESTINATION include
+    FILES_MATCHING
+        PATTERN "*.h"
+        PATTERN "*.hpp"
+)
+
 # libcint public headers
 install(
     DIRECTORY "${cint_SOURCE_DIR}/include/"
@@ -212,6 +224,5 @@ install(
         "${MICROMAMBA_ENV_PREFIX}/Library/lib/mkl_intel_thread.lib"
         "${MICROMAMBA_ENV_PREFIX}/Library/lib/mkl_core.lib"
         "${MICROMAMBA_ENV_PREFIX}/Library/lib/mkl_rt.lib"
-        "${MICROMAMBA_ENV_PREFIX}/Library/lib/gtest.lib"
     DESTINATION lib
 )

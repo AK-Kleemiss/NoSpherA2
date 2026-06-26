@@ -15,22 +15,36 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Src\tests\pch.cpp">
+    <ClCompile Include="..\..\tests\src\IntegrationTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Src\tests\Tests.cpp">
+    <ClCompile Include="..\..\tests\src\pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Src\tests\UnitTests.cpp">
+    <ClCompile Include="..\..\tests\src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Src\tests\IntegrationTests.cpp">
+    <ClCompile Include="..\..\tests\src\UnitTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Src\tests\pch.h">
+    <None Include="packages.config" />
+    <None Include="..\..\tests\tests.toml">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\..\tests\src\SetIntegrationTestLocks.cmake">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\tests\src\pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\tests\src\CMakeLists.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

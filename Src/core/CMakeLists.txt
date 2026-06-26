@@ -20,15 +20,9 @@ file(
 )
 
 #Basis Set Generator:
-
 set(
     NOSPHERA2_BASIS_SET_DIRECTORY
     "${PROJECT_SOURCE_DIR}/BasisSetGenerator/basis_sets"
-)
-
-set(
-    NOSPHERA2_GENERATED_DIRECTORY
-    "${CMAKE_CURRENT_BINARY_DIR}/generated"
 )
 
 set(
@@ -39,10 +33,6 @@ set(
 add_custom_command(
     OUTPUT
         "${NOSPHERA2_GENERATED_BASIS_SOURCE}"
-
-    COMMAND
-        "${CMAKE_COMMAND}" -E make_directory
-        "${NOSPHERA2_GENERATED_DIRECTORY}"
 
     COMMAND
         "$<TARGET_FILE:BasisSetConverter>"
@@ -70,6 +60,8 @@ add_library(
         ${NOSPHERA2_CORE_HEADERS}
         "${NOSPHERA2_GENERATED_BASIS_SOURCE}"
 )
+
+nosphera2_enable_optimizations(NoSpherA2Core)
 
 add_library(
     NoSpherA2::Core

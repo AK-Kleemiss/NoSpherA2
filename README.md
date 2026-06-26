@@ -28,7 +28,7 @@ git submodule update --init --recursive
 
 #### **Prerequisites**
 
-- **Cmake**  (min 6.3.25)
+- **CMake** (min 3.25)
 - ***C++20 compiler** (MSVC 19.35, GCC 12.2, Clang 15.0)
 
 #### Step 1: Bootstrap the micromamba environment
@@ -44,10 +44,14 @@ cmake -P scripts/BootstrapMicromamba.cmake
 NoSpherA2 uses CMake presets to simplify the build process.
 
 ```sh
-cmake --preset <buildtype>-<platform>
+cmake --preset <preset>
 ```
 
-Where `<platform>` is one of `windows-msvc`, `linux-gcc`, or `macos-release-full-arm64`, and `<buildtype>` is either `release` or `debug`.
+Common presets include:
+
+- Windows: `release-windows`, `debug-windows`
+- Linux: `release-linux`, `debug-linux`
+- macOS (per-arch): `release-macos-arm64`, `release-macos-x86_64`, `debug-macos-arm64`, `debug-macos-x86_64`
 
 ##### Configuration Options:
 
@@ -56,10 +60,10 @@ Where `<platform>` is one of `windows-msvc`, `linux-gcc`, or `macos-release-full
 #### Step 3: Build the project
 
 ```sh
-cmake --build --preset <buildtype>-<platform>
+cmake --build --preset <preset>
 ```
 
-The final executable will be located in the build directory, e.g. `build/release-xxxx/bin/NoSpherA2`
+The final executable will be located in the preset build directory, e.g. `build/release-windows/bin/NoSpherA2.exe`.
 
 ---
 
@@ -74,17 +78,31 @@ If you want to develop NoSpherA2 on Windows using Visual Studio please also init
 ### **Command**
 
 ```powershell
-cmake --preset release-windows -DNOSPHERA2_DEPENDENCIES_ONLY=ON -DNOSPHERA2_BUILD_TESTS=ON
-cmake --build --preset release-windows --parallel
-cmake --install build/release-windows --config Release --prefix "deps-install-release"
+cmake -P scripts/SetupVSEnvironment.cmake
 ```
 
 ### Run Tests
-After building the project using the `NOSPHERA2_BUILD_TESTS` Flag, you can run the tests using `ctest`.
+
+After building the project using the `NOSPHERA2_BUILD_TESTS` flag, you can run the tests using `ctest`.
+
+Note: the C++ test executables (and some Python tests) require `OCC_DATA_PATH` to point at the OCC runtime data directory (default in this repo: `occ/share`).
 
 ```bash
-ctest --preset <buildtype>-<platform> --output-on-failure
+ctest --preset <preset> --output-on-failure
 ```
+
+Example (Windows, Debug):
+
+```powershell
+ctest --preset debug-windows --output-on-failure
+```
+
+### Building a MacOS Universal Binary
+To build a universal binary for macOS, you can use the following command:
+
+```bash
+cmake --preset release-macos-universal
+```   
 
 ---
 

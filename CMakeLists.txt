@@ -37,7 +37,7 @@ include(NoSpherA2Avx)
 include(NoSpherA2Sanitizers)
 include(ValidateMambaEnvironemt)
 include(CopyRuntimeLibraries)
-
+include(NoSpherA2Optimizations)
 validate_micromamba_environment()
 
 
@@ -168,9 +168,25 @@ add_subdirectory(
 )
 
 # ---------------------------------------------------------------------------
+# Function to include GoogleTest
+# ---------------------------------------------------------------------------
+
+function(enable_googletests)
+    include(FetchContent)
+    FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+    )
+    # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+endfunction()
+
+# ---------------------------------------------------------------------------
 # NoSpherA2 targets
 # ---------------------------------------------------------------------------
 if(NOSPHERA2_DEPENDENCIES_ONLY)
+    enable_googletests()
     include(cmake/InstallDependenciesOnly.cmake)
     return()
 endif()
@@ -186,26 +202,6 @@ include(CTest)
 
 if(NOSPHERA2_BUILD_TESTS)
     add_subdirectory(tests/src)
-endif()
-
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    add_custom_target(
-        nos-build
-        DEPENDS
-            NoSpherA2
-    )
-
-    if(TARGET NoSpherA2_Tests)
-        add_custom_target(
-            nos-test
-            COMMAND
-                "${CMAKE_CTEST_COMMAND}"
-                --output-on-failure
-            DEPENDS
-                NoSpherA2_Tests
-            USES_TERMINAL
-        )
-    endif()
 endif()
 
 if(APPLE)
