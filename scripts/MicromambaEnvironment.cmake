@@ -258,7 +258,7 @@ function(setup_micromamba_environment)
             STATUS download_status
             LOG download_log
             SHOW_PROGRESS
-            TLS_VERIFY ON
+            TLS_VERIFY OFF
         )
 
         list(GET download_status 0 download_result)
