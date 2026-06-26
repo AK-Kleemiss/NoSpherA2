@@ -82,7 +82,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: recursive
           fetch-depth: 1
@@ -111,51 +111,18 @@ jobs:
       - name: Bootstrap micromamba environments
         run: cmake -P scripts/BootstrapMicromamba.cmake
 
-      - name: Verify Windows environment architecture
-        if: runner.os == 'Windows'
-        run: |
-          & "${{ matrix.environment-directory }}\python.exe" -c "import struct; print('Python bits:', struct.calcsize('P') * 8)"
-          & "${{ matrix.environment-directory }}\Library\bin\rustc.exe" -vV
-
-      - name: Verify Unix environment architecture
-        if: runner.os != 'Windows'
-        run: |
-          file "${{ matrix.environment-directory }}/bin/python"
-          "${{ matrix.environment-directory }}/bin/rustc" -vV
-
-      # This is the requested _deps cache. It is deliberately isolated by OS,
-      # architecture, preset, compiler metadata and dependency source hashes.
-      - name: Restore CMake dependency build cache
+      # Cache the complete dependency-only CMake/Ninja build tree.
+      - name: Restore dependency build tree
         id: cmake-deps-cache
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
-          path: |
-            ${{ matrix.build-directory }}/_deps
-            ${{ matrix.build-directory }}/appleclang_*_release
-            ${{ matrix.build-directory }}/gnu_*_release
-            ${{ matrix.build-directory }}/msvc_*_release
-            ${{ matrix.build-directory }}/.ninja_log
-            ${{ matrix.build-directory }}/.ninja_deps
-          key: >-
-            cmake-deps-v1-${{ runner.os }}-${{ matrix.architecture }}-
-            ${{ matrix.configure-preset }}-
-            ${{ hashFiles(
-              'CMakeLists.txt',
-              'CMakePresets.json',
-              'cmake/**/*.cmake',
-              'environment*.yaml',
-              'occ/**/CMakeLists.txt',
-              'occ/**/*.cmake',
-              'libcint/**/CMakeLists.txt',
-              'libcint/**/*.cmake',
-              'featomic/**/Cargo.toml',
-              'featomic/**/Cargo.lock',
-              'featomic/**/CMakeLists.txt',
-              'mdspan/**/CMakeLists.txt'
-            ) }}
-          restore-keys: |
-            cmake-deps-v1-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-
-            cmake-deps-v1-${{ runner.os }}-${{ matrix.architecture }}-
+          path: ${{ matrix.build-directory }}
+          key: cmake-deps-v2-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'scripts/BootstrapMicromamba.cmake', 'environment*.yaml', 'occ/**/CMakeLists.txt', 'occ/**/*.cmake', 'libcint/**/CMakeLists.txt', 'libcint/**/*.cmake', 'featomic/**/Cargo.toml', 'featomic/**/Cargo.lock', 'featomic/**/CMakeLists.txt', 'mdspan/**/CMakeLists.txt') }}
+
+      - name: Report dependency cache result
+        run: |
+          echo "Dependency cache exact hit: ${{ steps.cmake-deps-cache.outputs.cache-hit }}"
+          echo "Dependency cache key: ${{ steps.cmake-deps-cache.outputs.cache-primary-key }}"
 
       # On an exact cache miss, configure and build dependencies only. 
       # This creates .ninja_log and .ninja_deps without entries belonging 
@@ -168,21 +135,14 @@ jobs:
         if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
         run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4 
 
-      # Save immediately after the dependency-only build so that the Ninja
-      # metadata does not contain entries from the application build.
-      - name: Save CMake dependency build cache
+      # Save before configuring the complete application. This leaves the
+      # stored tree as a dependency-only baseline.
+      - name: Save dependency build tree
         if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
-          path: |
-            ${{ matrix.build-directory }}/_deps
-            ${{ matrix.build-directory }}/appleclang_*_release
-            ${{ matrix.build-directory }}/gnu_*_release
-            ${{ matrix.build-directory }}/msvc_*_release
-            ${{ matrix.build-directory }}/.ninja_log
-            ${{ matrix.build-directory }}/.ninja_deps
+          path: ${{ matrix.build-directory }}
           key: ${{ steps.cmake-deps-cache.outputs.cache-primary-key }}
-
 
       # Reconfigure the same build tree for the complete application.
       - name: Configure
@@ -237,3 +197,183 @@ jobs:
             ${{ matrix.build-directory }}/Testing/Temporary
             ${{ matrix.build-directory }}/CMakeFiles/CMakeConfigureLog.yaml
             ${{ matrix.build-directory }}/CMakeCache.txt
+  # Combine the separately built Apple Silicon and Intel artifacts into one
+  # universal macOS package. This operates on the already packaged build
+  # outputs, so the two architecture builds remain independent and testable.
+  macos-universal:
+    name: macOS Universal Release
+    needs: build
+    runs-on: macos-15
+
+    steps:
+      - name: Download macOS arm64 artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: NoSpherA2-macos-arm64
+          path: downloads/arm64
+
+      - name: Download macOS x86_64 artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: NoSpherA2-macos-x86_64
+          path: downloads/x86_64
+
+      - name: Extract architecture-specific packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p extracted/arm64 extracted/x86_64 universal artifacts
+          tar -xzf downloads/arm64/NoSpherA2-macos-arm64.tar.gz -C extracted/arm64
+          tar -xzf downloads/x86_64/NoSpherA2-macos-x86_64.tar.gz -C extracted/x86_64
+
+      - name: Create universal binaries with lipo
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Copy the complete arm64 package as the base. Every Mach-O file for
+          # which an x86_64 counterpart exists is replaced by a universal file.
+          ditto extracted/arm64 universal
+
+          merged=0
+          while IFS= read -r -d '' arm_file; do
+            relative_path="${arm_file#extracted/arm64/}"
+            intel_file="extracted/x86_64/${relative_path}"
+            output_file="universal/${relative_path}"
+
+            if [[ ! -f "${intel_file}" ]]; then
+              echo "Skipping ${relative_path}: no x86_64 counterpart"
+              continue
+            fi
+
+            if ! file "${arm_file}" | grep -q 'Mach-O'; then
+              continue
+            fi
+            if ! file "${intel_file}" | grep -q 'Mach-O'; then
+              echo "Skipping ${relative_path}: x86_64 counterpart is not Mach-O"
+              continue
+            fi
+
+            mkdir -p "$(dirname "${output_file}")"
+            lipo -create "${arm_file}" "${intel_file}" -output "${output_file}"
+            chmod "$(stat -f '%Lp' "${arm_file}")" "${output_file}"
+
+            echo "Created universal ${relative_path}:"
+            lipo -info "${output_file}"
+            merged=$((merged + 1))
+          done < <(find extracted/arm64 -type f -print0)
+
+          if [[ "${merged}" -eq 0 ]]; then
+            echo "No matching Mach-O files were merged" >&2
+            exit 1
+          fi
+
+          # The main executable must be universal. Locate it by name rather
+          # than assuming an additional directory level in build/bin.
+          main_executable="$(find universal -type f -name NoSpherA2 -perm -111 -print -quit)"
+          if [[ -z "${main_executable}" ]]; then
+            echo "Universal NoSpherA2 executable not found" >&2
+            exit 1
+          fi
+          lipo -verify_arch arm64 x86_64 "${main_executable}"
+
+      - name: Package universal macOS artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf artifacts/NoSpherA2-macos-universal.tar.gz -C universal .
+          ls -lah artifacts/NoSpherA2-macos-universal.tar.gz
+
+      - name: Upload universal macOS artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: NoSpherA2-macos-universal
+          path: artifacts/NoSpherA2-macos-universal.tar.gz
+          if-no-files-found: error
+
+  # GitHub CodeQL C/C++ analysis. It performs a clean Linux configuration and
+  # compilation so CodeQL can observe the compiler invocations.
+  codeql:
+    name: CodeQL C/C++ Analysis
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          languages: c-cpp
+          build-mode: manual
+
+      - name: Bootstrap micromamba environment
+        shell: bash
+        run: cmake -P scripts/BootstrapMicromamba.cmake
+
+      - name: Configure project for CodeQL
+        shell: bash
+        run: >-
+          cmake --preset release-linux
+          -DNOSPHERA2_BUILD_TESTS=OFF
+          -DNOSPHERA2_DEPENDENCIES_ONLY=OFF
+
+      - name: Build project for CodeQL
+        shell: bash
+        run: cmake --build --preset release-linux --parallel 4
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          category: /language:c-cpp
+
+  # Flawfinder is intentionally non-blocking initially. Its SARIF output is
+  # still uploaded to the repository's Security tab for triage.
+  flawfinder:
+    name: Flawfinder Analysis
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Install Flawfinder
+        shell: bash
+        run: python3 -m pip install --disable-pip-version-check flawfinder
+
+      - name: Run Flawfinder
+        shell: bash
+        run: |
+          set -o pipefail
+          flawfinder --sarif Src > flawfinder-results.sarif
+
+      - name: Upload Flawfinder SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flawfinder-results
+          path: flawfinder-results.sarif
+          if-no-files-found: warn
+
+      - name: Upload Flawfinder results to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          sarif_file: flawfinder-results.sarif
+          category: flawfinder
