@@ -43,6 +43,13 @@ function(nosphera2_enable_optimizations target_name)
                 /openmp:experimental
         )
 
+        target_link_options(
+            "${target_name}"
+            PRIVATE
+                /NODEFAULTLIB:vcomp
+                /NODEFAULTLIB:vcompd
+        )
+
         get_target_property(target_type "${target_name}" TYPE)
 
         if(NOT target_type STREQUAL "STATIC_LIBRARY")
@@ -66,6 +73,7 @@ function(nosphera2_enable_optimizations target_name)
                     -ffunction-sections
                     -fdata-sections
                 >
+                $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
         )
 
         get_target_property(target_type "${target_name}" TYPE)
@@ -79,6 +87,11 @@ function(nosphera2_enable_optimizations target_name)
                             LINKER:-dead_strip
                         >
                 )
+                target_link_libraries(
+                    "${target_name}"
+                    PRIVATE
+                        OpenMP::OpenMP_CXX
+                )
             else()
                 target_link_options(
                     "${target_name}"
@@ -88,11 +101,6 @@ function(nosphera2_enable_optimizations target_name)
                         >
                 )
             endif()
-            target_link_options(
-                "${target_name}"
-                PRIVATE
-                    OpenMP::OpenMP_CXX
-                )
         endif()
     endif()
 endfunction()
