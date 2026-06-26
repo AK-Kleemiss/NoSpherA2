@@ -73,7 +73,6 @@ function(nosphera2_enable_optimizations target_name)
                     -ffunction-sections
                     -fdata-sections
                 >
-                $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
         )
 
         get_target_property(target_type "${target_name}" TYPE)
@@ -100,6 +99,12 @@ function(nosphera2_enable_optimizations target_name)
                             LINKER:--gc-sections
                         >
                 )
+                target_compile_options(
+                    "${target_name}"
+                    PRIVATE
+                        $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
+                )
+                
             endif()
         endif()
     endif()
