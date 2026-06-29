@@ -8,19 +8,27 @@ A C++ CLI tool that generates `.tsc` (non-spherical scattering factor) files and
 
 ## Build Commands
 
-**Windows** (in VS 2022 Developer PowerShell, with `make.exe` on PATH):
+Preferred: use CMake presets.
+
+**Windows (MSVC, full build):**
 ```ps
-make.exe
+cmake --preset windows-msvc-release-full
+cmake --build --preset windows-msvc-release-full
 ```
 
-**Linux / macOS:**
+**Linux (GCC, full build):**
 ```sh
-make
+cmake --preset linux-gcc
+cmake --build --preset linux-gcc
 ```
 
-Output: `NoSpherA2` (or `NoSpherA2.exe` on Windows) at the repo root.
+**macOS (full build, per-arch):**
+```sh
+cmake --preset macos-release-full-arm64
+cmake --build --preset macos-release-full-arm64
+```
 
-CMake presets also exist for targeted builds: `linux-occ-gcc`, `macos-release-*`, `windows-clang-cl`, and `windows-msvc-debug`.
+Output: the executable is produced in the preset build folder (e.g. `build-windows-msvc-release-full/NoSpherA2.exe`).
 
 ## Running Tests
 
@@ -33,6 +41,10 @@ NOS_EXE=./NoSpherA2 OCC_DATA_PATH=occ/share uv run pytest
 
 # Enable full/slow tests
 RUN_FULL_TEST=1 uv run pytest
+
+# Or via CMake/CTest
+cmake --build --preset <your-preset>
+ctest --test-dir build-<your-preset> --output-on-failure
 ```
 
 Key environment variables:

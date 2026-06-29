@@ -1,264 +1,224 @@
-cmake_minimum_required(VERSION 3.15)
-project(NoSpherA2 CXX C)
-message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
-set(CMAKE_CXX_STANDARD 20)
+cmake_minimum_required(VERSION 3.25)
 
+project(NoSpherA2 LANGUAGES C CXX)
+
+message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
+
+option(NOSPHERA2_BUILD_DLL "Build the NoSpherA2 DLL" OFF)
+option(NOSPHERA2_BUILD_TESTS "Build NoSpherA2 tests" OFF)
+option(NOSPHERA2_DEPENDENCIES_ONLY "Build dependencies without building NoSpherA2" OFF)
+
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
-if (NO_TRIVIAL_INIT)
-    add_compile_options(-ftrivial-auto-var-init=pattern)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+if(NO_TRIVIAL_INIT)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(-ftrivial-auto-var-init=pattern)
+    else()
+        message(WARNING
+            "NO_TRIVIAL_INIT is enabled, but "
+            "${CMAKE_CXX_COMPILER_ID} does not support "
+            "-ftrivial-auto-var-init=pattern"
+        )
+    endif()
 endif()
 
 if(WIN32)
     set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
 endif()
 
-# Vector instruction policy. OCC and NoSpherA2 MUST be built with the same
-# setting: Eigen object layouts differ between AVX and non-AVX builds, and
-# mixing them across the static-link boundary causes crashes.
-#   NOS_AVX=ON   build with AVX
-#   NOS_AVX=OFF  SSE only — maximum compatibility, used by CI
-#   unset        honor the NOS_AVX environment variable, else detect the host
-if(NOT DEFINED NOS_AVX)
-    if(DEFINED ENV{NOS_AVX} AND NOT "$ENV{NOS_AVX}" STREQUAL "")
-        set(NOS_AVX "$ENV{NOS_AVX}")
-    else()
-        set(NOS_AVX "AUTO")
-    endif()
-endif()
-set(NOS_USE_AVX OFF)
-if(NOS_AVX STREQUAL "AUTO")
-    if(NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64|AMD64|amd64)")
-        try_run(NOS_AVX_RUN_RESULT NOS_AVX_COMPILE_RESULT
-            ${CMAKE_BINARY_DIR}/nos_avx_check
-            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/detect_avx.c)
-        if(NOS_AVX_COMPILE_RESULT AND NOS_AVX_RUN_RESULT EQUAL 0)
-            set(NOS_USE_AVX ON)
-        endif()
-    endif()
-elseif(NOS_AVX)
-    set(NOS_USE_AVX ON)
-endif()
-message(STATUS "NOS_AVX=${NOS_AVX} -> building with AVX: ${NOS_USE_AVX}")
-
-if(LINUX)
-    add_compile_options(
-        -msse2
-        -msse3
-        -msse4.1
-        -msse4.2
-    )
-    if(NOS_USE_AVX)
-        add_compile_options(-mavx)
-    endif()
-endif()
-
-if(WIN32 AND NOS_USE_AVX)
-    add_compile_options(/arch:AVX)
-endif()
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
-set(DEBUG_DIR ${CMAKE_SOURCE_DIR}/build_debug)
-if(NOT CMAKE_INSTALL_PREFIX)
-    set(CMAKE_INSTALL_PREFIX "$ENV{HOME}" CACHE PATH "Install path prefix")
-endif()
-message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
-
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    option(BUILD_TESTING "Run tests" ON)
-    option(
-        BUILD_RELEASE_OCC
-        "Build OCC in release mode even if NoSpherA2 is built in Debug"
-        OFF
-    )
-    option(FROM_SOURCE_DEPENDENCIES "BUILD EVERY DEPENDENCY FROM SOURCE" OFF)
-    option(WINDOWS_CROSS_COMPILE "CROSS COMPILING TO WINDOWS" OFF)
-    option(
-        BUILD_OPENMP
-        "Necessary if cross compiling from windows to Linux/Darwin"
-        OFF
-    )
-    option(
-        USE_VECTOR_INSTRUCTIONS
-        "If you want to use vector instructions. Defaults to ON"
-        ON
-    )
-    option(WITH_CLANG_TIDY "Enable clang tidy" OFF)
-    if(NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
-        set(MKL_INTERFACE
-            "lp64"
-            CACHE STRING
-            "ilp64 uses double precision for indices in MKL, the other option is lp64."
-        )
-        set(ONEAPI_DIRECTORY
-            $ENV{MKLROOT}
-            CACHE STRING
-            "Location of OneAPI. If empty and you didn't loaded modules or used a setvars.sh, OneAPI will be downloaded."
-        )
-        set(FAKE_HOME_TEST
-            "ON"
-            CACHE STRING
-            "This is for testing the automatic install of MKL. It pretends the home directory is at /tmp/home."
-        )
-    endif()
-    set(CONDA_ENV "base" CACHE STRING "Conda env to be used.")
-    set(CONDA_COMMAND
-        "conda"
-        CACHE STRING
-        "CONDA command (used to download dependencies.)"
-    )
-    set(OCC_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING "Build type for OCC")
-    option(IS_ACTIONS "Building in GitHub Actions" OFF)
-    option(USE_CUSTOM_ENV OFF)
-    if(NOT CONDA_ENV STREQUAL "base")
-        option(USE_CUSTOM_ENV "Use a user provided environment for conda." ON)
-    endif()
-    set(USE_SANITIZER
-        ""
-        CACHE STRING
-        "Sanitizer to use: Address, Thread, or Memory (Only available in Debug mode)"
-    )
-endif()
-if(
-    NOT "${USE_SANITIZER}" STREQUAL ""
-    AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug"
+list(PREPEND CMAKE_MODULE_PATH
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
 )
-    message(
-        FATAL_ERROR
-        "Sanitizer should only be used in Debug mode. Without debug symbols it is really hard to know where the issue is."
+
+include(NoSpherA2Avx)
+include(NoSpherA2Sanitizers)
+include(ValidateMambaEnvironemt)
+include(CopyRuntimeLibraries)
+include(NoSpherA2Optimizations)
+validate_micromamba_environment()
+
+
+# ---------------------------------------------------------------------------
+# libcint
+# ---------------------------------------------------------------------------
+
+set(WITH_FORTRAN OFF)
+set(WITH_CINT2_INTERFACE OFF)
+set(ENABLE_STATIC ON)
+set(PYPZPX ON)
+set(WITH_RANGE_COULOMB ON)
+set(WITH_PYTHON_BINDINGS OFF)
+set(BUILD_SHARED_LIBS OFF)
+
+add_subdirectory(
+    libcint
+    "${CMAKE_BINARY_DIR}/_deps/libcint"
+    EXCLUDE_FROM_ALL
+)
+
+if(NOT TARGET cint)
+    message(FATAL_ERROR
+        "The bundled libcint project did not define the target 'cint'"
     )
 endif()
 
-if(NOT "${USE_SANITIZER}" STREQUAL "" AND MSVC)
-    message(
-        FATAL_ERROR
-        "Sanitizers configured via USE_SANITIZER are not supported with the MSVC toolchain in this project."
-    )
-endif()
-
-if(USE_SANITIZER MATCHES "Address")
-    add_compile_options(
-        $<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>
-        $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
-        $<$<CONFIG:Debug>:-O0>
-    )
-    add_link_options($<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>)
-elseif(USE_SANITIZER MATCHES "Thread")
-    add_compile_options(
-        $<$<CONFIG:Debug>:-fsanitize=thread>
-        $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
-        $<$<CONFIG:Debug>:-O0>
-    )
-    add_link_options($<$<CONFIG:Debug>:-fsanitize=thread>)
-elseif(USE_SANITIZER MATCHES "Memory")
-    add_compile_options(
-        $<$<CONFIG:Debug>:-fsanitize=memory>
-        $<$<CONFIG:Debug>:-fsanitize-memory-track-origins>
-        $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
-        $<$<CONFIG:Debug>:-O0>
-    )
-    add_link_options($<$<CONFIG:Debug>:-fsanitize=memory>)
-endif()
-
-if(MSVC AND NOT ("${OCC_BUILD_TYPE}" STREQUAL "${CMAKE_BUILD_TYPE}"))
-    message(
-        FATAL_ERROR
-        "Building OCC in a different mode than NoSpherA2 is not supported because MSVC containers have
-            different sizes between Release and Debug builds."
-    )
-endif()
-
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-#include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake")
-if (NOT ONLY_OCC)
-    add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
-endif ()
-
-# external dependencies
-set(WITH_FORTRAN "OFF")
-set(WITH_CINT2_INTERFACE "OFF")
-set(ENABLE_STATIC "ON")
-set(BUILD_SHARED_LIBS "OFF")
-set(PYPZPX "ON")
-set(WITH_RANGE_COULOMB "ON")
-if(ONLY_OCC)
-    if(WIN32)
-        set(libcint_IMPORTED_LOCATION
-            "${CMAKE_SOURCE_DIR}/Lib/LibCint/lib/cint.lib"
-        )
-        if(EXISTS ${libcint_IMPORTED_LOCATION})
-            message(
-                STATUS
-                "Using precompiled libcint from ${libcint_IMPORTED_LOCATION}"
-            )
-        else()
-            message(
-                FATAL_ERROR
-                "You beed to run '.\\Windows\\Build_Dependencies\\build_deps.ps1 .'"
-            )
-        endif()
-        add_library(cint STATIC IMPORTED)
-        set_target_properties(
-            cint
-            PROPERTIES
-                IMPORTED_LOCATION "${libcint_IMPORTED_LOCATION}"
-                INTERFACE_INCLUDE_DIRECTORIES
-                    "${CMAKE_SOURCE_DIR}/Lib/LibCint/include"
-        )
-    else()
-        if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
-            set(libcint_dir
-                ${CMAKE_SOURCE_DIR}/Lib/LibCint_${CMAKE_OSX_ARCHITECTURES}
-            )
-        else()
-            set(libcint_dir ${CMAKE_SOURCE_DIR}/Lib/LibCint)
-        endif()
-        add_library(cint STATIC IMPORTED)
-        set_target_properties(
-            cint
-            PROPERTIES
-                IMPORTED_LOCATION "${libcint_dir}/lib/libcint.a"
-                INTERFACE_INCLUDE_DIRECTORIES "${libcint_dir}/include"
-        )
-        if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-            target_link_libraries(cint INTERFACE -lquadmath)
-        endif()
-    endif()
-else()
-    add_subdirectory(libcint)
-endif()
-
-add_library(libcint::libcint INTERFACE IMPORTED GLOBAL)
-target_link_libraries(libcint::libcint INTERFACE cint)
+# libcint's current CMake target does not expose all source-tree public
+# headers when consumed directly with add_subdirectory().
 target_include_directories(
-    libcint::libcint
-    INTERFACE
-        "${CMAKE_SOURCE_DIR}/libcint/include"
-        "${CMAKE_SOURCE_DIR}/libcint/src"
+    cint
+    PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libcint/include>"
 )
-set(USE_SYSTEM_LIBCINT "ON")
-set(BUILD_FPIC "ON")
-set(WITH_PYTHON_BINDINGS "OFF")
-set(BUILD_SHARED_LIBS "FALSE")
-if(NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
-    if(WIN32)
-        set(Python3_EXECUTABLE ${MICROMAMBA_ENV_PATH}/python.exe)
-        set(Python_EXECUTABLE ${MICROMAMBA_ENV_PATH}/python.exe)
-    else()
-        set(Python3_EXECUTABLE ${MICROMAMBA_ENV_PATH}/bin/python)
-    endif()
+
+if(NOT TARGET libcint::libcint)
+    add_library(libcint::libcint ALIAS cint)
 endif()
-add_subdirectory(occ)
-if(ONLY_OCC)
+
+# ---------------------------------------------------------------------------
+# OCC
+# ---------------------------------------------------------------------------
+
+set(USE_SYSTEM_LIBCINT ON)
+set(BUILD_FPIC ON)
+set(WITH_PYTHON_BINDINGS OFF)
+set(BUILD_SHARED_LIBS OFF)
+
+add_subdirectory(
+    occ
+    "${CMAKE_BINARY_DIR}/_deps/occ"
+    EXCLUDE_FROM_ALL
+)
+
+# ---------------------------------------------------------------------------
+# mdspan
+# ---------------------------------------------------------------------------
+
+add_subdirectory(
+    mdspan
+    "${CMAKE_BINARY_DIR}/_deps/mdspan"
+    EXCLUDE_FROM_ALL
+)
+
+# ---------------------------------------------------------------------------
+# featomic
+# ---------------------------------------------------------------------------
+
+set(FEATOMIC_FETCH_METATENSOR ON CACHE BOOL
+    "Fetch the matching metatensor-core source" FORCE
+)
+set(FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF CACHE BOOL
+    "Build only the selected featomic library type" FORCE
+)
+set(FEATOMIC_USE_STATIC_METATENSOR ON CACHE BOOL
+    "Link featomic against static metatensor-core" FORCE
+)
+set(BUILD_SHARED_LIBS OFF)
+
+add_subdirectory(
+    featomic/featomic
+    "${CMAKE_BINARY_DIR}/_deps/featomic"
+    EXCLUDE_FROM_ALL
+)
+
+# ---------------------------------------------------------------------------
+# Intel MKL
+# ---------------------------------------------------------------------------
+
+set(MKL_LINK "static")
+set(MKL_INTERFACE lp64)
+set(MKL_THREADING intel_thread)
+set(MKL_MPI intelmpi)
+if(WIN32)
+    set(
+        MKL_DIR
+        "${MICROMAMBA_ENV_PREFIX}/Library/lib/cmake/mkl"
+        CACHE PATH
+        "MKL CMake package directory"
+    )
+else()
+    set(
+        MKL_DIR
+        "${MICROMAMBA_ENV_PREFIX}/lib/cmake/mkl"
+        CACHE PATH
+        "MKL CMake package directory"
+    )
+endif()
+
+if(APPLE)
+    find_library(
+        NOSPHERA2_ACCELERATE_FRAMEWORK
+        Accelerate
+        REQUIRED
+    )
+    find_package(OpenMP REQUIRED COMPONENTS CXX)
+else()
+    find_package(MKL CONFIG REQUIRED)
+endif()
+
+
+# ---------------------------------------------------------------------------
+# Basis Set Generation
+# ---------------------------------------------------------------------------
+add_subdirectory(
+    BasisSetGenerator
+    "${CMAKE_BINARY_DIR}/tools/BasisSetConverter"
+)
+
+# ---------------------------------------------------------------------------
+# Function to include GoogleTest
+# ---------------------------------------------------------------------------
+
+function(enable_googletests)
+    include(FetchContent)
+    FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+    )
+    # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+endfunction()
+
+# ---------------------------------------------------------------------------
+# NoSpherA2 targets
+# ---------------------------------------------------------------------------
+if(NOSPHERA2_DEPENDENCIES_ONLY)
+    enable_googletests()
+    include(cmake/InstallDependenciesOnly.cmake)
     return()
 endif()
-add_subdirectory(mdspan)
-set(FEATOMIC_FETCH_METATENSOR "ON")
-set(BUILD_SHARED_LIBS "OFF")
-set(FEATOMIC_INSTALL_BOTH_STATIC_SHARED "OFF")
-set(FEATOMIC_USE_STATIC_METATENSOR "ON")
-add_subdirectory(featomic/featomic)
 
-add_subdirectory(Src)
-enable_testing()
-add_subdirectory(tests)
+add_subdirectory(Src/core)
+add_subdirectory(app)
+
+if(NOSPHERA2_BUILD_DLL)
+    add_subdirectory(Src/dll)
+endif()
+
+include(CTest)
+
+if(NOSPHERA2_BUILD_TESTS)
+    add_subdirectory(tests/src)
+endif()
+
+if(APPLE)
+    add_custom_target(
+        NoSpherA2Universal
+
+        COMMAND
+            "${CMAKE_COMMAND}"
+            "-DARM64_DIRECTORY=${PROJECT_SOURCE_DIR}/build/release-macos-arm64/bin"
+            "-DX86_64_DIRECTORY=${PROJECT_SOURCE_DIR}/build/release-macos-x86_64/bin"
+            "-DOUTPUT_DIRECTORY=${PROJECT_SOURCE_DIR}/build/release-macos-universal/bin"
+            -P
+            "${PROJECT_SOURCE_DIR}/cmake/CreateMacOSUniversal.cmake"
+
+        COMMENT
+            "Creating universal macOS binaries"
+
+        VERBATIM
+    )
+endif()

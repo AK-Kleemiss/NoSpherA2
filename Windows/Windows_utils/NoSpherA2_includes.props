@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup />
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalDependencies>featomic.lib;metatensor.lib;cint.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>mkl_rt.lib;mkl_intel_lp64.lib;mkl_core.lib;mkl_intel_thread.lib;libiomp5md.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ws2_32.lib;Ntdll.lib;userenv.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dftd4.lib;gau2grid_static.lib;libecpint_static.lib;occ_cg.lib;occ_core.lib;occ_crystal.lib;occ_descriptors.lib;occ_dft.lib;occ_disp.lib;occ_dma.lib;occ_driver.lib;occ_elastic_fit.lib;occ_geometry.lib;occ_gto.lib;occ_interaction.lib;occ_io.lib;occ_isosurface.lib;occ_main.lib;occ_opt.lib;occ_qm.lib;occ_numint.lib;occ_ints.lib;occ_sht.lib;occ_slater.lib;occ_solvent.lib;occ_xdm.lib;occ_xtb.lib;scn.lib;xc.lib;_subprocess.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <Lib>
+      <AdditionalDependencies>featomic.lib;cint.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>mkl_intel_lp64.lib;mkl_core.lib;mkl_intel_thread.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dftd4.lib;gau2grid_static.lib;libecpint_static.lib;occ_cg.lib;occ_core.lib;occ_crystal.lib;occ_descriptors.lib;occ_dft.lib;occ_disp.lib;occ_dma.lib;occ_driver.lib;occ_elastic_fit.lib;occ_geometry.lib;occ_gto.lib;occ_interaction.lib;occ_io.lib;occ_isosurface.lib;occ_main.lib;occ_opt.lib;occ_qm.lib;occ_numint.lib;occ_ints.lib;occ_sht.lib;occ_slater.lib;occ_solvent.lib;occ_xdm.lib;occ_xtb.lib;scn.lib;xc.lib;_subprocess.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup />
+</Project>
+

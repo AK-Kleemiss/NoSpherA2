@@ -1,382 +1,338 @@
 {
   "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+
   "configurePresets": [
     {
-      "name": "base-options",
+      "name": "common-base",
       "hidden": true,
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build-${presetName}",
-      "cacheVariables": {
-        "WITH_CLANG_TIDY": "OFF",
-        "WITH_OCC": "ON",
-        "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "ENV_PATH": "${sourceDir}/mambaenv",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ",
-        "USE_SYSTEM_LIBCINT": "ON",
-        "ONLY_OCC": "OFF"
-      }
+      "generator": "Ninja"
     },
     {
-      "name": "only-occ-options",
+      "name": "release-base",
       "hidden": true,
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build-${presetName}",
       "cacheVariables": {
-        "WITH_CLANG_TIDY": "OFF",
-        "WITH_OCC": "ON",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "ENV_PATH": "${sourceDir}/mambaenv",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ",
-        "USE_SYSTEM_LIBCINT": "ON",
-        "ONLY_OCC": "ON"
+        "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
-      "name": "windows-clang-cl",
-      "displayName": "Windows Clang-CL",
-      "description": "Release build for Windows using clang-cl and lld-link",
-      "inherits": "only-occ-options",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_release",
-        "CMAKE_C_COMPILER": "clang-cl.exe",
-        "CMAKE_CXX_COMPILER": "clang-cl.exe",
-        "CMAKE_C_COMPILER_TARGET": "x86_64-pc-windows-msvc",
-        "CMAKE_CXX_COMPILER_TARGET": "x86_64-pc-windows-msvc",
-        "CMAKE_LINKER": "lld-link.exe",
-        "CMAKE_EXE_LINKER_FLAGS": "runtimeobject.lib /machine:X64",
-        "CMAKE_SHARED_LINKER_FLAGS": "runtimeobject.lib /machine:X64",
-        "CMAKE_STATIC_LINKER_FLAGS": "/machine:X64",
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
-        "BUILD_SHARED_LIBS": "OFF",
-        "TBB_BUILD_SHARED": "ON",
-        "GG_NO_PRAGMA": "ON",
-        "CPACK_SYSTEM_NAME": "windows",
-        "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MD",
-        "CMAKE_C_FLAGS": "/EHsc /MD"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      },
-      "environment": {
-        "CXXFLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MD",
-        "CFLAGS": "/EHsc /MD"
-      },
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      }
-    },
-    {
-      "name": "windows-clang-cl-debug",
-      "displayName": "Windows Clang-CL Debug",
-      "description": "Debug OCC build for Windows using clang-cl and lld-link",
-      "inherits": "only-occ-options",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_debug",
-        "CMAKE_C_COMPILER": "clang-cl.exe",
-        "CMAKE_CXX_COMPILER": "clang-cl.exe",
-        "CMAKE_C_COMPILER_TARGET": "x86_64-pc-windows-msvc",
-        "CMAKE_CXX_COMPILER_TARGET": "x86_64-pc-windows-msvc",
-        "CMAKE_LINKER": "lld-link.exe",
-        "CMAKE_EXE_LINKER_FLAGS": "runtimeobject.lib /machine:X64",
-        "CMAKE_SHARED_LINKER_FLAGS": "runtimeobject.lib /machine:X64",
-        "CMAKE_STATIC_LINKER_FLAGS": "/machine:X64",
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebugDLL",
-        "BUILD_SHARED_LIBS": "OFF",
-        "TBB_BUILD_SHARED": "ON",
-        "GG_NO_PRAGMA": "ON",
-        "CPACK_SYSTEM_NAME": "windows",
-        "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MDd",
-        "CMAKE_C_FLAGS": "/EHsc /MDd"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      },
-      "environment": {
-        "CXXFLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MDd",
-        "CFLAGS": "/EHsc /MDd"
-      },
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      }
-    },
-    {
-      "name": "windows-msvc-debug",
-      "displayName": "Windows MSVC Debug",
-      "description": "Debug OCC build for Windows using MSVC cl, matching Visual Studio Debug projects",
-      "inherits": "only-occ-options",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_debug",
-        "CMAKE_C_COMPILER": "cl.exe",
-        "CMAKE_CXX_COMPILER": "cl.exe",
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebugDLL",
-        "BUILD_SHARED_LIBS": "OFF",
-        "TBB_BUILD_SHARED": "ON",
-        "GG_NO_PRAGMA": "ON",
-        "CPACK_SYSTEM_NAME": "windows",
-        "CMAKE_CXX_FLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MDd /bigobj",
-        "CMAKE_C_FLAGS": "/EHsc /MDd"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      },
-      "environment": {
-        "CXXFLAGS": "-D__TBB_DYNAMIC_LOAD_ENABLED=0 /EHsc /MDd /bigobj",
-        "CFLAGS": "/EHsc /MDd"
-      },
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      }
-    },
-    {
-      "name": "linux-gcc",
-      "displayName": "linux-gcc (ccache)",
-      "description": "Release build for Linux using GCC and ccache",
-      "inherits": "base-options",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_SHARED_LIBS": "OFF",
-        "TBB_BUILD_SHARED": "ON",
-        "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store",
-        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
-        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
-      }
-    },
-    {
-      "name": "linux-occ-gcc",
-      "displayName": "linux-occ-gcc (Only Build OCC)",
-      "description": "Release build of OCC for Linux using GCC and ccache",
-      "inherits": "only-occ-options",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_SHARED_LIBS": "OFF",
-        "TBB_BUILD_SHARED": "ON",
-        "CCACHE_OPTIONS": "CCACHE_CPP2=true;CCACHE_SLOPPINESS=clang_index_store"
-      }
-    },
-    {
-      "name": "macos-base",
+      "name": "debug-base",
       "hidden": true,
-      "inherits": "only-occ-options",
       "cacheVariables": {
-        "OpenMP_ROOT": "$env{HOMEBREW_PREFIX}/opt/libomp",
-        "TBB_BUILD_SHARED": "ON"
+        "CMAKE_BUILD_TYPE": "Debug"
       }
+    },
 
-    },
     {
-      "name": "macos-debug",
-      "inherits": "macos-base",
-      "displayName": "macOS Debug (Clang)",
+      "name": "windows-base",
+      "hidden": true,
+      "inherits": "common-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "environment": {
+        "PATH": "${sourceDir}/.mambaenv/env;${sourceDir}/.mambaenv/env/Library/bin;${sourceDir}/.mambaenv/env/Scripts;$penv{PATH}",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/.mambaenv/env",
+        "PKG_CONFIG_PATH": "${sourceDir}/.mambaenv/env/Library/lib/pkgconfig;${sourceDir}/.mambaenv/env/Library/share/pkgconfig",
+        "RUSTC": "${sourceDir}/.mambaenv/env/Library/bin/rustc.exe",
+
+        "CMAKE_GENERATOR": "Ninja",
+        "CMAKE_GENERATOR_x86_64_pc_windows_msvc": "Ninja",
+        "CMAKE_GENERATOR_x86_64-pc-windows-msvc": "Ninja"
+      },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "MICROMAMBA_ENV_PREFIX": "${sourceDir}/.mambaenv/env",
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/.mambaenv/env/Library/bin/ninja.exe",
+        "Python3_EXECUTABLE": "${sourceDir}/.mambaenv/env/python.exe",
+        "Python_EXECUTABLE": "${sourceDir}/.mambaenv/env/python.exe",
+        "PKG_CONFIG_EXECUTABLE": "${sourceDir}/.mambaenv/env/Library/bin/pkg-config.exe",
+        "CARGO_EXE": "${sourceDir}/.mambaenv/env/Library/bin/cargo.exe"
       }
     },
     {
-      "name": "macos-release",
-      "inherits": "macos-base",
-      "displayName": "macOS release (Clang)",
+      "name": "macos-arm64-base",
+      "hidden": true,
+      "inherits": "common-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "environment": {
+        "PATH": "${sourceDir}/.mambaenv/env-arm64/bin:$penv{PATH}",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/.mambaenv/env-arm64",
+        "PKG_CONFIG_PATH": "${sourceDir}/.mambaenv/env-arm64/lib/pkgconfig:${sourceDir}/.mambaenv/env-arm64/share/pkgconfig",
+        "RUSTC": "${sourceDir}/.mambaenv/env-arm64/bin/rustc"
+      },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "MICROMAMBA_ENV_PREFIX": "${sourceDir}/.mambaenv/env-arm64",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/.mambaenv/env-arm64/bin/ninja",
+        "Python3_EXECUTABLE": "${sourceDir}/.mambaenv/env-arm64/bin/python",
+        "Python_EXECUTABLE": "${sourceDir}/.mambaenv/env-arm64/bin/python",
+        "PKG_CONFIG_EXECUTABLE": "${sourceDir}/.mambaenv/env-arm64/bin/pkg-config",
+        "CARGO_EXE": "${sourceDir}/.mambaenv/env-arm64/bin/cargo",
+
+        "OpenMP_CXX_FLAGS": "-Xpreprocessor -fopenmp",
+        "OpenMP_CXX_INCLUDE_DIR": "${sourceDir}/.mambaenv/env-arm64/include",
+        "OpenMP_CXX_LIB_NAMES": "omp",
+        "OpenMP_omp_LIBRARY": "${sourceDir}/.mambaenv/env-arm64/lib/libomp.dylib"
       }
     },
     {
-      "name": "macos-release-x86_64",
-      "inherits": "macos-release",
-      "displayName": "macOS release (Clang, x86_64)",
+      "name": "macos-x86_64-base",
+      "hidden": true,
+      "inherits": "common-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "environment": {
+        "PATH": "${sourceDir}/.mambaenv/env-x86_64/bin:$penv{PATH}",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/.mambaenv/env-x86_64",
+        "PKG_CONFIG_PATH": "${sourceDir}/.mambaenv/env-x86_64/lib/pkgconfig:${sourceDir}/.mambaenv/env-x86_64/share/pkgconfig",
+        "RUSTC": "${sourceDir}/.mambaenv/env-x86_64/bin/rustc"
+      },
       "cacheVariables": {
+        "MICROMAMBA_ENV_PREFIX": "${sourceDir}/.mambaenv/env-x86_64",
         "CMAKE_OSX_ARCHITECTURES": "x86_64",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_x86_64"
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/.mambaenv/env-x86_64/bin/ninja",
+        "Python3_EXECUTABLE": "${sourceDir}/.mambaenv/env-x86_64/bin/python",
+        "Python_EXECUTABLE": "${sourceDir}/.mambaenv/env-x86_64/bin/python",
+        "PKG_CONFIG_EXECUTABLE": "${sourceDir}/.mambaenv/env-x86_64/bin/pkg-config",
+        "CARGO_EXE": "${sourceDir}/.mambaenv/env-x86_64/bin/cargo",
+        
+        "OpenMP_CXX_FLAGS": "-Xpreprocessor -fopenmp",
+        "OpenMP_CXX_INCLUDE_DIR": "${sourceDir}/.mambaenv/env-x86_64/include",
+        "OpenMP_CXX_LIB_NAMES": "omp",
+        "OpenMP_omp_LIBRARY": "${sourceDir}/.mambaenv/env-x86_64/lib/libomp.dylib"
       }
     },
     {
-        "name": "macos-release-arm64",
-        "inherits": "macos-release",
-        "displayName": "macOS release (Clang, arm64)",
-        "cacheVariables": {
-            "CMAKE_OSX_ARCHITECTURES": "arm64",
-          "CMAKE_INSTALL_PREFIX": "${sourceDir}/Lib/occ_arm64"
-        }
-    },
-    {
-      "name": "Debug",
-      "inherits": "base-options",
-      "displayName": "Debug (GCC/ccache)",
+      "name": "unix-base",
+      "hidden": true,
+      "inherits": "common-base",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "environment": {
+        "PATH": "${sourceDir}/.mambaenv/env/bin:$penv{PATH}",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/.mambaenv/env",
+        "PKG_CONFIG_PATH": "${sourceDir}/.mambaenv/env/lib/pkgconfig:${sourceDir}/.mambaenv/env/share/pkgconfig",
+        "RUSTC": "${sourceDir}/.mambaenv/env/bin/rustc"
+      },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "MICROMAMBA_ENV_PREFIX": "${sourceDir}/.mambaenv/env",
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/.mambaenv/env/bin/ninja",
+        "Python3_EXECUTABLE": "${sourceDir}/.mambaenv/env/bin/python",
+        "Python_EXECUTABLE": "${sourceDir}/.mambaenv/env/bin/python",
+        "PKG_CONFIG_EXECUTABLE": "${sourceDir}/.mambaenv/env/bin/pkg-config",
+        "CARGO_EXE": "${sourceDir}/.mambaenv/env/bin/cargo"
       }
     },
+
     {
-      "name": "Release",
-      "inherits": "base-options",
-      "displayName": "Release (GCC)",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
+      "name": "release-windows",
+      "displayName": "Release — Windows",
+      "inherits": [
+        "windows-base",
+        "release-base"
+      ],
+      "binaryDir": "${sourceDir}/build/release-windows"
+    },
+    {
+      "name": "debug-windows",
+      "displayName": "Debug — Windows",
+      "inherits": [
+        "windows-base",
+        "debug-base"
+      ],
+      "binaryDir": "${sourceDir}/build/debug-windows"
+    },
+
+    {
+      "name": "release-linux",
+      "displayName": "Release — Linux",
+      "inherits": [
+        "unix-base",
+        "release-base"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "binaryDir": "${sourceDir}/build/release-linux"
+    },
+    {
+      "name": "debug-linux",
+      "displayName": "Debug — Linux",
+      "inherits": [
+        "unix-base",
+        "debug-base"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "binaryDir": "${sourceDir}/build/debug-linux"
+    },
+
+    {
+      "name": "release-macos-arm64",
+      "displayName": "Release — macOS arm64",
+      "inherits": [
+        "macos-arm64-base",
+        "release-base"
+      ],
+      "binaryDir": "${sourceDir}/build/release-macos-arm64"
+    },
+    {
+      "name": "release-macos-x86_64",
+      "displayName": "Release — macOS x86_64",
+      "inherits": [
+        "macos-x86_64-base",
+        "release-base"
+      ],
+      "binaryDir": "${sourceDir}/build/release-macos-x86_64"
+    },
+    {
+      "name": "debug-macos-arm64",
+      "displayName": "Debug — macOS arm64",
+      "inherits": [
+        "macos-arm64-base",
+        "debug-base"
+      ],
+      "binaryDir": "${sourceDir}/build/debug-macos-arm64"
+    },
+    {
+      "name": "debug-macos-x86_64",
+      "displayName": "Debug — macOS x86_64",
+      "inherits": [
+        "macos-x86_64-base",
+        "debug-base"
+      ],
+      "binaryDir": "${sourceDir}/build/debug-macos-x86_64"
     }
   ],
+
   "buildPresets": [
     {
-      "name": "macos-release-arm64",
-      "configurePreset": "macos-release-arm64",
-      "targets": "occ"
+      "name": "build-base",
+      "hidden": true,
+      "inheritConfigureEnvironment": true
+    },
+
+    {
+      "name": "release-windows",
+      "inherits": "build-base",
+      "configurePreset": "release-windows"
     },
     {
-      "name": "macos-release-x86_64",
-      "configurePreset": "macos-release-x86_64",
-      "targets": "occ"
+      "name": "debug-windows",
+      "inherits": "build-base",
+      "configurePreset": "debug-windows"
     },
     {
-      "name": "macos-debug",
-      "configurePreset": "macos-debug"
+      "name": "release-linux",
+      "inherits": "build-base",
+      "configurePreset": "release-linux"
     },
     {
-      "name": "windows-clang-cl",
-      "configurePreset": "windows-clang-cl",
-      "targets": "occ"
+      "name": "debug-linux",
+      "inherits": "build-base",
+      "configurePreset": "debug-linux"
     },
     {
-      "name": "windows-clang-cl-debug",
-      "configurePreset": "windows-clang-cl-debug",
-      "targets": "occ"
+      "name": "release-macos-arm64",
+      "inherits": "build-base",
+      "configurePreset": "release-macos-arm64"
     },
     {
-      "name": "windows-msvc-debug",
-      "configurePreset": "windows-msvc-debug",
-      "targets": "occ"
+      "name": "release-macos-x86_64",
+      "inherits": "build-base",
+      "configurePreset": "release-macos-x86_64"
     },
     {
-      "name": "linux-gcc",
-      "configurePreset": "linux-gcc"
+      "name": "debug-macos-arm64",
+      "inherits": "build-base",
+      "configurePreset": "debug-macos-arm64"
     },
     {
-      "name": "linux-occ-gcc",
-      "configurePreset": "linux-occ-gcc",
-      "targets": "occ"
+      "name": "debug-macos-x86_64",
+      "inherits": "build-base",
+      "configurePreset": "debug-macos-x86_64"
+    },
+    {
+      "name": "release-macos-universal",
+      "displayName": "Release — macOS Universal",
+      "inherits": "build-base",
+      "configurePreset": "release-macos-arm64",
+      "targets": [
+        "NoSpherA2Universal"
+      ]
     }
   ],
+
   "testPresets": [
     {
-      "name": "macos-release",
-      "configurePreset": "macos-release",
-      "description": "Run all NoSpherA2 tests on macOS",
+      "name": "test-base",
+      "hidden": true,
+      "inheritConfigureEnvironment": true,
       "output": {
         "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error",
-        "stopOnFailure": false
-      },
-      "environment": {
-        "OCC_DATA_PATH": "${sourceDir}/occ/share"
       }
-    }
-  ],
-  "workflowPresets": [
+    },
+
     {
-      "name": "windows-clang-cl",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "windows-clang-cl"
-        },
-        {
-          "type": "build",
-          "name": "windows-clang-cl"
-        }
-      ]
+      "name": "release-windows",
+      "inherits": "test-base",
+      "configurePreset": "release-windows"
     },
     {
-      "name": "windows-clang-cl-debug",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "windows-clang-cl-debug"
-        },
-        {
-          "type": "build",
-          "name": "windows-clang-cl-debug"
-        }
-      ]
+      "name": "debug-windows",
+      "inherits": "test-base",
+      "configurePreset": "debug-windows"
     },
     {
-      "name": "windows-msvc-debug",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "windows-msvc-debug"
-        },
-        {
-          "type": "build",
-          "name": "windows-msvc-debug"
-        }
-      ]
+      "name": "release-linux",
+      "inherits": "test-base",
+      "configurePreset": "release-linux"
     },
     {
-      "name": "linux-gcc",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "linux-gcc"
-        },
-        {
-          "type": "build",
-          "name": "linux-gcc"
-        }
-      ]
+      "name": "debug-linux",
+      "inherits": "test-base",
+      "configurePreset": "debug-linux"
     },
     {
-      "name": "linux-occ-gcc",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "linux-occ-gcc"
-        },
-        {
-          "type": "build",
-          "name": "linux-occ-gcc"
-        }
-      ]
+      "name": "release-macos-arm64",
+      "inherits": "test-base",
+      "configurePreset": "release-macos-arm64"
     },
     {
-      "name": "macos-release-arm64",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "macos-release-arm64"
-        },
-        {
-          "type": "build",
-          "name": "macos-release-arm64"
-        }
-      ]
+      "name": "release-macos-x86_64",
+      "inherits": "test-base",
+      "configurePreset": "release-macos-x86_64"
     },
     {
-      "name": "macos-release-x86_64",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "macos-release-x86_64"
-        },
-        {
-          "type": "build",
-          "name": "macos-release-x86_64"
-        }
-      ]
+      "name": "debug-macos-arm64",
+      "inherits": "test-base",
+      "configurePreset": "debug-macos-arm64"
+    },
+    {
+      "name": "debug-macos-x86_64",
+      "inherits": "test-base",
+      "configurePreset": "debug-macos-x86_64"
     }
   ]
 }
-
-
