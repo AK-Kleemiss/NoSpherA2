@@ -58,7 +58,7 @@ target_precompile_headers(
 target_compile_definitions(
     NoSpherA2Dll
     PRIVATE
-        NOSPHERA2_DLL_BUILD
+        BUILDING_DLL
 )
 
 set_target_properties(
