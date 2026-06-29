@@ -8,476 +8,377 @@ on:
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
-    inputs:
-      upload_libs:
-        description:  >
-          Uploads the created libs as artifacts. If not, saves space on CI runs, but can be useful for debugging. Only applies to the dependencies job.
-        required: false
-        type: boolean
-        default: false
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 env:
-    FEATOMIC_CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF"
-    OCC_DATA_PATH: "${{ github.workspace }}/occ/share"
-    SCCACHE_GHA_ENABLED: "true"
-    RUSTC_WRAPPER: "sccache"
-    # Build OCC and NoSpherA2 without AVX (SSE only) so release binaries run
-    # on older CPUs. Honored by CMake (root CMakeLists.txt), MSBuild
-    # (Directory.Build.targets), and Linux/makefile. Both OCC and NoSpherA2
-    # must use the same setting (Eigen ABI differs with AVX).
-    NOS_AVX: "OFF"
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  CTEST_PARALLEL_LEVEL: 4
+  CARGO_TERM_COLOR: always
 
 jobs:
-  # Build matrix for all platforms
   build:
+    name: ${{ matrix.name }}
+
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest  # Apple Silicon (ARM64)
-            name: Mac_ARM64
-            build-script: "make NoSpherA2_arm64 COMP=\"sccache clang++\" -j && cp Mac/NoSpherA2_arm64 ./"
-            artifact-name: executable_MacOS_ARM64
-            executable-path: Mac/NoSpherA2_arm64
-            artifact-path: |
-              Mac/NoSpherA2_arm64
-              Mac/libomp.dylib
-              Mac/libtbb*.dylib
+          - name: Linux Release
+            os: ubuntu-24.04
+            configure-preset: release-linux
+            build-preset: release-linux
+            test-preset: release-linux
+            build-directory: build/release-linux
+            environment-directory: .mambaenv/env
+            architecture: x86_64
+            shell: bash
+            artifact-path: artifacts/NoSpherA2-linux-x86_64.tar.gz
+            artifact-name: NoSpherA2-linux-x86_64
 
+          - name: Windows Release
+            os: windows-2022
+            configure-preset: release-windows
+            build-preset: release-windows
+            test-preset: release-windows
+            build-directory: build/release-windows
+            environment-directory: .mambaenv/env
+            architecture: x86_64
+            shell: pwsh
+            artifact-path: artifacts/NoSpherA2-windows-x64.zip
+            artifact-name: NoSpherA2-windows-x64
 
-          - os: macos-15-intel  # Intel x86_64
-            name: Mac_x86_64
-            build-script: "make NoSpherA2_x86_64 COMP=\"sccache clang++\" -j && cp Mac/NoSpherA2_x86_64 ./"
-            artifact-name: executable_MacOS_x86_64
-            executable-path: Mac/NoSpherA2_x86_64
-            artifact-path: |
-              Mac/NoSpherA2_x86_64
-              Mac/libomp.dylib
-              Mac/libtbb*.dylib
+          - name: macOS arm64 Release
+            os: macos-15
+            configure-preset: release-macos-arm64
+            build-preset: release-macos-arm64
+            test-preset: release-macos-arm64
+            build-directory: build/release-macos-arm64
+            environment-directory: .mambaenv/env-arm64
+            architecture: arm64
+            shell: bash
+            artifact-path: artifacts/NoSpherA2-macos-arm64.tar.gz
+            artifact-name: NoSpherA2-macos-arm64
 
-          - os: ubuntu-latest
-            name: Linux
-            build-script: "cd Linux && make COMP=\"sccache g++\" -j && cp NoSpherA2 ../"
-            artifact-name: executable_Linux
-            artifact-path: |
-              NoSpherA2
-              libiomp5.so
-              libtbb.so*
-
-          - os: windows-2022
-            name: Windows
-            build-script: |
-              cd Windows
-              msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64 -p:PlatformToolset=v143 -p:SkipBuildDependencies=true
-            artifact-name: executable_Windows
-            artifact-path: |
-              Windows/x64/Release/NoSpherA2.exe
-              Windows/x64/Release/libiomp5md.dll
-              Windows/x64/Release/tbb12.dll
-              Windows/x64/Release/mkl_intel_thread.2.dll
-              Windows/x64/Release/mkl_core.2.dll
-              Windows/x64/Release/mkl_def.2.dll
-
-    runs-on: ${{ matrix.os }}
-    name: Build ${{ matrix.name }}
-
-    steps:
-    - name: Harden Runner
-      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
-      with:
-        egress-policy: audit
-
-    - name: Checkout
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      with:
-        submodules: recursive
-        fetch-depth: 1
-
-    - name: Setup Build Environment
-      uses: ./.github/actions/setup-build-env
-      with:
-        platform: ${{ matrix.name }}
-
-    - name: Cache Dependencies
-      uses: ./.github/actions/cache-deps
-      with:
-        platform: ${{ matrix.name }}
-
-    - name: Build Dependencies
-      uses: ./.github/actions/build-deps
-      with:
-        platform: ${{ matrix.name }}
-        upload_libs: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.upload_libs == 'true' }}
-
-    - name: Build NoSpherA2
-      run: ${{ matrix.build-script }}
-
-    - name: Bundle libomp into binary (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        LIBOMP=$(brew --prefix libomp)/lib/libomp.dylib
-        BINARY=${{ matrix.executable-path }}
-        cp "$LIBOMP" "$(dirname $BINARY)/libomp.dylib"
-        install_name_tool -change "$LIBOMP" "@executable_path/libomp.dylib" "$BINARY"
-
-    - name: Bundle libtbb into binary (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        BINARY=${{ matrix.executable-path }}
-        BINDIR="$(dirname $BINARY)"
-        # Find the TBB dylib referenced by the binary
-        LIBTBB=$(otool -L "$BINARY" | grep libtbb | awk '{print $1}' | head -1)
-        if [ -n "$LIBTBB" ] && [ -f "$LIBTBB" ]; then
-          TBBNAME=$(basename "$LIBTBB")
-          cp "$LIBTBB" "$BINDIR/$TBBNAME"
-          install_name_tool -change "$LIBTBB" "@executable_path/$TBBNAME" "$BINARY"
-          # Ensure both libtbb.dylib and libtbb.12.dylib exist
-          if [ "$TBBNAME" != "libtbb.12.dylib" ] && [ ! -f "$BINDIR/libtbb.12.dylib" ]; then
-            cp "$BINDIR/$TBBNAME" "$BINDIR/libtbb.12.dylib"
-          fi
-          if [ "$TBBNAME" != "libtbb.dylib" ] && [ ! -f "$BINDIR/libtbb.dylib" ]; then
-            cp "$BINDIR/$TBBNAME" "$BINDIR/libtbb.dylib"
-          fi
-        fi
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        name: ${{ matrix.artifact-name }}
-        path: ${{ matrix.artifact-path }}
-
-  # Create macOS Universal Binary
-  build_mac_universal:
-    needs: build
-    runs-on: macos-latest
-    name: Build macOS Universal Binary
-
-    steps:
-    - name: Harden Runner
-      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
-      with:
-        egress-policy: audit
-
-    - name: Checkout
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      with:
-        submodules: recursive
-        fetch-depth: 1
-
-    - name: Download ARM64 Binary
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        name: executable_MacOS_ARM64
-        path: ./arm64/
-
-    - name: Download x86_64 Binary
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        name: executable_MacOS_x86_64
-        path: ./x86_64/
-
-    - name: Create Universal Binary with lipo
-      run: |
-        echo "Creating universal binary with lipo..."
-        mkdir -p universal
-
-        # Make binaries executable
-        chmod +x ./arm64/NoSpherA2_arm64
-        chmod +x ./x86_64/NoSpherA2_x86_64
-
-        # Verify architectures before combining
-        echo "ARM64 binary architecture:"
-        file ./arm64/NoSpherA2_arm64
-        lipo -info ./arm64/NoSpherA2_arm64
-
-        echo "x86_64 binary architecture:"
-        file ./x86_64/NoSpherA2_x86_64
-        lipo -info ./x86_64/NoSpherA2_x86_64
-
-        # Create universal binary
-        lipo -create -output ./universal/NoSpherA2_Mac ./arm64/NoSpherA2_arm64 ./x86_64/NoSpherA2_x86_64
-
-        # Verify universal binary
-        echo "Universal binary architecture:"
-        file ./universal/NoSpherA2_Mac
-        lipo -info ./universal/NoSpherA2_Mac
-
-        # Make executable
-        chmod +x ./universal/NoSpherA2_Mac
-
-        # Combine arch-specific TBB dylibs into a universal fat dylib.
-        # The binaries reference the versioned install name (libtbb.12.dylib),
-        # so combine each name that exists and keep both files available.
-        for name in libtbb.dylib libtbb.12.dylib; do
-          if [ -f "./arm64/$name" ] && [ -f "./x86_64/$name" ]; then
-            lipo -create "./arm64/$name" "./x86_64/$name" -output "./universal/$name"
-          fi
-        done
-        if [ ! -f ./universal/libtbb.12.dylib ] && [ -f ./universal/libtbb.dylib ]; then
-          cp ./universal/libtbb.dylib ./universal/libtbb.12.dylib
-        fi
-        if [ ! -f ./universal/libtbb.dylib ] && [ -f ./universal/libtbb.12.dylib ]; then
-          cp ./universal/libtbb.12.dylib ./universal/libtbb.dylib
-        fi
-
-        # Combine arch-specific libomp dylibs into a universal fat dylib
-        lipo -create \
-          ./arm64/libomp.dylib \
-          ./x86_64/libomp.dylib \
-          -output ./universal/libomp.dylib
-
-    - name: Upload Universal Binary
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        name: executable_MacOS_Universal
-        path: |
-          ./universal/NoSpherA2_Mac
-          ./universal/libtbb*.dylib
-          ./universal/libomp.dylib
-
-  test:
-    needs: build
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest  # Apple Silicon (ARM64)
-            name: Mac_ARM64
-            artifact-name: executable_MacOS_ARM64
-            artifact-path: Mac
-            executable-name: NoSpherA2_arm64
-
-          - os: macos-15-intel  # Intel x86_64
-            name: Mac_x86_64
-            artifact-name: executable_MacOS_x86_64
-            artifact-path: Mac
-            executable-name: NoSpherA2_x86_64
-
-          - os: ubuntu-latest
-            name: Linux
-            artifact-name: executable_Linux
-            artifact-path: |
-              NoSpherA2
-              libiomp5.so
-              libtbb.so*
-            executable-name: NoSpherA2
-
-          - os: windows-2022
-            name: Windows
-            artifact-name: executable_Windows
-            artifact-path: |
-              Windows/x64/Release/NoSpherA2.exe
-              Windows/x64/Release/libiomp5md.dll
-              Windows/x64/Release/tbb12.dll
-              Windows/x64/Release/mkl_intel_thread.2.dll
-              Windows/x64/Release/mkl_core.2.dll
-              Windows/x64/Release/mkl_def.2.dll
-            executable-name: NoSpherA2.exe
+          - name: macOS x86_64 Release
+            os: macos-15-intel
+            configure-preset: release-macos-x86_64
+            build-preset: release-macos-x86_64
+            test-preset: release-macos-x86_64
+            build-directory: build/release-macos-x86_64
+            environment-directory: .mambaenv/env-x86_64
+            architecture: x86_64
+            shell: bash
+            artifact-path: artifacts/NoSpherA2-macos-x86_64.tar.gz
+            artifact-name: NoSpherA2-macos-x86_64
 
     runs-on: ${{ matrix.os }}
-    name: Test ${{ matrix.name }}
+
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
     steps:
-    - name: Harden Runner
-      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
-      with:
-        egress-policy: audit
-
-    - name: Checkout
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      with:
-        submodules: recursive
-
-    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        name: ${{ matrix.artifact-name }}
-        path: ${{ github.workspace }}
-
-    - name: Set executable path
-      id: set-exe
-      shell: bash
-      run: |
-        echo "NOS_EXE=${{ github.workspace }}/${{ matrix.executable-name }}" >> $GITHUB_ENV
-
-    - name: "Set up Python"
-      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-      with:
-        python-version-file: "pyproject.toml"
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-
-    - name: Install the project
-      run: uv sync --locked --all-extras --dev
-
-    - name: Make executable
-      if: runner.os == 'macOS' || runner.os == 'Linux'
-      run: chmod +x ${{ env.NOS_EXE }}
-
-    - name: Run tests
-      run: uv run pytest
-
-    - name: Check for failed logs
-      id: check-failed-logs
-      if: always()
-      shell: bash
-      run: |
-        if [ -d "${{ github.workspace }}/tests/failed_logs" ]; then
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Upload Artifacts
-      if: always() && steps.check-failed-logs.outputs.exists == 'true'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        name: Failed Tests - ${{ matrix.name }}
-        path: ${{github.workspace}}/tests/failed_logs
-
-  # Combine all artifacts
-  combine_all:
-    needs: [build, build_mac_universal]
-    runs-on: ubuntu-latest
-    name: Combine All Executables
-
-    steps:
-    - name: Harden Runner
-      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
-      with:
-        egress-policy: audit
-
-    - name: Download Linux Executable
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        name: executable_Linux
-
-    - name: Download macOS Universal Binary
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        name: executable_MacOS_Universal
-
-    - name: Download Windows Executable
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        name: executable_Windows
-
-    - name: Archive all executables
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        name: executables
-        path: |
-          NoSpherA2
-          NoSpherA2.exe
-          NoSpherA2_Mac
-
-  # Security analysis jobs
-  CodeQL:
-    name: Analyze
-    runs-on: ubuntu-latest
-    needs: build
-    continue-on-error: true
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ 'cpp' ]
-
-    steps:
-    - name: Harden Runner
-      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
-      with:
-        egress-policy: audit
-
-    - name: Checkout repository
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      with:
-        submodules: recursive
-        fetch-depth: 1
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
-      with:
-        languages: ${{ matrix.language }}
-        source-root: Src
-
-    - name: Setup Build Environment
-      uses: ./.github/actions/setup-build-env
-      with:
-        platform: Linux
-
-    - name: Cache Dependencies
-      uses: ./.github/actions/cache-deps
-      with:
-        platform: Linux
-
-    - name: Build Dependencies
-      uses: ./.github/actions/build-deps
-      with:
-        platform: Linux
-        upload_libs: false
-
-    - name: Build project
-      run: cd Linux && make -j1
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
-      with:
-        output: 'codeql-results.sarif'
-      continue-on-error: true
-
-    - name: Upload analysis results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
-      with:
-        sarif_file: ${{github.workspace}}/codeql-results.sarif
-        category: codeql
-      continue-on-error: true
-
-  flawfinder:
-    name: flawfinder
-    runs-on: ubuntu-latest
-    needs: build
-    continue-on-error: true
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
-        with:
-          egress-policy: audit
-
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-            submodules: false
-            fetch-depth: 1
+          submodules: recursive
+          fetch-depth: 1
 
-      - name: transfer to UTF8
-        run: |
-          find Src/. -type f -exec bash -c 'file="$1"; if [[ $(file -b --mime-encoding "$file") != "utf-8" ]]; then iconv -f ISO-8859-1 -t UTF-8 "$file" -o "${file}.utf8" && mv "${file}.utf8" "$file"; fi' _ {} \;
-
-      - name: flawfinder_scan
-        uses: david-a-wheeler/flawfinder@c4216b74cf2639ffa98503768bd6e4299b5440c9 # 2.0.20
+      # Ninja uses whichever compiler environment is active. On Windows,
+      # initialize the x64 MSVC environment before configuring CMake.
+      - name: Initialize MSVC x64 environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
         with:
-          arguments: '--sarif Src'
-          output: 'flawfinder_results.sarif'
+          arch: x64
+
+      - name: Show toolchain
+        run: |
+          cmake --version
+          ninja --version
+          git --version
+
+      - name: Show MSVC compiler
+        if: runner.os == 'Windows'
+        run: |
+          where.exe cl
+          cl
         continue-on-error: true
 
-      - name: Upload analysis results to GitHub Security tab
+      - name: Bootstrap micromamba environments
+        run: cmake -P scripts/BootstrapMicromamba.cmake
+
+      # Cache the complete dependency-only CMake/Ninja build tree.
+      - name: Restore dependency build tree
+        id: cmake-deps-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ matrix.build-directory }}
+          key: cmake-deps-v2-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'scripts/BootstrapMicromamba.cmake', 'environment*.yaml', 'occ/**/CMakeLists.txt', 'occ/**/*.cmake', 'libcint/**/CMakeLists.txt', 'libcint/**/*.cmake', 'featomic/**/Cargo.toml', 'featomic/**/Cargo.lock', 'featomic/**/CMakeLists.txt', 'mdspan/**/CMakeLists.txt') }}
+
+      - name: Report dependency cache result
+        run: |
+          echo "Dependency cache exact hit: ${{ steps.cmake-deps-cache.outputs.cache-hit }}"
+          echo "Dependency cache key: ${{ steps.cmake-deps-cache.outputs.cache-primary-key }}"
+
+      # On an exact cache miss, configure and build dependencies only. 
+      # This creates .ninja_log and .ninja_deps without entries belonging 
+      # to the main NoSpherA2 sources.
+      - name: Configure dependencies 
+        if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
+        run: cmake --preset "${{ matrix.configure-preset }}" -DNOSPHERA2_DEPENDENCIES_ONLY=ON
+
+      - name: Build dependencies
+        if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
+        run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4 
+
+      # Save before configuring the complete application. This leaves the
+      # stored tree as a dependency-only baseline.
+      - name: Save dependency build tree
+        if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ matrix.build-directory }}
+          key: ${{ steps.cmake-deps-cache.outputs.cache-primary-key }}
+
+      # Reconfigure the same build tree for the complete application.
+      - name: Configure
+        run: cmake --preset "${{ matrix.configure-preset }}" -DNOSPHERA2_BUILD_TESTS=ON -DNOSPHERA2_DEPENDENCIES_ONLY=OFF
+
+      - name: Build
+        run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
+
+      - name: Run tests
+        run: ctest --preset "${{ matrix.test-preset }}" --output-on-failure
+
+      - name: Package Unix artifacts
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p artifacts
+
+          tar \
+            -czf "${{ matrix.artifact-path }}" \
+            -C "${{ matrix.build-directory }}/bin" \
+            .
+
+          echo "Created artifact:"
+          ls -lah artifacts
+
+      - name: Package Windows artifacts
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+
+          Compress-Archive `
+            -Path "${{ matrix.build-directory }}\bin\*" `
+            -DestinationPath "${{ matrix.artifact-path }}" `
+            -Force
+
+          Write-Host "Created artifact:"
+          Get-ChildItem artifacts
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-path }}
+          if-no-files-found: error
+
+      - name: Upload test logs after failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ runner.os }}-${{ matrix.architecture }}
+          if-no-files-found: ignore
+          path: |
+            ${{ matrix.build-directory }}/Testing/Temporary
+            ${{ matrix.build-directory }}/CMakeFiles/CMakeConfigureLog.yaml
+            ${{ matrix.build-directory }}/CMakeCache.txt
+  # Combine the separately built Apple Silicon and Intel artifacts into one
+  # universal macOS package. This operates on the already packaged build
+  # outputs, so the two architecture builds remain independent and testable.
+  macos-universal:
+    name: macOS Universal Release
+    needs: build
+    runs-on: macos-15
+
+    steps:
+      - name: Download macOS arm64 artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: NoSpherA2-macos-arm64
+          path: downloads/arm64
+
+      - name: Download macOS x86_64 artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: NoSpherA2-macos-x86_64
+          path: downloads/x86_64
+
+      - name: Extract architecture-specific packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p extracted/arm64 extracted/x86_64 universal artifacts
+          tar -xzf downloads/arm64/NoSpherA2-macos-arm64.tar.gz -C extracted/arm64
+          tar -xzf downloads/x86_64/NoSpherA2-macos-x86_64.tar.gz -C extracted/x86_64
+
+      - name: Create universal binaries with lipo
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Copy the complete arm64 package as the base. Every Mach-O file for
+          # which an x86_64 counterpart exists is replaced by a universal file.
+          ditto extracted/arm64 universal
+
+          merged=0
+          while IFS= read -r -d '' arm_file; do
+            relative_path="${arm_file#extracted/arm64/}"
+            intel_file="extracted/x86_64/${relative_path}"
+            output_file="universal/${relative_path}"
+
+            if [[ ! -f "${intel_file}" ]]; then
+              echo "Skipping ${relative_path}: no x86_64 counterpart"
+              continue
+            fi
+
+            if ! file "${arm_file}" | grep -q 'Mach-O'; then
+              continue
+            fi
+            if ! file "${intel_file}" | grep -q 'Mach-O'; then
+              echo "Skipping ${relative_path}: x86_64 counterpart is not Mach-O"
+              continue
+            fi
+
+            mkdir -p "$(dirname "${output_file}")"
+            lipo -create "${arm_file}" "${intel_file}" -output "${output_file}"
+            chmod "$(stat -f '%Lp' "${arm_file}")" "${output_file}"
+
+            echo "Created universal ${relative_path}:"
+            lipo -info "${output_file}"
+            merged=$((merged + 1))
+          done < <(find extracted/arm64 -type f -print0)
+
+          if [[ "${merged}" -eq 0 ]]; then
+            echo "No matching Mach-O files were merged" >&2
+            exit 1
+          fi
+
+          # The main executable must be universal. Locate it by name rather
+          # than assuming an additional directory level in build/bin.
+          main_executable="$(find universal -type f -name NoSpherA2 -perm -111 -print -quit)"
+          if [[ -z "${main_executable}" ]]; then
+            echo "Universal NoSpherA2 executable not found" >&2
+            exit 1
+          fi
+          
+          echo "Verifying universal executable: ${main_executable}"
+          lipo -info "${main_executable}"
+          lipo "${main_executable}" -verify_arch arm64 x86_64
+
+          echo "Universal executable contains both arm64 and x86_64."
+
+      - name: Package universal macOS artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf artifacts/NoSpherA2-macos-universal.tar.gz -C universal .
+          ls -lah artifacts/NoSpherA2-macos-universal.tar.gz
+
+      - name: Upload universal macOS artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: NoSpherA2-macos-universal
+          path: artifacts/NoSpherA2-macos-universal.tar.gz
+          if-no-files-found: error
+
+  # GitHub CodeQL C/C++ analysis. It performs a clean Linux configuration and
+  # compilation so CodeQL can observe the compiler invocations.
+  codeql:
+    name: CodeQL C/C++ Analysis
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          languages: c-cpp
+          build-mode: manual
+
+      - name: Bootstrap micromamba environment
+        shell: bash
+        run: cmake -P scripts/BootstrapMicromamba.cmake
+
+      - name: Configure project for CodeQL
+        shell: bash
+        run: >-
+          cmake --preset release-linux
+          -DNOSPHERA2_BUILD_TESTS=OFF
+          -DNOSPHERA2_DEPENDENCIES_ONLY=OFF
+
+      - name: Build project for CodeQL
+        shell: bash
+        run: cmake --build --preset release-linux --parallel 4
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          category: /language:c-cpp
+
+  # Flawfinder is intentionally non-blocking initially. Its SARIF output is
+  # still uploaded to the repository's Security tab for triage.
+  flawfinder:
+    name: Flawfinder Analysis
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Install Flawfinder
+        shell: bash
+        run: python3 -m pip install --disable-pip-version-check flawfinder
+
+      - name: Run Flawfinder
+        shell: bash
+        run: |
+          set -o pipefail
+          flawfinder --sarif Src > flawfinder-results.sarif
+
+      - name: Upload Flawfinder SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flawfinder-results
+          path: flawfinder-results.sarif
+          if-no-files-found: warn
+
+      - name: Upload Flawfinder results to Security tab
+        if: always()
         uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
         with:
-          sarif_file: ${{github.workspace}}/flawfinder_results.sarif
+          sarif_file: flawfinder-results.sarif
           category: flawfinder
