@@ -110,7 +110,7 @@ cmake --preset release-macos-universal
 
 ### Creating a Pull Request
 
-1. **Fork the repository** and create a new branch for your feature or bugfix.ö
+1. **Fork the repository** and create a new branch for your feature or bugfix.
 2. **Write clear, concise commit messages** describing your changes.
 3. **Ensure your code builds and passes all tests** on your platform.
 4. **Push your branch** to your fork and open a Pull Request (PR) against the `main` branch of this repository.
