@@ -387,6 +387,8 @@ public:
     const d3 get_atom_pos(const unsigned int& nr) const;
     /** Get atom label (element name + index). */
     const std::string get_atom_label(const unsigned int& nr) const;
+    /** Get atom ID. */
+    const uint64_t get_id_for_atom(const int nr) { return atoms[nr].get_ID(); }
     /** Number of atoms with a basis set loaded. */
     const int get_nr_basis_set_loaded() const;
     /** Does atom nr have a basis set loaded? */
@@ -422,7 +424,7 @@ public:
     /** End primitive index (relative) for shell. */
     const int get_shell_end(const unsigned int& nr_atom, const unsigned int& nr_shell) const;
     /** Add new atom with coordinates + charge. */
-    bool push_back_atom(const std::string& label, const double& x, const double& y, const double& z, const int& charge, const std::string& ID = "0000000000000");
+    bool push_back_atom(const std::string& label, const double& x, const double& y, const double& z, const int& charge, const uint64_t& ID = 0);
     /** Add existing atom object (copy). */
     bool push_back_atom(const atom& given);
     /** Safe atom accessor (returns default atom if out of range). */

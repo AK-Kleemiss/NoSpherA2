@@ -139,7 +139,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     charge = occ_WF.charge();
     const occ::Mat3N atom_positions = occ_WF.positions();
     for (long i = 0; i < occ_WF.atoms.size(); i++) {
-        push_back_atom(constants::atnr2letter(occ_WF.atoms[i].atomic_number), atom_positions(0, i), atom_positions(1, i), atom_positions(2, i), static_cast<int>(occ_WF.nuclear_charges()(i)), "");
+        push_back_atom(constants::atnr2letter(occ_WF.atoms[i].atomic_number), atom_positions(0, i), atom_positions(1, i), atom_positions(2, i), static_cast<int>(occ_WF.nuclear_charges()(i)), 0);
     }
     auto &shells = occ_WF.basis.shells();
 
@@ -291,7 +291,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     }
 }
 
-bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string &ID)
+bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const uint64_t &ID)
 {
     ncen++;
     if (_charge >= 1)
@@ -2515,7 +2515,7 @@ __________________________________
 
 */
         for (int i = 0; i < 7; i++) getline(rf, line); //skip 6 lines to get to the shells
-        atom temp_at(atom_type, "0000000000000", 0, 0, 0, 0, constants::get_Z_from_label(atom_type.c_str()));
+        atom temp_at(atom_type, 0, 0, 0, 0, 0, constants::get_Z_from_label(atom_type.c_str()));
         for (int s = 0; s < shells_local; s++)
         {
             //getline(rf, line); //get shell line
@@ -8959,7 +8959,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     // making it into the wavefunction data
     for (int i = 0; i < ncent; i++)
     {
-        err_checkf(push_back_atom(atom(atyp[i], "0000000000000", i, x[i], y[i], z[i], _charge[i])), "Error adding atom to WFN!", file);
+        err_checkf(push_back_atom(atom(atyp[i], 0, i, x[i], y[i], z[i], _charge[i])), "Error adding atom to WFN!", file);
     }
     err_checkf(ncen == ncent, "Error adding atoms to WFN!", file);
 

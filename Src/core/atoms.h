@@ -43,7 +43,7 @@ public:
 class atom {
 private:
     std::string label;
-    std::string ID;
+    uint64_t ID;
     int nr, charge, ECP_electrons;
     double x, y, z;
     d3 frac_coords;
@@ -58,8 +58,8 @@ private:
     bool is_asym = false;
 public:
     atom();
-    atom(const std::string& l, const std::string& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch);
-    atom(const std::string& l, const std::string& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
+    atom(const std::string& l, const uint64_t& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch);
+    atom(const std::string& l, const uint64_t& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
     atom& operator=(const atom& rhs);
     void print_values() const;
     bool push_back_basis_set(const double & exponent, const double &coefficient, const int &type, const int &shell);
@@ -69,9 +69,8 @@ public:
     void assign_ADPs(vec& second, vec& third, vec& fourth);
     void assign_ADPs(vec& second);
     void assign_ADPs(double& Uiso);
-    void assign_ID(const std::string& id);
-    void set_ID(const std::string& id);
-    std::string get_ID() const;
+    void set_ID(const uint64_t& id);
+    uint64_t get_ID(const int dat = 0);
     const basis_set_entry& get_basis_set_entry(const int& _nr) const { return basis_set[_nr]; };
     // Non-const overload to obtain a mutable reference
     basis_set_entry& get_basis_set_entry(const int& _nr) { return basis_set[_nr]; }
@@ -121,6 +120,6 @@ public:
     void set_is_asym(const bool& val) { is_asym = val; };
     double distance_to(const atom& other) const;
 
-
+    uint64_t calculate_better_ID(const int& charge, const double& frac_x, const double& frac_y, const double& frac_z, const int& dat = 0);
     bool operator==(const atom& other) const;
 };

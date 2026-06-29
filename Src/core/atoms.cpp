@@ -21,7 +21,7 @@ basis_set_entry::basis_set_entry(double g_coefficient, double g_exponent, unsign
 
 atom::atom() {
     label = '?';
-    ID = "0000000000000";
+    ID = 0;
     nr = 0;
     x = 0.0;
     y = 0.0;
@@ -34,7 +34,7 @@ atom::atom() {
 };
 
 atom::atom(const std::string& l, 
-    const std::string& id, 
+    const uint64_t& id, 
     const int& n, 
     const double& c1, 
     const double& c2, 
@@ -43,7 +43,7 @@ atom::atom(const std::string& l,
 {};
 
 atom::atom(const std::string& l, 
-    const std::string& id, 
+    const uint64_t& id,
     const int& n, 
     const double& c1, 
     const double& c2, 
@@ -158,15 +158,68 @@ void atom::assign_ADPs(vec& second, vec& third, vec& fourth) {
     }
 };
 
-void atom::assign_ID(const std::string& id) {
+void atom::set_ID(const uint64_t& id) {
     ID = id;
 };
 
-void atom::set_ID(const std::string& id) {
-    ID = id;
+/*
+* Helper function to calculate a scatterer ID based on the element and fractional coordinates
+*/
+struct scatterer_id_masks_d2 {
+    const static uint64_t
+        z_mask = 0x00000000000000FF,
+        a_mask = 0x0000000001FFFF00,
+        b_mask = 0x000003FFFE000000,
+        c_mask = 0x07FFFC0000000000,
+        a_sig = 0x0800000000000000,
+        b_sig = 0x1000000000000000,
+        c_sig = 0x2000000000000000,
+        d_mask = 0xC000000000000000,
+        mask_m = 0x000000000001FFFF; // max crd value
+    const static int a_shift = 17;
 };
 
-std::string atom::get_ID() const {
+//  0-8 - z, 8-25, 25-42, 42-59 - a, b c, 59-61 - signs, 62-64 - dat precision : ~0.0000077
+uint64_t atom::get_ID(const int dat){
+    if (ID != 0) return ID;
+    if (frac_coords[0] + frac_coords[1] + frac_coords[2] == 0.0) {
+        std::cout << "Warning: Fractional coordinates are all zero, cannot calculate ID! Returning 0." << std::endl;
+        return 0;
+    }
+
+    const int cell_m = 1; // magic number for the cell size, can be changed to 16 or 1, if interested read for yourself
+    const double multiplier = 1; // multiplier for the precision of the coordinates
+
+    ID = ((uint64_t)charge) & scatterer_id_masks_d2::z_mask;
+    static const int64_t k = scatterer_id_masks_d2::mask_m / cell_m;
+    int64_t coord_val = multiplier == 1 ? (int64_t)(frac_coords[0] * k)
+        : ((int64_t)round(frac_coords[0] * multiplier)) / multiplier * k;
+    if (coord_val < 0) {
+        ID |= scatterer_id_masks_d2::a_sig;
+        ID |= (((-coord_val) << 8) & scatterer_id_masks_d2::a_mask);
+    }
+    else {
+        ID |= ((std::abs(coord_val) << 8) & scatterer_id_masks_d2::a_mask);
+    }
+    coord_val = multiplier == 1 ? (int64_t)(frac_coords[1] * k)
+        : ((int64_t)round(frac_coords[1] * multiplier)) / multiplier * k;
+    if (coord_val < 0) {
+        ID |= scatterer_id_masks_d2::b_sig;
+        ID |= (((-coord_val) << (8 + scatterer_id_masks_d2::a_shift)) & scatterer_id_masks_d2::b_mask);
+    }
+    else {
+        ID |= ((coord_val << (8 + scatterer_id_masks_d2::a_shift)) & scatterer_id_masks_d2::b_mask);
+    }
+    coord_val = multiplier == 1 ? (int64_t)(frac_coords[2] * k)
+        : ((int64_t)round(frac_coords[2] * multiplier)) / multiplier * k;
+    if (coord_val < 0) {
+        ID |= scatterer_id_masks_d2::c_sig;
+        ID |= (((-coord_val) << (8 + scatterer_id_masks_d2::a_shift * 2)) & scatterer_id_masks_d2::c_mask);
+    }
+    else {
+        ID |= ((coord_val << (8 + scatterer_id_masks_d2::a_shift * 2)) & scatterer_id_masks_d2::c_mask);
+    }
+    ID |= (((int64_t)dat << (8 + scatterer_id_masks_d2::a_shift * 3) + 3) & scatterer_id_masks_d2::d_mask);
     return ID;
 };
 

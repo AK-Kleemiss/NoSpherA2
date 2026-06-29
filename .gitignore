@@ -15,47 +15,43 @@
 *.o
 
 #Explicit Files to ignore
-tests/alanine_integrated_occ/alanine.owf.fchk
-tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
-tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_lap.cube
-tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_eli.cube
-tests/epoxide_gbw/converted.wfn
-tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
-tests/reading_SALTED/alanine_rho.cube
-tests/reading_SALTED/ORCA/water_monomer.densities
-tests/reading_SALTED/ORCA/water_monomer.gbw
-tests/reading_SALTED/ORCA/water_monomer.inp
-tests/reading_SALTED/ORCA/water_monomer.wfn
-tests/reading_SALTED/ORCA/water_monomer.wfx
-tests/reading_SALTED/ORCA/water_monomer_property.txt
-tests/reading_SALTED/visualize water
-tests/reading_SALTED/water_monomer_rho.cube
-tests/reading_SALTED/water_rho.cube
-tests/ECP_SF/Atomic_densities/*.gbw
-tests/Coeffs_From_ML/*
-tests/reading_ML_Coeffs
-tests/SALTED/sfacs.dat
-tests/cytidine_tonto/temp_wavefunction.wfn
-tests/SALTED/temp_rascaline.xyz
-tests/grown/temp_wavefunction.wfn
-tests/RI_Test_2
-tests/NiP3_fchk/log.fchk
-Src/basis_data.cpp
-tests/src/cmake_test_discovery_e3b0c44298.json
-.mambaenv
+/tests/alanine_integrated_occ/alanine.owf.fchk
+/tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
+/tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_lap.cube
+/tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_eli.cube
+/tests/epoxide_gbw/converted.wfn
+/tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
+/tests/reading_SALTED/alanine_rho.cube
+/tests/reading_SALTED/ORCA/water_monomer.densities
+/tests/reading_SALTED/ORCA/water_monomer.gbw
+/tests/reading_SALTED/ORCA/water_monomer.inp
+/tests/reading_SALTED/ORCA/water_monomer.wfn
+/tests/reading_SALTED/ORCA/water_monomer.wfx
+/tests/reading_SALTED/ORCA/water_monomer_property.txt
+/tests/reading_SALTED/visualize water
+/tests/reading_SALTED/water_monomer_rho.cube
+/tests/reading_SALTED/water_rho.cube
+/tests/ECP_SF/Atomic_densities/*.gbw
+/tests/Coeffs_From_ML/*
+/tests/reading_ML_Coeffs
+/tests/SALTED/sfacs.dat
+/tests/cytidine_tonto/temp_wavefunction.wfn
+/tests/SALTED/temp_rascaline.xyz
+/tests/grown/temp_wavefunction.wfn
+/tests/RI_Test_2
+/tests/NiP3_fchk/log.fchk
+/Src/basis_data.cpp
+/tests/src/cmake_test_discovery_e3b0c44298.json
+/.mambaenv
 
 checkpoint.txt
-./intel-onemkl*.sh
+/intel-onemkl*.sh
 
-./Windows/Windows_utils/Build_Dependencies/deps.stamp
-./Windows/Windows_utils/Build_Dependencies/**
+/Windows/Windows_utils/Build_Dependencies/deps.stamp
+/Windows/Windows_utils/Build_Dependencies/**
 
 #Folders created by build
-./build*
-./Windows/NoSpherA2*/**
-./Windows/Tests/**
-deps-install-*
-
-#Libs
-./Lib/*
-
+/build
+/Windows/NoSpherA2*/**
+/Windows/Tests/**
+/deps-install-*

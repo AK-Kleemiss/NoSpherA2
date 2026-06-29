@@ -820,7 +820,7 @@ void generate_fractional_hkl(const double& dmin,
 svec read_atoms_from_CIF(std::ifstream& cif_input,
 	const ivec& input_groups,
 	const cell& unit_cell,
-	const WFN& wave,
+	WFN& wave,
 	const svec& known_atoms,
 	ivec& atom_type_list,
 	ivec& asym_atom_to_type_list,
@@ -946,6 +946,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					}
 					if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
 					{
+						wave.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
 						string element = constants::atnr2letter(wave.get_atom_charge(i));
 						err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
 						string label = fields[label_field];
@@ -2557,9 +2558,14 @@ tsc_block_type calculate_scattering_factors(
             hkl);
     }
 
+	std::vector<uint64_t> IDs(asym_atom_list.size());
+	for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++) {
+		IDs[atm_idx] = wavy->get_id_for_atom(asym_atom_list[atm_idx]);
+	}
+
     tsc_block_type blocky(
         sf,
-        labels,
+        IDs,
         hkl);
 
     if (opt.needs_Thakkar_fill)

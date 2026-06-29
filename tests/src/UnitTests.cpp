@@ -9,6 +9,7 @@
 #include "core/scattering_factors.h"
 #include "core/nos_math.h"
 #include "core/GridManager.h"
+#include "core/atoms.h"
 
 static constexpr double PI_VAL = 3.14159265358979323846;
 
@@ -1692,5 +1693,280 @@ namespace NoSpherA2UnitTests
         EXPECT_TRUE(std::isfinite(lam));
         EXPECT_TRUE(lam > 0.0); // positive definite matrix
     }
+
+    // -----------------------------------------------------------------------
+    // Atom Tests 
+    // -----------------------------------------------------------------------
+    class AtomTest : public ::testing::Test {
+    protected:
+        static constexpr double kTolerance = 1.0e-12;
+
+        static constexpr std::uint64_t kZMask = 0x00000000000000FFULL;
+        static constexpr std::uint64_t kAMask = 0x0000000001FFFF00ULL;
+        static constexpr std::uint64_t kBMask = 0x000003FFFE000000ULL;
+        static constexpr std::uint64_t kCMask = 0x07FFFC0000000000ULL;
+        static constexpr std::uint64_t kASign = 0x0800000000000000ULL;
+        static constexpr std::uint64_t kBSign = 0x1000000000000000ULL;
+        static constexpr std::uint64_t kCSign = 0x2000000000000000ULL;
+        static constexpr std::uint64_t kDatMask = 0xC000000000000000ULL;
+
+        static constexpr std::int64_t kCoordinateMaximum = 0x1FFFF;
+
+        static atom make_atom()
+        {
+            return atom{
+                "C1",
+                std::uint64_t{0},
+                6,
+                1.25,
+                -2.5,
+                3.75,
+                0
+            };
+        }
+
+        static atom make_atom_fractional(
+            const int charge,
+            const double x,
+            const double y,
+            const double z)
+        {
+            atom result{
+                "Test",
+                std::uint64_t{0},
+                charge,
+                0.0,
+                0.0,
+                0.0,
+                charge
+            };
+
+            result.set_frac_coords(d3{ x, y, z });
+            return result;
+        }
+
+        static std::uint64_t extractA(const std::uint64_t id)
+        {
+            return (id & kAMask) >> 8;
+        }
+
+        static std::uint64_t extractB(const std::uint64_t id)
+        {
+            return (id & kBMask) >> 25;
+        }
+
+        static std::uint64_t extractC(const std::uint64_t id)
+        {
+            return (id & kCMask) >> 42;
+        }
+
+        static std::uint64_t extractDat(const std::uint64_t id)
+        {
+            return (id & kDatMask) >> 62;
+        }
+    };
+
+    TEST_F(AtomTest, IDZeroFractionalCoordinatesReturnZero)
+    {
+        atom value =
+            make_atom_fractional(6, 0.0, 0.0, 0.0);
+
+        EXPECT_EQ(value.get_ID(), std::uint64_t{ 0 });
+    }
+
+    TEST_F(AtomTest, IDEncodesChargeCoordinatesAndDat)
+    {
+        atom value = make_atom_fractional(
+            6,
+            1.0 / static_cast<double>(kCoordinateMaximum),
+            2.0 / static_cast<double>(kCoordinateMaximum),
+            3.0 / static_cast<double>(kCoordinateMaximum)
+        );
+
+        const std::uint64_t id = value.get_ID(2);
+
+        EXPECT_EQ(id & kZMask, std::uint64_t{ 6 });
+        EXPECT_EQ(extractA(id), std::uint64_t{ 1 });
+        EXPECT_EQ(extractB(id), std::uint64_t{ 2 });
+        EXPECT_EQ(extractC(id), std::uint64_t{ 3 });
+        EXPECT_EQ(extractDat(id), std::uint64_t{ 2 });
+    }
+
+    TEST_F(AtomTest, IDEncodesCoordinateSignsSeparatelyFromMagnitude)
+    {
+        atom positive =
+            make_atom_fractional(6, 0.1, 0.2, 0.3);
+
+        atom negative =
+            make_atom_fractional(6, -0.1, -0.2, -0.3);
+
+        const std::uint64_t positiveId = positive.get_ID();
+        const std::uint64_t negativeId = negative.get_ID();
+
+        EXPECT_EQ(extractA(positiveId), extractA(negativeId));
+        EXPECT_EQ(extractB(positiveId), extractB(negativeId));
+        EXPECT_EQ(extractC(positiveId), extractC(negativeId));
+
+        EXPECT_EQ(positiveId & (kASign | kBSign | kCSign), 0u);
+        EXPECT_EQ(
+            negativeId & (kASign | kBSign | kCSign),
+            kASign | kBSign | kCSign
+        );
+    }
+
+    TEST_F(AtomTest, IDFractionalCoordinatesAreTruncated)
+    {
+        atom value =
+            make_atom_fractional(6, 0.5, 0.5, 0.5);
+
+        const std::uint64_t id = value.get_ID();
+
+        // static_cast<int64_t>(0.5 * 131071) truncates to 65535.
+        constexpr std::uint64_t expected = 65535;
+
+        EXPECT_EQ(extractA(id), expected);
+        EXPECT_EQ(extractB(id), expected);
+        EXPECT_EQ(extractC(id), expected);
+    }
+
+    TEST_F(AtomTest, IDIsCachedUntilExplicitlyReset)
+    {
+        atom value =
+            make_atom_fractional(6, 0.1, 0.2, 0.3);
+
+        const std::uint64_t originalId = value.get_ID(0);
+
+        value.set_frac_coords(d3{ 0.7, 0.8, 0.9 });
+        value.set_charge(8);
+
+        EXPECT_EQ(value.get_ID(3), originalId);
+
+        value.set_ID(0);
+
+        EXPECT_NE(value.get_ID(3), originalId);
+    }
+
+    TEST_F(AtomTest, IDToStringAndBack)
+    {
+        atom value =
+            make_atom_fractional(6, 0.1, 0.2, 0.3);
+
+        const std::uint64_t originalId = value.get_ID(0);
+
+        const std::string idStr = std::to_string(originalId);
+        const std::uint64_t parsedId = std::stoull(idStr);
+
+        EXPECT_EQ(parsedId, originalId);
+    }
+
+
+// -----------------------------------------------------------------------
+// Non-trivial atom behavior
+// -----------------------------------------------------------------------
+
+TEST_F(AtomTest, DistanceToOtherAtomIsEuclideanDistance)
+{
+    const atom first{
+        "A",
+        std::uint64_t{1},
+        1,
+        1.0,
+        2.0,
+        3.0,
+        0
+    };
+
+    const atom second{
+        "B",
+        std::uint64_t{2},
+        1,
+        4.0,
+        6.0,
+        3.0,
+        0
+    };
+
+    EXPECT_NEAR(first.distance_to(second), 5.0, kTolerance);
+    EXPECT_NEAR(second.distance_to(first), 5.0, kTolerance);
+}
+
+TEST_F(AtomTest, BasisSetSupportsAddingModifyingAndErasingEntries)
+{
+    atom value = make_atom();
+
+    ASSERT_TRUE(value.push_back_basis_set(10.0, 0.1, 1, 0));
+    ASSERT_TRUE(value.push_back_basis_set(20.0, 0.2, 2, 1));
+    ASSERT_TRUE(value.push_back_basis_set(30.0, 0.3, 3, 2));
+
+    value.set_basis_set_exponent(1, 25.0);
+    value.set_basis_set_coefficient(1, 0.25);
+
+    EXPECT_DOUBLE_EQ(value.get_basis_set_exponent(1), 25.0);
+    EXPECT_DOUBLE_EQ(value.get_basis_set_coefficient(1), 0.25);
+
+    value.erase_basis_set(0);
+
+    ASSERT_EQ(value.get_basis_set_size(), 2u);
+    EXPECT_DOUBLE_EQ(value.get_basis_set_exponent(0), 25.0);
+    EXPECT_DOUBLE_EQ(value.get_basis_set_exponent(1), 30.0);
+}
+
+TEST_F(AtomTest, IndexedShellCountSetterExpandsAndZeroInitializesVector)
+{
+    atom value = make_atom();
+
+    value.set_shellcount(3u, 9u);
+
+    ASSERT_EQ(value.get_shellcount_size(), 4u);
+    EXPECT_EQ(value.get_shellcount(0u), 0u);
+    EXPECT_EQ(value.get_shellcount(1u), 0u);
+    EXPECT_EQ(value.get_shellcount(2u), 0u);
+    EXPECT_EQ(value.get_shellcount(3u), 9u);
+}
+
+TEST_F(AtomTest, AssignmentPerformsDeepCopy)
+{
+    atom source{
+        "O1",
+        std::uint64_t{555},
+        8,
+        1.0,
+        2.0,
+        3.0,
+        -2,
+        2
+    };
+
+    source.set_frac_coords(d3{ 0.1, 0.2, 0.3 });
+    source.set_shellcount(std::vector<unsigned int>{2u, 3u});
+    ASSERT_TRUE(source.push_back_basis_set(25.0, 0.75, 2, 1));
+
+    atom destination;
+    destination = source;
+
+    destination.set_label("Changed");
+    destination.set_basis_set_exponent(0, 999.0);
+    destination.set_shellcount(0u, 99u);
+
+    EXPECT_EQ(source.get_label(), "O1");
+    EXPECT_DOUBLE_EQ(source.get_basis_set_exponent(0), 25.0);
+    EXPECT_EQ(source.get_shellcount(0u), 2u);
+
+    EXPECT_EQ(destination.get_label(), "Changed");
+    EXPECT_DOUBLE_EQ(destination.get_basis_set_exponent(0), 999.0);
+    EXPECT_EQ(destination.get_shellcount(0u), 99u);
+}
+
+TEST_F(AtomTest, EqualityDetectsMeaningfulDifference)
+{
+    atom first = make_atom();
+    atom second = make_atom();
+
+    EXPECT_TRUE(first == second);
+
+    ASSERT_TRUE(second.push_back_basis_set(10.0, 0.5, 1, 0));
+
+    EXPECT_FALSE(first == second);
+}
 
 } // namespace NoSpherA2UnitTests

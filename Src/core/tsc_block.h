@@ -111,6 +111,34 @@ public:
         }
         anomalous_dispersion = false;
     };
+    tsc_block(
+        std::vector<std::vector<numtype>>& given_sf,
+        std::vector<uint64_t>& given_IDs,
+        hkl_list& given_index)
+    {
+        NaN = "NaN in SF! ";
+        sf.resize(given_sf.size());
+#pragma omp parallel for
+        for (int i = 0; i < given_sf.size(); i++)
+        {
+            sf[i].resize(given_sf[i].size());
+            for (int j = 0; j < given_sf[i].size(); j++)
+            {
+                err_checkf(is_nan(given_sf[i][j]) == false, NaN, std::cout);
+                sf[i][j] = given_sf[i][j];
+            }
+        }
+        for (const uint64_t id : given_IDs) {
+            scatterer.push_back(std::to_string(id));
+        }
+        index.resize(3);
+        for (const i3& hkl : given_index)
+        {
+            for (int i = 0; i < 3; i++)
+                index[i].push_back(hkl[i]);
+        }
+        anomalous_dispersion = false;
+    };
     tsc_block(std::filesystem::path& file_name)
     {
         NaN = "NaN in SF! ";
