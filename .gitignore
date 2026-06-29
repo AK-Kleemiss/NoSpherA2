@@ -8,7 +8,7 @@
 *.ifc
 *.so
 *.dylib
-__pycache__
+*__pycache__*
 *.exe
 *.dll
 *.d
@@ -38,25 +38,24 @@ tests/SALTED/sfacs.dat
 tests/cytidine_tonto/temp_wavefunction.wfn
 tests/SALTED/temp_rascaline.xyz
 tests/grown/temp_wavefunction.wfn
-/tests/RI_Test_2
+tests/RI_Test_2
 tests/NiP3_fchk/log.fchk
 Src/basis_data.cpp
 tests/src/cmake_test_discovery_e3b0c44298.json
 .mambaenv
 
 checkpoint.txt
-/intel-onemkl*.sh
+./intel-onemkl*.sh
 
-/Windows/Windows_utils/Build_Dependencies/deps.stamp
-/Windows/Windows_utils/MKL.auto.props
-/Windows/Windows_utils/Build_Dependencies/*/*
+./Windows/Windows_utils/Build_Dependencies/deps.stamp
+./Windows/Windows_utils/Build_Dependencies/**
 
 #Folders created by build
-/build*
-/Windows/NoSpherA2*/*/*
-/Windows/Tests/*/*
+./build*
+./Windows/NoSpherA2*/**
+./Windows/Tests/**
 deps-install-*
 
 #Libs
-/Lib/*
+./Lib/*
 
