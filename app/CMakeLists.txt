@@ -19,14 +19,13 @@ target_compile_features(
         cxx_std_20
 )
 
-if (NOT APPLE)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE AND NOT WIN32)
     target_link_options(
         NoSpherA2
         PRIVATE
             -static-libstdc++
             -static-libgcc
     )
-else()
 endif()
 
 target_link_libraries(
