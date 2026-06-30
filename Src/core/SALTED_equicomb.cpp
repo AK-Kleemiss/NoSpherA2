@@ -115,7 +115,11 @@ void equicomb(int natoms, int nrad1, int nrad2,
                             const cdouble *__restrict cvec_ptr = c2r[i].data();
                             const double *__restrict pvec_real_ptr = pcmplx_real.data();
                             const double *__restrict pvec_imag_ptr = pcmplx_imag.data();
-#pragma ivdep
+#if defined(_MSC_VER)
+#pragma loop(ivdep)
+#elif defined(__GNUC__) || defined(__clang__)
+#pragma GCC ivdep
+#endif
                             for (j = 0; j < l21; ++j)
                             {
                                 const cdouble &c2r_ih = cvec_ptr[j];

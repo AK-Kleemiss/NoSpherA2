@@ -743,7 +743,11 @@ double cube::ewald_sum(const int kMax, const double conv) {
 #pragma omp parallel for reduction(+:temp)
                     for (int d1 = 0; d1 < size[0]; d1++) {
                         double v1 = 0, kDotR = 0;
-#pragma ivdep
+#if defined(_MSC_VER)
+#pragma loop(ivdep)
+#elif defined(__GNUC__) || defined(__clang__)
+#pragma GCC ivdep
+#endif
                         for (int d2 = 0; d2 < size[1]; d2++) {
                             for (int d3_ = 0; d3_ < size[2]; d3_++) {
                                 v1 = values[d1][d2][d3_];

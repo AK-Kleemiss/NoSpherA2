@@ -891,7 +891,6 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
         for (int j = 0; j < n; j++) {
             jn = j * n;
             T = &Temp2[in + j];
-#pragma simd
             for (int k = 0; k < n; k++)
                 *T += V[in + k] * W[k] * V[jn + k];
         }

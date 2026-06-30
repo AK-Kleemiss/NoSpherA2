@@ -986,7 +986,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
     }
 
 #ifdef _OPENMP
-#pragma omp parallel for collapse(2) schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
 #endif
     for (int x = 0; x < size_x; x++) {
         for (int y = 0; y < size_y; y++) {

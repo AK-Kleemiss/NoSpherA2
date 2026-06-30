@@ -387,7 +387,11 @@ int GTOcontract_exp0(double* ectr, double* coord, double* alpha, double* coeff,
     double* gridy = coord + BLKSIZE;
     double* gridz = coord + BLKSIZE * 2;
 
+#if defined(_MSC_VER)
+#pragma loop(ivdep)
+#elif defined(__GNUC__) || defined(__clang__)
 #pragma GCC ivdep
+#endif
     for (i = 0; i < ngrids; i++) {
         rr[i] = gridx[i] * gridx[i] + gridy[i] * gridy[i] + gridz[i] * gridz[i];
     }
@@ -416,7 +420,11 @@ static void _fill_grid2atm(double* grid2atm, double* coord, size_t bgrids, size_
     double* r_atm;
     for (atm_id = 0; atm_id < natm; atm_id++) {
         r_atm = env + atm[PTR_COORD + atm_id * ATM_SLOTS];
+#if defined(_MSC_VER)
+#pragma loop(ivdep)
+#elif defined(__GNUC__) || defined(__clang__)
 #pragma GCC ivdep
+#endif
         for (ig = 0; ig < bgrids; ig++) {
             grid2atm[0 * BLKSIZE + ig] = coord[0 * ngrids + ig] - r_atm[0];
             grid2atm[1 * BLKSIZE + ig] = coord[1 * ngrids + ig] - r_atm[1];
@@ -529,7 +537,11 @@ void GTOshell_eval_grid_cart(double* gto, double* ri, double* exps,
         break;
     case 1:
         for (k = 0; k < nc; k++) {
+#if defined(_MSC_VER)
+#pragma loop(ivdep)
+#elif defined(__GNUC__) || defined(__clang__)
 #pragma GCC ivdep
+#endif
             for (i = 0; i < blksize; i++) {
                 gto[i] = gridx[i] * exps[k * BLKSIZE + i];
                 gto[1 * ngrids + i] = gridy[i] * exps[k * BLKSIZE + i];
@@ -540,7 +552,11 @@ void GTOshell_eval_grid_cart(double* gto, double* ri, double* exps,
         break;
     case 2:
         for (k = 0; k < nc; k++) {
+#if defined(_MSC_VER)
+#pragma loop(ivdep)
+#elif defined(__GNUC__) || defined(__clang__)
 #pragma GCC ivdep
+#endif
             for (i = 0; i < blksize; i++) {
                 gto[i] = exps[k * BLKSIZE + i] * gridx[i] * gridx[i]; // xx
                 gto[1 * ngrids + i] = exps[k * BLKSIZE + i] * gridx[i] * gridy[i]; // xy
@@ -554,7 +570,11 @@ void GTOshell_eval_grid_cart(double* gto, double* ri, double* exps,
         break;
     case 3:
         for (k = 0; k < nc; k++) {
+#if defined(_MSC_VER)
+#pragma loop(ivdep)
+#elif defined(__GNUC__) || defined(__clang__)
 #pragma GCC ivdep
+#endif
             for (i = 0; i < blksize; i++) {
                 gto[i] = exps[k * BLKSIZE + i] * gridx[i] * gridx[i] * gridx[i]; // xxx
                 gto[1 * ngrids + i] = exps[k * BLKSIZE + i] * gridx[i] * gridx[i] * gridy[i]; // xxy
@@ -578,7 +598,11 @@ void GTOshell_eval_grid_cart(double* gto, double* ri, double* exps,
                 zpows[i] = 1;
             }
             for (lx = 1; lx <= l; lx++) {
+#if defined(_MSC_VER)
+#pragma loop(ivdep)
+#elif defined(__GNUC__) || defined(__clang__)
 #pragma GCC ivdep
+#endif
                 for (i = 0; i < blksize; i++) {
                     xpows[lx * BLKSIZE + i] = xpows[(lx - 1) * BLKSIZE + i] * gridx[i];
                     ypows[lx * BLKSIZE + i] = ypows[(lx - 1) * BLKSIZE + i] * gridy[i];
@@ -588,7 +612,11 @@ void GTOshell_eval_grid_cart(double* gto, double* ri, double* exps,
             for (lx = l; lx >= 0; lx--) {
                 for (ly = l - lx; ly >= 0; ly--) {
                     lz = l - lx - ly;
+#if defined(_MSC_VER)
+#pragma loop(ivdep)
+#elif defined(__GNUC__) || defined(__clang__)
 #pragma GCC ivdep
+#endif
                     for (i = 0; i < blksize; i++) {
                         gto[i] = xpows[lx * BLKSIZE + i]
                             * ypows[ly * BLKSIZE + i]

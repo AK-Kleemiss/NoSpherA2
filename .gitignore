@@ -16,6 +16,8 @@
 
 #Explicit Files to ignore
 tests/alanine_integrated_occ/alanine.owf.fchk
+tests/alanine_integrated_occ/basis/*
+tests/alanine_integrated_occ/methods/*
 tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
 tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_lap.cube
 tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_eli.cube
@@ -45,17 +47,17 @@ tests/src/cmake_test_discovery_e3b0c44298.json
 .mambaenv
 
 checkpoint.txt
-./intel-onemkl*.sh
+intel-onemkl*.sh
 
-./Windows/Windows_utils/Build_Dependencies/deps.stamp
-./Windows/Windows_utils/Build_Dependencies/**
+Windows/Windows_utils/Build_Dependencies/deps.stamp
+Windows/Windows_utils/Build_Dependencies/**
 
 #Folders created by build
-./build*
-./Windows/NoSpherA2*/**
-./Windows/Tests/**
+build*
+Windows/NoSpherA2*/**
+Windows/Tests/**
 deps-install-*
 
 #Libs
-./Lib/*
+Lib/*
 
