@@ -214,6 +214,7 @@ std::string help_message =
     "   -profiling      [tests_root]             Runs the internal profiling suite (all test paths). Optional root defaults to ./tests\n"
     "   -promol_nci      <frag1.xyz> <frag2.xyz> [rcut1] [rcut2] [rho_abs_max] [rdg_max]\n"
     "                                            Promolecular NCI/RDG analysis from two XYZ fragments using Thakkar spherical atom densities.\n"
+    "                                            Put -resolution and -radius before -promol_nci if overriding their defaults.\n"
     "                                            Defaults: rcut1=0.95 dominant-fragment discard, rcut2=0.75 fragment-sum keep;\n"
     "                                            output: <frag1>_<frag2>_signed_rho.cube,\n"
     "                                            <frag1>_<frag2>_rdg.cube, <frag1>_<frag2>_values.dat,\n"

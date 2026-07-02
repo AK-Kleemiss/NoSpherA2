@@ -1120,6 +1120,91 @@ bool cube::set_origin(unsigned int i, double value)
     return (true);
 };
 
+bool cube::find_value_bounds(i3 &lower, i3 &upper, double ignore_value, double tolerance, int padding) const
+{
+    if (!loaded || size[0] <= 0 || size[1] <= 0 || size[2] <= 0)
+        return false;
+
+    lower = { size[0], size[1], size[2] };
+    upper = { -1, -1, -1 };
+
+    for (int x = 0; x < size[0]; x++)
+    {
+        for (int y = 0; y < size[1]; y++)
+        {
+            for (int z = 0; z < size[2]; z++)
+            {
+                const double value = values[x][y][z];
+                if (!std::isfinite(value))
+                    continue;
+                if (std::abs(value - ignore_value) <= tolerance)
+                    continue;
+
+                lower[0] = std::min(lower[0], x);
+                lower[1] = std::min(lower[1], y);
+                lower[2] = std::min(lower[2], z);
+                upper[0] = std::max(upper[0], x);
+                upper[1] = std::max(upper[1], y);
+                upper[2] = std::max(upper[2], z);
+            }
+        }
+    }
+
+    if (upper[0] < 0)
+        return false;
+
+    for (int i = 0; i < 3; i++)
+    {
+        lower[i] = std::max(0, lower[i] - padding);
+        upper[i] = std::min(size[i] - 1, upper[i] + padding);
+    }
+    return true;
+}
+
+bool cube::shrink_to_bounds(const i3 &lower, const i3 &upper)
+{
+    if (!loaded)
+        return false;
+    for (int i = 0; i < 3; i++)
+        if (lower[i] < 0 || upper[i] < lower[i] || upper[i] >= size[i])
+            return false;
+
+    const i3 new_size = {
+        upper[0] - lower[0] + 1,
+        upper[1] - lower[1] + 1,
+        upper[2] - lower[2] + 1
+    };
+    const d3 new_origin = get_pos(lower[0], lower[1], lower[2]);
+
+    vec3 new_values(new_size[0]);
+#pragma omp parallel for
+    for (int x = 0; x < new_size[0]; x++)
+    {
+        new_values[x].resize(new_size[1]);
+        for (int y = 0; y < new_size[1]; y++)
+        {
+            new_values[x][y].resize(new_size[2]);
+            for (int z = 0; z < new_size[2]; z++)
+                new_values[x][y][z] = values[x + lower[0]][y + lower[1]][z + lower[2]];
+        }
+    }
+
+    size = new_size;
+    origin = new_origin;
+    values = std::move(new_values);
+    calc_dv();
+    return true;
+}
+
+bool cube::shrink_to_values(double ignore_value, double tolerance, int padding)
+{
+    i3 lower;
+    i3 upper;
+    if (!find_value_bounds(lower, upper, ignore_value, tolerance, padding))
+        return false;
+    return shrink_to_bounds(lower, upper);
+}
+
 std::filesystem::path cube::super_cube()
 {
     using namespace std;

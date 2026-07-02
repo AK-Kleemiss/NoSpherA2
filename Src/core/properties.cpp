@@ -678,8 +678,19 @@ struct PromolecularAtom {
     d3 pos;
     int charge = 1;
     int fragment = 0;
-    Thakkar density;
 };
+
+std::vector<Thakkar> make_thakkar_interpolators()
+{
+    std::vector<Thakkar> atom_models;
+    atom_models.reserve(92);
+    for (int a = 0; a < 92; a++)
+    {
+        atom_models.emplace_back(a);
+        atom_models[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
+    }
+    return atom_models;
+}
 
 double cube_value_clamped(const cube &source, int x, int y, int z)
 {
@@ -697,29 +708,15 @@ double cube_axis_step(const cube &source, int axis)
     return std::sqrt(sum);
 }
 
-double promolecular_density_at(
-    const d3 &pos,
-    const std::vector<PromolecularAtom> &atoms,
-    int fragment)
-{
-    double rho = 0.0;
-    for (const PromolecularAtom &atom : atoms)
-    {
-        if (fragment != 0 && atom.fragment != fragment)
-            continue;
-        rho += atom.density.get_radial_density(array_length(pos, atom.pos));
-    }
-    return rho;
-}
-
 PromolecularFragmentDensities promolecular_fragment_densities_at(
     const d3 &pos,
-    const std::vector<PromolecularAtom> &atoms)
+    const std::vector<PromolecularAtom> &atoms,
+    const std::vector<Thakkar> &atom_models)
 {
     PromolecularFragmentDensities result;
     for (const PromolecularAtom &atom : atoms)
     {
-        const double contribution = atom.density.get_radial_density(array_length(pos, atom.pos));
+        const double contribution = atom_models[atom.charge - 1].get_interpolated_density(array_length(pos, atom.pos));
         if (atom.fragment == 1)
             result.rho1 += contribution;
         else
@@ -809,7 +806,6 @@ void add_promolecular_atoms(
         atom_entry.pos = fragment.get_atom_pos(i);
         atom_entry.charge = fragment.get_atom_charge(i);
         atom_entry.fragment = fragment_id;
-        atom_entry.density = Thakkar(atom_entry.charge);
         atoms.push_back(atom_entry);
     }
 }
@@ -892,6 +888,7 @@ void write_promolecular_nci_vmd(
         << "mol material Opaque\n"
         << "mol addrep $nci\n"
         << "mol scaleminmax $nci 0 -2.0 2.0\n"
+        << "color scale method BGR\n"
         << "\n"
         << "display resetview\n";
 
@@ -980,6 +977,7 @@ void promolecular_nci_analysis(
     atoms.reserve(fragment1.get_ncen() + fragment2.get_ncen());
     add_promolecular_atoms(fragment1, 1, atoms);
     add_promolecular_atoms(fragment2, 2, atoms);
+    const vector<Thakkar> atom_models = make_thakkar_interpolators();
 
     cube rho_cube(local_opts.NbSteps, combined.get_ncen(), true);
     cube signed_rho_cube(local_opts.NbSteps, combined.get_ncen(), true);
@@ -1020,8 +1018,33 @@ void promolecular_nci_analysis(
     {
         for (int y = 0; y < rho_cube.get_size(1); y++)
             for (int z = 0; z < rho_cube.get_size(2); z++)
-                rho_cube.set_value(x, y, z, promolecular_density_at(rho_cube.get_pos(x, y, z), atoms, 0));
+            {
+                const d3 pos = rho_cube.get_pos(x, y, z);
+                const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms, atom_models);
+                const double rho = densities.total();
+                rho_cube.set_value(x, y, z, rho);
+                rdg_cube.set_value(
+                    x,
+                    y,
+                    z,
+                    is_promolecular_nci_point(densities, rho, opts.promol_nci_rcut1, opts.promol_nci_rcut2) ? 1.0 : 101.0);
+            }
         density_progress.update();
+    }
+    std::cout << std::endl;
+
+    i3 shrink_lower;
+    i3 shrink_upper;
+    if (rdg_cube.find_value_bounds(shrink_lower, shrink_upper, 101.0))
+    {
+        rho_cube.shrink_to_bounds(shrink_lower, shrink_upper);
+        signed_rho_cube.shrink_to_bounds(shrink_lower, shrink_upper);
+        rdg_cube.shrink_to_bounds(shrink_lower, shrink_upper);
+        log << "Shrunk promolecular NCI work grid to "
+            << rdg_cube.get_size(0) << " x "
+            << rdg_cube.get_size(1) << " x "
+            << rdg_cube.get_size(2)
+            << " grid points, ignoring RDG mask value 101." << endl;
     }
 
     ofstream values_file(output_base.string() + "_values.dat", ios::out);
@@ -1030,19 +1053,27 @@ void promolecular_nci_analysis(
     values_file << "# rcut1 " << opts.promol_nci_rcut1 << " rcut2 " << opts.promol_nci_rcut2 << "\n";
 
     unsigned long long kept_points = 0;
+    std::vector<std::ostringstream> values_by_thread(1);
+#ifdef _OPENMP
+    values_by_thread.resize(omp_get_max_threads());
+#endif
     ProgressBar rdg_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular RDG");
-#pragma omp parallel for schedule(dynamic) reduction(+ : kept_points)
+#pragma omp parallel reduction(+ : kept_points)
+    {
+        int thread_id = 0;
+#ifdef _OPENMP
+        thread_id = omp_get_thread_num();
+#endif
+        std::ostringstream &local_values = values_by_thread[thread_id];
+#pragma omp for schedule(dynamic)
     for (int x = 0; x < rho_cube.get_size(0); x++)
     {
-        std::ostringstream local_values;
         for (int y = 0; y < rho_cube.get_size(1); y++)
         {
             for (int z = 0; z < rho_cube.get_size(2); z++)
             {
-                const d3 pos = rho_cube.get_pos(x, y, z);
-                const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms);
                 const double rho = rho_cube.get_value(x, y, z);
-                if (!is_promolecular_nci_point(densities, rho, opts.promol_nci_rcut1, opts.promol_nci_rcut2))
+                if (std::abs(rdg_cube.get_value(x, y, z) - 101.0) <= 1E-12)
                 {
                     signed_rho_cube.set_value(x, y, z, 0.0);
                     rdg_cube.set_value(x, y, z, 101.0);
@@ -1065,12 +1096,11 @@ void promolecular_nci_analysis(
                 kept_points++;
             }
         }
-#pragma omp critical
-        {
-            values_file << local_values.str();
-        }
         rdg_progress.update();
     }
+    }
+    for (const std::ostringstream &local_values : values_by_thread)
+        values_file << local_values.str();
 
     signed_rho_cube.set_path(output_base.string() + "_signed_rho.cube");
     rdg_cube.set_path(output_base.string() + "_rdg.cube");
