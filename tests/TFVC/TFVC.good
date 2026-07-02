@@ -65,15 +65,15 @@ Atom   2: 0.383886
 Atom   3: 5.57163e-05
 Table of Charges in electrons
       Atom     Becke Hirshfeld      TFVC      MBIS     EMBIS
-        O1    -0.165    -0.303    -1.103    -0.811    -0.767
-        H1     0.083     0.152     0.551     0.406     0.384
-        H2     0.083     0.152     0.551     0.406     0.384
+        O1    -0.165    -0.299    -1.103    -0.809    -0.767
+        H1     0.083     0.149     0.551     0.405     0.384
+        H2     0.083     0.149     0.551     0.405     0.384
         He     0.000     0.000     0.000     0.000     0.000
 Total number of electrons:
  Becke:      11.999404
- Hirshfeld:  11.999828
+ Hirshfeld:  11.999807
  TVFC:       11.999835
- MBIS:       11.999366
+ MBIS:       11.999373
  EMBIS:      11.999432
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
