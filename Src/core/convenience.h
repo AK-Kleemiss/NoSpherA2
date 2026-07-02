@@ -83,6 +83,11 @@ struct properties_options
     double promol_nci_rcut2 = 0.75;
     double promol_nci_rho_abs_max = 0.5;
     double promol_nci_rdg_max = 1.0;
+    // The promolecular NCI _values.dat writer parallelizes over grid points with
+    // dynamic OpenMP scheduling, so row order (not the values themselves) is
+    // non-deterministic between runs. Force it to run single-threaded for
+    // reproducible output ordering, e.g. for golden-file test generation.
+    bool promol_nci_single_threaded = false;
     std::array<int, 3> NbSteps = { 0, 0, 0 };
     std::array<double, 6> MinMax = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     ivec MO_numbers;

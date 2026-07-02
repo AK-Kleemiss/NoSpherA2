@@ -2548,6 +2548,8 @@ void options::digest_options()
 
             i += 2 + optional_index;
         }
+        else if (temp == "-promol_nci_single_thread")
+            properties.promol_nci_single_threaded = true;
         else if (temp == "-radius")
             properties.radius = stod(arguments[i + 1]);
         else if (temp == "-resolution")

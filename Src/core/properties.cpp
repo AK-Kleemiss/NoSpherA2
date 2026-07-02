@@ -1091,12 +1091,18 @@ void promolecular_nci_analysis(
     values_file << "# rcut1 " << opts.promol_nci_rcut1 << " rcut2 " << opts.promol_nci_rcut2 << "\n";
 
     unsigned long long kept_points = 0;
-    std::vector<std::ostringstream> values_by_thread(1);
 #ifdef _OPENMP
-    values_by_thread.resize(omp_get_max_threads());
+    // schedule(dynamic) below makes the mapping of grid points to threads (and
+    // therefore the row order in values_by_thread) non-deterministic between
+    // runs; -promol_nci_single_thread pins this region to one thread so output
+    // ordering is reproducible, e.g. for golden-file test generation.
+    const int nci_write_threads = opts.promol_nci_single_threaded ? 1 : omp_get_max_threads();
+#else
+    const int nci_write_threads = 1;
 #endif
+    std::vector<std::ostringstream> values_by_thread(nci_write_threads);
     ProgressBar rdg_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular RDG");
-#pragma omp parallel reduction(+ : kept_points)
+#pragma omp parallel reduction(+ : kept_points) num_threads(nci_write_threads)
     {
         int thread_id = 0;
 #ifdef _OPENMP

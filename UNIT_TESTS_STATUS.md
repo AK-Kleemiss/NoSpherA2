@@ -1,5 +1,5 @@
 # Unit Test Status
-**Last updated: 2026-07-02**
+**Last updated: 2026-07-02** (added `intermolecular_nci` entry and `-promol_nci_single_thread` note)
 
 ## Test Harnesses
 
@@ -77,6 +77,7 @@ Added: 2026-06-14.
 | sucrose_ptb | sucrose_IAM_SF | sucrose_ptb.good | no | ✅ passing |
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |
 | sucrose_twin | sucrose_fchk_SF | sucrose_twin.good | no | ✅ passing |
+| intermolecular_nci | intermolecular_nci | good.dat | no | requires `-promol_nci_single_thread` (see note below) |
 | wfn_reading | wfn_reading | wfn_reading.good | no | ✅ passing |
 | TFVC | TFVC | TFVC.good | no | ✅ passing |
 | TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
@@ -116,7 +117,14 @@ files generated before they can be registered.
 
 ## Known Issues
 
-No current documented known issues.
+- `intermolecular_nci`'s `_values.dat` writer (`promolecular_nci_analysis` in
+  `Src/core/properties.cpp`) parallelizes over grid points with
+  `schedule(dynamic)`, so output row order is not reproducible run-to-run
+  under multi-threading (values are correct, ordering is not). The test's
+  `tests.toml` args pass `-promol_nci_single_thread` (added 2026-07-02,
+  `Src/core/convenience.h`/`.cpp`) to force single-threaded, deterministic
+  output ordering for golden-file comparison. This flag is test/reproducibility
+  tooling, not needed for normal end-user runs.
 
 ---
 

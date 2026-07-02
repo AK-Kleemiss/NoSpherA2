@@ -206,16 +206,16 @@ GridManager: Generated total of 33800 grid points.
 Starting MBIS iterations...
 MBIS iteration: 1 max change: 0.494439
 MBIS iteration: 2 max change: 0.203013
-MBIS iteration: 3 max change: 0.086842
-MBIS iteration: 4 max change: 0.045898
+MBIS iteration: 3 max change: 0.0868418
+MBIS iteration: 4 max change: 0.0458976
 MBIS iteration: 5 max change: 0.044522
-MBIS iteration: 6 max change: 0.039351
-MBIS iteration: 7 max change: 0.033745
-MBIS iteration: 8 max change: 0.028678
-MBIS iteration: 9 max change: 0.024334
-MBIS iteration: 10 max change: 0.020670
-MBIS iteration: 11 max change: 0.017585
-MBIS converged after 11 iterations with max charge change: 0.014985 and max sig change: 0.000904
+MBIS iteration: 6 max change: 0.0393511
+MBIS iteration: 7 max change: 0.0337451
+MBIS iteration: 8 max change: 0.0286776
+MBIS iteration: 9 max change: 0.0243344
+MBIS iteration: 10 max change: 0.0206697
+MBIS iteration: 11 max change: 0.0175854
+MBIS converged after 11 iterations with max charge change: 0.0149848 and max sig change: 0.000903808
 Promolecular charges:
 Atom   0: -0.069378
 Atom   1: -0.113038
@@ -223,99 +223,99 @@ Atom   2: -0.338356
 Atom   3: -0.493201
 Atom   4: 0.131206
 Atom   5: 0.361123
-Atom   6: -0.396260
+Atom   6: -0.39626
 Atom   7: 0.352341
-Atom   8: -0.238260
+Atom   8: -0.23826
 Atom   9: 0.101576
-Atom  10: 0.221020
-Atom  11: -0.072590
+Atom  10: 0.22102
+Atom  11: -0.0725902
 Atom  12: 0.102769
-Atom  13: 0.088378
+Atom  13: 0.0883783
 Atom  14: 0.107319
 Atom  15: -0.315426
 Atom  16: -0.093951
 Atom  17: 0.117519
-Atom  18: 0.097186
+Atom  18: 0.0971858
 Atom  19: 0.103008
-Atom  20: -0.020847
+Atom  20: -0.0208475
 Atom  21: 0.106696
-Atom  22: 0.088153
-Atom  23: -0.025862
+Atom  22: 0.0881532
+Atom  23: -0.0258619
 Atom  24: 0.107197
-Atom  25: 0.094328
+Atom  25: 0.0943281
 Starting EMBIS iterations...
-EMBIS iteration:    1 max charge/alpha change: 4.526229/0.492775
-EMBIS iteration:    2 max charge/alpha change: 1.983135/0.010855
-EMBIS iteration:    3 max charge/alpha change: 0.985333/0.009668
-EMBIS iteration:    4 max charge/alpha change: 0.594907/0.008870
-EMBIS iteration:    5 max charge/alpha change: 0.424735/0.010482
-EMBIS iteration:    6 max charge/alpha change: 0.359559/0.011175
-EMBIS iteration:    7 max charge/alpha change: 0.343126/0.011185
-EMBIS iteration:    8 max charge/alpha change: 0.325809/0.010874
-EMBIS iteration:    9 max charge/alpha change: 0.305986/0.010424
-EMBIS iteration:   10 max charge/alpha change: 0.283934/0.009922
-EMBIS iteration:   11 max charge/alpha change: 0.260553/0.009412
-EMBIS iteration:   12 max charge/alpha change: 0.236794/0.008916
-EMBIS iteration:   13 max charge/alpha change: 0.213444/0.008441
-EMBIS iteration:   14 max charge/alpha change: 0.191073/0.007992
-EMBIS iteration:   15 max charge/alpha change: 0.170716/0.007568
-EMBIS iteration:   16 max charge/alpha change: 0.155741/0.007170
-EMBIS iteration:   17 max charge/alpha change: 0.141835/0.006796
-EMBIS iteration:   18 max charge/alpha change: 0.129025/0.006445
-EMBIS iteration:   19 max charge/alpha change: 0.117296/0.006115
-EMBIS iteration:   20 max charge/alpha change: 0.106608/0.005804
-EMBIS iteration:   21 max charge/alpha change: 0.096901/0.005511
-EMBIS iteration:   22 max charge/alpha change: 0.088109/0.005236
-EMBIS iteration:   23 max charge/alpha change: 0.080162/0.004975
-EMBIS iteration:   24 max charge/alpha change: 0.072989/0.004730
-EMBIS iteration:   25 max charge/alpha change: 0.066521/0.004498
-EMBIS iteration:   26 max charge/alpha change: 0.060692/0.004278
-EMBIS iteration:   27 max charge/alpha change: 0.055440/0.004071
-EMBIS iteration:   28 max charge/alpha change: 0.050708/0.003874
-EMBIS iteration:   29 max charge/alpha change: 0.046443/0.003688
-EMBIS iteration:   30 max charge/alpha change: 0.042597/0.003512
-EMBIS iteration:   31 max charge/alpha change: 0.039127/0.003345
-EMBIS iteration:   32 max charge/alpha change: 0.035994/0.003187
-EMBIS iteration:   33 max charge/alpha change: 0.033161/0.003036
-EMBIS iteration:   34 max charge/alpha change: 0.030598/0.002893
-EMBIS iteration:   35 max charge/alpha change: 0.028276/0.002758
-EMBIS iteration:   36 max charge/alpha change: 0.026169/0.002629
-EMBIS iteration:   37 max charge/alpha change: 0.024255/0.002507
-EMBIS iteration:   38 max charge/alpha change: 0.022515/0.002391
-EMBIS iteration:   39 max charge/alpha change: 0.020929/0.002280
-EMBIS iteration:   40 max charge/alpha change: 0.019482/0.002175
-EMBIS iteration:   41 max charge/alpha change: 0.018160/0.002079
-EMBIS iteration:   42 max charge/alpha change: 0.016950/0.001995
-EMBIS iteration:   43 max charge/alpha change: 0.015840/0.001914
-EMBIS iteration:   44 max charge/alpha change: 0.014822/0.001835
-EMBIS iteration:   45 max charge/alpha change: 0.013885/0.001760
-EMBIS iteration:   46 max charge/alpha change: 0.013023/0.001688
-EMBIS iteration:   47 max charge/alpha change: 0.012227/0.001618
-EMBIS iteration:   48 max charge/alpha change: 0.011492/0.001551
-EMBIS iteration:   49 max charge/alpha change: 0.010812/0.001487
-EMBIS iteration:   50 max charge/alpha change: 0.010182/0.001426
-EMBIS iteration:   51 max charge/alpha change: 0.009597/0.001367
-EMBIS iteration:   52 max charge/alpha change: 0.009054/0.001310
-EMBIS iteration:   53 max charge/alpha change: 0.008548/0.001255
-EMBIS iteration:   54 max charge/alpha change: 0.008076/0.001203
-EMBIS iteration:   55 max charge/alpha change: 0.007637/0.001153
-EMBIS iteration:   56 max charge/alpha change: 0.007226/0.001105
-EMBIS iteration:   57 max charge/alpha change: 0.006841/0.001059
-EMBIS iteration:   58 max charge/alpha change: 0.006481/0.001015
-EMBIS converged after 58 iterations with max charge change: 0.000972 and max sig change: 0.006144
+EMBIS iteration:    1 max charge/alpha change: 4.52623/0.492775
+EMBIS iteration:    2 max charge/alpha change: 1.98313/0.0108547
+EMBIS iteration:    3 max charge/alpha change: 0.985333/0.00966776
+EMBIS iteration:    4 max charge/alpha change: 0.594907/0.00886977
+EMBIS iteration:    5 max charge/alpha change: 0.424735/0.0104818
+EMBIS iteration:    6 max charge/alpha change: 0.359559/0.0111752
+EMBIS iteration:    7 max charge/alpha change: 0.343126/0.0111854
+EMBIS iteration:    8 max charge/alpha change: 0.325809/0.0108745
+EMBIS iteration:    9 max charge/alpha change: 0.305986/0.0104235
+EMBIS iteration:   10 max charge/alpha change: 0.283934/0.00992176
+EMBIS iteration:   11 max charge/alpha change: 0.260553/0.00941236
+EMBIS iteration:   12 max charge/alpha change: 0.236794/0.00891575
+EMBIS iteration:   13 max charge/alpha change: 0.213444/0.00844101
+EMBIS iteration:   14 max charge/alpha change: 0.191073/0.00799162
+EMBIS iteration:   15 max charge/alpha change: 0.170716/0.00756826
+EMBIS iteration:   16 max charge/alpha change: 0.155741/0.00717027
+EMBIS iteration:   17 max charge/alpha change: 0.141835/0.00679636
+EMBIS iteration:   18 max charge/alpha change: 0.129025/0.00644503
+EMBIS iteration:   19 max charge/alpha change: 0.117296/0.00611473
+EMBIS iteration:   20 max charge/alpha change: 0.106608/0.00580397
+EMBIS iteration:   21 max charge/alpha change: 0.0969006/0.00551133
+EMBIS iteration:   22 max charge/alpha change: 0.0881089/0.00523552
+EMBIS iteration:   23 max charge/alpha change: 0.0801621/0.00497535
+EMBIS iteration:   24 max charge/alpha change: 0.0729891/0.00472974
+EMBIS iteration:   25 max charge/alpha change: 0.0665211/0.0044977
+EMBIS iteration:   26 max charge/alpha change: 0.060692/0.00427833
+EMBIS iteration:   27 max charge/alpha change: 0.05544/0.00407082
+EMBIS iteration:   28 max charge/alpha change: 0.0507079/0.00387439
+EMBIS iteration:   29 max charge/alpha change: 0.046443/0.00368837
+EMBIS iteration:   30 max charge/alpha change: 0.0425974/0.0035121
+EMBIS iteration:   31 max charge/alpha change: 0.0391274/0.00334501
+EMBIS iteration:   32 max charge/alpha change: 0.0359938/0.00318654
+EMBIS iteration:   33 max charge/alpha change: 0.0331612/0.00303619
+EMBIS iteration:   34 max charge/alpha change: 0.030598/0.00289349
+EMBIS iteration:   35 max charge/alpha change: 0.0282757/0.00275799
+EMBIS iteration:   36 max charge/alpha change: 0.0261691/0.00262929
+EMBIS iteration:   37 max charge/alpha change: 0.0242554/0.00250701
+EMBIS iteration:   38 max charge/alpha change: 0.0225146/0.0023908
+EMBIS iteration:   39 max charge/alpha change: 0.0209288/0.00228031
+EMBIS iteration:   40 max charge/alpha change: 0.0194818/0.00217523
+EMBIS iteration:   41 max charge/alpha change: 0.0181596/0.00207945
+EMBIS iteration:   42 max charge/alpha change: 0.0169495/0.0019949
+EMBIS iteration:   43 max charge/alpha change: 0.0158403/0.00191354
+EMBIS iteration:   44 max charge/alpha change: 0.0148219/0.00183528
+EMBIS iteration:   45 max charge/alpha change: 0.0138854/0.00176003
+EMBIS iteration:   46 max charge/alpha change: 0.0130229/0.0016877
+EMBIS iteration:   47 max charge/alpha change: 0.0122273/0.0016182
+EMBIS iteration:   48 max charge/alpha change: 0.0114922/0.00155143
+EMBIS iteration:   49 max charge/alpha change: 0.0108121/0.00148731
+EMBIS iteration:   50 max charge/alpha change: 0.0101819/0.00142574
+EMBIS iteration:   51 max charge/alpha change: 0.00959702/0.00136664
+EMBIS iteration:   52 max charge/alpha change: 0.0090535/0.00130991
+EMBIS iteration:   53 max charge/alpha change: 0.00854771/0.00125548
+EMBIS iteration:   54 max charge/alpha change: 0.00807637/0.00120326
+EMBIS iteration:   55 max charge/alpha change: 0.00763658/0.00115317
+EMBIS iteration:   56 max charge/alpha change: 0.00722571/0.00110512
+EMBIS iteration:   57 max charge/alpha change: 0.00684138/0.00105904
+EMBIS iteration:   58 max charge/alpha change: 0.00648147/0.00101486
+EMBIS converged after 58 iterations with max charge change: 0.000972498 and max sig change: 0.00614403
 Promolecular charges:
-Atom   0: -0.093692
+Atom   0: -0.0936924
 Atom   1: -0.133836
 Atom   2: -0.193241
 Atom   3: -0.503632
-Atom   4: 0.007450
+Atom   4: 0.00744994
 Atom   5: 0.260225
 Atom   6: -0.251963
 Atom   7: 0.415239
-Atom   8: -0.029488
+Atom   8: -0.0294877
 Atom   9: 0.101613
-Atom  10: -0.023959
-Atom  11: -0.154450
+Atom  10: -0.0239595
+Atom  11: -0.15445
 Atom  12: 0.124991
 Atom  13: 0.100321
 Atom  14: 0.129231
@@ -324,10 +324,10 @@ Atom  16: -0.213101
 Atom  17: 0.140838
 Atom  18: 0.124224
 Atom  19: 0.121542
-Atom  20: -0.070978
+Atom  20: -0.0709781
 Atom  21: 0.101974
-Atom  22: 0.096097
-Atom  23: -0.069413
+Atom  22: 0.0960972
+Atom  23: -0.0694129
 Atom  24: 0.106367
 Atom  25: 0.103247
 Table of Charges in electrons

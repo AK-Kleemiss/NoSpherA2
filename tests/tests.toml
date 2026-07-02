@@ -113,6 +113,7 @@ actual = "unit_surrounding_values.dat"
 resolution = 0.5
 radius = 0.5
 promol_nci = ["unit.xyz", "surrounding.xyz"]
+promol_nci_single_thread = true
 
 [reading_SALTED]
 directory = "SALTED"

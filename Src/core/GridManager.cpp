@@ -6,6 +6,7 @@ template<typename AtomType>
 double make_sphericals(
     vec2 &dens,
     vec2 &dist,
+    vec2 &second_deriv,
     const ivec &atom_type_list,
     std::ostream &file,
     const std::vector<std::pair<vec, vec>> &pop_sig,
@@ -101,6 +102,13 @@ double make_sphericals(
     {
         file << "Cleared the sphericals!" << endl;
     }
+
+    second_deriv.clear();
+    second_deriv.resize(atlsize);
+#pragma omp parallel for
+    for (int i = 0; i < atlsize; i++)
+        second_deriv[i] = natural_cubic_spline_second_derivatives(dist[i], dens[i]);
+
     return lincr;
 }
 //template double make_sphericals<Thakkar>(vec2& dens, vec2& dist, const ivec& atom_type_list, std::ostream& file, std::vector<std::pair<vec, vec>>& pop_sig, bool debug, double incr_start, double min_dist, int accuracy);
@@ -907,14 +915,14 @@ void GridManager::calculateSphericalDensities(
     // Calculate radial densities using Thakkar spherical atoms
     if (sig_pop.size() == 0) {
         complete_type_list = identifyAtomTypes(wave);
-        lincr_ = make_sphericals<Thakkar>(radial_density_, radial_distances_, complete_type_list,
+        lincr_ = make_sphericals<Thakkar>(radial_density_, radial_distances_, radial_second_deriv_, complete_type_list,
             std::cout, sig_pop, config_.debug, 1.005, 1.0E-7, config_.accuracy);
         start_dist_ = 1.0E-7;
     }
     else {
         for (int i = 0; i < ncen; i++)
             complete_type_list.emplace_back(wave.get_atom_charge(i));
-        lincr_ = make_sphericals<MBIS_Atom>(radial_density_, radial_distances_, complete_type_list,
+        lincr_ = make_sphericals<MBIS_Atom>(radial_density_, radial_distances_, radial_second_deriv_, complete_type_list,
             std::cout, sig_pop, config_.debug, 1.0025, 1.0E-8, config_.accuracy);
         start_dist_ = 1.0E-8;  // MBIS_Atom can have very steep densities near the nucleus, so we need to start closer to zero
     }
@@ -962,9 +970,10 @@ void GridManager::calculateSphericalDensities(
                 (*grid)[g][GridData::GridIndex::Y][p],
                 (*grid)[g][GridData::GridIndex::Z][p] }, ax);
 
-                const double density = linear_interpolate_spherical_density(
+                const double density = cubic_spline_interpolate_spherical_density(
                     radial_density_[type_idx],
                     radial_distances_[type_idx],
+                    radial_second_deriv_[type_idx],
                     dist,
                     lincr_,
                     start_dist_);
@@ -1029,9 +1038,10 @@ void GridManager::calculateSphericalDensities(
                                 const double dist = array_length(g_pos, a);
 
                                 // Use the SAME interpolation function
-                                const double density = linear_interpolate_spherical_density(
+                                const double density = cubic_spline_interpolate_spherical_density(
                                     radial_density_[type_idx],
                                     radial_distances_[type_idx],
+                                    radial_second_deriv_[type_idx],
                                     dist,
                                     lincr_,
                                     start_dist_);

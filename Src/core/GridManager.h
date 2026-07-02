@@ -8,6 +8,7 @@ template<typename AtomType>
 double make_sphericals(
     vec2 &dens,
     vec2 &dist,
+    vec2 &second_deriv,
     const ivec &atom_type_list,
     std::ostream &file,
     const std::vector<std::pair<vec, vec>> &pop_sig,
@@ -68,6 +69,7 @@ private:
     GridData grid_data_;
     vec2 radial_density_;
     vec2 radial_distances_;
+    vec2 radial_second_deriv_;
     ivec atom_type_list_;
     double lincr_ = 0.0;
     double start_dist_ = 1E-7;
