@@ -3,7 +3,7 @@
 #include "convenience.h"
 #include "constants.h"
 #include "b2c.h"
-#include <Eigen/Dense>
+#include "nos_math.h"
 
 using namespace std;
 
@@ -59,6 +59,46 @@ bool brackets_stationary_point(const cube *cub, int x, int y, int z)
     const bool y_change = (center - cub->get_value(x, y - 1, z)) * (cub->get_value(x, y + 1, z) - center) <= 0.0;
     const bool z_change = (center - cub->get_value(x, y, z - 1)) * (cub->get_value(x, y, z + 1) - center) <= 0.0;
     return x_change && y_change && z_change;
+}
+
+// Closed-form inverse of a row-major 3x3 matrix via the adjugate/determinant.
+// Returns false (leaving inv untouched) if m is (numerically) singular.
+// Used instead of a LAPACK call because this runs many times per Newton-Raphson
+// iteration on a fixed-size 3x3 system, where solver call overhead would dominate.
+bool invert_3x3(const double m[9], double inv[9])
+{
+    const double det =
+        m[0] * (m[4] * m[8] - m[5] * m[7]) -
+        m[1] * (m[3] * m[8] - m[5] * m[6]) +
+        m[2] * (m[3] * m[7] - m[4] * m[6]);
+
+    const double scale = std::max({ std::abs(m[0]), std::abs(m[1]), std::abs(m[2]),
+                                     std::abs(m[3]), std::abs(m[4]), std::abs(m[5]),
+                                     std::abs(m[6]), std::abs(m[7]), std::abs(m[8]) });
+    const double threshold = std::max(1e-300, scale * scale * scale * 1e-12);
+    if (!std::isfinite(det) || std::abs(det) < threshold)
+        return false;
+
+    const double inv_det = 1.0 / det;
+    inv[0] = (m[4] * m[8] - m[5] * m[7]) * inv_det;
+    inv[1] = (m[2] * m[7] - m[1] * m[8]) * inv_det;
+    inv[2] = (m[1] * m[5] - m[2] * m[4]) * inv_det;
+    inv[3] = (m[5] * m[6] - m[3] * m[8]) * inv_det;
+    inv[4] = (m[0] * m[8] - m[2] * m[6]) * inv_det;
+    inv[5] = (m[2] * m[3] - m[0] * m[5]) * inv_det;
+    inv[6] = (m[3] * m[7] - m[4] * m[6]) * inv_det;
+    inv[7] = (m[1] * m[6] - m[0] * m[7]) * inv_det;
+    inv[8] = (m[0] * m[4] - m[1] * m[3]) * inv_det;
+    return true;
+}
+
+d3 mat3_vec_mul(const double m[9], const d3 &v)
+{
+    return {
+        m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+        m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
+        m[6] * v[0] + m[7] * v[1] + m[8] * v[2]
+    };
 }
 
 bool is_seed_duplicate(const std::vector<critical_point_seed> &seeds, const critical_point_seed &candidate, double distance_tolerance)
@@ -137,19 +177,15 @@ critical_point evaluate_critical_point(
         result.virial_field = v;
     }
 
-    Eigen::Matrix3d hessian;
-    hessian << hessian_data[0], hessian_data[1], hessian_data[2],
-        hessian_data[3], hessian_data[4], hessian_data[5],
-        hessian_data[6], hessian_data[7], hessian_data[8];
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(hessian);
-    if (solver.info() == Eigen::Success) {
-        const Eigen::Vector3d eigenvalues = solver.eigenvalues();
-        const Eigen::Matrix3d eigenvectors = solver.eigenvectors();
+    vec hessian_A(hessian_data, hessian_data + 9);
+    vec hessian_W(3);
+    if (try_make_Eigenvalues(hessian_A, hessian_W)) {
+        const vec &eigenvalues = hessian_W;
         result.hessian_eigenvalues = { eigenvalues[0], eigenvalues[1], eigenvalues[2] };
         result.hessian_eigenvectors = {
-            d3{ eigenvectors(0, 0), eigenvectors(1, 0), eigenvectors(2, 0) },
-            d3{ eigenvectors(0, 1), eigenvectors(1, 1), eigenvectors(2, 1) },
-            d3{ eigenvectors(0, 2), eigenvectors(1, 2), eigenvectors(2, 2) }
+            d3{ hessian_A[0 * 3 + 0], hessian_A[1 * 3 + 0], hessian_A[2 * 3 + 0] },
+            d3{ hessian_A[0 * 3 + 1], hessian_A[1 * 3 + 1], hessian_A[2 * 3 + 1] },
+            d3{ hessian_A[0 * 3 + 2], hessian_A[1 * 3 + 2], hessian_A[2 * 3 + 2] }
         };
 
         const double max_abs = std::max({ std::abs(eigenvalues[0]), std::abs(eigenvalues[1]), std::abs(eigenvalues[2]) });
@@ -705,20 +741,19 @@ std::vector<critical_point> refine_cube_critical_points(
             if (rho <= local_density_floor)
                 break;
 
-            Eigen::Matrix3d hessian;
-            hessian << hessian_data[0], hessian_data[1], hessian_data[2],
-                hessian_data[3], hessian_data[4], hessian_data[5],
-                hessian_data[6], hessian_data[7], hessian_data[8];
-            Eigen::Vector3d grad_vec(gradient[0], gradient[1], gradient[2]);
-            Eigen::FullPivLU<Eigen::Matrix3d> solver(hessian);
-            if (!solver.isInvertible())
+            double hessian_inv[9];
+            if (!invert_3x3(hessian_data, hessian_inv))
                 break;
 
-            Eigen::Vector3d step = -solver.solve(grad_vec);
-            if (!step.allFinite())
+            d3 step = mat3_vec_mul(hessian_inv, gradient);
+            step = { -step[0], -step[1], -step[2] };
+            if (!std::isfinite(step[0]) || !std::isfinite(step[1]) || !std::isfinite(step[2]))
                 break;
-            if (step.norm() > local_trust_radius)
-                step *= local_trust_radius / step.norm();
+            const double step_norm = array_length(step);
+            if (step_norm > local_trust_radius)
+                step = { step[0] * local_trust_radius / step_norm,
+                         step[1] * local_trust_radius / step_norm,
+                         step[2] * local_trust_radius / step_norm };
 
             bool accepted = false;
             d3 accepted_position = position;
@@ -728,7 +763,7 @@ std::vector<critical_point> refine_cube_critical_points(
 
             for (int attempt = 0; attempt < 8; attempt++) {
                 const double damping = std::pow(0.5, attempt);
-                const Eigen::Vector3d trial_step = step * damping;
+                const d3 trial_step{ step[0] * damping, step[1] * damping, step[2] * damping };
                 d3 trial_position{
                     position[0] + trial_step[0],
                     position[1] + trial_step[1],
@@ -741,12 +776,13 @@ std::vector<critical_point> refine_cube_critical_points(
                 const double trial_norm = array_length(trial_gradient);
                 if (!std::isfinite(trial_norm))
                     continue;
-                if (trial_norm <= gradient_norm || trial_step.norm() <= step_tolerance) {
+                const double trial_step_norm = array_length(trial_step);
+                if (trial_norm <= gradient_norm || trial_step_norm <= step_tolerance) {
                     accepted = true;
                     accepted_position = trial_position;
                     accepted_gradient = trial_gradient;
                     accepted_norm = trial_norm;
-                    accepted_step_norm = trial_step.norm();
+                    accepted_step_norm = trial_step_norm;
                     break;
                 }
             }
@@ -813,11 +849,12 @@ std::vector<critical_point> analyze_cube_critical_points(
 
     // Invert the grid matrix once to convert WFN atom positions → grid indices.
     // cube::get_pos: pos = origin + V * idx  →  idx = V^{-1} * (pos − origin)
-    Eigen::Matrix3d V;
+    double V[9];
     for (int r = 0; r < 3; r++)
         for (int c = 0; c < 3; c++)
-            V(r, c) = cub->get_vector(r, c);
-    Eigen::Matrix3d Vinv = V.inverse();
+            V[r * 3 + c] = cub->get_vector(r, c);
+    double Vinv[9];
+    err_checkf(invert_3x3(V, Vinv), "Cube grid matrix is singular!", std::cout);
 
     const i3 sizes = cub->get_sizes();
     const double density_floor = resolve_value_floor(cub, value_floor);
@@ -827,10 +864,10 @@ std::vector<critical_point> analyze_cube_critical_points(
 
     // Helper: project a real-space position onto the nearest interior grid index.
     auto pos_to_idx = [&](const d3 &pos) -> i3 {
-        Eigen::Vector3d rhs(pos[0] - cub->get_origin(0),
-                            pos[1] - cub->get_origin(1),
-                            pos[2] - cub->get_origin(2));
-        Eigen::Vector3d fidx = Vinv * rhs;
+        const d3 rhs{ pos[0] - cub->get_origin(0),
+                      pos[1] - cub->get_origin(1),
+                      pos[2] - cub->get_origin(2) };
+        const d3 fidx = mat3_vec_mul(Vinv, rhs);
         return {
             std::max(1, std::min(sizes[0] - 2, (int)std::round(fidx[0]))),
             std::max(1, std::min(sizes[1] - 2, (int)std::round(fidx[1]))),

@@ -695,7 +695,7 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
     return dot<dMatrix2>(reshape<dMatrix2>(Vt, Shape2D(k, n)), reshape<dMatrix2>(A_copy, Shape2D(k, m)), true, false);
 }
 
-void make_Eigenvalues(vec& A, vec& W) {
+bool try_make_Eigenvalues(vec& A, vec& W) {
     const int n = static_cast<int>(W.size());
 #ifdef __APPLE__
     // Use Accelerate framework on macOS for eigenvalue computation
@@ -714,16 +714,29 @@ void make_Eigenvalues(vec& A, vec& W) {
         A.data(), (int*)&n,
         W.data(),
         work.data(), (int*)&lwork, (int*)&info);
-    err_checkf(info == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+    if (info != 0)
+        return false;
+    // Accelerate's dsyev_ stores eigenvectors in Fortran column-major order;
+    // convert to row-major so callers see a consistent layout on all platforms.
+    vec A_row_major(n * n);
+    for (int row = 0; row < n; ++row)
+        for (int col = 0; col < n; ++col)
+            A_row_major[row * n + col] = A[col * n + row];
+    A.swap(A_row_major);
+    return true;
 #else
-    err_checkf(LAPACKE_dsyev(
+    return LAPACKE_dsyev(
         LAPACK_ROW_MAJOR,
         'V', 'U',
         n,
         A.data(),
         n,
-        W.data()) == 0, "The algorithm failed to compute eigenvalues.", std::cout);
+        W.data()) == 0;
 #endif
+}
+
+void make_Eigenvalues(vec& A, vec& W) {
+    err_checkf(try_make_Eigenvalues(A, W), "The algorithm failed to compute eigenvalues.", std::cout);
 }
 
 vec mat_sqrt(vec& A, vec& W, const double cutoff) {
@@ -731,17 +744,6 @@ vec mat_sqrt(vec& A, vec& W, const double cutoff) {
     vec Temp(n * n, 0.0);
 
     make_Eigenvalues(A, W);
-#ifdef __APPLE__
-    {
-        // Accelerate's dsyev_ stores eigenvectors in Fortran column-major order.
-        // The reconstruction below treats A as a row-major matrix.
-        vec A_row_major(n * n);
-        for (int row = 0; row < n; ++row)
-            for (int col = 0; col < n; ++col)
-                A_row_major[row * n + col] = A[col * n + row];
-        A.swap(A_row_major);
-    }
-#endif
 
     for (int i = 0; i < n; ++i)
         W[i] = abs(W[i]) < cutoff ? 0.0 : std::sqrt(abs(W[i]));

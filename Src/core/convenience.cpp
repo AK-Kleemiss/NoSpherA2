@@ -1692,60 +1692,12 @@ void swap_sort_multi(ivec order, std::vector<ivec> &v)
 
 double get_lambda_1(double *a)
 {
-    vec bw, zw;
-    // int run = 0;
-    double eig1, eig2, eig3;
-    const double p1 = a[1] * a[1] + a[2] * a[2] + a[5] * a[5];
-    if (p1 == 0)
-    {
-        eig1 = a[0];
-        eig2 = a[4];
-        eig3 = a[8];
-        if ((eig1 < eig2 && eig2 < eig3) || (eig3 < eig2 && eig2 < eig1))
-            return eig2;
-
-        else if ((eig2 < eig1 && eig1 < eig3) || (eig3 < eig1 && eig1 < eig2))
-            return eig1;
-
-        else
-            return eig3;
-    }
-    else
-    {
-        const double q = (a[0] + a[4] + a[8]) / 3;
-        const double p2 = pow(a[0] - q, 2) + pow(a[4] - q, 2) + pow(a[8] - q, 2) + 2 * p1;
-        const double p = sqrt(p2 / 6);
-        const double B[9]{
-            a[0] - q,
-            a[1],
-            a[2],
-            a[3],
-            a[4] - q,
-            a[5],
-            a[6],
-            a[7],
-            a[8] - q };
-        const double r = (B[0] * B[4] * B[8] + B[1] * B[5] * B[6] + B[3] * B[4] * B[7] - B[0] * B[5] * B[7] - B[1] * B[3] * B[8] - B[2] * B[4] * B[6]) / 2;
-        double phi;
-        if (r <= -1)
-            phi = constants::PI / 3;
-        else if (r >= 1)
-            phi = 0;
-        else
-            phi = acos(r) / 3;
-
-        eig1 = q + 2 * p * cos(phi);
-        eig3 = q + 2 * p * cos(phi + 2 * constants::PI / 3);
-        eig2 = 3 * q - eig1 - eig3;
-        if ((eig1 < eig2 && eig2 < eig3) || (eig3 < eig2 && eig2 < eig1))
-            return eig2;
-
-        else if ((eig2 < eig1 && eig1 < eig3) || (eig3 < eig1 && eig1 < eig2))
-            return eig1;
-
-        else
-            return eig3;
-    }
+    // a is a row-major symmetric 3x3 matrix: a[1]==a[3], a[2]==a[6], a[5]==a[7]
+    vec A(a, a + 9);
+    vec W(3);
+    make_Eigenvalues(A, W);
+    // W is sorted ascending (LAPACK dsyev convention); the median is the middle entry
+    return W[1];
 };
 
 double get_bessel_ratio(const double nu, const double x)

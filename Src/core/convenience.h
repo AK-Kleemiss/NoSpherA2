@@ -417,7 +417,7 @@ void swap_sort(ivec order, cvec &v);
 
 void swap_sort_multi(ivec order, std::vector<ivec> &v);
 
-// Given a 3x3 matrix in a single array of double will find and sort eigenvalues and return biggest eigenvalue
+// Given a 3x3 symmetric matrix in a single row-major array of double, returns the median (middle) eigenvalue
 double get_lambda_1(double *a);
 
 double get_decimal_precision_from_CIF_number(std::string &given_string);
