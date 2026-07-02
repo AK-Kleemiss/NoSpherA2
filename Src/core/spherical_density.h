@@ -160,6 +160,12 @@ public:
 class Thakkar : public Spherical_Atom
 {
 protected:
+    // Natural cubic spline second derivatives over (radial_dist, radial_density),
+    // built alongside the linear-interpolation table in make_interpolator(). Used
+    // by get_interpolated_density_spline() for callers that differentiate the
+    // density numerically and need a curvature-continuous field, at similar
+    // per-query cost to the plain linear table lookup.
+    vec radial_second_deriv;
     void calc_orbs(int& nr_ex,
         int& nr_coef,
         const double& dist,
@@ -218,6 +224,9 @@ public:
         const int& min_f) const override;
     void make_interpolator(const double& incr, const double& min_dist) override;
     double get_interpolated_density(const double& dist) const override;
+    // Same table as get_interpolated_density(), but evaluated as a natural cubic
+    // spline (C2-continuous) instead of piecewise-linear.
+    double get_interpolated_density_spline(const double& dist) const;
 };
 
 class MBIS_Atom

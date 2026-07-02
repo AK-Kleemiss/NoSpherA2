@@ -572,6 +572,31 @@ const double Thakkar::get_custom_form_factor(
         return result;
 };
 
+namespace {
+// Natural cubic spline second derivatives over (x, y) (Numerical-Recipes-style
+// tridiagonal solve, O(n)). Boundary condition: y''(x0) = y''(x_{n-1}) = 0.
+vec natural_cubic_spline_second_derivatives(const vec &x, const vec &y)
+{
+    const size_t n = x.size();
+    vec y2(n, 0.0);
+    if (n < 3)
+        return y2;
+
+    vec u(n, 0.0);
+    for (size_t i = 1; i < n - 1; i++)
+    {
+        const double sig = (x[i] - x[i - 1]) / (x[i + 1] - x[i - 1]);
+        const double p = sig * y2[i - 1] + 2.0;
+        y2[i] = (sig - 1.0) / p;
+        double du = (y[i + 1] - y[i]) / (x[i + 1] - x[i]) - (y[i] - y[i - 1]) / (x[i] - x[i - 1]);
+        u[i] = (6.0 * du / (x[i + 1] - x[i - 1]) - sig * u[i - 1]) / p;
+    }
+    for (size_t k = n - 1; k-- > 0;)
+        y2[k] = y2[k] * y2[k + 1] + u[k];
+    return y2;
+}
+} // namespace
+
 void Thakkar::make_interpolator(const double &incr, const double &min_dist) {
     lincr = log(incr);
     start = min_dist;
@@ -584,6 +609,7 @@ void Thakkar::make_interpolator(const double &incr, const double &min_dist) {
         radial_density.push_back(current);
         _dist *= incr;
     }
+    radial_second_deriv = natural_cubic_spline_second_derivatives(radial_dist, radial_density);
 };
 
 double Thakkar::get_interpolated_density(const double &dist) const {
@@ -597,6 +623,20 @@ double Thakkar::get_interpolated_density(const double &dist) const {
     if (result < 1E-16)
         return 0;
     return result;
+};
+
+double Thakkar::get_interpolated_density_spline(const double &dist) const {
+    if (dist > radial_dist.back())
+        return 0;
+    else if (dist < radial_dist[0])
+        return radial_density[0];
+    const int nr = int(floor(log(dist / start) / lincr));
+    const double h = radial_dist[nr + 1] - radial_dist[nr];
+    const double a = (radial_dist[nr + 1] - dist) / h;
+    const double b = (dist - radial_dist[nr]) / h;
+    const double result = a * radial_density[nr] + b * radial_density[nr + 1] +
+        ((a * a * a - a) * radial_second_deriv[nr] + (b * b * b - b) * radial_second_deriv[nr + 1]) * (h * h) / 6.0;
+    return result < 1E-16 ? 0.0 : result;
 };
 
 MBIS_Atom::MBIS_Atom(const int g_atom_number, const vec &g_sig, const vec &g_pop)

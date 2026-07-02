@@ -716,7 +716,11 @@ PromolecularFragmentDensities promolecular_fragment_densities_at(
     PromolecularFragmentDensities result;
     for (const PromolecularAtom &atom : atoms)
     {
-        const double contribution = atom_models[atom.charge - 1].get_interpolated_density(array_length(pos, atom.pos));
+        // Cubic-spline (not linear) table lookup: lambda2_at() differentiates this
+        // field twice via finite differences, and a linear interpolant's curvature
+        // discontinuities at each table node otherwise show up as sign noise in the
+        // (often small) lambda2 that drives NCI coloring.
+        const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(array_length(pos, atom.pos));
         if (atom.fragment == 1)
             result.rho1 += contribution;
         else
