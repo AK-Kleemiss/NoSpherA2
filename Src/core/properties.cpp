@@ -730,15 +730,22 @@ PromolecularFragmentDensities promolecular_fragment_densities_at(
 
 bool is_promolecular_nci_point(
     const PromolecularFragmentDensities &densities,
-    double rcut_lower,
-    double rcut_upper)
+    double total_density,
+    double dominant_density_cutoff,
+    double fragment_sum_cutoff)
 {
-    const double rho = densities.total();
-    if (rho <= 1E-20)
+    total_density = std::abs(total_density);
+    if (total_density <= 1E-20)
         return false;
 
-    const double dominant_fraction = std::max(densities.rho1, densities.rho2) / rho;
-    return dominant_fraction >= rcut_lower && dominant_fraction <= rcut_upper;
+    const double fragment_density = densities.total();
+    if (fragment_density <= 1E-20)
+        return false;
+
+    if (std::max(densities.rho1, densities.rho2) >= fragment_density * dominant_density_cutoff)
+        return false;
+
+    return fragment_density >= total_density * fragment_sum_cutoff;
 }
 
 double reduced_density_gradient_at(const cube &rho_cube, int x, int y, int z)
@@ -876,6 +883,9 @@ void write_promolecular_nci_vmd(
         << "set nci [molinfo top]\n"
         << "mol delrep 0 $nci\n"
         << "mol addfile " << tcl_quote_path(std::filesystem::absolute(rdg_path)) << " type cube waitfor all\n"
+        << "while {[molinfo $nci get numreps] > 0} {\n"
+        << "    mol delrep 0 $nci\n"
+        << "}\n"
         << "mol representation Isosurface 0.5 1 0 0 1 1\n"
         << "mol color Volume 0\n"
         << "mol selection all\n"
@@ -999,18 +1009,20 @@ void promolecular_nci_analysis(
     rdg_cube.set_comment1("Promolecular reduced density gradient using Thakkar spherical atoms");
     rdg_cube.set_comment2("from " + xyz1.string() + " and " + xyz2.string());
 
-    const double rcut_lower = std::min(opts.promol_nci_rcut1, opts.promol_nci_rcut2);
-    const double rcut_upper = std::max(opts.promol_nci_rcut1, opts.promol_nci_rcut2);
-
     log << "Promolecular NCI analysis for " << xyz1 << " and " << xyz2 << endl;
     log << "Grid points: " << local_opts.n_grid_points() << endl;
-    log << "Dominant-fragment density fraction cutoff: " << rcut_lower << " to " << rcut_upper << endl;
+    log << "Dominant-fragment density discard cutoff: " << opts.promol_nci_rcut1 << endl;
+    log << "Fragment-sum density keep cutoff: " << opts.promol_nci_rcut2 << endl;
 
-    rho_cube.evaluate_on_grid(
-        [&atoms](const d3 &pos) {
-            return promolecular_density_at(pos, atoms, 0);
-        },
-        false);
+    ProgressBar density_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular rho");
+#pragma omp parallel for schedule(dynamic)
+    for (int x = 0; x < rho_cube.get_size(0); x++)
+    {
+        for (int y = 0; y < rho_cube.get_size(1); y++)
+            for (int z = 0; z < rho_cube.get_size(2); z++)
+                rho_cube.set_value(x, y, z, promolecular_density_at(rho_cube.get_pos(x, y, z), atoms, 0));
+        density_progress.update();
+    }
 
     ofstream values_file(output_base.string() + "_values.dat", ios::out);
     err_checkf(values_file.good(), "Could not open " + output_base.string() + "_values.dat for writing.", log);
@@ -1018,6 +1030,7 @@ void promolecular_nci_analysis(
     values_file << "# rcut1 " << opts.promol_nci_rcut1 << " rcut2 " << opts.promol_nci_rcut2 << "\n";
 
     unsigned long long kept_points = 0;
+    ProgressBar rdg_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular RDG");
 #pragma omp parallel for schedule(dynamic) reduction(+ : kept_points)
     for (int x = 0; x < rho_cube.get_size(0); x++)
     {
@@ -1028,14 +1041,14 @@ void promolecular_nci_analysis(
             {
                 const d3 pos = rho_cube.get_pos(x, y, z);
                 const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms);
-                if (!is_promolecular_nci_point(densities, rcut_lower, rcut_upper))
+                const double rho = rho_cube.get_value(x, y, z);
+                if (!is_promolecular_nci_point(densities, rho, opts.promol_nci_rcut1, opts.promol_nci_rcut2))
                 {
                     signed_rho_cube.set_value(x, y, z, 0.0);
-                    rdg_cube.set_value(x, y, z, 0.0);
+                    rdg_cube.set_value(x, y, z, 101.0);
                     continue;
                 }
 
-                const double rho = rho_cube.get_value(x, y, z);
                 const double lambda2 = lambda2_at(rho_cube, x, y, z);
                 const double signed_rho = lambda2 < 0.0 ? -rho : rho;
                 const double rdg = sanitize_finite(reduced_density_gradient_at(rho_cube, x, y, z));
@@ -1056,6 +1069,7 @@ void promolecular_nci_analysis(
         {
             values_file << local_values.str();
         }
+        rdg_progress.update();
     }
 
     signed_rho_cube.set_path(output_base.string() + "_signed_rho.cube");
