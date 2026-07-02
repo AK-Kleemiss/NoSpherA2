@@ -9,8 +9,8 @@
 
 ## Build/Test Ground Truth
 
-- Linux/macOS quick build: `make` (produces `NoSpherA2` at repo root).
-- Windows quick build: `make.exe` in VS developer shell (produces `NoSpherA2.exe`).
+- Linux quick build: `cmake --preset linux-gcc && cmake --build --preset linux-gcc`.
+- Windows quick build: `cmake --preset windows-msvc-release-full && cmake --build --preset windows-msvc-release-full`.
 - CMake presets exist for OCC-focused workflows, e.g. `linux-occ-gcc`, `macos-release-*`, `windows-clang-cl`.
 - Windows/OCC integration validation: build `Windows\Tests\Tests.vcxproj` with `SolutionDir` pointing at `Windows\`, then run `vstest.console.exe Windows\x64\Release\Tests.dll /Platform:x64`.
 - OCC uses shared oneTBB at runtime. Artifacts must include `tbb12.dll`, `libtbb.so*`, or `libtbb.dylib`; do not add `tbbmalloc_proxy`.

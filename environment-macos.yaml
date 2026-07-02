@@ -1,0 +1,12 @@
+name: mambaenv
+channels:
+   - conda-forge
+dependencies:
+   # Explicit Python version ensures the interpreter is present for featomic's CMake checks.
+   - python=3.12
+
+   - pkgconfig
+   - ninja
+   - rust
+
+   - llvm-openmp

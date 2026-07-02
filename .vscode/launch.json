@@ -5,16 +5,16 @@
       "name": "(gdb) Launch",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/NoSpherA2_Debug",
-      "args": [
-        "-cif", "olex2/Wfn_job/sucrose.cif",
-		"-dmin", "0.9",
-		"-wfn", "olex2/Wfn_job/sucrose.wfx",
-		"-acc", "1", "-v",
+      "program": "${workspaceFolder}/build/Debug/bin/NoSpherA2_Debug",
+      "args": [ 
+        "-cif", "epoxide.cif",
+		"-dmin", "0.4",
+		"-wfn", "epoxide.gbw",
+		"-ri_fit", "combo_basis_fit", "-v",
         "-no-date"
       ],
       "stopAtEntry": false,
-      "cwd": "${workspaceFolder}/tests/sucrose_fchk_SF",
+      "cwd": "${workspaceFolder}/tests/epoxide_gbw",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",
