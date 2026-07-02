@@ -899,6 +899,7 @@ void write_promolecular_nci_vmd(
 
 void write_promolecular_nci_plot_script(
     const std::filesystem::path &output_base,
+    const properties_options &opts,
     std::ostream &log)
 {
     const std::filesystem::path values_path = output_base.string() + "_values.dat";
@@ -909,10 +910,19 @@ void write_promolecular_nci_plot_script(
 
     plot_file
         << "from pathlib import Path\n"
+        << "import sys\n"
         << "\n"
         << "import matplotlib.pyplot as plt\n"
         << "import numpy as np\n"
         << "from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm\n"
+        << "\n"
+        << "def read_float_arg(name, default):\n"
+        << "    if name not in sys.argv[1:]:\n"
+        << "        return default\n"
+        << "    idx = sys.argv.index(name)\n"
+        << "    if idx + 1 >= len(sys.argv):\n"
+        << "        raise SystemExit(f\"{name} requires a numeric value\")\n"
+        << "    return float(sys.argv[idx + 1])\n"
         << "\n"
         << "dat_path = Path(__file__).with_name(" << std::quoted(values_path.filename().string()) << ")\n"
         << "data = np.loadtxt(dat_path, comments=\"#\")\n"
@@ -921,6 +931,19 @@ void write_promolecular_nci_plot_script(
         << "\n"
         << "signed_rho = data[:, 0]\n"
         << "rdg = data[:, 1]\n"
+        << "xmax = " << std::setprecision(16) << opts.promol_nci_rho_abs_max << "\n"
+        << "ymax = " << std::setprecision(16) << opts.promol_nci_rdg_max << "\n"
+        << "xmax = read_float_arg(\"-xmax\", None if xmax < 0.0 else xmax)\n"
+        << "ymax = read_float_arg(\"-ymax\", None if ymax < 0.0 else ymax)\n"
+        << "mask = np.ones_like(signed_rho, dtype=bool)\n"
+        << "if xmax is not None:\n"
+        << "    mask &= np.abs(signed_rho) <= xmax\n"
+        << "if ymax is not None:\n"
+        << "    mask &= rdg <= ymax\n"
+        << "signed_rho = signed_rho[mask]\n"
+        << "rdg = rdg[mask]\n"
+        << "if signed_rho.size == 0:\n"
+        << "    raise SystemExit(\"No points remain after applying plot limits\")\n"
         << "rho_min = float(np.min(signed_rho))\n"
         << "rho_max = float(np.max(signed_rho))\n"
         << "\n"
@@ -935,11 +958,20 @@ void write_promolecular_nci_plot_script(
         << "ax.axvline(0.0, color=\"0.65\", linewidth=0.8)\n"
         << "ax.set_xlabel(\"signed rho\")\n"
         << "ax.set_ylabel(\"RDG\")\n"
+        << "if xmax is not None:\n"
+        << "    ax.set_xlim(-xmax, xmax)\n"
+        << "if ymax is not None:\n"
+        << "    ax.set_ylim(0.0, ymax)\n"
         << "ax.set_title(dat_path.stem.replace(\"_values\", \"\"))\n"
         << "cbar = fig.colorbar(scatter, ax=ax)\n"
         << "cbar.set_label(\"signed rho\")\n"
-        << "fig.savefig(dat_path.with_name(dat_path.stem.replace(\"_values\", \"_plot\") + \".png\"), dpi=300)\n"
-        << "plt.show()\n";
+        << "png_path = dat_path.with_name(dat_path.stem.replace(\"_values\", \"_plot\") + \".png\")\n"
+        << "fig.savefig(png_path, dpi=300)\n"
+        << "print(f\"Wrote {png_path}\")\n"
+        << "if \"-show\" in sys.argv[1:]:\n"
+        << "    plt.show()\n"
+        << "else:\n"
+        << "    plt.close(fig)\n";
 
     log << "Wrote " << plot_path << std::endl;
 }
@@ -1109,7 +1141,7 @@ void promolecular_nci_analysis(
     signed_rho_cube.write_file(true);
     rdg_cube.write_file(true);
     write_promolecular_nci_vmd(xyz1, xyz2, output_base, log);
-    write_promolecular_nci_plot_script(output_base, log);
+    write_promolecular_nci_plot_script(output_base, opts, log);
 
     log << "Wrote " << signed_rho_cube.get_path() << endl;
     log << "Wrote " << rdg_cube.get_path() << endl;

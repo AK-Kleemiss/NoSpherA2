@@ -516,6 +516,12 @@ TEST(TomlIntegrationTests, Properties)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, IntermolecularNCI)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "intermolecular_nci");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, RiFit)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit");

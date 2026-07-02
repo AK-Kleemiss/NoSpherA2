@@ -251,21 +251,20 @@ bool cube::write_file(bool force, bool absolute)
         }
     }
     using namespace std;
-    std::stringstream stream;
-    std::string temp;
-    std::ofstream of(path, std::ios::out);
+    std::vector<char> file_buffer(16 * 1024 * 1024);
+    std::ofstream of;
+    of.rdbuf()->pubsetbuf(file_buffer.data(), static_cast<std::streamsize>(file_buffer.size()));
+    of.open(path, std::ios::out);
     of << comment1 << endl;
     of << comment2 << endl;
     of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << endl;
     for (int i = 0; i < 3; i++)
     {
-        stream << setw(5) << size[i];
+        of << setw(5) << size[i];
         for (int j = 0; j < 3; j++)
-            stream << fixed << setw(12) << setprecision(6) << vectors[i][j];
-        stream << endl;
+            of << fixed << setw(12) << setprecision(6) << vectors[i][j];
+        of << endl;
     }
-    of << stream.str();
-    stream.str("");
     for (int i = 0; i < na; i++)
     {
         of << setw(5) << parent_wavefunction->get_atom_charge(i) << setw(5) << parent_wavefunction->get_atom_charge(i) << ".000000";
@@ -273,6 +272,7 @@ bool cube::write_file(bool force, bool absolute)
             of << fixed << setw(12) << setprecision(6) << parent_wavefunction->get_atom_coordinate(i, j);
         of << endl;
     }
+    of << uppercase << scientific << setprecision(5);
     for (int run_x = 0; run_x < size[0]; run_x++)
     {
         for (int run_y = 0; run_y < size[1]; run_y++)
@@ -281,18 +281,16 @@ bool cube::write_file(bool force, bool absolute)
             while (temp_write < size[2])
             {
                 if (absolute)
-                    stream << uppercase << scientific << setw(13) << setprecision(5) << abs(values[run_x][run_y][temp_write]);
+                    of << setw(13) << abs(values[run_x][run_y][temp_write]);
                 else
-                    stream << uppercase << scientific << setw(13) << setprecision(5) << values[run_x][run_y][temp_write];
+                    of << setw(13) << values[run_x][run_y][temp_write];
                 temp_write++;
                 if (temp_write % 6 == 0)
-                    stream << endl;
+                    of << '\n';
             }
             if (temp_write % 6 != 0)
-                stream << endl;
+                of << '\n';
         }
-        of << stream.str();
-        stream.str("");
     }
     return (true);
 };
@@ -300,9 +298,10 @@ bool cube::write_file(bool force, bool absolute)
 bool cube::write_file(const std::filesystem::path &given_path, bool debug)
 {
     using namespace std;
-    stringstream stream;
-    string temp;
-    ofstream of(given_path, ios::out);
+    std::vector<char> file_buffer(16 * 1024 * 1024);
+    ofstream of;
+    of.rdbuf()->pubsetbuf(file_buffer.data(), static_cast<std::streamsize>(file_buffer.size()));
+    of.open(given_path, ios::out);
     of << comment1 << "\n";
     of << comment2 << "\n";
     of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(5) << setprecision(6) << origin[2] << "\n";
@@ -323,13 +322,15 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
     if (debug)
         std::cout << "Finished atoms!" << endl;
     if (get_loaded())
+    {
+        of << uppercase << scientific << setprecision(5);
         for (int run_x = 0; run_x < size[0]; run_x++)
             for (int run_y = 0; run_y < size[1]; run_y++)
             {
                 int temp_write = 0;
                 while (temp_write < size[2])
                 {
-                    of << uppercase << scientific << setw(13) << setprecision(5) << values[run_x][run_y][temp_write];
+                    of << setw(13) << values[run_x][run_y][temp_write];
                     temp_write++;
                     if (temp_write % 6 == 0)
                         of << "\n";
@@ -339,6 +340,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
                 if (temp_write % 6 != 0)
                     of << "\n";
             }
+    }
     else
     {
         ifstream f(path, ios::in);
