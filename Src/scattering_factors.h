@@ -228,11 +228,11 @@ static void add_ECP_contribution(
  * @param debug Flag indicating whether to enable debug mode.
  */
 void calc_SF(const int& points,
-    vec2& k_pt,
-    vec2& d1,
-    vec2& d2,
-    vec2& d3,
-    vec2& dens,
+    const vec2& k_pt,
+    const vec2& d1,
+    const vec2& d2,
+    const vec2& d3,
+    const vec2& dens,
     cvec2& sf,
     std::ostream& file,
     _time_point& start,

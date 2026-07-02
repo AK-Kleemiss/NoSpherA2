@@ -378,24 +378,24 @@ void XCW::eval_translation_phase(cvec2& translation_phase) {
 	// closing function
 }
 
-void XCW::parse_anom_atoms(std::vector<anom_atom> &anom_atoms) {
-    std::ifstream file(opt->anom_disp_path);
-    if (!file) {
-        std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
-    }
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty())
-            continue;
-        std::istringstream iss(line);
-        std::string symbol;
-        double real_part, imag_part;
-        if (iss >> symbol >> real_part >> imag_part) {
-            if (!symbol.empty() && symbol[0] != '_' && symbol != "loop_") {
-                anom_atoms.push_back({ symbol, cdouble(real_part, imag_part) });
-            }
-        }
-    }
+void XCW::parse_anom_atoms(std::vector<anom_atom>& anom_atoms) {
+	std::ifstream file(opt->anom_disp_path);
+	if (!file) {
+		std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
+	}
+	std::string line;
+	while (std::getline(file, line)) {
+		if (line.empty())
+			continue;
+		std::istringstream iss(line);
+		std::string symbol;
+		double real_part, imag_part;
+		if (iss >> symbol >> real_part >> imag_part) {
+			if (!symbol.empty() && symbol[0] != '_' && symbol != "loop_") {
+				anom_atoms.push_back({ symbol, cdouble(real_part, imag_part) });
+			}
+		}
+	}
 }
 
 void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase) {
@@ -428,8 +428,8 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 }
 
 void XCW::eval_scale() {
-    double numerator = 0.0;
-    double denominator = 0.0;
+	double numerator = 0.0;
+	double denominator = 0.0;
 
 #pragma omp parallel for reduction(+:numerator, denominator)
 	for (int i = 0; i < cryst.nr_small; ++i) {
@@ -482,99 +482,99 @@ void XCW::create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& o
 }
 
 ivec XCW::generate_asym_lookup(const int r) {
-    ivec asym_list;
-    auto it = hkl.begin();
-    std::advance(it, r);
-    ivec3 rots = unit_cell.get_sym();
-    i3 tempv;
-    const i3 &hkl_temp = *it;
-    for (int s = 0; s < rots[0][0].size(); s++) {
-        tempv = { 0, 0, 0 };
-        for (int h = 0; h < 3; h++) {
-            for (int j = 0; j < 3; j++) {
-                tempv[j] += hkl_temp[h] * rots[j][h][s];
-            }
-        }
-        int idx_ = 0;
-        auto idx = hkl_enlarged.find(tempv);
-        if (idx != hkl_enlarged.end()) {
-            idx_ = std::distance(hkl_enlarged.begin(), idx);
-        }
-        asym_list.push_back(idx_);
-    }
-    return asym_list;
-    // closing function
+	ivec asym_list;
+	auto it = hkl.begin();
+	std::advance(it, r);
+	ivec3 rots = unit_cell.get_sym();
+	i3 tempv;
+	const i3& hkl_temp = *it;
+	for (int s = 0; s < rots[0][0].size(); s++) {
+		tempv = { 0, 0, 0 };
+		for (int h = 0; h < 3; h++) {
+			for (int j = 0; j < 3; j++) {
+				tempv[j] += hkl_temp[h] * rots[j][h][s];
+			}
+		}
+		int idx_ = 0;
+		auto idx = hkl_enlarged.find(tempv);
+		if (idx != hkl_enlarged.end()) {
+			idx_ = std::distance(hkl_enlarged.begin(), idx);
+		}
+		asym_list.push_back(idx_);
+	}
+	return asym_list;
+	// closing function
 }
 
-cvec2 XCW::calculateXCWintegral(GridManager &grid_manager, const ao_data &mu_data, const ao_data &nu_data, const ivec &asym_atom_list, vec2 &k_pt, bool &equal, vec2 &mu_vals) {
-    GridData &GD = grid_manager.getGridData();
-    vec2 *grids = grid_manager.getNeedsHelper() ? GD.helper_grids.data() : GD.atomic_grids.data();
-    const int n_grids = grid_manager.getNeedsHelper() ? GD.helper_grids.size() : GD.atomic_grids.size();
-    const int *points = grid_manager.getNeedsHelper() ? GD.helper_num_points_per_atom.data() : GD.num_points_per_atom.data();
-    const double mp0 = mu_data.pos[0];
-    const double mp1 = mu_data.pos[1];
-    const double mp2 = mu_data.pos[2];
-    const double np0 = nu_data.pos[0];
-    const double np1 = nu_data.pos[1];
-    const double np2 = nu_data.pos[2];
-    const std::vector<primitive> mu_prims = mu_data.prims;
-    const std::vector<primitive> nu_prims = nu_data.prims;
-    if (equal) {
-        mu_vals.resize(n_grids);
-        for (int g = 0; g < n_grids; g++) {
-            const int num_points = points[g];
-            mu_vals[g].resize(num_points);
-            vec2 &atom_grid = grids[g];
-            const double *x_ptr = atom_grid[GridData::GridIndex::X].data();
-            const double *y_ptr = atom_grid[GridData::GridIndex::Y].data();
-            const double *z_ptr = atom_grid[GridData::GridIndex::Z].data();
-            double *overlap_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
-#pragma omp parallel for schedule(dynamic, 4)
-			for (int p = 0; p < num_points; p++) {
-				std::array<double, 4> d_mu;
-				double* d_mu_ptr = d_mu.data();
-				*d_mu_ptr = x_ptr[p] - mp0;
-				*(d_mu_ptr + 1) = y_ptr[p] - mp1;
-				*(d_mu_ptr + 2) = z_ptr[p] - mp2;
-				*(d_mu_ptr + 3) = std::hypot(*(d_mu_ptr), *(d_mu_ptr + 1), *(d_mu_ptr + 2));
-				mu_vals[g][p] = dummy_wave.eval_ao(d_mu, mu_prims, mu_data.m);
-				overlap_ptr[p] = std::pow(mu_vals[g][p], 2);
+ivec2 XCW::generate_asym_lookup_(const int r) {
+	ivec2 asym_list;
+	auto it = hkl.begin();
+	std::advance(it, r);
+	ivec3 rots = unit_cell.get_sym();
+	i3 tempv;
+	const i3& hkl_temp = *it;
+	for (int s = 0; s < rots[0][0].size(); s++) {
+		tempv = { 0, 0, 0 };
+		for (int h = 0; h < 3; h++) {
+			for (int j = 0; j < 3; j++) {
+				tempv[j] += hkl_temp[h] * rots[j][h][s];
 			}
 		}
-	}
-	else {
-		for (int g = 0; g < n_grids; g++) {
-			const int num_points = points[g];
-			vec2& atom_grid = grids[g];
-			const double* x_ptr = atom_grid[GridData::GridIndex::X].data();
-			const double* y_ptr = atom_grid[GridData::GridIndex::Y].data();
-			const double* z_ptr = atom_grid[GridData::GridIndex::Z].data();
-			double* overlap_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
-#pragma omp parallel for schedule(dynamic, 4)
-			for (int p = 0; p < num_points; p++) {
-				std::array<double, 4> d_mu, d_nu;
-				double* d_mu_ptr = d_mu.data();
-				double* d_nu_ptr = d_nu.data();
-				*d_mu_ptr = x_ptr[p] - mp0;
-				*(d_mu_ptr + 1) = y_ptr[p] - mp1;
-				*(d_mu_ptr + 2) = z_ptr[p] - mp2;
-				*(d_mu_ptr + 3) = std::hypot(*(d_mu_ptr), *(d_mu_ptr + 1), *(d_mu_ptr + 2));
-				*d_nu_ptr = x_ptr[p] - np0;
-				*(d_nu_ptr + 1) = y_ptr[p] - np1;
-				*(d_nu_ptr + 2) = z_ptr[p] - np2;
-				*(d_nu_ptr + 3) = std::hypot(*(d_nu_ptr), *(d_nu_ptr + 1), *(d_nu_ptr + 2));
-				overlap_ptr[p] = (*d_mu_ptr + 3) > 12 || (*d_nu_ptr + 3) > 12 ? 0 : mu_vals[g][p] * dummy_wave.eval_ao(d_nu, nu_prims, nu_data.m);
-			}
+		int idx_ = 0;
+		auto idx = hkl_enlarged.find(tempv);
+		if (idx != hkl_enlarged.end()) {
+			idx_ = std::distance(hkl_enlarged.begin(), idx);
 		}
+		ivec temporary = { idx_, s };
+		asym_list.push_back(temporary);
 	}
-	vec2 d1, d2, d3, dens;
-	std::vector<_time_point> time_points({ get_time() });
-	_time_point end;
-	grid_manager.getDensityVectors(dummy_wave, asym_atom_list, d1, d2, d3, dens);
-	const int points_ = grid_manager.getTotalGridPoints();
-	cvec2 sf;
-	calc_SF(points_, k_pt, d1, d2, d3, dens, sf, std::cout, time_points.front(), end, opt->debug, true, true);
-	return sf;
+	return asym_list;
+	// closing function
+}
+
+void XCW::calculateXCWintegral(const vec2& mu_vals, const vec2& nu_vals, const int* points, vec2& atom_grids_values, const cvec2& phase, const std::vector<asym_atom>& asym_atoms, const cvec2& DW_fact, const cvec2& phase_fact, const int mu, const int nu, const int r, const cdouble& translation_phase) {
+	const int n_grids = atom_grids_values.size();
+	cvec sfs(n_grids);
+	double sum_re, sum_im;
+	int p;
+#pragma omp parallel for schedule(dynamic, 1) private(sum_re, sum_im, p)
+	for (int g = 0; g < n_grids; g++) {
+		const int np = points[g];
+		const double* __restrict mu_ptr = mu_vals[g].data();
+		const double* __restrict nu_ptr = nu_vals[g].data();
+		const cdouble* __restrict phase_ptr = phase[g].data();
+		const long long int np_4 = (np / 4) * 4;
+		sum_re = 0.0;
+		sum_im = 0.0;
+		for (p = 0; p < np_4; p += 4) {
+			const double overlap0 = mu_ptr[p] * nu_ptr[p];
+			const double overlap1 = mu_ptr[p + 1] * nu_ptr[p + 1];
+			const double overlap2 = mu_ptr[p + 2] * nu_ptr[p + 2];
+			const double overlap3 = mu_ptr[p + 3] * nu_ptr[p + 3];
+			const double phase_re0 = phase_ptr[p].real();
+			const double phase_re1 = phase_ptr[p + 1].real();
+			const double phase_re2 = phase_ptr[p + 2].real();
+			const double phase_re3 = phase_ptr[p + 3].real();
+			const double phase_im0 = phase_ptr[p].imag();
+			const double phase_im1 = phase_ptr[p + 1].imag();
+			const double phase_im2 = phase_ptr[p + 2].imag();
+			const double phase_im3 = phase_ptr[p + 3].imag();
+			sum_re += overlap0 * phase_re0 + overlap1 * phase_re1 + overlap2 * phase_re2 + overlap3 * phase_re3;
+			sum_im += overlap0 * phase_im0 + overlap1 * phase_im1 + overlap2 * phase_im2 + overlap3 * phase_im3;
+		}
+		for (p = np_4; p < np; p++) {
+			sum_re += mu_ptr[p] * nu_ptr[p] * phase_ptr[p].real();
+			sum_im += mu_ptr[p] * nu_ptr[p] * phase_ptr[p].imag();
+		}
+		sfs[g] = cdouble(sum_re, sum_im);
+	}
+	for (int at = 0; at < cryst.ncen; at++) {
+		const double asym_fact = asym_atoms[at].asym_fact;
+		const cvec& DW_at = DW_fact[at];
+		const cvec& phase_at = phase_fact[at];
+		const cdouble temp1 = sfs[at] * DW_at[r] * phase_at[r];
+		I[flattened_idx(r, mu, nu)] += temp1 * asym_fact * translation_phase;
+	}
 }
 
 size_t XCW::tri_index(int mu, int nu) const noexcept {
@@ -618,8 +618,10 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	I.resize(cryst.nr_small * (cryst.nmo * (cryst.nmo + 1)) / 2);
 	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
 
-    cvec2 XCW_integral;
+	cvec XCW_integrals;
+	cvec2 XCW_integral_old;
 
+	// Grid setup
 	GridConfiguration config;
 	config.accuracy = opt->accuracy;
 	config.partition_type = opt->partition_type;
@@ -631,90 +633,154 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	dummy_wave.delete_unoccupied_MOs();
 	bvec needs_grid(cryst.ncen, true);
 	grid_manager.setup3DGridsForMolecule(dummy_wave, asym_atom_list, needs_grid, unit_cell);
-	int cofs;
+
 	bool equal = false;
-	double cutoff = 0;
-	std::vector<ivec> asym_lookup(cryst.nr_small);
+
+	GridData& GD = grid_manager.getGridData();
+	vec2* grids = grid_manager.getNeedsHelper() ? GD.helper_grids.data() : GD.atomic_grids.data();
+	vec2 d1, d2, d3, weights;
+	const int n_grids = grid_manager.getNeedsHelper() ? GD.helper_grids.size() : GD.atomic_grids.size();
+	for (int g = 0; g < n_grids; g++) {
+		std::fill(grids[g][GridData::GridIndex::WFN_DENSITY].begin(), grids[g][GridData::GridIndex::WFN_DENSITY].end(), 1.0);
+	}
+	grid_manager.getDensityVectors(dummy_wave, asym_atom_list, d1, d2, d3, weights);
+	const int* points = grid_manager.getNeedsHelper() ? GD.helper_num_points_per_atom.data() : GD.num_points_per_atom.data();
+	const int total_points = grid_manager.getTotalGridPoints();
+	vec2 atom_grids_values(n_grids);
+	for (int g = 0; g < n_grids; g++) {
+		atom_grids_values[g].resize(points[g]);
+	}
+	std::cout << "Total number of grid points after pruning: " << total_points << std::endl;
+
+	ivec2 asym_lookup(cryst.nr_small);
 	for (r = 0; r < cryst.nr_small; r++) {
 		asym_lookup[r] = generate_asym_lookup(r);
 	}
+	const unsigned int num_syms = asym_lookup[0].size();
+
+	// Precompute screening
+	double cutoff = 0;
+	int screen_counter = 0;
+	ivec2 skip(cryst.nmo, ivec(cryst.nmo, 0));
 	for (mu = 0; mu < cryst.nmo; mu++) {
-		vec2 mu_vals;
 		const ao_data& mu_prims = ao_data_shells[mu];
 		const std::vector<primitive>& mu_primitives = mu_prims.prims;
 		const double& mp0 = mu_prims.pos[0];
 		const double& mp1 = mu_prims.pos[1];
 		const double& mp2 = mu_prims.pos[2];
-		for (nu = mu; nu < cryst.nmo; nu++) {
-			if (nu == mu) {
-				equal = true;
-			}
-			else {
-				equal = false;
-			}
+		for (nu = mu + 1; nu < cryst.nmo; nu++) {
 			const ao_data& nu_prims = ao_data_shells[nu];
 			const std::vector<primitive>& nu_primitives = nu_prims.prims;
 			const double& np0 = nu_prims.pos[0];
 			const double& np1 = nu_prims.pos[1];
 			const double& np2 = nu_prims.pos[2];
-			// Screening
+
 			const double dist0 = mp0 - np0;
 			const double dist1 = mp1 - np1;
 			const double dist2 = mp2 - np2;
-			const double dist = std::sqrt(dist0 * dist0 + dist1 * dist1 + dist2 * dist2);
-			if (!equal) {
-				double c_tot = 0;
-				//for (cofs = 0; cofs < mu_primitives.size(); cofs++) {
-				//	double alpha = mu_primitives[cofs].get_exp();
-				//	double beta = nu_primitives[cofs].get_exp();
-				//	double alpha_k_l = alpha * beta / (alpha + beta);
-				//	c_tot += std::abs(mu_primitives[cofs].get_coef()) * std::abs(nu_primitives[cofs].get_coef()) * std::pow(constants::PI / alpha_k_l, 1.5);
-				//}
-				for (size_t i = 0; i < mu_primitives.size(); ++i) {
-					double alpha = mu_primitives[i].get_exp();
-					for (size_t j = 0; j < nu_primitives.size(); ++j) {
-						double beta = nu_primitives[j].get_exp();
-						double alpha_k_l = alpha * beta / (alpha + beta);
-						c_tot += std::abs(mu_primitives[i].get_coef())
-							* std::abs(nu_primitives[j].get_coef())
-							* std::pow(constants::PI / alpha_k_l, 1.5);
-					}
+			const double dist = dist0 * dist0 + dist1 * dist1 + dist2 * dist2;
+			if (dist < 1e-5) {
+				continue;
+			}
+			double e_tol = 0.0005;
+			vec mu_eff;
+			double c = 0;
+			double mu_min = std::numeric_limits<double>::max();
+			for (int k = 0; k < mu_primitives.size(); ++k) {
+				const double alpha = mu_primitives[k].get_exp();
+				const double l_k = mu_primitives[k].get_type() + 1;
+				const double l_half_k = l_k * 0.5;
+				double N_k = std::sqrt(0.25 * constants::INV_PI * (2 * l_k + 1)) * std::pow(l_k / alpha, l_half_k) * std::exp(-l_half_k);
+				for (int j = 0; j < nu_primitives.size(); ++j) {
+					const double beta = nu_primitives[j].get_exp();
+					const double l_j = nu_primitives[j].get_type() + 1;
+					const double alpha_beta = alpha + beta;
+					const double mu_k_l = alpha * beta / (2 * (alpha_beta));
+					mu_eff.push_back(mu_k_l);
+					const double l_half_j = 0.5 * l_j;
+					double N_j = std::sqrt(0.25 * constants::INV_PI * (2 * l_j + 1)) * std::pow(l_j / beta, l_half_j) * std::exp(-l_half_j);
+					const double A_kj = std::pow(constants::TWO_PI / alpha_beta, 1.5) * N_k * N_j;
+					c += std::abs(mu_primitives[k].get_coef() * nu_primitives[j].get_coef()) * A_kj;
 				}
-				c_tot *= std::sqrt((2 * mu_primitives[0].get_type() + 1) * (2 * nu_primitives[0].get_type() + 1) / (constants::TWO_PI * constants::TWO_PI));
-				double alpha_min = mu_primitives[mu_primitives.size() - 1].get_exp();
-				double beta_min = nu_primitives[nu_primitives.size() - 1].get_exp();
-				double a_min = (alpha_min + beta_min) / (alpha_min * beta_min);
-				const double screen = 0.001;
-				cutoff = std::sqrt(a_min * std::log(c_tot / screen));
 			}
-			if (dist > cutoff && !equal) {
-				//continue;
+			for (int temp_ = 0; temp_ < mu_eff.size(); temp_++) {
+				mu_min = std::min(mu_min, mu_eff[temp_]);
 			}
+			cutoff = std::log(c / e_tol) / mu_min;
+			if (dist > cutoff) {
+				skip[mu][nu] = 1;
+			}
+		}
+	}
 
-			cdouble temp1;
-			double asym_fact;
-			int idx;
-			XCW_integral = calculateXCWintegral(grid_manager, mu_prims, nu_prims, asym_atom_list, k_pt, equal, mu_vals);
-			for (r = 0; r < cryst.nr_small; r++) {
-				const cvec& translation_phase_r = translation_phase[r];
-				const ivec& asym_list = asym_lookup[r];
-				for (at = 0; at < cryst.ncen; at++) {
-					asym_fact = asym_atoms[at].asym_fact;
-					const cvec& XCW_at = XCW_integral[at];
-					const cvec& DW_at = DW_fact[at];
-					const cvec& phase_at = phase_fact[at];
-					temp1 = 0;
-					for (r_asym = 0; r_asym < asym_list.size(); r_asym++) {
-						idx = asym_list[r_asym];
-						temp1 += XCW_at[idx] * DW_at[idx] * phase_at[idx] * translation_phase_r[r_asym];
-					}
-					I[flattened_idx(r, mu, nu)] += temp1 * asym_fact;
+	// Precompute mu_vals for all grids
+	vec3 mu_vals(cryst.nmo, vec2(n_grids));
+#pragma omp parallel for schedule(dynamic)
+	for (mu = 0; mu < cryst.nmo; mu++) {
+		const ao_data& mu_prims = ao_data_shells[mu];
+		const std::vector<primitive> mu_primitives = mu_prims.prims;
+		const double mp0 = mu_prims.pos[0];
+		const double mp1 = mu_prims.pos[1];
+		const double mp2 = mu_prims.pos[2];
+		for (int g = 0; g < n_grids; g++) {
+			vec2& atom_grid = grids[g];
+			const double* x_ptr = atom_grid[GridData::GridIndex::X].data();
+			const double* y_ptr = atom_grid[GridData::GridIndex::Y].data();
+			const double* z_ptr = atom_grid[GridData::GridIndex::Z].data();
+			mu_vals[mu][g].resize(points[g]);
+			double* local_mu_vals_ptr = mu_vals[mu][g].data();
+			for (int p = 0; p < points[g]; p++) {
+				d4 d_mu{ x_ptr[p] - mp0, y_ptr[p] - mp1 , z_ptr[p] - mp2 , 0 };
+				d_mu[3] = std::hypot(d_mu[0], d_mu[1], d_mu[2]);
+				local_mu_vals_ptr[p] = (d_mu[3] > 12) ? 0.0 : dummy_wave.eval_ao(d_mu, mu_primitives, mu_prims.m);
+			}
+		}
+	}
+	std::cout << "AO values calculated for all grids." << std::endl;
+
+	ProgressBar* pb = new ProgressBar((unsigned long long)cryst.nr, 60, "=", "|", "Calculating XCW integrals...", std::cout);
+	auto start = std::chrono::high_resolution_clock::now();
+
+	// Main loop for computation of I
+	for (int r = 0; r < cryst.nr_small; r++) {
+
+		// Extract all k_pts needed for this r
+		vec2 single_k_pts(num_syms);
+		for (int syms = 0; syms < num_syms; syms++) {
+			single_k_pts[syms] = { k_pt[0][asym_lookup[r][syms]], k_pt[1][asym_lookup[r][syms]], k_pt[2][asym_lookup[r][syms]] };
+		}
+
+		// Precompute weighted phase factors for integration
+		cvec3 phase(num_syms, cvec2(n_grids));
+		for (int syms = 0; syms < num_syms; syms++) {
+			for (int g = 0; g < n_grids; g++) {
+				phase[syms][g].resize(points[g]);
+				for (int p = 0; p < points[g]; p++) {
+					const double work0 = single_k_pts[syms][0] * d1[g][p] + single_k_pts[syms][1] * d2[g][p] + single_k_pts[syms][2] * d3[g][p];
+					phase[syms][g][p] = std::polar(weights[g][p], work0);
 				}
 			}
 		}
-		// Print out that contributions from mu are done
-		std::cout << "Finished contributions from mu = " << mu << std::endl;
+
+		//Compute the elements of the I tensor (WIP)
+		for (mu = 0; mu < cryst.nmo; mu++) {
+			for (nu = mu; nu < cryst.nmo; nu++) {
+				if (skip[mu][nu]) {
+					screen_counter++;
+					continue;
+				}
+				for (int syms = 0; syms < num_syms; syms++) {
+					calculateXCWintegral(mu_vals[mu], mu_vals[nu], points, atom_grids_values, phase[syms], asym_atoms, DW_fact, phase_fact, mu, nu, r, translation_phase[r][syms]);
+				}
+			}
+		}
+		pb->update();
 	}
+	free(pb);
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = end - start;
+	std::cout << std::endl << "Time taken for XCW integrals: " << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
+	std::cout << "Screened out " << screen_counter / cryst.nr << " pairs of mu, nu" << std::endl;
 }
 
 void XCW::calc_F_calc(const dMatrix2& D) {
@@ -820,9 +886,9 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	}
 }
 
-void XCW::setup_SCF_mol(occ::core::Molecule &mol) {
-    double bohr2angstrom = constants::bohr2ang(1);
-    std::ostringstream init_stream;
+void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
+	double bohr2angstrom = constants::bohr2ang(1);
+	std::ostringstream init_stream;
 
 	init_stream << cryst.ncen << "\n\n";
 
@@ -837,10 +903,10 @@ void XCW::setup_SCF_mol(occ::core::Molecule &mol) {
 			init_stream << "\n";
 	}
 
-    std::string init = init_stream.str();
-    mol = occ::io::molecule_from_xyz_string(init);
-    mol.set_charge(opt->charge);
-    mol.set_multiplicity(opt->mult);
+	std::string init = init_stream.str();
+	mol = occ::io::molecule_from_xyz_string(init);
+	mol.set_charge(opt->charge);
+	mol.set_multiplicity(opt->mult);
 }
 
 void XCW::setup_basis(occ::core::Molecule& mol, std::string& basis_set_name, occ::qm::AOBasis& occ_basis_set) {
@@ -935,23 +1001,17 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	double e_diff_mem = 0;
 	occ::Mat dm_last = scf.ctx.mo.D;
 
-    do {
+	do {
 
 		converged = SCF_iteration(scf, lambda, alpha, e_diff_mem, quant, last_quant, dm_last);
 
-    } while (!converged && scf.iter < scf.maxiter);
+	} while (!converged && scf.iter < scf.maxiter);
 
-    if (converged) {
-        XCW_log << "____________________________________________________________________________\n";
-        std::stringstream print_;
-        print_ << "***SCF converged in " << scf.iter + 1 << " iterations***";
-        print_centered_message(print_.str(), 76, XCW_log);
-
-		std::cout << "F_calcs:" << std::endl;
-		for (int i = 0; i < cryst.nr_small; i++) {
-			std::cout << std::fixed << std::setprecision(3) << std::pow(std::abs(F_calc[0][i]), 2) << std::endl;
-		}
-
+	if (converged) {
+		XCW_log << "____________________________________________________________________________\n";
+		std::stringstream print_;
+		print_ << "***SCF converged in " << scf.iter + 1 << " iterations***";
+		print_centered_message(print_.str(), 76, XCW_log);
 		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << cryst.chi2 << "\t" << cryst.GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 		create_tscb(scf, lambda);
@@ -1046,13 +1106,13 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	dm_last = scf.ctx.mo.D;
 	return false;
 
-    // Apply damping
-    scf.ctx.mo.D *= (1 - alpha);
-    scf.ctx.mo.D += alpha * dm_old;
+	// Apply damping
+	scf.ctx.mo.D *= (1 - alpha);
+	scf.ctx.mo.D += alpha * dm_old;
 
-    return false;
+	return false;
 
-    //closing function
+	//closing function
 }
 
 bool XCW::SCF_convergence_check(const double& quant_diff, const double& gradient, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last) {
@@ -1197,9 +1257,14 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read, bool safe) {
 
 void XCW::run_XCW_fitting() {
 
-	bool read = true;
+	bool read = false;
 	bool safe = false;
 	occ::qm::HartreeFock hf = setup_XCW_procedure(read, safe);
+	//std::cout << "I_tensor elements:" << std::endl;
+	//for (int print = 0; print < 78680; print++) {
+	//	std::cout << I[print] << std::endl;
+	//}
+	//exit(0);
 	occ::qm::SCF scf(hf, settings.hf_type);
 	occ::qm::Wavefunction last_wfn;
 	bool has_guess = false;
@@ -1223,11 +1288,11 @@ void XCW::run_XCW_fitting() {
 		scf.update_occupied_orbital_count();
 		scf.convergence_accelerator.set_strategy(scf.convergence_settings.diis_strategy);
 		scf.convergence_accelerator.set_switch_threshold(scf.convergence_settings.diis_switch_threshold);
- 		do_SCF(lambda, alpha, scf, last_wfn, has_guess);
+		do_SCF(lambda, alpha, scf, last_wfn, has_guess);
 		last_wfn = scf.wavefunction();
 	}
 
-    std::cout << "Finished XCW fitting procedure." << std::endl;
-    exit(0);
+	std::cout << "Finished XCW fitting procedure." << std::endl;
+	exit(0);
 
 }

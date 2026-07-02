@@ -1750,11 +1750,11 @@ void calc_SF_SALTED(const vec2& k_pt,
  * @param no_date Flag indicating whether to exclude the date in the output.
  */
 void calc_SF(const int& points,
-	vec2& k_pt,
-	vec2& d1,
-	vec2& d2,
-	vec2& d3,
-	vec2& dens,
+	const vec2& k_pt,
+	const vec2& d1,
+	const vec2& d2,
+	const vec2& d3,
+	const vec2& dens,
 	cvec2& sf,
 	std::ostream& file,
 	_time_point& start,
@@ -1790,7 +1790,8 @@ void calc_SF(const int& points,
 	}
 	long long int pmax, p, s;
 	complex<double>* sf_local;
-	double work, rho, c, si, * dens_local, re, im, * d1_local, * d2_local, * d3_local;
+	double work, rho, c, si, re, im;
+	const double* d1_local, * d2_local, * d3_local, * dens_local;
 
 	// Pre-fetch k_pt data pointers for better cache locality
 	const double* k1_data = k_pt[0].data();

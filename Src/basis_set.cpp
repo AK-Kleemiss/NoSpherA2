@@ -78,9 +78,14 @@ occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms)
 				coefficients.push_back(primitives[primitive_idx].coefficient);
 				primitive_idx++;
 			}
-			shells.emplace_back(l, exponents, vec2(1,coefficients), origin);
-			shells.back().kind = occ::gto::Shell::Kind::Spherical;
-			shells.back().incorporate_shell_norm();
+
+			occ::gto::Shell shell(l, exponents, { coefficients }, origin);
+			shell.kind = occ::gto::Shell::Kind::Spherical;
+			shell.incorporate_shell_norm();
+			shells.push_back(shell);
+			//shells.emplace_back(l, exponents, vec2(1,coefficients), origin);
+			//shells.back().kind = occ::gto::Shell::Kind::Spherical;
+			//shells.back().incorporate_shell_norm();
 		}
 		// TODO: Handle ECPs if needed, currently not supported
 		//if (element_basis.ecp_electrons > 0) {

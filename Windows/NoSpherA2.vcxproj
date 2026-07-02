@@ -261,7 +261,7 @@
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
-      <AdditionalOptions>-openmp:experimental /utf-8  /wd4068</AdditionalOptions>
+      <AdditionalOptions> /utf-8  /wd4068</AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <SupportJustMyCode>false</SupportJustMyCode>
     </ClCompile>
@@ -566,7 +566,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Lib\lahva;..\Lib\featomic_install\include;..\Lib\LibCint\include;..\Lib\occ\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <AdditionalOptions>-openmp:experimental /utf-8 /wd4068</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
