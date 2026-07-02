@@ -46,7 +46,7 @@ inline double linear_interpolate_spherical_density(
         return 0;
     else if (dist < spherical_dist[0])
         return radial_dens[0];
-    const int nr = log_spline_index(spherical_dist, dist, lincr, start);
+    const int nr = std::max(1, log_spline_index(spherical_dist, dist, lincr, start));
     result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
     if (result < 1E-10)
         result = 0;
