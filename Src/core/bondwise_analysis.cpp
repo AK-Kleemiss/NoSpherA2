@@ -748,15 +748,6 @@ std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN &wavy) {
     return bonds;
 }
 
-#ifdef __APPLE__
-static void eigenvectors_to_row_major(vec &matrix, const int n) {
-    vec row_major(n * n);
-    for (int row = 0; row < n; ++row)
-        for (int col = 0; col < n; ++col)
-            row_major[row * n + col] = matrix[col * n + row];
-    matrix.swap(row_major);
-}
-#endif
 
 //Assuming square matrices
 vec change_basis_sq(const vec &in, const vec &transformation, int size) {
@@ -867,11 +858,6 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     err_checkf(isSymmetricViaEigenvalues<vec>(P, n), "Transformed matrix not symmetric!", std::cout);
 #endif
     make_Eigenvalues(P, occu);
-#ifdef __APPLE__
-    // Accelerate's dsyev_ returns eigenvectors in Fortran column-major layout.
-    // The NAO back-projection below consumes P through row-major CBLAS.
-    eigenvectors_to_row_major(P, n);
-#endif
 #ifdef NSA2DEBUG
     std::cout << "Eigenvalues of projected density P:\n";
     for (int i = 0; i < n; i++) {
@@ -1651,9 +1637,6 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
             auto X = change_basis_general(Ionic_Operator, transpose(A), true);
             vec ionic_eigenvals(X.extent(0));
             make_Eigenvalues(X.container(), ionic_eigenvals);
-#ifdef __APPLE__
-            eigenvectors_to_row_major(X.container(), static_cast<int>(X.extent(0)));
-#endif
 
             auto EVC = dot<dMatrix2>(SI, X);
 
@@ -1919,9 +1902,6 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
         // solve symmetric eigenproblem of X
         vec ionic_eigenvals(X.extent(0));
         make_Eigenvalues(X.container(), ionic_eigenvals);
-#ifdef __APPLE__
-        eigenvectors_to_row_major(X.container(), static_cast<int>(X.extent(0)));
-#endif
 
 #ifdef NSA2DEBUG
         std::cout << "Ionic eigenvalues between atom " << bond.first + 1 << " and atom " << bond.second + 1 << ":\n";

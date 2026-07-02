@@ -390,7 +390,7 @@ static UT_Result run_inprocess_test(const std::filesystem::path& repo_root,
     }
 
     // Inject OCC_DATA_PATH for in-process runs.
-    const std::string occDataPath = (repo_root / "Lib" / "occ" / "share" / "occ").string();
+    const std::string occDataPath = (repo_root / "occ" / "share").string();
 #ifdef _WIN32
     _putenv_s("OCC_DATA_PATH", occDataPath.c_str());
 #else

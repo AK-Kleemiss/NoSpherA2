@@ -13,6 +13,27 @@ inline void not_implemented_SA(const std::string& file, const int& line, const s
 };
 #define err_not_impl_SA() not_implemented_SA(__FILE__, __LINE__, __func__, "Virtual_function", std::cout);
 
+// Compute the log-spline table index for the interval containing dist.
+// The grid is logarithmically spaced: table[k] = start * exp(k * lincr).
+// Uses an O(1) log-based estimate then corrects by at most one step using
+// exact comparisons against the stored table, ensuring identical results
+// on all platforms regardless of platform-specific log() rounding.
+inline int log_spline_index(
+    const vec& table,
+    const double dist,
+    const double lincr,
+    const double start)
+{
+    const int max_idx = static_cast<int>(table.size()) - 2;
+    int nr = static_cast<int>(floor(log(dist / start) / lincr));
+    if (nr < 0) nr = 0;
+    if (nr > max_idx) nr = max_idx;
+    // Correct for potential 1-ULP rounding in log()
+    if (nr < max_idx && dist >= table[nr + 1]) ++nr;
+    else if (nr > 0 && dist < table[nr]) --nr;
+    return nr;
+}
+
 inline double linear_interpolate_spherical_density(
     const vec& radial_dens,
     const vec& spherical_dist,
@@ -25,7 +46,7 @@ inline double linear_interpolate_spherical_density(
         return 0;
     else if (dist < spherical_dist[0])
         return radial_dens[0];
-    int nr = int(floor(log(dist / start) / lincr));
+    const int nr = log_spline_index(spherical_dist, dist, lincr, start);
     result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
     if (result < 1E-10)
         result = 0;
@@ -71,7 +92,7 @@ inline double cubic_spline_interpolate_spherical_density(
         return 0;
     else if (dist < spherical_dist[0])
         return radial_dens[0];
-    const int nr = int(floor(log(dist / start) / lincr));
+    const int nr = log_spline_index(spherical_dist, dist, lincr, start);
     const double h = spherical_dist[nr + 1] - spherical_dist[nr];
     const double a = (spherical_dist[nr + 1] - dist) / h;
     const double b = 1.0 - a;
