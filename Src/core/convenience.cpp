@@ -212,6 +212,11 @@ std::string help_message =
     "   -mtc_charge     <List of charges>        Matching charges for -cmtc and -mtc wavefucntions\n"
     "   -mtc_ECP        <List of ECP modes>      Matching ECP modes for -cmtc and -mtc wavefucntions\n"
     "   -profiling      [tests_root]             Runs the internal profiling suite (all test paths). Optional root defaults to ./tests\n"
+    "   -promol_nci      <frag1.xyz> <frag2.xyz> [rcut1] [rcut2] [rho_abs_max] [rdg_max]\n"
+    "                                            Promolecular NCI/RDG analysis from two XYZ fragments using Thakkar spherical atom densities.\n"
+    "                                            Defaults: rcut1=0.95, rcut2=0.75; output: <frag1>_<frag2>_signed_rho.cube,\n"
+    "                                            <frag1>_<frag2>_rdg.cube, <frag1>_<frag2>_values.dat,\n"
+    "                                            <frag1>_<frag2>_nci.vmd, and <frag1>_<frag2>_plot.py.\n"
     "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
     "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
    "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
@@ -2550,6 +2555,48 @@ void options::digest_options()
             {
                 profiling_tests_root = arguments[i + 1];
             }
+        }
+        else if (temp == "-promol_nci")
+        {
+            err_checkf(i + 2 < argc,
+                "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max]",
+                std::cout);
+            const std::filesystem::path xyz1 = arguments[i + 1];
+            const std::filesystem::path xyz2 = arguments[i + 2];
+            err_checkf(std::filesystem::exists(xyz1), "First XYZ file doesn't exist: " + xyz1.string(), std::cout);
+            err_checkf(std::filesystem::exists(xyz2), "Second XYZ file doesn't exist: " + xyz2.string(), std::cout);
+
+            double *optional_values[] = {
+                &properties.promol_nci_rcut1,
+                &properties.promol_nci_rcut2,
+                &properties.promol_nci_rho_abs_max,
+                &properties.promol_nci_rdg_max
+            };
+            int optional_index = 0;
+            while (optional_index < 4 && i + 3 + optional_index < argc)
+            {
+                try
+                {
+                    size_t consumed = 0;
+                    const std::string &candidate = arguments[i + 3 + optional_index];
+                    const double value = std::stod(candidate, &consumed);
+                    if (consumed != candidate.size())
+                        break;
+                    *optional_values[optional_index] = value;
+                    optional_index++;
+                }
+                catch (...)
+                {
+                    break;
+                }
+            }
+
+            promolecular_nci_analysis(
+                xyz1,
+                xyz2,
+                properties,
+                std::cout);
+            exit(0);
         }
         else if (temp == "-radius")
             properties.radius = stod(arguments[i + 1]);

@@ -1,5 +1,5 @@
 # Unit Test Status
-**Last updated: 2026-06-14**
+**Last updated: 2026-07-02**
 
 ## Test Harnesses
 
@@ -15,15 +15,15 @@ Environment variables:
 
 ---
 
-## Current Validation Status (2026-06-14)
+## Current Validation Status (2026-07-02)
 
 | Suite | Config | Result |
 |-------|--------|--------|
-| Python pytest Release | non-full (19 tests) | **passing** |
-| Python pytest Release | full (21 tests) | **passing** (1 tolerated numeric warn in `fchk_conversion`) |
-| Python pytest Debug | full (21 tests) | **passing** |
-| VS Tests Debug | full (21 tests) | **passing** |
-| VS Tests Release | full (21 tests) | **passing** |
+| Python pytest Release | non-full (21 tests) | **passing** |
+| Python pytest Release | full (23 tests) | **passing** (1 tolerated numeric warn in `fchk_conversion`) |
+| Python pytest Debug | full (23 tests) | **passing** |
+| VS Tests Debug | full (23 tests) | **passing** |
+| VS Tests Release | full (23 tests) | **passing** |
 | Python pytest macOS | `RGBI_Groups_NH3BH3`, `RGBI_Groups_NH3Li` targeted | **passing** (validated 2026-06-17) |
 
 ---
@@ -58,7 +58,7 @@ Added: 2026-06-14.
 | Test name | Directory | Good file | Full? | Status |
 |-----------|-----------|-----------|-------|--------|
 | alanine_occ | alanine_occ | alanine_occ.good | no | ✅ passing |
-| alanine_integrated_occ | alanine_integrated_occ | alanine_integrated_occ.good | no | ⚠️ **crashing** — see INVESTIGATION_STATUS.md |
+| alanine_integrated_occ | alanine_integrated_occ | alanine_integrated_occ.good | no | ✅ passing |
 | disorder_THPP | disorder | disorder_THPP.good | no | ✅ passing |
 | fourier_transform | SALTED | fourier_transform.good | no | ✅ passing |
 | fractal | sucrose_fchk_SF | fractal.good | no | ✅ passing |
@@ -78,8 +78,8 @@ Added: 2026-06-14.
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |
 | sucrose_twin | sucrose_fchk_SF | sucrose_twin.good | no | ✅ passing |
 | wfn_reading | wfn_reading | wfn_reading.good | no | ✅ passing |
-| **TFVC** | TFVC | TFVC.good | no | 🆕 **added 2026-06-14** — not yet validated |
-| **TFVC_ECP** | TFVC | TFVC_ECP.good | no | 🆕 **added 2026-06-14** — not yet validated |
+| TFVC | TFVC | TFVC.good | no | ✅ passing |
+| TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
 | fchk_conversion | NiP3_fchk | good.fchk | **yes** | ✅ passing (tolerated numeric warn) |
 | fourier_transform_full | SALTED | fourier_transform_full.good | **yes** | ✅ passing |
 
@@ -116,18 +116,7 @@ files generated before they can be registered.
 
 ## Known Issues
 
-### `alanine_integrated_occ` — heap corruption crash (all platforms)
-- The standalone EXE crashes for **all** OCC density-fitting jobs (`-occ` flag with DF basis)
-- The VS in-process DLL also crashes
-- Root cause: heap corruption in OCC's integral engine (`~IntegralEngineDF`)
-- Exit code: `0xC0000374` (STATUS_HEAP_CORRUPTION via `RtlFailFast` — uncatchable by SEH)
-- The output fchk file is **never written** because the crash happens before destructors finish
-- Full details: see `INVESTIGATION_STATUS.md`
-
-### TFVC / TFVC_ECP — newly added, not yet validated
-- Good files exist and were generated from prior runs, but these tests have never been run through
-  the VS test harness
-- Run against both Debug and Release before marking as passing
+No current documented known issues.
 
 ---
 

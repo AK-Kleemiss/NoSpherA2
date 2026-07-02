@@ -79,6 +79,10 @@ struct properties_options
     double resolution = 0.1;
     double radius = 2.0;
     double integral_accuracy = -1;
+    double promol_nci_rcut1 = 0.95;
+    double promol_nci_rcut2 = 0.75;
+    double promol_nci_rho_abs_max = -1.0;
+    double promol_nci_rdg_max = -1.0;
     std::array<int, 3> NbSteps = { 0, 0, 0 };
     std::array<double, 6> MinMax = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     ivec MO_numbers;
