@@ -593,7 +593,7 @@ double Thakkar::get_interpolated_density(const double &dist) const {
         return 0;
     else if (dist < radial_dist[0])
         return radial_density[0];
-    int nr = int(floor(log(dist / start) / lincr));
+    int nr = std::max(1, log_spline_index(radial_dist, dist, lincr, start));
     result = radial_density[nr] + (radial_density[nr + 1] - radial_density[nr]) / (radial_dist[nr] - radial_dist[nr - 1]) * (dist - radial_dist[nr - 1]);
     if (result < 1E-16)
         return 0;
@@ -650,7 +650,7 @@ double MBIS_Atom::get_interpolated_density(const double &dist) const {
         return 0;
     else if (dist < radial_dist[0])
         return radial_density[0];
-    int nr = int(floor(log(dist / start) / lincr));
+    int nr = std::max(1, log_spline_index(radial_dist, dist, lincr, start));
     result = radial_density[nr] + (radial_density[nr + 1] - radial_density[nr]) / (radial_dist[nr] - radial_dist[nr - 1]) * (dist - radial_dist[nr - 1]);
     if (result < 1E-16)
         return 0;
