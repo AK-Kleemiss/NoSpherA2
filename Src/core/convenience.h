@@ -709,6 +709,8 @@ struct options
     std::filesystem::path occ_toml_path;
     std::filesystem::path cwd;
     std::filesystem::path profiling_tests_root = "tests";
+    std::filesystem::path promol_nci_xyz1;
+    std::filesystem::path promol_nci_xyz2;
     properties_options properties;
     bool debug = false;
     bool all_charges = false;
@@ -737,6 +739,7 @@ struct options
     ivec3 rgbi_group_sets;
     bool fract = false;
     bool profiling = false;
+    bool promol_nci = false;
     bool get_g = false;
     int accuracy = 2;
     int threads = -1;

@@ -2563,10 +2563,11 @@ void options::digest_options()
             err_checkf(i + 2 < argc,
                 "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max]",
                 std::cout);
-            const std::filesystem::path xyz1 = arguments[i + 1];
-            const std::filesystem::path xyz2 = arguments[i + 2];
-            err_checkf(std::filesystem::exists(xyz1), "First XYZ file doesn't exist: " + xyz1.string(), std::cout);
-            err_checkf(std::filesystem::exists(xyz2), "Second XYZ file doesn't exist: " + xyz2.string(), std::cout);
+            promol_nci = true;
+            promol_nci_xyz1 = arguments[i + 1];
+            promol_nci_xyz2 = arguments[i + 2];
+            err_checkf(std::filesystem::exists(promol_nci_xyz1), "First XYZ file doesn't exist: " + promol_nci_xyz1.string(), std::cout);
+            err_checkf(std::filesystem::exists(promol_nci_xyz2), "Second XYZ file doesn't exist: " + promol_nci_xyz2.string(), std::cout);
 
             double *optional_values[] = {
                 &properties.promol_nci_rcut1,
@@ -2593,12 +2594,7 @@ void options::digest_options()
                 }
             }
 
-            promolecular_nci_analysis(
-                xyz1,
-                xyz2,
-                properties,
-                std::cout);
-            exit(0);
+            i += 2 + optional_index;
         }
         else if (temp == "-radius")
             properties.radius = stod(arguments[i + 1]);

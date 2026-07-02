@@ -26,6 +26,18 @@ int run_app(int argc, char **argv)
     opt.cwd = cwd;
     vector<WFN> wavy;
 
+    if (opt.promol_nci)
+    {
+        promolecular_nci_analysis(
+            opt.promol_nci_xyz1,
+            opt.promol_nci_xyz2,
+            opt.properties,
+            std::cout);
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf);
+        return 0;
+    }
+
     log_file << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {

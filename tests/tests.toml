@@ -104,6 +104,16 @@ DEF = true
 eli = true
 resolution = 1.5
 
+[intermolecular_nci]
+directory = "intermolecular_nci"
+good = "good.dat"
+actual = "unit_surrounding_values.dat"
+
+[intermolecular_nci.args]
+resolution = 0.5
+radius = 0.5
+promol_nci = ["unit.xyz", "surrounding.xyz"]
+
 [reading_SALTED]
 directory = "SALTED"
 
