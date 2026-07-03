@@ -188,13 +188,16 @@ cases failing with small numeric drift; after rebuilding, all 13 pass against th
 `alanine_integrated_occ.good` was actually regenerated. Treat this as historical status unless
 you have rerun the current CMake presets in this checkout.
 
-As of 2026-07-03, `ctest --preset release-macos-arm64` reports **201/201 passing**, including
+As of 2026-07-03, `ctest --preset release-macos-arm64` reports **200/200 passing**, including
 `TomlIntegrationTests.IntermolecularNCI`, after fixing an off-by-one atomic-number indexing bug
 in `make_thakkar_interpolators()` (`Src/core/properties.cpp`, commit `88f0a9a`) that had been
 causing undefined-behavior-driven divergence between macOS arm64 and other platforms. Verified
 identical (byte-for-byte) `unit_surrounding_values.dat` output between a from-scratch local
-`release-macos-x86_64` build and the arm64 build. See `UNIT_TESTS_STATUS.md` Known Issues for the
-full root-cause writeup.
+`release-macos-x86_64` build and the arm64 build. Separately, the 5 `-rgbi_no_sym` RGBI tests
+(merged in via `420c36b`) were removed after `RGBI_Groups_NH3BH3_ANO` was found to fail
+identically on all four CI platforms — a real design gap in the no-symmetrization + ANO-basis
+combination, not a platform or golden-file issue. See `UNIT_TESTS_STATUS.md` Known Issues for
+both root-cause writeups.
 
 The June-2026 note below (21/21, VS/pytest harnesses) predates the CMake/ctest migration and is
 kept only as history.

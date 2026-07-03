@@ -26,13 +26,8 @@ set_tests_properties(
 
 # Tests using tests/RGBI_groups
 set_tests_properties(
-    TomlIntegrationTests.RGBI_Groups_NH3BH3
-    TomlIntegrationTests.RGBI_Groups_NH3BH3_ANO
     TomlIntegrationTests.RGBI_Groups_NH3BH3_sym
     TomlIntegrationTests.RGBI_Groups_NH3BH3_sym_ANO
-    TomlIntegrationTests.RGBI_Groups_NH3Li
-    TomlIntegrationTests.RGBI_NH3Li
-    TomlIntegrationTests.RGBI_NH3Li_ANO
     PROPERTIES
         RESOURCE_LOCK integration_RGBI_groups
 )

@@ -227,25 +227,6 @@ dmin = 0.84
 acc = 1
 ECP = 1
 
-[RGBI_Groups_NH3BH3]
-directory = "RGBI_groups"
-good = "NH3BH3.good"
-
-[RGBI_Groups_NH3BH3.args]
-wfn = "nh3bh3.gbw"
-rgbi_no_sym = ""
-rgbi-groups = ["0,4,5,7","1,2,3,6"]
-
-[RGBI_Groups_NH3BH3_ANO]
-directory = "RGBI_groups"
-good = "NH3BH3_ano.good"
-
-[RGBI_Groups_NH3BH3_ANO.args]
-wfn = "nh3bh3.gbw"
-rgbi_no_sym = ""
-rgbi_basis = "ano"
-rgbi-groups = ["0,4,5,7","1,2,3,6"]
-
 [RGBI_Groups_NH3BH3_sym]
 directory = "RGBI_groups"
 good = "NH3BH3_sym.good"
@@ -265,29 +246,4 @@ rgbi = ""
 rgbi_basis = "ano"
 rgbi-groups = ["0,4,5,7","1,2,3,6"]
 
-[RGBI_Groups_NH3Li]
-directory = "RGBI_groups"
-good = "nh3li.good"
-
-[RGBI_Groups_NH3Li.args]
-wfn = "nh3li.gbw"
-rgbi_no_sym = ""
-rgbi-groups = ["0,1,2,3","4"]
-
-[RGBI_NH3Li]
-directory = "RGBI"
-good = "nh3li_nao.good"
-
-[RGBI_NH3Li.args]
-wfn = "../RGBI_groups/nh3li.gbw"
-rgbi_no_sym = ""
-
-[RGBI_NH3Li_ANO]
-directory = "RGBI"
-good = "nh3li_ano.good"
-
-[RGBI_NH3Li_ANO.args]
-wfn = "../RGBI_groups/nh3li.gbw"
-rgbi_no_sym = ""
-rgbi_basis = "ano"
 

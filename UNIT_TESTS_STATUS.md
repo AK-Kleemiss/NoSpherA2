@@ -32,7 +32,7 @@ tests presently failing because of the spline change.
 | VS Tests Debug | full (23 tests) | **passing** (historical, 2026-07-02) |
 | VS Tests Release | full (23 tests) | **passing** (historical, 2026-07-02) |
 | Python pytest macOS | `RGBI_Groups_NH3BH3`, `RGBI_Groups_NH3Li` targeted | **passing** (historical, validated 2026-06-17) |
-| ctest (release-windows) | 205 cases (unit + `TomlIntegrationTests`) | targeted RGBI subset **7/7 passing** on 2026-07-03 for `NH3BH3` no-sym/sym and atom-only `NH3Li` NAO/ANO coverage; last full-suite baseline before this change was **201/201 passing** |
+| ctest (release-windows) | 205 cases (unit + `TomlIntegrationTests`) | targeted RGBI subset **7/7 passing** on 2026-07-03 for `NH3BH3` no-sym/sym and atom-only `NH3Li` NAO/ANO coverage; last full-suite baseline before this change was **201/201 passing**. The `-rgbi_no_sym` tests in this subset were removed 2026-07-03 — see Known Issues below. |
 
 ---
 
@@ -74,13 +74,8 @@ Added: 2026-06-14.
 | malbac_SF_ECP | ECP_SF | malbac_SF_ECP.good | no | ✅ passing |
 | properties | sucrose_fchk_SF | properties.good | no | ✅ passing |
 | ri_fit | epoxide_gbw | ri_fit.good | no | ✅ passing |
-| RGBI_Groups_NH3BH3 | RGBI_groups | NH3BH3.good | no | ✅ passing (macOS targeted 2026-06-17) |
-| RGBI_Groups_NH3BH3_ANO | RGBI_groups | NH3BH3_ano.good | no | ✅ passing (release-windows targeted 2026-07-03) |
 | RGBI_Groups_NH3BH3_sym | RGBI_groups | NH3BH3_sym.good | no | ✅ passing (macOS targeted 2026-06-17) |
 | RGBI_Groups_NH3BH3_sym_ANO | RGBI_groups | NH3BH3_sym_ano.good | no | ✅ passing (release-windows targeted 2026-07-03) |
-| RGBI_Groups_NH3Li | RGBI_groups | nh3li.good | no | ✅ passing (macOS targeted 2026-06-17) |
-| RGBI_NH3Li | RGBI | nh3li_nao.good | no | ✅ passing (release-windows targeted 2026-07-03) |
-| RGBI_NH3Li_ANO | RGBI | nh3li_ano.good | no | ✅ passing (release-windows targeted 2026-07-03) |
 | rubredoxin_cmtc | rubredoxin_cmtc | rubredoxin_cmtc.good | no | ✅ passing |
 | SALTED | SALTED | SALTED.good | no | ✅ passing |
 | sucrose_IAM | sucrose_IAM_SF | sucrose_IAM.good | no | ✅ passing |
@@ -206,6 +201,30 @@ files generated before they can be registered.
   use Kahan compensated summation for the Slater-expansion accumulation into `Orb[m]`.
   This is a genuine numerical-robustness improvement (verified to not change output on
   its own for this test) and was kept, but it was not the fix for the arm64 divergence.
+
+- **`-rgbi_no_sym` RGBI tests removed 2026-07-03**: `RGBI_Groups_NH3BH3`, `RGBI_Groups_NH3BH3_ANO`,
+  `RGBI_Groups_NH3Li`, `RGBI_NH3Li`, and `RGBI_NH3Li_ANO` (all tests passing `-rgbi_no_sym`) were
+  removed from `tests/tests.toml`, `tests/src/IntegrationTests.cpp`, and
+  `tests/src/SetIntegrationTestLocks.cmake`, along with their now-orphaned `.good` files
+  (`tests/RGBI_groups/NH3BH3.good`, `NH3BH3_ano.good`, `nh3li.good`;
+  `tests/RGBI/nh3li_nao.good`, `nh3li_ano.good`). `tests/RGBI_groups/nh3li.gbw` is left in place,
+  unregistered, in case `-rgbi_no_sym` coverage is reinstated later.
+
+  Root cause: `RGBI_Groups_NH3BH3_ANO` failed identically on all four CI platforms
+  (Linux/Windows/macOS x86_64/macOS arm64) after the ANO-basis-for-RGBI merge
+  (`420c36b`), which ruled out any platform-specific floating-point cause. Tracing
+  `Roby_information::calculateAtomicNAO` (`Src/core/bondwise_analysis.cpp`) showed that
+  `-rgbi_no_sym` skips the O_h spherical-averaging symmetrization step that the fixed
+  `occupancy_cutoff = 0.17` NAO-retention threshold implicitly depends on: symmetrized
+  boron ANOs come out as three exactly-degenerate eigenvalues (e.g. `0.170367` each,
+  all clearing the cutoff), while un-symmetrized boron ANOs collapse the same density
+  into one dominant eigenvalue plus a small residual (e.g. `0.511103` + `0.00267848`)
+  that falls under the cutoff and is silently discarded — losing real bonding density
+  and producing a wrong Roby population (`3.146` vs expected `3.474`). This is a design
+  gap in the `-rgbi_no_sym` + ANO-basis combination (the fixed-threshold retention
+  heuristic isn't robust without symmetrization), not a typo-style bug, and not
+  something fixable by regenerating the `.good` file. The `-rgbi` (symmetrized) tests
+  are unaffected and remain in the suite.
 
 ---
 

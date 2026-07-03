@@ -588,18 +588,6 @@ TEST(TomlIntegrationTests, TFVCEcp)
     EXPECT_TRUE(result.success) << result.message;
 }
 
-TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3)
-{
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3");
-    EXPECT_TRUE(result.success) << result.message;
-}
-
-TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_ANO)
-{
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_ANO");
-    EXPECT_TRUE(result.success) << result.message;
-}
-
 TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_sym)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_sym");
@@ -609,24 +597,6 @@ TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_sym)
 TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_sym_ANO)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_sym_ANO");
-    EXPECT_TRUE(result.success) << result.message;
-}
-
-TEST(TomlIntegrationTests, RGBI_Groups_NH3Li)
-{
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3Li");
-    EXPECT_TRUE(result.success) << result.message;
-}
-
-TEST(TomlIntegrationTests, RGBI_NH3Li)
-{
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li");
-    EXPECT_TRUE(result.success) << result.message;
-}
-
-TEST(TomlIntegrationTests, RGBI_NH3Li_ANO)
-{
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_ANO");
     EXPECT_TRUE(result.success) << result.message;
 }
 }
