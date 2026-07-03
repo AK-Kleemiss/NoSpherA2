@@ -82,7 +82,7 @@ Added: 2026-06-14.
 | sucrose_ptb | sucrose_IAM_SF | sucrose_ptb.good | no | ✅ passing |
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |
 | sucrose_twin | sucrose_fchk_SF | sucrose_twin.good | no | ✅ passing |
-| intermolecular_nci | intermolecular_nci | good.dat | no | requires `-promol_nci_single_thread`; regenerated after analytical `get_lambda_1` macOS fix (see note below) |
+| intermolecular_nci | intermolecular_nci | good.dat | no | requires `-promol_nci_single_thread`; regenerated 2026-07-03 after fixing an off-by-one atomic-number bug (see note below) — ✅ passing on macOS arm64 and macOS x86_64 |
 | wfn_reading | wfn_reading | wfn_reading.good | no | ✅ passing |
 | TFVC | TFVC | TFVC.good | no | ✅ passing |
 | TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
@@ -166,8 +166,41 @@ files generated before they can be registered.
   tooling, not needed for normal end-user runs. On 2026-07-03, macOS arm64
   still failed because `get_lambda_1` used LAPACK/Accelerate eigenvalues for
   near-zero Hessians; `Src/core/convenience.cpp` now uses an analytical 3x3
-  symmetric-matrix formula for the middle eigenvalue, and `good.dat` was
-  regenerated from that deterministic path.
+  symmetric-matrix formula for the middle eigenvalue.
+
+- **Root cause of the macOS arm64 divergence found and fixed 2026-07-03**: after the
+  `get_lambda_1` fix above, `IntermolecularNCI` still produced ~6x more accepted grid
+  points on macOS arm64 than on Linux/Windows/macOS x86_64 (2480 vs. 413), with values
+  differing even for early points. AddressSanitizer traced this to a real bug in
+  `make_thakkar_interpolators()` (`Src/core/properties.cpp`): it built its 92-entry
+  `atom_models` vector with atomic numbers `0..91`, but every caller indexes it as
+  `atom_models[atom.charge - 1]`, expecting index 0 to hold atomic number 1 (Hydrogen).
+  Every real element's density lookup was off by one, and the bogus atomic-number-0
+  entry triggered an out-of-bounds read of `Thakkar_ns`/`np`/`nd`/`nf`
+  (`n_vector[atomic_number - 1]` = `n_vector[-1]`) whose garbage value was used as a
+  loop trip count in `calc_orbs` — undefined behavior whose outcome depends on
+  whatever happens to sit in adjacent memory, which differs by platform/build. This
+  is what made the test look architecture-dependent; it was never really about arm64
+  vs. x86_64 floating-point math. Three "make the math more careful" fixes were tried
+  and individually verified to have **zero** effect on the divergence before the real
+  bug was found: Kahan-compensated summation in `calc_orbs` (kept anyway, see below),
+  swapping cubic-spline for linear interpolation, and building with
+  `-ffp-contract=off` to rule out FMA-contraction differences.
+
+  Fixed by changing `atom_models.emplace_back(a)` to `atom_models.emplace_back(a + 1)`
+  (commit `88f0a9a`). Verified via: (1) AddressSanitizer clean before/after on macOS
+  arm64, (2) a from-scratch local `release-macos-x86_64` build (with the fix) produces
+  byte-for-byte identical `unit_surrounding_values.dat` output to the arm64 build
+  (178 points each, `28 x 37 x 39` shrunk grid on both), (3) full `ctest` suite
+  (201/201) still passes on macOS arm64 after the fix. `good.dat` was regenerated from
+  this now cross-platform-identical output; the old 413-point `good.dat` was itself a
+  product of the pre-fix bug (it happened to reproduce consistently across
+  Linux/Windows/macOS x86_64's memory layouts, but was never numerically correct).
+
+  Separately, `Thakkar::calc_orbs` (`Src/core/spherical_density.cpp`) was changed to
+  use Kahan compensated summation for the Slater-expansion accumulation into `Orb[m]`.
+  This is a genuine numerical-robustness improvement (verified to not change output on
+  its own for this test) and was kept, but it was not the fix for the arm64 divergence.
 
 ---
 

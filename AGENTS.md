@@ -172,9 +172,19 @@ rebuild (following the Thakkar cubic-spline interpolation change in
 partitioning). A same-day run against a not-fully-rebuilt binary showed 13 `TomlIntegrationTests`
 cases failing with small numeric drift; after rebuilding, all 13 pass against their existing
 `.good` files unchanged — see `UNIT_TESTS_STATUS.md` Known Issues. Only
-`alanine_integrated_occ.good` was actually regenerated. The June-2026 note below (21/21,
-VS/pytest harnesses) predates the CMake/ctest migration and is kept only as history. Treat this
-as historical status unless you have rerun the current CMake presets in this checkout.
+`alanine_integrated_occ.good` was actually regenerated. Treat this as historical status unless
+you have rerun the current CMake presets in this checkout.
+
+As of 2026-07-03, `ctest --preset release-macos-arm64` reports **201/201 passing**, including
+`TomlIntegrationTests.IntermolecularNCI`, after fixing an off-by-one atomic-number indexing bug
+in `make_thakkar_interpolators()` (`Src/core/properties.cpp`, commit `88f0a9a`) that had been
+causing undefined-behavior-driven divergence between macOS arm64 and other platforms. Verified
+identical (byte-for-byte) `unit_surrounding_values.dat` output between a from-scratch local
+`release-macos-x86_64` build and the arm64 build. See `UNIT_TESTS_STATUS.md` Known Issues for the
+full root-cause writeup.
+
+The June-2026 note below (21/21, VS/pytest harnesses) predates the CMake/ctest migration and is
+kept only as history.
 
 Known fixed areas from June 2026:
 
