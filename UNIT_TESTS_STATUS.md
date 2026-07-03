@@ -82,7 +82,7 @@ Added: 2026-06-14.
 | sucrose_ptb | sucrose_IAM_SF | sucrose_ptb.good | no | ✅ passing |
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |
 | sucrose_twin | sucrose_fchk_SF | sucrose_twin.good | no | ✅ passing |
-| intermolecular_nci | intermolecular_nci | good.dat | no | requires `-promol_nci_single_thread` (see note below) |
+| intermolecular_nci | intermolecular_nci | good.dat | no | requires `-promol_nci_single_thread`; regenerated after analytical `get_lambda_1` macOS fix (see note below) |
 | wfn_reading | wfn_reading | wfn_reading.good | no | ✅ passing |
 | TFVC | TFVC | TFVC.good | no | ✅ passing |
 | TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
@@ -163,7 +163,11 @@ files generated before they can be registered.
   `tests.toml` args pass `-promol_nci_single_thread` (added 2026-07-02,
   `Src/core/convenience.h`/`.cpp`) to force single-threaded, deterministic
   output ordering for golden-file comparison. This flag is test/reproducibility
-  tooling, not needed for normal end-user runs.
+  tooling, not needed for normal end-user runs. On 2026-07-03, macOS arm64
+  still failed because `get_lambda_1` used LAPACK/Accelerate eigenvalues for
+  near-zero Hessians; `Src/core/convenience.cpp` now uses an analytical 3x3
+  symmetric-matrix formula for the middle eigenvalue, and `good.dat` was
+  regenerated from that deterministic path.
 
 ---
 

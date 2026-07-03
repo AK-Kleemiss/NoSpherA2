@@ -1692,13 +1692,34 @@ void swap_sort_multi(ivec order, std::vector<ivec> &v)
 
 double get_lambda_1(double *a)
 {
-    // a is a row-major symmetric 3x3 matrix: a[1]==a[3], a[2]==a[6], a[5]==a[7]
-    vec A(a, a + 9);
-    vec W(3);
-    make_Eigenvalues(A, W);
-    // W is sorted ascending (LAPACK dsyev convention); the median is the middle entry
-    return W[1];
-};
+    // Returns the middle eigenvalue (lambda2) of a row-major symmetric 3x3 matrix.
+    const double a00 = a[0], a01 = a[1], a02 = a[2];
+    const double a11 = a[4], a12 = a[5], a22 = a[8];
+
+    const double p1 = a01 * a01 + a02 * a02 + a12 * a12;
+    if (p1 < std::numeric_limits<double>::epsilon())
+    {
+        double eigs[3] = { a00, a11, a22 };
+        std::sort(eigs, eigs + 3);
+        return eigs[1];
+    }
+
+    const double q = (a00 + a11 + a22) / 3.0;
+    const double b00 = a00 - q, b11 = a11 - q, b22 = a22 - q;
+    const double p2 = b00 * b00 + b11 * b11 + b22 * b22 + 2.0 * p1;
+    const double p = std::sqrt(p2 / 6.0);
+
+    const double c00 = b00 / p, c01 = a01 / p, c02 = a02 / p;
+    const double c11 = b11 / p, c12 = a12 / p, c22 = b22 / p;
+    const double r = 0.5 * (c00 * (c11 * c22 - c12 * c12)
+                          - c01 * (c01 * c22 - c12 * c02)
+                          + c02 * (c01 * c12 - c11 * c02));
+
+    const double phi = std::acos(std::clamp(r, -1.0, 1.0)) / 3.0;
+    const double eig_max = q + 2.0 * p * std::cos(phi);
+    const double eig_min = q + 2.0 * p * std::cos(phi + 2.0 * constants::PI / 3.0);
+    return 3.0 * q - eig_max - eig_min;
+}
 
 double get_bessel_ratio(const double nu, const double x)
 {
