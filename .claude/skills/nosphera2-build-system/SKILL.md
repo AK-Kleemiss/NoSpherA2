@@ -78,6 +78,8 @@ For preset builds on Windows, use an x64 Visual Studio Developer shell or anothe
 
 The Visual Studio solution under `Windows/` is legacy but still useful for DLL/OCC integration debugging. VS tests must remain in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for crashing tests.
 
+The VS `NoSpherA2`/`NoSpherA2_LIB` projects share an `OutDir` (`Windows\Windows_utils\NoSpherA2_universal.props`) pointing at `build\$(Configuration)_$(Platform)\` (e.g. `build\Release_x64\NoSpherA2.exe`) — a sibling of, but distinct from, the CMake preset output `build\release-windows\bin\NoSpherA2.exe`. `Windows\Tests\Tests.vcxproj` was not repointed and still builds to `Windows\Tests\$(Configuration)_$(Platform)\`.
+
 ## Dependency Boundaries
 
 Do not edit submodules casually. Prefer parent-project CMake or generated-source workarounds when fixing integration issues from the parent repository.

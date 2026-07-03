@@ -122,34 +122,64 @@ def build_argv(exe: str, args_table: dict) -> list[str]:
     return argv
 
 
-def default_executable_candidates(root: Path) -> list[Path]:
+def default_executable_candidates(root: Path, build_kind: str = "auto") -> list[Path]:
     """Known build output locations, most-preferred first: the legacy Visual
     Studio solution build (Windows only) ahead of the CMake preset build
-    trees (see CMakePresets.json), release presets ahead of debug ones."""
+    trees (see CMakePresets.json), release presets ahead of debug ones.
+
+    The VS `NoSpherA2`/`NoSpherA2_LIB` projects share an OutDir
+    (Windows/Windows_utils/NoSpherA2_universal.props) pointing at
+    build/<Configuration>_<Platform>/ (e.g. build/Release_x64/NoSpherA2.exe) --
+    a sibling of, but distinct from, the CMake preset tree
+    build/release-windows/bin/NoSpherA2.exe.
+
+    build_kind restricts the search: "vs" for the VS build only, "cmake" for
+    the CMake preset trees only, "auto" (default) for VS-then-CMake."""
     exe_name = "NoSpherA2.exe" if os.name == "nt" else "NoSpherA2"
     candidates: list[Path] = []
-    if os.name == "nt":
-        candidates.append(root / "Windows" / "x64" / "Release" / exe_name)
-    for preset in (
-        "release-windows", "release-linux", "release-macos-arm64", "release-macos-x86_64",
-        "debug-windows", "debug-linux", "debug-macos-arm64", "debug-macos-x86_64",
-    ):
-        candidates.append(root / "build" / preset / "bin" / exe_name)
+    if build_kind in ("auto", "vs") and os.name == "nt":
+        candidates.append(root / "build" / "Release_x64" / exe_name)
+        candidates.append(root / "build" / "Debug_x64" / exe_name)
+    if build_kind in ("auto", "cmake"):
+        for preset in (
+            "release-windows", "release-linux", "release-macos-arm64", "release-macos-x86_64",
+            "debug-windows", "debug-linux", "debug-macos-arm64", "debug-macos-x86_64",
+        ):
+            candidates.append(root / "build" / preset / "bin" / exe_name)
     return candidates
 
 
-def resolve_executable(root: Path, explicit: str | None) -> str:
-    """Priority: --exe > $NOS_EXE > first existing known build output
-    (VS build preferred over CMake, see default_executable_candidates) >
-    bare 'NoSpherA2' resolved via PATH as a last resort."""
+def resolve_executable(root: Path, explicit: str | None, build_kind: str = "auto") -> str:
+    """Priority: --exe > $NOS_EXE > first existing known build output for
+    build_kind (VS preferred over CMake when build_kind is "auto", see
+    default_executable_candidates) > bare 'NoSpherA2' resolved via PATH."""
     if explicit:
         return explicit
     if os.environ.get("NOS_EXE"):
         return os.environ["NOS_EXE"]
-    for candidate in default_executable_candidates(root):
+    for candidate in default_executable_candidates(root, build_kind):
         if candidate.is_file():
             return str(candidate)
     return "NoSpherA2"
+
+
+# Printed by the CLI's argument parser when no recognized action flag was
+# found (e.g. a tests.toml [test.args] key that isn't an actual CLI flag,
+# such as a stale reference to a flag that only exists as a direct C++
+# function call in tests/src/UnitTests.cpp now). Seeing this in "actual"
+# output means the run didn't do what the test intends -- never treat it as
+# a valid update source.
+HELP_DUMP_MARKER = "Did not understand the task to perform!"
+
+# Tests known to behave incorrectly when launched as a spawned subprocess
+# (as run_test() does) rather than in-process. See CLAUDE.md: "VS tests must
+# run in-process through NoSpherA2_DLL.dll; do not add subprocess fallbacks
+# for failing VS tests, including alanine_integrated_occ." Use `ctest` for
+# these instead of --run.
+SUBPROCESS_INCOMPATIBLE_TESTS = {
+    "alanine_integrated_occ": "documented (CLAUDE.md) to require in-process execution; "
+    "a spawned subprocess is not equivalent -- use ctest for this test instead",
+}
 
 
 def run_test(
@@ -159,6 +189,9 @@ def run_test(
     occ_data_path: str | None,
     timeout: float,
 ) -> tuple[bool, str]:
+    if test.name in SUBPROCESS_INCOMPATIBLE_TESTS:
+        return False, f"SKIP {test.name}: not run via --run ({SUBPROCESS_INCOMPATIBLE_TESTS[test.name]})"
+
     test_dir = root / "tests" / test.directory
     if not test_dir.exists():
         return False, f"SKIP {test.name}: test directory missing ({test_dir})"
@@ -185,6 +218,15 @@ def run_test(
     if proc.returncode != 0:
         tail = "\n".join((proc.stdout + proc.stderr).splitlines()[-20:])
         return False, f"SKIP {test.name}: run failed with exit code {proc.returncode} ({' '.join(argv)})\n{tail}"
+
+    actual_path = ctest_actual_path(root, test)
+    if actual_path.exists():
+        actual_text = actual_path.read_text(errors="replace")
+        if HELP_DUMP_MARKER in actual_text:
+            return False, (
+                f"SKIP {test.name}: exe printed its help/usage text instead of running "
+                f"-- one or more [test.args] keys are not recognized CLI flags ({' '.join(argv)})"
+            )
 
     return True, f"RAN  {test.name}: {' '.join(argv)}"
 
@@ -303,8 +345,16 @@ def parse_args() -> argparse.Namespace:
         "--exe",
         default=None,
         help="Path to the NoSpherA2 executable for --run (default: $NOS_EXE, else the first existing "
-        "known build output -- VS Release build preferred over CMake preset builds -- else "
-        "'NoSpherA2' resolved via PATH; see default_executable_candidates())",
+        "known build output per --build -- else 'NoSpherA2' resolved via PATH; see "
+        "default_executable_candidates())",
+    )
+    parser.add_argument(
+        "--build",
+        choices=("auto", "vs", "cmake"),
+        default="auto",
+        help="Which known build output to auto-discover for --run when --exe/$NOS_EXE aren't set: "
+        "'auto' (default) tries the VS Release build first then CMake preset builds, 'vs' or "
+        "'cmake' restricts the search to just that one",
     )
     parser.add_argument(
         "--occ-data-path",
@@ -356,7 +406,7 @@ def main() -> int:
     root = args.root.resolve()
     tests_file = args.tests_file if args.tests_file.is_absolute() else (root / args.tests_file)
     failed_logs = args.failed_logs if args.failed_logs.is_absolute() else (root / args.failed_logs)
-    exe = resolve_executable(root, args.exe)
+    exe = resolve_executable(root, args.exe, args.build)
     if args.run:
         print(f"Using executable: {exe}")
 

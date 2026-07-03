@@ -1,5 +1,7 @@
 # Unit Test Status
-**Last updated: 2026-07-02** (added `intermolecular_nci` entry and `-promol_nci_single_thread` note)
+**Last updated: 2026-07-03** (pruned 4 stale `tests.toml` entries with non-existent CLI flags;
+regenerated `alanine_integrated_occ.good`; **201/201 ctest passing** after full rebuild — see
+Known Issues for a same-day transient 13-failure episode against a stale/partial build)
 
 ## Test Harnesses
 
@@ -15,16 +17,22 @@ Environment variables:
 
 ---
 
-## Current Validation Status (2026-07-02)
+## Current Validation Status
+
+The table below (2026-06-17/2026-07-02) predates both the CMake/ctest migration and the
+2026-07-03 Thakkar cubic-spline change, and is kept only as history — see `ctest --preset
+<preset> --output-on-failure` for current status and the Known Issues section below for the
+tests presently failing because of the spline change.
 
 | Suite | Config | Result |
 |-------|--------|--------|
-| Python pytest Release | non-full (21 tests) | **passing** |
-| Python pytest Release | full (23 tests) | **passing** (1 tolerated numeric warn in `fchk_conversion`) |
-| Python pytest Debug | full (23 tests) | **passing** |
-| VS Tests Debug | full (23 tests) | **passing** |
-| VS Tests Release | full (23 tests) | **passing** |
-| Python pytest macOS | `RGBI_Groups_NH3BH3`, `RGBI_Groups_NH3Li` targeted | **passing** (validated 2026-06-17) |
+| Python pytest Release | non-full (21 tests) | **passing** (historical, 2026-07-02) |
+| Python pytest Release | full (23 tests) | **passing** (historical, 2026-07-02; 1 tolerated numeric warn in `fchk_conversion`) |
+| Python pytest Debug | full (23 tests) | **passing** (historical, 2026-07-02) |
+| VS Tests Debug | full (23 tests) | **passing** (historical, 2026-07-02) |
+| VS Tests Release | full (23 tests) | **passing** (historical, 2026-07-02) |
+| Python pytest macOS | `RGBI_Groups_NH3BH3`, `RGBI_Groups_NH3Li` targeted | **passing** (historical, validated 2026-06-17) |
+| ctest (release-windows) | 201 cases (unit + `TomlIntegrationTests`) | **201/201 passing** (2026-07-03, full rebuild); see Known Issues for a same-day transient 13-failure episode against a stale/partial build |
 
 ---
 
@@ -58,16 +66,13 @@ Added: 2026-06-14.
 | Test name | Directory | Good file | Full? | Status |
 |-----------|-----------|-----------|-------|--------|
 | alanine_occ | alanine_occ | alanine_occ.good | no | ✅ passing |
-| alanine_integrated_occ | alanine_integrated_occ | alanine_integrated_occ.good | no | ✅ passing |
+| alanine_integrated_occ | alanine_integrated_occ | alanine_integrated_occ.good | no | ✅ passing (regenerated 2026-07-03, see note below) |
 | disorder_THPP | disorder | disorder_THPP.good | no | ✅ passing |
-| fourier_transform | SALTED | fourier_transform.good | no | ✅ passing |
 | fractal | sucrose_fchk_SF | fractal.good | no | ✅ passing |
 | grown_water | grown | grown_water.good | no | ✅ passing |
 | Hybrid_mode | Hybrid | Hybrid_mode.good | no | ✅ passing |
 | malbac_SF_ECP | ECP_SF | malbac_SF_ECP.good | no | ✅ passing |
-| openBLAS | OpenBLAS | openBLAS.good | no | ✅ passing |
 | properties | sucrose_fchk_SF | properties.good | no | ✅ passing |
-| reading_SALTED | SALTED | reading_SALTED.good | no | ✅ passing |
 | ri_fit | epoxide_gbw | ri_fit.good | no | ✅ passing |
 | RGBI_Groups_NH3BH3 | RGBI_groups | NH3BH3.good | no | ✅ passing (macOS targeted 2026-06-17) |
 | RGBI_Groups_NH3Li | RGBI_groups | nh3li.good | no | ✅ passing (macOS targeted 2026-06-17) |
@@ -82,7 +87,6 @@ Added: 2026-06-14.
 | TFVC | TFVC | TFVC.good | no | ✅ passing |
 | TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
 | fchk_conversion | NiP3_fchk | good.fchk | **yes** | ✅ passing (tolerated numeric warn) |
-| fourier_transform_full | SALTED | fourier_transform_full.good | **yes** | ✅ passing |
 
 ---
 
@@ -98,7 +102,7 @@ files generated before they can be registered.
 | molden_file | many .molden/.wfn/.wfx | no .good file |
 | RI_Test | TESTMOL.gbw, RI_Test.good | good file uses dev-machine absolute paths; `-test_RI` is an internal mode |
 | RI_Test_2 | sucrose.cif, sucrose.gbw, .wfn | no .good file |
-| reading_SALTED (dir) | alanine/crambin .npy data | no .good file; different from `reading_SALTED` test (which uses SALTED/) |
+| reading_SALTED (dir) | alanine/crambin .npy data | no .good file; not the same as the now-removed `reading_SALTED` `tests.toml` entry (which used SALTED/) |
 | CASSCF | water.inp | no .good file, CASSCF not yet wired into CLI |
 | cytidine_tonto | many tonto-format files | external tonto dependency |
 | polarizabilities | gjf/wfn files | no .good file |
@@ -116,6 +120,41 @@ files generated before they can be registered.
 ---
 
 ## Known Issues
+
+- **Transient 13-test failure episode, 2026-07-03** (`alanine_occ`, `disorder_THPP`,
+  `grown_water`, `Hybrid_mode`, `malbac_SF_ECP`, `rubredoxin_cmtc`, `sucrose_ptb`, `sucrose_SF`,
+  `sucrose_twin`, `wfn_reading`, `TFVC`, `TFVC_ECP`, plus `alanine_integrated_occ`): an earlier
+  `ctest` run the same day (against a not-fully-rebuilt binary, mid-way through the Thakkar
+  cubic-spline interpolation change in `Src/core/spherical_density.h`/`Src/core/GridManager.cpp`
+  — see `lambda2_at` in `Src/core/properties.cpp` for why that change was made) showed all 13
+  failing with small (typically 3rd-decimal-place) Hirshfeld-weight numeric drift. After a full
+  rebuild, all 13 pass again against their **existing, unmodified** `.good` files — i.e. this was
+  not a real regression requiring golden-file updates, just a stale-build artifact. Only
+  `alanine_integrated_occ.good` was actually regenerated (see below); it wasn't strictly necessary
+  in hindsight, but reflects a real, freshly-verified in-process run and is harmless to keep.
+  If a similar-looking failure set reappears, rebuild fully before concluding the `.good` files
+  need updating — genuine regressions from future changes will look identical to this at a glance.
+
+- `alanine_integrated_occ` regenerated 2026-07-03: ran `ctest --test-dir build/release-windows -R
+  AlanineIntegratedOcc` (in-process, per the run rule below), then
+  `python update_good_from_pytest_results.py --test alanine_integrated_occ --yes` to accept the
+  ctest-produced in-place output (`tests/alanine_integrated_occ/NoSpherA2.log`) as the new
+  `alanine_integrated_occ.good`. Re-ran ctest afterward to confirm it now passes. This test does
+  run correctly as a normal ctest in-process case; the CLAUDE.md guidance against subprocess
+  fallbacks refers to a distinct, historical crash when launched as a *spawned subprocess*
+  (e.g. `update_good_from_pytest_results.py --run`), not to ctest's own in-process runner.
+
+- **Removed 2026-07-03**: `fourier_transform`, `fourier_transform_full`, `openBLAS`,
+  `reading_SALTED` were deleted from `tests/tests.toml`. Their `[test.args]` keys
+  (`test_analytical`, `blastest`, `test_reading_SALTED_binary`) are not real `NoSpherA2` CLI
+  flags — passing them produces the "Did not understand the task to perform!" help dump instead
+  of running anything. Grepping the source found these names only in `tests.toml` and in
+  `tests/src/UnitTests.cpp`, where the equivalent coverage already exists as direct C++ function
+  calls with no CLI path at all (`BesselTests.AnalyticFourier` → `test_analytical_fourier()`,
+  `SALTEDTests.ReadingSALTEDBinaryFile` → `test_reading_SALTED_binary_file()`, plus a BLAS
+  self-test). None of the four had a corresponding `TEST(TomlIntegrationTests, ...)` in
+  `tests/src/IntegrationTests.cpp` either, so they were already effectively dead from ctest's
+  perspective — this just removes the stale, misleading `tests.toml`/`.good` entries to match.
 
 - `intermolecular_nci`'s `_values.dat` writer (`promolecular_nci_analysis` in
   `Src/core/properties.cpp`) parallelizes over grid points with

@@ -39,13 +39,6 @@ mtc_mult = [1, 1]
 mtc_ECP = [0, 0]
 mtc_charge = [0, 0]
 
-[fourier_transform]
-directory = "SALTED"
-
-[fourier_transform.args]
-test_analytical = true
-acc = 1
-
 [fractal]
 directory = "sucrose_fchk_SF"
 good = "fractal.good"
@@ -86,12 +79,6 @@ wfn = "malbac.gbw"
 acc = 1
 ECP = 1
 
-[openBLAS]
-directory = "OpenBLAS"
-
-[openBLAS.args]
-blastest = true
-
 [properties]
 directory = "sucrose_fchk_SF"
 
@@ -114,12 +101,6 @@ resolution = 0.5
 radius = 0.5
 promol_nci = ["unit.xyz", "surrounding.xyz"]
 promol_nci_single_thread = true
-
-[reading_SALTED]
-directory = "SALTED"
-
-[reading_SALTED.args]
-test_reading_SALTED_binary = true
 
 [ri_fit]
 directory = "epoxide_gbw"
@@ -273,9 +254,3 @@ wfn = "nh3li.gbw"
 rgbi_no_sym = ""
 rgbi-groups = ["0,1,2,3","4"]
 
-[fourier_transform_full]
-directory = "SALTED"
-full = true
-
-[fourier_transform_full.args]
-test_analytical = "full"

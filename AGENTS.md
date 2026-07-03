@@ -80,10 +80,17 @@ The CMake flow is the default for new validation. The legacy Visual Studio solut
 
 ```ps
 msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\
-vstest.console.exe Windows\x64\Release\Tests.dll /Platform:x64
+vstest.console.exe Windows\Tests\Release_x64\Tests.exe /Platform:x64
 ```
 
 Visual Studio tests must run in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for failing VS tests, including `alanine_integrated_occ`. If all tests complete in under a second, the test binary or working directory is probably wrong.
+
+The VS solution's `NoSpherA2`/`NoSpherA2_LIB` projects use a shared `OutDir`
+(`Windows\Windows_utils\NoSpherA2_universal.props`) that writes into the same top-level `build/`
+tree the CMake presets use, but under `build\$(Configuration)_$(Platform)\` (e.g.
+`build\Release_x64\NoSpherA2.exe`) rather than the CMake preset's
+`build\release-windows\bin\NoSpherA2.exe`. `Windows\Tests\Tests.vcxproj` was not repointed and
+still builds to its own `Windows\Tests\$(Configuration)_$(Platform)\`.
 
 ## Adding or Changing Tests
 
@@ -159,7 +166,15 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
-As of the latest documented June 2026 validation, the native test suites had passed in Release and Debug configurations with 21/21 tests. Treat this as historical status unless you have rerun the current CMake presets in this checkout.
+As of 2026-07-03, `ctest --preset release-windows` reports **201/201 passing** after a full
+rebuild (following the Thakkar cubic-spline interpolation change in
+`Src/core/spherical_density.h` / `Src/core/GridManager.cpp`, Hirshfeld-weight density
+partitioning). A same-day run against a not-fully-rebuilt binary showed 13 `TomlIntegrationTests`
+cases failing with small numeric drift; after rebuilding, all 13 pass against their existing
+`.good` files unchanged — see `UNIT_TESTS_STATUS.md` Known Issues. Only
+`alanine_integrated_occ.good` was actually regenerated. The June-2026 note below (21/21,
+VS/pytest harnesses) predates the CMake/ctest migration and is kept only as history. Treat this
+as historical status unless you have rerun the current CMake presets in this checkout.
 
 Known fixed areas from June 2026:
 
