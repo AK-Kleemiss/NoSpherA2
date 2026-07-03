@@ -1699,18 +1699,17 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     class AtomTest : public ::testing::Test {
     protected:
-        static constexpr double kTolerance = 1.0e-12;
+        static constexpr std::uint64_t kZMask = scatterer_id_masks_d5::z_mask;
+        static constexpr std::uint64_t kAMask = scatterer_id_masks_d5::a_mask;
+        static constexpr std::uint64_t kBMask = scatterer_id_masks_d5::b_mask;
+        static constexpr std::uint64_t kCMask = scatterer_id_masks_d5::c_mask;
+        static constexpr std::uint64_t kASign = scatterer_id_masks_d5::a_sig;
+        static constexpr std::uint64_t kBSign = scatterer_id_masks_d5::b_sig;
+        static constexpr std::uint64_t kCSign = scatterer_id_masks_d5::c_sig;
+        static constexpr std::uint64_t kDatMask = scatterer_id_masks_d5::d_mask;
 
-        static constexpr std::uint64_t kZMask = 0x00000000000000FFULL;
-        static constexpr std::uint64_t kAMask = 0x0000000001FFFF00ULL;
-        static constexpr std::uint64_t kBMask = 0x000003FFFE000000ULL;
-        static constexpr std::uint64_t kCMask = 0x07FFFC0000000000ULL;
-        static constexpr std::uint64_t kASign = 0x0800000000000000ULL;
-        static constexpr std::uint64_t kBSign = 0x1000000000000000ULL;
-        static constexpr std::uint64_t kCSign = 0x2000000000000000ULL;
-        static constexpr std::uint64_t kDatMask = 0xC000000000000000ULL;
-
-        static constexpr std::int64_t kCoordinateMaximum = 0x1FFFF;
+        static constexpr std::int64_t kCoordinateMaximum = 0xFFFF;
+        static constexpr std::int64_t cell_m = 16;
 
         static atom make_atom()
         {
@@ -1752,17 +1751,17 @@ namespace NoSpherA2UnitTests
 
         static std::uint64_t extractB(const std::uint64_t id)
         {
-            return (id & kBMask) >> 25;
+            return (id & kBMask) >> (8 + scatterer_id_masks_d5::a_shift);
         }
 
         static std::uint64_t extractC(const std::uint64_t id)
         {
-            return (id & kCMask) >> 42;
+            return (id & kCMask) >> (8 + scatterer_id_masks_d5::a_shift * 2);
         }
 
         static std::uint64_t extractDat(const std::uint64_t id)
         {
-            return (id & kDatMask) >> 62;
+            return (id & kDatMask) >> (8 + scatterer_id_masks_d5::a_shift * 3 + 3);
         }
     };
 
@@ -1778,17 +1777,21 @@ namespace NoSpherA2UnitTests
     {
         atom value = make_atom_fractional(
             6,
-            1.0 / static_cast<double>(kCoordinateMaximum),
-            2.0 / static_cast<double>(kCoordinateMaximum),
-            3.0 / static_cast<double>(kCoordinateMaximum)
+            0.1,
+            0.4,
+            0.7
         );
 
         const std::uint64_t id = value.get_ID(2);
 
+        const double actualA = static_cast<double>(extractA(id)) / kCoordinateMaximum * cell_m;
+        const double actualB = static_cast<double>(extractB(id)) / kCoordinateMaximum * cell_m;
+        const double actualC = static_cast<double>(extractC(id)) / kCoordinateMaximum * cell_m;
+
         EXPECT_EQ(id & kZMask, std::uint64_t{ 6 });
-        EXPECT_EQ(extractA(id), std::uint64_t{ 1 });
-        EXPECT_EQ(extractB(id), std::uint64_t{ 2 });
-        EXPECT_EQ(extractC(id), std::uint64_t{ 3 });
+        EXPECT_NEAR(actualA, 0.1, 1e-3);
+        EXPECT_NEAR(actualB, 0.4, 1e-3);
+        EXPECT_NEAR(actualC, 0.7, 1e-3);
         EXPECT_EQ(extractDat(id), std::uint64_t{ 2 });
     }
 
@@ -1821,8 +1824,7 @@ namespace NoSpherA2UnitTests
 
         const std::uint64_t id = value.get_ID();
 
-        // static_cast<int64_t>(0.5 * 131071) truncates to 65535.
-        constexpr std::uint64_t expected = 65535;
+        constexpr std::uint64_t expected = 0.5 * kCoordinateMaximum / cell_m;
 
         EXPECT_EQ(extractA(id), expected);
         EXPECT_EQ(extractB(id), expected);
@@ -1886,8 +1888,8 @@ TEST_F(AtomTest, DistanceToOtherAtomIsEuclideanDistance)
         0
     };
 
-    EXPECT_NEAR(first.distance_to(second), 5.0, kTolerance);
-    EXPECT_NEAR(second.distance_to(first), 5.0, kTolerance);
+    EXPECT_NEAR(first.distance_to(second), 5.0, 1e-12);
+    EXPECT_NEAR(second.distance_to(first), 5.0, 1e-12);
 }
 
 TEST_F(AtomTest, BasisSetSupportsAddingModifyingAndErasingEntries)
