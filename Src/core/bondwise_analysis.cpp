@@ -7,6 +7,7 @@
 #include "nos_math.h"
 #include "integration_params.h"
 #include "b2c.h"
+#include <occ/qm/hf.h>
 
 namespace {
     struct OhOperation {
@@ -25,6 +26,233 @@ namespace {
 
     int atomic_shell_size(const int l, const bool cartesian) {
         return cartesian ? cartesian_shell_size(l) : 2 * l + 1;
+    }
+
+    int tonto_period_number(const int atomic_number) {
+        if (atomic_number < 1)
+            return 0;
+
+        int period = 1;
+        int noble = 0;
+        while (true) {
+            const int n = (period + 2) / 2;
+            noble += 2 * n * n;
+            if (atomic_number <= noble)
+                return period;
+            period++;
+        }
+    }
+
+    int tonto_column_number(const int atomic_number) {
+        if (atomic_number < 1)
+            return 0;
+
+        int period = 1;
+        int noble = 0;
+        while (true) {
+            const int n = (period + 2) / 2;
+            noble += 2 * n * n;
+            if (atomic_number <= noble)
+                return atomic_number - (noble - 2 * n * n);
+            period++;
+        }
+    }
+
+    int tonto_ground_state_multiplicity(const int atomic_number) {
+        const int period = tonto_period_number(atomic_number);
+        const int column = tonto_column_number(atomic_number);
+        switch (period) {
+        case 0:
+            return 1;
+        case 1:
+        case 2:
+        case 3:
+            switch (column) {
+            case 8: return 1;
+            case 1:
+            case 3:
+            case 7: return 2;
+            case 2:
+            case 4:
+            case 6: return 3;
+            case 5: return 4;
+            default: return 1;
+            }
+        case 4:
+        case 5:
+            switch (column) {
+            case 2:
+            case 12:
+            case 18: return 1;
+            case 1:
+            case 3:
+            case 11:
+            case 13:
+            case 17: return 2;
+            case 4:
+            case 10:
+            case 14:
+            case 16: return 3;
+            case 5:
+            case 9:
+            case 15: return 4;
+            case 6:
+            case 8: return 5;
+            case 7: return 6;
+            default: return 1;
+            }
+        case 6:
+        case 7:
+            switch (column) {
+            case 2:
+            case 16:
+            case 26:
+            case 32: return 1;
+            case 1:
+            case 3:
+            case 15:
+            case 17:
+            case 25:
+            case 27:
+            case 31: return 2;
+            case 4:
+            case 14:
+            case 18:
+            case 24:
+            case 28:
+            case 30: return 3;
+            case 5:
+            case 13:
+            case 19:
+            case 23:
+            case 29: return 4;
+            case 6:
+            case 12:
+            case 20:
+            case 22: return 5;
+            case 7:
+            case 11:
+            case 21: return 6;
+            case 8:
+            case 10: return 7;
+            case 9: return 8;
+            default: return 1;
+            }
+        default:
+            return 1;
+        }
+    }
+
+    int tonto_core_electron_count(const int atomic_number) {
+        if (atomic_number < 1)
+            return 0;
+
+        int noble = 0;
+        int period = 1;
+        while (true) {
+            const int n = (period + 2) / 2;
+            const int next_noble = noble + 2 * n * n;
+            if (atomic_number <= next_noble)
+                return noble;
+            noble = next_noble;
+            period++;
+        }
+    }
+
+    occ::gto::AOBasis build_occ_atomic_basis_from_wfn_atom(
+        const atom &atm, const e_origin origin, const bool cartesian) {
+        std::vector<occ::core::Atom> occ_atoms{ { atm.get_charge(), 0.0, 0.0, 0.0 } };
+        std::vector<occ::gto::Shell> shells;
+        const auto basis_set = atm.get_basis_set();
+        int primitive_idx = 0;
+
+        while (primitive_idx < static_cast<int>(basis_set.size())) {
+            const int shell_id = static_cast<int>(basis_set[primitive_idx].get_shell());
+            const int l = origin == e_origin::OCC
+                ? static_cast<int>(basis_set[primitive_idx].get_type())
+                : static_cast<int>(basis_set[primitive_idx].get_type()) - 1;
+            err_checkf(l >= 0,
+                "Encountered an invalid shell angular momentum while building an OCC atomic basis.",
+                std::cout);
+            std::vector<double> exponents;
+            std::vector<double> coefficients;
+            while (primitive_idx < static_cast<int>(basis_set.size()) &&
+                static_cast<int>(basis_set[primitive_idx].get_shell()) == shell_id) {
+                exponents.push_back(basis_set[primitive_idx].get_exponent());
+                coefficients.push_back(basis_set[primitive_idx].get_coefficient());
+                primitive_idx++;
+            }
+
+            occ::gto::Shell shell(l, exponents, { coefficients }, { 0.0, 0.0, 0.0 });
+            shell.kind = cartesian ? occ::gto::Shell::Kind::Cartesian : occ::gto::Shell::Kind::Spherical;
+            shell.incorporate_shell_norm();
+            shells.push_back(shell);
+        }
+
+        occ::gto::AOBasis result(occ_atoms, shells, "wfn-atomic-basis");
+        result.set_pure(!cartesian);
+        result.set_ecp_electrons({ atm.get_ECP_electrons() });
+        return result;
+    }
+
+    dMatrix2 eigen_matrix_to_dmatrix2(const occ::Mat &matrix) {
+        dMatrix2 result(matrix.rows(), matrix.cols());
+        for (int row = 0; row < matrix.rows(); ++row)
+            for (int col = 0; col < matrix.cols(); ++col)
+                result(row, col) = matrix(row, col);
+        return result;
+    }
+
+    class ScopedOccLogLevel {
+    public:
+        explicit ScopedOccLogLevel(const spdlog::level::level_enum level) {
+            auto logger = spdlog::default_logger();
+            if (logger != nullptr) {
+                had_logger = true;
+                previous_level = logger->level();
+                logger->set_level(level);
+            }
+        }
+
+        ~ScopedOccLogLevel() {
+            if (!had_logger)
+                return;
+            if (auto logger = spdlog::default_logger(); logger != nullptr)
+                logger->set_level(previous_level);
+        }
+
+    private:
+        bool had_logger = false;
+        spdlog::level::level_enum previous_level = spdlog::level::info;
+    };
+
+    dMatrix2 compute_tonto_style_atomic_density(
+        const atom &atm, const e_origin origin, const bool cartesian) {
+        ScopedOccLogLevel quiet_occ_logs(spdlog::level::err);
+        const occ::gto::AOBasis basis = build_occ_atomic_basis_from_wfn_atom(atm, origin, cartesian);
+        const int effective_atomic_number = atm.get_charge() - atm.get_ECP_electrons();
+        const int multiplicity = std::max(1, tonto_ground_state_multiplicity(effective_atomic_number));
+        const bool restricted = multiplicity == 1 && (effective_atomic_number % 2 == 0);
+        const auto spin_kind = restricted
+            ? occ::qm::SpinorbitalKind::Restricted
+            : occ::qm::SpinorbitalKind::Unrestricted;
+
+        occ::qm::HartreeFock hf(basis);
+        occ::qm::SCF<occ::qm::HartreeFock> scf(hf, spin_kind);
+        scf.set_charge_multiplicity(0, multiplicity);
+        scf.compute_scf_energy();
+
+        occ::qm::MolecularOrbitals mo =
+            occ::io::conversion::orb::to_gaussian_order(basis, scf.wavefunction().mo);
+        mo.update_occupied_orbitals();
+        mo.update_density_matrix();
+
+        if (spin_kind == occ::qm::SpinorbitalKind::Restricted)
+            return eigen_matrix_to_dmatrix2(mo.D);
+
+        const occ::Mat spin_summed =
+            occ::qm::block::a(mo.D) + occ::qm::block::b(mo.D);
+        return eigen_matrix_to_dmatrix2(spin_summed);
     }
 
     const std::vector<OhOperation> &oh_operations() {
@@ -814,7 +1042,9 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     const dMatrix2 &S_full,
     const std::vector<int> &atom_indices,
     const ivec &shell_angular_momenta,
-    const bool spherical) {
+    const bool spherical,
+    const double occupancy_cutoff,
+    const int leading_orbitals_to_skip) {
 
     err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
     err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
@@ -922,9 +1152,12 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     vec sorted_evecs;
     sorted_evecs.reserve(n * n);
 
+    const int skip_orbitals = std::clamp(leading_orbitals_to_skip, 0, n);
     for (int i = 0; i < n; i++) {
+        if (i < skip_orbitals)
+            continue;
         int original_idx = idx[i];
-        if (result.eigenvalues[original_idx] < 0.17)
+        if (occupancy_cutoff >= 0.0 && result.eigenvalues[original_idx] < occupancy_cutoff)
             continue;
         sorted_evals.emplace_back(result.eigenvalues[original_idx]);
 
@@ -1144,10 +1377,11 @@ double Roby_information::Roby_population_analysis(const ivec atoms) {
     return P;
 }
 
-void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize) {
+void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, const bool use_ano_basis) {
     const int N_atoms = wavy.get_ncen();
     const std::vector<atom> ats = wavy.get_atoms();
     NAOs.reserve(N_atoms);
+    ano_fallback_atoms.clear();
 
     density_matrix = wavy.get_dm();
 
@@ -1165,6 +1399,8 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize) {
 #endif
 
     //err_checkf()
+
+    const double occupancy_cutoff = 0.17;
 
     int last_index = 0;
     ivec2 indices(wavy.get_ncen());
@@ -1217,11 +1453,66 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize) {
         if (wavy.get_origin() == e_origin::gbw)
             std::stable_sort(shell_angular_momenta.begin(), shell_angular_momenta.end());
 
-        //pNAO.eigenvectors = orthogonalizePNAOs(pNAO.eigenvectors, S_full, static_cast<int>(indices[a.get_nr()].size()));
-        NAOs.emplace_back(calculateAtomicNAO(density_matrix, overlap_matrix,
-            indices[a.get_nr() - 1],
-            symmetrize ? shell_angular_momenta : ivec{},
-            !wavy.get_d_f_switch()));
+        const bool spherical = !wavy.get_d_f_switch();
+
+        auto make_molecular_fallback = [&]() {
+            auto fallback = calculateAtomicNAO(density_matrix, overlap_matrix,
+                indices[a.get_nr() - 1],
+                symmetrize ? shell_angular_momenta : ivec{},
+                spherical,
+                occupancy_cutoff);
+            fallback.atom_index = a.get_nr() - 1;
+            return fallback;
+        };
+        if (use_ano_basis) {
+            try {
+                const dMatrix2 atomic_density =
+                    compute_tonto_style_atomic_density(a, wavy.get_origin(), wavy.get_d_f_switch());
+                const int n_local = static_cast<int>(indices[a.get_nr() - 1].size());
+                if (static_cast<int>(atomic_density.extent(0)) != n_local ||
+                    static_cast<int>(atomic_density.extent(1)) != n_local) {
+                    throw std::runtime_error(
+                        "Atomic OCC density size does not match the loaded WFN basis layout.");
+                }
+                const int effective_atomic_number = a.get_charge() - a.get_ECP_electrons();
+                const int core_orbitals_to_skip =
+                    std::max(0, tonto_core_electron_count(effective_atomic_number) / 2);
+                ivec local_indices(indices[a.get_nr() - 1].size());
+                std::iota(local_indices.begin(), local_indices.end(), 0);
+                vec S_sub(n_local * n_local, 0.0);
+                get_submatrix(overlap_matrix, S_sub, indices[a.get_nr() - 1]);
+                const dMatrix2 atomic_overlap = reshape<dMatrix2>(S_sub, Shape2D(n_local, n_local));
+                auto ano = calculateAtomicNAO(atomic_density, atomic_overlap,
+                    local_indices,
+                    symmetrize ? shell_angular_momenta : ivec{},
+                    spherical,
+                    occupancy_cutoff,
+                    core_orbitals_to_skip);
+                ano.sub_OM = S_sub;
+                ano.sub_DM = atomic_density.container();
+                ano.matrix_elements = indices[a.get_nr() - 1];
+                ano.atom_index = a.get_nr() - 1;
+                NAOs.emplace_back(std::move(ano));
+            }
+            catch (const std::exception &e) {
+                std::cout << "Warning: RGBI ANO state build failed for atom "
+                    << a.get_nr() - 1 << " (" << a.get_label()
+                    << "). Falling back to molecular local orbitals. Reason: "
+                    << e.what() << '\n';
+                ano_fallback_atoms.push_back(a.get_nr() - 1);
+                NAOs.emplace_back(make_molecular_fallback());
+            }
+            catch (...) {
+                std::cout << "Warning: RGBI ANO state build failed for atom "
+                    << a.get_nr() - 1 << " (" << a.get_label()
+                    << "). Falling back to molecular local orbitals.\n";
+                ano_fallback_atoms.push_back(a.get_nr() - 1);
+                NAOs.emplace_back(make_molecular_fallback());
+            }
+        }
+        else {
+            NAOs.emplace_back(make_molecular_fallback());
+        }
         NAOs.back().atom_index = a.get_nr() - 1;
     }
 #ifdef NSA2DEBUG
@@ -1747,11 +2038,28 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
     std::cout << sep << "\n";
 }
 
-Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize) {
+Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis) {
     auto bonds = get_bonded_atom_pairs(wavy);
-    std::cout << "Calculating NAOs for all atoms...                 " << std::flush;
-    computeAllAtomicNAOs(wavy, symmetrize);
+    const char *orbital_label = use_ano_basis ? "ANOs" : "NAOs";
+    std::cout << "Calculating " << orbital_label << " for all atoms...                 " << std::flush;
+    computeAllAtomicNAOs(wavy, symmetrize, use_ano_basis);
     std::cout << " ...done!" << std::endl;
+    if (use_ano_basis) {
+        if (ano_fallback_atoms.empty()) {
+            std::cout << "ANO fallback summary: no atom-level fallbacks were needed." << std::endl;
+        }
+        else {
+            std::cout << "ANO fallback summary: used molecular local-orbital fallback for "
+                << ano_fallback_atoms.size() << "/" << wavy.get_ncen() << " atoms";
+            std::cout << " (";
+            for (int i = 0; i < static_cast<int>(ano_fallback_atoms.size()); ++i) {
+                if (i > 0)
+                    std::cout << ", ";
+                std::cout << ano_fallback_atoms[i];
+            }
+            std::cout << ")." << std::endl;
+        }
+    }
     Shape2D NAOs_size;
     NAOs_size.cols = static_cast<int>(overlap_matrix.extent(0));
     for (size_t atom_idx = 0; atom_idx < NAOs.size(); atom_idx++) {

@@ -10,6 +10,7 @@ class atom;
 class BasisSet;
 struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
+enum class RGBIOrbitalBasis { NAO, ANO };
 
 void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file = std::cout);
 void not_implemented(const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file);
@@ -741,6 +742,7 @@ struct options
     bool calc_F_calc = false;
     bool rgbi = false;
     bool rgbi_no_sym = false;
+    RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
     ivec3 rgbi_group_sets;
     bool fract = false;
     bool profiling = false;
