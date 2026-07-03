@@ -196,6 +196,7 @@ std::string help_message =
     "   -TFVC                                    Use the Topological Fuzzy Voronoi Cells (TFVC) partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -rgbi                                    Run Roby-Gould Bond Index analysis.\n"
     "   -rgbi_no_sym                             Run RGBI without atomic O_h symmetrization.\n"
+    "   -rgbi_basis    <nao|ano>                 Use the occupied NAO subset (default) or the full atom-local ANO set for RGBI.\n"
     "   -rgbi-groups    <GROUP> <GROUP> [...]    Run RGBI group analysis for comma-separated atom index groups/ranges, e.g. 0-5,7. Repeat for multiple groupings.\n"
     "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
@@ -2584,6 +2585,19 @@ void options::digest_options()
         else if (temp == "-rgbi_no_sym") {
             rgbi = true;
             rgbi_no_sym = true;
+        }
+        else if (temp == "-rgbi_basis") {
+            err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);
+            rgbi = true;
+            std::string basis = arguments[i + 1];
+            std::transform(basis.begin(), basis.end(), basis.begin(),
+                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (basis == "nao")
+                rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
+            else if (basis == "ano")
+                rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
+            else
+                err_checkf(false, "Invalid -rgbi_basis value '" + basis + "'. Use 'nao' or 'ano'.", std::cout);
         }
         else if (temp == "-rgbi-groups") {
             int n = 1;

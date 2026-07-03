@@ -32,7 +32,7 @@ tests presently failing because of the spline change.
 | VS Tests Debug | full (23 tests) | **passing** (historical, 2026-07-02) |
 | VS Tests Release | full (23 tests) | **passing** (historical, 2026-07-02) |
 | Python pytest macOS | `RGBI_Groups_NH3BH3`, `RGBI_Groups_NH3Li` targeted | **passing** (historical, validated 2026-06-17) |
-| ctest (release-windows) | 201 cases (unit + `TomlIntegrationTests`) | **201/201 passing** (2026-07-03, full rebuild); see Known Issues for a same-day transient 13-failure episode against a stale/partial build |
+| ctest (release-windows) | 205 cases (unit + `TomlIntegrationTests`) | targeted RGBI subset **7/7 passing** on 2026-07-03 for `NH3BH3` no-sym/sym and atom-only `NH3Li` NAO/ANO coverage; last full-suite baseline before this change was **201/201 passing** |
 
 ---
 
@@ -75,7 +75,12 @@ Added: 2026-06-14.
 | properties | sucrose_fchk_SF | properties.good | no | ✅ passing |
 | ri_fit | epoxide_gbw | ri_fit.good | no | ✅ passing |
 | RGBI_Groups_NH3BH3 | RGBI_groups | NH3BH3.good | no | ✅ passing (macOS targeted 2026-06-17) |
+| RGBI_Groups_NH3BH3_ANO | RGBI_groups | NH3BH3_ano.good | no | ✅ passing (release-windows targeted 2026-07-03) |
+| RGBI_Groups_NH3BH3_sym | RGBI_groups | NH3BH3_sym.good | no | ✅ passing (macOS targeted 2026-06-17) |
+| RGBI_Groups_NH3BH3_sym_ANO | RGBI_groups | NH3BH3_sym_ano.good | no | ✅ passing (release-windows targeted 2026-07-03) |
 | RGBI_Groups_NH3Li | RGBI_groups | nh3li.good | no | ✅ passing (macOS targeted 2026-06-17) |
+| RGBI_NH3Li | RGBI | nh3li_nao.good | no | ✅ passing (release-windows targeted 2026-07-03) |
+| RGBI_NH3Li_ANO | RGBI | nh3li_ano.good | no | ✅ passing (release-windows targeted 2026-07-03) |
 | rubredoxin_cmtc | rubredoxin_cmtc | rubredoxin_cmtc.good | no | ✅ passing |
 | SALTED | SALTED | SALTED.good | no | ✅ passing |
 | sucrose_IAM | sucrose_IAM_SF | sucrose_IAM.good | no | ✅ passing |
