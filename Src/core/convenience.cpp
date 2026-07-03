@@ -1705,7 +1705,7 @@ double get_lambda_1(double *a)
     // Sum of squares of the three distinct off-diagonal elements
     const double p1 = a01 * a01 + a02 * a02 + a12 * a12;
 
-    if (p1 == 0.0)
+    if (p1 < std::numeric_limits<double>::epsilon())
     {
         // Diagonal matrix: eigenvalues are the diagonal entries
         double eigs[3] = {a00, a11, a22};
