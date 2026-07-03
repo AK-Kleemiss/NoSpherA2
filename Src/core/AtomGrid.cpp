@@ -1412,7 +1412,9 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     return sig_pop_vector;
 }
 
+#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("-fno-fast-math") //gcc fails to converge in this function when using fast math, so not use it
+#endif
 // TCA 106, 178 (2001), eq. 19
 double get_r_outer(const double &max_error,
     const double &alpha_outer,
@@ -1509,4 +1511,6 @@ double get_h(const double &max_error, const int &l, const double &guess)
 
     return h;
 }
+#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("fast-math")
+#endif
