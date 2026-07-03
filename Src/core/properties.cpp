@@ -682,11 +682,15 @@ struct PromolecularAtom {
 
 std::vector<Thakkar> make_thakkar_interpolators()
 {
+    // atom_models[atom.charge - 1] is the lookup convention (see
+    // promolecular_fragment_densities_at), so index a must hold atomic
+    // number a+1, not a=0 (which would build a bogus atomic-number-0 model
+    // and read Thakkar_ns/np/nd/nf out of bounds for every real element).
     std::vector<Thakkar> atom_models;
     atom_models.reserve(92);
     for (int a = 0; a < 92; a++)
     {
-        atom_models.emplace_back(a);
+        atom_models.emplace_back(a + 1);
         atom_models[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
     }
     return atom_models;
