@@ -246,4 +246,21 @@ rgbi = ""
 rgbi_basis = "ano"
 rgbi-groups = ["0,4,5,7","1,2,3,6"]
 
+[RGBI_NH3Li]
+directory = "RGBI"
+good = "nh3li_nao.good"
+
+[RGBI_NH3Li.args]
+wfn = "../RGBI_groups/nh3li.gbw"
+rgbi = ""
+
+[RGBI_NH3Li_ANO]
+directory = "RGBI"
+good = "nh3li_ano.good"
+
+[RGBI_NH3Li_ANO.args]
+wfn = "../RGBI_groups/nh3li.gbw"
+rgbi = ""
+rgbi_basis = "ano"
+
 
