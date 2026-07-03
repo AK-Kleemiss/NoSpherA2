@@ -285,7 +285,7 @@ int run_app(int argc, char **argv)
         tsc_block<int, cdouble> result;
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
-            known_scatterer = result.get_scatterers();
+            known_scatterer = result.get_scatterers_string();
             if (!opt.SALTED)
             {
                 if (wavy[i].get_origin() == 7)
@@ -327,7 +327,7 @@ int run_app(int argc, char **argv)
             }
         }
 
-        known_scatterer = result.get_scatterers();
+        known_scatterer = result.get_scatterers_string();
         log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
         _time_point start = get_time();
         log_file << "Writing tsc file... " << flush;

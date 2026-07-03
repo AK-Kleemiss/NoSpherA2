@@ -16,10 +16,6 @@ void XCW::construct(const options &opt_in) {
     std::ifstream cif_input(cif.c_str(), std::ios::in);
     unit_cell = cell(cif, std::cout, opt_in.debug, opt_in.do_XCW);
     hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt_in.twin_law, unit_cell, std::cout, obs, opt_in.debug);
-    svec empty({});
-    ivec atom_type_list;
-    ivec asym_atom_to_type_list;
-    bvec constant_atoms;
     std::ofstream log3("log3.txt", std::ios::out);
     read_atoms_from_CIF(cif_input, unit_cell, ncen, needs_grid, asym_atoms, opt_in.debug);
 

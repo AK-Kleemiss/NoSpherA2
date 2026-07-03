@@ -123,3 +123,19 @@ public:
     uint64_t calculate_better_ID(const int& charge, const double& frac_x, const double& frac_y, const double& frac_z, const int& dat = 0);
     bool operator==(const atom& other) const;
 };
+
+uint64_t get_atom_ID(const int Z, const d3& frac_coords, const int dat);
+
+struct scatterer_id_masks_d5 {
+    const static uint64_t
+        z_mask = 0x00000000000000FF,
+        a_mask = 0x0000000000FFFF00,
+        b_mask = 0x000000FFFF000000,
+        c_mask = 0x00FFFF0000000000,
+        a_sig = 0x0100000000000000,
+        b_sig = 0x0200000000000000,
+        c_sig = 0x0400000000000000,
+        d_mask = 0xF800000000000000,
+        mask_m = 0x000000000000FFFF; // max crd value
+    const static int a_shift = 16;
+};
