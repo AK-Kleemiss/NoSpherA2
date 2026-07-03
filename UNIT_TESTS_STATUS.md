@@ -82,7 +82,7 @@ Added: 2026-06-14.
 | sucrose_ptb | sucrose_IAM_SF | sucrose_ptb.good | no | ✅ passing |
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |
 | sucrose_twin | sucrose_fchk_SF | sucrose_twin.good | no | ✅ passing |
-| intermolecular_nci | intermolecular_nci | good.dat | no | requires `-promol_nci_single_thread` (see note below) |
+| intermolecular_nci | intermolecular_nci | good.dat | no | requires `-promol_nci_single_thread` (see note below); ⚠️ was failing on macOS arm64 — fixed 2026-07-03 by replacing LAPACK `get_lambda_1` with analytical 3×3 eigenvalue formula |
 | wfn_reading | wfn_reading | wfn_reading.good | no | ✅ passing |
 | TFVC | TFVC | TFVC.good | no | ✅ passing |
 | TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
@@ -155,6 +155,17 @@ files generated before they can be registered.
   self-test). None of the four had a corresponding `TEST(TomlIntegrationTests, ...)` in
   `tests/src/IntegrationTests.cpp` either, so they were already effectively dead from ctest's
   perspective — this just removes the stale, misleading `tests.toml`/`.good` entries to match.
+
+- **macOS arm64 `IntermolecularNCI` failure fixed 2026-07-03**: The `TomlIntegrationTests.IntermolecularNCI`
+  test was failing on macOS arm64 CI runners (GitHub Actions, `macos-15`). Root cause: `get_lambda_1`
+  in `Src/core/convenience.cpp` called LAPACK `dsyev_` via `make_Eigenvalues`. On arm64 Apple Silicon
+  the Accelerate framework's `dsyev_` implementation produced different floating-point results than
+  the x86_64 Accelerate version (and Intel MKL on Windows/Linux), causing the middle eigenvalue
+  (lambda2) to differ — including sign flips for near-zero cases — which propagated into the
+  `signed_rho` column in the NCI scatter values. Fix: replaced `get_lambda_1` with an analytical
+  trigonometric Cardano formula (Smith 1961 / Wikipedia "Eigenvalue algorithm for symmetric 3×3
+  matrices") that is purely deterministic, standard-library only, and gives bit-for-bit identical
+  results on all platforms.
 
 - `intermolecular_nci`'s `_values.dat` writer (`promolecular_nci_analysis` in
   `Src/core/properties.cpp`) parallelizes over grid points with

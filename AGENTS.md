@@ -176,6 +176,11 @@ cases failing with small numeric drift; after rebuilding, all 13 pass against th
 VS/pytest harnesses) predates the CMake/ctest migration and is kept only as history. Treat this
 as historical status unless you have rerun the current CMake presets in this checkout.
 
+`TomlIntegrationTests.IntermolecularNCI` was failing on macOS arm64 CI; fixed 2026-07-03 by
+replacing the LAPACK-based `get_lambda_1` in `Src/core/convenience.cpp` with an analytical
+trigonometric Cardano formula for the middle eigenvalue of a 3×3 real symmetric matrix. See
+`UNIT_TESTS_STATUS.md` Known Issues for details.
+
 Known fixed areas from June 2026:
 
 1. `alanine_integrated_occ` passes in-process in Release and Debug.

@@ -1692,13 +1692,53 @@ void swap_sort_multi(ivec order, std::vector<ivec> &v)
 
 double get_lambda_1(double *a)
 {
-    // a is a row-major symmetric 3x3 matrix: a[1]==a[3], a[2]==a[6], a[5]==a[7]
-    vec A(a, a + 9);
-    vec W(3);
-    make_Eigenvalues(A, W);
-    // W is sorted ascending (LAPACK dsyev convention); the median is the middle entry
-    return W[1];
-};
+    // Returns the middle eigenvalue (lambda2) of the real symmetric 3x3 matrix 'a'
+    // (row-major, 9 elements; symmetric: a[1]==a[3], a[2]==a[6], a[5]==a[7]).
+    //
+    // Uses the analytical trigonometric Cardano formula to avoid platform-specific
+    // LAPACK/Accelerate floating-point differences (e.g. arm64 vs x86_64 macOS).
+    //
+    // Algorithm: Smith (1961) / Wikipedia "Eigenvalue algorithm for symmetric 3x3 matrices".
+    const double a00 = a[0], a01 = a[1], a02 = a[2];
+    const double a11 = a[4], a12 = a[5], a22 = a[8];
+
+    // Sum of squares of the three distinct off-diagonal elements
+    const double p1 = a01 * a01 + a02 * a02 + a12 * a12;
+
+    if (p1 == 0.0)
+    {
+        // Diagonal matrix: eigenvalues are the diagonal entries
+        double eigs[3] = {a00, a11, a22};
+        std::sort(eigs, eigs + 3);
+        return eigs[1];
+    }
+
+    const double q = (a00 + a11 + a22) / 3.0;  // = trace/3
+
+    const double b00 = a00 - q, b11 = a11 - q, b22 = a22 - q;
+    const double p2 = b00 * b00 + b11 * b11 + b22 * b22 + 2.0 * p1;
+    const double p = std::sqrt(p2 / 6.0);
+
+    // Form the normalised matrix B = (A - q*I) / p
+    const double c00 = b00 / p, c01 = a01 / p, c02 = a02 / p;
+    const double c11 = b11 / p, c12 = a12 / p, c22 = b22 / p;
+
+    // r = det(B) / 2
+    const double r = 0.5 * (c00 * (c11 * c22 - c12 * c12)
+                          - c01 * (c01 * c22 - c12 * c02)
+                          + c02 * (c01 * c12 - c11 * c02));
+
+    // Clamp to [-1, 1] to guard against rounding pushing r slightly out of range
+    const double phi = std::acos(std::clamp(r, -1.0, 1.0)) / 3.0;
+
+    // The three eigenvalues sorted descending:
+    //   eig_max = q + 2p*cos(phi)              [largest]
+    //   eig_min = q + 2p*cos(phi + 2*pi/3)     [smallest]
+    //   eig_mid = 3q - eig_max - eig_min        [middle, from trace identity]
+    const double eig_max = q + 2.0 * p * std::cos(phi);
+    const double eig_min = q + 2.0 * p * std::cos(phi + 2.0 * constants::PI / 3.0);
+    return 3.0 * q - eig_max - eig_min;
+}
 
 double get_bessel_ratio(const double nu, const double x)
 {
