@@ -10,6 +10,7 @@
 #include "core/nos_math.h"
 #include "core/GridManager.h"
 #include "core/atoms.h"
+#include "core/tsc_block.h"
 
 static constexpr double PI_VAL = 3.14159265358979323846;
 
@@ -410,6 +411,48 @@ namespace {
 
 namespace NoSpherA2UnitTests
 {
+    TEST(TscBlockTests, ConstructorWarnsForDuplicateScattererIds)
+    {
+        const std::vector<std::vector<cdouble>> form_factors = {
+            { cdouble(1.0, 0.0) },
+            { cdouble(2.0, 0.0) },
+            { cdouble(3.0, 0.0) }
+        };
+        const std::vector<std::uint64_t> scatterer_ids = { 0xabc, 0xdef, 0xabc };
+        const std::vector<std::vector<int>> indices = { { 1 }, { 0 }, { 0 } };
+
+        testing::internal::CaptureStdout();
+        tsc_block<int, cdouble> block(form_factors, scatterer_ids, indices);
+        const std::string output = testing::internal::GetCapturedStdout();
+
+        EXPECT_NE(output.find("WARNING: Duplicate scatterer_ID 0xabc"), std::string::npos);
+    }
+
+    TEST(TscBlockTests, AppendWarnsForDuplicateScattererIds)
+    {
+        const std::vector<std::vector<int>> indices = { { 1 }, { 0 }, { 0 } };
+        const std::vector<std::vector<cdouble>> lhs_form_factors = {
+            { cdouble(1.0, 0.0) }
+        };
+        const std::vector<std::uint64_t> lhs_scatterer_ids = { 0xabc };
+        const std::vector<std::vector<cdouble>> rhs_form_factors = {
+            { cdouble(2.0, 0.0) },
+            { cdouble(3.0, 0.0) }
+        };
+        const std::vector<std::uint64_t> rhs_scatterer_ids = { 0xabc, 0xdef };
+
+        tsc_block<int, cdouble> lhs(lhs_form_factors, lhs_scatterer_ids, indices);
+        tsc_block<int, cdouble> rhs(rhs_form_factors, rhs_scatterer_ids, indices);
+        std::ostringstream log;
+
+        testing::internal::CaptureStdout();
+        lhs.append(rhs, log);
+        const std::string output = testing::internal::GetCapturedStdout();
+
+        EXPECT_NE(output.find("WARNING: Duplicate scatterer_ID 0xabc"), std::string::npos);
+        EXPECT_EQ(lhs.scatterer_size(), 2);
+    }
+
     TEST(SALTEDTests, ReadingSALTEDBinaryFile)
     {
         test_reading_SALTED_binary_file();

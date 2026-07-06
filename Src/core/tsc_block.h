@@ -24,6 +24,27 @@ private:
 
     static constexpr const char* nan_message_ = "NaN in SF!";
 
+    static void warn_duplicate_scatterer_id(std::uint64_t id)
+    {
+        std::cout << "WARNING: Duplicate scatterer_ID 0x"
+            << std::hex << id << std::dec
+            << " in TSC block; identical scatterer_ID entries can lead to problems.\n";
+    }
+
+    static void warn_duplicate_scatterer_ids(const ScattererLabels& scatterers)
+    {
+        std::unordered_set<std::uint64_t> seen;
+        for (const auto& scatterer : scatterers)
+        {
+            if (!std::holds_alternative<std::uint64_t>(scatterer))
+                continue;
+
+            const std::uint64_t id = std::get<std::uint64_t>(scatterer);
+            if (!seen.insert(id).second)
+                warn_duplicate_scatterer_id(id);
+        }
+    }
+
     template <ScattererValue Label>
     static ScattererLabels make_scatterers(const std::vector<Label>& labels)
     {
@@ -86,6 +107,7 @@ private:
     {
         sf_ = copy_and_validate_sf(given_sf);
         scatterers_ = make_scatterers(given_scatterers);
+        warn_duplicate_scatterer_ids(scatterers_);
 
         if constexpr (std::same_as<
             std::remove_cvref_t<IndexInput>,
@@ -341,6 +363,7 @@ private:
         if (reflection_size() == 0)
         {
             *this = std::forward<Block>(rhs);
+            warn_duplicate_scatterer_ids(scatterers_);
             return;
         }
 
@@ -352,7 +375,11 @@ private:
         for (std::size_t i = 0; i < rhs.scatterers_.size(); ++i)
         {
             if (!existing.insert(rhs.scatterers_[i]).second)
+            {
+                if (std::holds_alternative<std::uint64_t>(rhs.scatterers_[i]))
+                    warn_duplicate_scatterer_id(std::get<std::uint64_t>(rhs.scatterers_[i]));
                 continue;
+            }
 
             if constexpr (std::is_rvalue_reference_v<Block&&>)
             {
@@ -428,6 +455,7 @@ public:
         header_ = read_bytes(in, static_cast<std::size_t>(header_size));
 
         read_binary_scatterers(in);
+        warn_duplicate_scatterer_ids(scatterers_);
 
         const std::uint64_t reflection_count = read_scalar<std::uint64_t>(in);
         indices_.assign(3, {});
