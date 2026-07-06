@@ -532,13 +532,19 @@ ivec2 XCW::generate_asym_lookup_(const int r) {
 	// closing function
 }
 
-void XCW::calculateXCWintegral(const vec2& mu_vals, const vec2& nu_vals, const int* points, vec2& atom_grids_values, const cvec2& phase, const std::vector<asym_atom>& asym_atoms, const cvec2& DW_fact, const cvec2& phase_fact, const int mu, const int nu, const int r, const cdouble& translation_phase) {
-	const int n_grids = atom_grids_values.size();
+void XCW::calculateXCWintegral(const vec2& grid_positions, const d3& mu_position, const d3& nu_position, const vec2& mu_vals, const vec2& nu_vals, const int* points, const cvec2& phase, const std::vector<asym_atom>& asym_atoms, const cvec2& DW_fact, const cvec2& phase_fact, const int mu, const int nu, const int r, const cdouble& translation_phase, int& skipped_grids) {
+	const int n_grids = mu_vals.size();
 	cvec sfs(n_grids);
 	double sum_re, sum_im;
 	int p;
-#pragma omp parallel for schedule(dynamic, 1) private(sum_re, sum_im, p)
+	#pragma omp parallel for schedule(dynamic, 1) private(sum_re, sum_im, p)
 	for (int g = 0; g < n_grids; g++) {
+		const double distance_mu = std::pow(grid_positions[g][0] - mu_position[0], 2) + std::pow(grid_positions[g][1] - mu_position[1], 2) + std::pow(grid_positions[g][2] - mu_position[2], 2);
+		const double distance_nu = std::pow(grid_positions[g][0] - nu_position[0], 2) + std::pow(grid_positions[g][1] - nu_position[1], 2) + std::pow(grid_positions[g][2] - nu_position[2], 2);
+		if(distance_mu > 144 || distance_nu > 144) {
+			skipped_grids++;
+			continue;
+		}
 		const int np = points[g];
 		const double* __restrict mu_ptr = mu_vals[g].data();
 		const double* __restrict nu_ptr = nu_vals[g].data();
@@ -646,10 +652,6 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	grid_manager.getDensityVectors(dummy_wave, asym_atom_list, d1, d2, d3, weights);
 	const int* points = grid_manager.getNeedsHelper() ? GD.helper_num_points_per_atom.data() : GD.num_points_per_atom.data();
 	const int total_points = grid_manager.getTotalGridPoints();
-	vec2 atom_grids_values(n_grids);
-	for (int g = 0; g < n_grids; g++) {
-		atom_grids_values[g].resize(points[g]);
-	}
 	std::cout << "Total number of grid points after pruning: " << total_points << std::endl;
 
 	ivec2 asym_lookup(cryst.nr_small);
@@ -657,6 +659,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		asym_lookup[r] = generate_asym_lookup(r);
 	}
 	const unsigned int num_syms = asym_lookup[0].size();
+
+	vec2 grid_positions(cryst.ncen);
+	for (int at = 0; at < cryst.ncen; at++) {
+		grid_positions[at] = { dummy_wave.get_atom_pos(at)[0], dummy_wave.get_atom_pos(at)[1], dummy_wave.get_atom_pos(at)[2] };
+	}
 
 	// Precompute screening
 	double cutoff = 0;
@@ -714,6 +721,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 
 	// Precompute mu_vals for all grids
+	ivec3 non_zero_points(cryst.nmo, ivec2(n_grids));
 	vec3 mu_vals(cryst.nmo, vec2(n_grids));
 #pragma omp parallel for schedule(dynamic)
 	for (mu = 0; mu < cryst.nmo; mu++) {
@@ -732,7 +740,13 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			for (int p = 0; p < points[g]; p++) {
 				d4 d_mu{ x_ptr[p] - mp0, y_ptr[p] - mp1 , z_ptr[p] - mp2 , 0 };
 				d_mu[3] = std::hypot(d_mu[0], d_mu[1], d_mu[2]);
-				local_mu_vals_ptr[p] = (d_mu[3] > 12) ? 0.0 : dummy_wave.eval_ao(d_mu, mu_primitives, mu_prims.m);
+				if (d_mu[3] > 12) {
+					local_mu_vals_ptr[p] = 0.0;
+				}
+				else {
+					local_mu_vals_ptr[p] = dummy_wave.eval_ao(d_mu, mu_primitives, mu_prims.m);
+					non_zero_points[mu][g].push_back(p);
+				}
 			}
 		}
 	}
@@ -742,6 +756,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// Main loop for computation of I
+	int skipped_grids = 0;
 	for (int r = 0; r < cryst.nr_small; r++) {
 
 		// Extract all k_pts needed for this r
@@ -770,7 +785,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					continue;
 				}
 				for (int syms = 0; syms < num_syms; syms++) {
-					calculateXCWintegral(mu_vals[mu], mu_vals[nu], points, atom_grids_values, phase[syms], asym_atoms, DW_fact, phase_fact, mu, nu, r, translation_phase[r][syms]);
+					calculateXCWintegral(grid_positions, ao_data_shells[mu].pos, ao_data_shells[nu].pos, mu_vals[mu], mu_vals[nu], points, phase[syms], asym_atoms, DW_fact, phase_fact, mu, nu, r, translation_phase[r][syms], skipped_grids);
 				}
 			}
 		}
@@ -779,8 +794,10 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	free(pb);
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = end - start;
-	std::cout << std::endl << "Time taken for XCW integrals: " << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
-	std::cout << "Screened out " << screen_counter / cryst.nr << " pairs of mu, nu" << std::endl;
+	const int number_integrals = (cryst.nmo * (cryst.nmo + 1) / 2);
+	std::cout << std::endl << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
+	std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter / cryst.nr << " pairs of mu, nu (" << screen_counter / static_cast<double>(cryst.nr * number_integrals) * 100 << "%)" << std::endl;
+	std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / (static_cast<long long>(number_integrals) * cryst.nr * cryst.ncen) * 100 << "%)" << std::endl;
 }
 
 void XCW::calc_F_calc(const dMatrix2& D) {
@@ -1260,11 +1277,6 @@ void XCW::run_XCW_fitting() {
 	bool read = false;
 	bool safe = false;
 	occ::qm::HartreeFock hf = setup_XCW_procedure(read, safe);
-	//std::cout << "I_tensor elements:" << std::endl;
-	//for (int print = 0; print < 78680; print++) {
-	//	std::cout << I[print] << std::endl;
-	//}
-	//exit(0);
 	occ::qm::SCF scf(hf, settings.hf_type);
 	occ::qm::Wavefunction last_wfn;
 	bool has_guess = false;
