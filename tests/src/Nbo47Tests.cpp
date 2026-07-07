@@ -128,6 +128,18 @@ std::optional<double> parse_total_electrons(const std::filesystem::path& nbo_pat
     return std::nullopt;
 }
 
+double packed_trace_product(const std::vector<double>& density, const std::vector<double>& overlap, int nbasis)
+{
+    double trace = 0.0;
+    for (int i = 0; i < nbasis; i++) {
+        for (int j = 0; j <= i; j++) {
+            const int ij = i * (i + 1) / 2 + j;
+            trace += density[ij] * overlap[ij] * (i == j ? 1.0 : 2.0);
+        }
+    }
+    return trace;
+}
+
 } // namespace
 
 TEST(Nbo47, EpoxideGbwWritesValidFile47)
@@ -168,6 +180,7 @@ TEST(Nbo47, EpoxideGbwWritesValidFile47)
     EXPECT_EQ(density.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
     EXPECT_EQ(fock.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
     EXPECT_EQ(lcaomo.size(), static_cast<size_t>(nbasis * nbasis));
+    EXPECT_NEAR(packed_trace_product(density, overlap, nbasis), 24.0, 1.0e-5);
 }
 
 TEST(Nbo47, WriteNboReportsProgressWhenRequested)
@@ -275,6 +288,7 @@ TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
     EXPECT_EQ(density.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
     EXPECT_EQ(fock.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
     EXPECT_EQ(lcaomo.size(), static_cast<size_t>(nbasis * nbasis));
+    EXPECT_NEAR(packed_trace_product(density, overlap, nbasis), 13.0, 1.0e-5);
 }
 
 TEST(Nbo47, OpenShellNh3LiGennboProducesEnergyAnalysisWhenAvailable)

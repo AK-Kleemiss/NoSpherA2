@@ -4376,7 +4376,37 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     progress("Building density matrix");
     int naotr = nbo_nao * (nbo_nao + 1) / 2;
     vec CDM(naotr, 0.0);
+    auto build_mo_density = [&]() {
+        vec density(naotr, 0.0);
+        int density_progress_next = 10;
+#pragma omp parallel for schedule(dynamic)
+        for (int iu = 0; iu < nbo_nao; iu++) {
+            for (int iv = 0; iv <= iu; iv++) {
+                const int iuv = (iu * (iu + 1) / 2) + iv;
+                int alpha_index = 0;
+                int beta_index = 0;
+                for (int m = 0; m < get_nmo(); m++) {
+                    const double occ = get_MO_occ(m);
+                    if (MOs[m].get_op() == 0) {
+                        if (occ != 0.0)
+                            density[iuv] += occ * CMO[alpha_index][iu] * CMO[alpha_index][iv];
+                        alpha_index++;
+                    }
+                    else if (MOs[m].get_op() == 1) {
+                        if (occ != 0.0)
+                            density[iuv] += occ * CMO_beta[beta_index][iu] * CMO_beta[beta_index][iv];
+                        beta_index++;
+                    }
+                }
+            }
+#pragma omp critical(nbo_progress)
+            progress_percent("Density build", iu + 1, nbo_nao, density_progress_next);
+        }
+        return density;
+    };
+    bool density_from_cached_dm = false;
     if (static_cast<int>(DM.extent(0)) == nbo_nao && static_cast<int>(DM.extent(1)) == nbo_nao) {
+        density_from_cached_dm = true;
         ivec dm_to_nbo(nbo_nao, 0);
         for (const auto& shell : shells) {
             for (int c = 0; c < shell.nbo_components; c++) {
@@ -4393,30 +4423,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
         }
     }
     else {
-        int density_progress_next = 10;
-#pragma omp parallel for schedule(dynamic)
-        for (int iu = 0; iu < nbo_nao; iu++) {
-            for (int iv = 0; iv <= iu; iv++) {
-                const int iuv = (iu * (iu + 1) / 2) + iv;
-                int alpha_index = 0;
-                int beta_index = 0;
-                for (int m = 0; m < get_nmo(); m++) {
-                    const double occ = get_MO_occ(m);
-                    if (MOs[m].get_op() == 0) {
-                        if (occ != 0.0)
-                            CDM[iuv] += occ * CMO[alpha_index][iu] * CMO[alpha_index][iv];
-                        alpha_index++;
-                    }
-                    else if (MOs[m].get_op() == 1) {
-                        if (occ != 0.0)
-                            CDM[iuv] += occ * CMO_beta[beta_index][iu] * CMO_beta[beta_index][iv];
-                        beta_index++;
-                    }
-                }
-            }
-#pragma omp critical(nbo_progress)
-            progress_percent("Density build", iu + 1, nbo_nao, density_progress_next);
-        }
+        CDM = build_mo_density();
     }
 
     vec OVLP_matrix = {};
@@ -4487,6 +4494,36 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                 OVLP_nbo[i][j] = value;
             }
         }
+    }
+    auto packed_trace_product = [&](const vec& density) {
+        double trace = 0.0;
+        for (int i = 0; i < nbo_nao; i++) {
+            for (int j = 0; j <= i; j++) {
+                const int ij = (i * (i + 1) / 2) + j;
+                trace += density[ij] * OVLP_nbo[i][j] * (i == j ? 1.0 : 2.0);
+            }
+        }
+        return trace;
+    };
+    double expected_electrons = 0.0;
+    for (int m = 0; m < get_nmo(); m++)
+        expected_electrons += get_MO_occ(m);
+    double density_electrons = packed_trace_product(CDM);
+    if (density_from_cached_dm && std::abs(density_electrons - expected_electrons) > 1.0E-4) {
+        progress("Cached GBW density is inconsistent with FILE47 overlap: Tr(P*S)=" +
+            std::to_string(density_electrons) + ", expected=" + std::to_string(expected_electrons) +
+            ". Rebuilding density from NBO-ordered MO coefficients");
+        CDM = build_mo_density();
+        density_from_cached_dm = false;
+        density_electrons = packed_trace_product(CDM);
+    }
+    if (progress_log != nullptr) {
+        std::ostringstream density_check;
+        density_check << std::fixed << std::setprecision(6) << density_electrons
+                      << ", expected=" << expected_electrons;
+        *progress_log << "[FILE47] Density electron check Tr(P*S)=" << density_check.str()
+                      << " (" << progress_elapsed_seconds() << " s)" << std::endl;
+        progress_log->flush();
     }
     vec2 FOCK_nbo;
     if (alpha_mos == nbo_nao) {
