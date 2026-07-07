@@ -3371,6 +3371,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
         //Map to collect the end index of every type
         index = 0;
+        int atom_index = 0;
         for (atom &_atom : atoms) {
             std::map<int, int> type_end;
             std::vector<basis_set_entry> basis = _atom.get_basis_set();
@@ -3382,7 +3383,11 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                     type_end[type] = index + 2 * type + 1;
                 }
                 else {
-                    std::cout << "function of type " << type << " is out of line!" << std::endl;
+                    if (debug) {
+                        file << "GBW reader: moving out-of-order angular momentum block l=" << type
+                             << " for atom " << atom_index + 1 << ", shell " << shell + 1
+                             << " into the internal coefficient order." << std::endl;
+                    }
                     move_columns(reorderd_coefs_s1.container(), dimension, index, 2 * type + 1, type_end[type]);
 
                     if (operators == 2) {
@@ -3396,6 +3401,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 }
                 index += 2 * type + 1;
             }
+            atom_index++;
         }
 
 
@@ -4370,26 +4376,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     progress("Building density matrix");
     int naotr = nbo_nao * (nbo_nao + 1) / 2;
     vec CDM(naotr, 0.0);
-    for (int iu = 0; iu < nbo_nao; iu++) {
-        for (int iv = 0; iv <= iu; iv++) {
-            const int iuv = (iu * (iu + 1) / 2) + iv;
-            int alpha_index = 0;
-            int beta_index = 0;
-            for (int m = 0; m < get_nmo(); m++) {
-                const double occ = get_MO_occ(m);
-                if (MOs[m].get_op() == 0) {
-                    if (occ != 0.0)
-                        CDM[iuv] += occ * CMO[alpha_index][iu] * CMO[alpha_index][iv];
-                    alpha_index++;
-                }
-                else if (MOs[m].get_op() == 1) {
-                    if (occ != 0.0)
-                        CDM[iuv] += occ * CMO_beta[beta_index][iu] * CMO_beta[beta_index][iv];
-                    beta_index++;
-                }
-            }
-        }
-    }
     if (static_cast<int>(DM.extent(0)) == nbo_nao && static_cast<int>(DM.extent(1)) == nbo_nao) {
         ivec dm_to_nbo(nbo_nao, 0);
         for (const auto& shell : shells) {
@@ -4406,6 +4392,32 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
             }
         }
     }
+    else {
+        int density_progress_next = 10;
+#pragma omp parallel for schedule(dynamic)
+        for (int iu = 0; iu < nbo_nao; iu++) {
+            for (int iv = 0; iv <= iu; iv++) {
+                const int iuv = (iu * (iu + 1) / 2) + iv;
+                int alpha_index = 0;
+                int beta_index = 0;
+                for (int m = 0; m < get_nmo(); m++) {
+                    const double occ = get_MO_occ(m);
+                    if (MOs[m].get_op() == 0) {
+                        if (occ != 0.0)
+                            CDM[iuv] += occ * CMO[alpha_index][iu] * CMO[alpha_index][iv];
+                        alpha_index++;
+                    }
+                    else if (MOs[m].get_op() == 1) {
+                        if (occ != 0.0)
+                            CDM[iuv] += occ * CMO_beta[beta_index][iu] * CMO_beta[beta_index][iv];
+                        beta_index++;
+                    }
+                }
+            }
+#pragma omp critical(nbo_progress)
+            progress_percent("Density build", iu + 1, nbo_nao, density_progress_next);
+        }
+    }
 
     vec OVLP_matrix = {};
     Int_Params int_params(*this);
@@ -4414,24 +4426,34 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     compute2C<Overlap2C_CRT>(int_params, OVLP_matrix);
     progress("Transforming overlap matrix to NBO AO order");
     dMatrixRef2 OVLP_cart(OVLP_matrix.data(), internal_nao, internal_nao);
-    vec2 transform_global(internal_nao, vec(nbo_nao, 0.0));
-    for (const auto& shell : shells) {
-        const vec2 transform = shell_transform(shell.type);
-        for (int i = 0; i < shell.cart_components; i++)
-            for (int j = 0; j < shell.nbo_components; j++)
-                transform_global[shell.internal_start + i][shell.nbo_start + j] = transform[i][j];
-    }
     vec2 OVLP_nbo(nbo_nao, vec(nbo_nao, 0.0));
     int overlap_progress_next = 10;
-    for (int i = 0; i < nbo_nao; i++) {
-        for (int j = 0; j < nbo_nao; j++) {
-            double value = 0.0;
-            for (int ci = 0; ci < internal_nao; ci++)
-                for (int cj = 0; cj < internal_nao; cj++)
-                    value += transform_global[ci][i] * OVLP_cart(ci, cj) * transform_global[cj][j];
-            OVLP_nbo[i][j] = value;
+    int overlap_shells_done = 0;
+#pragma omp parallel for schedule(dynamic)
+    for (int si = 0; si < static_cast<int>(shells.size()); si++) {
+        const auto& shell_i = shells[si];
+        const vec2 transform_i = shell_transform(shell_i.type);
+        for (const auto& shell_j : shells) {
+            const vec2 transform_j = shell_transform(shell_j.type);
+            for (int i = 0; i < shell_i.nbo_components; i++) {
+                for (int j = 0; j < shell_j.nbo_components; j++) {
+                    double value = 0.0;
+                    for (int ci = 0; ci < shell_i.cart_components; ci++) {
+                        const double left = transform_i[ci][i];
+                        if (left == 0.0)
+                            continue;
+                        for (int cj = 0; cj < shell_j.cart_components; cj++)
+                            value += left * OVLP_cart(shell_i.internal_start + ci, shell_j.internal_start + cj) * transform_j[cj][j];
+                    }
+                    OVLP_nbo[shell_i.nbo_start + i][shell_j.nbo_start + j] = value;
+                }
+            }
         }
-        progress_percent("Overlap transform", i + 1, nbo_nao, overlap_progress_next);
+#pragma omp critical(nbo_progress)
+        {
+            overlap_shells_done++;
+            progress_percent("Overlap transform", overlap_shells_done, static_cast<int>(shells.size()), overlap_progress_next);
+        }
     }
     for (const auto& shell_i : shells) {
         for (const auto& shell_j : shells) {
@@ -4456,6 +4478,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
             for (int ao = 0; ao < nbo_nao; ao++)
                 pure_mo(m, ao) = CMO[m][ao];
         const dMatrix2 pure_mo_inverse = LAPACKE_invert(pure_mo, 1E-12);
+#pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < nbo_nao; i++) {
             for (int j = 0; j < nbo_nao; j++) {
                 double value = 0.0;
@@ -4467,25 +4490,31 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     }
     vec2 FOCK_nbo;
     if (alpha_mos == nbo_nao) {
-        progress("Building Fock matrix from MO energies");
+        progress("Building Fock matrix from MO energies with BLAS");
         FOCK_nbo = vec2(nbo_nao, vec(nbo_nao, 0.0));
-        int fock_progress_next = 10;
+        dMatrix2 overlap(nbo_nao, nbo_nao);
+        dMatrix2 cmo(nbo_nao, nbo_nao);
         for (int i = 0; i < nbo_nao; i++) {
-            for (int j = 0; j < nbo_nao; j++) {
-                double value = 0.0;
-                for (int m = 0; m < nbo_nao; m++) {
-                    double left = 0.0;
-                    double right = 0.0;
-                    for (int k = 0; k < nbo_nao; k++) {
-                        left += OVLP_nbo[i][k] * CMO[m][k];
-                        right += CMO[m][k] * OVLP_nbo[k][j];
-                    }
-                    value += left * get_MO_energy(m) * right;
-                }
-                FOCK_nbo[i][j] = value;
-            }
-            progress_percent("Fock build", i + 1, nbo_nao, fock_progress_next);
+            for (int j = 0; j < nbo_nao; j++)
+                overlap(i, j) = OVLP_nbo[i][j];
+            for (int m = 0; m < nbo_nao; m++)
+                cmo(m, i) = CMO[m][i];
         }
+        dMatrix2 eps_cmo(nbo_nao, nbo_nao);
+#pragma omp parallel for schedule(dynamic)
+        for (int m = 0; m < nbo_nao; m++)
+            for (int i = 0; i < nbo_nao; i++)
+                eps_cmo(m, i) = get_MO_energy(m) * cmo(m, i);
+        progress("Fock build: C^T * eps * C");
+        dMatrix2 ctc = dot<dMatrix2>(cmo, eps_cmo, true, false);
+        progress("Fock build: S * (C^T * eps * C)");
+        dMatrix2 left = dot<dMatrix2>(overlap, ctc, false, false);
+        progress("Fock build: S * (C^T * eps * C) * S");
+        dMatrix2 fock = dot<dMatrix2>(left, overlap, false, false);
+#pragma omp parallel for schedule(dynamic)
+        for (int i = 0; i < nbo_nao; i++)
+            for (int j = 0; j < nbo_nao; j++)
+                FOCK_nbo[i][j] = fock(i, j);
     }
     else {
         progress("Skipping Fock matrix: alpha MO count does not match NBO basis size");
