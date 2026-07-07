@@ -12,8 +12,7 @@ Preferred: use CMake presets.
 
 **Windows (MSVC, full build):**
 ```ps
-cmake --preset windows-msvc-release-full
-cmake --build --preset windows-msvc-release-full
+cmd /c "`"%VSINSTALLDIR%\Common7\Tools\VsDevCmd.bat`" -arch=x64 && cmake --preset release-windows && cmake --build --preset release-windows"
 ```
 
 **Linux (GCC, full build):**
@@ -28,7 +27,7 @@ cmake --preset macos-release-full-arm64
 cmake --build --preset macos-release-full-arm64
 ```
 
-Output: the executable is produced in the preset build folder (e.g. `build-windows-msvc-release-full/NoSpherA2.exe`).
+Output: the executable is produced in the preset build folder (e.g. `build/release-windows/bin/NoSpherA2.exe`).
 
 ## Running Tests
 
@@ -44,7 +43,7 @@ RUN_FULL_TEST=1 uv run pytest
 
 # Or via CMake/CTest
 cmake --build --preset <your-preset>
-ctest --test-dir build-<your-preset> --output-on-failure
+ctest --preset <your-preset>
 ```
 
 Key environment variables:
@@ -139,7 +138,7 @@ Do not reintroduce `tbbmalloc_proxy` or `tbbmalloc` linking for NoSpherA2. The b
 ## Known Pitfalls
 
 - **Golden-file float parsing**: the diff parser in `tests/run_test.py` can fail when a line contains multiple values. When fixing comparison logic, support scientific notation and multi-value lines without breaking existing thresholds.
-- **Windows toolchain**: use an x64 VS Developer shell for `windows-clang-cl` and `windows-msvc-debug` CMake preset flows.
+- **Windows toolchain**: before any Windows CMake configure, build, or test command, initialize the MSVC environment with the Visual Studio developer setup script. In this environment, run `VsDevCmd.bat -arch=x64` first, or chain it in the same `cmd /c` invocation as CMake. If standard headers such as `cstddef`, `vector`, `windows.h`, or libraries such as `kernel32.lib` are missing, treat that as an uninitialized MSVC/Windows SDK environment, not as a source patch failure.
 - **Submodules**: always clone with `--recursive`. If submodules are missing, run `git submodule update --init --recursive`.
 - **OCC submodule commits**: OCC source fixes must be committed in the `occ` repository first, then the parent NoSpherA2 repo must commit the updated submodule pointer.
 - **CI vs local**: when a test passes locally but fails in CI, compare `.github/workflows/c-cpp_all.yml` step-by-step with your local commands, particularly the `NOS_EXE` and `OCC_DATA_PATH` values.

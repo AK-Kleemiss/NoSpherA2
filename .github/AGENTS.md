@@ -8,10 +8,10 @@
 ## Build & test commands (agents can run these automatically)
 | Platform | Command | What it does |
 |----------|---------|--------------|
-| **Windows** | `cmake --preset windows-msvc-release-full && cmake --build --preset windows-msvc-release-full` | Configures + builds full NoSpherA2 (and bootstraps deps by default). |
+| **Windows** | `cmd /c "\"%VSINSTALLDIR%\Common7\Tools\VsDevCmd.bat\" -arch=x64 && cmake --preset release-windows && cmake --build --preset release-windows"` | Initializes the MSVC x64 environment, then configures + builds NoSpherA2. |
 | **Linux** | `cmake --preset linux-gcc && cmake --build --preset linux-gcc` | Configures + builds full NoSpherA2. |
 | **macOS** | `cmake --preset macos-release-full-arm64 && cmake --build --preset macos-release-full-arm64` | Configures + builds full NoSpherA2 for a specific arch. |
-| **All** | `ctest --test-dir build-<preset> --output-on-failure` | Runs the Python pytest harness through CTest integration. |
+| **All** | `ctest --preset <preset>` | Runs the configured CTest suite for the selected preset. |
 | **Windows native tests** | `vstest.console.exe Windows\x64\<Config>\Tests.dll /Platform:x64` | Use Visual Studio test tools for native/in-process debugging. Ensure the test binaries are built and the appropriate test adapter is installed.
 
 ## Important build notes for AI agents
@@ -19,8 +19,8 @@
 - **TBB runtime**: Do not build or link `tbbmalloc_proxy` for NoSpherA2. The build scripts copy the core TBB runtime from `Lib/occ` into the executable/artifact layout.
 - **Submodule handling**: The repository relies on several git submodules. Before any build, run `git submodule update --init --recursive`.
 - **Static linking**: Most third‑party libraries (`featomic`, `libcint`, `occ`) are linked statically, with OpenMP/MKL and TBB runtime files deployed alongside the executable where needed.
-- **Visual Studio version 18**: Windows builds must always start the VS Developer Command Prompt (VS version 18 in the current environment) to set up the compiler, linker, and environment variables. Ensure the build step invokes `VsDevCmd.bat` (e.g., `call "%VSINSTALLDIR%\Common7\Tools\VsDevCmd.bat"`) before running `msbuild`.
-- **Windows CMake presets**: `windows-clang-cl` and `windows-msvc-debug` are both valid targeted flows. The `windows-msvc-debug` workflow preset is required by the Windows dependency build action.
+- **Visual Studio version 18**: Windows builds must always initialize the VS Developer environment (VS version 18 in the current environment) before running CMake, CTest, MSBuild, or VSTest. Ensure the command invokes `VsDevCmd.bat -arch=x64` first, in the same shell/session as the build command.
+- **Windows CMake presets**: use `release-windows` and `debug-windows`. If CMake or Ninja cannot find standard headers such as `cstddef`, `vector`, `windows.h`, or libraries such as `kernel32.lib`, the MSVC/Windows SDK environment was not initialized; rerun after `VsDevCmd.bat -arch=x64`.
 - **Test execution on Windows**: Use Visual Studio test tools (`vstest.console.exe`) when debugging native/OCC behavior. Also keep the Python pytest harness passing because CI and golden-file coverage depend on it.
   - Visual Studio tests must run NoSpherA2 in-process through `NoSpherA2_DLL.dll`. Do not add subprocess fallbacks for failing VS tests, including `alanine_integrated_occ`; keep them natively debuggable in the VSTest host and fix the underlying in-process issue.
  - **OCC build process**: The OCC source resides in `occ/`. Build it via CMake presets (e.g. `linux-occ-gcc`) or as part of the full-build presets.

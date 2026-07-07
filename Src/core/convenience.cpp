@@ -2565,6 +2565,9 @@ void options::digest_options()
             rgbi = true;
             rgbi_no_sym = true;
         }
+        else if (temp == "-rgbi_EVs") {
+            rgbi_EVs = true;
+        }
         else if (temp == "-rgbi-groups") {
             int n = 1;
             ivec2 group_set;

@@ -3998,80 +3998,127 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
 
 bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
 {
-    //We want to write a .47 file that looks like this according to the NBO manual:
-    /*
- $GENNBO NATOMS=7 NBAS=28 UPPER BODM FORMAT=PRECISE $END
- $NBO $END
- $COORD
- Methylamine in 3-21G basis set
- 6 6 0.745914 0.011106 0.000000
- 7 7 -0.721743 -0.071848 0.000000
- 1 1 1.042059 1.060105 0.000000
- 1 1 1.129298 -0.483355 0.892539
- 1 1 1.129298 -0.483355 -0.892539
- 1 1 -1.076988 0.386322 -0.827032
- 1 1 -1.076988 0.386322 0.827032
- $END
- $BASIS
-    CENTER = 1 1 1 1 1 1 1 1 1 2 2 2 2
-             2 2 2 2 2 3 3 4 4 5 5 6 6
-             7 7
-    LABEL = 1 1 101 102 103 1 101 102 103 1 1 101 102
-            103 1 101 102 103 1 1 1 1 1 1 1 1
-            1 1
- $END
- $CONTRACT
-  NSHELL = 16
-    NEXP = 27
-   NCOMP = 1 4 4 1 4 4 1 1 1 1 1 1 1
-           1 1 1
-   NPRIM = 3 2 1 3 2 1 2 1 2 1 2 1 2
-           1 2 1
-    NPTR = 1 4 6 7 10 12 13 15 16 18 19 21 22 24 25 27
-    EXP = 0.172256000000E+03 0.259109000000E+02 0.553335000000E+01
-          0.366498000000E+01 0.770545000000E+00 0.195857000000E+00
-          0.242766000000E+03 0.364851000000E+02 0.781449000000E+01
-          0.542522000000E+01 0.114915000000E+01 0.283205000000E+00
-          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00
-          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00
-          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00
-          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00
-          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00
-     CS = 0.617669074000E-01 0.358794043000E+00 0.700713084000E+00
-         -0.395895162000E+00 0.121583436000E+01 0.100000000000E+01
-          0.598657005000E-01 0.352955003000E+00 0.706513006000E+00
-         -0.413300077000E+00 0.122441727000E+01 0.100000000000E+01
-          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01
-          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01
-          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01
-          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01
-          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01
-     CP = 0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
-          0.236459947000E+00 0.860618806000E+00 0.100000000000E+01
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
-          0.237972016000E+00 0.858953059000E+00 0.100000000000E+01
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
-          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00
- $END
- $OVERLAP
-          0.100000000000E+01 0.191447444408E+00 0.100000000000E+01
- $END
- $DENSITY
-          0.203642496554E+01 0.110916720865E+00 0.103889621321E+00
- $END
- $LCAOMO
-         -0.581395484288E-03 -0.241638924924E-02 -0.179639931958E-02
- $END
-    */
     using namespace std;
 
     err_checkf(get_nr_basis_set_loaded() == ncen, "Can only write .47 file if basis set is present!", std::cout);
-    vec CMO;
-    vec CMO_beta;
-    vec norm_const;
+
+    struct NboShell {
+        int atom = 0;
+        int shell = 0;
+        int type = 0;
+        int nprim = 0;
+        int atom_prim_start = 0;
+        int internal_start = 0;
+        int nbo_start = 0;
+        int cart_components = 0;
+        int nbo_components = 0;
+    };
+
+    auto cart_component_count = [](const int type) {
+        switch (type) {
+        case 1: return 1;
+        case 2: return 3;
+        case 3: return 6;
+        case 4: return 10;
+        case 5: return 15;
+        default: return 0;
+        }
+    };
+
+    auto nbo_component_count = [](const int type) {
+        switch (type) {
+        case 1: return 1;
+        case 2: return 3;
+        case 3: return 5;
+        case 4: return 7;
+        case 5: return 9;
+        default: return 0;
+        }
+    };
+
+    auto nbo_labels = [](const int type) -> ivec {
+        switch (type) {
+        case 1: return { 1 };
+        case 2: return { 103, 101, 102 };
+        case 3: return { 255, 252, 253, 254, 251 };
+        case 4: return { 351, 352, 353, 354, 355, 356, 357 };
+        case 5: return { 451, 452, 453, 454, 455, 456, 457, 458, 459 };
+        default: return {};
+        }
+    };
+
+    vec2 p_pure_2_cart;
+    vec2 d_pure_2_cart;
+    vec2 f_pure_2_cart;
+    vec2 g_pure_2_cart;
+    err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart),
+        "Error creating spherical/cartesian conversion matrix", std::cout);
+
+    auto shell_transform = [&](const int type) {
+        const int cart_count = cart_component_count(type);
+        const int nbo_count = nbo_component_count(type);
+        vec2 transform(cart_count, vec(nbo_count, 0.0));
+        if (type == 1 || type == 2) {
+            for (int i = 0; i < cart_count; i++)
+                transform[i][i] = 1.0;
+        }
+        else if (type == 3) {
+            transform = d_pure_2_cart;
+        }
+        else if (type == 4) {
+            transform = f_pure_2_cart;
+        }
+        else if (type == 5) {
+            transform = g_pure_2_cart;
+        }
+        return transform;
+    };
+
+    auto project_to_nbo = [](const vec2& transform, const vec& cart_values) {
+        const int cart_count = static_cast<int>(transform.size());
+        const int nbo_count = cart_count == 0 ? 0 : static_cast<int>(transform[0].size());
+        vec2 normal(nbo_count, vec(nbo_count, 0.0));
+        vec rhs(nbo_count, 0.0);
+        for (int c = 0; c < cart_count; c++) {
+            for (int i = 0; i < nbo_count; i++) {
+                rhs[i] += transform[c][i] * cart_values[c];
+                for (int j = 0; j < nbo_count; j++)
+                    normal[i][j] += transform[c][i] * transform[c][j];
+            }
+        }
+        solve_linear_system(normal, rhs);
+        return rhs;
+    };
+
+    vector<NboShell> shells;
+    int internal_nao = 0;
+    int nbo_nao = 0;
+    int nbo_nexp = 0;
+    int highest_angular = -1;
+    for (int a = 0; a < get_ncen(); a++) {
+        for (int s = 0; s < get_atom_shell_count(a); s++) {
+            const int type = get_shell_type(a, s);
+            const int cart_count = cart_component_count(type);
+            const int nbo_count = nbo_component_count(type);
+            err_checkf(cart_count > 0 && nbo_count > 0, "Unsupported basis shell in .47 writer", std::cout);
+            NboShell shell;
+            shell.atom = a;
+            shell.shell = s;
+            shell.type = type;
+            shell.nprim = get_atom_shell_primitives(a, s);
+            shell.atom_prim_start = get_shell_start(a, s);
+            shell.internal_start = internal_nao;
+            shell.nbo_start = nbo_nao;
+            shell.cart_components = cart_count;
+            shell.nbo_components = nbo_count;
+            shells.push_back(shell);
+            internal_nao += cart_count;
+            nbo_nao += nbo_count;
+            nbo_nexp += shell.nprim;
+            highest_angular = std::max(highest_angular, type - 1);
+        }
+    }
+
     vec2 basis_coefficients(get_ncen());
 #pragma omp parallel for
     for (int a = 0; a < get_ncen(); a++)
@@ -4101,6 +4148,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
             basis_coefficients[a].push_back(temp_c);
         }
     }
+    vec norm_const;
     for (int a = 0; a < get_ncen(); a++)
     {
         double aiaj = 0.0;
@@ -4239,7 +4287,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
                 std::cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << endl;
         }
     }
-    unsigned int run = 0;
     vec2 changed_coefs;
     changed_coefs.resize(get_nmo());
 #pragma omp parallel for
@@ -4252,140 +4299,75 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
         }
     }
 
-    int nao = 0;
-    int nshell = 0;
+    const int alpha_mos = get_MO_op_count(0);
+    const int beta_mos = get_MO_op_count(1);
+    vec2 CMO(alpha_mos, vec(nbo_nao, 0.0));
+    vec2 CMO_beta(beta_mos, vec(nbo_nao, 0.0));
+    int alpha_run = 0;
+    int beta_run = 0;
     for (int m = 0; m < get_nmo(); m++)
     {
-        int run_2 = 0;
-        if (MOs[m].get_op() != 0)
+        if (MOs[m].get_op() != 0 && MOs[m].get_op() != 1)
             continue;
-        for (int a = 0; a < get_ncen(); a++)
-        {
-            for (int s = 0; s < get_atom_shell_count(a); s++)
-            {
-                // if (debug) std::cout << "Going to load the " << get_shell_start_in_primitives(a, s) << ". value\n"l;
-                switch (get_shell_type(a, s))
-                {
-                case 1:
-                    nao++;
-                    CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s)]);
-                    if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                        std::cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
-                    break;
-                case 2:
-                    nao += 3;
-                    for (int i = 0; i < 3; i++)
-                        CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
-                    if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                        std::cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
-                    break;
-                case 3:
-                    nao += 6;
-                    for (int i = 0; i < 6; i++)
-                        CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
-                    if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                        std::cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
-                    break;
-                case 4:
-                    nao += 10;
-                    // this hardcoded piece is due to the order of f-type functions in the fchk
-                    for (int i = 0; i < 10; i++)
-                        CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
-                    if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                        std::cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
-                    break;
-                }
-                run_2++;
-            }
-            if (debug && m == 0)
-                std::cout << "finished with atom!" << endl;
+        vec* target = nullptr;
+        if (MOs[m].get_op() == 0) {
+            target = &CMO[alpha_run++];
         }
-        if (debug)
-            std::cout << "finished with MO!" << endl;
-        if (nshell != run_2)
-            nshell = run_2;
-    }
-    if (multi != 1)
-    {
-        for (int m = 0; m < nmo; m++)
-        {
-            if (MOs[m].get_op() != 1)
-                continue;
-            int run_2 = 0;
-            for (int a = 0; a < get_ncen(); a++)
-            {
-                for (int s = 0; s < get_atom_shell_count(a); s++)
-                {
-                    if (debug)
-                        std::cout << "Going to load the " << get_shell_start_in_primitives(a, s) << ". value" << endl;
-                    switch (get_shell_type(a, s))
-                    {
-                    case 1:
-                        CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s)]);
-                        if (m == 0)
-                            nao++;
-                        if (debug && get_atom_shell_primitives(a, s) != 1)
-                            std::cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
-                        break;
-                    case 2:
-                        for (int i = 0; i < 3; i++)
-                            CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
-                        if (debug && get_atom_shell_primitives(a, s) != 1)
-                            std::cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
-                        if (m == 0)
-                            nao += 3;
-                        break;
-                    case 3:
-                        for (int i = 0; i < 6; i++)
-                            CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
-                        if (debug && get_atom_shell_primitives(a, s) != 1)
-                            std::cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
-                        if (m == 0)
-                            nao += 6;
-                        break;
-                    case 4:
-                        // this hardcoded piece is due to the order of f-type functions in the fchk
-                        for (int i = 0; i < 10; i++)
-                            CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
-                        if (debug && get_atom_shell_primitives(a, s) != 1)
-                            std::cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
-                        if (m == 0)
-                            nao += 10;
-                        break;
-                    }
-                    run_2++;
-                }
-                if (debug)
-                    std::cout << "finished with atom!" << endl;
+        else {
+            target = &CMO_beta[beta_run++];
+        }
+        for (const auto& shell : shells) {
+            vec cart_values(shell.cart_components, 0.0);
+            const int primitive_start = get_shell_start_in_primitives(shell.atom, shell.shell);
+            double contraction = 0.0;
+            for (int p = 0; p < shell.nprim; p++) {
+                contraction = get_atom_basis_set_coefficient(shell.atom, shell.atom_prim_start + p);
+                if (std::abs(contraction) > 1E-14)
+                    break;
             }
-            if (debug)
-                std::cout << "finished with MO!" << endl;
-            if (nshell != run_2)
-                nshell = run_2;
+            err_checkf(std::abs(contraction) > 1E-14, "Cannot reconstruct pure MO coefficients for .47 output", std::cout);
+            for (int c = 0; c < shell.cart_components; c++)
+                cart_values[c] = get_MO_coef(m, primitive_start + c) / contraction;
+            const vec nbo_values = project_to_nbo(shell_transform(shell.type), cart_values);
+            for (int c = 0; c < shell.nbo_components; c++)
+                (*target)[shell.nbo_start + c] = nbo_values[c];
         }
     }
-    int naotr = nao * (nao + 1) / 2;
+    int naotr = nbo_nao * (nbo_nao + 1) / 2;
     vec CDM(naotr, 0.0);
-    for (int iu = 0; iu < nao; iu++)
-    {
-#pragma omp parallel for
-        for (int iv = 0; iv <= iu; iv++)
-        {
+    for (int iu = 0; iu < nbo_nao; iu++) {
+        for (int iv = 0; iv <= iu; iv++) {
             const int iuv = (iu * (iu + 1) / 2) + iv;
-            double occ;
-            for (int m = 0; m < get_nmo(); m++)
-            {
-                occ = get_MO_occ(m);
-                if (occ == 0.0)
-                    continue;
-                if (MOs[m].get_op() == 0)
-                {
-                    CDM[iuv] += occ * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
+            int alpha_index = 0;
+            int beta_index = 0;
+            for (int m = 0; m < get_nmo(); m++) {
+                const double occ = get_MO_occ(m);
+                if (MOs[m].get_op() == 0) {
+                    if (occ != 0.0)
+                        CDM[iuv] += occ * CMO[alpha_index][iu] * CMO[alpha_index][iv];
+                    alpha_index++;
                 }
-                else if (MOs[m].get_op() == 1)
-                {
-                    CDM[iuv] += occ * CMO_beta[iu + ((m % nao) * nao)] * CMO_beta[iv + ((m % nao) * nao)];
+                else if (MOs[m].get_op() == 1) {
+                    if (occ != 0.0)
+                        CDM[iuv] += occ * CMO_beta[beta_index][iu] * CMO_beta[beta_index][iv];
+                    beta_index++;
                 }
+            }
+        }
+    }
+    if (static_cast<int>(DM.extent(0)) == nbo_nao && static_cast<int>(DM.extent(1)) == nbo_nao) {
+        ivec dm_to_nbo(nbo_nao, 0);
+        for (const auto& shell : shells) {
+            for (int c = 0; c < shell.nbo_components; c++) {
+                const auto offset = constants::orca_2_pySCF(shell.type - 1, c);
+                err_checkf(offset.has_value(), "Unsupported NBO AO order in .47 density writer", std::cout);
+                dm_to_nbo[shell.nbo_start + c] = shell.nbo_start + static_cast<int>(offset.value());
+            }
+        }
+        for (int iu = 0; iu < nbo_nao; iu++) {
+            for (int iv = 0; iv <= iu; iv++) {
+                const int iuv = (iu * (iu + 1) / 2) + iv;
+                CDM[iuv] = DM(dm_to_nbo[iu], dm_to_nbo[iv]);
             }
         }
     }
@@ -4394,10 +4376,76 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
     Int_Params int_params(*this);
 
     compute2C<Overlap2C_CRT>(int_params, OVLP_matrix);
-    //We have the overlap matrix, now write it to file
+    dMatrixRef2 OVLP_cart(OVLP_matrix.data(), internal_nao, internal_nao);
+    vec2 transform_global(internal_nao, vec(nbo_nao, 0.0));
+    for (const auto& shell : shells) {
+        const vec2 transform = shell_transform(shell.type);
+        for (int i = 0; i < shell.cart_components; i++)
+            for (int j = 0; j < shell.nbo_components; j++)
+                transform_global[shell.internal_start + i][shell.nbo_start + j] = transform[i][j];
+    }
+    vec2 OVLP_nbo(nbo_nao, vec(nbo_nao, 0.0));
+    for (int i = 0; i < nbo_nao; i++) {
+        for (int j = 0; j < nbo_nao; j++) {
+            double value = 0.0;
+            for (int ci = 0; ci < internal_nao; ci++)
+                for (int cj = 0; cj < internal_nao; cj++)
+                    value += transform_global[ci][i] * OVLP_cart(ci, cj) * transform_global[cj][j];
+            OVLP_nbo[i][j] = value;
+        }
+    }
+    for (const auto& shell_i : shells) {
+        for (const auto& shell_j : shells) {
+            if (shell_i.atom != shell_j.atom)
+                continue;
+            if (shell_i.type != shell_j.type) {
+                for (int i = 0; i < shell_i.nbo_components; i++)
+                    for (int j = 0; j < shell_j.nbo_components; j++)
+                        OVLP_nbo[shell_i.nbo_start + i][shell_j.nbo_start + j] = 0.0;
+            }
+            else if (shell_i.shell == shell_j.shell) {
+                for (int i = 0; i < shell_i.nbo_components; i++)
+                    for (int j = 0; j < shell_j.nbo_components; j++)
+                        OVLP_nbo[shell_i.nbo_start + i][shell_j.nbo_start + j] = i == j ? 1.0 : 0.0;
+            }
+        }
+    }
+    if (alpha_mos == nbo_nao) {
+        dMatrix2 pure_mo(nbo_nao, nbo_nao);
+        for (int m = 0; m < nbo_nao; m++)
+            for (int ao = 0; ao < nbo_nao; ao++)
+                pure_mo(m, ao) = CMO[m][ao];
+        const dMatrix2 pure_mo_inverse = LAPACKE_invert(pure_mo, 1E-12);
+        for (int i = 0; i < nbo_nao; i++) {
+            for (int j = 0; j < nbo_nao; j++) {
+                double value = 0.0;
+                for (int m = 0; m < nbo_nao; m++)
+                    value += pure_mo_inverse(i, m) * pure_mo_inverse(j, m);
+                OVLP_nbo[i][j] = value;
+            }
+        }
+    }
+    vec2 FOCK_nbo;
+    if (alpha_mos == nbo_nao) {
+        FOCK_nbo = vec2(nbo_nao, vec(nbo_nao, 0.0));
+        for (int i = 0; i < nbo_nao; i++) {
+            for (int j = 0; j < nbo_nao; j++) {
+                double value = 0.0;
+                for (int m = 0; m < nbo_nao; m++) {
+                    double left = 0.0;
+                    double right = 0.0;
+                    for (int k = 0; k < nbo_nao; k++) {
+                        left += OVLP_nbo[i][k] * CMO[m][k];
+                        right += CMO[m][k] * OVLP_nbo[k][j];
+                    }
+                    value += left * get_MO_energy(m) * right;
+                }
+                FOCK_nbo[i][j] = value;
+            }
+        }
+    }
 
     ofstream rf(fileName, ios::out);
-    string line;
     stringstream stream;
     if (!rf.is_open())
     {
@@ -4405,156 +4453,155 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
         return false;
     }
 
-    rf << " $GENNBO NATOMS=" << ncen << " NBAS=" << nex << " UPPER BODM FORMAT=PRECISE $END" << endl;
-    rf << " $NBO NBO NRT $END" << endl;
+    auto write_int_array = [&](const string& name, const ivec& values, const int per_line, const int continuation_indent) {
+        rf << name;
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0 && i % per_line == 0)
+                rf << "\n" << string(continuation_indent, ' ');
+            rf << setw(5) << values[i];
+        }
+        rf << endl;
+    };
+
+    auto format_precise_value = [](const double value) {
+        if (value == 0.0)
+            return string("  0.000000000000E+00");
+
+        const double abs_value = std::abs(value);
+        const int exponent = static_cast<int>(std::floor(std::log10(abs_value))) + 1;
+        double mantissa = value / std::pow(10.0, exponent);
+        int adjusted_exponent = exponent;
+        if (std::abs(mantissa) >= 1.0) {
+            mantissa /= 10.0;
+            adjusted_exponent++;
+        }
+
+        stringstream local;
+        local << fixed << setprecision(12) << mantissa;
+        if (local.str().rfind("1.", 0) == 0 || local.str().rfind("-1.", 0) == 0) {
+            mantissa /= 10.0;
+            adjusted_exponent++;
+            local.str("");
+            local.clear();
+            local << fixed << setprecision(12) << mantissa;
+        }
+        string result = local.str() + "E" + (adjusted_exponent >= 0 ? "+" : "-");
+        result += (std::abs(adjusted_exponent) < 10 ? "0" : "") + std::to_string(std::abs(adjusted_exponent));
+        return string(std::max(0, 20 - static_cast<int>(result.size())), ' ') + result;
+    };
+
+    auto write_real_array = [&](const string& name, const vec& values) {
+        rf << name;
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0 && i % 3 == 0)
+                rf << "\n" << string(10, ' ');
+            rf << format_precise_value(values[i]);
+        }
+        rf << endl;
+    };
+
+    rf << " $GENNBO NATOMS=" << ncen << " NBAS=" << nbo_nao << " UPPER BODM FORMAT=PRECISE $END" << endl;
+    rf << " $NBO $END" << endl;
     rf << " $COORD" << endl;
     rf << " .47 file generated by NoSpherA2 based on " << path << endl;
     for (int i = 0; i < ncen; i++)
-        //To-do: Fix second charge mention for ECPs depending on the mode of the wfn / maybe by file type?!
-        rf << " " << setw(2) << get_atom_charge(i) << " " << setw(2) << get_atom_charge(i) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 0) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 1) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 2) << endl;
+    {
+        const int atomic_number = get_atom_charge(i);
+        const int nuclear_charge = atomic_number - get_atom_ECP_electrons(i);
+        rf << " " << setw(5) << atomic_number << setw(5) << nuclear_charge
+            << fixed << setprecision(6) << setw(15) << constants::bohr2ang(get_atom_coordinate(i, 0))
+            << fixed << setprecision(6) << setw(15) << constants::bohr2ang(get_atom_coordinate(i, 1))
+            << fixed << setprecision(6) << setw(15) << constants::bohr2ang(get_atom_coordinate(i, 2)) << endl;
+    }
     rf << " $END" << endl;
+
+    ivec nbo_centers;
+    ivec labels;
+    for (const auto& shell : shells) {
+        const ivec shell_labels = nbo_labels(shell.type);
+        for (int label : shell_labels) {
+            nbo_centers.push_back(shell.atom + 1);
+            labels.push_back(label);
+        }
+    }
     rf << " $BASIS" << endl;
-    rf << "    CENTER = ";
-    for (int i = 0; i < nex; i++) {
-        rf << centers.at(i) << " ";
-        if (i % 13 == 0 && i != 0)
-            rf << "\n             ";
-    }
-    rf.flush();
-    rf << "\n    LABEL = ";
+    write_int_array("  CENTER =", nbo_centers, 11, 10);
+    write_int_array("   LABEL =", labels, 11, 10);
+    rf << " $END" << endl;
 
-    int highest_angular = -1;
-    for (int i = 0; i < nex; i++) {
-        rf << constants::type_2_nbo(types.at(i)) << " ";
-        if (i % 13 == 0 && i != 0)
-            rf << "\n             ";
-    }
-    rf.flush();
-    rf << "\n $END" << endl;
-
-    string comp_string = "";
-    string exp_string = "";
-    string nprim_string = "";
-    string nptr_string = "";
-    svec cx_string(5);
-    nshell = 0;
-    for (int i = 0; i < nex; i++) {
-        string nr = to_string(constants::type_2_nbo(types.at(i)));
-        if (nr.back() == '1') {
-            nshell++;
-            if (nr == "1") {
-                comp_string += "  1 ";
-                cx_string[0] += "0.100000000000E+01 ";
-                cx_string[1] += "0.000000000000E+00 ";
-                cx_string[2] += "0.000000000000E+00 ";
-                cx_string[3] += "0.000000000000E+00 ";
-                cx_string[4] += "0.000000000000E+00 ";
-                highest_angular = std::max(highest_angular, 0);
-            }
-            else if (nr.front() == '1') {
-                comp_string += "  3 ";
-                cx_string[0] += "0.000000000000E+00 ";
-                cx_string[1] += "0.100000000000E+01 ";
-                cx_string[2] += "0.000000000000E+00 ";
-                cx_string[3] += "0.000000000000E+00 ";
-                cx_string[4] += "0.000000000000E+00 ";
-                highest_angular = std::max(highest_angular, 1);
-            }
-            else if (nr.front() == '2') {
-                comp_string += "  6 ";
-                cx_string[0] += "0.000000000000E+00 ";
-                cx_string[1] += "0.000000000000E+00 ";
-                cx_string[2] += "0.100000000000E+01 ";
-                cx_string[3] += "0.000000000000E+00 ";
-                cx_string[4] += "0.000000000000E+00 ";
-                highest_angular = std::max(highest_angular, 2);
-            }
-            else if (nr.front() == '3') {
-                comp_string += " 10 ";
-                cx_string[0] += "0.000000000000E+00 ";
-                cx_string[1] += "0.000000000000E+00 ";
-                cx_string[2] += "0.000000000000E+00 ";
-                cx_string[3] += "0.100000000000E+01 ";
-                cx_string[4] += "0.000000000000E+00 ";
-                highest_angular = std::max(highest_angular, 3);
-            }
-            else if (nr.front() == '4') {
-                comp_string += " 15 ";
-                cx_string[0] += "0.000000000000E+00 ";
-                cx_string[1] += "0.000000000000E+00 ";
-                cx_string[2] += "0.000000000000E+00 ";
-                cx_string[3] += "0.000000000000E+00 ";
-                cx_string[4] += "0.100000000000E+01 ";
-                highest_angular = std::max(highest_angular, 4);
-            }
-            stream << setw(18) << scientific << setprecision(11) << exponents.at(i);
-            exp_string += stream.str();
-            stream.str("");
-            nprim_string += "  1 ";
-            stream << setw(4) << to_string(i + 1);
-            nptr_string += stream.str();
-            stream.str("");
-            if ((nshell % 13) == 0 && i != 0) {
-                comp_string += "\n            ";
-                nprim_string += "\n            ";
-                nptr_string += "\n           ";
-            }
-            if ((nshell % 3) == 0 && i != 0) {
-                exp_string += "\n          ";
-                for (int j = 0; j < 5; j++)
-                    cx_string[j] += "\n           ";
-            }
+    ivec ncomp;
+    ivec nprim;
+    ivec nptr;
+    vec exp_values;
+    vec2 contract_values(5, vec(nbo_nexp, 0.0));
+    int exp_index = 0;
+    for (const auto& shell : shells) {
+        ncomp.push_back(shell.nbo_components);
+        nprim.push_back(shell.nprim);
+        nptr.push_back(exp_index + 1);
+        for (int p = 0; p < shell.nprim; p++) {
+            exp_values.push_back(get_atom_basis_set_exponent(shell.atom, shell.atom_prim_start + p));
+            contract_values[shell.type - 1][exp_index] = get_atom_basis_set_coefficient(shell.atom, shell.atom_prim_start + p);
+            exp_index++;
         }
     }
+
     rf << " $CONTRACT" << endl;
-    rf << "  NSHELL = " << nshell << endl;
-    rf << "    NEXP = " << nshell << endl;
-    rf << "   NCOMP =  " << comp_string << endl;
-    rf << "   NPRIM =  " << nprim_string << endl;
-    rf << "    NPTR = " << nptr_string << endl;
-    rf << "     EXP =" << exp_string << endl;
-    if (highest_angular >= 0) rf << "      CS = " << cx_string[0] << endl;
-    if (highest_angular >= 1) rf << "      CP = " << cx_string[1] << endl;
-    if (highest_angular >= 2) rf << "      CD = " << cx_string[2] << endl;
-    if (highest_angular >= 3) rf << "      CF = " << cx_string[3] << endl;
-    if (highest_angular >= 4) rf << "      CG = " << cx_string[4] << endl;
+    rf << "  NSHELL =" << setw(6) << shells.size() << endl;
+    rf << "    NEXP =" << setw(6) << nbo_nexp << endl;
+    write_int_array("   NCOMP =", ncomp, 11, 10);
+    write_int_array("   NPRIM =", nprim, 11, 10);
+    write_int_array("    NPTR =", nptr, 11, 10);
+    write_real_array("     EXP =", exp_values);
+    if (highest_angular >= 0) write_real_array("      CS =", contract_values[0]);
+    if (highest_angular >= 1) write_real_array("      CP =", contract_values[1]);
+    if (highest_angular >= 2) write_real_array("      CD =", contract_values[2]);
+    if (highest_angular >= 3) write_real_array("      CF =", contract_values[3]);
+    if (highest_angular >= 4) write_real_array("      CG =", contract_values[4]);
     rf << " $END" << endl;
-    rf << " $OVERLAP " << endl;
-    dMatrixRef2 OVLP_mat(OVLP_matrix.data(), nao, nao);
-    int runner = 0;
-    for (int i = 0; i < nao; i++) {
-        for (int j = i; j < nao; j++) {
-            runner++;
-            stream.str("");
-            stream << uppercase << scientific << showpoint << setprecision(12) << setw(19) << OVLP_mat(i, j);
-            rf << stream.str() << " ";
-            if (runner % 3 == 0)
-                rf << "\n";
-        }
-    }
-    rf << " $END" << endl;
-    rf << " $DENSITY " << endl;
-    for (int i = 0; i < naotr; i++) {
-        stream.str("");
-        stream << uppercase << scientific << showpoint << setprecision(12) << setw(19) << CDM[i];
-        rf << stream.str() << " ";
-        if ((i + 1) % 3 == 0)
+    auto write_precise_value = [&](const double value, int& count) {
+        rf << format_precise_value(value);
+        count++;
+        if (count % 4 == 0)
             rf << "\n";
-    }
+    };
+
+    rf << " $OVERLAP" << endl;
+    int runner = 0;
+    for (int i = 0; i < nbo_nao; i++)
+        for (int j = 0; j <= i; j++)
+            write_precise_value(OVLP_nbo[i][j], runner);
+    if (runner % 4 != 0)
+        rf << "\n";
     rf << " $END" << endl;
-    rf << " $LCAOMO " << endl;
-    for (int mo_counter = 0; mo_counter < nao; mo_counter++)
+    rf << " $DENSITY" << endl;
+    runner = 0;
+    for (int i = 0; i < naotr; i++)
+        write_precise_value(CDM[i], runner);
+    if (runner % 4 != 0)
+        rf << "\n";
+    rf << " $END" << endl;
+    if (!FOCK_nbo.empty()) {
+        rf << " $FOCK" << endl;
+        runner = 0;
+        for (int i = 0; i < nbo_nao; i++)
+            for (int j = 0; j <= i; j++)
+                write_precise_value(FOCK_nbo[i][j], runner);
+        if (runner % 4 != 0)
+            rf << "\n";
+        rf << " $END" << endl;
+    }
+    rf << " $LCAOMO" << endl;
+    runner = 0;
+    for (int mo_counter = 0; mo_counter < std::min(alpha_mos, nbo_nao); mo_counter++)
     {
         if (debug)
             std::cout << "Writing MO #" << mo_counter + 1 << "...\n";
-        for (int i = 0; i < nao; i++) {
-            stream.str("");
-            stream << uppercase << scientific << showpoint << setprecision(12) << setw(19) << CMO[mo_counter * nao + i];
-            rf << stream.str() << " ";
-            if ((i + 1) % 3 == 0)
-                rf << "\n";
-        }
+        for (int i = 0; i < nbo_nao; i++)
+            write_precise_value(CMO[mo_counter][i], runner);
     }
+    if (runner % 4 != 0)
+        rf << "\n";
     rf << " $END" << endl;
     rf.close();
     return true;
