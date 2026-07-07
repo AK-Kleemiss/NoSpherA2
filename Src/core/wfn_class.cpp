@@ -3996,11 +3996,34 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     return true;
 };
 
-bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
+bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, std::ostream* progress_log)
 {
     using namespace std;
 
     err_checkf(get_nr_basis_set_loaded() == ncen, "Can only write .47 file if basis set is present!", std::cout);
+    const auto nbo_start_time = std::chrono::high_resolution_clock::now();
+    auto progress_elapsed_seconds = [&]() {
+        return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - nbo_start_time).count();
+    };
+    auto progress = [&](const std::string& message) {
+        if (progress_log != nullptr) {
+            *progress_log << "[FILE47] " << message << " (" << progress_elapsed_seconds() << " s)" << std::endl;
+            progress_log->flush();
+        }
+    };
+    auto progress_percent = [&](const std::string& label, const int completed, const int total, int& next_percent) {
+        if (progress_log == nullptr || total <= 0)
+            return;
+        const int percent = static_cast<int>((100LL * completed) / total);
+        if (percent >= next_percent || completed == total) {
+            *progress_log << "[FILE47] " << label << " " << percent << "% (" << completed << "/" << total << ", "
+                          << progress_elapsed_seconds() << " s)" << std::endl;
+            progress_log->flush();
+            next_percent = percent + 10;
+        }
+    };
+
+    progress("Starting .47 conversion to " + fileName.string());
 
     struct NboShell {
         int atom = 0;
@@ -4118,7 +4141,12 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
             highest_angular = std::max(highest_angular, type - 1);
         }
     }
+    progress("Built NBO shell model: atoms=" + std::to_string(get_ncen()) +
+        ", shells=" + std::to_string(shells.size()) +
+        ", NBO basis functions=" + std::to_string(nbo_nao) +
+        ", primitives=" + std::to_string(nbo_nexp));
 
+    progress("Normalizing basis coefficients");
     vec2 basis_coefficients(get_ncen());
 #pragma omp parallel for
     for (int a = 0; a < get_ncen(); a++)
@@ -4301,14 +4329,19 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
 
     const int alpha_mos = get_MO_op_count(0);
     const int beta_mos = get_MO_op_count(1);
+    progress("Reconstructing MO coefficients in NBO AO order: alpha=" + std::to_string(alpha_mos) +
+        ", beta=" + std::to_string(beta_mos));
     vec2 CMO(alpha_mos, vec(nbo_nao, 0.0));
     vec2 CMO_beta(beta_mos, vec(nbo_nao, 0.0));
     int alpha_run = 0;
     int beta_run = 0;
+    int mo_progress_next = 10;
+    int mo_seen = 0;
     for (int m = 0; m < get_nmo(); m++)
     {
         if (MOs[m].get_op() != 0 && MOs[m].get_op() != 1)
             continue;
+        mo_seen++;
         vec* target = nullptr;
         if (MOs[m].get_op() == 0) {
             target = &CMO[alpha_run++];
@@ -4332,7 +4365,9 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
             for (int c = 0; c < shell.nbo_components; c++)
                 (*target)[shell.nbo_start + c] = nbo_values[c];
         }
+        progress_percent("MO coefficient reconstruction", mo_seen, alpha_mos + beta_mos, mo_progress_next);
     }
+    progress("Building density matrix");
     int naotr = nbo_nao * (nbo_nao + 1) / 2;
     vec CDM(naotr, 0.0);
     for (int iu = 0; iu < nbo_nao; iu++) {
@@ -4375,7 +4410,9 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
     vec OVLP_matrix = {};
     Int_Params int_params(*this);
 
+    progress("Computing Cartesian AO overlap integrals");
     compute2C<Overlap2C_CRT>(int_params, OVLP_matrix);
+    progress("Transforming overlap matrix to NBO AO order");
     dMatrixRef2 OVLP_cart(OVLP_matrix.data(), internal_nao, internal_nao);
     vec2 transform_global(internal_nao, vec(nbo_nao, 0.0));
     for (const auto& shell : shells) {
@@ -4385,6 +4422,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
                 transform_global[shell.internal_start + i][shell.nbo_start + j] = transform[i][j];
     }
     vec2 OVLP_nbo(nbo_nao, vec(nbo_nao, 0.0));
+    int overlap_progress_next = 10;
     for (int i = 0; i < nbo_nao; i++) {
         for (int j = 0; j < nbo_nao; j++) {
             double value = 0.0;
@@ -4393,6 +4431,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
                     value += transform_global[ci][i] * OVLP_cart(ci, cj) * transform_global[cj][j];
             OVLP_nbo[i][j] = value;
         }
+        progress_percent("Overlap transform", i + 1, nbo_nao, overlap_progress_next);
     }
     for (const auto& shell_i : shells) {
         for (const auto& shell_j : shells) {
@@ -4411,6 +4450,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
         }
     }
     if (alpha_mos == nbo_nao) {
+        progress("Reconstructing overlap from MO inverse for a square alpha coefficient matrix");
         dMatrix2 pure_mo(nbo_nao, nbo_nao);
         for (int m = 0; m < nbo_nao; m++)
             for (int ao = 0; ao < nbo_nao; ao++)
@@ -4427,7 +4467,9 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
     }
     vec2 FOCK_nbo;
     if (alpha_mos == nbo_nao) {
+        progress("Building Fock matrix from MO energies");
         FOCK_nbo = vec2(nbo_nao, vec(nbo_nao, 0.0));
+        int fock_progress_next = 10;
         for (int i = 0; i < nbo_nao; i++) {
             for (int j = 0; j < nbo_nao; j++) {
                 double value = 0.0;
@@ -4442,7 +4484,11 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
                 }
                 FOCK_nbo[i][j] = value;
             }
+            progress_percent("Fock build", i + 1, nbo_nao, fock_progress_next);
         }
+    }
+    else {
+        progress("Skipping Fock matrix: alpha MO count does not match NBO basis size");
     }
 
     ofstream rf(fileName, ios::out);
@@ -4452,6 +4498,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
         std::cout << "Sorry, can't open the file...\n";
         return false;
     }
+    progress("Writing FILE47 sections");
 
     auto write_int_array = [&](const string& name, const ivec& values, const int per_line, const int continuation_indent) {
         rf << name;
@@ -4604,6 +4651,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug)
         rf << "\n";
     rf << " $END" << endl;
     rf.close();
+    progress("Finished .47 conversion");
     return true;
 };
 

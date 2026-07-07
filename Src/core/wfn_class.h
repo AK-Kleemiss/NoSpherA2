@@ -245,7 +245,7 @@ public:
     /** Write current wavefunction to .wfn file (optionally only occupied). */
     bool write_wfn(const std::filesystem::path& fileName, const bool& debug, const bool occupied) const;
     /** Write current wavefunction to .47 file (optionally only occupied). */
-    bool write_nbo(const std::filesystem::path& fileName, const bool& debug);
+    bool write_nbo(const std::filesystem::path& fileName, const bool& debug, std::ostream* progress_log = nullptr);
     /** Write atomic geometry to .xyz file. */
     bool write_xyz(const std::filesystem::path& fileName);
     /** Set internal path field. */

@@ -170,6 +170,27 @@ TEST(Nbo47, EpoxideGbwWritesValidFile47)
     EXPECT_EQ(lcaomo.size(), static_cast<size_t>(nbasis * nbasis));
 }
 
+TEST(Nbo47, WriteNboReportsProgressWhenRequested)
+{
+    const auto root = repo_root();
+    const auto fixture_dir = root / "tests" / "epoxide_gbw" / "NBO";
+    const auto input_gbw = fixture_dir / "epoxide.gbw";
+    ASSERT_TRUE(std::filesystem::exists(input_gbw));
+
+    const auto temp_dir = make_temp_dir();
+    const auto generated_47 = temp_dir / "epoxide.47";
+
+    WFN wave(input_gbw, false);
+    std::ostringstream progress_log;
+    ASSERT_TRUE(wave.write_nbo(generated_47, false, &progress_log));
+
+    const std::string log_text = progress_log.str();
+    EXPECT_NE(log_text.find("[FILE47] Starting .47 conversion"), std::string::npos);
+    EXPECT_NE(log_text.find("[FILE47] Computing Cartesian AO overlap integrals"), std::string::npos);
+    EXPECT_NE(log_text.find("[FILE47] Writing FILE47 sections"), std::string::npos);
+    EXPECT_NE(log_text.find("[FILE47] Finished .47 conversion"), std::string::npos);
+}
+
 TEST(Nbo47, EpoxideGennboMatchesReferenceWhenAvailable)
 {
     if (!wsl_gennbo_available()) {

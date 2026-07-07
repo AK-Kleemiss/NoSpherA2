@@ -2177,7 +2177,7 @@ void options::digest_options()
             std::filesystem::path _wfn = arguments[i + 1];
             WFN wavy(e_origin::NOT_YET_DEFINED);
             wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
-            wavy.write_nbo(_wfn.replace_extension(".47"), debug);
+            wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout);
             exit(0);
         }
         else if (temp == "-convert_XCW")
