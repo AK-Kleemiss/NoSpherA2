@@ -170,8 +170,6 @@ install(
         ${FEATOMIC_LIBS}
         ${METATENSOR_LIBS}
     DESTINATION lib
-    FILES_MATCHING
-        PATTERN "*.lib"
 )
 
 # featomic public C API headers
