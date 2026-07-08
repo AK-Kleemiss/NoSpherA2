@@ -70,11 +70,13 @@ private:
     std::vector<dMatrix2> overlap_matrices;
     std::vector<bond_index_result> RGBI;
     std::vector<group_bond_index_result> RGBI_groups;
+    ivec ano_fallback_atoms;
     NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
         const std::vector<int>& atom_indices, const ivec& shell_angular_momenta = {},
-        bool spherical = false, bool EVs = false);
+        bool spherical = false, double occupancy_cutoff = 0.17,
+        int leading_orbitals_to_skip = 0, , bool EVs = false);
     double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
-    void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool EVs= false);
+    void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool use_ano_basis, bool EVs= false);
     ivec find_eigenvalue_pairs(const vec& eigvals, const double tolerance = 1E-4);
     void transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& EVC,
         const vec& eigvals,
@@ -97,10 +99,7 @@ public:
     Roby_information() = default;
     ~Roby_information() = default;
     Roby_information(const Roby_information&) = default;
-    Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool EVs = false);
-
-
-
+    Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool use_ano_basis = false, bool EVs = false);
 
 };
 

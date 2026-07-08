@@ -26,6 +26,18 @@ int run_app(int argc, char **argv)
     opt.cwd = cwd;
     vector<WFN> wavy;
 
+    if (opt.promol_nci)
+    {
+        promolecular_nci_analysis(
+            opt.promol_nci_xyz1,
+            opt.promol_nci_xyz2,
+            opt.properties,
+            std::cout);
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf);
+        return 0;
+    }
+
     log_file << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {
@@ -436,7 +448,8 @@ int run_app(int argc, char **argv)
         log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
         if (opt.rgbi) {
-            Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym, opt.rgbi_EVs);
+            Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym,
+                opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs);
         }
 
         // this one is for generation of an fchk file

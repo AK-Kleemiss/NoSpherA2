@@ -59,6 +59,48 @@ add_subdirectory(
     EXCLUDE_FROM_ALL
 )
 
+# Patch libcint GCC ivdep pragmas for MSVC without modifying the submodule.
+if(MSVC)
+    set(_libcint_ivdep_pragma
+        "#if defined(_MSC_VER)\n#pragma loop(ivdep)\n#elif defined(__GNUC__) || defined(__clang__)\n#pragma GCC ivdep\n#endif"
+    )
+
+    get_target_property(_cint_sources cint SOURCES)
+
+    foreach(_libcint_ivdep_source IN ITEMS
+        "src/cart2sph.c"
+        "src/g1e_grids.c"
+        "src/fblas.c"
+    )
+        set(_libcint_ivdep_in
+            "${CMAKE_CURRENT_SOURCE_DIR}/libcint/${_libcint_ivdep_source}"
+        )
+        set(_libcint_ivdep_out
+            "${CMAKE_CURRENT_BINARY_DIR}/patched/libcint/${_libcint_ivdep_source}"
+        )
+
+        file(READ "${_libcint_ivdep_in}" _libcint_ivdep_text)
+        string(REPLACE
+            "#pragma GCC ivdep"
+            "${_libcint_ivdep_pragma}"
+            _libcint_ivdep_text
+            "${_libcint_ivdep_text}"
+        )
+
+        get_filename_component(_libcint_ivdep_out_dir
+            "${_libcint_ivdep_out}"
+            DIRECTORY
+        )
+        file(MAKE_DIRECTORY "${_libcint_ivdep_out_dir}")
+        file(WRITE "${_libcint_ivdep_out}" "${_libcint_ivdep_text}")
+
+        list(REMOVE_ITEM _cint_sources "${_libcint_ivdep_source}")
+        list(APPEND _cint_sources "${_libcint_ivdep_out}")
+    endforeach()
+
+    set_target_properties(cint PROPERTIES SOURCES "${_cint_sources}")
+endif()
+
 if(NOT TARGET cint)
     message(FATAL_ERROR
         "The bundled libcint project did not define the target 'cint'"

@@ -390,7 +390,7 @@ static UT_Result run_inprocess_test(const std::filesystem::path& repo_root,
     }
 
     // Inject OCC_DATA_PATH for in-process runs.
-    const std::string occDataPath = (repo_root / "Lib" / "occ" / "share" / "occ").string();
+    const std::string occDataPath = (repo_root / "occ" / "share").string();
 #ifdef _WIN32
     _putenv_s("OCC_DATA_PATH", occDataPath.c_str());
 #else
@@ -516,6 +516,12 @@ TEST(TomlIntegrationTests, Properties)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, IntermolecularNCI)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "intermolecular_nci");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, RiFit)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit");
@@ -582,21 +588,27 @@ TEST(TomlIntegrationTests, TFVCEcp)
     EXPECT_TRUE(result.success) << result.message;
 }
 
-TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3)
-{
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3");
-    EXPECT_TRUE(result.success) << result.message;
-}
-
 TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_sym)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_sym");
     EXPECT_TRUE(result.success) << result.message;
 }
 
-TEST(TomlIntegrationTests, RGBI_Groups_NH3Li)
+TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_sym_ANO)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3Li");
+    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_sym_ANO");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, RGBI_NH3Li)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, RGBI_NH3Li_ANO)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_ANO");
     EXPECT_TRUE(result.success) << result.message;
 }
 }

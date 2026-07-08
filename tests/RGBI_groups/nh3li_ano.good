@@ -1,0 +1,60 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                                  "nh3li.gbw" done!
+Number of atoms in Wavefunction file: 5 Number of MOs: 126
+Calculating ANOs for all atoms...                  ...done!
+ANO fallback summary: no atom-level fallbacks were needed.
+Calculating Population for all atoms...            ...done.
+
+Total Population: 9.24434
+
+[      Calculating Atomic Populations     ]
+[-----------------------------------------] 100% 
+Population of atom 0: 7.2517
+Population of atom 1: 1.45528
+Population of atom 2: 1.45436
+Population of atom 3: 1.45542
+Population of atom 4: 1.11289
+[       Calculating Bond Populations      ]
+[-----------------------------------------] 100% 
+
+Roby-Gould Bond Indices (RGBI) Analysis
+----------------------------------------------
+Number of electrons in system:         13
+Number of electrons in Roby Analysis:  9.24434
+Percentage of electrons accounted for: 71.11 %
+----------------------------------------------
+
+
+Atom Nr        Els       n_A     n_B    n_AB    s_AB    Cov.    Ion.    Tot.   Pyth.   Arak.
+--------------------------------------------------------------------------------------------
+   0 -   4    N - Li   7.252   1.113   8.262   0.102   0.171   0.410   0.444  14.824  25.161
+   0 -   1    N -  H   7.252   1.455   7.841   0.866   0.628   0.249   0.675  86.365  75.923
+   0 -   2    N -  H   7.252   1.454   7.840   0.866   0.627   0.250   0.675  86.293  75.856
+   0 -   3    N -  H   7.252   1.455   7.841   0.866   0.628   0.249   0.675  86.376  75.933
+--------------------------------------------------------------------------------------------
+
+
+Roby-Gould Bond Indices (RGBI) - Group Analysis
+----------------------------------------------
+Groups defined:
+  G0: atoms 0(N), 1(H), 2(H), 3(H)
+  G1: atoms 4(Li)
+----------------------------------------------
+
+Group populations:
+  Population of G0 (NH3)                8.37023
+  Population of G1 (Li)                 1.11289
+----------------------------------------------
+
+Group             n_G1    n_G2  n_G1G2  s_G1G2    Cov.    Ion.    Tot.   Pyth.   Arak.
+------------------------------------------------------------------------------------------
+G0 - G1          8.370   1.113   9.244   0.239   0.249   0.138   0.285  76.641  67.887
+------------------------------------------------------------------------------------------

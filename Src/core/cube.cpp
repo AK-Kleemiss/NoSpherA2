@@ -251,21 +251,20 @@ bool cube::write_file(bool force, bool absolute)
         }
     }
     using namespace std;
-    std::stringstream stream;
-    std::string temp;
-    std::ofstream of(path, std::ios::out);
+    std::vector<char> file_buffer(16 * 1024 * 1024);
+    std::ofstream of;
+    of.rdbuf()->pubsetbuf(file_buffer.data(), static_cast<std::streamsize>(file_buffer.size()));
+    of.open(path, std::ios::out);
     of << comment1 << endl;
     of << comment2 << endl;
     of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << endl;
     for (int i = 0; i < 3; i++)
     {
-        stream << setw(5) << size[i];
+        of << setw(5) << size[i];
         for (int j = 0; j < 3; j++)
-            stream << fixed << setw(12) << setprecision(6) << vectors[i][j];
-        stream << endl;
+            of << fixed << setw(12) << setprecision(6) << vectors[i][j];
+        of << endl;
     }
-    of << stream.str();
-    stream.str("");
     for (int i = 0; i < na; i++)
     {
         of << setw(5) << parent_wavefunction->get_atom_charge(i) << setw(5) << parent_wavefunction->get_atom_charge(i) << ".000000";
@@ -273,6 +272,7 @@ bool cube::write_file(bool force, bool absolute)
             of << fixed << setw(12) << setprecision(6) << parent_wavefunction->get_atom_coordinate(i, j);
         of << endl;
     }
+    of << uppercase << scientific << setprecision(5);
     for (int run_x = 0; run_x < size[0]; run_x++)
     {
         for (int run_y = 0; run_y < size[1]; run_y++)
@@ -281,18 +281,16 @@ bool cube::write_file(bool force, bool absolute)
             while (temp_write < size[2])
             {
                 if (absolute)
-                    stream << uppercase << scientific << setw(13) << setprecision(5) << abs(values[run_x][run_y][temp_write]);
+                    of << setw(13) << abs(values[run_x][run_y][temp_write]);
                 else
-                    stream << uppercase << scientific << setw(13) << setprecision(5) << values[run_x][run_y][temp_write];
+                    of << setw(13) << values[run_x][run_y][temp_write];
                 temp_write++;
                 if (temp_write % 6 == 0)
-                    stream << endl;
+                    of << '\n';
             }
             if (temp_write % 6 != 0)
-                stream << endl;
+                of << '\n';
         }
-        of << stream.str();
-        stream.str("");
     }
     return (true);
 };
@@ -300,9 +298,10 @@ bool cube::write_file(bool force, bool absolute)
 bool cube::write_file(const std::filesystem::path &given_path, bool debug)
 {
     using namespace std;
-    stringstream stream;
-    string temp;
-    ofstream of(given_path, ios::out);
+    std::vector<char> file_buffer(16 * 1024 * 1024);
+    ofstream of;
+    of.rdbuf()->pubsetbuf(file_buffer.data(), static_cast<std::streamsize>(file_buffer.size()));
+    of.open(given_path, ios::out);
     of << comment1 << "\n";
     of << comment2 << "\n";
     of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(5) << setprecision(6) << origin[2] << "\n";
@@ -323,13 +322,15 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
     if (debug)
         std::cout << "Finished atoms!" << endl;
     if (get_loaded())
+    {
+        of << uppercase << scientific << setprecision(5);
         for (int run_x = 0; run_x < size[0]; run_x++)
             for (int run_y = 0; run_y < size[1]; run_y++)
             {
                 int temp_write = 0;
                 while (temp_write < size[2])
                 {
-                    of << uppercase << scientific << setw(13) << setprecision(5) << values[run_x][run_y][temp_write];
+                    of << setw(13) << values[run_x][run_y][temp_write];
                     temp_write++;
                     if (temp_write % 6 == 0)
                         of << "\n";
@@ -339,6 +340,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
                 if (temp_write % 6 != 0)
                     of << "\n";
             }
+    }
     else
     {
         ifstream f(path, ios::in);
@@ -743,7 +745,11 @@ double cube::ewald_sum(const int kMax, const double conv) {
 #pragma omp parallel for reduction(+:temp)
                     for (int d1 = 0; d1 < size[0]; d1++) {
                         double v1 = 0, kDotR = 0;
-#pragma ivdep
+#if defined(_MSC_VER)
+#pragma loop(ivdep)
+#elif defined(__GNUC__) || defined(__clang__)
+#pragma GCC ivdep
+#endif
                         for (int d2 = 0; d2 < size[1]; d2++) {
                             for (int d3_ = 0; d3_ < size[2]; d3_++) {
                                 v1 = values[d1][d2][d3_];
@@ -1115,6 +1121,91 @@ bool cube::set_origin(unsigned int i, double value)
         return (false);
     return (true);
 };
+
+bool cube::find_value_bounds(i3 &lower, i3 &upper, double ignore_value, double tolerance, int padding) const
+{
+    if (!loaded || size[0] <= 0 || size[1] <= 0 || size[2] <= 0)
+        return false;
+
+    lower = { size[0], size[1], size[2] };
+    upper = { -1, -1, -1 };
+
+    for (int x = 0; x < size[0]; x++)
+    {
+        for (int y = 0; y < size[1]; y++)
+        {
+            for (int z = 0; z < size[2]; z++)
+            {
+                const double value = values[x][y][z];
+                if (!std::isfinite(value))
+                    continue;
+                if (std::abs(value - ignore_value) <= tolerance)
+                    continue;
+
+                lower[0] = std::min(lower[0], x);
+                lower[1] = std::min(lower[1], y);
+                lower[2] = std::min(lower[2], z);
+                upper[0] = std::max(upper[0], x);
+                upper[1] = std::max(upper[1], y);
+                upper[2] = std::max(upper[2], z);
+            }
+        }
+    }
+
+    if (upper[0] < 0)
+        return false;
+
+    for (int i = 0; i < 3; i++)
+    {
+        lower[i] = std::max(0, lower[i] - padding);
+        upper[i] = std::min(size[i] - 1, upper[i] + padding);
+    }
+    return true;
+}
+
+bool cube::shrink_to_bounds(const i3 &lower, const i3 &upper)
+{
+    if (!loaded)
+        return false;
+    for (int i = 0; i < 3; i++)
+        if (lower[i] < 0 || upper[i] < lower[i] || upper[i] >= size[i])
+            return false;
+
+    const i3 new_size = {
+        upper[0] - lower[0] + 1,
+        upper[1] - lower[1] + 1,
+        upper[2] - lower[2] + 1
+    };
+    const d3 new_origin = get_pos(lower[0], lower[1], lower[2]);
+
+    vec3 new_values(new_size[0]);
+#pragma omp parallel for
+    for (int x = 0; x < new_size[0]; x++)
+    {
+        new_values[x].resize(new_size[1]);
+        for (int y = 0; y < new_size[1]; y++)
+        {
+            new_values[x][y].resize(new_size[2]);
+            for (int z = 0; z < new_size[2]; z++)
+                new_values[x][y][z] = values[x + lower[0]][y + lower[1]][z + lower[2]];
+        }
+    }
+
+    size = new_size;
+    origin = new_origin;
+    values = std::move(new_values);
+    calc_dv();
+    return true;
+}
+
+bool cube::shrink_to_values(double ignore_value, double tolerance, int padding)
+{
+    i3 lower;
+    i3 upper;
+    if (!find_value_bounds(lower, upper, ignore_value, tolerance, padding))
+        return false;
+    return shrink_to_bounds(lower, upper);
+}
 
 std::filesystem::path cube::super_cube()
 {

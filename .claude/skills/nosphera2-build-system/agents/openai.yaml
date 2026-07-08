@@ -1,0 +1,4 @@
+interface:
+  display_name: "NoSpherA2 Build System"
+  short_description: "Current CMake presets and tests"
+  default_prompt: "Use $nosphera2-build-system to inspect, build, test, or update the current NoSpherA2 CMake preset workflow."

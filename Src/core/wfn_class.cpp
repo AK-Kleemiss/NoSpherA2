@@ -8822,9 +8822,11 @@ const void WFN::computeLapELI(
     Lap = Hess[0] + Hess[1] + Hess[2];
 };
 
-//WTF?! Not having this leads to undefined behaviour on Roky apparently but not Ubuntu/Windows?!
+//WTF?! Not having this leads to undefined behaviour on Rocky apparently but not Ubuntu/Windows?!
+#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC push_options
 #pragma GCC optimize ("O3")
+#endif
 const double WFN::computeLap(
     const d3 &PosGrid // [3] vector with current position on te grid
 ) const
@@ -8953,7 +8955,9 @@ const double WFN::computeLap(
     }
     return Hess[0] + Hess[1] + Hess[2];
 };
+#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC pop_options
+#endif
 
 const double WFN::computeMO(
     const d3 &PosGrid, // [3] array with current position on the grid

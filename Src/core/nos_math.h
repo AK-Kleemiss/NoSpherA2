@@ -149,6 +149,13 @@ void get_submatrices(const T2& D_full, const T2& S_full, T& D_sub, T& S_sub, con
 //calculates the Moore-Penrose pseudo-inverse of a matrix A using SVD
 dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5);
 
+// Symmetric eigendecomposition of A (n x n, row-major). On return, W holds the
+// ascending eigenvalues and A holds the eigenvectors as columns, row-major
+// (eigenvector j is {A[0*n+j], A[1*n+j], ..., A[(n-1)*n+j]}) on both MKL/LAPACKE
+// and Accelerate backends. Returns false (leaving A/W unspecified) if the
+// underlying dsyev call fails to converge, instead of aborting.
+bool try_make_Eigenvalues(vec& A, vec& W);
+// Same as try_make_Eigenvalues but aborts via err_checkf on failure.
 void make_Eigenvalues(vec& A, vec& W);
 vec mat_sqrt(vec& A, vec& W, const double cutoff = 1E-5);
 

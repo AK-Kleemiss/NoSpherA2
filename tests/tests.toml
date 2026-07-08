@@ -39,13 +39,6 @@ mtc_mult = [1, 1]
 mtc_ECP = [0, 0]
 mtc_charge = [0, 0]
 
-[fourier_transform]
-directory = "SALTED"
-
-[fourier_transform.args]
-test_analytical = true
-acc = 1
-
 [fractal]
 directory = "sucrose_fchk_SF"
 good = "fractal.good"
@@ -86,12 +79,6 @@ wfn = "malbac.gbw"
 acc = 1
 ECP = 1
 
-[openBLAS]
-directory = "OpenBLAS"
-
-[openBLAS.args]
-blastest = true
-
 [properties]
 directory = "sucrose_fchk_SF"
 
@@ -104,11 +91,16 @@ DEF = true
 eli = true
 resolution = 1.5
 
-[reading_SALTED]
-directory = "SALTED"
+[intermolecular_nci]
+directory = "intermolecular_nci"
+good = "good.dat"
+actual = "unit_surrounding_values.dat"
 
-[reading_SALTED.args]
-test_reading_SALTED_binary = true
+[intermolecular_nci.args]
+resolution = 0.5
+radius = 0.5
+promol_nci = ["unit.xyz", "surrounding.xyz"]
+promol_nci_single_thread = true
 
 [ri_fit]
 directory = "epoxide_gbw"
@@ -235,15 +227,6 @@ dmin = 0.84
 acc = 1
 ECP = 1
 
-[RGBI_Groups_NH3BH3]
-directory = "RGBI_groups"
-good = "NH3BH3.good"
-
-[RGBI_Groups_NH3BH3.args]
-wfn = "nh3bh3.gbw"
-rgbi_no_sym = ""
-rgbi-groups = ["0,4,5,7","1,2,3,6"]
-
 [RGBI_Groups_NH3BH3_sym]
 directory = "RGBI_groups"
 good = "NH3BH3_sym.good"
@@ -253,18 +236,31 @@ wfn = "nh3bh3.gbw"
 rgbi = ""
 rgbi-groups = ["0,4,5,7","1,2,3,6"]
 
-[RGBI_Groups_NH3Li]
+[RGBI_Groups_NH3BH3_sym_ANO]
 directory = "RGBI_groups"
-good = "nh3li.good"
+good = "NH3BH3_sym_ano.good"
 
-[RGBI_Groups_NH3Li.args]
-wfn = "nh3li.gbw"
-rgbi_no_sym = ""
-rgbi-groups = ["0,1,2,3","4"]
+[RGBI_Groups_NH3BH3_sym_ANO.args]
+wfn = "nh3bh3.gbw"
+rgbi = ""
+rgbi_basis = "ano"
+rgbi-groups = ["0,4,5,7","1,2,3,6"]
 
-[fourier_transform_full]
-directory = "SALTED"
-full = true
+[RGBI_NH3Li]
+directory = "RGBI"
+good = "nh3li_nao.good"
 
-[fourier_transform_full.args]
-test_analytical = "full"
+[RGBI_NH3Li.args]
+wfn = "../RGBI_groups/nh3li.gbw"
+rgbi = ""
+
+[RGBI_NH3Li_ANO]
+directory = "RGBI"
+good = "nh3li_ano.good"
+
+[RGBI_NH3Li_ANO.args]
+wfn = "../RGBI_groups/nh3li.gbw"
+rgbi = ""
+rgbi_basis = "ano"
+
+

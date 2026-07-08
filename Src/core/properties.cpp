@@ -662,6 +662,506 @@ void Calc_MO(
     print_time(start, end, file);
 };
 
+namespace {
+
+struct PromolecularFragmentDensities {
+    double rho1 = 0.0;
+    double rho2 = 0.0;
+
+    double total() const
+    {
+        return rho1 + rho2;
+    }
+};
+
+struct PromolecularAtom {
+    d3 pos;
+    int charge = 1;
+    int fragment = 0;
+};
+
+std::vector<Thakkar> make_thakkar_interpolators()
+{
+    // atom_models[atom.charge - 1] is the lookup convention (see
+    // promolecular_fragment_densities_at), so index a must hold atomic
+    // number a+1, not a=0 (which would build a bogus atomic-number-0 model
+    // and read Thakkar_ns/np/nd/nf out of bounds for every real element).
+    std::vector<Thakkar> atom_models;
+    atom_models.reserve(92);
+    for (int a = 0; a < 92; a++)
+    {
+        atom_models.emplace_back(a + 1);
+        atom_models[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
+    }
+    return atom_models;
+}
+
+double cube_value_clamped(const cube &source, int x, int y, int z)
+{
+    x = std::clamp(x, 0, source.get_size(0) - 1);
+    y = std::clamp(y, 0, source.get_size(1) - 1);
+    z = std::clamp(z, 0, source.get_size(2) - 1);
+    return source.get_value(x, y, z);
+}
+
+double cube_axis_step(const cube &source, int axis)
+{
+    double sum = 0.0;
+    for (int i = 0; i < 3; i++)
+        sum += source.get_vector(i, axis) * source.get_vector(i, axis);
+    return std::sqrt(sum);
+}
+
+PromolecularFragmentDensities promolecular_fragment_densities_at(
+    const d3 &pos,
+    const std::vector<PromolecularAtom> &atoms,
+    const std::vector<Thakkar> &atom_models)
+{
+    PromolecularFragmentDensities result;
+    for (const PromolecularAtom &atom : atoms)
+    {
+        // Cubic-spline (not linear) table lookup: lambda2_at() differentiates this
+        // field twice via finite differences, and a linear interpolant's curvature
+        // discontinuities at each table node otherwise show up as sign noise in the
+        // (often small) lambda2 that drives NCI coloring.
+        const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(array_length(pos, atom.pos));
+        if (atom.fragment == 1)
+            result.rho1 += contribution;
+        else
+            result.rho2 += contribution;
+    }
+    return result;
+}
+
+bool is_promolecular_nci_point(
+    const PromolecularFragmentDensities &densities,
+    double total_density,
+    double dominant_density_cutoff,
+    double fragment_sum_cutoff)
+{
+    total_density = std::abs(total_density);
+    if (total_density <= 1E-20)
+        return false;
+
+    const double fragment_density = densities.total();
+    if (fragment_density <= 1E-20)
+        return false;
+
+    if (std::max(densities.rho1, densities.rho2) >= fragment_density * dominant_density_cutoff)
+        return false;
+
+    return fragment_density >= total_density * fragment_sum_cutoff;
+}
+
+double reduced_density_gradient_at(const cube &rho_cube, int x, int y, int z)
+{
+    const double rho = std::abs(rho_cube.get_value(x, y, z));
+    if (rho <= 1E-20)
+        return 0.0;
+
+    const double hx = cube_axis_step(rho_cube, 0);
+    const double hy = cube_axis_step(rho_cube, 1);
+    const double hz = cube_axis_step(rho_cube, 2);
+
+    const double gx = (cube_value_clamped(rho_cube, x + 1, y, z) - cube_value_clamped(rho_cube, x - 1, y, z)) / (2.0 * hx);
+    const double gy = (cube_value_clamped(rho_cube, x, y + 1, z) - cube_value_clamped(rho_cube, x, y - 1, z)) / (2.0 * hy);
+    const double gz = (cube_value_clamped(rho_cube, x, y, z + 1) - cube_value_clamped(rho_cube, x, y, z - 1)) / (2.0 * hz);
+
+    const double grad_norm = std::sqrt(gx * gx + gy * gy + gz * gz);
+    const double rdg_factor = 2.0 * std::pow(3.0 * constants::PI * constants::PI, 1.0 / 3.0);
+    return grad_norm / (rdg_factor * std::pow(rho, 4.0 / 3.0));
+}
+
+double lambda2_at(const cube &rho_cube, int x, int y, int z)
+{
+    const double hx = cube_axis_step(rho_cube, 0);
+    const double hy = cube_axis_step(rho_cube, 1);
+    const double hz = cube_axis_step(rho_cube, 2);
+    const double center = cube_value_clamped(rho_cube, x, y, z);
+
+    double hessian[9]{};
+    hessian[0] = (cube_value_clamped(rho_cube, x + 1, y, z) - 2.0 * center + cube_value_clamped(rho_cube, x - 1, y, z)) / (hx * hx);
+    hessian[4] = (cube_value_clamped(rho_cube, x, y + 1, z) - 2.0 * center + cube_value_clamped(rho_cube, x, y - 1, z)) / (hy * hy);
+    hessian[8] = (cube_value_clamped(rho_cube, x, y, z + 1) - 2.0 * center + cube_value_clamped(rho_cube, x, y, z - 1)) / (hz * hz);
+
+    hessian[1] = hessian[3] =
+        (cube_value_clamped(rho_cube, x + 1, y + 1, z) -
+            cube_value_clamped(rho_cube, x + 1, y - 1, z) -
+            cube_value_clamped(rho_cube, x - 1, y + 1, z) +
+            cube_value_clamped(rho_cube, x - 1, y - 1, z)) / (4.0 * hx * hy);
+    hessian[2] = hessian[6] =
+        (cube_value_clamped(rho_cube, x + 1, y, z + 1) -
+            cube_value_clamped(rho_cube, x + 1, y, z - 1) -
+            cube_value_clamped(rho_cube, x - 1, y, z + 1) +
+            cube_value_clamped(rho_cube, x - 1, y, z - 1)) / (4.0 * hx * hz);
+    hessian[5] = hessian[7] =
+        (cube_value_clamped(rho_cube, x, y + 1, z + 1) -
+            cube_value_clamped(rho_cube, x, y + 1, z - 1) -
+            cube_value_clamped(rho_cube, x, y - 1, z + 1) +
+            cube_value_clamped(rho_cube, x, y - 1, z - 1)) / (4.0 * hy * hz);
+
+    return get_lambda_1(hessian);
+}
+
+void add_promolecular_atoms(
+    const WFN &fragment,
+    int fragment_id,
+    std::vector<PromolecularAtom> &atoms)
+{
+    for (int i = 0; i < fragment.get_ncen(); i++)
+    {
+        PromolecularAtom atom_entry;
+        atom_entry.pos = fragment.get_atom_pos(i);
+        atom_entry.charge = fragment.get_atom_charge(i);
+        atom_entry.fragment = fragment_id;
+        atoms.push_back(atom_entry);
+    }
+}
+
+void add_atoms_to_combined_wfn(const WFN &fragment, WFN &combined)
+{
+    for (int i = 0; i < fragment.get_ncen(); i++)
+        combined.push_back_atom(
+            fragment.get_atom_label(i),
+            fragment.get_atom_coordinate(i, 0),
+            fragment.get_atom_coordinate(i, 1),
+            fragment.get_atom_coordinate(i, 2),
+            fragment.get_atom_charge(i));
+}
+
+std::string tcl_quote_path(const std::filesystem::path &path)
+{
+    const std::string input = path.generic_string();
+    std::string output = "\"";
+    for (const char c : input)
+    {
+        if (c == '\\' || c == '"' || c == '$' || c == '[' || c == ']')
+            output += '\\';
+        output += c;
+    }
+    output += '"';
+    return output;
+}
+
+void write_promolecular_nci_vmd(
+    const std::filesystem::path &xyz1,
+    const std::filesystem::path &xyz2,
+    const std::filesystem::path &output_base,
+    std::ostream &log)
+{
+    const std::filesystem::path signed_rho_path = output_base.string() + "_signed_rho.cube";
+    const std::filesystem::path rdg_path = output_base.string() + "_rdg.cube";
+    const std::filesystem::path vmd_path = output_base.string() + "_nci.vmd";
+
+    std::ofstream vmd_file(vmd_path, std::ios::out);
+    err_checkf(vmd_file.good(), "Could not open " + vmd_path.string() + " for writing.", log);
+
+    vmd_file
+        << "# VMD visualization for promolecular NCI/RDG analysis\n"
+        << "# Load with: vmd -e " << vmd_path.filename().string() << "\n"
+        << "display projection Orthographic\n"
+        << "display depthcue off\n"
+        << "axes location Off\n"
+        << "color Display Background white\n"
+        << "color scale method BGR\n"
+        << "\n"
+        << "mol new " << tcl_quote_path(std::filesystem::absolute(xyz1)) << " type xyz waitfor all\n"
+        << "set frag1 [molinfo top]\n"
+        << "mol delrep 0 $frag1\n"
+        << "mol representation CPK\n"
+        << "mol color Name\n"
+        << "mol selection all\n"
+        << "mol material Opaque\n"
+        << "mol addrep $frag1\n"
+        << "\n"
+        << "mol new " << tcl_quote_path(std::filesystem::absolute(xyz2)) << " type xyz waitfor all\n"
+        << "set frag2 [molinfo top]\n"
+        << "mol delrep 0 $frag2\n"
+        << "mol representation CPK\n"
+        << "mol color Name\n"
+        << "mol selection all\n"
+        << "mol material Opaque\n"
+        << "mol addrep $frag2\n"
+        << "\n"
+        << "mol new " << tcl_quote_path(std::filesystem::absolute(signed_rho_path)) << " type cube first 0 last -1 step 1 waitfor 1 volsets {0 }\n"
+        << "set nci [molinfo top]\n"
+        << "mol delrep 0 $nci\n"
+        << "mol addfile " << tcl_quote_path(std::filesystem::absolute(rdg_path)) << " type cube first 0 last -1 step 1 waitfor 1 volsets {0 } $nci\n"
+        << "while {[molinfo $nci get numreps] > 0} {\n"
+        << "    mol delrep 0 $nci\n"
+        << "}\n"
+        << "mol addrep $nci\n"
+        << "mol modselect 0 $nci all\n"
+        << "mol modstyle 0 $nci Isosurface 0.5 1 0 0 1 1\n"
+        << "mol modcolor 0 $nci Volume 0\n"
+        << "mol modmaterial 0 $nci Opaque\n"
+        << "mol colupdate 0 $nci on\n"
+        << "mol scaleminmax $nci 0 -2.0 2.0\n"
+        << "color scale method BGR\n"
+        << "color scale midpoint 0.5\n"
+        << "\n"
+        << "display resetview\n";
+
+    log << "Wrote " << vmd_path << std::endl;
+}
+
+void write_promolecular_nci_plot_script(
+    const std::filesystem::path &output_base,
+    const properties_options &opts,
+    std::ostream &log)
+{
+    const std::filesystem::path values_path = output_base.string() + "_values.dat";
+    const std::filesystem::path plot_path = output_base.string() + "_plot.py";
+
+    std::ofstream plot_file(plot_path, std::ios::out);
+    err_checkf(plot_file.good(), "Could not open " + plot_path.string() + " for writing.", log);
+
+    plot_file
+        << "from pathlib import Path\n"
+        << "import sys\n"
+        << "\n"
+        << "import matplotlib.pyplot as plt\n"
+        << "import numpy as np\n"
+        << "from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm\n"
+        << "\n"
+        << "def read_float_arg(name, default):\n"
+        << "    if name not in sys.argv[1:]:\n"
+        << "        return default\n"
+        << "    idx = sys.argv.index(name)\n"
+        << "    if idx + 1 >= len(sys.argv):\n"
+        << "        raise SystemExit(f\"{name} requires a numeric value\")\n"
+        << "    return float(sys.argv[idx + 1])\n"
+        << "\n"
+        << "dat_path = Path(__file__).with_name(" << std::quoted(values_path.filename().string()) << ")\n"
+        << "data = np.loadtxt(dat_path, comments=\"#\")\n"
+        << "if data.ndim == 1:\n"
+        << "    data = data.reshape(1, -1)\n"
+        << "\n"
+        << "signed_rho = data[:, 0]\n"
+        << "rdg = data[:, 1]\n"
+        << "xmax = " << std::setprecision(16) << opts.promol_nci_rho_abs_max << "\n"
+        << "ymax = " << std::setprecision(16) << opts.promol_nci_rdg_max << "\n"
+        << "xmax = read_float_arg(\"-xmax\", None if xmax < 0.0 else xmax)\n"
+        << "ymax = read_float_arg(\"-ymax\", None if ymax < 0.0 else ymax)\n"
+        << "mask = np.ones_like(signed_rho, dtype=bool)\n"
+        << "if xmax is not None:\n"
+        << "    mask &= np.abs(signed_rho) <= xmax\n"
+        << "if ymax is not None:\n"
+        << "    mask &= rdg <= ymax\n"
+        << "signed_rho = signed_rho[mask]\n"
+        << "rdg = rdg[mask]\n"
+        << "if signed_rho.size == 0:\n"
+        << "    raise SystemExit(\"No points remain after applying plot limits\")\n"
+        << "rho_min = float(np.min(signed_rho))\n"
+        << "rho_max = float(np.max(signed_rho))\n"
+        << "\n"
+        << "cmap = LinearSegmentedColormap.from_list(\"nci_bgr\", [\"blue\", \"green\", \"red\"])\n"
+        << "if rho_min < 0.0 < rho_max:\n"
+        << "    norm = TwoSlopeNorm(vmin=rho_min, vcenter=0.0, vmax=rho_max)\n"
+        << "else:\n"
+        << "    norm = None\n"
+        << "\n"
+        << "fig, ax = plt.subplots(figsize=(7.0, 5.0), constrained_layout=True)\n"
+        << "scatter = ax.scatter(signed_rho, rdg, c=signed_rho, s=4, cmap=cmap, norm=norm, linewidths=0)\n"
+        << "ax.axvline(0.0, color=\"0.65\", linewidth=0.8)\n"
+        << "ax.set_xlabel(\"signed rho\")\n"
+        << "ax.set_ylabel(\"RDG\")\n"
+        << "if xmax is not None:\n"
+        << "    ax.set_xlim(-xmax, xmax)\n"
+        << "if ymax is not None:\n"
+        << "    ax.set_ylim(0.0, ymax)\n"
+        << "ax.set_title(dat_path.stem.replace(\"_values\", \"\"))\n"
+        << "cbar = fig.colorbar(scatter, ax=ax)\n"
+        << "cbar.set_label(\"signed rho\")\n"
+        << "png_path = dat_path.with_name(dat_path.stem.replace(\"_values\", \"_plot\") + \".png\")\n"
+        << "fig.savefig(png_path, dpi=300)\n"
+        << "print(f\"Wrote {png_path}\")\n"
+        << "if \"-show\" in sys.argv[1:]:\n"
+        << "    plt.show()\n"
+        << "else:\n"
+        << "    plt.close(fig)\n";
+
+    log << "Wrote " << plot_path << std::endl;
+}
+
+} // namespace
+
+void promolecular_nci_analysis(
+    const std::filesystem::path &xyz1,
+    const std::filesystem::path &xyz2,
+    const properties_options &opts,
+    std::ostream &log)
+{
+    using namespace std;
+
+    err_checkf(std::filesystem::exists(xyz1), "First XYZ file does not exist: " + xyz1.string(), log);
+    err_checkf(std::filesystem::exists(xyz2), "Second XYZ file does not exist: " + xyz2.string(), log);
+
+    WFN fragment1(e_origin::xyz);
+    WFN fragment2(e_origin::xyz);
+    fragment1.read_xyz(xyz1, log, false);
+    fragment2.read_xyz(xyz2, log, false);
+
+    WFN combined(e_origin::xyz);
+    combined.set_path(xyz1.parent_path() / (xyz1.stem().string() + "_" + xyz2.stem().string() + ".xyz"));
+    add_atoms_to_combined_wfn(fragment1, combined);
+    add_atoms_to_combined_wfn(fragment2, combined);
+
+    properties_options local_opts = opts;
+    readxyzMinMax_fromWFN(combined, local_opts, true);
+    err_checkf(local_opts.NbSteps[0] > 1 && local_opts.NbSteps[1] > 1 && local_opts.NbSteps[2] > 1,
+        "Promolecular NCI grid is too small; decrease -resolution or increase -radius.", log);
+
+    const std::filesystem::path output_base =
+        xyz1.parent_path() / (xyz1.stem().string() + "_" + xyz2.stem().string());
+
+    vector<PromolecularAtom> atoms;
+    atoms.reserve(fragment1.get_ncen() + fragment2.get_ncen());
+    add_promolecular_atoms(fragment1, 1, atoms);
+    add_promolecular_atoms(fragment2, 2, atoms);
+    const vector<Thakkar> atom_models = make_thakkar_interpolators();
+
+    cube rho_cube(local_opts.NbSteps, combined.get_ncen(), true);
+    cube signed_rho_cube(local_opts.NbSteps, combined.get_ncen(), true);
+    cube rdg_cube(local_opts.NbSteps, combined.get_ncen(), true);
+    rho_cube.give_parent_wfn(combined);
+    signed_rho_cube.give_parent_wfn(combined);
+    rdg_cube.give_parent_wfn(combined);
+
+    for (int i = 0; i < 3; i++)
+    {
+        const double step = (local_opts.MinMax[i + 3] - local_opts.MinMax[i]) / local_opts.NbSteps[i];
+        rho_cube.set_origin(i, local_opts.MinMax[i]);
+        signed_rho_cube.set_origin(i, local_opts.MinMax[i]);
+        rdg_cube.set_origin(i, local_opts.MinMax[i]);
+        rho_cube.set_vector(i, i, step);
+        signed_rho_cube.set_vector(i, i, step);
+        rdg_cube.set_vector(i, i, step);
+    }
+    rho_cube.calc_dv();
+    signed_rho_cube.calc_dv();
+    rdg_cube.calc_dv();
+
+    rho_cube.set_comment1("Promolecular density using Thakkar spherical atoms");
+    rho_cube.set_comment2("from " + xyz1.string() + " and " + xyz2.string());
+    signed_rho_cube.set_comment1("Promolecular signed density using Thakkar spherical atoms");
+    signed_rho_cube.set_comment2("from " + xyz1.string() + " and " + xyz2.string());
+    rdg_cube.set_comment1("Promolecular reduced density gradient using Thakkar spherical atoms");
+    rdg_cube.set_comment2("from " + xyz1.string() + " and " + xyz2.string());
+
+    log << "Promolecular NCI analysis for " << xyz1 << " and " << xyz2 << endl;
+    log << "Grid points: " << local_opts.n_grid_points() << endl;
+    log << "Dominant-fragment density discard cutoff: " << opts.promol_nci_rcut1 << endl;
+    log << "Fragment-sum density keep cutoff: " << opts.promol_nci_rcut2 << endl;
+
+    ProgressBar density_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular rho");
+#pragma omp parallel for schedule(dynamic)
+    for (int x = 0; x < rho_cube.get_size(0); x++)
+    {
+        for (int y = 0; y < rho_cube.get_size(1); y++)
+            for (int z = 0; z < rho_cube.get_size(2); z++)
+            {
+                const d3 pos = rho_cube.get_pos(x, y, z);
+                const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms, atom_models);
+                const double rho = densities.total();
+                rho_cube.set_value(x, y, z, rho);
+                rdg_cube.set_value(
+                    x,
+                    y,
+                    z,
+                    is_promolecular_nci_point(densities, rho, opts.promol_nci_rcut1, opts.promol_nci_rcut2) ? 1.0 : 101.0);
+            }
+        density_progress.update();
+    }
+    std::cout << std::endl;
+
+    i3 shrink_lower;
+    i3 shrink_upper;
+    if (rdg_cube.find_value_bounds(shrink_lower, shrink_upper, 101.0))
+    {
+        rho_cube.shrink_to_bounds(shrink_lower, shrink_upper);
+        signed_rho_cube.shrink_to_bounds(shrink_lower, shrink_upper);
+        rdg_cube.shrink_to_bounds(shrink_lower, shrink_upper);
+        log << "Shrunk promolecular NCI work grid to "
+            << rdg_cube.get_size(0) << " x "
+            << rdg_cube.get_size(1) << " x "
+            << rdg_cube.get_size(2)
+            << " grid points, ignoring RDG mask value 101." << endl;
+    }
+
+    ofstream values_file(output_base.string() + "_values.dat", ios::out);
+    err_checkf(values_file.good(), "Could not open " + output_base.string() + "_values.dat for writing.", log);
+    values_file << "# signed_rho rdg\n";
+    values_file << "# rcut1 " << opts.promol_nci_rcut1 << " rcut2 " << opts.promol_nci_rcut2 << "\n";
+
+    unsigned long long kept_points = 0;
+#ifdef _OPENMP
+    // schedule(dynamic) below makes the mapping of grid points to threads (and
+    // therefore the row order in values_by_thread) non-deterministic between
+    // runs; -promol_nci_single_thread pins this region to one thread so output
+    // ordering is reproducible, e.g. for golden-file test generation.
+    const int nci_write_threads = opts.promol_nci_single_threaded ? 1 : omp_get_max_threads();
+#else
+    const int nci_write_threads = 1;
+#endif
+    std::vector<std::ostringstream> values_by_thread(nci_write_threads);
+    ProgressBar rdg_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular RDG");
+#pragma omp parallel reduction(+ : kept_points) num_threads(nci_write_threads)
+    {
+        int thread_id = 0;
+#ifdef _OPENMP
+        thread_id = omp_get_thread_num();
+#endif
+        std::ostringstream &local_values = values_by_thread[thread_id];
+#pragma omp for schedule(dynamic)
+    for (int x = 0; x < rho_cube.get_size(0); x++)
+    {
+        for (int y = 0; y < rho_cube.get_size(1); y++)
+        {
+            for (int z = 0; z < rho_cube.get_size(2); z++)
+            {
+                const double rho = rho_cube.get_value(x, y, z);
+                if (std::abs(rdg_cube.get_value(x, y, z) - 101.0) <= 1E-12)
+                {
+                    signed_rho_cube.set_value(x, y, z, 0.0);
+                    rdg_cube.set_value(x, y, z, 101.0);
+                    continue;
+                }
+
+                const double lambda2 = lambda2_at(rho_cube, x, y, z);
+                const double signed_rho = lambda2 < 0.0 ? -rho : rho;
+                const double rdg = sanitize_finite(reduced_density_gradient_at(rho_cube, x, y, z));
+
+                signed_rho_cube.set_value(x, y, z, signed_rho);
+                rdg_cube.set_value(x, y, z, rdg);
+
+                if (opts.promol_nci_rho_abs_max >= 0.0 && std::abs(signed_rho) > opts.promol_nci_rho_abs_max)
+                    continue;
+                if (opts.promol_nci_rdg_max >= 0.0 && rdg > opts.promol_nci_rdg_max)
+                    continue;
+
+                local_values << scientific << setprecision(10) << signed_rho << " " << rdg << "\n";
+                kept_points++;
+            }
+        }
+        rdg_progress.update();
+    }
+    }
+    for (const std::ostringstream &local_values : values_by_thread)
+        values_file << local_values.str();
+
+    signed_rho_cube.set_path(output_base.string() + "_signed_rho.cube");
+    rdg_cube.set_path(output_base.string() + "_rdg.cube");
+    signed_rho_cube.write_file(true);
+    rdg_cube.write_file(true);
+    write_promolecular_nci_vmd(xyz1, xyz2, output_base, log);
+    write_promolecular_nci_plot_script(output_base, opts, log);
+
+    log << "Wrote " << signed_rho_cube.get_path() << endl;
+    log << "Wrote " << rdg_cube.get_path() << endl;
+    log << "Wrote " << output_base.string() + "_values.dat" << " with " << kept_points << " points" << endl;
+}
+
 void properties_calculation(options &opt)
 {
     using namespace std;
