@@ -1137,4 +1137,6 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path &basis_
 };
 
 
+#ifndef NOSPHERA2_BASIS_DATA_SEPARATE
 #include "../basis_data.cpp"
+#endif

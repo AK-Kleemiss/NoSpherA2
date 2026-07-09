@@ -24,6 +24,29 @@ private:
 
     static constexpr const char* nan_message_ = "NaN in SF!";
 
+    static bool has_nan(const cdouble& value)
+    {
+        return value.real() != value.real() ||
+            value.imag() != value.imag();
+    }
+
+    template <typename Value>
+    static bool has_nan(const Value& value)
+    {
+        return value != value;
+    }
+
+    static void validate_sf_row(const cvec& row)
+    {
+        const cdouble* values = row.data();
+        const std::size_t size = row.size();
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            if (has_nan(values[i]))
+                err_checkf(false, nan_message_, std::cout);
+        }
+    }
+
     static void warn_duplicate_scatterer_id(std::uint64_t id)
     {
         std::cout << "WARNING: Duplicate scatterer_ID 0x"
@@ -63,12 +86,8 @@ private:
 #pragma omp parallel for
         for (int i = 0; i < static_cast<int>(given_sf.size()); ++i)
         {
-            result[i].resize(given_sf[i].size());
-            for (std::size_t j = 0; j < given_sf[i].size(); ++j)
-            {
-                err_checkf(!is_nan(given_sf[i][j]), nan_message_, std::cout);
-                result[i][j] = given_sf[i][j];
-            }
+            result[i].assign(given_sf[i].begin(), given_sf[i].end());
+            validate_sf_row(result[i]);
         }
         return result;
     }

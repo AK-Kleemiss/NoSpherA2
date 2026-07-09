@@ -28,6 +28,8 @@ private:
     struct NAOResult {
         vec eigenvalues;  // Occupancies
         vec eigenvectors; // Coefficients
+        vec omitted_eigenvalues;
+        vec omitted_eigenvectors;
         int atom_index = -1;
         ivec matrix_elements;
         vec sub_DM;

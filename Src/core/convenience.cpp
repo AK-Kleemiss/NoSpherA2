@@ -2588,6 +2588,7 @@ void options::digest_options()
         }
         else if (temp == "-rgbi_EVs")
             rgbi_EVs = true;
+        }
         else if (temp == "-rgbi_basis") {
             err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);
             rgbi = true;
