@@ -114,7 +114,7 @@ jobs:
       # Cache the complete dependency-only CMake/Ninja build tree.
       - name: Restore dependency build tree
         id: cmake-deps-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ${{ matrix.build-directory }}
           key: cmake-deps-v2-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'scripts/BootstrapMicromamba.cmake', 'environment*.yaml', 'occ/**/CMakeLists.txt', 'occ/**/*.cmake', 'libcint/**/CMakeLists.txt', 'libcint/**/*.cmake', 'featomic/**/Cargo.toml', 'featomic/**/Cargo.lock', 'featomic/**/CMakeLists.txt', 'mdspan/**/CMakeLists.txt') }}
@@ -139,7 +139,7 @@ jobs:
       # stored tree as a dependency-only baseline.
       - name: Save dependency build tree
         if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: ${{ matrix.build-directory }}
           key: ${{ steps.cmake-deps-cache.outputs.cache-primary-key }}
