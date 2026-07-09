@@ -917,8 +917,16 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				if (debug)
 					file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
+				int group_nr = 0;
+				if (group_field != -1 && fields[group_field] != ".") {
+					group_nr = std::stoi(fields[group_field]);
+				}
 				bool old_atom = false;
-				string atom_ID = std::to_string(get_atom_ID(constants::get_Z_from_label(fields[type_field].c_str()) + 1, {stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])}, 0));
+				string atom_ID = std::to_string(get_atom_ID(
+					constants::get_Z_from_label(fields[type_field].c_str()) + 1, 
+					{stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])},
+					group_nr
+				));
 #pragma omp parallel for reduction(|| : old_atom)
 				for (int run = 0; run < known_atoms.size(); run++)
 				{
@@ -944,6 +952,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
 					{
 						wave.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
+                        wave.set_atom_group_nr(i, group_nr);
 						string element = constants::atnr2letter(wave.get_atom_charge(i));
 						err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
 						string label = fields[label_field];
@@ -2470,15 +2479,15 @@ tsc_block_type calculate_scattering_factors(
 		IDs[atm_idx] = wavy->get_id_for_atom(asym_atom_list[atm_idx]);
 	}
 
-  //  tsc_block_type blocky(
-  //      sf,
-  //      IDs,
-  //      hkl,
-		//"SCATTERER_IDS");
     tsc_block_type blocky(
         sf,
-        labels,
-        hkl);
+        IDs,
+        hkl,
+		"SCATTERER_IDS");
+    //tsc_block_type blocky(
+    //    sf,
+    //    labels,
+    //    hkl);
 
 
     if (opt.needs_Thakkar_fill)

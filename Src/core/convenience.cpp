@@ -2870,6 +2870,16 @@ void options::digest_options()
             WFN wavy(wfn);
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
             DensityFitting::demonstrate_enhanced_density_fitting(wavy, wavy_aux);
+            exit(0);
+
+        }
+        else if (temp == "-RI_WFN_DIFF") {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -RI_WFN_DIFF to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -RI_WFN_DIFF to specify an auxiliary basis set.", std::cout);
+            WFN wavy(wfn);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+            DensityFitting::QM_RI_difference_cube(wavy, wavy_aux);
+            exit(0);
 
             //exit(0);
         }

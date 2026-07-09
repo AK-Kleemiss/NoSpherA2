@@ -166,7 +166,7 @@ void atom::set_ID(const uint64_t& id) {
 * Helper function to calculate a scatterer ID based on the element and fractional coordinates
 */
 //  0-8 - z, 8-25, 25-42, 42-59 - a, b c, 59-61 - signs, 62-64 - dat precision : ~0.0000077
-uint64_t get_atom_ID(const int Z, const d3& frac_coords, const int dat) {
+uint64_t get_atom_ID(const int Z, const d3& frac_coords, const int group_nr) {
     uint64_t ID = 0;
     if (frac_coords[0] + frac_coords[1] + frac_coords[2] == 0.0) {
         std::cout << "Warning: Fractional coordinates are all zero, cannot calculate ID! Returning 0." << std::endl;
@@ -205,14 +205,14 @@ uint64_t get_atom_ID(const int Z, const d3& frac_coords, const int dat) {
     else {
         ID |= ((coord_val << (8 + scatterer_id_masks_d5::a_shift * 2)) & scatterer_id_masks_d5::c_mask);
     }
-    ID |= (((int64_t)dat << (8 + scatterer_id_masks_d5::a_shift * 3) + 3) & scatterer_id_masks_d5::d_mask);
+    ID |= (((int64_t)(group_nr + scatterer_id_masks_d5::group_shift) << (8 + scatterer_id_masks_d5::a_shift * 3) + 3) & scatterer_id_masks_d5::d_mask);
     return ID;
 }
 
-uint64_t atom::get_ID(const int dat){
+uint64_t atom::get_ID(){
     if (ID != 0) return ID;
 
-    ID = ::get_atom_ID(charge, frac_coords, dat);
+    ID = ::get_atom_ID(charge, frac_coords, group_nr);
     return ID;
 };
 

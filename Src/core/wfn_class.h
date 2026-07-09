@@ -467,6 +467,7 @@ public:
     void set_atom_ADPs(const int& nr, const vec2& adps) { atoms[nr].set_ADPs(adps); };
     /** Set fractional coordinates for atom (crystallography). */
     void set_atom_frac_coords(const int& nr, const d3& frac) { atoms[nr].set_frac_coords(frac); };
+    void set_atom_group_nr(const int atm_nr, const int group_nr) { atoms[atm_nr].set_group_nr(group_nr); };
     int get_atom_basis_set_id(const int& nr) const { return atoms[nr].get_basis_set_id(); };
     //----------Calcualtion of Properties-----------------
     /** Density at position (helper that allocates temporaries). */

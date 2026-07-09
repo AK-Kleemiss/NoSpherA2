@@ -51,5 +51,7 @@ namespace DensityFitting
 
     // Demonstration function
     void demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& wavy_aux);
+    // Calculate the difference between the QM density and the RI density and write it to a cube file
+    void QM_RI_difference_cube(WFN& wavy, const WFN& wavy_aux);
 
 }
