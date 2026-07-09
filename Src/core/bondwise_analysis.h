@@ -74,7 +74,7 @@ private:
     NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
         const std::vector<int>& atom_indices, const ivec& shell_angular_momenta = {},
         bool spherical = false, double occupancy_cutoff = 0.17,
-        int leading_orbitals_to_skip = 0, , bool EVs = false);
+        int leading_orbitals_to_skip = 0, bool EVs = false);
     double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
     void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool use_ano_basis, bool EVs= false);
     ivec find_eigenvalue_pairs(const vec& eigvals, const double tolerance = 1E-4);
