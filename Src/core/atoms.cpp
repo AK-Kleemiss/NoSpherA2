@@ -64,6 +64,7 @@ atom& atom::operator= (const atom& rhs) {
     shellcount = rhs.shellcount;
     ECP_electrons = rhs.ECP_electrons;
     frac_coords = rhs.frac_coords;
+    group_nr = rhs.group_nr;
     return *this;
 };
 
@@ -213,6 +214,13 @@ uint64_t atom::get_ID(){
     if (ID != 0) return ID;
 
     ID = ::get_atom_ID(charge, frac_coords, group_nr);
+    return ID;
+};
+
+uint64_t atom::get_ID(const int dat) {
+    if (ID != 0) return ID;
+
+    ID = ::get_atom_ID(charge, frac_coords, dat - scatterer_id_masks_d5::group_shift);
     return ID;
 };
 

@@ -72,6 +72,7 @@ public:
     void assign_ADPs(double& Uiso);
     void set_ID(const uint64_t& id);
     uint64_t get_ID();
+    uint64_t get_ID(const int dat);
     const basis_set_entry& get_basis_set_entry(const int& _nr) const { return basis_set[_nr]; };
     // Non-const overload to obtain a mutable reference
     basis_set_entry& get_basis_set_entry(const int& _nr) { return basis_set[_nr]; }
