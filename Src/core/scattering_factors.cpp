@@ -2479,15 +2479,15 @@ tsc_block_type calculate_scattering_factors(
 		IDs[atm_idx] = wavy->get_id_for_atom(asym_atom_list[atm_idx]);
 	}
 
+  //  tsc_block_type blocky(
+  //      sf,
+  //      IDs,
+  //      hkl,
+		//"SCATTERER_IDS");
     tsc_block_type blocky(
         sf,
-        IDs,
-        hkl,
-		"SCATTERER_IDS");
-    //tsc_block_type blocky(
-    //    sf,
-    //    labels,
-    //    hkl);
+        labels,
+        hkl);
 
 
     if (opt.needs_Thakkar_fill)

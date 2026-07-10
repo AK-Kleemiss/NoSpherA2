@@ -313,9 +313,6 @@ int run_app(int argc, char **argv)
             }
             else if (opt.SALTED)
             {
-                // Fill WFN with the primitives of the JKFit basis (currently hardcoded)
-                // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-
                 std::shared_ptr<SALTEDPredictor> temp_pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
