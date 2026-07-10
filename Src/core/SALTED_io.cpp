@@ -5,6 +5,32 @@
 #include "nos_math.h"
 #include "basis_set.h"
 
+namespace {
+constexpr int kMaxSaltedBlocks = 10000;
+constexpr int kMaxSaltedStringLength = 1 << 20;
+constexpr int kMaxSaltedDatasetDims = 8;
+constexpr size_t kMaxSaltedDatasetValues = static_cast<size_t>(1) << 31;
+
+template <typename T>
+void read_exact(std::ifstream& file, T& value, const std::string& context)
+{
+    file.read(reinterpret_cast<char*>(&value), sizeof(T));
+    err_checkf(static_cast<bool>(file), "Error reading SALTED binary " + context, std::cout);
+}
+
+void read_exact_bytes(std::ifstream& file, void* data, const std::streamsize size, const std::string& context)
+{
+    file.read(reinterpret_cast<char*>(data), size);
+    err_checkf(static_cast<bool>(file), "Error reading SALTED binary " + context, std::cout);
+}
+
+void skip_exact(std::ifstream& file, const std::streamoff offset, const std::string& context)
+{
+    file.seekg(offset, std::ios::cur);
+    err_checkf(static_cast<bool>(file), "Error seeking SALTED binary " + context, std::cout);
+}
+}
+
 std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path)
 {
     try
@@ -211,7 +237,7 @@ std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int length) {
     
     //Remove null characters from the string
     string_out.erase(std::remove(string_out.begin(), string_out.end(), '\0'), string_out.end());
-    return std::string(string_out.begin(), string_out.end());
+    return trim(std::string(string_out.begin(), string_out.end()));
 }
 
 void SALTED_BINARY_FILE::open_file() {
@@ -244,7 +270,7 @@ bool SALTED_BINARY_FILE::read_header() {
     }
     
     // Validate numBlocks to prevent excessive memory usage or infinite loops
-    if (numBlocks < 0 || numBlocks > 10000) { // Reasonable upper limit
+    if (numBlocks < 0 || numBlocks > kMaxSaltedBlocks) { // Reasonable upper limit
         std::cerr << "Invalid number of blocks: " << numBlocks << std::endl;
         return false;
     }
@@ -277,49 +303,58 @@ bool SALTED_BINARY_FILE::read_header() {
     return true;
 }
 
-//Small macro to read a block of data
-//Skips the first 9 bytes of the block with info about the key (5 bytes str) +  datatype (4 bytes int32) 
-//Reads the data into the container
-//Increments the block_id
-#define READ_BLOCK(container, size) file.seekg(9, std::ios::cur); file.read((char*)container, size);
-#define READ_BLOCK_STRING(container) file.seekg(9, std::ios::cur); file.read((char*)&string_size, 4); container.resize(string_size, '\0');  file.read((char*)container.data(), string_size);
-
 void SALTED_BINARY_FILE::populate_config(Config &config) {
     err_checkf(header_end != -1, "Header not read yet! Aborting", std::cout);
+    err_checkf(table_of_contents.find("CONFG") != table_of_contents.end(),
+        "SALTED binary file does not contain required CONFG block: " + filepath.string(), std::cout);
     file.seekg(table_of_contents["CONFG"], std::ios::beg);
 
     // Read config data
-    READ_BLOCK(&config.average, 1); //Bool data
-    READ_BLOCK(&config.field, 1); 
-    READ_BLOCK(&config.sparsify, 1); 
-    READ_BLOCK(&config.ncut, 4); //Int data
-    READ_BLOCK(&config.nang1, 4); 
-    READ_BLOCK(&config.nang2, 4);
-    READ_BLOCK(&config.nrad1, 4); 
-    READ_BLOCK(&config.nrad2, 4); 
-    READ_BLOCK(&config.Menv, 4); 
-    READ_BLOCK(&config.Ntrain, 4);
-    READ_BLOCK(&config.rcut1, 8);  //Double data
-    READ_BLOCK(&config.rcut2, 8);
-    READ_BLOCK(&config.sig1, 8);
-    READ_BLOCK(&config.sig2, 8);
-    READ_BLOCK(&config.zeta, 8);
-    READ_BLOCK(&config.trainfrac, 8);
+    auto read_config_block = [this](void* target, const std::streamsize size, const std::string& name) {
+        skip_exact(file, 9, "config field header for " + name);
+        read_exact_bytes(file, target, size, "config field " + name);
+    };
+    read_config_block(&config.average, 1, "average"); //Bool data
+    read_config_block(&config.field, 1, "field");
+    read_config_block(&config.sparsify, 1, "sparsify");
+    read_config_block(&config.ncut, 4, "ncut"); //Int data
+    read_config_block(&config.nang1, 4, "nang1");
+    read_config_block(&config.nang2, 4, "nang2");
+    read_config_block(&config.nrad1, 4, "nrad1");
+    read_config_block(&config.nrad2, 4, "nrad2");
+    read_config_block(&config.Menv, 4, "Menv");
+    read_config_block(&config.Ntrain, 4, "Ntrain");
+    read_config_block(&config.rcut1, 8, "rcut1");  //Double data
+    read_config_block(&config.rcut2, 8, "rcut2");
+    read_config_block(&config.sig1, 8, "sig1");
+    read_config_block(&config.sig2, 8, "sig2");
+    read_config_block(&config.zeta, 8, "zeta");
+    read_config_block(&config.trainfrac, 8, "trainfrac");
 
     int string_size;
     std::vector<char> string_out;
-    READ_BLOCK_STRING(string_out);
+    auto read_config_string = [this, &string_size, &string_out](const std::string& name) {
+        skip_exact(file, 9, "config string header for " + name);
+        read_exact(file, string_size, "config string length for " + name);
+        err_checkf(string_size >= 0 && string_size <= kMaxSaltedStringLength,
+            "Invalid SALTED config string length for " + name + ": " + std::to_string(string_size), std::cout);
+        string_out.assign(static_cast<size_t>(string_size), '\0');
+        if (string_size > 0)
+            read_exact_bytes(file, string_out.data(), string_size, "config string " + name);
+    };
+
+    read_config_string("species");
     config.species = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
 
-    READ_BLOCK_STRING(string_out);
+    read_config_string("neighspe1");
     config.neighspe1 = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
     config.nspe1 = (int)config.neighspe1.size();
 
-    READ_BLOCK_STRING(string_out);
+    read_config_string("neighspe2");
     config.neighspe2 = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
     config.nspe2 = (int)config.neighspe2.size();
 
-    READ_BLOCK_STRING(string_out);
+    read_config_string("dfbasis");
     config.dfbasis = std::string(string_out.begin(), string_out.end());
 }
 
@@ -327,24 +362,42 @@ void SALTED_BINARY_FILE::populate_config(Config &config) {
 template <typename T>
 void SALTED_BINARY_FILE::read_dataset(std::vector<T>& data, std::vector<size_t>& dims) {
     int ndims;
-    file.read((char*)&ndims, 4);
-    dims.resize(ndims, 0);
+    read_exact(file, ndims, "dataset dimension count");
+    err_checkf(ndims >= 0 && ndims <= kMaxSaltedDatasetDims,
+        "Invalid SALTED dataset dimension count: " + std::to_string(ndims), std::cout);
+    dims.assign(static_cast<size_t>(ndims), 0);
     for (int i = 0; i < ndims; i++) {
-        file.read((char*)&dims[i], 4);
+        uint32_t dim = 0;
+        read_exact(file, dim, "dataset dimension " + std::to_string(i));
+        dims[i] = static_cast<size_t>(dim);
     }
-    int size = static_cast<int>(std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<size_t>()));
+    size_t size = 1;
+    for (const size_t dim : dims) {
+        err_checkf(dim <= kMaxSaltedDatasetValues && size <= kMaxSaltedDatasetValues / std::max<size_t>(dim, 1),
+            "SALTED dataset is unreasonably large or dimension product overflows", std::cout);
+        size *= dim;
+    }
+    err_checkf(size <= kMaxSaltedDatasetValues,
+        "SALTED dataset is unreasonably large: " + std::to_string(size) + " values", std::cout);
     data.resize(size);
-    file.read((char*)data.data(), size * sizeof(T));
+    if (size > 0)
+        read_exact_bytes(file, data.data(), static_cast<std::streamsize>(size * sizeof(T)), "dataset payload");
 }
 
 template <typename T>
 T SALTED_BINARY_FILE::read_generic_blocks(const std::string& key, std::function<void(T&, int)> process_block) {
     err_checkf(header_end != -1, "Header not read yet! Aborting", std::cout);
-    file.seekg(table_of_contents[key], std::ios::beg);
-    file.seekg(4, std::ios::cur); // Skip the datatype
+    const auto block = table_of_contents.find(key);
+    err_checkf(block != table_of_contents.end(),
+        "SALTED binary file does not contain required " + key + " block: " + filepath.string(), std::cout);
+    file.seekg(block->second, std::ios::beg);
+    err_checkf(static_cast<bool>(file), "Error seeking SALTED binary block " + key, std::cout);
+    skip_exact(file, 4, "block datatype for " + key); // Skip the datatype
 
     int n_blocks;
-    file.read(reinterpret_cast<char*>(&n_blocks), sizeof(n_blocks));
+    read_exact(file, n_blocks, "block count for " + key);
+    err_checkf(n_blocks >= 0 && n_blocks <= kMaxSaltedBlocks,
+        "Invalid SALTED block count for " + key + ": " + std::to_string(n_blocks), std::cout);
     
     T result;
     if constexpr (std::is_same_v<T, std::shared_ptr<BasisSet>>) {
@@ -416,14 +469,18 @@ std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_features() {
 
 std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_data(const std::string& key) {
     return read_generic_blocks<std::unordered_map<std::string, dMatrix2>>(key,
-        [this](std::unordered_map<std::string, dMatrix2>& container, int i) {
+        [this, &key](std::unordered_map<std::string, dMatrix2>& container, int i) {
             std::string element = read_string_remove_NULL(5);
             int nlambda;
-            file.read(reinterpret_cast<char*>(&nlambda), sizeof(nlambda));
+            read_exact(file, nlambda, "lambda count for " + element);
+            err_checkf(nlambda >= 0 && nlambda <= kMaxSaltedBlocks,
+                "Invalid SALTED lambda count for " + element + ": " + std::to_string(nlambda), std::cout);
             for (int lam = 0; lam < nlambda; lam++) {
                 std::vector<size_t> dims;
                 vec data;
                 read_dataset(data, dims);
+                err_checkf(dims.size() == 2,
+                    "Expected 2D SALTED " + key + " dataset for " + element + " lambda " + std::to_string(lam), std::cout);
                 container[element + std::to_string(lam)] = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
             }
         }
@@ -435,7 +492,9 @@ std::shared_ptr<BasisSet> SALTED_BINARY_FILE::read_basis_set() {
     return read_generic_blocks<std::shared_ptr<BasisSet>>("BASIS",
         [this](std::shared_ptr<BasisSet>& bs, int i) {
             int atomic_nr;
-            file.read(reinterpret_cast<char*>(&atomic_nr), sizeof(atomic_nr));
+            read_exact(file, atomic_nr, "basis atomic number");
+            err_checkf(atomic_nr >= 1 && atomic_nr <= 118,
+                "Invalid atomic number in SALTED basis block: " + std::to_string(atomic_nr), std::cout);
             std::cout << "Reading basis set for atomic number: " << atomic_nr << std::endl;
             std::vector<size_t> dims;
             ivec contractions;
@@ -447,10 +506,17 @@ std::shared_ptr<BasisSet> SALTED_BINARY_FILE::read_basis_set() {
             vec coefficients;
             read_dataset(coefficients, dims);
             size_t primitive_index = 0;
+            err_checkf(!dims.empty(), "Invalid empty SALTED basis dimensions", std::cout);
             bs->set_count_for_element(atomic_nr - 1, dims[0]);
             for (int contraction = 0; contraction < contractions.size(); contraction++) {
+                err_checkf(contraction < angular_momenta_per_shell.size(),
+                    "SALTED basis angular-momentum array shorter than contraction array", std::cout);
                 int angular_momentum = angular_momenta_per_shell[contraction];
                 for (int func = 0; func < contractions[contraction]; func++, primitive_index++) {
+                    err_checkf(primitive_index < angular_momenta_per_shell.size()
+                        && primitive_index < exponents_per_shell.size()
+                        && primitive_index < coefficients.size(),
+                        "SALTED basis primitive arrays have inconsistent sizes", std::cout);
                     bs->add_owned_primitive({ 1, angular_momenta_per_shell[primitive_index], exponents_per_shell[primitive_index], coefficients[primitive_index], contraction });
                 }
             }
