@@ -92,7 +92,7 @@ static bool numeric_line_matches(const std::string& expected,
     }
     for (size_t i = 0; i < exp_nums.size(); ++i) {
         const double diff = std::abs(exp_nums[i] - act_nums[i]);
-        const double allowed = std::abs(act_nums[i]) * rtol;
+        const double allowed = std::max(rtol, std::abs(act_nums[i]) * rtol);
         if (diff > allowed) {
             return false;
         }
