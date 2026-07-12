@@ -626,70 +626,6 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
         std::cout << out << std::endl;
     }
 
-    //const double radius = 3.0;
-    //const double increment = 0.1;
-
-    //std::vector<vec> all_coeffs = { coeff_unrestrained , coeff_enhanced, coeff_hybrid};
-    //WFN dummy = wavy;
-    //WFN dummy_aux = wavy_aux;
-    //double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-    //int steps[3]{ 0, 0, 0 };
-    //readxyzMinMax_fromWFN(dummy, MinMax, steps, radius, increment, true);
-    //dummy.delete_unoccupied_MOs();
-    ////Cubes: 0=WFN, 1=RI_Unrestrained, 2=RI_Enhanced, 3=RI_Hybrid
-    //std::vector<cube> cubes;
-    //for (int a = 0; a < 4; a++) {
-    //    cubes.push_back(cube(steps[0], steps[1], steps[2], dummy.get_ncen(), true));
-    //    for (int i = 0; i < 3; i++)
-    //    {
-    //        cubes[a].set_origin(i, MinMax[i]);
-    //        cubes[a].set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-    //    }
-    //}
-    //cubes[0].give_parent_wfn(dummy);
-    //cubes[1].give_parent_wfn(dummy_aux);
-    //cubes[2].give_parent_wfn(dummy_aux);
-    //cubes[3].give_parent_wfn(dummy_aux);
-    //std::cout << "Starting work..." << std::endl;
-    //cubes[0].set_comment1("Calculated density using NoSpherA2 for WFN");
-    //cubes[1].set_comment1("Calculated density using SALTED RI (Unrestrained)");
-    //cubes[2].set_comment1("Calculated density using SALTED RI (Enhanced Restraints)");
-    //cubes[3].set_comment1("Calculated density using SALTED RI (Hybrid Approach)");
-    //cubes[0].set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_WFN.cube");
-    //cubes[1].set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_RI_Unrestrained.cube");
-    //cubes[2].set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_RI_Enhanced.cube");
-    //cubes[3].set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_RI_Hybrid.cube");
-    //std::vector<vec> all_coeffs = { coeff_unrestrained , coeff_enhanced, coeff_hybrid };
-    //for (int a = 0; a < 4; a++) {
-    //    //See if the cubefile already exists, if yes skip the calculation and just load it
-    //    if (std::filesystem::exists(cubes[a].get_path())) {
-    //        cubes[a].read_file(true, true);
-    //    }
-    //    else {
-    //        std::cout << "Calculating cube for density..." << std::endl;
-    //        if (a == 0)
-    //            wavy.calc_rho_cube(cubes[a]);
-    //        else
-    //            calc_cube_ML(all_coeffs[a-1], dummy_aux, cubes[a]);
-    //        cubes[a].write_file(false, false);
-    //    }
-    //}
-    ////Calculate difference cubes
-    //for (int a = 1; a < 4; a++) {
-    //    cube diff = cubes[0] - cubes[a];
-    //    diff.calc_dv();
-    //    double rrs = cubes[0].rrs(cubes[a]);
-    //    vec sums = diff.double_sum();
-    //    std::cout << "Difference WFN - Method " << a - 1 << ": RRS = " << std::scientific << std::setprecision(6) << rrs
-    //        << ", Sum = " << std::fixed << std::setprecision(6) << sums[0]
-    //        << ", |Sum| = " << std::fixed << std::setprecision(6) << sums[1] << std::endl;
-    //    diff.set_comment1("Difference cube: WFN - Method " + std::to_string(a - 1));
-    //    diff.give_parent_wfn(dummy);
-    //    diff.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_diff_Method" + std::to_string(a - 1) + ".cube");
-    //    diff.write_file(true, false);
-    //}
-
-
     // Compare results
     std::cout << "\n=== Method Comparison ===" << std::endl;
     std::cout << "Unrestrained        - Max coeff: " << std::fixed << std::setprecision(6)
@@ -745,4 +681,79 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
     std::cout << "Hybrid:       " << std::fixed << std::setprecision(6) << avg_hybrid << std::endl;
 
     std::cout << "=================================================\n" << std::endl;
+}
+
+
+void DensityFitting::QM_RI_difference_cube(WFN& wavy, const WFN& wavy_aux) {
+    //#include "test_functions.h"
+    std::cout << "\n=== Enhanced Density Fitting Demonstration ===" << std::endl;
+    CONFIG ri_config;
+    ri_config.adaptive_restraint = true;
+    ri_config.analyze_quality = true;
+    ri_config.charge_scheme = CHARGE_SCHEME::HIRSHFELD;
+    ri_config.metric = METRIC_TYPE::COULOMB;
+    ri_config.restraint_strength = 2e-4;
+    ri_config.tikhonov_lambda = 1e-6;
+
+    _time_point start_time = get_time();
+    // Method 0: Unrestrained (original approach)
+    std::cout << "\n--- Method 0: Unrestrained (Baseline) ---" << std::endl;
+    ri_config.restrain_type = RESTRAINT_TYPE::NONE;
+    vec coeffs = density_fit(wavy, wavy_aux, ri_config);
+    std::cout << "Time for unrestrained fit: "
+        << std::chrono::duration<double>(get_time() - start_time).count() << " seconds." << std::endl;
+    std::cout << "Time for RI-Fitting: "
+        << std::chrono::duration<double>(get_time() - start_time).count() << " seconds." << std::endl;
+
+    WFN dummy = wavy;
+    WFN dummy_aux = wavy_aux;
+
+    properties_options props;
+    props.radius = 3.0;
+    props.resolution = 0.1;
+
+    readxyzMinMax_fromWFN(dummy, props, true);
+    dummy.delete_unoccupied_MOs();
+    //Cubes: 0=WFN, 1=RI
+    cube WFN_cube({ props.NbSteps[0], props.NbSteps[1], props.NbSteps[2] }, dummy.get_ncen(), true);
+    cube RI_cube({ props.NbSteps[0], props.NbSteps[1], props.NbSteps[2] }, dummy.get_ncen(), true);
+    WFN_cube.give_parent_wfn(dummy);
+    RI_cube.give_parent_wfn(dummy_aux);
+
+    for (int i = 0; i < 3; i++) {
+        WFN_cube.set_origin(i, props.MinMax[i]);
+        WFN_cube.set_vector(i, i, (props.MinMax[i + 3] - props.MinMax[i]) / props.NbSteps[i]);
+        RI_cube.set_origin(i, props.MinMax[i]);
+        RI_cube.set_vector(i, i, (props.MinMax[i + 3] - props.MinMax[i]) / props.NbSteps[i]);
+    }
+    WFN_cube.calc_dv();
+    RI_cube.calc_dv();
+
+
+    std::cout << "Starting work..." << std::endl;
+    WFN_cube.set_comment1("Calculated density using NoSpherA2 for WFN");
+    RI_cube.set_comment1("Calculated density using SALTED RI");
+    WFN_cube.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_WFN.cube");
+    RI_cube.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_RI.cube");
+
+    std::cout << "Calculating WFN density cube..." << std::endl;
+    wavy.calc_rho_cube(WFN_cube);
+    WFN_cube.write_file(false, false);
+    std::cout << "Calculating RI density cube..." << std::endl;
+    calc_cube_ML(coeffs, dummy_aux, RI_cube);
+    RI_cube.write_file(false, false);
+
+
+    //Calculate difference cube
+    cube diff = WFN_cube - RI_cube;
+    diff.calc_dv(); 
+    double rrs = WFN_cube.rrs(RI_cube);
+    vec sums = diff.double_sum();
+    std::cout << "RRS = " << std::scientific << std::setprecision(6) << rrs
+        << ", Sum = " << std::fixed << std::setprecision(6) << sums[0]
+        << ", |Sum| = " << std::fixed << std::setprecision(6) << sums[1] << std::endl;
+    diff.set_comment1("Difference cube: WFN - RI");
+    diff.give_parent_wfn(dummy);
+    diff.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_diff_RI.cube");
+    diff.write_file(true, false);
 }

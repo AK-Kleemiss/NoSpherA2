@@ -245,7 +245,7 @@ public:
     /** Write current wavefunction to .wfn file (optionally only occupied). */
     bool write_wfn(const std::filesystem::path& fileName, const bool& debug, const bool occupied) const;
     /** Write current wavefunction to .47 file (optionally only occupied). */
-    bool write_nbo(const std::filesystem::path& fileName, const bool& debug);
+    bool write_nbo(const std::filesystem::path& fileName, const bool& debug, std::ostream* progress_log = nullptr);
     /** Write atomic geometry to .xyz file. */
     bool write_xyz(const std::filesystem::path& fileName);
     /** Set internal path field. */
@@ -387,6 +387,8 @@ public:
     const d3 get_atom_pos(const unsigned int& nr) const;
     /** Get atom label (element name + index). */
     const std::string get_atom_label(const unsigned int& nr) const;
+    /** Get atom ID. */
+    const uint64_t get_id_for_atom(const int nr) { return atoms[nr].get_ID(); }
     /** Number of atoms with a basis set loaded. */
     const int get_nr_basis_set_loaded() const;
     /** Does atom nr have a basis set loaded? */
@@ -422,7 +424,7 @@ public:
     /** End primitive index (relative) for shell. */
     const int get_shell_end(const unsigned int& nr_atom, const unsigned int& nr_shell) const;
     /** Add new atom with coordinates + charge. */
-    bool push_back_atom(const std::string& label, const double& x, const double& y, const double& z, const int& charge, const std::string& ID = "0000000000000");
+    bool push_back_atom(const std::string& label, const double& x, const double& y, const double& z, const int& charge, const uint64_t& ID = 0);
     /** Add existing atom object (copy). */
     bool push_back_atom(const atom& given);
     /** Safe atom accessor (returns default atom if out of range). */
@@ -465,6 +467,7 @@ public:
     void set_atom_ADPs(const int& nr, const vec2& adps) { atoms[nr].set_ADPs(adps); };
     /** Set fractional coordinates for atom (crystallography). */
     void set_atom_frac_coords(const int& nr, const d3& frac) { atoms[nr].set_frac_coords(frac); };
+    void set_atom_group_nr(const int atm_nr, const int group_nr) { atoms[atm_nr].set_group_nr(group_nr); };
     int get_atom_basis_set_id(const int& nr) const { return atoms[nr].get_basis_set_id(); };
     //----------Calcualtion of Properties-----------------
     /** Density at position (helper that allocates temporaries). */

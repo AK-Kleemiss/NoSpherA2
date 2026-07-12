@@ -13,30 +13,38 @@ Calculating ANOs for all atoms...                  ...done!
 ANO fallback summary: no atom-level fallbacks were needed.
 Calculating Population for all atoms...            ...done.
 
-Total Population: 9.24434
+Total Population: 12.3016
 
 [      Calculating Atomic Populations     ]
 [-----------------------------------------] 100% 
-Population of atom 0: 7.2517
+Population of atom 0: 9.15043
 Population of atom 1: 1.45528
 Population of atom 2: 1.45436
 Population of atom 3: 1.45542
-Population of atom 4: 1.11289
+Population of atom 4: 3.06323
+Atomic projector population outside selected ANO cutoff of atom 0: 1.11874
+Atomic projector population outside selected ANO cutoff of atom 1: 1.02404
+Atomic projector population outside selected ANO cutoff of atom 2: 1.02274
+Atomic projector population outside selected ANO cutoff of atom 3: 1.02415
+Atomic projector population outside selected ANO cutoff of atom 4: 1.23473
 [       Calculating Bond Populations      ]
 [-----------------------------------------] 100% 
 
 Roby-Gould Bond Indices (RGBI) Analysis
 ----------------------------------------------
 Number of electrons in system:         13
-Number of electrons in Roby Analysis:  9.24434
-Percentage of electrons accounted for: 71.11 %
+Number of electrons in Roby Analysis:  12.3016
+Number of cutoff electrons:            0.696887
+Number after cutoff projection:        12.9985
+Percentage of electrons accounted for: 94.63 %
+Percentage after cutoff projection:    99.99 %
 ----------------------------------------------
 
 
 Atom Nr        Els       n_A     n_B    n_AB    s_AB    Cov.    Ion.    Tot.   Pyth.   Arak.
 --------------------------------------------------------------------------------------------
-   0 -   4    N - Li   7.252   1.113   8.262   0.102   0.171   0.410   0.444  14.824  25.161
-   0 -   1    N -  H   7.252   1.455   7.841   0.866   0.628   0.249   0.675  86.365  75.923
-   0 -   2    N -  H   7.252   1.454   7.840   0.866   0.627   0.250   0.675  86.293  75.856
-   0 -   3    N -  H   7.252   1.455   7.841   0.866   0.628   0.249   0.675  86.376  75.933
+   0 -   4    N - Li   9.150   3.063  12.065   0.148   0.215   0.392   0.448  23.108  31.924
+   0 -   1    N -  H   9.150   1.455   9.284   1.322   0.864   0.312   0.918  88.477  77.951
+   0 -   2    N -  H   9.150   1.454   9.284   1.321   0.863   0.312   0.918  88.419  77.894
+   0 -   3    N -  H   9.150   1.455   9.284   1.322   0.864   0.312   0.918  88.485  77.960
 --------------------------------------------------------------------------------------------

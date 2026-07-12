@@ -2158,7 +2158,7 @@ void options::digest_options()
             std::filesystem::path _wfn = arguments[i + 1];
             WFN wavy(e_origin::NOT_YET_DEFINED);
             wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
-            wavy.write_nbo(_wfn.replace_extension(".47"), debug);
+            wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout);
             exit(0);
         }
         else if (temp == "-convert_XCW")
@@ -2586,6 +2586,9 @@ void options::digest_options()
             rgbi = true;
             rgbi_no_sym = true;
         }
+        else if (temp == "-rgbi_EVs") {
+            rgbi_EVs = true;
+        }
         else if (temp == "-rgbi_basis") {
             err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);
             rgbi = true;
@@ -2723,11 +2726,10 @@ void options::digest_options()
 
             WFN wavy(wfn);
             SALTEDPredictor SP(wavy, *this);
-            string df_basis_name = SP.get_dfbasis_name();
             filesystem::path salted_model_path = SP.get_salted_filename();
             log_file << "Using " << salted_model_path << " for the prediction" << endl;
             if (!SP.basis_set_loaded()) {
-                df_basis_name = SP.get_dfbasis_name();
+                const string df_basis_name = SP.get_dfbasis_name();
                 std::shared_ptr<BasisSet> _aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
                 load_basis_into_WFN(SP.wavy, _aux_basis);
             }
@@ -2868,6 +2870,16 @@ void options::digest_options()
             WFN wavy(wfn);
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
             DensityFitting::demonstrate_enhanced_density_fitting(wavy, wavy_aux);
+            exit(0);
+
+        }
+        else if (temp == "-RI_WFN_DIFF") {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -RI_WFN_DIFF to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -RI_WFN_DIFF to specify an auxiliary basis set.", std::cout);
+            WFN wavy(wfn);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+            DensityFitting::QM_RI_difference_cube(wavy, wavy_aux);
+            exit(0);
 
             //exit(0);
         }

@@ -34,6 +34,12 @@
     <Filter Include="Source Files\SALTED">
       <UniqueIdentifier>{780bf45d-b341-4232-8c7a-8ac0d43de213}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Utils">
+      <UniqueIdentifier>{0f1dc53d-8bdb-453c-8329-4b2016f814cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Utils">
+      <UniqueIdentifier>{d6a5e11a-7417-4905-b98b-7c11f304d442}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="@(ProjectHeader)" />
@@ -156,12 +162,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="nos_math.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="$(SrcDir)pch.h;$(SrcDir)AtomGrid.h;$(SrcDir)atoms.h;$(SrcDir)b2c.h;$(SrcDir)basis_set.h;$(SrcDir)bondwise_analysis.h;$(SrcDir)cell.h;$(SrcDir)cif.h;$(SrcDir)constants.h;$(SrcDir)convenience.h;$(SrcDir)cube.h;$(SrcDir)CUDA_utilities.h;$(SrcDir)def2-E;$(SrcDir)ECPs_corrections.h;$(SrcDir)fchk.h;$(SrcDir)GridManager.h;$(SrcDir)integration_params.h;$(SrcDir)integrator.h;$(SrcDir)isosurface.h;$(SrcDir)libCintKernels.h;$(SrcDir)libCintMain.h;$(SrcDir)molecule.h;$(SrcDir)mo_class.h;$(SrcDir)NoSpherA2.h;$(SrcDir)nos_math.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="$(SrcDir)pch.h;$(SrcDir)AtomGrid.h;$(SrcDir)atoms.h;$(SrcDir)b2c.h;$(SrcDir)basis_set.h;$(SrcDir)bondwise_analysis.h;$(SrcDir)cell.h;$(SrcDir)cif.h;$(SrcDir)constants.h;$(SrcDir)convenience.h;$(SrcDir)cube.h;$(SrcDir)CUDA_utilities.h;$(SrcDir)def2-E;$(SrcDir)ECPs_corrections.h;$(SrcDir)fchk.h;$(SrcDir)GridManager.h;$(SrcDir)integration_params.h;$(SrcDir)integrator.h;$(SrcDir)isosurface.h;$(SrcDir)libCintKernels.h;$(SrcDir)libCintMain.h;$(SrcDir)molecule.h;$(SrcDir)mo_class.h;$(SrcDir)NoSpherA2.h;$(SrcDir)nos_math.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="$(SrcDir)pch.h;$(SrcDir)AtomGrid.h;$(SrcDir)atoms.h;$(SrcDir)b2c.h;$(SrcDir)basis_set.h;$(SrcDir)bondwise_analysis.h;$(SrcDir)cell.h;$(SrcDir)cif.h;$(SrcDir)constants.h;$(SrcDir)convenience.h;$(SrcDir)cube.h;$(SrcDir)CUDA_utilities.h;$(SrcDir)def2-E;$(SrcDir)ECPs_corrections.h;$(SrcDir)fchk.h;$(SrcDir)GridManager.h;$(SrcDir)integration_params.h;$(SrcDir)integrator.h;$(SrcDir)isosurface.h;$(SrcDir)libCintKernels.h;$(SrcDir)libCintMain.h;$(SrcDir)molecule.h;$(SrcDir)mo_class.h;$(SrcDir)NoSpherA2.h;$(SrcDir)nos_math.h" />
@@ -1881,34 +1881,13 @@
     <ClInclude Include="nos_math.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Src\core\AtomGrid.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\atoms.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Src\core\b2c.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\basis_set.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Src\core\bondwise_analysis.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Src\core\cell.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Src\core\cif.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\constants.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\convenience.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\cube.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Src\core\CUDA_utilities.h">
@@ -1923,33 +1902,6 @@
     <ClInclude Include="..\..\Src\core\fchk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Src\core\GridManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\integration_params.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\integrator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\isosurface.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\libCintKernels.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\libCintMain.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\mo_class.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\molecule.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\nos_math.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Src\core\NoSpherA2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1962,44 +1914,92 @@
     <ClInclude Include="..\..\Src\core\properties.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Src\core\SALTED_equicomb.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\SALTED_io.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\SALTED_predictor.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\SALTED_utilities.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Src\core\scatterer_id.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Src\core\scattering_factors.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Src\core\sphere_lebedev_rule.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Src\core\spherical_density.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\test_functions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Src\core\Thakkar_coefs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Src\core\tsc_block.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Src\core\wfn_class.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Src\core\XCW.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\SALTED_equicomb.h">
+      <Filter>Header Files\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\SALTED_io.h">
+      <Filter>Header Files\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\SALTED_predictor.h">
+      <Filter>Header Files\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\SALTED_utilities.h">
+      <Filter>Header Files\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\integrator.h">
+      <Filter>Header Files\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\integration_params.h">
+      <Filter>Header Files\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\libCintKernels.h">
+      <Filter>Header Files\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\libCintMain.h">
+      <Filter>Header Files\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\AtomGrid.h">
+      <Filter>Header Files\Grids</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\GridManager.h">
+      <Filter>Header Files\Grids</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\convenience.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\constants.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\nos_math.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\test_functions.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\wfn_class.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\tsc_block.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\atoms.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\basis_set.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\cell.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\mo_class.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\molecule.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\sphere_lebedev_rule.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\isosurface.h">
+      <Filter>Header Files\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\cube.h">
+      <Filter>Header Files\Utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -2218,10 +2218,184 @@
     <ClCompile Include="$(SrcDir)\AtomGrid.cpp;$(SrcDir)atoms.cpp;$(SrcDir)\b2c.cpp;$(SrcDir)\basis_set.cpp;$(SrcDir)\bondwise_analysis.cpp;$(SrcDir)\cell.cpp;$(SrcDir)\cif.cpp;$(SrcDir)\constants.cpp;$(SrcDir)\convenience.cpp;$(SrcDir)\cube.cpp;$(SrcDir)\ECPs_corrections.cpp;$(SrcDir)\fchk.cpp;$(SrcDir)\GridManager.cpp;$(SrcDir)\integration_params.cpp;$(SrcDir)\integrator.cpp;$(SrcDir)\isosurface.cpp;$(SrcDir)\libCintKernels.cpp;$(SrcDir)\libCintMain.cpp;$(SrcDir)\molecule.cpp;$(SrcDir)\NoSpherA2.cpp;$(SrcDir)\nos_math.cpp;$(SrcDir)\properties.cpp;$(SrcDir)\SALTED_equicomb.cpp;$(SrcDir)\SALTED_io.cpp;$(SrcDir)\SALTED_predictor.cpp;$(SrcDir)\SALTED_utilities.cpp;$(SrcDir)\scattering_factors.cpp;$(SrcDir)\sphere_lebedev_rule.cpp;$(SrcDir)\spherical_density.cpp;$(SrcDir)\wfn_class.cpp;$(SrcDir)\XCW.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(SrcDir)\AtomGrid.cpp;$(SrcDir)atoms.cpp;$(SrcDir)\b2c.cpp;$(SrcDir)\basis_set.cpp;$(SrcDir)\bondwise_analysis.cpp;$(SrcDir)\cell.cpp;$(SrcDir)\cif.cpp;$(SrcDir)\constants.cpp;$(SrcDir)\convenience.cpp;$(SrcDir)\cube.cpp;$(SrcDir)\ECPs_corrections.cpp;$(SrcDir)\fchk.cpp;$(SrcDir)\GridManager.cpp;$(SrcDir)\integration_params.cpp;$(SrcDir)\integrator.cpp;$(SrcDir)\isosurface.cpp;$(SrcDir)\libCintKernels.cpp;$(SrcDir)\libCintMain.cpp;$(SrcDir)\molecule.cpp;$(SrcDir)\NoSpherA2.cpp;$(SrcDir)\nos_math.cpp;$(SrcDir)\properties.cpp;$(SrcDir)\SALTED_equicomb.cpp;$(SrcDir)\SALTED_io.cpp;$(SrcDir)\SALTED_predictor.cpp;$(SrcDir)\SALTED_utilities.cpp;$(SrcDir)\scattering_factors.cpp;$(SrcDir)\sphere_lebedev_rule.cpp;$(SrcDir)\spherical_density.cpp;$(SrcDir)\wfn_class.cpp;$(SrcDir)\XCW.cpp">
+    <ClCompile Include="atoms.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(SrcDir)\AtomGrid.cpp;$(SrcDir)atoms.cpp;$(SrcDir)\b2c.cpp;$(SrcDir)\basis_set.cpp;$(SrcDir)\bondwise_analysis.cpp;$(SrcDir)\cell.cpp;$(SrcDir)\cif.cpp;$(SrcDir)\constants.cpp;$(SrcDir)\convenience.cpp;$(SrcDir)\cube.cpp;$(SrcDir)\ECPs_corrections.cpp;$(SrcDir)\fchk.cpp;$(SrcDir)\GridManager.cpp;$(SrcDir)\integration_params.cpp;$(SrcDir)\integrator.cpp;$(SrcDir)\isosurface.cpp;$(SrcDir)\libCintKernels.cpp;$(SrcDir)\libCintMain.cpp;$(SrcDir)\molecule.cpp;$(SrcDir)\NoSpherA2.cpp;$(SrcDir)\nos_math.cpp;$(SrcDir)\properties.cpp;$(SrcDir)\SALTED_equicomb.cpp;$(SrcDir)\SALTED_io.cpp;$(SrcDir)\SALTED_predictor.cpp;$(SrcDir)\SALTED_utilities.cpp;$(SrcDir)\scattering_factors.cpp;$(SrcDir)\sphere_lebedev_rule.cpp;$(SrcDir)\spherical_density.cpp;$(SrcDir)\wfn_class.cpp;$(SrcDir)\XCW.cpp">
+    <ClCompile Include="\b2c.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\basis_set.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\bondwise_analysis.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\cell.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\cif.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\constants.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\convenience.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\cube.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\ECPs_corrections.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\fchk.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\GridManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\integration_params.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\integrator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\isosurface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\libCintKernels.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\libCintMain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\molecule.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\NoSpherA2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\nos_math.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\properties.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\SALTED_equicomb.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\SALTED_io.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\SALTED_predictor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\SALTED_utilities.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\scattering_factors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\sphere_lebedev_rule.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\spherical_density.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\wfn_class.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\XCW.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="atoms.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\b2c.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\basis_set.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\bondwise_analysis.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\cell.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\cif.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\constants.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\convenience.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\cube.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\ECPs_corrections.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\fchk.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\GridManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\integration_params.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\integrator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\isosurface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\libCintKernels.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\libCintMain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\molecule.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\NoSpherA2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\nos_math.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\properties.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\SALTED_equicomb.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\SALTED_io.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\SALTED_predictor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\SALTED_utilities.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\scattering_factors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\sphere_lebedev_rule.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\spherical_density.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\wfn_class.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="\XCW.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="atoms.cpp">
@@ -4985,222 +5159,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="\qct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="atoms.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\b2c.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\basis_set.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\bondwise_analysis.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\cell.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\cif.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\constants.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\convenience.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\cube.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\ECPs_corrections.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\fchk.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\GridManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\integration_params.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\integrator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\isosurface.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\libCintKernels.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\libCintMain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\molecule.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\NoSpherA2.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\nos_math.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\properties.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\SALTED_equicomb.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\SALTED_io.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\SALTED_predictor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\SALTED_utilities.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\scattering_factors.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\sphere_lebedev_rule.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\spherical_density.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\wfn_class.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\XCW.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\qct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="atoms.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\b2c.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\basis_set.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\bondwise_analysis.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\cell.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\cif.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\constants.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\convenience.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\cube.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\ECPs_corrections.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\fchk.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\GridManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\integration_params.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\integrator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\isosurface.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\libCintKernels.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\libCintMain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\molecule.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\NoSpherA2.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\nos_math.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\properties.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\SALTED_equicomb.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\SALTED_io.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\SALTED_predictor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\SALTED_utilities.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\scattering_factors.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\sphere_lebedev_rule.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\spherical_density.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\wfn_class.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\XCW.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="\qct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\AtomGrid.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\atoms.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Src\core\b2c.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Src\core\basis_set.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Src\core\bondwise_analysis.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Src\core\cell.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Src\core\cif.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\constants.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\convenience.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\cube.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Src\core\ECPs_corrections.cpp">
@@ -5209,28 +5176,7 @@
     <ClCompile Include="..\..\Src\core\fchk.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Src\core\GridManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\integration_params.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\integrator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Src\core\isosurface.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\libCintKernels.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\libCintMain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\molecule.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\nos_math.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Src\core\NoSpherA2.cpp">
@@ -5245,32 +5191,74 @@
     <ClCompile Include="..\..\Src\core\qct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Src\core\SALTED_equicomb.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\SALTED_io.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\SALTED_predictor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\SALTED_utilities.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Src\core\scattering_factors.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Src\core\sphere_lebedev_rule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Src\core\spherical_density.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Src\core\wfn_class.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Src\core\XCW.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\SALTED_equicomb.cpp">
+      <Filter>Source Files\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\SALTED_io.cpp">
+      <Filter>Source Files\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\SALTED_predictor.cpp">
+      <Filter>Source Files\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\SALTED_utilities.cpp">
+      <Filter>Source Files\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\integrator.cpp">
+      <Filter>Source Files\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\integration_params.cpp">
+      <Filter>Source Files\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\libCintKernels.cpp">
+      <Filter>Source Files\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\libCintMain.cpp">
+      <Filter>Source Files\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\GridManager.cpp">
+      <Filter>Source Files\Grids</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\AtomGrid.cpp">
+      <Filter>Source Files\Grids</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\atoms.cpp">
+      <Filter>Source Files\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\wfn_class.cpp">
+      <Filter>Source Files\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\nos_math.cpp">
+      <Filter>Source Files\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\molecule.cpp">
+      <Filter>Source Files\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\cube.cpp">
+      <Filter>Source Files\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\cell.cpp">
+      <Filter>Source Files\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\basis_set.cpp">
+      <Filter>Source Files\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\sphere_lebedev_rule.cpp">
+      <Filter>Source Files\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\constants.cpp">
+      <Filter>Source Files\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\convenience.cpp">
+      <Filter>Source Files\Utils</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

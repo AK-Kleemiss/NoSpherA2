@@ -820,15 +820,13 @@ void generate_fractional_hkl(const double& dmin,
 svec read_atoms_from_CIF(std::ifstream& cif_input,
 	const ivec& input_groups,
 	const cell& unit_cell,
-	const WFN& wave,
+	WFN& wave,
 	const svec& known_atoms,
 	ivec& atom_type_list,
 	ivec& asym_atom_to_type_list,
 	ivec& asym_atom_list,
 	bvec& needs_grid,
 	std::ostream& file,
-	bvec& constant_atoms,
-	const bool SALTED,
 	const bool debug)
 {
 	using namespace std;
@@ -919,14 +917,21 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				if (debug)
 					file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
+				int group_nr = 0;
+				if (group_field != -1 && fields[group_field] != ".") {
+					group_nr = std::stoi(fields[group_field]);
+				}
 				bool old_atom = false;
+				string atom_ID = std::to_string(get_atom_ID(
+					constants::get_Z_from_label(fields[type_field].c_str()) + 1, 
+					{stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])},
+					group_nr
+				));
 #pragma omp parallel for reduction(|| : old_atom)
 				for (int run = 0; run < known_atoms.size(); run++)
 				{
-					if (fields[label_field] == known_atoms[run])
+					if (fields[label_field] == known_atoms[run] || atom_ID == known_atoms[run])
 					{
-						if (SALTED && (group_field == -1 || fields[group_field].c_str()[0] == '.'))
-							continue;
 						old_atom = true;
 						if (debug)
 							file << "I already know this one! " << fields[label_field] << " " << known_atoms[run] << endl;
@@ -946,6 +951,8 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					}
 					if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
 					{
+						wave.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
+                        wave.set_atom_group_nr(i, group_nr);
 						string element = constants::atnr2letter(wave.get_atom_charge(i));
 						err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
 						string label = fields[label_field];
@@ -1035,17 +1042,6 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								}
 							}
 						}
-
-						if (group_field == -1)
-						{
-							constant_atoms.push_back(true);
-						}
-						else if (fields[group_field].c_str()[0] != '.')
-						{
-							constant_atoms.push_back(false);
-						}
-						else
-							constant_atoms.push_back(true);
 
 						labels[i] = fields[label_field];
 						asym_atom_list.push_back(i);
@@ -1138,7 +1134,6 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 /**
  * Reads atoms from a CIF file and performs necessary operations. Works without wavefunction for XCW routine.
  */
-
 void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& ncen, bvec& needs_grid, std::vector<asym_atom>& asym_atoms, const bool debug){
 	if (!cif_input)
 	{
@@ -1500,16 +1495,6 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //                            }
 //                        }
 //
-//                        if (group_field == -1)
-//                        {
-//                            constant_atoms.push_back(true);
-//                        }
-//                        else if (fields[group_field].c_str()[0] != '.')
-//                        {
-//                            constant_atoms.push_back(false);
-//                        }
-//                        else
-//                            constant_atoms.push_back(true);
 //
 //                        labels[i] = fields[label_field];
 //                        asym_atom_list.push_back(i);
@@ -2219,7 +2204,6 @@ tsc_block_type calculate_scattering_factors(
 	ivec atom_type_list;
 	ivec asym_atom_to_type_list;
 	ivec asym_atom_list;
-	bvec constant_atoms;
 	bvec needs_grid(nat, false);
 	if (opt.debug)
 		file << "Reading atoms!!!!" << endl;
@@ -2234,8 +2218,6 @@ tsc_block_type calculate_scattering_factors(
 		asym_atom_list,
 		needs_grid,
 		file,
-		constant_atoms,
-		opt.SALTED,
 		opt.debug);
 
 	cif_input.close();
@@ -2331,9 +2313,6 @@ tsc_block_type calculate_scattering_factors(
     }
     else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor &>)
     {
-        err_checkf(labels.size() == asym_atom_list.size() && labels.size() == constant_atoms.size(),
-            "Inconsistent SALTED atom bookkeeping after CIF read!", file);
-
         // Generation of SALTED density coefficients
         file << "\nGenerating densities... " << endl;
         vec coefs = calculator.gen_SALTED_densities();
@@ -2341,68 +2320,6 @@ tsc_block_type calculate_scattering_factors(
         time_points.push_back(get_time());
         time_descriptions.push_back("SALTED prediction");
         calculator.shrink_intermediate_vectors();
-
-		// In disorder calculations beyond the first component, keep constant atoms in the
-		// environment for the prediction but remove their contributions from the result.
-		if (nr != 0)
-		{
-			ivec remove_positions;
-			ivec remove_atom_indices;
-			for (int i = 0; i < constant_atoms.size(); i++)
-			{
-				if (!constant_atoms[i])
-					continue;
-				remove_positions.push_back(i);
-				remove_atom_indices.push_back(asym_atom_list[i]);
-			}
-
-			sort(remove_atom_indices.begin(), remove_atom_indices.end());
-			remove_atom_indices.erase(unique(remove_atom_indices.begin(), remove_atom_indices.end()), remove_atom_indices.end());
-
-			if (!remove_atom_indices.empty())
-			{
-				std::vector<int> coef_offsets(wavy->get_ncen() + 1, 0);
-				for (int atom_idx = 0; atom_idx < wavy->get_ncen(); atom_idx++)
-				{
-					int coef_count = 0;
-					const int lim = (int)wavy->get_atom_basis_set_size(atom_idx);
-					for (int i_basis = 0; i_basis < lim; i_basis++)
-						coef_count += 2 * wavy->get_atom_basis_set_entry(atom_idx, i_basis).get_primitive().get_type() + 1;
-					coef_offsets[atom_idx + 1] = coef_offsets[atom_idx] + coef_count;
-				}
-
-				for (auto it = remove_atom_indices.rbegin(); it != remove_atom_indices.rend(); ++it)
-				{
-					const int atom_idx = *it;
-					coefs.erase(coefs.begin() + coef_offsets[atom_idx], coefs.begin() + coef_offsets[atom_idx + 1]);
-					wavy->erase_atom(atom_idx);
-				}
-
-				svec filtered_labels;
-				ivec filtered_asym_atom_list;
-				bvec filtered_constant_atoms;
-				filtered_labels.reserve(labels.size() - remove_positions.size());
-				filtered_asym_atom_list.reserve(asym_atom_list.size() - remove_positions.size());
-				filtered_constant_atoms.reserve(constant_atoms.size() - remove_positions.size());
-
-				for (int i = 0; i < labels.size(); i++)
-				{
-					if (constant_atoms[i])
-						continue;
-
-					const int old_atom_index = asym_atom_list[i];
-					const int removed_before = static_cast<int>(std::lower_bound(remove_atom_indices.begin(), remove_atom_indices.end(), old_atom_index) - remove_atom_indices.begin());
-
-					filtered_labels.push_back(labels[i]);
-					filtered_asym_atom_list.push_back(old_atom_index - removed_before);
-					filtered_constant_atoms.push_back(false);
-				}
-
-				labels = std::move(filtered_labels);
-				asym_atom_list = std::move(filtered_asym_atom_list);
-				constant_atoms = std::move(filtered_constant_atoms);
-			}
-		}
 
 		err_checkf(labels.size() == asym_atom_list.size(),
 			"Inconsistent SALTED atom bookkeeping after disorder filtering!", file);
@@ -2557,10 +2474,21 @@ tsc_block_type calculate_scattering_factors(
             hkl);
     }
 
+	std::vector<uint64_t> IDs(asym_atom_list.size());
+	for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++) {
+		IDs[atm_idx] = wavy->get_id_for_atom(asym_atom_list[atm_idx]);
+	}
+
+  //  tsc_block_type blocky(
+  //      sf,
+  //      IDs,
+  //      hkl,
+		//"SCATTERER_IDS");
     tsc_block_type blocky(
         sf,
         labels,
         hkl);
+
 
     if (opt.needs_Thakkar_fill)
     {
@@ -2641,7 +2569,6 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
 	ivec atom_type_list;
 	ivec asym_atom_to_type_list;
 	ivec asym_atom_list;
-	bvec constant_atoms;
 	bvec needs_grid(wavy[0].get_ncen(), false);
 	svec known_atoms;
 
@@ -2655,8 +2582,6 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
 		asym_atom_list,
 		needs_grid,
 		std::cout,
-		constant_atoms,
-		opt.SALTED,
 		opt.debug);
 
 	cif_input.close();

@@ -154,15 +154,13 @@ svec read_atoms_from_CIF(
     std::ifstream& cif_input,
     const ivec& input_groups,
     const cell& unit_cell,
-    const WFN& wave,
+    WFN& wave,
     const svec& known_atoms,
     ivec& atom_type_list,
     ivec& asym_atom_to_type_list,
     ivec& asym_atom_list,
     bvec& needs_grid,
     std::ostream& file,
-    bvec& constant_atoms,
-    const bool SALTED = false,
     const bool debug = false);
 
 
