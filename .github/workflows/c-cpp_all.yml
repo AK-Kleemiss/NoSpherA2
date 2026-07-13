@@ -22,6 +22,12 @@ jobs:
   build:
     name: ${{ matrix.name }}
 
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      RUSTC_WRAPPER: "sccache"
+      CARGO_INCREMENTAL: "0"
+
     strategy:
       fail-fast: false
       matrix:
@@ -32,7 +38,6 @@ jobs:
             build-preset: release-linux
             test-preset: release-linux
             build-directory: build/release-linux
-            environment-directory: .mambaenv/env
             architecture: x86_64
             shell: bash
             artifact-path: artifacts/NoSpherA2-linux-x86_64.tar.gz
@@ -44,7 +49,6 @@ jobs:
             build-preset: release-windows
             test-preset: release-windows
             build-directory: build/release-windows
-            environment-directory: .mambaenv/env
             architecture: x86_64
             shell: pwsh
             artifact-path: artifacts/NoSpherA2-windows-x64.zip
@@ -56,7 +60,6 @@ jobs:
             build-preset: release-macos-arm64
             test-preset: release-macos-arm64
             build-directory: build/release-macos-arm64
-            environment-directory: .mambaenv/env-arm64
             architecture: arm64
             shell: bash
             artifact-path: artifacts/NoSpherA2-macos-arm64.tar.gz
@@ -68,7 +71,6 @@ jobs:
             build-preset: release-macos-x86_64
             test-preset: release-macos-x86_64
             build-directory: build/release-macos-x86_64
-            environment-directory: .mambaenv/env-x86_64
             architecture: x86_64
             shell: bash
             artifact-path: artifacts/NoSpherA2-macos-x86_64.tar.gz
@@ -111,45 +113,39 @@ jobs:
       - name: Bootstrap micromamba environments
         run: cmake -P scripts/BootstrapMicromamba.cmake
 
-      # Cache the complete dependency-only CMake/Ninja build tree.
-      - name: Restore dependency build tree
-        id: cmake-deps-cache
-        uses: actions/cache/restore@v5
+      # Cargo's registry and Git checkout caches contain downloaded sources,
+      # not compiler outputs. Rust compiler outputs are handled by sccache.
+      - name: Cache Cargo downloads
+        uses: actions/cache@v5
         with:
-          path: ${{ matrix.build-directory }}
-          key: cmake-deps-v2-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'scripts/BootstrapMicromamba.cmake', 'environment*.yaml', 'occ/**/CMakeLists.txt', 'occ/**/*.cmake', 'libcint/**/CMakeLists.txt', 'libcint/**/*.cmake', 'featomic/**/Cargo.toml', 'featomic/**/Cargo.lock', 'featomic/**/CMakeLists.txt', 'mdspan/**/CMakeLists.txt') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-downloads-v1-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-downloads-v1-${{ runner.os }}-${{ matrix.architecture }}-
 
-      - name: Report dependency cache result
-        run: |
-          echo "Dependency cache exact hit: ${{ steps.cmake-deps-cache.outputs.cache-hit }}"
-          echo "Dependency cache key: ${{ steps.cmake-deps-cache.outputs.cache-primary-key }}"
-
-      # On an exact cache miss, configure and build dependencies only. 
-      # This creates .ninja_log and .ninja_deps without entries belonging 
-      # to the main NoSpherA2 sources.
-      - name: Configure dependencies 
-        if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
-        run: cmake --preset "${{ matrix.configure-preset }}" -DNOSPHERA2_DEPENDENCIES_ONLY=ON
-
-      - name: Build dependencies
-        if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
-        run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4 
-
-      # Save before configuring the complete application. This leaves the
-      # stored tree as a dependency-only baseline.
-      - name: Save dependency build tree
-        if: steps.cmake-deps-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
         with:
-          path: ${{ matrix.build-directory }}
-          key: ${{ steps.cmake-deps-cache.outputs.cache-primary-key }}
+          version: "v0.16.0"
 
-      # Reconfigure the same build tree for the complete application.
+      # Configure a fresh build tree. sccache reuses individual compilation
+      # results, so the CMake/Ninja tree itself does not need to be cached.
       - name: Configure
-        run: cmake --preset "${{ matrix.configure-preset }}" -DNOSPHERA2_BUILD_TESTS=ON -DNOSPHERA2_DEPENDENCIES_ONLY=OFF
+        run: >-
+          cmake --preset "${{ matrix.configure-preset }}"
+          -DNOSPHERA2_BUILD_TESTS=ON
+          -DNOSPHERA2_DEPENDENCIES_ONLY=OFF
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
       - name: Build
         run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
+
+      - name: Show sccache statistics
+        if: always()
+        run: sccache --show-stats
 
       - name: Run tests
         run: ctest --preset "${{ matrix.test-preset }}" --output-on-failure
