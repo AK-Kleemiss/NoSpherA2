@@ -23,8 +23,9 @@ jobs:
     name: ${{ matrix.name }}
 
     env:
-      SCCACHE_GHA_ENABLED: "true"
-      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      SCCACHE_DIR: ${{ runner.temp }}/sccache
+      SCCACHE_CACHE_SIZE: "3G"
+
       RUSTC_WRAPPER: "sccache"
       CARGO_INCREMENTAL: "0"
 
@@ -89,6 +90,54 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+
+      - name: Compute dependency fingerprint
+        id: dependency-fingerprint
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import os
+          import pathlib
+          import subprocess
+
+          digest = hashlib.sha256()
+
+          # Captures the exact revisions of libcint, OCC, mdspan, featomic,
+          # and any nested submodules.
+          digest.update(
+              subprocess.check_output(
+                  ["git", "submodule", "status", "--recursive"]
+              )
+          )
+
+          # Files outside the submodules that affect dependency configuration.
+          patterns = [
+              "CMakeLists.txt",
+              "CMakePresets.json",
+              "scripts/BootstrapMicromamba.cmake",
+              "environment*.yaml",
+              "cmake/**/*.cmake",
+          ]
+
+          for pattern in patterns:
+              for path in sorted(pathlib.Path(".").glob(pattern)):
+                  if not path.is_file():
+                      continue
+
+                  digest.update(path.as_posix().encode("utf-8"))
+                  digest.update(b"\0")
+                  digest.update(path.read_bytes())
+                  digest.update(b"\0")
+
+          with open(
+              os.environ["GITHUB_OUTPUT"],
+              "a",
+              encoding="utf-8",
+          ) as output:
+              print(f"value={digest.hexdigest()}", file=output)
+          PY
+
       # Ninja uses whichever compiler environment is active. On Windows,
       # initialize the x64 MSVC environment before configuring CMake.
       - name: Initialize MSVC x64 environment
@@ -130,6 +179,15 @@ jobs:
         with:
           version: "v0.16.0"
 
+      - name: Restore packed sccache
+        id: sccache-restore
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-packed-v1-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-${{ steps.dependency-fingerprint.outputs.value }}
+          restore-keys: |
+            sccache-packed-v1-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-
+
       # Configure a fresh build tree. sccache reuses individual compilation
       # results, so the CMake/Ninja tree itself does not need to be cached.
       - name: Configure
@@ -146,6 +204,17 @@ jobs:
       - name: Show sccache statistics
         if: always()
         run: sccache --show-stats
+
+      - name: Stop sccache
+        run: sccache --stop-server
+        continue-on-error: true
+
+      - name: Save packed sccache
+        if: steps.sccache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: ${{ steps.sccache-restore.outputs.cache-primary-key }}
 
       - name: Run tests
         run: ctest --preset "${{ matrix.test-preset }}" --output-on-failure
