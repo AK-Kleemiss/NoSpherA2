@@ -204,10 +204,6 @@ jobs:
       - name: Build
         run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
 
-      - name: Show sccache statistics
-        if: always()
-        run: sccache --show-stats
-
       - name: Stop sccache
         run: sccache --stop-server
         continue-on-error: true
