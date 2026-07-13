@@ -23,7 +23,7 @@ jobs:
     name: ${{ matrix.name }}
 
     env:
-      SCCACHE_DIR: ${{ runner.temp }}/sccache
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
       SCCACHE_CACHE_SIZE: "3G"
 
       RUSTC_WRAPPER: "sccache"
@@ -184,9 +184,12 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ env.SCCACHE_DIR }}
-          key: sccache-packed-v1-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-${{ steps.dependency-fingerprint.outputs.value }}
+          key: >-
+            sccache-packed-v2-sccache-0.16.0-${{ runner.os }}-${{
+            matrix.architecture }}-${{ matrix.configure-preset }}-${{
+            steps.dependency-fingerprint.outputs.value }}
           restore-keys: |
-            sccache-packed-v1-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-
+            sccache-packed-v2-sccache-0.16.0-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-
 
       # Configure a fresh build tree. sccache reuses individual compilation
       # results, so the CMake/Ninja tree itself does not need to be cached.
@@ -210,7 +213,10 @@ jobs:
         continue-on-error: true
 
       - name: Save packed sccache
-        if: steps.sccache-restore.outputs.cache-hit != 'true'
+        if: >-
+          success() &&
+          github.event_name != 'pull_request' &&
+          steps.sccache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ env.SCCACHE_DIR }}
