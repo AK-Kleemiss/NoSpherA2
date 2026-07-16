@@ -2,6 +2,10 @@
 
 #include "convenience.h"
 
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <type_traits>
 #include <unordered_set>
 using ScattererLabel = std::variant<std::string, std::uint64_t>;
 using ScattererLabels = std::vector<ScattererLabel>;
@@ -232,6 +236,15 @@ private:
         return result;
     }
 
+    static std::int32_t checked_binary_size(
+        const std::size_t size,
+        const char* description)
+    {
+        if (size > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()))
+            throw std::runtime_error(std::string(description) + " exceeds the 32-bit TSCB limit");
+        return static_cast<std::int32_t>(size);
+    }
+
     void write_scatterer_text(std::ostream& out) const
     {
         validate_uniform_scatterer_type();
@@ -256,7 +269,7 @@ private:
         validate_uniform_scatterer_type();
 
         std::string payload;
-        int payload_size;
+        std::int32_t payload_size;
         if (uses_ids())
         {
             payload.resize(scatterers_.size() * sizeof(std::uint64_t));
@@ -267,7 +280,7 @@ private:
                 std::memcpy(destination, &id, sizeof(id));
                 destination += sizeof(id);
             }
-            payload_size = static_cast<int>(scatterers_.size());
+            payload_size = checked_binary_size(scatterers_.size(), "Scatterer count");
         }
         else
         {
@@ -278,8 +291,7 @@ private:
                     payload.push_back(' ');
                 }
             }
-            payload_size =
-                static_cast<int>(payload.size());
+            payload_size = checked_binary_size(payload.size(), "Scatterer payload");
         }
         write_scalar(out, payload_size);
         write_bytes(out, payload.data(), payload.size());
@@ -287,7 +299,9 @@ private:
 
     void read_binary_scatterers(std::istream& in)
     {
-        const int count = read_scalar<int>(in);
+        const std::int32_t count = read_scalar<std::int32_t>(in);
+        if (count < 0)
+            throw std::runtime_error("Negative scatterer payload size in TSCB file");
         scatterers_.clear();
 
         const bool id_payload =
@@ -470,13 +484,17 @@ public:
         std::ifstream in(file_name, std::ios::binary);
         check_stream(in, "Failed to open TSCB file");
 
-        const std::uint64_t header_size = read_scalar<std::uint64_t>(in);
+        const std::int32_t header_size = read_scalar<std::int32_t>(in);
+        if (header_size < 0)
+            throw std::runtime_error("Negative header size in TSCB file");
         header_ = read_bytes(in, static_cast<std::size_t>(header_size));
 
         read_binary_scatterers(in);
         warn_duplicate_scatterer_ids(scatterers_);
 
-        const std::uint64_t reflection_count = read_scalar<std::uint64_t>(in);
+        const std::int32_t reflection_count = read_scalar<std::int32_t>(in);
+        if (reflection_count < 0)
+            throw std::runtime_error("Negative reflection count in TSCB file");
         indices_.assign(3, {});
         for (auto& dimension : indices_)
             dimension.reserve(static_cast<std::size_t>(reflection_count));
@@ -485,7 +503,7 @@ public:
         for (auto& row : sf_)
             row.reserve(static_cast<std::size_t>(reflection_count));
 
-        for (std::uint64_t reflection = 0;
+        for (std::int32_t reflection = 0;
             reflection < reflection_count;
             ++reflection)
         {
@@ -700,27 +718,46 @@ public:
         std::ofstream out(name, std::ios::binary | std::ios::trunc);
         check_stream(out, "Failed to open TSCB file for writing");
 
-        const int header_size =
-            static_cast<int>(header_.size());
+        const std::int32_t header_size =
+            checked_binary_size(header_.size(), "Header size");
         write_scalar(out, header_size);
         write_bytes(out, header_.data(), header_.size());
 
         write_binary_scatterers(out);
 
-        const int reflections =
-            static_cast<int>(reflection_size());
+        const std::size_t reflection_count = reflection_size();
+        const std::int32_t reflections =
+            checked_binary_size(reflection_count, "Reflection count");
         write_scalar(out, reflections);
 
-        for (std::size_t reflection = 0;
-            reflection < reflection_size();
-            ++reflection)
+        constexpr std::size_t buffer_capacity = 16 * 1024 * 1024;
+        std::vector<char> buffer;
+        buffer.reserve(buffer_capacity);
+
+        auto flush_buffer = [&]()
+        {
+            write_bytes(out, buffer.data(), buffer.size());
+            buffer.clear();
+        };
+        auto append_scalar = [&]<typename T>(const T& value)
+        {
+            static_assert(std::is_trivially_copyable_v<T>);
+            if (buffer.size() + sizeof(T) > buffer_capacity)
+                flush_buffer();
+            const std::size_t offset = buffer.size();
+            buffer.resize(offset + sizeof(T));
+            std::memcpy(buffer.data() + offset, &value, sizeof(T));
+        };
+
+        for (std::size_t reflection = 0; reflection < reflection_count; ++reflection)
         {
             for (std::size_t dimension = 0; dimension < 3; ++dimension)
-                write_scalar(out, indices_[dimension][reflection]);
+                append_scalar(indices_[dimension][reflection]);
 
             for (const auto& row : sf_)
-                write_scalar(out, row[reflection]);
+                append_scalar(row[reflection]);
         }
+        flush_buffer();
     }
 };
 
