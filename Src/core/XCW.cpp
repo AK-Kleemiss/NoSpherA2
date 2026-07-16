@@ -532,42 +532,6 @@ ivec2 XCW::generate_asym_lookup_(const int r) {
 	// closing function
 }
 
-cdouble XCW::calculateXCWintegral(const ivec& active_grids, const vec2& mu_vals, const vec2& nu_vals, const int* points, const cvec2& phase, const cvec& grid_factors, const cdouble& translation_phase) {
-	cdouble integral = 0.0;
-	for (const int g : active_grids) {
-		const int np = points[g];
-		const double* __restrict mu_ptr = mu_vals[g].data();
-		const double* __restrict nu_ptr = nu_vals[g].data();
-		const cdouble* __restrict phase_ptr = phase[g].data();
-		const int np_4 = (np / 4) * 4;
-		double sum_re = 0.0;
-		double sum_im = 0.0;
-		int p = 0;
-		for (; p < np_4; p += 4) {
-			const double overlap0 = mu_ptr[p] * nu_ptr[p];
-			const double overlap1 = mu_ptr[p + 1] * nu_ptr[p + 1];
-			const double overlap2 = mu_ptr[p + 2] * nu_ptr[p + 2];
-			const double overlap3 = mu_ptr[p + 3] * nu_ptr[p + 3];
-			const double phase_re0 = phase_ptr[p].real();
-			const double phase_re1 = phase_ptr[p + 1].real();
-			const double phase_re2 = phase_ptr[p + 2].real();
-			const double phase_re3 = phase_ptr[p + 3].real();
-			const double phase_im0 = phase_ptr[p].imag();
-			const double phase_im1 = phase_ptr[p + 1].imag();
-			const double phase_im2 = phase_ptr[p + 2].imag();
-			const double phase_im3 = phase_ptr[p + 3].imag();
-			sum_re += overlap0 * phase_re0 + overlap1 * phase_re1 + overlap2 * phase_re2 + overlap3 * phase_re3;
-			sum_im += overlap0 * phase_im0 + overlap1 * phase_im1 + overlap2 * phase_im2 + overlap3 * phase_im3;
-		}
-		for (; p < np; p++) {
-			sum_re += mu_ptr[p] * nu_ptr[p] * phase_ptr[p].real();
-			sum_im += mu_ptr[p] * nu_ptr[p] * phase_ptr[p].imag();
-		}
-		integral += cdouble(sum_re, sum_im) * grid_factors[g];
-	}
-	return integral * translation_phase;
-}
-
 size_t XCW::tri_index(int mu, int nu) const noexcept {
 	return mu * cryst.nmo - (mu * (mu - 1)) / 2 + (nu - mu);
 }
@@ -778,6 +742,43 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			values.insert(values.end(), values_for_ao.begin(), values_for_ao.end());
 		}
 	}
+	struct MatrixTile {
+		int row_start;
+		int row_count;
+		int col_start;
+		int col_count;
+		size_t result_offset;
+	};
+	constexpr int screened_tile_size = 64;
+	std::vector<std::vector<MatrixTile>> grid_matrix_tiles(n_atom_grids);
+	ivec grid_tile_result_sizes(n_atom_grids, 0);
+	for (int g = 0; g < n_atom_grids; ++g) {
+		const ivec& active_aos = grid_active_aos[g];
+		const int n_active = static_cast<int>(active_aos.size());
+		size_t result_offset = 0;
+		for (int row_start = 0; row_start < n_active; row_start += screened_tile_size) {
+			const int row_count = std::min(screened_tile_size, n_active - row_start);
+			for (int col_start = row_start; col_start < n_active; col_start += screened_tile_size) {
+				const int col_count = std::min(screened_tile_size, n_active - col_start);
+				bool needed = false;
+				for (int row = row_start; row < row_start + row_count && !needed; ++row) {
+					const int first_col = (row_start == col_start) ? row : col_start;
+					for (int col = first_col; col < col_start + col_count; ++col) {
+						if (!skip[active_aos[row]][active_aos[col]]) {
+							needed = true;
+							break;
+						}
+					}
+				}
+				if (needed) {
+					grid_matrix_tiles[g].push_back({ row_start, row_count, col_start, col_count, result_offset });
+					result_offset += static_cast<size_t>(row_count) * col_count;
+				}
+			}
+		}
+		grid_tile_result_sizes[g] = static_cast<int>(result_offset);
+	}
+	vec3().swap(mu_vals);
 
 	ProgressBar pb((unsigned long long)cryst.nr_small, 60, "=", "|", "Calculating XCW integrals...", std::cout);
 	auto start = std::chrono::high_resolution_clock::now();
@@ -797,12 +798,12 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		cvec3 phase(num_syms, cvec2(n_grids));
 		cvec grid_factors(n_atom_grids);
 		vec weighted_values;
-		vec matrix_real;
-		vec matrix_imag;
+		vec tile_real_values;
+		vec tile_imag_values;
 #if !defined(__APPLE__)
 		mkl_set_num_threads_local(1);
 #endif
-#pragma omp for schedule(static)
+#pragma omp for schedule(dynamic, 1)
 	for (int r = 0; r < cryst.nr_small; r++) {
 
 		// Extract all k_pts needed for this r
@@ -843,8 +844,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				const int np = points[g];
 				const vec& ao_values = grid_ao_values[g];
 				weighted_values.resize(ao_values.size());
-				matrix_real.resize(static_cast<size_t>(n_active) * n_active);
-				matrix_imag.resize(static_cast<size_t>(n_active) * n_active);
+				tile_real_values.resize(grid_tile_result_sizes[g]);
+				tile_imag_values.resize(grid_tile_result_sizes[g]);
 				const cdouble* phase_values = phase[syms][g].data();
 				for (int local_mu = 0; local_mu < n_active; ++local_mu) {
 					const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
@@ -853,8 +854,12 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 						weighted_row[p] = ao_row[p] * phase_values[p].real();
 					}
 				}
-				cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, n_active, n_active, np, 1.0,
-					ao_values.data(), np, weighted_values.data(), np, 0.0, matrix_real.data(), n_active);
+				for (const MatrixTile& tile : grid_matrix_tiles[g]) {
+					cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
+						ao_values.data() + static_cast<size_t>(tile.row_start) * np, np,
+						weighted_values.data() + static_cast<size_t>(tile.col_start) * np, np,
+						0.0, tile_real_values.data() + tile.result_offset, tile.col_count);
+				}
 				for (int local_mu = 0; local_mu < n_active; ++local_mu) {
 					const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
 					double* weighted_row = weighted_values.data() + static_cast<size_t>(local_mu) * np;
@@ -862,17 +867,26 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 						weighted_row[p] = ao_row[p] * phase_values[p].imag();
 					}
 				}
-				cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, n_active, n_active, np, 1.0,
-					ao_values.data(), np, weighted_values.data(), np, 0.0, matrix_imag.data(), n_active);
+				for (const MatrixTile& tile : grid_matrix_tiles[g]) {
+					cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
+						ao_values.data() + static_cast<size_t>(tile.row_start) * np, np,
+						weighted_values.data() + static_cast<size_t>(tile.col_start) * np, np,
+						0.0, tile_imag_values.data() + tile.result_offset, tile.col_count);
+				}
 
 				const cdouble factor = grid_factors[g] * translation_phase[r][syms];
-				for (int local_mu = 0; local_mu < n_active; ++local_mu) {
-					const int mu = active_aos[local_mu];
-					for (int local_nu = local_mu; local_nu < n_active; ++local_nu) {
-						const int nu = active_aos[local_nu];
-						if (!skip[mu][nu]) {
-							const size_t matrix_idx = static_cast<size_t>(local_mu) * n_active + local_nu;
-							I[base + tri_index(mu, nu)] += cdouble(matrix_real[matrix_idx], matrix_imag[matrix_idx]) * factor;
+				for (const MatrixTile& tile : grid_matrix_tiles[g]) {
+					for (int tile_row = 0; tile_row < tile.row_count; ++tile_row) {
+						const int local_mu = tile.row_start + tile_row;
+						const int mu = active_aos[local_mu];
+						const int first_tile_col = (tile.row_start == tile.col_start) ? tile_row : 0;
+						for (int tile_col = first_tile_col; tile_col < tile.col_count; ++tile_col) {
+							const int local_nu = tile.col_start + tile_col;
+							const int nu = active_aos[local_nu];
+							if (!skip[mu][nu]) {
+								const size_t matrix_idx = tile.result_offset + static_cast<size_t>(tile_row) * tile.col_count + tile_col;
+								I[base + tri_index(mu, nu)] += cdouble(tile_real_values[matrix_idx], tile_imag_values[matrix_idx]) * factor;
+							}
 						}
 					}
 				}

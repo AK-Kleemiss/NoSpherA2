@@ -146,8 +146,6 @@ private:
 	void eval_phase(cvec2& phase_fact);
 	// Evaluates the translational contribution to the phase factors
 	void eval_translation_phase(cvec2& translation_phase);
-	// Calculates the XCW_integrals
-	cdouble calculateXCWintegral(const ivec& active_grids, const vec2& mu_vals, const vec2& nu_vals, const int* points, const cvec2& phase, const cvec& grid_factors, const cdouble& translation_phase);
 	// Creates primitive vectors from the basis set for calculating the XCW integrals
 	void create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set);
 	// Helper function that does eveything needed for XCW procedure
