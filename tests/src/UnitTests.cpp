@@ -409,6 +409,83 @@ namespace {
 
 namespace NoSpherA2UnitTests
 {
+
+    TEST(TscBlockTests, ConstructorWarnsForDuplicateScattererIds)
+    {
+        const std::vector<std::vector<cdouble>> form_factors = {
+            { cdouble(1.0, 0.0) },
+            { cdouble(2.0, 0.0) },
+            { cdouble(3.0, 0.0) }
+        };
+        const std::vector<std::uint64_t> scatterer_ids = { 0xabc, 0xdef, 0xabc };
+        const std::vector<std::vector<int>> indices = { { 1 }, { 0 }, { 0 } };
+
+        testing::internal::CaptureStdout();
+        tsc_block<int, cdouble> block(form_factors, scatterer_ids, indices);
+        const std::string output = testing::internal::GetCapturedStdout();
+
+        EXPECT_NE(output.find("WARNING: Duplicate scatterer_ID 0xabc"), std::string::npos);
+    }
+
+    TEST(TscBlockTests, AppendWarnsForDuplicateScattererIds)
+    {
+        const std::vector<std::vector<int>> indices = { { 1 }, { 0 }, { 0 } };
+        const std::vector<std::vector<cdouble>> lhs_form_factors = {
+            { cdouble(1.0, 0.0) }
+        };
+        const std::vector<std::uint64_t> lhs_scatterer_ids = { 0xabc };
+        const std::vector<std::vector<cdouble>> rhs_form_factors = {
+            { cdouble(2.0, 0.0) },
+            { cdouble(3.0, 0.0) }
+        };
+        const std::vector<std::uint64_t> rhs_scatterer_ids = { 0xabc, 0xdef };
+
+        tsc_block<int, cdouble> lhs(lhs_form_factors, lhs_scatterer_ids, indices);
+        tsc_block<int, cdouble> rhs(rhs_form_factors, rhs_scatterer_ids, indices);
+        std::ostringstream log;
+
+        testing::internal::CaptureStdout();
+        lhs.append(rhs, log);
+        const std::string output = testing::internal::GetCapturedStdout();
+
+        EXPECT_NE(output.find("WARNING: Duplicate scatterer_ID 0xabc"), std::string::npos);
+        EXPECT_EQ(lhs.scatterer_size(), 2);
+    }
+
+    TEST(TscBlockTests, BinaryFileRoundTripsWith32BitSizes)
+    {
+        const std::vector<std::vector<cdouble>> form_factors = {
+            { cdouble(1.25, -0.5), cdouble(2.5, 0.75) },
+            { cdouble(-3.0, 1.5), cdouble(4.25, -2.0) }
+        };
+        const std::vector<std::uint64_t> scatterer_ids = { 0xabc, 0xdef };
+        const std::vector<std::vector<int>> indices = {
+            { 1, -2 }, { 0, 3 }, { -1, 4 }
+        };
+        const std::filesystem::path path =
+            std::filesystem::temp_directory_path() / "nosphera2_tscb_32bit_roundtrip.tscb";
+
+        tsc_block<int, cdouble> original(
+            form_factors, scatterer_ids, indices, "SCATTERER_IDS");
+        original.write_tscb_file({}, path);
+        tsc_block<int, cdouble> restored(path);
+        std::filesystem::remove(path);
+
+        ASSERT_EQ(restored.scatterer_size(), scatterer_ids.size());
+        ASSERT_EQ(restored.reflection_size(), indices[0].size());
+        for (std::size_t scatterer = 0; scatterer < scatterer_ids.size(); ++scatterer)
+        {
+            EXPECT_EQ(std::get<std::uint64_t>(restored.get_scatterer(scatterer)),
+                scatterer_ids[scatterer]);
+            EXPECT_EQ(restored.get_sf_for_scatterer(scatterer), form_factors[scatterer]);
+        }
+        for (std::size_t reflection = 0; reflection < indices[0].size(); ++reflection)
+        {
+            EXPECT_EQ(restored.get_indices(reflection),
+                (std::array<int, 3>{ indices[0][reflection], indices[1][reflection], indices[2][reflection] }));
+        }
+    }
+
     TEST(SALTEDTests, ReadingSALTEDBinaryFile)
     {
         test_reading_SALTED_binary_file();

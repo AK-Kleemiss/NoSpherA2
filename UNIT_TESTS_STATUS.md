@@ -1,5 +1,9 @@
 # Unit Test Status
-**Last updated: 2026-06-14**
+**Last updated: 2026-07-15** (added
+`TscBlockTests.BinaryFileRoundTripsWith32BitSizes` for buffered TSCB output and matching
+32-bit binary size fields; the first compile attempt lacked MSVC standard-library include paths,
+and the developer-environment retry exceeded the validation time window without producing a
+compiler error. Last full validated baseline remains **201/201 ctest passing**.)
 
 ## Test Harnesses
 
@@ -58,7 +62,7 @@ Added: 2026-06-14.
 | Test name | Directory | Good file | Full? | Status |
 |-----------|-----------|-----------|-------|--------|
 | alanine_occ | alanine_occ | alanine_occ.good | no | ✅ passing |
-| alanine_integrated_occ | alanine_integrated_occ | alanine_integrated_occ.good | no | ⚠️ **crashing** — see INVESTIGATION_STATUS.md |
+| alanine_integrated_occ | alanine_integrated_occ | alanine_integrated_occ.good | no | ✅ passing |
 | disorder_THPP | disorder | disorder_THPP.good | no | ✅ passing |
 | fourier_transform | SALTED | fourier_transform.good | no | ✅ passing |
 | fractal | sucrose_fchk_SF | fractal.good | no | ✅ passing |
@@ -78,8 +82,8 @@ Added: 2026-06-14.
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |
 | sucrose_twin | sucrose_fchk_SF | sucrose_twin.good | no | ✅ passing |
 | wfn_reading | wfn_reading | wfn_reading.good | no | ✅ passing |
-| **TFVC** | TFVC | TFVC.good | no | 🆕 **added 2026-06-14** — not yet validated |
-| **TFVC_ECP** | TFVC | TFVC_ECP.good | no | 🆕 **added 2026-06-14** — not yet validated |
+| **TFVC** | TFVC | TFVC.good | no | ✅ passing |
+| **TFVC_ECP** | TFVC | TFVC_ECP.good | no | ✅ passing |
 | fchk_conversion | NiP3_fchk | good.fchk | **yes** | ✅ passing (tolerated numeric warn) |
 | fourier_transform_full | SALTED | fourier_transform_full.good | **yes** | ✅ passing |
 

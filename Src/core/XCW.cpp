@@ -532,27 +532,18 @@ ivec2 XCW::generate_asym_lookup_(const int r) {
 	// closing function
 }
 
-void XCW::calculateXCWintegral(const vec2& grid_positions, const d3& mu_position, const d3& nu_position, const vec2& mu_vals, const vec2& nu_vals, const int* points, const cvec2& phase, const std::vector<asym_atom>& asym_atoms, const cvec2& DW_fact, const cvec2& phase_fact, const int mu, const int nu, const int r, const cdouble& translation_phase, int& skipped_grids) {
-	const int n_grids = mu_vals.size();
-	cvec sfs(n_grids);
-	double sum_re, sum_im;
-	int p;
-	#pragma omp parallel for schedule(dynamic, 1) private(sum_re, sum_im, p)
-	for (int g = 0; g < n_grids; g++) {
-		const double distance_mu = std::pow(grid_positions[g][0] - mu_position[0], 2) + std::pow(grid_positions[g][1] - mu_position[1], 2) + std::pow(grid_positions[g][2] - mu_position[2], 2);
-		const double distance_nu = std::pow(grid_positions[g][0] - nu_position[0], 2) + std::pow(grid_positions[g][1] - nu_position[1], 2) + std::pow(grid_positions[g][2] - nu_position[2], 2);
-		if(distance_mu > 144 || distance_nu > 144) {
-			skipped_grids++;
-			continue;
-		}
+cdouble XCW::calculateXCWintegral(const ivec& active_grids, const vec2& mu_vals, const vec2& nu_vals, const int* points, const cvec2& phase, const cvec& grid_factors, const cdouble& translation_phase) {
+	cdouble integral = 0.0;
+	for (const int g : active_grids) {
 		const int np = points[g];
 		const double* __restrict mu_ptr = mu_vals[g].data();
 		const double* __restrict nu_ptr = nu_vals[g].data();
 		const cdouble* __restrict phase_ptr = phase[g].data();
-		const long long int np_4 = (np / 4) * 4;
-		sum_re = 0.0;
-		sum_im = 0.0;
-		for (p = 0; p < np_4; p += 4) {
+		const int np_4 = (np / 4) * 4;
+		double sum_re = 0.0;
+		double sum_im = 0.0;
+		int p = 0;
+		for (; p < np_4; p += 4) {
 			const double overlap0 = mu_ptr[p] * nu_ptr[p];
 			const double overlap1 = mu_ptr[p + 1] * nu_ptr[p + 1];
 			const double overlap2 = mu_ptr[p + 2] * nu_ptr[p + 2];
@@ -568,19 +559,13 @@ void XCW::calculateXCWintegral(const vec2& grid_positions, const d3& mu_position
 			sum_re += overlap0 * phase_re0 + overlap1 * phase_re1 + overlap2 * phase_re2 + overlap3 * phase_re3;
 			sum_im += overlap0 * phase_im0 + overlap1 * phase_im1 + overlap2 * phase_im2 + overlap3 * phase_im3;
 		}
-		for (p = np_4; p < np; p++) {
+		for (; p < np; p++) {
 			sum_re += mu_ptr[p] * nu_ptr[p] * phase_ptr[p].real();
 			sum_im += mu_ptr[p] * nu_ptr[p] * phase_ptr[p].imag();
 		}
-		sfs[g] = cdouble(sum_re, sum_im);
+		integral += cdouble(sum_re, sum_im) * grid_factors[g];
 	}
-	for (int at = 0; at < cryst.ncen; at++) {
-		const double asym_fact = asym_atoms[at].asym_fact;
-		const cvec& DW_at = DW_fact[at];
-		const cvec& phase_at = phase_fact[at];
-		const cdouble temp1 = sfs[at] * DW_at[r] * phase_at[r];
-		I[flattened_idx(r, mu, nu)] += temp1 * asym_fact * translation_phase;
-	}
+	return integral * translation_phase;
 }
 
 size_t XCW::tri_index(int mu, int nu) const noexcept {
@@ -621,7 +606,8 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 
 void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase) {
 
-	I.resize(cryst.nr_small * (cryst.nmo * (cryst.nmo + 1)) / 2);
+	const int packed_size = (cryst.nmo * (cryst.nmo + 1)) / 2;
+	I.assign(cryst.nr_small * packed_size, cdouble{});
 	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
 
 	cvec XCW_integrals;
@@ -667,7 +653,6 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 
 	// Precompute screening
 	double cutoff = 0;
-	int screen_counter = 0;
 	ivec2 skip(cryst.nmo, ivec(cryst.nmo, 0));
 	for (mu = 0; mu < cryst.nmo; mu++) {
 		const ao_data& mu_prims = ao_data_shells[mu];
@@ -721,12 +706,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 
 	// Precompute mu_vals for all grids
-	ivec3 non_zero_points(cryst.nmo, ivec2(n_grids));
 	vec3 mu_vals(cryst.nmo, vec2(n_grids));
 #pragma omp parallel for schedule(dynamic)
 	for (mu = 0; mu < cryst.nmo; mu++) {
 		const ao_data& mu_prims = ao_data_shells[mu];
-		const std::vector<primitive> mu_primitives = mu_prims.prims;
+		const std::vector<primitive>& mu_primitives = mu_prims.prims;
 		const double mp0 = mu_prims.pos[0];
 		const double mp1 = mu_prims.pos[1];
 		const double mp2 = mu_prims.pos[2];
@@ -745,28 +729,88 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				}
 				else {
 					local_mu_vals_ptr[p] = dummy_wave.eval_ao(d_mu, mu_primitives, mu_prims.m);
-					non_zero_points[mu][g].push_back(p);
 				}
 			}
 		}
 	}
 	std::cout << "AO values calculated for all grids." << std::endl;
 
-	ProgressBar* pb = new ProgressBar((unsigned long long)cryst.nr, 60, "=", "|", "Calculating XCW integrals...", std::cout);
+	const int n_atom_grids = std::min(n_grids, cryst.ncen);
+	ivec2 active_grids(packed_size);
+	ivec skipped_grids_per_pair(packed_size, 0);
+	for (mu = 0; mu < cryst.nmo; ++mu) {
+		for (nu = mu; nu < cryst.nmo; ++nu) {
+			const size_t pair_idx = tri_index(mu, nu);
+			if (skip[mu][nu]) {
+				continue;
+			}
+			ivec& pair_grids = active_grids[pair_idx];
+			for (int g = 0; g < n_atom_grids; ++g) {
+				const double mu_dx = grid_positions[g][0] - ao_data_shells[mu].pos[0];
+				const double mu_dy = grid_positions[g][1] - ao_data_shells[mu].pos[1];
+				const double mu_dz = grid_positions[g][2] - ao_data_shells[mu].pos[2];
+				const double nu_dx = grid_positions[g][0] - ao_data_shells[nu].pos[0];
+				const double nu_dy = grid_positions[g][1] - ao_data_shells[nu].pos[1];
+				const double nu_dz = grid_positions[g][2] - ao_data_shells[nu].pos[2];
+				const double distance_mu = mu_dx * mu_dx + mu_dy * mu_dy + mu_dz * mu_dz;
+				const double distance_nu = nu_dx * nu_dx + nu_dy * nu_dy + nu_dz * nu_dz;
+				if (distance_mu <= 144.0 && distance_nu <= 144.0) {
+					pair_grids.push_back(g);
+				}
+			}
+			skipped_grids_per_pair[pair_idx] = n_atom_grids - static_cast<int>(pair_grids.size());
+		}
+	}
+	ivec2 grid_active_aos(n_atom_grids);
+	vec2 grid_ao_values(n_atom_grids);
+	for (int g = 0; g < n_atom_grids; ++g) {
+		ivec& active_aos = grid_active_aos[g];
+		vec& values = grid_ao_values[g];
+		for (int mu = 0; mu < cryst.nmo; ++mu) {
+			const double dx = grid_positions[g][0] - ao_data_shells[mu].pos[0];
+			const double dy = grid_positions[g][1] - ao_data_shells[mu].pos[1];
+			const double dz = grid_positions[g][2] - ao_data_shells[mu].pos[2];
+			if (dx * dx + dy * dy + dz * dz > 144.0) {
+				continue;
+			}
+			active_aos.push_back(mu);
+			const vec& values_for_ao = mu_vals[mu][g];
+			values.insert(values.end(), values_for_ao.begin(), values_for_ao.end());
+		}
+	}
+
+	ProgressBar pb((unsigned long long)cryst.nr_small, 60, "=", "|", "Calculating XCW integrals...", std::cout);
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// Main loop for computation of I
-	int skipped_grids = 0;
+	long long skipped_grids = 0;
+	long long screen_counter = 0;
+	for (int mu = 0; mu < cryst.nmo; ++mu) {
+		for (int nu = mu; nu < cryst.nmo; ++nu) {
+			screen_counter += skip[mu][nu];
+		}
+	}
+	screen_counter *= cryst.nr_small;
+#pragma omp parallel reduction(+:skipped_grids)
+	{
+		vec2 single_k_pts(num_syms, vec(3));
+		cvec3 phase(num_syms, cvec2(n_grids));
+		cvec grid_factors(n_atom_grids);
+		vec weighted_values;
+		vec matrix_real;
+		vec matrix_imag;
+#if !defined(__APPLE__)
+		mkl_set_num_threads_local(1);
+#endif
+#pragma omp for schedule(static)
 	for (int r = 0; r < cryst.nr_small; r++) {
 
 		// Extract all k_pts needed for this r
-		vec2 single_k_pts(num_syms);
 		for (int syms = 0; syms < num_syms; syms++) {
 			single_k_pts[syms] = { k_pt[0][asym_lookup[r][syms]], k_pt[1][asym_lookup[r][syms]], k_pt[2][asym_lookup[r][syms]] };
 		}
 
 		// Precompute weighted phase factors for integration
-		cvec3 phase(num_syms, cvec2(n_grids));
 		for (int syms = 0; syms < num_syms; syms++) {
 			for (int g = 0; g < n_grids; g++) {
 				phase[syms][g].resize(points[g]);
@@ -776,25 +820,72 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				}
 			}
 		}
+		for (int g = 0; g < n_atom_grids; ++g) {
+			grid_factors[g] = asym_atoms[g].asym_fact * DW_fact[g][r] * phase_fact[g][r];
+		}
 
-		//Compute the elements of the I tensor (WIP)
-		for (mu = 0; mu < cryst.nmo; mu++) {
-			for (nu = mu; nu < cryst.nmo; nu++) {
-				if (skip[mu][nu]) {
-					screen_counter++;
-					continue;
-				}
-				for (int syms = 0; syms < num_syms; syms++) {
-					calculateXCWintegral(grid_positions, ao_data_shells[mu].pos, ao_data_shells[nu].pos, mu_vals[mu], mu_vals[nu], points, phase[syms], asym_atoms, DW_fact, phase_fact, mu, nu, r, translation_phase[r][syms], skipped_grids);
+		for (int mu = 0; mu < cryst.nmo; ++mu) {
+			for (int nu = mu; nu < cryst.nmo; ++nu) {
+				if (!skip[mu][nu]) {
+					skipped_grids += static_cast<long long>(num_syms) * skipped_grids_per_pair[tri_index(mu, nu)];
 				}
 			}
 		}
-		pb->update();
+
+		const size_t base = static_cast<size_t>(r) * packed_size;
+		for (int syms = 0; syms < num_syms; ++syms) {
+			for (int g = 0; g < n_atom_grids; ++g) {
+				const ivec& active_aos = grid_active_aos[g];
+				const int n_active = static_cast<int>(active_aos.size());
+				if (n_active == 0) {
+					continue;
+				}
+				const int np = points[g];
+				const vec& ao_values = grid_ao_values[g];
+				weighted_values.resize(ao_values.size());
+				matrix_real.resize(static_cast<size_t>(n_active) * n_active);
+				matrix_imag.resize(static_cast<size_t>(n_active) * n_active);
+				const cdouble* phase_values = phase[syms][g].data();
+				for (int local_mu = 0; local_mu < n_active; ++local_mu) {
+					const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
+					double* weighted_row = weighted_values.data() + static_cast<size_t>(local_mu) * np;
+					for (int p = 0; p < np; ++p) {
+						weighted_row[p] = ao_row[p] * phase_values[p].real();
+					}
+				}
+				cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, n_active, n_active, np, 1.0,
+					ao_values.data(), np, weighted_values.data(), np, 0.0, matrix_real.data(), n_active);
+				for (int local_mu = 0; local_mu < n_active; ++local_mu) {
+					const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
+					double* weighted_row = weighted_values.data() + static_cast<size_t>(local_mu) * np;
+					for (int p = 0; p < np; ++p) {
+						weighted_row[p] = ao_row[p] * phase_values[p].imag();
+					}
+				}
+				cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, n_active, n_active, np, 1.0,
+					ao_values.data(), np, weighted_values.data(), np, 0.0, matrix_imag.data(), n_active);
+
+				const cdouble factor = grid_factors[g] * translation_phase[r][syms];
+				for (int local_mu = 0; local_mu < n_active; ++local_mu) {
+					const int mu = active_aos[local_mu];
+					for (int local_nu = local_mu; local_nu < n_active; ++local_nu) {
+						const int nu = active_aos[local_nu];
+						if (!skip[mu][nu]) {
+							const size_t matrix_idx = static_cast<size_t>(local_mu) * n_active + local_nu;
+							I[base + tri_index(mu, nu)] += cdouble(matrix_real[matrix_idx], matrix_imag[matrix_idx]) * factor;
+						}
+					}
+				}
+			}
+		}
+		#pragma omp critical(XCW_progress_bar)
+		pb.update();
 	}
-	free(pb);
+	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = end - start;
-	const int number_integrals = (cryst.nmo * (cryst.nmo + 1) / 2);
+	const int number_integrals = packed_size;
+	XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
 	std::cout << std::endl << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
 	std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter / cryst.nr << " pairs of mu, nu (" << screen_counter / static_cast<double>(cryst.nr * number_integrals) * 100 << "%)" << std::endl;
 	std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / (static_cast<long long>(number_integrals) * cryst.nr * cryst.ncen) * 100 << "%)" << std::endl;

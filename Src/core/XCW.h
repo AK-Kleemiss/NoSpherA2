@@ -147,7 +147,7 @@ private:
 	// Evaluates the translational contribution to the phase factors
 	void eval_translation_phase(cvec2& translation_phase);
 	// Calculates the XCW_integrals
-	void calculateXCWintegral(const vec2& grid_positions, const d3& mu_position, const d3& nu_position, const vec2& mu_vals, const vec2& nu_vals, const int* points, const cvec2& phase, const std::vector<asym_atom>& asym_atoms, const cvec2& DW_fact, const cvec2& phase_fact, const int mu, const int nu, const int r, const cdouble& translation_phase, int& skipped_grids);
+	cdouble calculateXCWintegral(const ivec& active_grids, const vec2& mu_vals, const vec2& nu_vals, const int* points, const cvec2& phase, const cvec& grid_factors, const cdouble& translation_phase);
 	// Creates primitive vectors from the basis set for calculating the XCW integrals
 	void create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set);
 	// Helper function that does eveything needed for XCW procedure
