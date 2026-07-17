@@ -90,20 +90,12 @@ const std::string SALTEDPredictor::get_dfbasis_name() const
     return config.dfbasis;
 }
 
-void calculateConjugate(std::vector<std::vector<std::vector<std::vector<std::complex<double>>>>> &v2)
+void calculateConjugate(SALTEDDescriptors& v2)
 {
 #pragma omp parallel for
-    for (int i = 0; i < v2.size(); ++i)
+    for (int i = 0; i < static_cast<int>(v2.values().size()); ++i)
     {
-        auto &vec3d = v2[i];
-        for (auto &vec2d : vec3d)
-        {
-            for (auto &vec1d : vec2d)
-            {
-                std::transform(vec1d.begin(), vec1d.end(), vec1d.begin(), [](const std::complex<double> &val)
-                               { return std::conj(val); });
-            }
-        }
+        v2.values()[i] = std::conj(v2.values()[i]);
     }
 }
 
@@ -216,9 +208,17 @@ void SALTEDPredictor::read_model_data() {
 vec SALTEDPredictor::predict()
 {
     using namespace std;
-    // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
-    vec2 pvec(SALTED_Utils::get_lmax_max(lmax) + 1);
-    for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
+    // Process each lambda block immediately after equicomb. This keeps only one
+    // large descriptor block alive instead of retaining every lambda in pvec.
+    const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
+    std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
+    std::vector<dMatrix2> kernell0_nm(config.species.size());
+    for (int spe_idx = 0; spe_idx < static_cast<int>(config.species.size()); ++spe_idx)
+    {
+        psi_nm[spe_idx].resize(lmax[config.species[spe_idx]] + 1);
+    }
+
+    for (int lam = 0; lam < lmax_max + 1; lam++)
     {
         int llmax = 0;
         unordered_map<int, ivec> lvalues{};
@@ -261,27 +261,18 @@ vec SALTEDPredictor::predict()
             p.assign((size_t)natoms * ((size_t)2 * lam + 1) * featsize[lam], 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
         }
-        pvec[lam] = p;
-    }
-
-    std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
-    for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
-    {
-        const string spe = config.species[spe_idx];
-        psi_nm[spe_idx].resize(lmax[spe] + 1);
-
-        if (atom_idx.find(spe) == atom_idx.end())
+        for (int spe_idx = 0; spe_idx < static_cast<int>(config.species.size()); ++spe_idx)
         {
-            continue;
-        }
-        dMatrix2 kernell0_nm;
-        for (int lam = 0; lam < lmax[spe] + 1; ++lam)
-        {
+            const string& spe = config.species[spe_idx];
+            if (lam > lmax[spe] || atom_idx.find(spe) == atom_idx.end())
+            {
+                continue;
+            }
             int lam2_1 = 2 * lam + 1;
             int row_size = featsize[lam] * lam2_1; // Size of a block of rows
 
             dMatrix2 pvec_lam(atom_idx[spe].size() * lam2_1, featsize[lam]);
-            dMatrixRef2 _pvec(pvec[lam].data(), natoms, featsize[lam] * lam2_1);
+            dMatrixRef2 _pvec(p.data(), natoms, featsize[lam] * lam2_1);
             double* pvec_ptr = pvec_lam.data();
             for (const int idx : atom_idx[spe])
             {
@@ -299,7 +290,7 @@ vec SALTEDPredictor::predict()
 
                 if (lam == 0)
                 {
-                    kernell0_nm = kernel_nm;
+                    kernell0_nm[spe_idx] = kernel_nm;
                     kernel_nm = elementWiseExponentiation(kernel_nm, config.zeta);
                 }
                 else
@@ -308,7 +299,7 @@ vec SALTEDPredictor::predict()
                     {
                         for (size_t i2 = 0; i2 < Mspe[spe]; ++i2)
                         {
-                            double scale_factor = pow(kernell0_nm(i1, i2), config.zeta - 1);
+                            double scale_factor = pow(kernell0_nm[spe_idx](i1, i2), config.zeta - 1);
                             size_t base_i = i1 * lam2_1;
                             size_t base_j = i2 * lam2_1;
                             for (size_t i = 0; i < lam2_1; ++i)
@@ -325,8 +316,6 @@ vec SALTEDPredictor::predict()
             }
         }
     }
-    pvec.clear();
-    pvec.shrink_to_fit();
 
     unordered_map<string, dMatrix1> C{};
     unordered_map<string, int> ispe{};
