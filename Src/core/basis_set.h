@@ -36,6 +36,7 @@ public:
     void operator+=(const BasisSet& other);
 
     void set_name(const std::string& name) { _name = name; }
+    const std::string& get_name() const { return _name; }
     void set_primitive_count(uint32_t count) { _primitiveCount = count; }
     uint32_t get_primitive_count() const { return _primitiveCount; }
     void set_element_ranges(const std::array<int, 118>& counts) { _elementCounts = counts; }

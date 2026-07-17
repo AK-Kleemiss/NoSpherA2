@@ -41,6 +41,8 @@ void XCW::construct(const options& opt_in) {
 	make_k_pts(cryst.nr != 0 && hkl.size() == 0, opt_in.save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt_in.debug);
 	read_fracs_ADPs_from_CIF(cif, dummy_wave, log3, opt_in.debug);
 	XCW_log.open("XCW.log");
+	std::cout << "XCW orbital basis set: " << basis->get_name() << std::endl;
+	XCW_log << "XCW orbital basis set: " << basis->get_name() << std::endl;
 	cryst.inv_scale = 1.0 / (cryst.nr_small - settings.n_params);
 	F_calc.resize(2);
 	F_calc[0].resize(cryst.nr_small, 0);
