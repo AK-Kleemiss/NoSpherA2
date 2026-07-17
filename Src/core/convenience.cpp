@@ -3108,6 +3108,15 @@ void options::digest_options()
         }
         else if (temp == "-do_XCW") {
             do_XCW = true;
+            // Optional trailing "stepsize max_value" to limit the lambda scan
+            // range, e.g. for quick tests: -do_XCW 0.01 0.01
+            if (i + 2 < argc &&
+                string(arguments[i + 1]).find("-") != 0 &&
+                string(arguments[i + 2]).find("-") != 0)
+            {
+                xcw_lambda_step = stod(arguments[i + 1]);
+                xcw_lambda_max = stod(arguments[i + 2]);
+            }
         }
         else if (temp == "-calc_F") {
             calc_F_calc = true;

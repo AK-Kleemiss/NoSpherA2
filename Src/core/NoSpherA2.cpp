@@ -552,10 +552,11 @@ int run_app(int argc, char **argv)
         }
         if (opt.calc_F_calc) {
 			std::cout << "Currently not implemented..." << std::endl;
-            exit(0);
             //xcw.calc_F_calc_fast();
         }
-        exit(0);
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf);
+        return 0;
     }
     // Contains all calculations of properties and cubes
     if (opt.properties.calc())

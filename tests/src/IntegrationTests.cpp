@@ -486,6 +486,12 @@ TEST(TomlIntegrationTests, DisorderTHPP)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, P1_test_XCW)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, Fractal)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "fractal");

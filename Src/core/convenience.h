@@ -742,6 +742,8 @@ struct options
     bool needs_Thakkar_fill = false;
     bool qct = false;
     bool do_XCW = false;
+    double xcw_lambda_step = 0.0;
+    double xcw_lambda_max = 0.0;
     bool calc_F_calc = false;
     bool rgbi = false;
     bool rgbi_no_sym = false;

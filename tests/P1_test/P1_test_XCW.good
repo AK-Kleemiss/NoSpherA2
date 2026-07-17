@@ -1,0 +1,31 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                            "P1_test_NA2.cif"Reading:                                "P1_test.hkl" done!
+Nr of reflections read from file: 3215
+Number of symmetry operations: 1
+Nr of reflections to be used: 3215
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 3215
+XCW orbital basis set: def2-svp-basis
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 151614 grid points.
+Total number of grid points after pruning: 148356
+AO values calculated for all grids.
+[                 Calculating XCW integrals...                ]
+[=============================================================] 100% 
+More detailed output in XCW.log file...
+____________________________________________________________________________
+ Lambda		Chi^2	GooF	Total Energy	Perturbation	Target quantity 
+								(Eh)		   (a. u.)			(a. u.)
+____________________________________________________________________________
+	0.000	1.253	1.811	-1984.745543784		0.000		-1984.745543784
+	0.010	1.233	1.788	-1984.745445290		0.012		-1984.733114710
+Finished XCW fitting procedure.

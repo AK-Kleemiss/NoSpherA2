@@ -7,6 +7,13 @@
 
 void XCW::construct(const options& opt_in) {
 	opt = &opt_in;
+	if (opt_in.xcw_lambda_step > 0.0) {
+		settings.xcw_step_size = opt_in.xcw_lambda_step;
+		settings.num_xcw_steps = static_cast<int>(std::round(opt_in.xcw_lambda_max / opt_in.xcw_lambda_step)) + 1;
+	}
+	if (!opt_in.basis_set.empty()) {
+		settings.basis_set_name = opt_in.basis_set;
+	}
 	std::filesystem::path hkl_filename = opt_in.hkl;
 	std::filesystem::path cif = opt_in.cif;
 	std::ifstream cif_input(cif.c_str(), std::ios::in);
@@ -67,8 +74,8 @@ XCW::SCF_settings XCW::loadSettings() {
 	settings.hf_type = occ::qm::SpinorbitalKind::Restricted;
 	settings.alpha = 0.5;
 	settings.level_shift = 0.0;
-	settings.num_xcw_steps = 10;
 	settings.xcw_step_size = 0.01;
+	settings.num_xcw_steps = static_cast<int>(std::round(1.0 / settings.xcw_step_size)) + 1; // lambda max = 1.0 by default
 	settings.max_scf_iterations = 100;
 	settings.charge = 0;
 	settings.multiplicity = 1;
@@ -1510,6 +1517,4 @@ void XCW::run_XCW_fitting() {
 	}
 
 	std::cout << "Finished XCW fitting procedure." << std::endl;
-	exit(0);
-
 }

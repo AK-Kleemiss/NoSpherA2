@@ -1,9 +1,16 @@
 # Unit Test Status
-**Last updated: 2026-07-15** (added
+**Last updated: 2026-07-18** (fixed the `TomlIntegrationTests.P1_test_XCW` access violation:
+`GridManager::calculateMBISWeights`/`calculateEMBISWeights` ignored `config_.no_density_eval`
+and forced a real WFN density evaluation on XCW's MO-pruned dummy wavefunction, corrupting
+memory — see Known Issues below. `P1_test_XCW` is now enabled and passing in-process at
+`OMP_NUM_THREADS=20`. Last full validated baseline remains **201/201 ctest passing**; this adds
+one new passing test on top of that baseline, not yet re-counted into the total.)
+
+**2026-07-15** (added
 `TscBlockTests.BinaryFileRoundTripsWith32BitSizes` for buffered TSCB output and matching
 32-bit binary size fields; the first compile attempt lacked MSVC standard-library include paths,
 and the developer-environment retry exceeded the validation time window without producing a
-compiler error. Last full validated baseline remains **201/201 ctest passing**.)
+compiler error.)
 
 ## Test Harnesses
 
@@ -91,6 +98,7 @@ Added: 2026-06-14.
 | TFVC | TFVC | TFVC.good | no | ✅ passing |
 | TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
 | fchk_conversion | NiP3_fchk | good.fchk | **yes** | ✅ passing (tolerated numeric warn) |
+| P1_test_XCW | P1_test | P1_test_XCW.good | no | ✅ passing (added 2026-07-18, in-process only; see note below) |
 
 ---
 
@@ -124,6 +132,71 @@ files generated before they can be registered.
 ---
 
 ## Known Issues
+
+- **`P1_test_XCW` access violation, root-caused and fixed 2026-07-18**: the in-process
+  `TomlIntegrationTests.P1_test_XCW` test reliably crashed (`0xC0000005`) inside
+  `GridManager::setup3DGridsForMolecule`, but only when driven through the in-process GoogleTest
+  harness — not the standalone `NoSpherA2.exe`. A debug-CRT build (`cmake --preset debug-windows
+  -DNOSPHERA2_BUILD_TESTS=ON`) reproduced it deterministically (independent of thread count) as a
+  clean `vector subscript out of range` assertion, which narrowed it to
+  `GridManager::calculateMBISWeights`/`calculateEMBISWeights`: both unconditionally called
+  `calculateNonSphericalDensities()` whenever `!non_spherical_densities_calculated_`, ignoring
+  `config_.no_density_eval`. `XCW::eval_I` (`Src/core/XCW.cpp`) sets `no_density_eval = true` and
+  fills `WFN_DENSITY` with a placeholder value itself *after* grid setup returns — it deliberately
+  skips real density evaluation on `dummy_wave`, which has had `delete_unoccupied_MOs()` called on
+  it. The `[defaults]` block in `tests/tests.toml` (and the equivalent hardcoded defaults in the
+  C++ harness, `tests/src/IntegrationTests.cpp`) injects `-all_charges` into every toml-driven
+  test, which triggers the MBIS/EMBIS "every scheme" branch inside
+  `GridManager::setup3DGridsForMolecule` — and that branch called the offending function on the
+  MO-pruned wavefunction, corrupting memory. It happened to not crash when run as a standalone
+  process (undefined-behavior heap read that landed in still-mapped memory there), but reliably
+  faulted in the larger, differently-laid-out in-process test binary.
+  Fix (`Src/core/GridManager.cpp`): guard both call sites with `&& !config_.no_density_eval`, and
+  gate the whole "every scheme" (`debug`/`all_charges`) computation in
+  `setup3DGridsForMolecule` on `!config_.no_density_eval` (`want_every_scheme`), since
+  MBIS/EMBIS are density-based and produce meaningless zero output without real density anyway —
+  unlike Hirshfeld, which stays available since it only needs spherical, not WFN, density.
+  A second, independent bug was found in the same investigation: `XCW::run_XCW_fitting()`
+  (`Src/core/XCW.cpp`) ended with `exit(0)`, which — when running in-process — terminates the
+  whole GoogleTest binary immediately, skipping the `EXPECT_TRUE(result.success)` golden-file
+  comparison entirely and making earlier "passing" runs a false positive rather than a real pass.
+  Replaced with falling off the end of the (void) function; `NoSpherA2.cpp`'s caller already does
+  the proper `log_file.flush(); std::cout.rdbuf(_coutbuf); return 0;` cleanup after the call
+  returns.
+  Also fixed as part of the same session: `make_MBIS_vectors`/`make_EMBIS_tensors`
+  (`Src/core/AtomGrid.cpp`/`.h`) hardcoded `std::cout` for their verbose per-iteration
+  convergence/"Promolecular charges" output; they now take an `std::ostream&` parameter
+  (default `std::cout`, so all other callers are unaffected) that `GridManager::calculateMBISWeights`/
+  `calculateEMBISWeights` forward from their own new `file` parameter, itself forwarded from
+  `setup3DGridsForMolecule`'s existing `file` parameter. XCW passes `XCW_log` through this chain
+  (via `scattering_factors.cpp`'s `calculate_scattering_factors(..., XCW_log, ...)`
+  call inside `XCW::create_tscb`), so that output now lands in `XCW.log` instead of leaking into
+  the shared `NoSpherA2.log`.
+  `P1_test_XCW`'s `tests.toml` args were changed from a bare `do_XCW = ""` flag to
+  `do_XCW = [0.01, 0.01]`, using a new `-do_XCW stepsize max_value` CLI form
+  (`Src/core/convenience.h`/`.cpp`, `options::xcw_lambda_step`/`xcw_lambda_max`, consumed in
+  `XCW::construct`) that limits the lambda scan to 2 steps (`lambda = 0.00, 0.01`) instead of the
+  previous hardcoded 10-step (`0.00`–`0.09`) default, cutting the test from several minutes to
+  ~2.5 minutes. The plain `-do_XCW` flag (no trailing numbers) is unaffected and now defaults to
+  `lambda_step = 0.01`, `lambda_max = 1.0` (101 steps) rather than the old hardcoded 10 steps —
+  this is a real behavior change for any existing non-test `-do_XCW` invocation without explicit
+  step/max arguments.
+  `tests/P1_test/P1_test_XCW.good` was regenerated from a real passing in-process run against
+  this new 2-step invocation (previous `.good` was captured from a manual standalone run that
+  never used the `-all_charges`/`-no_date` flags the test harness actually injects, so it could
+  not have matched even before this fix). Verified byte-identical against a standalone
+  `NoSpherA2.exe` run with the same arguments.
+  **Follow-up bug found, not yet fixed**: while investigating whether `P1_test_XCW` could use a
+  smaller/faster orbital basis, a `-b <name>` override was wired into `XCW::construct` (sets
+  `settings.basis_set_name`, reusing the existing general-purpose `-b` flag). Any basis other than
+  the hardcoded default `def2-svp` (tried `3-21g` and `sto-3g`) reliably crashes with a real
+  access violation inside OCC's SOAD initial-guess step, reproduced standalone
+  (`NoSpherA2.exe -do_XCW 0.01 0.01 -b sto-3g ...` → `0xC0000005`), independent of basis-set data
+  content. This is a separate, pre-existing bug in `BasisSet::to_AOBasis()`
+  (`Src/core/basis_set.cpp`)/`XCW::setup_basis` or in how the resulting `AOBasis` interacts with
+  OCC's SOAD guess — not yet investigated further. The `-b` CLI plumbing is left in place (it is
+  correctly implemented and harmless when unused), but `P1_test_XCW` keeps the default
+  `def2-svp` basis until this is root-caused separately.
 
 - **Transient 13-test failure episode, 2026-07-03** (`alanine_occ`, `disorder_THPP`,
   `grown_water`, `Hybrid_mode`, `malbac_SF_ECP`, `rubredoxin_cmtc`, `sucrose_ptb`, `sucrose_SF`,

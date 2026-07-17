@@ -86,8 +86,8 @@ private:
 
     void calculateSphericalDensities(const WFN &wave, const cell &unit_cell, const ivec &atom_list, vec2 &single_spherical_density, vec2 &combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
     void calculateHirshfeldWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list);
-    std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid);
-    void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid);
+    std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid, std::ostream &file = std::cout);
+    void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid, std::ostream &file = std::cout);
     void pruneGrid();
 
     void addTimingPoint(const std::string &label) {

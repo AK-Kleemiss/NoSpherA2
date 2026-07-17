@@ -244,7 +244,15 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
     // Identify unique atom types
     atom_type_list_ = identifyAtomTypes(wave);
 
-    if (config_.partition_type == PartitionType::EMBIS || config_.partition_type == PartitionType::MBIS || config_.debug || config_.all_charges)
+    // "Every scheme" comparison output (debug / all_charges) requires real WFN
+    // density (MBIS/EMBIS are density-based, unlike the purely geometric
+    // Hirshfeld scheme). When the caller opted out of density evaluation
+    // (no_density_eval, e.g. XCW's dummy grid setup), that comparison output
+    // would be meaningless and calculating it would force an invalid density
+    // evaluation, so treat debug/all_charges as inactive in that case.
+    const bool want_every_scheme = (config_.debug || config_.all_charges) && !config_.no_density_eval;
+
+    if (config_.partition_type == PartitionType::EMBIS || config_.partition_type == PartitionType::MBIS || want_every_scheme)
         needs_helper_grids_ = true;
 
     // Setup prototype grids for each atom type
@@ -256,24 +264,24 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
     addTimingPoint("Atomic Grid setup");
 
     // Calculate Hirshfeld weights if needed
-    if (config_.partition_type == PartitionType::Hirshfeld || config_.debug || config_.all_charges) {
+    if (config_.partition_type == PartitionType::Hirshfeld || want_every_scheme) {
         calculateHirshfeldWeights(wave, unit_cell, atom_list);
         addTimingPoint("Hirshfeld Weights");
     }
 
     std::vector<std::pair<vec, vec>> sig_pop; // Dummy vector for now, will be used for MBIS if needed
 
-    if (config_.partition_type == PartitionType::MBIS || config_.debug || config_.all_charges) {
-        sig_pop = calculateMBISWeights(wave, unit_cell, atom_list, ng_local);
+    if (config_.partition_type == PartitionType::MBIS || want_every_scheme) {
+        sig_pop = calculateMBISWeights(wave, unit_cell, atom_list, ng_local, file);
         addTimingPoint("MBIS Weights");
     }
 
-    if (config_.partition_type == PartitionType::EMBIS || config_.debug || config_.all_charges) {
+    if (config_.partition_type == PartitionType::EMBIS || want_every_scheme) {
         if (sig_pop.empty()) {
-            sig_pop = calculateMBISWeights(wave, unit_cell, atom_list, ng_local);
+            sig_pop = calculateMBISWeights(wave, unit_cell, atom_list, ng_local, file);
             addTimingPoint("MBIS Weights");
         }
-        calculateEMBISWeights(wave, unit_cell, atom_list, sig_pop, ng_local);
+        calculateEMBISWeights(wave, unit_cell, atom_list, sig_pop, ng_local, file);
         addTimingPoint("EMBIS Weights");
     }
 
@@ -1079,14 +1087,14 @@ void GridManager::calculateHirshfeldWeights(const WFN &wave, const cell &unit_ce
     }
 }
 
-std::vector<std::pair<vec, vec>> GridManager::calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid) {
-    if (!non_spherical_densities_calculated_) {
+std::vector<std::pair<vec, vec>> GridManager::calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid, std::ostream &file) {
+    if (!non_spherical_densities_calculated_ && !config_.no_density_eval) {
         calculateNonSphericalDensities(wave, unit_cell);
         addTimingPoint("WFN evaluation on grid");
     }
     vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids; // Use helper grids if needed
     ivec *num_points = needs_helper_grids_ ? &grid_data_.helper_num_points_per_atom : &grid_data_.num_points_per_atom; // Use helper grids if needed
-    std::vector<std::pair<vec, vec>> sig_pop = make_MBIS_vectors(wave, *grid, *num_points);
+    std::vector<std::pair<vec, vec>> sig_pop = make_MBIS_vectors(wave, *grid, *num_points, config_.debug, file);
     const int s = grid->size();
     vec2 single_spherical_density(s), combined_spherical_density(s);
     calculateSphericalDensities(wave, unit_cell, atom_list, single_spherical_density, combined_spherical_density, sig_pop);
@@ -1108,8 +1116,8 @@ std::vector<std::pair<vec, vec>> GridManager::calculateMBISWeights(const WFN &wa
     return sig_pop;
 }
 
-void GridManager::calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid) {
-    if (!non_spherical_densities_calculated_) {
+void GridManager::calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid, std::ostream &file) {
+    if (!non_spherical_densities_calculated_ && !config_.no_density_eval) {
         calculateNonSphericalDensities(wave, unit_cell);
         addTimingPoint("WFN evaluation on grid");
     }
@@ -1117,7 +1125,7 @@ void GridManager::calculateEMBISWeights(const WFN &wave, const cell &unit_cell, 
     ivec *num_points = needs_helper_grids_ ? &grid_data_.helper_num_points_per_atom : &grid_data_.num_points_per_atom; // Use helper grids if needed
     const int s = grid->size();
     vec2 single_spherical_density(s), combined_spherical_density(s);
-    const std::vector<std::pair<vec2, vec>> sig_pop = make_EMBIS_tensors(wave, *grid, *num_points, false, MBIS_weights);
+    const std::vector<std::pair<vec2, vec>> sig_pop = make_EMBIS_tensors(wave, *grid, *num_points, config_.debug, MBIS_weights, file);
     int g;
 
     for (g = 0; g < s; g++) {

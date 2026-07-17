@@ -946,7 +946,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     const WFN &wavy,
     const vec3 &grid,
     const ivec &num_grid_points,
-    const bool debug)
+    const bool debug,
+    std::ostream &file)
 {
     using sp_vec = std::vector<std::pair<vec, vec>>;
     const auto atoms = wavy.get_atoms();
@@ -982,7 +983,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
             std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
             std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
         }
-        it == 0 ? std::cout << "Starting MBIS iterations..." << std::endl : std::cout << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
+        it == 0 ? file << "Starting MBIS iterations..." << std::endl : file << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
         for (int i = 0; i < ncen; i++) {
             const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
@@ -1089,13 +1090,13 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
             charges[i] = wavy.get_atom_charge(i) - vec_sum(sig_pop_vector[i].second) + wavy.get_atom_ECP_electrons(i);
             varmax = std::max(varmax, std::abs(charges[i] - last_charges[i]));
             if (debug)
-                std::cout << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
+                file << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
         }
         if (varmax < crit || varsig < crit) {
-            std::cout << "MBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
-            std::cout << "Promolecular charges:\n";
+            file << "MBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
+            file << "Promolecular charges:\n";
             for (int i = 0; i < wavy.get_ncen(); i++) {
-                std::cout << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
+                file << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
             }
             return sig_pop_vector;
         }
@@ -1103,7 +1104,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         last_charges = charges;
 
     }
-    std::cout << "MBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
+    file << "MBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
     return sig_pop_vector;
 }
 
@@ -1114,7 +1115,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     const vec3 &grid,
     const ivec &num_grid_points,
     const bool debug,
-    const std::vector<std::pair<vec, vec>> MBIS_vectors)
+    const std::vector<std::pair<vec, vec>> MBIS_vectors,
+    std::ostream &file)
 {
     using sp_vec = std::vector<std::pair<vec2, vec>>;
     const double crit = 0.001;
@@ -1207,7 +1209,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
             std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_6);
             std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
         }
-        it == 0 ? std::cout << "Starting EMBIS iterations..." << std::endl : std::cout << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
+        it == 0 ? file << "Starting EMBIS iterations..." << std::endl : file << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
         for (int i = 0; i < ncen; i++) {
             const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
@@ -1394,13 +1396,13 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
             charges[i] = wavy.get_atom_charge(i) - vec_sum(sig_pop_vector[i].second) + wavy.get_atom_ECP_electrons(i);
             varmax = std::max(varmax, std::abs(charges[i] - last_charges[i]));
             if (debug)
-                std::cout << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
+                file << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
         }
         if (varmax < crit || varsig < crit) {
-            std::cout << "EMBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
-            std::cout << "Promolecular charges:\n";
+            file << "EMBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
+            file << "Promolecular charges:\n";
             for (int i = 0; i < wavy.get_ncen(); i++) {
-                std::cout << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
+                file << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
             }
             return sig_pop_vector;
         }
@@ -1408,7 +1410,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         last_charges = charges;
 
     }
-    std::cout << "EMBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
+    file << "EMBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
     return sig_pop_vector;
 }
 

@@ -263,4 +263,12 @@ wfn = "../RGBI_groups/nh3li.gbw"
 rgbi = ""
 rgbi_basis = "ano"
 
+[P1_test_XCW]
+directory = "P1_test"
+good = "P1_test_XCW.good"
 
+[P1_test_XCW.args]
+do_XCW = [0.01, 0.01]
+cif = "P1_test_NA2.cif"
+hkl = "P1_test.hkl"
+anom_disp = "anom_disp.txt"
