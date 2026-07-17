@@ -4,9 +4,12 @@
 #include <fstream>
 #include <vector>
 #include <ostream>
+#include <filesystem>
 
 class WFN;
 class cell;
+struct options;
+struct properties_options;
 enum cube_type {
     Rho = 0,
     RDG = 1,
@@ -252,6 +255,12 @@ void Calc_RhoEli(
  * @param opt The options object containing the necessary data for the calculation.
  */
 void properties_calculation(options &opt);
+
+void promolecular_nci_analysis(
+    const std::filesystem::path& xyz1,
+    const std::filesystem::path& xyz2,
+    const properties_options& opts,
+    std::ostream& log);
 
 /**
  * Combines the MO (Molecular Orbital) files based on the given options.

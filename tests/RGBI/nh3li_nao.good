@@ -1,0 +1,41 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                   "../RGBI_groups/nh3li.gbw" done!
+Number of atoms in Wavefunction file: 5 Number of MOs: 126
+Calculating NAOs for all atoms...                  ...done!
+Calculating Population for all atoms...            ...done.
+
+Total Population: 12.9218
+
+[      Calculating Atomic Populations     ]
+[-----------------------------------------] 100% 
+Population of atom 0: 9.42047
+Population of atom 1: 1.4373
+Population of atom 2: 1.4353
+Population of atom 3: 1.43756
+Population of atom 4: 3.1097
+[       Calculating Bond Populations      ]
+[-----------------------------------------] 100% 
+
+Roby-Gould Bond Indices (RGBI) Analysis
+----------------------------------------------
+Number of electrons in system:         13
+Number of electrons in Roby Analysis:  12.9218
+Percentage of electrons accounted for: 99.4 %
+----------------------------------------------
+
+
+Atom Nr        Els       n_A     n_B    n_AB    s_AB    Cov.    Ion.    Tot.   Pyth.   Arak.
+--------------------------------------------------------------------------------------------
+   0 -   4    N - Li   9.420   3.110  12.393   0.137   0.184   0.421   0.459  15.972  26.173
+   0 -   1    N -  H   9.420   1.437   9.615   1.243   0.905   0.296   0.952  90.322  79.861
+   0 -   2    N -  H   9.420   1.435   9.614   1.242   0.904   0.298   0.952  90.223  79.754
+   0 -   3    N -  H   9.420   1.438   9.615   1.243   0.905   0.296   0.952  90.336  79.876
+--------------------------------------------------------------------------------------------

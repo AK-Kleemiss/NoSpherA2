@@ -19,6 +19,8 @@
 #include <optional>
 #include <cstdlib>
 #include <vector>
+#include <algorithm>
+#include <cctype>
 
 #include "gtest/gtest.h"
 

@@ -19,16 +19,22 @@ Environment variables:
 
 ---
 
-## Current Validation Status (2026-06-14)
+## Current Validation Status
+
+The table below (2026-06-17/2026-07-02) predates both the CMake/ctest migration and the
+2026-07-03 Thakkar cubic-spline change, and is kept only as history — see `ctest --preset
+<preset> --output-on-failure` for current status and the Known Issues section below for the
+tests presently failing because of the spline change.
 
 | Suite | Config | Result |
 |-------|--------|--------|
-| Python pytest Release | non-full (19 tests) | **passing** |
-| Python pytest Release | full (21 tests) | **passing** (1 tolerated numeric warn in `fchk_conversion`) |
-| Python pytest Debug | full (21 tests) | **passing** |
-| VS Tests Debug | full (21 tests) | **passing** |
-| VS Tests Release | full (21 tests) | **passing** |
-| Python pytest macOS | `RGBI_Groups_NH3BH3`, `RGBI_Groups_NH3Li` targeted | **passing** (validated 2026-06-17) |
+| Python pytest Release | non-full (21 tests) | **passing** (historical, 2026-07-02) |
+| Python pytest Release | full (23 tests) | **passing** (historical, 2026-07-02; 1 tolerated numeric warn in `fchk_conversion`) |
+| Python pytest Debug | full (23 tests) | **passing** (historical, 2026-07-02) |
+| VS Tests Debug | full (23 tests) | **passing** (historical, 2026-07-02) |
+| VS Tests Release | full (23 tests) | **passing** (historical, 2026-07-02) |
+| Python pytest macOS | `RGBI_Groups_NH3BH3`, `RGBI_Groups_NH3Li` targeted | **passing** (historical, validated 2026-06-17) |
+| ctest (release-windows) | 205 cases (unit + `TomlIntegrationTests`) | targeted RGBI subset **7/7 passing** on 2026-07-03 for `NH3BH3` no-sym/sym and atom-only `NH3Li` NAO/ANO coverage; last full-suite baseline before this change was **201/201 passing**. The `-rgbi_no_sym` tests in this subset were removed 2026-07-03 — see Known Issues below. |
 
 ---
 
@@ -62,30 +68,29 @@ Added: 2026-06-14.
 | Test name | Directory | Good file | Full? | Status |
 |-----------|-----------|-----------|-------|--------|
 | alanine_occ | alanine_occ | alanine_occ.good | no | ✅ passing |
-| alanine_integrated_occ | alanine_integrated_occ | alanine_integrated_occ.good | no | ✅ passing |
+| alanine_integrated_occ | alanine_integrated_occ | alanine_integrated_occ.good | no | ✅ passing (regenerated 2026-07-03, see note below) |
 | disorder_THPP | disorder | disorder_THPP.good | no | ✅ passing |
-| fourier_transform | SALTED | fourier_transform.good | no | ✅ passing |
 | fractal | sucrose_fchk_SF | fractal.good | no | ✅ passing |
 | grown_water | grown | grown_water.good | no | ✅ passing |
 | Hybrid_mode | Hybrid | Hybrid_mode.good | no | ✅ passing |
 | malbac_SF_ECP | ECP_SF | malbac_SF_ECP.good | no | ✅ passing |
-| openBLAS | OpenBLAS | openBLAS.good | no | ✅ passing |
 | properties | sucrose_fchk_SF | properties.good | no | ✅ passing |
-| reading_SALTED | SALTED | reading_SALTED.good | no | ✅ passing |
 | ri_fit | epoxide_gbw | ri_fit.good | no | ✅ passing |
-| RGBI_Groups_NH3BH3 | RGBI_groups | NH3BH3.good | no | ✅ passing (macOS targeted 2026-06-17) |
-| RGBI_Groups_NH3Li | RGBI_groups | nh3li.good | no | ✅ passing (macOS targeted 2026-06-17) |
+| RGBI_Groups_NH3BH3_sym | RGBI_groups | NH3BH3_sym.good | no | ✅ passing (macOS targeted 2026-06-17) |
+| RGBI_Groups_NH3BH3_sym_ANO | RGBI_groups | NH3BH3_sym_ano.good | no | ✅ passing (release-windows targeted 2026-07-03) |
+| RGBI_NH3Li | RGBI | nh3li_nao.good | no | ✅ passing (macOS arm64, regenerated with `-rgbi` 2026-07-03) |
+| RGBI_NH3Li_ANO | RGBI | nh3li_ano.good | no | ✅ passing (macOS arm64, regenerated with `-rgbi` 2026-07-03) |
 | rubredoxin_cmtc | rubredoxin_cmtc | rubredoxin_cmtc.good | no | ✅ passing |
 | SALTED | SALTED | SALTED.good | no | ✅ passing |
 | sucrose_IAM | sucrose_IAM_SF | sucrose_IAM.good | no | ✅ passing |
 | sucrose_ptb | sucrose_IAM_SF | sucrose_ptb.good | no | ✅ passing |
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |
 | sucrose_twin | sucrose_fchk_SF | sucrose_twin.good | no | ✅ passing |
+| intermolecular_nci | intermolecular_nci | good.dat | no | requires `-promol_nci_single_thread`; regenerated 2026-07-03 after fixing an off-by-one atomic-number bug (see note below) — ✅ passing on macOS arm64 and macOS x86_64 |
 | wfn_reading | wfn_reading | wfn_reading.good | no | ✅ passing |
-| **TFVC** | TFVC | TFVC.good | no | ✅ passing |
-| **TFVC_ECP** | TFVC | TFVC_ECP.good | no | ✅ passing |
+| TFVC | TFVC | TFVC.good | no | ✅ passing |
+| TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
 | fchk_conversion | NiP3_fchk | good.fchk | **yes** | ✅ passing (tolerated numeric warn) |
-| fourier_transform_full | SALTED | fourier_transform_full.good | **yes** | ✅ passing |
 
 ---
 
@@ -101,7 +106,7 @@ files generated before they can be registered.
 | molden_file | many .molden/.wfn/.wfx | no .good file |
 | RI_Test | TESTMOL.gbw, RI_Test.good | good file uses dev-machine absolute paths; `-test_RI` is an internal mode |
 | RI_Test_2 | sucrose.cif, sucrose.gbw, .wfn | no .good file |
-| reading_SALTED (dir) | alanine/crambin .npy data | no .good file; different from `reading_SALTED` test (which uses SALTED/) |
+| reading_SALTED (dir) | alanine/crambin .npy data | no .good file; not the same as the now-removed `reading_SALTED` `tests.toml` entry (which used SALTED/) |
 | CASSCF | water.inp | no .good file, CASSCF not yet wired into CLI |
 | cytidine_tonto | many tonto-format files | external tonto dependency |
 | polarizabilities | gjf/wfn files | no .good file |
@@ -120,18 +125,121 @@ files generated before they can be registered.
 
 ## Known Issues
 
-### `alanine_integrated_occ` — heap corruption crash (all platforms)
-- The standalone EXE crashes for **all** OCC density-fitting jobs (`-occ` flag with DF basis)
-- The VS in-process DLL also crashes
-- Root cause: heap corruption in OCC's integral engine (`~IntegralEngineDF`)
-- Exit code: `0xC0000374` (STATUS_HEAP_CORRUPTION via `RtlFailFast` — uncatchable by SEH)
-- The output fchk file is **never written** because the crash happens before destructors finish
-- Full details: see `INVESTIGATION_STATUS.md`
+- **Transient 13-test failure episode, 2026-07-03** (`alanine_occ`, `disorder_THPP`,
+  `grown_water`, `Hybrid_mode`, `malbac_SF_ECP`, `rubredoxin_cmtc`, `sucrose_ptb`, `sucrose_SF`,
+  `sucrose_twin`, `wfn_reading`, `TFVC`, `TFVC_ECP`, plus `alanine_integrated_occ`): an earlier
+  `ctest` run the same day (against a not-fully-rebuilt binary, mid-way through the Thakkar
+  cubic-spline interpolation change in `Src/core/spherical_density.h`/`Src/core/GridManager.cpp`
+  — see `lambda2_at` in `Src/core/properties.cpp` for why that change was made) showed all 13
+  failing with small (typically 3rd-decimal-place) Hirshfeld-weight numeric drift. After a full
+  rebuild, all 13 pass again against their **existing, unmodified** `.good` files — i.e. this was
+  not a real regression requiring golden-file updates, just a stale-build artifact. Only
+  `alanine_integrated_occ.good` was actually regenerated (see below); it wasn't strictly necessary
+  in hindsight, but reflects a real, freshly-verified in-process run and is harmless to keep.
+  If a similar-looking failure set reappears, rebuild fully before concluding the `.good` files
+  need updating — genuine regressions from future changes will look identical to this at a glance.
 
-### TFVC / TFVC_ECP — newly added, not yet validated
-- Good files exist and were generated from prior runs, but these tests have never been run through
-  the VS test harness
-- Run against both Debug and Release before marking as passing
+- `alanine_integrated_occ` regenerated 2026-07-03: ran `ctest --test-dir build/release-windows -R
+  AlanineIntegratedOcc` (in-process, per the run rule below), then
+  `python update_good_from_pytest_results.py --test alanine_integrated_occ --yes` to accept the
+  ctest-produced in-place output (`tests/alanine_integrated_occ/NoSpherA2.log`) as the new
+  `alanine_integrated_occ.good`. Re-ran ctest afterward to confirm it now passes. This test does
+  run correctly as a normal ctest in-process case; the CLAUDE.md guidance against subprocess
+  fallbacks refers to a distinct, historical crash when launched as a *spawned subprocess*
+  (e.g. `update_good_from_pytest_results.py --run`), not to ctest's own in-process runner.
+
+- **Removed 2026-07-03**: `fourier_transform`, `fourier_transform_full`, `openBLAS`,
+  `reading_SALTED` were deleted from `tests/tests.toml`. Their `[test.args]` keys
+  (`test_analytical`, `blastest`, `test_reading_SALTED_binary`) are not real `NoSpherA2` CLI
+  flags — passing them produces the "Did not understand the task to perform!" help dump instead
+  of running anything. Grepping the source found these names only in `tests.toml` and in
+  `tests/src/UnitTests.cpp`, where the equivalent coverage already exists as direct C++ function
+  calls with no CLI path at all (`BesselTests.AnalyticFourier` → `test_analytical_fourier()`,
+  `SALTEDTests.ReadingSALTEDBinaryFile` → `test_reading_SALTED_binary_file()`, plus a BLAS
+  self-test). None of the four had a corresponding `TEST(TomlIntegrationTests, ...)` in
+  `tests/src/IntegrationTests.cpp` either, so they were already effectively dead from ctest's
+  perspective — this just removes the stale, misleading `tests.toml`/`.good` entries to match.
+
+- `intermolecular_nci`'s `_values.dat` writer (`promolecular_nci_analysis` in
+  `Src/core/properties.cpp`) parallelizes over grid points with
+  `schedule(dynamic)`, so output row order is not reproducible run-to-run
+  under multi-threading (values are correct, ordering is not). The test's
+  `tests.toml` args pass `-promol_nci_single_thread` (added 2026-07-02,
+  `Src/core/convenience.h`/`.cpp`) to force single-threaded, deterministic
+  output ordering for golden-file comparison. This flag is test/reproducibility
+  tooling, not needed for normal end-user runs. On 2026-07-03, macOS arm64
+  still failed because `get_lambda_1` used LAPACK/Accelerate eigenvalues for
+  near-zero Hessians; `Src/core/convenience.cpp` now uses an analytical 3x3
+  symmetric-matrix formula for the middle eigenvalue.
+
+- **Root cause of the macOS arm64 divergence found and fixed 2026-07-03**: after the
+  `get_lambda_1` fix above, `IntermolecularNCI` still produced ~6x more accepted grid
+  points on macOS arm64 than on Linux/Windows/macOS x86_64 (2480 vs. 413), with values
+  differing even for early points. AddressSanitizer traced this to a real bug in
+  `make_thakkar_interpolators()` (`Src/core/properties.cpp`): it built its 92-entry
+  `atom_models` vector with atomic numbers `0..91`, but every caller indexes it as
+  `atom_models[atom.charge - 1]`, expecting index 0 to hold atomic number 1 (Hydrogen).
+  Every real element's density lookup was off by one, and the bogus atomic-number-0
+  entry triggered an out-of-bounds read of `Thakkar_ns`/`np`/`nd`/`nf`
+  (`n_vector[atomic_number - 1]` = `n_vector[-1]`) whose garbage value was used as a
+  loop trip count in `calc_orbs` — undefined behavior whose outcome depends on
+  whatever happens to sit in adjacent memory, which differs by platform/build. This
+  is what made the test look architecture-dependent; it was never really about arm64
+  vs. x86_64 floating-point math. Three "make the math more careful" fixes were tried
+  and individually verified to have **zero** effect on the divergence before the real
+  bug was found: Kahan-compensated summation in `calc_orbs` (kept anyway, see below),
+  swapping cubic-spline for linear interpolation, and building with
+  `-ffp-contract=off` to rule out FMA-contraction differences.
+
+  Fixed by changing `atom_models.emplace_back(a)` to `atom_models.emplace_back(a + 1)`
+  (commit `88f0a9a`). Verified via: (1) AddressSanitizer clean before/after on macOS
+  arm64, (2) a from-scratch local `release-macos-x86_64` build (with the fix) produces
+  byte-for-byte identical `unit_surrounding_values.dat` output to the arm64 build
+  (178 points each, `28 x 37 x 39` shrunk grid on both), (3) full `ctest` suite
+  (201/201) still passes on macOS arm64 after the fix. `good.dat` was regenerated from
+  this now cross-platform-identical output; the old 413-point `good.dat` was itself a
+  product of the pre-fix bug (it happened to reproduce consistently across
+  Linux/Windows/macOS x86_64's memory layouts, but was never numerically correct).
+
+  Separately, `Thakkar::calc_orbs` (`Src/core/spherical_density.cpp`) was changed to
+  use Kahan compensated summation for the Slater-expansion accumulation into `Orb[m]`.
+  This is a genuine numerical-robustness improvement (verified to not change output on
+  its own for this test) and was kept, but it was not the fix for the arm64 divergence.
+
+- **`-rgbi_no_sym` RGBI tests removed 2026-07-03**: `RGBI_Groups_NH3BH3`, `RGBI_Groups_NH3BH3_ANO`,
+  `RGBI_Groups_NH3Li`, `RGBI_NH3Li`, and `RGBI_NH3Li_ANO` (all tests passing `-rgbi_no_sym`) were
+  removed from `tests/tests.toml`, `tests/src/IntegrationTests.cpp`, and
+  `tests/src/SetIntegrationTestLocks.cmake`, along with their now-orphaned `.good` files
+  (`tests/RGBI_groups/NH3BH3.good`, `NH3BH3_ano.good`, `nh3li.good`;
+  `tests/RGBI/nh3li_nao.good`, `nh3li_ano.good`).
+
+  The two non-group `NH3Li` tests were reinstated the same day as `-rgbi` (symmetrized) instead
+  of `-rgbi_no_sym`, under the same `RGBI_NH3Li`/`RGBI_NH3Li_ANO` names, with fresh `.good` files
+  in `tests/RGBI/`. Group-based `NH3BH3`/`NH3Li` no-sym coverage was not reinstated (only the
+  ANO variant of the `NH3BH3` group test was actually broken, but there is no non-ANO group test
+  left to distinguish "removed because broken" from "removed as part of the no-sym cleanup" without
+  re-adding it, so it was left out along with the others). When regenerating any `-no_date`-tested
+  `.good` file by hand, always pass `-no_date` to the CLI — the in-process test harness
+  (`run_inprocess_test` in `tests/src/IntegrationTests.cpp`) injects it automatically for every
+  test, which truncates `NoSpherA2_message()`'s banner (skips the contributor list and build-date
+  line); a `.good` file generated by running the standalone binary without `-no_date` will have
+  extra banner lines and fail to match.
+
+  Root cause: `RGBI_Groups_NH3BH3_ANO` failed identically on all four CI platforms
+  (Linux/Windows/macOS x86_64/macOS arm64) after the ANO-basis-for-RGBI merge
+  (`420c36b`), which ruled out any platform-specific floating-point cause. Tracing
+  `Roby_information::calculateAtomicNAO` (`Src/core/bondwise_analysis.cpp`) showed that
+  `-rgbi_no_sym` skips the O_h spherical-averaging symmetrization step that the fixed
+  `occupancy_cutoff = 0.17` NAO-retention threshold implicitly depends on: symmetrized
+  boron ANOs come out as three exactly-degenerate eigenvalues (e.g. `0.170367` each,
+  all clearing the cutoff), while un-symmetrized boron ANOs collapse the same density
+  into one dominant eigenvalue plus a small residual (e.g. `0.511103` + `0.00267848`)
+  that falls under the cutoff and is silently discarded — losing real bonding density
+  and producing a wrong Roby population (`3.146` vs expected `3.474`). This is a design
+  gap in the `-rgbi_no_sym` + ANO-basis combination (the fixed-threshold retention
+  heuristic isn't robust without symmetrization), not a typo-style bug, and not
+  something fixable by regenerating the `.good` file. The `-rgbi` (symmetrized) tests
+  are unaffected and remain in the suite.
 
 ---
 

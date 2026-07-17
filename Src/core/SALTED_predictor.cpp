@@ -79,6 +79,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     if (wavy.get_nmo() != 0)
         wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
 
+    wavy.delete_basis_set();
     if (file.basis_set_defined()) {
         load_basis_into_WFN(wavy, file.read_basis_set());
         bbasis_set_loaded = true;

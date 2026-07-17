@@ -43,7 +43,7 @@ public:
 class atom {
 private:
     std::string label;
-    std::string ID;
+    uint64_t ID;
     int nr, charge, ECP_electrons;
     double x, y, z;
     d3 frac_coords;
@@ -56,10 +56,11 @@ private:
     //[2] = fourth order (D1111, D1112, D1113, D1122, D1123, D1133, D1222, D1223, D1233, D1333, D2222, D2223, D2233, D2333, D3333)
     vec2 ADPs;
     bool is_asym = false;
+    int group_nr = 90000;
 public:
     atom();
-    atom(const std::string& l, const std::string& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch);
-    atom(const std::string& l, const std::string& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
+    atom(const std::string& l, const uint64_t& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch);
+    atom(const std::string& l, const uint64_t& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
     atom& operator=(const atom& rhs);
     void print_values() const;
     bool push_back_basis_set(const double & exponent, const double &coefficient, const int &type, const int &shell);
@@ -69,9 +70,9 @@ public:
     void assign_ADPs(vec& second, vec& third, vec& fourth);
     void assign_ADPs(vec& second);
     void assign_ADPs(double& Uiso);
-    void assign_ID(const std::string& id);
-    void set_ID(const std::string& id);
-    std::string get_ID() const;
+    void set_ID(const uint64_t& id);
+    uint64_t get_ID();
+    uint64_t get_ID(const int dat);
     const basis_set_entry& get_basis_set_entry(const int& _nr) const { return basis_set[_nr]; };
     // Non-const overload to obtain a mutable reference
     basis_set_entry& get_basis_set_entry(const int& _nr) { return basis_set[_nr]; }
@@ -119,8 +120,27 @@ public:
     vec2 get_ADPs() const { return ADPs; };
     bool get_is_asym() const { return is_asym; };
     void set_is_asym(const bool& val) { is_asym = val; };
+    void set_group_nr(const int group_nr) { this->group_nr = group_nr; };
     double distance_to(const atom& other) const;
 
-
     bool operator==(const atom& other) const;
+};
+
+uint64_t get_atom_ID(const int Z, const d3& frac_coords, const int dat = 0);
+
+struct scatterer_id_masks_d5 {
+    const static uint64_t
+        z_mask = 0x00000000000000FF,
+        a_mask = 0x0000000000FFFF00,
+        b_mask = 0x000000FFFF000000,
+        c_mask = 0x00FFFF0000000000,
+        a_sig = 0x0100000000000000,
+        b_sig = 0x0200000000000000,
+        c_sig = 0x0400000000000000,
+        d_mask = 0xF800000000000000,
+        mask_m = 0x000000000000FFFF; // max crd value
+    const static int a_shift = 16; 
+    //The groups in refinement are defined positive and negative, so we need to shift the group number by 16 to make it positive and fit.
+    // E.g. group 0 becomes 16, group 1 becomes 17, group -1 becomes 15, etc.
+    const static int group_shift = 16;
 };

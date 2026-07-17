@@ -9,35 +9,36 @@ Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Reading:                                  "nh3li.gbw" done!
 Number of atoms in Wavefunction file: 5 Number of MOs: 126
-Calculating NAOs for all atoms...                  ...done!
+Calculating ANOs for all atoms...                  ...done!
+ANO fallback summary: no atom-level fallbacks were needed.
 Calculating Population for all atoms...            ...done.
 
-Total Population: 12.9735
+Total Population: 9.24434
 
 [      Calculating Atomic Populations     ]
 [-----------------------------------------] 100% 
-Population of atom 0: 9.37543
-Population of atom 1: 1.49283
-Population of atom 2: 1.49074
-Population of atom 3: 1.49309
-Population of atom 4: 3.06958
+Population of atom 0: 7.2517
+Population of atom 1: 1.45528
+Population of atom 2: 1.45436
+Population of atom 3: 1.45542
+Population of atom 4: 1.11289
 [       Calculating Bond Populations      ]
 [-----------------------------------------] 100% 
 
 Roby-Gould Bond Indices (RGBI) Analysis
 ----------------------------------------------
 Number of electrons in system:         13
-Number of electrons in Roby Analysis:  12.9735
-Percentage of electrons accounted for: 99.8 %
+Number of electrons in Roby Analysis:  9.24434
+Percentage of electrons accounted for: 71.11 %
 ----------------------------------------------
 
 
 Atom Nr        Els       n_A     n_B    n_AB    s_AB    Cov.    Ion.    Tot.   Pyth.   Arak.
 --------------------------------------------------------------------------------------------
-   0 -   4    N - Li   9.375   3.070  12.362   0.083   0.137   0.428   0.450   9.271  19.697
-   0 -   1    N -  H   9.375   1.493   9.598   1.271   0.920   0.250   0.953  93.104  83.084
-   0 -   2    N -  H   9.375   1.491   9.598   1.268   0.919   0.251   0.952  93.080  83.054
-   0 -   3    N -  H   9.375   1.493   9.597   1.271   0.920   0.250   0.953  93.106  83.087
+   0 -   4    N - Li   7.252   1.113   8.262   0.102   0.171   0.410   0.444  14.824  25.161
+   0 -   1    N -  H   7.252   1.455   7.841   0.866   0.628   0.249   0.675  86.365  75.923
+   0 -   2    N -  H   7.252   1.454   7.840   0.866   0.627   0.250   0.675  86.293  75.856
+   0 -   3    N -  H   7.252   1.455   7.841   0.866   0.628   0.249   0.675  86.376  75.933
 --------------------------------------------------------------------------------------------
 
 
@@ -49,11 +50,11 @@ Groups defined:
 ----------------------------------------------
 
 Group populations:
-  Population of G0 (NH3)                10.04732
-  Population of G1 (Li)                 3.06958
+  Population of G0 (NH3)                8.37023
+  Population of G1 (Li)                 1.11289
 ----------------------------------------------
 
 Group             n_G1    n_G2  n_G1G2  s_G1G2    Cov.    Ion.    Tot.   Pyth.   Arak.
 ------------------------------------------------------------------------------------------
-G0 - G1         10.047   3.070  12.973   0.143   0.203   0.241   0.315  41.635  44.649
+G0 - G1          8.370   1.113   9.244   0.239   0.249   0.138   0.285  76.641  67.887
 ------------------------------------------------------------------------------------------

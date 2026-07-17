@@ -1,231 +1,216 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code and other AI coding assistants when working in this repository.
 
 ## What is NoSpherA2
 
-A C++ CLI tool that generates `.tsc` (non-spherical scattering factor) files and property grids from quantum chemistry wavefunction files. Used with Olex2/olex2.refine for Hirshfeld Atom Refinement (HAR) in crystallography.
+NoSpherA2 is a C++ CLI tool that generates `.tsc` non-spherical scattering-factor files and property grids from quantum-chemistry wavefunction files. It is used with Olex2/olex2.refine for Hirshfeld Atom Refinement (HAR) in crystallography.
 
-## Build Commands
+## Current Build System
 
-Preferred: use CMake presets.
+The active build system is CMake/Ninja with presets. The top-level CMake project owns dependency configuration for `libcint`, `occ`, `mdspan`, `featomic`, Intel MKL or Apple Accelerate/OpenMP, the basis-set converter, the core library, the CLI app, and optional tests/DLL targets.
 
-**Windows (MSVC, full build):**
-```ps
-cmake --preset windows-msvc-release-full
-cmake --build --preset windows-msvc-release-full
-```
+Bootstrap the local micromamba toolchain before configuring a fresh checkout:
 
-**Linux (GCC, full build):**
 ```sh
-cmake --preset linux-gcc
-cmake --build --preset linux-gcc
+cmake -P scripts/BootstrapMicromamba.cmake
 ```
 
-**macOS (full build, per-arch):**
+Use the preset names that exist in `CMakePresets.json`; do not use old names such as `windows-msvc-release-full`, `linux-gcc`, `macos-release-full-arm64`, or `windows-msvc-debug`.
+
+Common configure/build presets:
+
 ```sh
-cmake --preset macos-release-full-arm64
-cmake --build --preset macos-release-full-arm64
+# Windows
+cmake --preset release-windows
+cmake --build --preset release-windows
+
+cmake --preset debug-windows
+cmake --build --preset debug-windows
+
+# Linux
+cmake --preset release-linux
+cmake --build --preset release-linux
+
+# macOS per architecture
+cmake --preset release-macos-arm64
+cmake --build --preset release-macos-arm64
+
+cmake --preset release-macos-x86_64
+cmake --build --preset release-macos-x86_64
 ```
 
-The CMake configuration bootstraps a micromamba environment by default (see README) to ensure dependencies are available.
+The executable is written to the preset build tree under `bin`, for example `build/release-windows/bin/NoSpherA2.exe`.
 
-### Building on Windows from an Agent/CLI session (no Developer Shell)
+Important CMake options:
 
-The VS Developer Shell (`VsDevCmd.bat`) cannot be sourced inside the Bash or PowerShell tools because environment variables set by a `call` inside `cmd /c` do not persist to the next tool invocation, and `msbuild` is not on the default PATH.
+- `NOSPHERA2_BUILD_TESTS=ON` builds the C++ GTest/CTest suite in `tests/src`.
+- `NOSPHERA2_BUILD_DLL=ON` builds the optional Windows DLL target from `Src/dll`.
+- `NOSPHERA2_DEPENDENCIES_ONLY=ON` configures/builds dependency targets and then returns before building NoSpherA2. CI uses this to cache dependency build trees.
 
-Use the full path to MSBuild and invoke it from **PowerShell** (not Bash — Bash strips leading `/` from `/p:` switches):
+CI configures with `NOSPHERA2_BUILD_TESTS=ON` and `NOSPHERA2_DEPENDENCIES_ONLY=OFF` after restoring or creating a dependency-only cache.
+
+### Windows Agent/CLI Notes
+
+For CMake preset builds, run from an x64 Visual Studio Developer PowerShell or initialize the MSVC environment before invoking CMake/Ninja. If Ninja can find `cl.exe` but compilation fails on missing standard headers such as `stdlib.h`, the shell/toolchain environment is incomplete.
+
+The legacy Visual Studio solution still exists for Windows/OCC integration debugging. If using MSBuild from a normal PowerShell session, pass the full `MSBuild.exe` path and preserve `/p:` switches:
 
 ```powershell
 $msbuild = "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe"
-$solDir   = "D:\git\NoSpherA2\Windows\"
+$solDir = "D:\git\NoSpherA2\Windows\"
 
-# Build the DLL (contains all Src/ production code)
-& $msbuild "D:\git\NoSpherA2\NoSpherA2_DLL\NoSpherA2_DLL.vcxproj" `
-    /p:Configuration=Release /p:Platform=x64 "/p:SolutionDir=$solDir" /v:minimal
-
-# Build the VS unit-test project
 & $msbuild "D:\git\NoSpherA2\Windows\Tests\Tests.vcxproj" `
     /p:Configuration=Release /p:Platform=x64 "/p:SolutionDir=$solDir" /v:minimal
 ```
 
-Replace `Release` with `Debug` for a debug build. Supported configurations: `Debug`, `Release`, `Profile`, `GenCube`, `Release + Copy`.
+Do not invoke MSBuild through Bash for this project; Bash can strip leading `/` from `/p:` switches.
 
-Run the VS unit tests:
-
-```powershell
-$vstest = "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe"
-& $vstest "D:\git\NoSpherA2\Windows\x64\Release\Tests.dll" /Platform:x64
-```
-
-For code coverage (instruments `NoSpherA2_DLL.dll` + `Tests.dll`):
-
-```powershell
-& $vstest "D:\git\NoSpherA2\Windows\x64\Profile\Tests.dll" /Platform:x64 `
-    /Settings:"D:\git\NoSpherA2\Windows\coverage.runsettings" /EnableCodeCoverage
-```
-
-**Key pitfalls:**
-- `NoSpherA2_DLL.vcxproj` lives at `NoSpherA2_DLL\` (repo root), **not** under `Windows\`.
-- Always pass `/p:SolutionDir=` so relative paths inside the vcxproj resolve correctly.
-- Never use `Bash` for MSBuild invocations — the `/p:` flag prefix is silently stripped.
+The VS solution's `NoSpherA2`/`NoSpherA2_LIB` projects use a shared `OutDir`
+(`Windows\Windows_utils\NoSpherA2_universal.props`) that writes into the same top-level `build/`
+tree the CMake presets use, but under `build\$(Configuration)_$(Platform)\` (e.g.
+`build\Release_x64\NoSpherA2.exe`, `build\Debug_x64\NoSpherA2.exe`) rather than the CMake preset's
+`build\release-windows\bin\NoSpherA2.exe`. Don't confuse the two when picking an executable to
+run — see `update_good_from_pytest_results.py --build {vs,cmake}` for a way to pick one
+explicitly. `Windows\Tests\Tests.vcxproj` was not repointed and still builds to its own
+`Windows\Tests\$(Configuration)_$(Platform)\` (e.g. `Windows\Tests\Release_x64\Tests.exe`).
 
 ## Running Tests
 
+Preferred CMake/CTest flow:
+
 ```sh
-# Run all tests (requires uv)
-uv run pytest
-
-# Skip slow/full tests (default)
-NOS_EXE=./NoSpherA2 OCC_DATA_PATH=occ/share uv run pytest
-
-# Enable full/slow tests
-RUN_FULL_TEST=1 uv run pytest
+cmake --preset <preset> -DNOSPHERA2_BUILD_TESTS=ON
+cmake --build --preset <preset>
+ctest --preset <preset> --output-on-failure
 ```
 
-Key environment variables:
-- `NOS_EXE` — path to the executable (defaults to `NoSpherA2` in PATH)
-- `OCC_DATA_PATH` — must point to OCC data files; on local Windows builds this is normally `D:\git\NoSpherA2\Lib\occ\share\occ`
-- `RUN_FULL_TEST` — set to any truthy value to enable slow integration tests
+Python golden-file tests are still available:
 
-Tests are golden-file comparisons: the harness runs `NoSpherA2` with args from `tests/tests.toml`, captures stdout, and diffs against `.good` reference files in each test subdirectory.
+```sh
+uv run pytest
+```
+
+Useful environment variables:
+
+- `NOS_EXE` - path to the executable for Python tests.
+- `OCC_DATA_PATH` - OCC runtime data directory. CTest defaults this to `occ/share`; local Windows Python runs commonly need `D:\git\NoSpherA2\Lib\occ\share\occ` or the current equivalent.
+- `RUN_FULL_TEST` - truthy value enables slow/full Python integration tests.
+
+Tests are golden-file comparisons: the harness runs NoSpherA2 with args from `tests/tests.toml`, captures stdout, and diffs against `.good` reference files in each test subdirectory.
 
 ### Windows Visual Studio Tests
 
-The repository also has a Visual Studio test project under `Windows/Tests`. Prefer this path when validating Windows/OCC integration issues:
+The CMake flow is the default for new validation. The Visual Studio test project remains useful when debugging Windows DLL/OCC behavior:
 
 ```powershell
-# See "Building on Windows from an Agent/CLI session" above for the full invocation.
-# Quick reference (run from a VS Developer PowerShell where msbuild is on PATH):
-msbuild Windows\Tests\Tests.vcxproj /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\
-vstest.console.exe Windows\x64\Release\Tests.dll /Platform:x64
+msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\
+vstest.console.exe Windows\Tests\Release_x64\Tests.exe /Platform:x64
 ```
 
-Visual Studio tests must run in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for failing VS tests, including `alanine_integrated_occ`. If all tests complete in under a second, the test binary or working directory is probably wrong. The default suite should take tens of seconds; `RUN_FULL_TEST=1` enables the longer cases.
+Visual Studio tests must run in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for failing VS tests, including `alanine_integrated_occ`. If all tests complete in under a second, the test binary or working directory is probably wrong.
 
-### Current Validation Status
+For coverage, keep `coverage.runsettings` aligned with the current DLL/test output layout before trusting the report.
 
-As of 2026-06-13, the full suite passes in all actively validated native configurations:
-- Python pytest Release full: `21 passed` (one tolerated `fchk_conversion` numeric warning)
-- Python pytest Debug full: `21 passed`
-- Visual Studio native Debug full: `21 passed`
-- Visual Studio native Release full: `21 passed`
-
-`Release+Copy` was intentionally not rerun in the latest validation pass.
-
-### Adding a Test
-
-Register in `tests/tests.toml`:
-```toml
-[my_test_name]
-directory = "my_test_dir"         # subdirectory under tests/
-# good = "custom.good"            # optional: override default good file name
-
-[my_test_name.args]
-cif = "structure.cif"
-hkl = "data.hkl"
-wfn = "wavefunction.wfx"
-acc = 0
-```
-
-CLI args are always under `<testname>.args`. The test framework passes these as `--key value` to the executable.
-
-**Also add a `TEST_METHOD` to `Windows/Tests/Tests.cpp`** — every entry in `tests.toml` must have a matching VS test method so both harnesses stay in sync.
-
-After adding a test, update `UNIT_TESTS_STATUS.md` with the new row and its validation result.
-
-## Agent / AI Coding-Assistant Rules
-
-These rules apply to Claude Code, Codex, Copilot, and any other AI agent working in this repo.
+## Agent Rules
 
 ### Unit-test documentation is mandatory
 
-Whenever an agent **adds, removes, modifies, or investigates** a test — whether in `tests/tests.toml`, `Windows/Tests/Tests.cpp`, `tests/run_test.py`, `TestRunner.h`, or any `.good` reference file — it **must**:
+Whenever an agent adds, removes, modifies, or investigates a test in `tests/tests.toml`, `tests/src`, `Windows/Tests`, `tests/run_test.py`, `TestRunner.h`, or any `.good` reference file, it must:
 
-1. Update `UNIT_TESTS_STATUS.md`:
-   - If a new test is added: add a row to the registered-test table with status `🆕 not yet validated`.
-   - If a test is validated as passing: change its status to `✅ passing` and update the validation-status table at the top.
-   - If a test is found to be failing or crashing: change its status to `❌ failing` or `⚠️ crashing` and add a note to the Known Issues section.
-   - If a test is removed: delete its row and note why in a comment commit message.
-2. Update the "Current Validation Status" block in **this file (`CLAUDE.md`)** if the overall pass count changes.
-3. Never leave `UNIT_TESTS_STATUS.md` stale after making test changes — the file is the single source of truth for test coverage and should be commitworthy on its own.
+1. Update `UNIT_TESTS_STATUS.md`.
+2. Update the validation-status block in this file and `AGENTS.md` if the overall pass count changes.
+3. Keep the file commitworthy; do not leave unit-test documentation stale after test work.
 
-### Do not break the VS test / pytest parity
+### Keep test harnesses aligned
 
-`tests/tests.toml` and `Windows/Tests/Tests.cpp` must stay in sync — every test registered in the TOML must have a matching `TEST_METHOD`, and vice versa. Check both files when adding or removing tests.
+`tests/tests.toml`, `tests/src`, and `Windows/Tests/Tests.cpp` should stay in sync where they cover the same workflows. Check all relevant harnesses when adding or removing tests.
 
-## Architecture
+### Respect submodule boundaries
 
-### Source Layout
+Do not casually edit vendored submodules. For local parent-side workarounds, prefer generated-source or CMake target augmentation in the parent project. If an OCC source fix is required, commit it inside `occ` first, then update the parent submodule pointer.
 
+## Source Layout
+
+```text
+app/                 CLI executable target (`NoSpherA2`)
+Src/core/            Core C++ library target (`NoSpherA2Core`, alias `NoSpherA2::Core`)
+Src/dll/             Optional DLL target when `NOSPHERA2_BUILD_DLL=ON`
+tests/src/           C++ GTest/CTest integration and unit tests
+tests/               Python pytest harness and golden-file test cases
+BasisSetGenerator/   Basis-set converter used to generate `Src/basis_data.cpp`
+occ/                 OCC submodule, the main quantum-chemistry dependency
+featomic/            Rust/C++ submodule for ML feature generation via metatensor
+libcint/             C submodule for electron integral evaluation
+mdspan/              C++ multidimensional-array reference implementation
+cmake/               Project CMake modules
+scripts/             Micromamba/bootstrap/Visual Studio helper scripts
+Windows/             Legacy Visual Studio solution/projects and Windows test harness
+Linux/               Linux packaging/build helper scripts
 ```
-Src/           C++ source for the NoSpherA2 library and CLI
-occ/           OCC submodule — quantum chemistry library (26+ modules)
-featomic/      Rust submodule — ML feature generation via metatensor
-libcint/       C submodule — electron integral evaluation
-mdspan/        C++ submodule — multidimensional array reference impl
-tests/         Python pytest harness + golden-file test cases
-Windows/       VS project files and Windows-specific build scripts
-Linux/         Linux build scripts
-Mac/           macOS build scripts (universal binary: x86_64 + arm64)
-```
 
-### Key `Src/` Modules
+Key core modules live in `Src/core`:
 
-- **Entry point**: `NoSpherA2.cpp` — CLI option parsing, dispatches to computation
-- **I/O**: `fchk.cpp/h`, `cif.h`, `wfn_class.cpp/h` — parse Gaussian fchk/wfx, CIF, and wavefunction formats
-- **Molecular representation**: `atoms.cpp/h`, `molecule.cpp/h`, `basis_set.cpp/h`
-- **Integration engine**: `AtomGrid.cpp/h`, `GridManager.cpp/h`, `integrator.cpp/h`, `integration_params.cpp/h`
-- **Math/integrals**: `nos_math.cpp/h`, `libCintMain.cpp/h`, `libCintKernels.cpp/h`
-- **Analysis**: `scattering_factors.cpp/h`, `bondwise_analysis.cpp/h`, `isosurface.cpp/h`
-- **ML density (SALTED)**: `SALTED_*.cpp/h` — machine-learning-based density predictions
-- **Output**: `tsc_block.h`, `properties.cpp/h`, `cube.cpp/h` — TSC format, cube files, property grids
+- I/O: `fchk.cpp/h`, `cif.cpp/h`, `wfn_class.cpp/h`
+- Molecular representation: `atoms.cpp/h`, `molecule.cpp/h`, `basis_set.cpp/h`
+- Integration engine: `AtomGrid.cpp/h`, `GridManager.cpp/h`, `integrator.cpp/h`, `integration_params.cpp/h`
+- Math/integrals: `nos_math.cpp/h`, `libCintMain.cpp/h`, `libCintKernels.cpp/h`
+- Analysis/output: `scattering_factors.cpp/h`, `bondwise_analysis.cpp/h`, `isosurface.cpp/h`, `properties.cpp/h`, `cube.cpp/h`, `tsc_block.h`
+- ML density: `SALTED_*.cpp/h`
 
-The `Src/CMakeLists.txt` builds both a static `libnosphera2` and the `NoSpherA2` executable.
+## Dependency and Linking Notes
 
-### Dependency on OCC
-
-The `occ/` submodule is the heaviest dependency — it provides HF/DFT, crystal analysis, isosurface computation, and more. When editing quantum chemistry logic, check whether OCC already provides the needed functionality before implementing it in `Src/`.
-
-### Linking
-
-Most dependencies (OCC, featomic, libcint, Intel MKL static libraries) are linked statically. oneTBB is intentionally built and deployed dynamically because static/proxy TBB caused Windows runtime instability in OCC integration tests.
-
-Expected runtime files beside packaged executables:
-- Windows: `tbb12.dll`
-- Linux: `libtbb.so*`
-- macOS: `libtbb.dylib`
-
-Do not reintroduce `tbbmalloc_proxy` or `tbbmalloc` linking for NoSpherA2. The build scripts copy the core TBB runtime from `Lib/occ`.
+- The top-level project consumes bundled dependencies with `add_subdirectory`.
+- `libcint` is patched parent-side for MSVC `ivdep` pragmas by generating rewritten sources under the build tree; do not edit the submodule for that workaround.
+- OCC is the heaviest dependency. Check whether OCC already provides needed quantum-chemistry functionality before implementing new logic in `Src/core`.
+- Most dependencies are linked statically.
+- oneTBB is intentionally deployed dynamically. Expected runtime files beside packaged executables include `tbb12.dll`, `libtbb.so*`, or `libtbb.dylib`.
+- Do not reintroduce `tbbmalloc_proxy` or `tbbmalloc` linking for NoSpherA2.
 
 ## Known Pitfalls
 
-- **Golden-file float parsing**: the diff parser in `tests/run_test.py` can fail when a line contains multiple values. When fixing comparison logic, support scientific notation and multi-value lines without breaking existing thresholds.
-- **Windows toolchain**: use an x64 VS Developer shell for `windows-clang-cl` and `windows-msvc-debug` CMake preset flows.
-- **Submodules**: always clone with `--recursive`. If submodules are missing, run `git submodule update --init --recursive`.
-- **OCC submodule commits**: OCC source fixes must be committed in the `occ` repository first, then the parent NoSpherA2 repo must commit the updated submodule pointer.
-- **CI vs local**: when a test passes locally but fails in CI, compare `.github/workflows/c-cpp_all.yml` step-by-step with your local commands, particularly the `NOS_EXE` and `OCC_DATA_PATH` values.
-- **VS tests are always in-process**: the `subprocess` field has been removed from `TestDef`. Never reintroduce subprocess execution to work around an in-process failure — fix the underlying OCC/libcint issue instead. If a VS test crashes in-process, attach the debugger directly (the managed vstest host already has the debugger attached).
-- **New libcint parallel call sites**: always pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use `three_center_max_cache_size<kind>` + `tbb::enumerable_thread_specific` (see `occ/src/qm/detail/df_kernels.h`).
+- Use `cmake --list-presets=all` or inspect `CMakePresets.json` before assuming preset names. Host-conditional configure presets may hide non-host presets from a plain `cmake --list-presets`.
+- On Windows, use an x64 Visual Studio Developer environment before configuring CMake so Ninja can find `cl.exe` and the MSVC standard headers.
+- Golden-file float parsing must support scientific notation and multi-value lines without weakening existing thresholds.
+- Clone with `--recursive`; if submodules are missing, run `git submodule update --init --recursive`.
+- CI and local runs can differ because CI uses a dependency-only cache flow. Compare `.github/workflows/c-cpp_all.yml` step-by-step when a failure only appears in CI.
+- VS tests are always in-process. Never reintroduce subprocess execution to work around a crash; fix the underlying OCC/libcint/DLL issue instead.
+- New libcint parallel call sites should pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use the existing `three_center_max_cache_size<kind>` and `tbb::enumerable_thread_specific` pattern in OCC.
 
-## OCC Integration and Windows Tests — Fixed (June 2026)
+## Current Validation Notes
 
-The `alanine_integrated_occ` test passes in both Release and Debug (21/21) with all tests running in-process. Current fixes include:
+As of 2026-07-03, `ctest --preset release-windows` reports **201/201 passing** after a full
+rebuild (following the Thakkar cubic-spline interpolation change in
+`Src/core/spherical_density.h` / `Src/core/GridManager.cpp`, Hirshfeld-weight density
+partitioning). A same-day run against a not-fully-rebuilt binary showed 13 `TomlIntegrationTests`
+cases failing with small numeric drift; after rebuilding, all 13 pass against their existing
+`.good` files unchanged — see `UNIT_TESTS_STATUS.md` Known Issues. Only
+`alanine_integrated_occ.good` was actually regenerated. Treat this as historical status unless
+you have rerun the current CMake presets in this checkout.
 
-1. **Heap corruption** — added `IntegralEngineDF::~IntegralEngineDF()` to clear Eigen buffers before libcint engines are destroyed.
-2. **TBB instability** — oneTBB is now built shared (`TBB_BUILD_SHARED=ON`); `tbbmalloc_proxy` is not linked.
-3. **AVX/ABI mismatch** — `Directory.Build.targets` selects the MSBuild instruction set from `NOS_AVX`, keeping NoSpherA2, the DLL, tests, and OCC on the same Eigen ABI.
-4. **In-process heap corruption in TBB parallel integrals** — `compute_three_center_integrals_tbb` and `three_center_aux_kernel` now pre-allocate per-thread libcint scratch buffers so libcint never calls `malloc`/`free` inside the parallel region. This eliminates the `STATUS_HEAP_CORRUPTION` (0xC0000374) fast-fail that occurred under the busy .NET vstest heap.
-5. **MSVC Debug dependency build** — `windows-msvc-debug` now has a workflow preset, matching the CI dependency action and fixing the missing-preset build failure.
-6. **fchk conversion** — `fchk_conversion` now writes and compares `log.fchk`; `Src/fchk.cpp` handles restricted/beta coefficient emission, CMO bounds, virtual orbitals, and G shells correctly.
+As of 2026-07-03, `ctest --preset release-macos-arm64` reports **202/202 passing**, including
+`TomlIntegrationTests.IntermolecularNCI`, after fixing an off-by-one atomic-number indexing bug
+in `make_thakkar_interpolators()` (`Src/core/properties.cpp`, commit `88f0a9a`) that had been
+causing undefined-behavior-driven divergence between macOS arm64 and other platforms. Verified
+identical (byte-for-byte) `unit_surrounding_values.dat` output between a from-scratch local
+`release-macos-x86_64` build and the arm64 build. Separately, the 5 `-rgbi_no_sym` RGBI tests
+(merged in via `420c36b`) were removed after `RGBI_Groups_NH3BH3_ANO` was found to fail
+identically on all four CI platforms — a real design gap in the no-symmetrization + ANO-basis
+combination, not a platform or golden-file issue. `RGBI_NH3Li`/`RGBI_NH3Li_ANO` were then
+reinstated using `-rgbi` (symmetrized) instead. See `UNIT_TESTS_STATUS.md` Known Issues for
+both root-cause writeups.
 
-All `[NOS-DBG]` diagnostic traces and Windows heap-check helpers have been removed from the source.
+The June-2026 note below (21/21, VS/pytest harnesses) predates the CMake/ctest migration and is
+kept only as history.
 
-See `HANDOFF.md` for full details and validation commands.
+Known fixed areas from June 2026:
 
-## Hybrid_mode Debug Fix — Fixed (June 2026)
+1. `alanine_integrated_occ` passes in-process in Release and Debug.
+2. `IntegralEngineDF::~IntegralEngineDF()` clears Eigen buffers before libcint engines are destroyed.
+3. oneTBB is deployed shared; `tbbmalloc_proxy` is not linked.
+4. MSBuild instruction-set selection follows `NOS_AVX` to keep Eigen ABI consistent.
+5. Parallel three-center libcint scratch buffers avoid heap corruption under vstest.
+6. `fchk_conversion` writes and compares `log.fchk` and handles restricted/beta coefficients, CMO bounds, virtual orbitals, and G shells.
+7. `Hybrid_mode` Debug vstest passes after the restricted `read_gbw` coefficient-span fix and Debug CRT dialog suppression.
 
-`Hybrid_mode` Debug vstest now passes as part of the full 21/21 Debug suite. Two issues were resolved:
-
-1. **OOB vector access in `read_gbw`** — `coefs_2D_s2_span` was unconditionally constructed with `coefficients[1].data()` even when `operators==1` (restricted wavefunction). With MSVC IDL=2 this raises a CRT assertion dialog blocking the vstest host (WaitReason=UserRequest, 0% CPU). Fix: use `coefficients[0].data()` as a fallback when `operators!=2`.
-2. **Debug CRT dialog suppression** — `_CrtSetReportMode` + `_set_invalid_parameter_handler` added to `dllmain.cpp` (Debug-only) so future CRT assertions print to stderr rather than showing invisible modal dialogs in the test host.
+See `UNIT_TESTS_STATUS.md` for test inventory details, but prefer live CMake files and CI workflow files for current build-system facts.

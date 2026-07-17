@@ -1,0 +1,50 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                   "../RGBI_groups/nh3li.gbw" done!
+Number of atoms in Wavefunction file: 5 Number of MOs: 126
+Calculating ANOs for all atoms...                  ...done!
+ANO fallback summary: no atom-level fallbacks were needed.
+Calculating Population for all atoms...            ...done.
+
+Total Population: 12.3016
+
+[      Calculating Atomic Populations     ]
+[-----------------------------------------] 100% 
+Population of atom 0: 9.15043
+Population of atom 1: 1.45528
+Population of atom 2: 1.45436
+Population of atom 3: 1.45542
+Population of atom 4: 3.06323
+Atomic projector population outside selected ANO cutoff of atom 0: 1.11874
+Atomic projector population outside selected ANO cutoff of atom 1: 1.02404
+Atomic projector population outside selected ANO cutoff of atom 2: 1.02274
+Atomic projector population outside selected ANO cutoff of atom 3: 1.02415
+Atomic projector population outside selected ANO cutoff of atom 4: 1.23473
+[       Calculating Bond Populations      ]
+[-----------------------------------------] 100% 
+
+Roby-Gould Bond Indices (RGBI) Analysis
+----------------------------------------------
+Number of electrons in system:         13
+Number of electrons in Roby Analysis:  12.3016
+Number of cutoff electrons:            0.696887
+Number after cutoff projection:        12.9985
+Percentage of electrons accounted for: 94.63 %
+Percentage after cutoff projection:    99.99 %
+----------------------------------------------
+
+
+Atom Nr        Els       n_A     n_B    n_AB    s_AB    Cov.    Ion.    Tot.   Pyth.   Arak.
+--------------------------------------------------------------------------------------------
+   0 -   4    N - Li   9.150   3.063  12.065   0.148   0.215   0.392   0.448  23.108  31.924
+   0 -   1    N -  H   9.150   1.455   9.284   1.322   0.864   0.312   0.918  88.477  77.951
+   0 -   2    N -  H   9.150   1.454   9.284   1.321   0.863   0.312   0.918  88.419  77.894
+   0 -   3    N -  H   9.150   1.455   9.284   1.322   0.864   0.312   0.918  88.485  77.960
+--------------------------------------------------------------------------------------------

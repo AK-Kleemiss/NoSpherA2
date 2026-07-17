@@ -11,6 +11,20 @@ add_executable(
     ${NOSPHERA2_APP_SOURCES}
 )
 
+if(WIN32)
+    target_sources(
+        NoSpherA2
+        PRIVATE
+            "${PROJECT_SOURCE_DIR}/Windows/NoSpherA2/Resource.rc"
+    )
+
+    target_include_directories(
+        NoSpherA2
+        PRIVATE
+            "${PROJECT_SOURCE_DIR}/Windows/NoSpherA2"
+    )
+endif()
+
 nosphera2_enable_optimizations(NoSpherA2)
 
 target_compile_features(
@@ -18,15 +32,6 @@ target_compile_features(
     PRIVATE
         cxx_std_20
 )
-
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE AND NOT WIN32)
-    target_link_options(
-        NoSpherA2
-        PRIVATE
-            -static-libstdc++
-            -static-libgcc
-    )
-endif()
 
 target_link_libraries(
     NoSpherA2
