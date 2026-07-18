@@ -468,6 +468,169 @@ void XCW::calc_criteria() {
 	cryst.GooF = std::sqrt(prefactor * sum_goof);
 }
 
+void XCW::ensure_hkl_ordered() {
+	if (!hkl_ordered_.empty() || hkl.empty()) {
+		return;
+	}
+	hkl_ordered_.reserve(hkl.size());
+	for (const i3& h : hkl) {
+		hkl_ordered_.push_back(h);
+	}
+}
+
+// See tests/P1_test/XCW_plan.md and Src/core/xcw_halting.h for the
+// statistical background. Computes z_h = (|F_obs,h| - |F_calc,h|) / sigma_h
+// for the current (converged) F_calc/F_scale, restricted to "strong"
+// reflections (|F_obs|/sigma >= opt->xcw_strong_cutoff, XCW_plan.md 4.2),
+// then tests {z_h} against N(0,1) after a global shape/scale decoupling
+// rescale (XCW_plan.md 4.1). This is the full-reflection-set version of the
+// criterion (XCW_plan.md sec. 2); the free/working-set cross-validation
+// variant (sec. 5) is not yet implemented.
+void XCW::evaluate_gaussian_halting(const double lambda) {
+	ensure_hkl_ordered();
+
+	const int n_total = cryst.nr_small;
+	vec z_raw;
+	vec resolution;
+	vec abs_F;
+	z_raw.reserve(n_total);
+	resolution.reserve(n_total);
+	abs_F.reserve(n_total);
+
+	for (int i = 0; i < n_total; i++) {
+		if (obs[i].sigma_obs <= 0.0) {
+			continue;
+		}
+		const double f_over_sigma = obs[i].abs_F_obs / obs[i].sigma_obs;
+		if (f_over_sigma < opt->xcw_strong_cutoff) {
+			continue;
+		}
+		const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
+		const double diff = scaled_F_calc - obs[i].abs_F_obs;
+		z_raw.push_back(diff / obs[i].sigma_obs);
+		resolution.push_back(unit_cell.get_stl_of_hkl(hkl_ordered_[i]));
+		abs_F.push_back(obs[i].abs_F_obs);
+	}
+
+	GaussianHaltEntry entry;
+	entry.lambda = lambda;
+	entry.n_total = n_total;
+	entry.n_used = static_cast<int>(z_raw.size());
+
+	if (entry.n_used < 8) {
+		XCW_log << "Gaussian halting criterion: only " << entry.n_used
+			<< " strong reflections (|F|/sigma >= " << opt->xcw_strong_cutoff
+			<< ") at lambda=" << lambda << ", skipping (need >= 8)." << std::endl;
+		gaussian_halt_history_.push_back(entry);
+		return;
+	}
+
+	// Decouple shape from scale (XCW_plan.md 4.1): rescale z so <z^2> ~ 1
+	// globally before testing the *shape* of the distribution against
+	// N(0,1). This is a single global scale factor, not the full
+	// resolution-uniform weighting scheme referenced in the plan.
+	double mean_z2 = 0.0;
+	for (const double v : z_raw) {
+		mean_z2 += v * v;
+	}
+	mean_z2 /= entry.n_used;
+	entry.sigma_scale = (mean_z2 > 0.0) ? std::sqrt(mean_z2) : 1.0;
+
+	vec z(entry.n_used);
+	for (int i = 0; i < entry.n_used; i++) {
+		z[i] = z_raw[i] / entry.sigma_scale;
+	}
+
+	entry.A2 = anderson_darling_statistic(z);
+	entry.ad_reject_5pct = entry.A2 > ANDERSON_DARLING_CRITICAL_5PCT;
+
+	const ProbabilityPlotFit pp = normal_probability_plot_fit(z);
+	entry.pp_slope = pp.slope;
+	entry.pp_intercept = pp.intercept;
+
+	entry.skewness = sample_skewness(z);
+	entry.excess_kurtosis = sample_excess_kurtosis(z);
+	entry.jarque_bera = jarque_bera_statistic(z);
+
+	const int n_bins = std::clamp(entry.n_used / 20, 2, 10);
+	const BinnedTrend res_trend = binned_z_squared_trend(z, resolution, n_bins);
+	entry.resolution_trend_slope = res_trend.slope;
+	entry.resolution_trend_r = res_trend.spearman_r;
+	entry.resolution_trend_flagged = res_trend.flagged;
+
+	const BinnedTrend int_trend = binned_z_squared_trend(z, abs_F, n_bins);
+	entry.intensity_trend_slope = int_trend.slope;
+	entry.intensity_trend_r = int_trend.spearman_r;
+	entry.intensity_trend_flagged = int_trend.flagged;
+
+	XCW_log << "Gaussian halting criterion at lambda=" << std::fixed << std::setprecision(5) << lambda << ":\n"
+		<< "  n_used=" << entry.n_used << "/" << entry.n_total << " (|F|/sigma >= " << opt->xcw_strong_cutoff
+		<< "), sigma_scale=" << entry.sigma_scale << "\n"
+		<< "  A^2=" << entry.A2 << (entry.ad_reject_5pct ? " (rejects N(0,1) at 5%)" : " (consistent with N(0,1) at 5%)") << "\n"
+		<< "  probability-plot slope=" << entry.pp_slope << " intercept=" << entry.pp_intercept << "\n"
+		<< "  skewness=" << entry.skewness << " excess_kurtosis=" << entry.excess_kurtosis
+		<< " Jarque-Bera=" << entry.jarque_bera << "\n"
+		<< "  resolution-binned <z^2> trend: slope=" << entry.resolution_trend_slope
+		<< " spearman_r=" << entry.resolution_trend_r << (entry.resolution_trend_flagged ? " [FLAGGED]" : "") << "\n"
+		<< "  |F|-binned <z^2> trend: slope=" << entry.intensity_trend_slope
+		<< " spearman_r=" << entry.intensity_trend_r << (entry.intensity_trend_flagged ? " [FLAGGED]" : "") << std::endl;
+
+	gaussian_halt_history_.push_back(entry);
+}
+
+// Prints the full per-lambda table to XCW_log (the detailed-output file,
+// same convention as the rest of the XCW-specific diagnostics) and echoes
+// only the one-line recommended halting lambda* to std::cout, matching the
+// existing "More detailed output in XCW.log file..." convention rather than
+// duplicating the whole table into the shared NoSpherA2.log. lambda* is
+// chosen as the argmin of A^2 among lambda steps with enough strong
+// reflections to be meaningful; a WARNING is appended if the binned-trend
+// test (XCW_plan.md 3.3) flags that lambda, since that indicates spatially
+// correlated residuals that a marginal normality test alone would miss.
+void XCW::report_gaussian_halting_summary() {
+	if (gaussian_halt_history_.empty()) {
+		return;
+	}
+
+	XCW_log << "\n____________________________________________________________________________\n"
+		<< "Gaussian halting criterion summary (tests/P1_test/XCW_plan.md)\n"
+		<< " Lambda\t\tA^2\treject5%\tpp_slope\tpp_intercept\tskew\tkurt\tres_trend_r\tint_trend_r\tn_used\n";
+	for (const GaussianHaltEntry& e : gaussian_halt_history_) {
+		XCW_log << "\t" << std::fixed << std::setprecision(5) << e.lambda
+			<< "\t" << std::setprecision(4) << e.A2
+			<< "\t" << (e.ad_reject_5pct ? "yes" : "no")
+			<< "\t\t" << e.pp_slope << "\t\t" << e.pp_intercept
+			<< "\t" << e.skewness << "\t" << e.excess_kurtosis
+			<< "\t" << e.resolution_trend_r << "\t\t" << e.intensity_trend_r
+			<< "\t" << e.n_used << "\n";
+	}
+
+	const GaussianHaltEntry* best = nullptr;
+	for (const GaussianHaltEntry& e : gaussian_halt_history_) {
+		if (e.n_used < 8) {
+			continue;
+		}
+		if (!best || e.A2 < best->A2) {
+			best = &e;
+		}
+	}
+
+	if (best) {
+		const bool trend_ok = !best->resolution_trend_flagged && !best->intensity_trend_flagged;
+		std::ostream* streams[2] = { &XCW_log, &std::cout };
+		for (std::ostream* s : streams) {
+			*s << "____________________________________________________________________________\n"
+				<< "Recommended halting lambda* = " << std::fixed << std::setprecision(5) << best->lambda
+				<< " (A^2=" << std::setprecision(4) << best->A2 << ")";
+			if (!trend_ok) {
+				*s << " -- WARNING: binned <z^2> trend test flagged at this lambda; "
+					<< "residuals may be spatially correlated, inspect before trusting lambda*.";
+			}
+			*s << std::endl;
+		}
+	}
+}
+
 void XCW::create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set) {
 	for (int atm = 0; atm < cryst.ncen; atm++) {
 		d3 pos = { occ_basis_set.atoms()[atm].x, occ_basis_set.atoms()[atm].y, occ_basis_set.atoms()[atm].z };
@@ -1243,6 +1406,10 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		print_centered_message(print_.str(), 76, XCW_log);
 		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << cryst.chi2 << "\t" << cryst.GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
+		if (opt->xcw_gaussian_halt) {
+			evaluate_gaussian_halting(lambda);
+		}
+
 		create_tscb(scf, lambda);
 	}
 	else {
@@ -1514,6 +1681,10 @@ void XCW::run_XCW_fitting() {
 		scf.convergence_accelerator.set_switch_threshold(scf.convergence_settings.diis_switch_threshold);
 		do_SCF(lambda, alpha, scf, last_wfn, has_guess);
 		last_wfn = scf.wavefunction();
+	}
+
+	if (opt->xcw_gaussian_halt) {
+		report_gaussian_halting_summary();
 	}
 
 	std::cout << "Finished XCW fitting procedure." << std::endl;

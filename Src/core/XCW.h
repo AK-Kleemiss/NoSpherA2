@@ -5,6 +5,7 @@
 #include "scattering_factors.h"
 #include "cell.h"
 #include "basis_set.h"
+#include "xcw_halting.h"
 #include <occ/qm/hf.h>
 
 class XCW {
@@ -168,6 +169,22 @@ private:
 	void eval_scale();
 	// Calculates quality criteria like GooF and chi^2
 	void calc_criteria();
+	// Distributional (Gaussian) halting criterion (see xcw_halting.h and
+	// tests/P1_test/XCW_plan.md). Computes standardized residuals z_h from
+	// the current F_calc/obs/F_scale, evaluates the Anderson-Darling
+	// statistic and supporting diagnostics, logs them, and stores the
+	// result for the final lambda* recommendation. Only called when
+	// opt->xcw_gaussian_halt is set.
+	void evaluate_gaussian_halting(const double lambda);
+	// Prints the per-lambda Gaussian-halting table and the recommended
+	// lambda* = argmin A^2 (subject to the binned-trend test) to XCW_log
+	// and std::cout. Called once at the end of run_XCW_fitting().
+	void report_gaussian_halting_summary();
+	// Builds the (once-cached) ordered list of Miller indices matching the
+	// index r used for obs[r]/F_calc[0][r] (see generate_asym_lookup),
+	// needed to look up per-reflection resolution for the binned trend
+	// test.
+	void ensure_hkl_ordered();
 
 
 	// Calculates the perturbation matrix elements
@@ -206,6 +223,11 @@ private:
 	std::vector<scattering_data> obs;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
+	// Ordered snapshot of `hkl` (see ensure_hkl_ordered), i.e. hkl_ordered_[r]
+	// is the Miller index of reflection r as used for obs[r]/F_calc[0][r].
+	std::vector<i3> hkl_ordered_;
+	// Per-lambda Gaussian halting diagnostics, see evaluate_gaussian_halting.
+	std::vector<GaussianHaltEntry> gaussian_halt_history_;
 	const options* opt;
 	WFN dummy_wave;
 	cell unit_cell;

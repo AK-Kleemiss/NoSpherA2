@@ -744,6 +744,10 @@ struct options
     bool do_XCW = false;
     double xcw_lambda_step = 0.0;
     double xcw_lambda_max = 0.0;
+    // Distributional (Gaussian) halting criterion, see tests/P1_test/XCW_plan.md
+    // and Src/core/xcw_halting.h/.cpp.
+    bool xcw_gaussian_halt = false;
+    double xcw_strong_cutoff = 3.0;
     bool calc_F_calc = false;
     bool rgbi = false;
     bool rgbi_no_sym = false;

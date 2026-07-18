@@ -241,7 +241,16 @@ std::string help_message =
     "      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n"
     "      convert tsc:  NoSpherA2.exe -tscb A.tscb\n"
     "      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n"
-    "      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
+    "      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n"
+    "   -do_XCW         [stepsize max_value]      Run X-ray constrained wavefunction (XCW) fitting. Requires -cif/-hkl.\n"
+    "                                            Optional trailing numbers limit the lambda scan to lambda = 0, stepsize, 2*stepsize, ..., max_value\n"
+    "                                            (e.g. -do_XCW 0.01 0.01 runs only lambda=0.00 and 0.01). Defaults to stepsize=0.01, max_value=1.0.\n"
+    "   -xcw_gaussian_halt                       Along with -do_XCW: at each converged lambda, test the standardized structure-factor\n"
+    "                                            residuals against N(0,1) (Anderson-Darling) as a halting criterion, complementing GooF=1.\n"
+    "                                            Logs per-lambda diagnostics to XCW.log and recommends lambda* = argmin A^2 at the end.\n"
+    "                                            See tests/P1_test/XCW_plan.md for the full statistical background.\n"
+    "   -xcw_strong_cutoff <NUMBER>              With -xcw_gaussian_halt: minimum |F_obs|/sigma for a reflection to enter the normality\n"
+    "                                            test (weak reflections are not Gaussian-distributed even for a perfect model). [3.0]\n");
 std::string NoSpherA2_message(bool no_date)
 {
     std::string t = "    _   __     _____       __              ___   ___\n";
@@ -3120,6 +3129,12 @@ void options::digest_options()
         }
         else if (temp == "-calc_F") {
             calc_F_calc = true;
+        }
+        else if (temp == "-xcw_gaussian_halt") {
+            xcw_gaussian_halt = true;
+        }
+        else if (temp == "-xcw_strong_cutoff") {
+            xcw_strong_cutoff = stod(arguments[i + 1]);
         }
         else if (temp == "-anom_disp")
         {
