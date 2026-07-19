@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "xcw_halting.h"
+#include "nos_math.h"
 
 double std_normal_cdf(const double z) {
     return 0.5 * std::erfc(-z / std::sqrt(2.0));
@@ -222,4 +223,124 @@ BinnedTrend binned_z_squared_trend(const vec& z, const vec& key, int n_bins, dou
     trend.spearman_r = spearman_correlation(bin_index, bin_mean_z2);
     trend.flagged = std::abs(trend.spearman_r) > flag_threshold;
     return trend;
+}
+
+namespace {
+    double eval_polynomial(const vec& coeffs, double x) {
+        double y = 0.0;
+        double xp = 1.0;
+        for (const double c : coeffs) {
+            y += c * xp;
+            xp *= x;
+        }
+        return y;
+    }
+}
+
+PolynomialFit fit_polynomial(const vec& x, const vec& y, int degree) {
+    PolynomialFit fit;
+    fit.degree = degree;
+    const int n = static_cast<int>(x.size());
+    err_checkf(x.size() == y.size(), "fit_polynomial: x and y size mismatch", std::cout);
+    err_checkf(degree >= 1, "fit_polynomial: degree must be >= 1", std::cout);
+
+    const int n_params = degree + 1;
+    if (n < degree + 3) {
+        return fit; // not enough points for a stable fit at this degree
+    }
+
+    // Normal-equations system (n_params x n_params): M[j][k] = Sum x_i^(j+k), rhs[j] = Sum y_i * x_i^j.
+    vec2 M(n_params, vec(n_params, 0.0));
+    vec rhs(n_params, 0.0);
+    vec power_sums(2 * n_params - 1, 0.0);
+    for (int i = 0; i < n; i++) {
+        double xp = 1.0;
+        for (int p = 0; p < 2 * n_params - 1; p++) {
+            power_sums[p] += xp;
+            xp *= x[i];
+        }
+    }
+    for (int j = 0; j < n_params; j++) {
+        for (int k = 0; k < n_params; k++) {
+            M[j][k] = power_sums[j + k];
+        }
+        double xj = 0.0;
+        for (int i = 0; i < n; i++) {
+            xj += y[i] * std::pow(x[i], j);
+        }
+        rhs[j] = xj;
+    }
+
+    solve_linear_system(M, rhs); // overwrites rhs with the solution in place; logs and leaves it
+                                  // unusable (checked below) if the system is singular.
+    for (const double c : rhs) {
+        if (!std::isfinite(c)) {
+            return fit; // singular system (e.g. duplicate/too-clustered x values)
+        }
+    }
+    fit.coeffs = rhs;
+
+    double rss = 0.0, mean_y = 0.0;
+    for (const double yi : y) mean_y += yi;
+    mean_y /= n;
+    double tss = 0.0;
+    for (int i = 0; i < n; i++) {
+        const double resid = y[i] - eval_polynomial(fit.coeffs, x[i]);
+        rss += resid * resid;
+        const double dy = y[i] - mean_y;
+        tss += dy * dy;
+    }
+    fit.rss = rss;
+    fit.r_squared = (tss > 0.0) ? (1.0 - rss / tss) : 0.0;
+    // AIC for least-squares regression with normally distributed errors:
+    // AIC = n*ln(RSS/n) + 2k, k = n_params + 1 (regression coefficients plus the noise variance).
+    fit.aic = (rss > 0.0)
+        ? static_cast<double>(n) * std::log(rss / static_cast<double>(n)) + 2.0 * (n_params + 1)
+        : -std::numeric_limits<double>::infinity();
+    fit.valid = true;
+
+    // Bounded grid search for an interior local minimum, from the smallest
+    // observed x out to 3x the observed span (a generous but bounded
+    // extrapolation window).
+    const double x_min = *std::min_element(x.begin(), x.end());
+    const double x_max = *std::max_element(x.begin(), x.end());
+    const double span = std::max(x_max - x_min, 1e-12);
+    const double search_hi = x_min + 3.0 * span;
+    constexpr int grid_points = 2000;
+    double best_x = 0.0, best_y = std::numeric_limits<double>::infinity();
+    int best_idx = -1;
+    vec grid_y(grid_points);
+    for (int i = 0; i < grid_points; i++) {
+        const double xi = x_min + (search_hi - x_min) * static_cast<double>(i) / (grid_points - 1);
+        grid_y[i] = eval_polynomial(fit.coeffs, xi);
+        if (grid_y[i] < best_y) {
+            best_y = grid_y[i];
+            best_x = xi;
+            best_idx = i;
+        }
+    }
+    // Only count it as a genuine minimum if it is an interior point of the
+    // search grid (not sitting at either boundary, which would mean the
+    // curve is still monotonic over the whole search window).
+    if (best_idx > 0 && best_idx < grid_points - 1) {
+        fit.has_minimum = true;
+        fit.vertex_x = best_x;
+        fit.vertex_y = best_y;
+    }
+    return fit;
+}
+
+PolynomialFit choose_best_polynomial_fit(const vec& x, const vec& y, const std::vector<int>& degrees,
+    std::vector<PolynomialFit>* all_candidates) {
+    PolynomialFit best;
+    for (const int degree : degrees) {
+        PolynomialFit candidate = fit_polynomial(x, y, degree);
+        if (all_candidates) {
+            all_candidates->push_back(candidate);
+        }
+        if (candidate.valid && (!best.valid || candidate.aic < best.aic)) {
+            best = candidate;
+        }
+    }
+    return best;
 }

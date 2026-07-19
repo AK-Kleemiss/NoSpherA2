@@ -1,0 +1,39 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                            "P1_test_NA2.cif"Reading:                                "P1_test.hkl" done!
+Nr of reflections read from file: 3215
+Number of symmetry operations: 1
+Nr of reflections to be used: 3215
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 3215
+XCW orbital basis set: def2-svp-basis
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 151614 grid points.
+Total number of grid points after pruning: 148356
+AO values calculated for all grids.
+[                 Calculating XCW integrals...                ]
+[=============================================================] 100% 
+More detailed output in XCW.log file...
+XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion (-xcw_h2_weighting); Chi^2/GooF below are this weighted quantity, not the classical GoF.
+____________________________________________________________________________
+ Lambda		Chi^2	GooF	Total Energy	Perturbation	Target quantity 
+								(Eh)		   (a. u.)			(a. u.)
+____________________________________________________________________________
+	0.000	3.901	3.921	-1984.745543784		0.000		-1984.745543784
+	0.010	2.877	3.191	-1984.741503022		0.029		-1984.712729989
+	0.020	2.482	2.890	-1984.735834522		0.050		-1984.686187690
+	0.030	2.259	2.716	-1984.730306274		0.068		-1984.662547441
+	0.040	2.109	2.598	-1984.725045325		0.084		-1984.640671836
+	0.050	2.000	2.512	-1984.720038300		0.100		-1984.620022711
+	0.060	1.916	2.445	-1984.715259464		0.115		-1984.600295246
+	0.070	1.848	2.391	-1984.710684913		0.129		-1984.581296119
+	0.080	1.793	2.346	-1984.706294046		0.143		-1984.562892840
+Finished XCW fitting procedure.

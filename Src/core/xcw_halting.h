@@ -1,5 +1,6 @@
 #pragma once
 #include "convenience.h"
+#include <limits>
 
 // Distributional (Gaussian) halting criterion for the XCW/XRW lambda scan.
 //
@@ -82,3 +83,38 @@ struct BinnedTrend {
 // trend is expected for i.i.d. residuals; XCW_plan.md 3.3). `flagged` is
 // set when |spearman_r| exceeds `flag_threshold`.
 BinnedTrend binned_z_squared_trend(const vec& z, const vec& key, int n_bins, double flag_threshold = 0.5);
+
+struct PolynomialFit {
+    bool valid = false;     // false if not enough points for this degree, or the fit is singular
+    int degree = 0;
+    vec coeffs;              // coeffs[k] is the x^k coefficient; y = Sum_k coeffs[k]*x^k
+    double rss = 0.0;         // residual sum of squares, Sum (y_i - yhat_i)^2
+    double r_squared = 0.0;   // 1 - RSS/TSS, coefficient of determination
+    double aic = std::numeric_limits<double>::infinity(); // Akaike Information Criterion (lower is better)
+    bool has_minimum = false; // true if the fitted curve has an interior local minimum
+                               // (positive curvature) within the search range used by
+                               // choose_best_polynomial_fit
+    double vertex_x = 0.0;    // location of that minimum, only meaningful if has_minimum
+    double vertex_y = 0.0;    // fitted value at vertex_x
+};
+
+// Least-squares fit of y = Sum_{k=0..degree} coeffs[k]*x^k through (x_i,y_i)
+// via the (degree+1)x(degree+1) normal-equations system, solved with the
+// existing LAPACK-backed solve_linear_system (Src/core/nos_math.h). Requires
+// at least `degree + 3` points (a small safety margin beyond the bare
+// minimum degree+1 needed to avoid an exactly-determined, unstable fit);
+// returns an invalid fit otherwise. The minimum (if any) is located by a
+// bounded grid search over [min(x), min(x) + 3*(max(x)-min(x))] rather than
+// an analytic root-finder, since for a "rough guide" estimate this is
+// simpler and equally robust for the low polynomial degrees used here.
+PolynomialFit fit_polynomial(const vec& x, const vec& y, int degree);
+
+// Fits every degree in `degrees` that has enough points (see fit_polynomial)
+// and returns the one with the lowest AIC, i.e. the best fit-quality/
+// parsimony trade-off rather than always preferring the more flexible
+// model. `all_candidates` (if non-null) receives every attempted fit
+// (including invalid ones) in the same order as `degrees`, for reporting
+// which functional forms were tried. Returns an invalid PolynomialFit if
+// none of `degrees` had enough points.
+PolynomialFit choose_best_polynomial_fit(const vec& x, const vec& y, const std::vector<int>& degrees,
+    std::vector<PolynomialFit>* all_candidates = nullptr);

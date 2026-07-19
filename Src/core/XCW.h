@@ -167,8 +167,14 @@ private:
 	// Methods used to determine various crystallographic parameters
 	// Evaluates the scaling factor for |F_calc| by least squares fitting
 	void eval_scale();
-	// Calculates quality criteria like GooF and chi^2
+	// Calculates quality criteria like GooF and chi^2. When
+	// opt->xcw_h2_weighting is set, both are computed with an additional
+	// 1/|H|^2 weighting (XCW_plan.md sec. 6.2, residual self-energy
+	// criterion) instead of the traditional unweighted sums.
 	void calc_criteria();
+	// Builds (once) the per-reflection 1/|H|^2 cache used by calc_criteria/
+	// calc_perturb when opt->xcw_h2_weighting is set. No-op otherwise.
+	void ensure_inv_H2_weights();
 	// Distributional (Gaussian) halting criterion (see xcw_halting.h and
 	// tests/P1_test/XCW_plan.md). Computes standardized residuals z_h from
 	// the current F_calc/obs/F_scale, evaluates the Anderson-Darling
@@ -176,10 +182,22 @@ private:
 	// result for the final lambda* recommendation. Only called when
 	// opt->xcw_gaussian_halt is set.
 	void evaluate_gaussian_halting(const double lambda);
-	// Prints the per-lambda Gaussian-halting table and the recommended
-	// lambda* = argmin A^2 (subject to the binned-trend test) to XCW_log
-	// and std::cout. Called once at the end of run_XCW_fitting().
+	// Prints the full per-lambda Gaussian-halting table (XCW_log only), then
+	// calls report_halting_progress_estimate(true). Called once at the end
+	// of run_XCW_fitting().
 	void report_gaussian_halting_summary();
+	// Prints the recommended lambda* = argmin A^2 so far (subject to the
+	// binned-trend test), a scan-boundary warning if that argmin sits at
+	// the last evaluated lambda, and -- fitting the A^2(lambda) trend so
+	// far with a small family of polynomial models and picking the best by
+	// AIC (see xcw_halting.h) -- an extrapolated estimate of where the
+	// true minimum likely lies, with the fit's residual/quality diagnostics
+	// for every candidate model tried. Called periodically during the scan
+	// (is_final=false, every 5 lambda steps) and once more at the end
+	// (is_final=true, from report_gaussian_halting_summary). Uses whatever
+	// is in gaussian_halt_history_ at call time, so periodic calls are
+	// naturally based on partial data.
+	void report_halting_progress_estimate(bool is_final);
 	// Builds the (once-cached) ordered list of Miller indices matching the
 	// index r used for obs[r]/F_calc[0][r] (see generate_asym_lookup),
 	// needed to look up per-reflection resolution for the binned trend
@@ -226,6 +244,8 @@ private:
 	// Ordered snapshot of `hkl` (see ensure_hkl_ordered), i.e. hkl_ordered_[r]
 	// is the Miller index of reflection r as used for obs[r]/F_calc[0][r].
 	std::vector<i3> hkl_ordered_;
+	// 1/|H_r|^2 per reflection, see ensure_inv_H2_weights.
+	vec inv_H2_;
 	// Per-lambda Gaussian halting diagnostics, see evaluate_gaussian_halting.
 	std::vector<GaussianHaltEntry> gaussian_halt_history_;
 	const options* opt;

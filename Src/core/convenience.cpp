@@ -170,7 +170,9 @@ std::string help_message =
     "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (tested for OCC)\n"
     "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename [requires -b and -d]\n"
     "   -occ            <FILENAME>.toml          Runs a wavefunction calculation for OCC. Requires using OCC input\n"
-    "   -b              <FILENAME>               Read this basis set\n"
+    "   -b              <FILENAME>               Read this basis set. With -do_XCW, also overrides the XCW orbital basis (default\n"
+    "                                            def2-svp); KNOWN ISSUE: any non-default basis currently crashes OCC's SOAD initial\n"
+    "                                            guess for -do_XCW, see UNIT_TESTS_STATUS.md.\n"
     "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
     "   -dmin           <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
     "   -hkl_min_max    <6 Numbers>              Performs calculation on hkl range defined by the 6 numbers. (replaces dmin and hkl)\n"
@@ -245,12 +247,27 @@ std::string help_message =
     "   -do_XCW         [stepsize max_value]      Run X-ray constrained wavefunction (XCW) fitting. Requires -cif/-hkl.\n"
     "                                            Optional trailing numbers limit the lambda scan to lambda = 0, stepsize, 2*stepsize, ..., max_value\n"
     "                                            (e.g. -do_XCW 0.01 0.01 runs only lambda=0.00 and 0.01). Defaults to stepsize=0.01, max_value=1.0.\n"
+    "                                            Writes a detailed XCW.log alongside the usual log; -anom_disp is normally also needed.\n"
+    "   -anom_disp      <FILENAME>.txt           With -do_XCW: anomalous dispersion table (one line per element: symbol, f', f''),\n"
+    "                                            parsed by the atomic symbol on each line.\n"
+    "   -all_charges                             Also compute every available partitioning scheme (Becke/Hirshfeld/TFVC/MBIS/EMBIS)\n"
+    "                                            instead of just the selected one, and print a comparison table. With -do_XCW, this\n"
+    "                                            only affects the per-lambda .tscb-generation charge table in XCW.log (real density\n"
+    "                                            available there); it has no effect on XCW's own initial integral setup, which\n"
+    "                                            always skips real density evaluation regardless of this flag.\n"
     "   -xcw_gaussian_halt                       Along with -do_XCW: at each converged lambda, test the standardized structure-factor\n"
     "                                            residuals against N(0,1) (Anderson-Darling) as a halting criterion, complementing GooF=1.\n"
     "                                            Logs per-lambda diagnostics to XCW.log and recommends lambda* = argmin A^2 at the end.\n"
     "                                            See tests/P1_test/XCW_plan.md for the full statistical background.\n"
     "   -xcw_strong_cutoff <NUMBER>              With -xcw_gaussian_halt: minimum |F_obs|/sigma for a reflection to enter the normality\n"
-    "                                            test (weak reflections are not Gaussian-distributed even for a perfect model). [3.0]\n");
+    "                                            test (weak reflections are not Gaussian-distributed even for a perfect model). [3.0]\n"
+    "   -xcw_h2_weighting                        Along with -do_XCW: fit against Energy + lambda * Sum_h diff_h^2/(sigma_h^2*|H_h|^2)\n"
+    "                                            (the residual electrostatic self-energy, emphasizing low-order reflections) instead\n"
+    "                                            of the traditional, unweighted Energy + lambda * GoF^2. Replaces the reported\n"
+    "                                            Chi^2/GooF in XCW.log with this weighted quantity. See tests/P1_test/XCW_plan.md sec. 6.2.\n"
+    "                                            Known limitation: this weighting can make the SCF converge much more slowly at higher\n"
+    "                                            lambda, and may fail to converge within the default iteration cap; if that happens,\n"
+    "                                            use a smaller max_value in -do_XCW stepsize max_value.\n");
 std::string NoSpherA2_message(bool no_date)
 {
     std::string t = "    _   __     _____       __              ___   ___\n";
@@ -3135,6 +3152,9 @@ void options::digest_options()
         }
         else if (temp == "-xcw_strong_cutoff") {
             xcw_strong_cutoff = stod(arguments[i + 1]);
+        }
+        else if (temp == "-xcw_h2_weighting") {
+            xcw_h2_weighting = true;
         }
         else if (temp == "-anom_disp")
         {

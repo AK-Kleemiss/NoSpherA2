@@ -451,6 +451,8 @@ void XCW::eval_scale() {
 }
 
 void XCW::calc_criteria() {
+	ensure_inv_H2_weights();
+	const bool h2 = opt->xcw_h2_weighting;
 	double prefactor = 1.0 / static_cast<double>(cryst.nr_small - settings.n_params);
 	double sum_chi = 0;
 	double sum_goof = 0;
@@ -459,8 +461,9 @@ void XCW::calc_criteria() {
 		const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
 		const double diff = scaled_F_calc - obs[i].abs_F_obs;
 		const double diff2 = scaled_F_calc * scaled_F_calc - obs[i].F_obs2;
-		const double weighted_chi = diff * diff / obs[i].sigma_obs;
-		const double weighted_goof = diff2 * diff2 / (obs[i].sigma_obs2 * obs[i].sigma_obs2);
+		const double w = h2 ? inv_H2_[i] : 1.0;
+		const double weighted_chi = diff * diff / obs[i].sigma_obs * w;
+		const double weighted_goof = diff2 * diff2 / (obs[i].sigma_obs2 * obs[i].sigma_obs2) * w;
 		sum_chi += weighted_chi;
 		sum_goof += weighted_goof;
 	}
@@ -475,6 +478,26 @@ void XCW::ensure_hkl_ordered() {
 	hkl_ordered_.reserve(hkl.size());
 	for (const i3& h : hkl) {
 		hkl_ordered_.push_back(h);
+	}
+}
+
+// Builds the per-reflection 1/|H|^2 cache used to weight the residual
+// self-energy criterion (XCW_plan.md sec. 6.2: U_res ~ Sum_h |dF_h|^2/|H_h|^2).
+// |H| = 1/d = 2*sin(theta)/lambda; the (0,0,0) reflection is already
+// excluded from `hkl` at read time (see read_hkl_full), so no H=0 guard is
+// needed beyond the defensive check below. Computed once and reused across
+// all SCF iterations and lambda steps, since it depends only on geometry.
+void XCW::ensure_inv_H2_weights() {
+	if (!opt->xcw_h2_weighting || !inv_H2_.empty()) {
+		return;
+	}
+	ensure_hkl_ordered();
+	inv_H2_.resize(cryst.nr_small);
+#pragma omp parallel for
+	for (int r = 0; r < cryst.nr_small; r++) {
+		const double stl = unit_cell.get_stl_of_hkl(hkl_ordered_[r]);
+		const double H2 = 4.0 * stl * stl;
+		inv_H2_[r] = (H2 > 0.0) ? 1.0 / H2 : 0.0;
 	}
 }
 
@@ -579,14 +602,8 @@ void XCW::evaluate_gaussian_halting(const double lambda) {
 }
 
 // Prints the full per-lambda table to XCW_log (the detailed-output file,
-// same convention as the rest of the XCW-specific diagnostics) and echoes
-// only the one-line recommended halting lambda* to std::cout, matching the
-// existing "More detailed output in XCW.log file..." convention rather than
-// duplicating the whole table into the shared NoSpherA2.log. lambda* is
-// chosen as the argmin of A^2 among lambda steps with enough strong
-// reflections to be meaningful; a WARNING is appended if the binned-trend
-// test (XCW_plan.md 3.3) flags that lambda, since that indicates spatially
-// correlated residuals that a marginal normality test alone would miss.
+// same convention as the rest of the XCW-specific diagnostics), then calls
+// report_halting_progress_estimate(true) for the final recommendation.
 void XCW::report_gaussian_halting_summary() {
 	if (gaussian_halt_history_.empty()) {
 		return;
@@ -605,7 +622,18 @@ void XCW::report_gaussian_halting_summary() {
 			<< "\t" << e.n_used << "\n";
 	}
 
+	report_halting_progress_estimate(true);
+}
+
+// See the declaration in XCW.h for the full behavior description. lambda*
+// is the argmin of A^2 among lambda steps with enough strong reflections to
+// be meaningful; a WARNING is appended if the binned-trend test
+// (XCW_plan.md 3.3) flags that lambda, since that indicates spatially
+// correlated residuals that a marginal normality test alone would miss.
+void XCW::report_halting_progress_estimate(bool is_final) {
 	const GaussianHaltEntry* best = nullptr;
+	double max_valid_lambda = 0.0;
+	vec fit_lambda, fit_A2;
 	for (const GaussianHaltEntry& e : gaussian_halt_history_) {
 		if (e.n_used < 8) {
 			continue;
@@ -613,18 +641,71 @@ void XCW::report_gaussian_halting_summary() {
 		if (!best || e.A2 < best->A2) {
 			best = &e;
 		}
+		max_valid_lambda = std::max(max_valid_lambda, e.lambda);
+		fit_lambda.push_back(e.lambda);
+		fit_A2.push_back(e.A2);
+	}
+	if (!best) {
+		return;
 	}
 
-	if (best) {
-		const bool trend_ok = !best->resolution_trend_flagged && !best->intensity_trend_flagged;
-		std::ostream* streams[2] = { &XCW_log, &std::cout };
-		for (std::ostream* s : streams) {
-			*s << "____________________________________________________________________________\n"
-				<< "Recommended halting lambda* = " << std::fixed << std::setprecision(5) << best->lambda
-				<< " (A^2=" << std::setprecision(4) << best->A2 << ")";
-			if (!trend_ok) {
-				*s << " -- WARNING: binned <z^2> trend test flagged at this lambda; "
-					<< "residuals may be spatially correlated, inspect before trusting lambda*.";
+	// A minimum found only at the last evaluated lambda is a scan-boundary
+	// artifact (A^2 was still falling when the data ran out), not evidence
+	// that lambda* has actually been reached -- flag it explicitly instead
+	// of silently reporting the boundary value.
+	const bool at_boundary = (best->lambda >= max_valid_lambda - 1e-12) && (fit_lambda.size() > 1);
+	const bool trend_ok = !best->resolution_trend_flagged && !best->intensity_trend_flagged;
+
+	// Try a small family of candidate functional forms for the A^2(lambda)
+	// trend and let AIC pick the best fit-quality/parsimony trade-off,
+	// rather than committing to a single functional form. Quartic needs
+	// noticeably more points than quadratic to be stable (see
+	// fit_polynomial's `degree + 3` minimum), so it naturally only enters
+	// consideration once the scan has enough steps.
+	std::vector<PolynomialFit> candidates;
+	const PolynomialFit fit = choose_best_polynomial_fit(fit_lambda, fit_A2, { 2, 4 }, &candidates);
+
+	std::ostream* streams[2] = { &XCW_log, &std::cout };
+	for (std::ostream* s : streams) {
+		*s << "____________________________________________________________________________\n";
+		if (!is_final) {
+			*s << "Gaussian halting criterion: progress update after " << fit_lambda.size() << " lambda steps\n";
+		}
+		*s << "Recommended halting lambda* = " << std::fixed << std::setprecision(5) << best->lambda
+			<< " (A^2=" << std::setprecision(4) << best->A2 << ")";
+		if (!trend_ok) {
+			*s << " -- WARNING: binned <z^2> trend test flagged at this lambda; "
+				<< "residuals may be spatially correlated, inspect before trusting lambda*.";
+		}
+		*s << std::endl;
+
+		for (const PolynomialFit& c : candidates) {
+			*s << "  candidate fit: degree=" << c.degree;
+			if (!c.valid) {
+				*s << " -- not enough points yet (need >= degree+3 evaluated lambda steps)\n";
+				continue;
+			}
+			*s << " RSS=" << std::setprecision(4) << c.rss << " R^2=" << c.r_squared
+				<< " AIC=" << c.aic << ((fit.valid && c.degree == fit.degree) ? " [chosen]" : "")
+				<< std::endl;
+		}
+
+		if (at_boundary) {
+			*s << "WARNING: A^2 is still falling at the last evaluated lambda (" << std::setprecision(5)
+				<< max_valid_lambda << "); this is a scan-boundary value, not a confirmed interior minimum. "
+				<< "Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum.";
+			if (fit.valid && fit.has_minimum && fit.vertex_x > max_valid_lambda) {
+				*s << " Degree-" << fit.degree << " polynomial extrapolation (best fit by AIC, R^2="
+					<< std::setprecision(4) << fit.r_squared << ") of the A^2(lambda) trend so far estimates "
+					<< "the minimum near lambda ~= " << std::setprecision(5) << fit.vertex_x
+					<< " (extrapolated, not yet observed -- treat as a rough guide to where to extend the scan, not a final answer).";
+			}
+			else if (!fit.valid) {
+				*s << " Not enough points yet to extrapolate an estimate (need >= 5 evaluated lambda steps).";
+			}
+			else if (!fit.has_minimum) {
+				*s << " The trend so far is not curving upward yet within the search window; "
+					<< "cannot extrapolate a stopping estimate, extend the scan further.";
 			}
 			*s << std::endl;
 		}
@@ -1193,6 +1274,8 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 }
 
 void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
+	ensure_inv_H2_weights();
+	const bool h2 = opt->xcw_h2_weighting;
 	switch (settings.refine_against) {
 	case 1: {
 		perturb.setZero(cryst.nmo, cryst.nmo);
@@ -1205,7 +1288,10 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			for (int r = 0; r < cryst.nr_small; r++) {
 				const double F_calc_abs = std::abs(F_calc[0][r]);
 				// There should be another sigma but somehow that does not seem to work
-				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * F_calc_abs);
+				cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * F_calc_abs);
+				if (h2) {
+					precompute *= inv_H2_[r];
+				}
 				const size_t base = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					size_t offset = base + tri_index(mu, mu);
@@ -1245,7 +1331,10 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			for (int r = 0; r < cryst.nr_small; r++) {
 				const double F_calc_abs = std::abs(F_calc[0][r]);
 				// There should be another sigma but somehow that does not seem to work
-				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2);
+				cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2);
+				if (h2) {
+					precompute *= inv_H2_[r];
+				}
 				const size_t base = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					size_t offset = base + tri_index(mu, mu);
@@ -1404,11 +1493,19 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		std::stringstream print_;
 		print_ << "***SCF converged in " << scf.iter + 1 << " iterations***";
 		print_centered_message(print_.str(), 76, XCW_log);
-		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << cryst.chi2 << "\t" << cryst.GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
+		// Computed before the summary line below so its A^2 can be appended
+		// as an extra column (see run_XCW_fitting's header, which only adds
+		// that column when opt->xcw_gaussian_halt is set).
 		if (opt->xcw_gaussian_halt) {
 			evaluate_gaussian_halting(lambda);
 		}
+
+		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << cryst.chi2 << "\t" << cryst.GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant;
+		if (opt->xcw_gaussian_halt && !gaussian_halt_history_.empty()) {
+			std::cout << "\t\t" << std::setprecision(4) << gaussian_halt_history_.back().A2;
+		}
+		std::cout << std::endl;
 
 		create_tscb(scf, lambda);
 	}
@@ -1661,8 +1758,18 @@ void XCW::run_XCW_fitting() {
 	bool has_guess = false;
 
 	std::cout << "More detailed output in XCW.log file..." << std::endl;
+	if (opt->xcw_h2_weighting) {
+		std::cout << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
+			<< "(-xcw_h2_weighting); Chi^2/GooF below are this weighted quantity, not the classical GoF." << std::endl;
+		XCW_log << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
+			<< "(-xcw_h2_weighting); Chi^2/GooF below are this weighted quantity, not the classical GoF." << std::endl;
+	}
 	std::cout << "____________________________________________________________________________\n";
-	std::cout << " Lambda\t\tChi^2\tGooF\tTotal Energy\tPerturbation\tTarget quantity \n";
+	std::cout << " Lambda\t\tChi^2\tGooF\tTotal Energy\tPerturbation\tTarget quantity ";
+	if (opt->xcw_gaussian_halt) {
+		std::cout << "\tA^2 (halt)";
+	}
+	std::cout << "\n";
 	std::cout << "								(Eh)		   (a. u.)			(a. u.)\n";
 	std::cout << "____________________________________________________________________________\n";
 
@@ -1681,6 +1788,14 @@ void XCW::run_XCW_fitting() {
 		scf.convergence_accelerator.set_switch_threshold(scf.convergence_settings.diis_switch_threshold);
 		do_SCF(lambda, alpha, scf, last_wfn, has_guess);
 		last_wfn = scf.wavefunction();
+
+		// Periodic progress estimate: every 5 completed lambda steps, using
+		// whatever the scan has accumulated so far (not just at the end).
+		// Skipped on the very last step since report_gaussian_halting_summary()
+		// below always prints a final one right after the loop.
+		if (opt->xcw_gaussian_halt && (step + 1) % 5 == 0 && step + 1 < settings.num_xcw_steps) {
+			report_halting_progress_estimate(false);
+		}
 	}
 
 	if (opt->xcw_gaussian_halt) {

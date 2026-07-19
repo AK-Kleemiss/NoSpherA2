@@ -748,6 +748,12 @@ struct options
     // and Src/core/xcw_halting.h/.cpp.
     bool xcw_gaussian_halt = false;
     double xcw_strong_cutoff = 3.0;
+    // Residual self-energy fitting criterion (XCW_plan.md sec. 6.2): fit
+    // against Energy + lambda * Sum_h diff_h^2/(sigma_h^2 * |H_h|^2) instead
+    // of the traditional, unweighted Energy + lambda * GoF^2. The 1/|H|^2
+    // weighting emphasizes low-order reflections, matching the residual
+    // Coulomb self-energy U_res of the residual electron density.
+    bool xcw_h2_weighting = false;
     bool calc_F_calc = false;
     bool rgbi = false;
     bool rgbi_no_sym = false;

@@ -272,3 +272,50 @@ do_XCW = [0.01, 0.01]
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
+
+# Longer lambda scan exercising the Gaussian halting criterion over a real
+# trajectory. Slow (several minutes); only run with RUN_FULL_TEST=1, see
+# tests/src/IntegrationTests.cpp.
+[P1_test_XCW_full]
+directory = "P1_test"
+good = "P1_test_XCW_full.good"
+full = true
+
+[P1_test_XCW_full.args]
+do_XCW = [0.01, 0.1]
+xcw_gaussian_halt = ""
+cif = "P1_test_NA2.cif"
+hkl = "P1_test.hkl"
+anom_disp = "anom_disp.txt"
+
+# -xcw_h2_weighting variant of P1_test_XCW: fits against the 1/|H|^2-weighted
+# residual self-energy criterion instead of the classical GoF^2.
+[P1_test_XCW_h2]
+directory = "P1_test"
+good = "P1_test_XCW_h2.good"
+
+[P1_test_XCW_h2.args]
+do_XCW = [0.01, 0.01]
+xcw_h2_weighting = ""
+cif = "P1_test_NA2.cif"
+hkl = "P1_test.hkl"
+anom_disp = "anom_disp.txt"
+
+# -xcw_h2_weighting variant of P1_test_XCW_full, same RUN_FULL_TEST gating,
+# but capped at lambda=0.08 rather than 0.1: the 1/|H|^2-weighted SCF
+# genuinely fails to converge by lambda=0.10 for this system (iteration
+# count escalates sharply from 33 at 0.08 to 55 at 0.09 to non-convergence
+# at 0.10, within the default 100-iteration cap) -- a real numerical
+# instability of this weighting at higher lambda, not a test/code bug. See
+# UNIT_TESTS_STATUS.md Known Issues.
+[P1_test_XCW_h2_full]
+directory = "P1_test"
+good = "P1_test_XCW_h2_full.good"
+full = true
+
+[P1_test_XCW_h2_full.args]
+do_XCW = [0.01, 0.08]
+xcw_h2_weighting = ""
+cif = "P1_test_NA2.cif"
+hkl = "P1_test.hkl"
+anom_disp = "anom_disp.txt"

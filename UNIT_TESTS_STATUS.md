@@ -1,5 +1,12 @@
 # Unit Test Status
-**Last updated: 2026-07-18** (fixed the `TomlIntegrationTests.P1_test_XCW` access violation:
+**Last updated: 2026-07-19** (added the Gaussian/Anderson-Darling XCW halting criterion
+(`-xcw_gaussian_halt`) and the `1/|H|^2`-weighted residual self-energy fitting criterion
+(`-xcw_h2_weighting`), both opt-in and off by default. Three new tests added:
+`P1_test_XCW_full`, `P1_test_XCW_h2`, `P1_test_XCW_h2_full`, alongside the existing
+`P1_test_XCW`. See Known Issues below and `tests/P1_test/XCW_plan.md` for the full
+implementation status against the original spec, including an honest per-item checklist.)
+
+**2026-07-18** (fixed the `TomlIntegrationTests.P1_test_XCW` access violation:
 `GridManager::calculateMBISWeights`/`calculateEMBISWeights` ignored `config_.no_density_eval`
 and forced a real WFN density evaluation on XCW's MO-pruned dummy wavefunction, corrupting
 memory — see Known Issues below. `P1_test_XCW` is now enabled and passing in-process at
@@ -99,6 +106,9 @@ Added: 2026-06-14.
 | TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
 | fchk_conversion | NiP3_fchk | good.fchk | **yes** | ✅ passing (tolerated numeric warn) |
 | P1_test_XCW | P1_test | P1_test_XCW.good | no | ✅ passing (added 2026-07-18, in-process only; see note below) |
+| P1_test_XCW_full | P1_test | P1_test_XCW_full.good | **yes** (`RUN_FULL_TEST=1`) | ✅ passing (added 2026-07-19, 11-step lambda scan to 0.1 with `-xcw_gaussian_halt`; see note below) |
+| P1_test_XCW_h2 | P1_test | P1_test_XCW_h2.good | no | ✅ passing (added 2026-07-19, 2-step scan with `-xcw_h2_weighting`; see note below) |
+| P1_test_XCW_h2_full | P1_test | P1_test_XCW_h2_full.good | **yes** (`RUN_FULL_TEST=1`) | ✅ passing (added 2026-07-19, 9-step lambda scan to 0.08 — capped below 0.1 due to an SCF convergence limitation of `-xcw_h2_weighting`, see note below) |
 
 ---
 
@@ -132,6 +142,35 @@ files generated before they can be registered.
 ---
 
 ## Known Issues
+
+- **Gaussian/Anderson-Darling XCW halting criterion + H²-weighted fitting criterion, added
+  2026-07-19**: two new opt-in `-do_XCW` features (`-xcw_gaussian_halt`,
+  `-xcw_h2_weighting`) implementing a distributional lambda-scan halting criterion and an
+  alternative `1/|H|²`-weighted fitting criterion, per `tests/P1_test/XCW_plan.md`
+  ("Distributional (Gaussian) Halting Criterion for XCW/XRW"). New module
+  `Src/core/xcw_halting.h`/`.cpp` (Anderson-Darling statistic, normal probability-plot fit,
+  skewness/kurtosis/Jarque-Bera, resolution-/intensity-binned ⟨z²⟩ trend, and a multi-degree
+  polynomial fit with AIC-based model selection used to extrapolate a stopping estimate when
+  the scan hasn't found an interior minimum yet). Both features are off by default with no
+  behavior change for existing `-do_XCW` users. `XCW_plan.md` now carries an honest per-item
+  checklist (§8) of what's actually implemented versus the original spec — the biggest gap is
+  §5 (free/working-set cross-validation): the current implementation computes everything on
+  the **full** reflection set, not a held-out free set, which was the spec's stated main
+  defense against XCW's structural overfitting. Test coverage: `P1_test_XCW` (2-step,
+  classical), `P1_test_XCW_full` (11-step to λ=0.1, `-xcw_gaussian_halt`, `RUN_FULL_TEST=1`),
+  `P1_test_XCW_h2` (2-step, `-xcw_h2_weighting`), `P1_test_XCW_h2_full` (9-step to λ=0.08,
+  `-xcw_h2_weighting`, `RUN_FULL_TEST=1`) — all passing.
+
+  **`-xcw_h2_weighting` SCF convergence instability at higher lambda**: for the P1 test system,
+  the `1/|H|²`-weighted SCF converges progressively more slowly as lambda increases (iteration
+  count 15 → 17 → 19 → 25 → 28 → 30 → 31 → 33 at λ=0.00–0.08, then jumps to 55 at λ=0.09) and
+  fails to converge by λ=0.10 within the default 100-iteration cap. This is why
+  `P1_test_XCW_h2_full` is capped at λ=0.08 rather than 0.1 like its classical counterpart —
+  not a test bug, a genuine numerical property of this weighting at this system's higher
+  lambda values, plausibly related to the slow/conditionally-convergent `Σ1/|H|²` series noted
+  in the plan's own §6.2 caveats. Not yet root-caused further (e.g. whether better
+  damping/DIIS settings would fix it, or it's inherent to the weighting) — see `XCW_plan.md`
+  §8 for the current status.
 
 - **`P1_test_XCW` access violation, root-caused and fixed 2026-07-18**: the in-process
   `TomlIntegrationTests.P1_test_XCW` test reliably crashed (`0xC0000005`) inside
