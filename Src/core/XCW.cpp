@@ -923,8 +923,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 
 	// Precompute mu_vals for all grids
-	constexpr double maximum_ao_grid_cutoff = 9.5;
-	constexpr double minimum_ao_grid_cutoff = 8.0;
+	constexpr double maximum_ao_grid_cutoff = 12;
+	constexpr double minimum_ao_grid_cutoff = 12;
 	double minimum_primitive_exponent = std::numeric_limits<double>::max();
 	for (const ao_data& ao_shell : ao_data_shells) {
 		for (const primitive& primitive : ao_shell.prims) {
@@ -1002,8 +1002,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 
 	ivec2 active_grids(packed_size);
 	ivec skipped_grids_per_pair(packed_size, 0);
-	for (mu = 0; mu < cryst.nmo; ++mu) {
-		for (nu = mu; nu < cryst.nmo; ++nu) {
+	for (mu = 0; mu < cryst.nmo; mu++) {
+		for (nu = mu; nu < cryst.nmo; nu++) {
 			const size_t pair_idx = tri_index(mu, nu);
 			if (skip[mu][nu]) {
 				continue;
@@ -1027,10 +1027,10 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 	ivec2 grid_active_aos(n_atom_grids);
 	vec2 grid_ao_values(n_atom_grids);
-	for (int g = 0; g < n_atom_grids; ++g) {
+	for (int g = 0; g < n_atom_grids; g++) {
 		ivec& active_aos = grid_active_aos[g];
 		vec& values = grid_ao_values[g];
-		for (int mu = 0; mu < cryst.nmo; ++mu) {
+		for (int mu = 0; mu < cryst.nmo; mu++) {
 			const double dx = grid_positions[g][0] - ao_data_shells[mu].pos[0];
 			const double dy = grid_positions[g][1] - ao_data_shells[mu].pos[1];
 			const double dz = grid_positions[g][2] - ao_data_shells[mu].pos[2];
@@ -1083,7 +1083,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			}
 		}
 		block.tile_result_size = static_cast<int>(result_offset);
-	};
+		};
 	for (int g = 0; g < n_atom_grids; ++g) {
 		const ivec& active_aos = grid_active_aos[g];
 		const vec& full_ao_values = grid_ao_values[g];
@@ -1180,12 +1180,12 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				}
 			}
 		}
-		for (int g = 0; g < n_atom_grids; ++g) {
+		for (int g = 0; g < n_atom_grids; g++) {
 			grid_factors[g] = asym_atoms[g].asym_fact * DW_fact[g][r] * phase_fact[g][r];
 		}
 
-		for (int mu = 0; mu < cryst.nmo; ++mu) {
-			for (int nu = mu; nu < cryst.nmo; ++nu) {
+		for (int mu = 0; mu < cryst.nmo; mu++) {
+			for (int nu = mu; nu < cryst.nmo; nu++) {
 				if (!skip[mu][nu]) {
 					skipped_grids += static_cast<long long>(num_syms) * skipped_grids_per_pair[tri_index(mu, nu)];
 				}
@@ -1193,8 +1193,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 
 		const size_t base = static_cast<size_t>(r) * packed_size;
-		for (int syms = 0; syms < num_syms; ++syms) {
-			for (int g = 0; g < n_atom_grids; ++g) {
+		for (int syms = 0; syms < num_syms; syms++) {
+			for (int g = 0; g < n_atom_grids; g++) {
 				const cdouble factor = grid_factors[g] * translation_phase[r][syms];
 				for (const GridBlock& block : grid_blocks[g]) {
 					const ivec& active_aos = block.active_aos;
