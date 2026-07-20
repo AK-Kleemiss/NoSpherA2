@@ -1,7 +1,8 @@
 # Unit Test Status
-**Last updated: 2026-07-20** (fixed a macOS-only build error and CI resource exhaustion in the
-four XCW tests added the previous day, both surfaced by CI after those tests were first pushed.
-See Known Issues below.)
+**Last updated: 2026-07-20** (fixed three rounds of CI failures in the four XCW tests added the
+previous day: a macOS-only build error, then a missing `RESOURCE_LOCK` causing all four tests
+(sharing one output log file) to race and corrupt each other's output under CI's
+`CTEST_PARALLEL_LEVEL=4` on every platform. See Known Issues below.)
 
 **2026-07-19** (added the Gaussian/Anderson-Darling XCW halting criterion
 (`-xcw_gaussian_halt`) and the `1/|H|^2`-weighted residual self-energy fitting criterion
@@ -146,6 +147,32 @@ files generated before they can be registered.
 ---
 
 ## Known Issues
+
+- **XCW test output race condition (RESOURCE_LOCK), found and fixed 2026-07-20**: after the
+  `-b sto-3g` fix below was pushed, CI failed again on **all three platforms** (Linux, Windows,
+  macOS) with `P1_test_XCW` and `P1_test_XCW_h2` both producing visibly *interleaved, byte-level
+  corrupted* `NoSpherA2.log` content — lines from one test's output spliced into the middle of the
+  other's. Actual root cause: `P1_test_XCW`, `P1_test_XCW_full`, `P1_test_XCW_h2`, and
+  `P1_test_XCW_h2_full` all use `directory = "P1_test"` in `tests/tests.toml`, and NoSpherA2's log
+  filename (`"NoSpherA2.log"`, `Src/core/NoSpherA2.cpp`) is hardcoded, not configurable via CLI —
+  so all four write to the exact same file. The CI workflow sets `CTEST_PARALLEL_LEVEL: 4`
+  (`.github/workflows/c-cpp_all.yml`), and this repo already has an established mechanism for
+  exactly this scenario — `tests/src/SetIntegrationTestLocks.cmake`, applying `RESOURCE_LOCK` via
+  `set_tests_properties()` to serialize tests that share a directory (already used for the
+  sucrose/TFVC/RGBI/SALTED test groups) — but the new P1_test entry was simply never added when
+  these four tests were created. Fixed by adding it. Verified locally with
+  `CTEST_PARALLEL_LEVEL=4` (matching CI exactly): the two fast tests now run serially instead of
+  concurrently and both pass; a full local 225-test suite run with the same parallel level found
+  no other regressions (one unrelated pre-existing failure, `Nbo47.EpoxideGennboMatchesReferenceWhenAvailable`,
+  requires an external WSL/gennbo tool not present in this environment).
+
+  This likely means the **original** (pre-`sto-3g`) Linux `bad_alloc`/Windows `(Timeout)`
+  failures documented below were *also* substantially caused by this same race — two full XCW
+  quantum-chemistry runs racing on the same output file, and incidentally roughly doubling peak
+  CPU/RAM demand by running concurrently, rather than being purely a `def2-svp` resource-sizing
+  problem as diagnosed at the time. The `-b sto-3g` switch remains a real, worthwhile improvement
+  (faster/lighter tests that also regression-test the STO-3G L-shell fix), but the `RESOURCE_LOCK`
+  entry is the fix that actually addresses the failure mode observed on all three platforms.
 
 - **CI failures in the four new XCW tests, found and fixed 2026-07-20**: after
   `P1_test_XCW`/`P1_test_XCW_full`/`P1_test_XCW_h2`/`P1_test_XCW_h2_full` were first pushed to CI,
