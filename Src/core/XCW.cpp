@@ -1168,7 +1168,13 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				for (int p = 0; p < points[g]; p++) {
 					phase_angles[p] = single_k_pts[syms][0] * d1[g][p] + single_k_pts[syms][1] * d2[g][p] + single_k_pts[syms][2] * d3[g][p];
 				}
-				vdSinCos(points[g], phase_angles.data(), phase_sines.data(), phase_cosines.data());
+#if defined(__APPLE__)
+					for (int p = 0; p < points[g]; p++) {
+						__sincos(phase_angles[p], &phase_sines[p], &phase_cosines[p]);
+					}
+#else
+					vdSinCos(points[g], phase_angles.data(), phase_sines.data(), phase_cosines.data());
+#endif
 				for (int p = 0; p < points[g]; p++) {
 					phase[syms][g][p] = cdouble(weights[g][p] * phase_cosines[p], weights[g][p] * phase_sines[p]);
 				}

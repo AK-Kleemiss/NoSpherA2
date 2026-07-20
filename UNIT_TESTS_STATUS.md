@@ -1,5 +1,9 @@
 # Unit Test Status
-**Last updated: 2026-07-19** (added the Gaussian/Anderson-Darling XCW halting criterion
+**Last updated: 2026-07-20** (fixed a macOS-only build error and CI resource exhaustion in the
+four XCW tests added the previous day, both surfaced by CI after those tests were first pushed.
+See Known Issues below.)
+
+**2026-07-19** (added the Gaussian/Anderson-Darling XCW halting criterion
 (`-xcw_gaussian_halt`) and the `1/|H|^2`-weighted residual self-energy fitting criterion
 (`-xcw_h2_weighting`), both opt-in and off by default. Three new tests added:
 `P1_test_XCW_full`, `P1_test_XCW_h2`, `P1_test_XCW_h2_full`, alongside the existing
@@ -142,6 +146,35 @@ files generated before they can be registered.
 ---
 
 ## Known Issues
+
+- **CI failures in the four new XCW tests, found and fixed 2026-07-20**: after
+  `P1_test_XCW`/`P1_test_XCW_full`/`P1_test_XCW_h2`/`P1_test_XCW_h2_full` were first pushed to CI,
+  three platform-specific failures surfaced:
+  - **macOS: build error**, `use of undeclared identifier 'vdSinCos'` at `Src/core/XCW.cpp`
+    (in `XCW::eval_I`). `vdSinCos` is an Intel MKL batched sin/cos call; macOS uses Apple
+    Accelerate instead of MKL (see `cmake/NoSpherA2Optimizations.cmake`) and has no equivalent
+    under that name. This is **pre-existing code** (commit `e7597d5`, predates the XCW work this
+    week) that had simply never been exercised by macOS CI before `P1_test_XCW` existed as an
+    automated test — the `mkl_set_num_threads_local` call two lines above it already had an
+    `#if !defined(__APPLE__)` guard, but the `vdSinCos` call itself didn't. Fixed by keeping the
+    batched `vdSinCos` path for non-Apple platforms and adding a per-element `__sincos` loop for
+    `__APPLE__`, mirroring the existing portable-sincos pattern already used in
+    `scattering_factors.cpp` (`sincos`/`__sincos`/plain `sin`+`cos` three-way split).
+  - **Linux: `std::bad_alloc`** thrown ~100ms into `P1_test_XCW`/`P1_test_XCW_h2`, and
+    **Windows: `(Timeout)`** on the same two tests plus (collaterally) the unrelated, previously
+    passing `DisorderTHPP`. Root cause: `def2-svp` for this 23-atom, 3215-reflection system needs
+    a multi-GB `I`-tensor (`packed_size = nmo*(nmo+1)/2` times `nr_small` complex doubles) and
+    took ~80s+ just for integral evaluation locally — too much for GitHub's standard shared
+    CI runners (4 vCPU, ~16GB RAM), and slow enough to drag the whole Windows ctest run past
+    its timeout. Fixed by switching all four tests to `-b sto-3g` (the now-fixed minimal basis,
+    see the entry below): far fewer basis functions, so both the `I`-tensor size and integral
+    evaluation time drop sharply. Locally, all four tests together now run in ~2 minutes total
+    (previously ~20+ minutes with `def2-svp`); the fast tests dropped from ~3 minutes to ~18
+    seconds each. This also turns each of these tests into a real regression test for the
+    STO-3G L-shell fix below, rather than only being smoke-tested manually. All four `.good`
+    files were regenerated against the new basis; convergence was re-verified for
+    `P1_test_XCW_h2_full`'s lambda=0.08 cap (still holds with STO-3G — SCF iteration counts stay
+    flat, 15 through 36, no escalation).
 
 - **Gaussian/Anderson-Darling XCW halting criterion + H²-weighted fitting criterion, added
   2026-07-19**: two new opt-in `-do_XCW` features (`-xcw_gaussian_halt`,

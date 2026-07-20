@@ -13,11 +13,11 @@ Number of symmetry operations: 1
 Nr of reflections to be used: 3215
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 3215
-XCW orbital basis set: def2-svp-basis
+XCW orbital basis set: sto-3g-basis
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 151614 grid points.
-Total number of grid points after pruning: 148356
+GridManager: Generated total of 102932 grid points.
+Total number of grid points after pruning: 102920
 AO values calculated for all grids.
 [                 Calculating XCW integrals...                ]
 [=============================================================] 100% 
@@ -26,6 +26,6 @@ ____________________________________________________________________________
  Lambda		Chi^2	GooF	Total Energy	Perturbation	Target quantity 
 								(Eh)		   (a. u.)			(a. u.)
 ____________________________________________________________________________
-	0.000	1.253	1.811	-1984.745543784		0.000		-1984.745543784
-	0.010	1.233	1.788	-1984.745445290		0.012		-1984.733114710
+	0.000	5.587	4.683	-1961.923538820		0.000		-1961.923538820
+	0.010	5.385	4.569	-1961.922559596		0.054		-1961.868705164
 Finished XCW fitting procedure.
