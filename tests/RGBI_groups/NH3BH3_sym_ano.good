@@ -1,0 +1,77 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                                 "nh3bh3.gbw" done!
+Number of atoms in Wavefunction file: 8 Number of MOs: 98
+Calculating ANOs for all atoms...                  ...done!
+ANO fallback summary: no atom-level fallbacks were needed.
+Calculating Population for all atoms...            ...done.
+
+Total Population: 16.8366
+
+[      Calculating Atomic Populations     ]
+[-----------------------------------------] 100% 
+Population of atom 0: 9.15657
+Population of atom 1: 8.21556
+Population of atom 2: 1.79419
+Population of atom 3: 1.79546
+Population of atom 4: 1.41549
+Population of atom 5: 1.41453
+Population of atom 6: 1.7931
+Population of atom 7: 1.41342
+Atomic projector population outside selected ANO cutoff of atom 0: 2.27687
+Atomic projector population outside selected ANO cutoff of atom 1: 3.57309
+Atomic projector population outside selected ANO cutoff of atom 2: 0.622411
+Atomic projector population outside selected ANO cutoff of atom 3: 0.62095
+Atomic projector population outside selected ANO cutoff of atom 4: 1.07297
+Atomic projector population outside selected ANO cutoff of atom 5: 1.07177
+Atomic projector population outside selected ANO cutoff of atom 6: 0.622914
+Atomic projector population outside selected ANO cutoff of atom 7: 1.07202
+[       Calculating Bond Populations      ]
+[-----------------------------------------] 100% 
+
+Roby-Gould Bond Indices (RGBI) Analysis
+----------------------------------------------
+Number of electrons in system:         18
+Number of electrons in Roby Analysis:  16.8366
+Number of cutoff electrons:            1.14514
+Number after cutoff projection:        17.9817
+Percentage of electrons accounted for: 93.54 %
+Percentage after cutoff projection:    99.9 %
+----------------------------------------------
+
+
+Atom Nr        Els       n_A     n_B    n_AB    s_AB    Cov.    Ion.    Tot.   Pyth.   Arak.
+--------------------------------------------------------------------------------------------
+   0 -   1    N -  B   9.157   8.216  16.077   1.295   0.911   0.621   1.102  68.249  61.892
+   0 -   4    N -  H   9.157   1.415   9.256   1.316   0.861   0.348   0.928  85.933  75.524
+   0 -   5    N -  H   9.157   1.415   9.256   1.315   0.860   0.348   0.928  85.953  75.542
+   0 -   7    N -  H   9.157   1.413   9.256   1.314   0.859   0.348   0.927  85.926  75.518
+   1 -   2    B -  H   8.216   1.794   8.541   1.468   0.850  -0.025   0.850  99.915  98.148
+   1 -   3    B -  H   8.216   1.795   8.541   1.470   0.851  -0.025   0.851  99.911  98.099
+   1 -   6    B -  H   8.216   1.793   8.540   1.469   0.850  -0.023   0.850  99.926  98.267
+--------------------------------------------------------------------------------------------
+
+
+Roby-Gould Bond Indices (RGBI) - Group Analysis
+----------------------------------------------
+Groups defined:
+  G0: atoms 0(N), 4(H), 5(H), 7(H)
+  G1: atoms 1(B), 2(H), 3(H), 6(H)
+----------------------------------------------
+
+Group populations:
+  Population of G0 (NH3)                9.45015
+  Population of G1 (BH3)                9.17266
+----------------------------------------------
+
+Group             n_G1    n_G2  n_G1G2  s_G1G2    Cov.    Ion.    Tot.   Pyth.   Arak.
+------------------------------------------------------------------------------------------
+G0 - G1          9.450   9.173  14.643   3.980   1.304   2.157   2.521  26.768  34.618
+------------------------------------------------------------------------------------------

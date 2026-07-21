@@ -10,6 +10,7 @@ class atom;
 class BasisSet;
 struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
+enum class RGBIOrbitalBasis { NAO, ANO };
 
 void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file = std::cout);
 void not_implemented(const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file);
@@ -79,6 +80,15 @@ struct properties_options
     double resolution = 0.1;
     double radius = 2.0;
     double integral_accuracy = -1;
+    double promol_nci_rcut1 = 0.95;
+    double promol_nci_rcut2 = 0.75;
+    double promol_nci_rho_abs_max = 0.5;
+    double promol_nci_rdg_max = 1.0;
+    // The promolecular NCI _values.dat writer parallelizes over grid points with
+    // dynamic OpenMP scheduling, so row order (not the values themselves) is
+    // non-deterministic between runs. Force it to run single-threaded for
+    // reproducible output ordering, e.g. for golden-file test generation.
+    bool promol_nci_single_threaded = false;
     std::array<int, 3> NbSteps = { 0, 0, 0 };
     std::array<double, 6> MinMax = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     ivec MO_numbers;
@@ -416,7 +426,7 @@ void swap_sort(ivec order, cvec &v);
 
 void swap_sort_multi(ivec order, std::vector<ivec> &v);
 
-// Given a 3x3 matrix in a single array of double will find and sort eigenvalues and return biggest eigenvalue
+// Given a 3x3 symmetric matrix in a single row-major array of double, returns the median (middle) eigenvalue
 double get_lambda_1(double *a);
 
 double get_decimal_precision_from_CIF_number(std::string &given_string);
@@ -708,6 +718,8 @@ struct options
     std::filesystem::path occ_toml_path;
     std::filesystem::path cwd;
     std::filesystem::path profiling_tests_root = "tests";
+    std::filesystem::path promol_nci_xyz1;
+    std::filesystem::path promol_nci_xyz2;
     properties_options properties;
     bool debug = false;
     bool all_charges = false;
@@ -733,9 +745,12 @@ struct options
     bool calc_F_calc = false;
     bool rgbi = false;
     bool rgbi_no_sym = false;
+    bool rgbi_EVs = false;
+    RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
     ivec3 rgbi_group_sets;
     bool fract = false;
     bool profiling = false;
+    bool promol_nci = false;
     bool get_g = false;
     int accuracy = 2;
     int threads = -1;

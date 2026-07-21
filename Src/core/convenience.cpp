@@ -196,6 +196,7 @@ std::string help_message =
     "   -TFVC                                    Use the Topological Fuzzy Voronoi Cells (TFVC) partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -rgbi                                    Run Roby-Gould Bond Index analysis.\n"
     "   -rgbi_no_sym                             Run RGBI without atomic O_h symmetrization.\n"
+    "   -rgbi_basis    <nao|ano>                 Use the occupied NAO subset (default) or the full atom-local ANO set for RGBI.\n"
     "   -rgbi-groups    <GROUP> <GROUP> [...]    Run RGBI group analysis for comma-separated atom index groups/ranges, e.g. 0-5,7. Repeat for multiple groupings.\n"
     "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
     "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
@@ -212,6 +213,13 @@ std::string help_message =
     "   -mtc_charge     <List of charges>        Matching charges for -cmtc and -mtc wavefucntions\n"
     "   -mtc_ECP        <List of ECP modes>      Matching ECP modes for -cmtc and -mtc wavefucntions\n"
     "   -profiling      [tests_root]             Runs the internal profiling suite (all test paths). Optional root defaults to ./tests\n"
+    "   -promol_nci      <frag1.xyz> <frag2.xyz> [rcut1] [rcut2] [rho_abs_max] [rdg_max]\n"
+    "                                            Promolecular NCI/RDG analysis from two XYZ fragments using Thakkar spherical atom densities.\n"
+    "                                            Put -resolution and -radius before -promol_nci if overriding their defaults.\n"
+    "                                            Defaults: rcut1=0.95 dominant-fragment discard, rcut2=0.75 fragment-sum keep;\n"
+    "                                            output: <frag1>_<frag2>_signed_rho.cube,\n"
+    "                                            <frag1>_<frag2>_rdg.cube, <frag1>_<frag2>_values.dat,\n"
+    "                                            <frag1>_<frag2>_nci.vmd, and <frag1>_<frag2>_plot.py.\n"
     "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
     "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
    "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
@@ -254,7 +262,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Daniel Bruex,\n");
         t.append("      Marti Gimferrer,\n");
         t.append("      Anker Nielsen,\n");
-        t.append("      Lucas Militao,´\n");
+        t.append("      Lucas Militao,\n");
         t.append("      and many more in communications or by feedback!\n");
         t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library, as well as OCC for the calculation of wavefunctions, when required.\n");
         t.append("The used packages are published under BSD-3 clause License or explicit consent for the use in this project was given.\n");
@@ -1896,61 +1904,34 @@ void swap_sort_multi(ivec order, std::vector<ivec> &v)
 
 double get_lambda_1(double *a)
 {
-    vec bw, zw;
-    // int run = 0;
-    double eig1, eig2, eig3;
-    const double p1 = a[1] * a[1] + a[2] * a[2] + a[5] * a[5];
-    if (p1 == 0)
+    // Returns the middle eigenvalue (lambda2) of a row-major symmetric 3x3 matrix.
+    const double a00 = a[0], a01 = a[1], a02 = a[2];
+    const double a11 = a[4], a12 = a[5], a22 = a[8];
+
+    const double p1 = a01 * a01 + a02 * a02 + a12 * a12;
+    if (p1 < std::numeric_limits<double>::epsilon())
     {
-        eig1 = a[0];
-        eig2 = a[4];
-        eig3 = a[8];
-        if ((eig1 < eig2 && eig2 < eig3) || (eig3 < eig2 && eig2 < eig1))
-            return eig2;
-
-        else if ((eig2 < eig1 && eig1 < eig3) || (eig3 < eig1 && eig1 < eig2))
-            return eig1;
-
-        else
-            return eig3;
+        double eigs[3] = { a00, a11, a22 };
+        std::sort(eigs, eigs + 3);
+        return eigs[1];
     }
-    else
-    {
-        const double q = (a[0] + a[4] + a[8]) / 3;
-        const double p2 = pow(a[0] - q, 2) + pow(a[4] - q, 2) + pow(a[8] - q, 2) + 2 * p1;
-        const double p = sqrt(p2 / 6);
-        const double B[9]{
-            a[0] - q,
-            a[1],
-            a[2],
-            a[3],
-            a[4] - q,
-            a[5],
-            a[6],
-            a[7],
-            a[8] - q };
-        const double r = (B[0] * B[4] * B[8] + B[1] * B[5] * B[6] + B[3] * B[4] * B[7] - B[0] * B[5] * B[7] - B[1] * B[3] * B[8] - B[2] * B[4] * B[6]) / 2;
-        double phi;
-        if (r <= -1)
-            phi = constants::PI / 3;
-        else if (r >= 1)
-            phi = 0;
-        else
-            phi = acos(r) / 3;
 
-        eig1 = q + 2 * p * cos(phi);
-        eig3 = q + 2 * p * cos(phi + 2 * constants::PI / 3);
-        eig2 = 3 * q - eig1 - eig3;
-        if ((eig1 < eig2 && eig2 < eig3) || (eig3 < eig2 && eig2 < eig1))
-            return eig2;
+    const double q = (a00 + a11 + a22) / 3.0;
+    const double b00 = a00 - q, b11 = a11 - q, b22 = a22 - q;
+    const double p2 = b00 * b00 + b11 * b11 + b22 * b22 + 2.0 * p1;
+    const double p = std::sqrt(p2 / 6.0);
 
-        else if ((eig2 < eig1 && eig1 < eig3) || (eig3 < eig1 && eig1 < eig2))
-            return eig1;
+    const double c00 = b00 / p, c01 = a01 / p, c02 = a02 / p;
+    const double c11 = b11 / p, c12 = a12 / p, c22 = b22 / p;
+    const double r = 0.5 * (c00 * (c11 * c22 - c12 * c12)
+                          - c01 * (c01 * c22 - c12 * c02)
+                          + c02 * (c01 * c12 - c11 * c02));
 
-        else
-            return eig3;
-    }
-};
+    const double phi = std::acos(std::clamp(r, -1.0, 1.0)) / 3.0;
+    const double eig_max = q + 2.0 * p * std::cos(phi);
+    const double eig_min = q + 2.0 * p * std::cos(phi + 2.0 * constants::PI / 3.0);
+    return 3.0 * q - eig_max - eig_min;
+}
 
 double get_bessel_ratio(const double nu, const double x)
 {
@@ -2388,7 +2369,7 @@ void options::digest_options()
             std::filesystem::path _wfn = arguments[i + 1];
             WFN wavy(e_origin::NOT_YET_DEFINED);
             wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
-            wavy.write_nbo(_wfn.replace_extension(".47"), debug);
+            wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout);
             exit(0);
         }
         else if (temp == "-convert_XCW")
@@ -2761,6 +2742,46 @@ void options::digest_options()
                 profiling_tests_root = arguments[i + 1];
             }
         }
+        else if (temp == "-promol_nci")
+        {
+            err_checkf(i + 2 < argc,
+                "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max]",
+                std::cout);
+            promol_nci = true;
+            promol_nci_xyz1 = arguments[i + 1];
+            promol_nci_xyz2 = arguments[i + 2];
+            err_checkf(std::filesystem::exists(promol_nci_xyz1), "First XYZ file doesn't exist: " + promol_nci_xyz1.string(), std::cout);
+            err_checkf(std::filesystem::exists(promol_nci_xyz2), "Second XYZ file doesn't exist: " + promol_nci_xyz2.string(), std::cout);
+
+            double *optional_values[] = {
+                &properties.promol_nci_rcut1,
+                &properties.promol_nci_rcut2,
+                &properties.promol_nci_rho_abs_max,
+                &properties.promol_nci_rdg_max
+            };
+            int optional_index = 0;
+            while (optional_index < 4 && i + 3 + optional_index < argc)
+            {
+                try
+                {
+                    size_t consumed = 0;
+                    const std::string &candidate = arguments[i + 3 + optional_index];
+                    const double value = std::stod(candidate, &consumed);
+                    if (consumed != candidate.size())
+                        break;
+                    *optional_values[optional_index] = value;
+                    optional_index++;
+                }
+                catch (...)
+                {
+                    break;
+                }
+            }
+
+            i += 2 + optional_index;
+        }
+        else if (temp == "-promol_nci_single_thread")
+            properties.promol_nci_single_threaded = true;
         else if (temp == "-radius")
             properties.radius = stod(arguments[i + 1]);
         else if (temp == "-resolution")
@@ -2774,6 +2795,22 @@ void options::digest_options()
         else if (temp == "-rgbi_no_sym") {
             rgbi = true;
             rgbi_no_sym = true;
+        }
+        else if (temp == "-rgbi_EVs") {
+            rgbi_EVs = true;
+        }
+        else if (temp == "-rgbi_basis") {
+            err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);
+            rgbi = true;
+            std::string basis = arguments[i + 1];
+            std::transform(basis.begin(), basis.end(), basis.begin(),
+                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (basis == "nao")
+                rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
+            else if (basis == "ano")
+                rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
+            else
+                err_checkf(false, "Invalid -rgbi_basis value '" + basis + "'. Use 'nao' or 'ano'.", std::cout);
         }
         else if (temp == "-rgbi-groups") {
             int n = 1;
@@ -2899,11 +2936,10 @@ void options::digest_options()
 
             WFN wavy(wfn);
             SALTEDPredictor SP(wavy, *this);
-            string df_basis_name = SP.get_dfbasis_name();
             filesystem::path salted_model_path = SP.get_salted_filename();
             log_file << "Using " << salted_model_path << " for the prediction" << endl;
             if (!SP.basis_set_loaded()) {
-                df_basis_name = SP.get_dfbasis_name();
+                const string df_basis_name = SP.get_dfbasis_name();
                 std::shared_ptr<BasisSet> _aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
                 load_basis_into_WFN(SP.wavy, _aux_basis);
             }
@@ -3044,6 +3080,16 @@ void options::digest_options()
             WFN wavy(wfn);
             WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
             DensityFitting::demonstrate_enhanced_density_fitting(wavy, wavy_aux);
+            exit(0);
+
+        }
+        else if (temp == "-RI_WFN_DIFF") {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -RI_WFN_DIFF to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -RI_WFN_DIFF to specify an auxiliary basis set.", std::cout);
+            WFN wavy(wfn);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+            DensityFitting::QM_RI_difference_cube(wavy, wavy_aux);
+            exit(0);
 
             //exit(0);
         }

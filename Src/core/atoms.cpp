@@ -21,7 +21,7 @@ basis_set_entry::basis_set_entry(double g_coefficient, double g_exponent, unsign
 
 atom::atom() {
     label = '?';
-    ID = "0000000000000";
+    ID = 0;
     nr = 0;
     x = 0.0;
     y = 0.0;
@@ -34,7 +34,7 @@ atom::atom() {
 };
 
 atom::atom(const std::string& l, 
-    const std::string& id, 
+    const uint64_t& id, 
     const int& n, 
     const double& c1, 
     const double& c2, 
@@ -43,7 +43,7 @@ atom::atom(const std::string& l,
 {};
 
 atom::atom(const std::string& l, 
-    const std::string& id, 
+    const uint64_t& id,
     const int& n, 
     const double& c1, 
     const double& c2, 
@@ -64,6 +64,7 @@ atom& atom::operator= (const atom& rhs) {
     shellcount = rhs.shellcount;
     ECP_electrons = rhs.ECP_electrons;
     frac_coords = rhs.frac_coords;
+    group_nr = rhs.group_nr;
     return *this;
 };
 
@@ -158,15 +159,68 @@ void atom::assign_ADPs(vec& second, vec& third, vec& fourth) {
     }
 };
 
-void atom::assign_ID(const std::string& id) {
+void atom::set_ID(const uint64_t& id) {
     ID = id;
 };
 
-void atom::set_ID(const std::string& id) {
-    ID = id;
+/*
+* Helper function to calculate a scatterer ID based on the element and fractional coordinates
+*/
+//  0-8 - z, 8-25, 25-42, 42-59 - a, b c, 59-61 - signs, 62-64 - dat precision : ~0.0000077
+uint64_t get_atom_ID(const int Z, const d3& frac_coords, const int group_nr) {
+    uint64_t ID = 0;
+    if (frac_coords[0] + frac_coords[1] + frac_coords[2] == 0.0) {
+        std::cout << "Warning: Fractional coordinates are all zero, cannot calculate ID! Returning 0." << std::endl;
+        return 0;
+    }
+
+    const int cell_m = 16; // magic number for the cell size, can be changed to 16 or 1, if interested read for yourself
+    const double multiplier = 1; // multiplier for the precision of the coordinates
+
+    ID = ((uint64_t)Z) & scatterer_id_masks_d5::z_mask;
+    static const int64_t k = scatterer_id_masks_d5::mask_m / cell_m;
+    int64_t coord_val = multiplier == 1 ? (int64_t)(frac_coords[0] * k)
+        : ((int64_t)round(frac_coords[0] * multiplier)) / multiplier * k;
+    if (coord_val < 0) {
+        ID |= scatterer_id_masks_d5::a_sig;
+        ID |= (((-coord_val) << 8) & scatterer_id_masks_d5::a_mask);
+    }
+    else {
+        ID |= ((std::abs(coord_val) << 8) & scatterer_id_masks_d5::a_mask);
+    }
+    coord_val = multiplier == 1 ? (int64_t)(frac_coords[1] * k)
+        : ((int64_t)round(frac_coords[1] * multiplier)) / multiplier * k;
+    if (coord_val < 0) {
+        ID |= scatterer_id_masks_d5::b_sig;
+        ID |= (((-coord_val) << (8 + scatterer_id_masks_d5::a_shift)) & scatterer_id_masks_d5::b_mask);
+    }
+    else {
+        ID |= ((coord_val << (8 + scatterer_id_masks_d5::a_shift)) & scatterer_id_masks_d5::b_mask);
+    }
+    coord_val = multiplier == 1 ? (int64_t)(frac_coords[2] * k)
+        : ((int64_t)round(frac_coords[2] * multiplier)) / multiplier * k;
+    if (coord_val < 0) {
+        ID |= scatterer_id_masks_d5::c_sig;
+        ID |= (((-coord_val) << (8 + scatterer_id_masks_d5::a_shift * 2)) & scatterer_id_masks_d5::c_mask);
+    }
+    else {
+        ID |= ((coord_val << (8 + scatterer_id_masks_d5::a_shift * 2)) & scatterer_id_masks_d5::c_mask);
+    }
+    ID |= (((int64_t)(group_nr + scatterer_id_masks_d5::group_shift) << (8 + scatterer_id_masks_d5::a_shift * 3) + 3) & scatterer_id_masks_d5::d_mask);
+    return ID;
+}
+
+uint64_t atom::get_ID(){
+    if (ID != 0) return ID;
+
+    ID = ::get_atom_ID(charge, frac_coords, group_nr);
+    return ID;
 };
 
-std::string atom::get_ID() const {
+uint64_t atom::get_ID(const int dat) {
+    if (ID != 0) return ID;
+
+    ID = ::get_atom_ID(charge, frac_coords, dat - scatterer_id_masks_d5::group_shift);
     return ID;
 };
 

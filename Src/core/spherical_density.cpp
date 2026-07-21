@@ -135,7 +135,14 @@ void Thakkar::calc_orbs(
     const int upper_m,
     double *Orb) const
 {
+    // Kahan compensated summation: the terms below are a Slater-type
+    // expansion with large-magnitude, alternating-sign contributions that
+    // can nearly cancel in the density tail (far from the nucleus). Naive
+    // accumulation loses precision to rounding error from the addition
+    // order itself; compensated summation removes that source, leaving
+    // only the true per-term input differences (e.g. libm rounding).
     double exponent;
+    double comp[19] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++)
     {
         for (int m = lower_m; m < upper_m; m++)
@@ -145,10 +152,13 @@ void Thakkar::calc_orbs(
             exponent = -z[nr_ex] * dist;
             if (exponent > -46.5)
             { // Corresponds to at least 1E-20
-                if (n[nr_ex] == 1)
-                    Orb[m] += c[nr_coef] * exp(exponent);
-                else
-                    Orb[m] += c[nr_coef] * fast_int_pow(dist, n[nr_ex] - 1) * exp(exponent);
+                const double term = (n[nr_ex] == 1)
+                    ? c[nr_coef] * exp(exponent)
+                    : c[nr_coef] * fast_int_pow(dist, n[nr_ex] - 1) * exp(exponent);
+                const double y = term - comp[m];
+                const double t = Orb[m] + y;
+                comp[m] = (t - Orb[m]) - y;
+                Orb[m] = t;
             }
             nr_coef++;
         }
@@ -584,6 +594,7 @@ void Thakkar::make_interpolator(const double &incr, const double &min_dist) {
         radial_density.push_back(current);
         _dist *= incr;
     }
+    radial_second_deriv = natural_cubic_spline_second_derivatives(radial_dist, radial_density);
 };
 
 double Thakkar::get_interpolated_density(const double &dist) const {
@@ -592,11 +603,15 @@ double Thakkar::get_interpolated_density(const double &dist) const {
         return 0;
     else if (dist < radial_dist[0])
         return radial_density[0];
-    int nr = int(floor(log(dist / start) / lincr));
+    int nr = std::max(1, log_spline_index(radial_dist, dist, lincr, start));
     result = radial_density[nr] + (radial_density[nr + 1] - radial_density[nr]) / (radial_dist[nr] - radial_dist[nr - 1]) * (dist - radial_dist[nr - 1]);
     if (result < 1E-16)
         return 0;
     return result;
+};
+
+double Thakkar::get_interpolated_density_spline(const double &dist) const {
+    return cubic_spline_interpolate_spherical_density(radial_density, radial_dist, radial_second_deriv, dist, lincr, start);
 };
 
 MBIS_Atom::MBIS_Atom(const int g_atom_number, const vec &g_sig, const vec &g_pop)
@@ -645,7 +660,7 @@ double MBIS_Atom::get_interpolated_density(const double &dist) const {
         return 0;
     else if (dist < radial_dist[0])
         return radial_density[0];
-    int nr = int(floor(log(dist / start) / lincr));
+    int nr = std::max(1, log_spline_index(radial_dist, dist, lincr, start));
     result = radial_density[nr] + (radial_density[nr + 1] - radial_density[nr]) / (radial_dist[nr] - radial_dist[nr - 1]) * (dist - radial_dist[nr - 1]);
     if (result < 1E-16)
         return 0;

@@ -108,6 +108,9 @@ public:
     std::filesystem::path get_path() const { return path; };
     void set_path(const std::filesystem::path& given) { path = given; };
     void resize(const i3& g_size) { size = g_size; values.resize(size[0]); for (int i = 0; i < size[0]; i++) { values[i].resize(size[1]); for (int j = 0; j < size[1]; j++) values[i][j].resize(size[2]); } }
+    bool find_value_bounds(i3& lower, i3& upper, double ignore_value, double tolerance = 1E-12, int padding = 1) const;
+    bool shrink_to_bounds(const i3& lower, const i3& upper);
+    bool shrink_to_values(double ignore_value, double tolerance = 1E-12, int padding = 1);
     std::vector<atom> get_parent_wfn_atoms() const;
     bool read_values(std::ifstream& file);
     double jaccard(const cube& right) const;

@@ -26,6 +26,18 @@ int run_app(int argc, char **argv)
     opt.cwd = cwd;
     vector<WFN> wavy;
 
+    if (opt.promol_nci)
+    {
+        promolecular_nci_analysis(
+            opt.promol_nci_xyz1,
+            opt.promol_nci_xyz2,
+            opt.properties,
+            std::cout);
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf);
+        return 0;
+    }
+
     log_file << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {
@@ -285,7 +297,7 @@ int run_app(int argc, char **argv)
         tsc_block<int, cdouble> result;
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
-            known_scatterer = result.get_scatterers();
+            known_scatterer = result.get_scatterers_string();
             if (!opt.SALTED)
             {
                 if (wavy[i].get_origin() == 7)
@@ -301,9 +313,6 @@ int run_app(int argc, char **argv)
             }
             else if (opt.SALTED)
             {
-                // Fill WFN with the primitives of the JKFit basis (currently hardcoded)
-                // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-
                 std::shared_ptr<SALTEDPredictor> temp_pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
@@ -327,7 +336,7 @@ int run_app(int argc, char **argv)
             }
         }
 
-        known_scatterer = result.get_scatterers();
+        known_scatterer = result.get_scatterers_string();
         log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
         _time_point start = get_time();
         log_file << "Writing tsc file... " << flush;
@@ -436,7 +445,8 @@ int run_app(int argc, char **argv)
         log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
         if (opt.rgbi) {
-            Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym);
+            Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym,
+                opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs);
         }
 
         // this one is for generation of an fchk file

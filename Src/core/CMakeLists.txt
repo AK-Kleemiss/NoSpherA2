@@ -69,6 +69,12 @@ add_library(
     NoSpherA2Core
 )
 
+target_compile_definitions(
+    NoSpherA2Core
+    PRIVATE
+        NOSPHERA2_BASIS_DATA_SEPARATE
+)
+
 target_compile_features(
     NoSpherA2Core
     PUBLIC

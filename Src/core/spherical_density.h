@@ -13,6 +13,27 @@ inline void not_implemented_SA(const std::string& file, const int& line, const s
 };
 #define err_not_impl_SA() not_implemented_SA(__FILE__, __LINE__, __func__, "Virtual_function", std::cout);
 
+// Compute the log-spline table index for the interval containing dist.
+// The grid is logarithmically spaced: table[k] = start * exp(k * lincr).
+// Uses an O(1) log-based estimate then corrects by at most one step using
+// exact comparisons against the stored table, ensuring identical results
+// on all platforms regardless of platform-specific log() rounding.
+inline int log_spline_index(
+    const vec& table,
+    const double dist,
+    const double lincr,
+    const double start)
+{
+    const int max_idx = static_cast<int>(table.size()) - 2;
+    int nr = static_cast<int>(floor(log(dist / start) / lincr));
+    if (nr < 0) nr = 0;
+    if (nr > max_idx) nr = max_idx;
+    // Correct for potential 1-ULP rounding in log()
+    if (nr < max_idx && dist >= table[nr + 1]) ++nr;
+    else if (nr > 0 && dist < table[nr]) --nr;
+    return nr;
+}
+
 inline double linear_interpolate_spherical_density(
     const vec& radial_dens,
     const vec& spherical_dist,
@@ -25,11 +46,59 @@ inline double linear_interpolate_spherical_density(
         return 0;
     else if (dist < spherical_dist[0])
         return radial_dens[0];
-    int nr = int(floor(log(dist / start) / lincr));
+    const int nr = std::max(1, log_spline_index(spherical_dist, dist, lincr, start));
     result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
     if (result < 1E-10)
         result = 0;
     return result;
+}
+
+// Natural cubic spline second derivatives over (x, y) (Numerical-Recipes-style
+// tridiagonal solve, O(n)). Boundary condition: y''(x0) = y''(x_{n-1}) = 0.
+inline vec natural_cubic_spline_second_derivatives(const vec& x, const vec& y)
+{
+    const size_t n = x.size();
+    vec y2(n, 0.0);
+    if (n < 3)
+        return y2;
+
+    vec u(n, 0.0);
+    for (size_t i = 1; i < n - 1; i++)
+    {
+        const double sig = (x[i] - x[i - 1]) / (x[i + 1] - x[i - 1]);
+        const double p = sig * y2[i - 1] + 2.0;
+        y2[i] = (sig - 1.0) / p;
+        const double du = (y[i + 1] - y[i]) / (x[i + 1] - x[i]) - (y[i] - y[i - 1]) / (x[i] - x[i - 1]);
+        u[i] = (6.0 * du / (x[i + 1] - x[i - 1]) - sig * u[i - 1]) / p;
+    }
+    for (size_t k = n - 1; k-- > 0;)
+        y2[k] = y2[k] * y2[k + 1] + u[k];
+    return y2;
+}
+
+// Cubic-spline counterpart of linear_interpolate_spherical_density(): same table
+// layout and index lookup, but C2-continuous (no curvature discontinuity at table
+// nodes). radial_second_deriv must be natural_cubic_spline_second_derivatives(
+// spherical_dist, radial_dens).
+inline double cubic_spline_interpolate_spherical_density(
+    const vec& radial_dens,
+    const vec& spherical_dist,
+    const vec& radial_second_deriv,
+    const double dist,
+    const double lincr,
+    const double start)
+{
+    if (dist > spherical_dist[spherical_dist.size() - 1])
+        return 0;
+    else if (dist < spherical_dist[0])
+        return radial_dens[0];
+    const int nr = log_spline_index(spherical_dist, dist, lincr, start);
+    const double h = spherical_dist[nr + 1] - spherical_dist[nr];
+    const double a = (spherical_dist[nr + 1] - dist) / h;
+    const double b = 1.0 - a;
+    const double result = a * radial_dens[nr] + b * radial_dens[nr + 1] +
+        ((a * a * a - a) * radial_second_deriv[nr] + (b * b * b - b) * radial_second_deriv[nr + 1]) * (h * h) / 6.0;
+    return result < 1E-10 ? 0.0 : result;
 }
 
 class Spherical_Atom
@@ -160,6 +229,12 @@ public:
 class Thakkar : public Spherical_Atom
 {
 protected:
+    // Natural cubic spline second derivatives over (radial_dist, radial_density),
+    // built alongside the linear-interpolation table in make_interpolator(). Used
+    // by get_interpolated_density_spline() for callers that differentiate the
+    // density numerically and need a curvature-continuous field, at similar
+    // per-query cost to the plain linear table lookup.
+    vec radial_second_deriv;
     void calc_orbs(int& nr_ex,
         int& nr_coef,
         const double& dist,
@@ -218,6 +293,9 @@ public:
         const int& min_f) const override;
     void make_interpolator(const double& incr, const double& min_dist) override;
     double get_interpolated_density(const double& dist) const override;
+    // Same table as get_interpolated_density(), but evaluated as a natural cubic
+    // spline (C2-continuous) instead of piecewise-linear.
+    double get_interpolated_density_spline(const double& dist) const;
 };
 
 class MBIS_Atom

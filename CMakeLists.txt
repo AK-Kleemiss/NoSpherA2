@@ -236,6 +236,18 @@ endif()
 add_subdirectory(Src/core)
 add_subdirectory(app)
 
+#Small --install target to copy the contents of bin. USAGE: cmake --install build/release-linux --prefix "$PWD/install-release"
+include(GNUInstallDirs)
+install(
+    DIRECTORY
+        "${CMAKE_BINARY_DIR}/bin/"
+    DESTINATION
+        "${CMAKE_INSTALL_BINDIR}"
+    USE_SOURCE_PERMISSIONS
+    COMPONENT Runtime
+)
+
+
 if(NOSPHERA2_BUILD_DLL)
     add_subdirectory(Src/dll)
 endif()
