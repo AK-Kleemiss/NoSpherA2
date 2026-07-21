@@ -49,13 +49,8 @@ tests/src/cmake_test_discovery_e3b0c44298.json
 checkpoint.txt
 intel-onemkl*.sh
 
-Windows/Windows_utils/Build_Dependencies/deps.stamp
-Windows/Windows_utils/Build_Dependencies/**
-
 #Folders created by build
 build*
-Windows/NoSpherA2*/**
-Windows/Tests/**
 deps-install-*
 
 #Libs
