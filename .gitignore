@@ -52,7 +52,16 @@ intel-onemkl*.sh
 #Folders created by build
 build*
 deps-install-*
+#Escape build directory for Windows
+/Windows/NoSpherA2**/Debug*
+/Windows/NoSpherA2**/Release*
+/Windows/Test**/Debug*
+/Windows/Test**/Release*
 
 #Libs
 Lib/*
 
+#Folders created by IDEs
+/.vs
+/Windows/NoSpherA2/.vs
+/Windows/Windows_cuda/.vs
