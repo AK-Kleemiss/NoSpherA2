@@ -313,7 +313,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 {
 	file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
 	i3 hkl_;
-	double F_, sigma_;
+	double F_, abs_F_, F2_, sigma_, sigma2_;
 	int positive_;
 	err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
 	std::ifstream hkl_input(hkl_filename, std::ios::in);
@@ -345,23 +345,25 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 			std::string temp_F = temp.substr(0, dot + 3);
 			std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
 			temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
-			sigma_ = stof(temp_sigma);
+			sigma2_ = stof(temp_sigma);
 			temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
 			F_ = stof(temp_F);
 			if (F_ < 0) {
-				F_ = -std::sqrt(-F_);
-				positive_ = -1;
-				sigma_ = sigma_ * 0.5 / -F_;
+				F2_ = -F_;
+				abs_F_ = std::sqrt(F2_);
+				F_ = -abs_F_;
+				sigma_ = sigma2_ * 0.5 / -F_;
 			}
 			else {
-				positive_ = 1;
-				F_ = std::sqrt(F_);
-				sigma_ = sigma_ * 0.5 / F_;
+				F2_ = F_;
+				abs_F_ = std::sqrt(F2_);
+				F_ = abs_F_;
+				sigma_ = sigma2_ * 0.5 / F_;
 			}
 		}
 		// if (debug) file << endl;
 		hkl.emplace(hkl_);
-		scattering_data temp_data = { F_, sigma_, positive_ };
+		scattering_data temp_data = { F_, abs_F_, F2_, sigma_, sigma2_ };
 		obs.push_back(temp_data);
 	}
 	hkl_list_it found = hkl.find(i3{ 0, 0, 0 });
@@ -1733,11 +1735,11 @@ void calc_SF_SALTED(const vec2& k_pt,
  * @param no_date Flag indicating whether to exclude the date in the output.
  */
 void calc_SF(const int& points,
-	vec2& k_pt,
-	vec2& d1,
-	vec2& d2,
-	vec2& d3,
-	vec2& dens,
+	const vec2& k_pt,
+	const vec2& d1,
+	const vec2& d2,
+	const vec2& d3,
+	const vec2& dens,
 	cvec2& sf,
 	std::ostream& file,
 	_time_point& start,
@@ -1769,11 +1771,12 @@ void calc_SF(const int& points,
 	}
 	ProgressBar* progress = nullptr;
 	if (!do_XCW) {
-		progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
+		progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors", file);
 	}
 	long long int pmax, p, s;
 	complex<double>* sf_local;
-	double work, rho, c, si, * dens_local, re, im, * d1_local, * d2_local, * d3_local;
+	double work, rho, c, si, re, im;
+	const double* d1_local, * d2_local, * d3_local, * dens_local;
 
 	// Pre-fetch k_pt data pointers for better cache locality
 	const double* k1_data = k_pt[0].data();
@@ -2085,19 +2088,19 @@ void convert_to_ED(const ivec& asym_atom_list,
 int make_atomic_grids_wrapper(
 	const WFN& wave, const bvec& needs_grid, const ivec& asym_atom_list, const cell& unit_cell, const svec& labels, //
 	std::vector<_time_point>& time_points, svec& time_descriptions, vec2& d1, vec2& d2, vec2& d3, vec2& dens,
-	const options& opt) {
+	const options& opt, std::ostream& file = std::cout) {
 
 	const int atoms_with_grids = vec_sum(needs_grid);
-	err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", std::cout);
-	err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", std::cout);
-	err_checkf(atoms_with_grids == asym_atom_list.size(), "Number of atoms with grids does not match the number of atoms in the CIF file!", std::cout);
-	std::cout << "There are:\n"
+	err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", file);
+	err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", file);
+	err_checkf(atoms_with_grids == asym_atom_list.size(), "Number of atoms with grids does not match the number of atoms in the CIF file!", file);
+	file << "There are:\n"
 		<< std::setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
 		//<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
 		<< std::setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << std::endl;
 
 
-	std::cout << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::endl;
+	file << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::endl;
 
 	GridConfiguration config;
 	config.accuracy = opt.accuracy;
@@ -2112,13 +2115,13 @@ int make_atomic_grids_wrapper(
 	temp.delete_unoccupied_MOs();
 
 	// Setup grids for the molecule
-	grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell, opt.get_g);
+	grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell, opt.get_g, file);
 	grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
 
 
 	// Calculate partitioned charges
 	PartitionResults results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
-	grid_manager.printChargeTable(labels, temp, asym_atom_list, std::cout, results);
+	grid_manager.printChargeTable(labels, temp, asym_atom_list, file, results);
 	time_points.push_back(get_time());
 	time_descriptions.push_back("calculate charges");
 
@@ -2383,7 +2386,7 @@ tsc_block_type calculate_scattering_factors(
 				time_points,
 				time_descriptions,
 				d1, d2, d3, dens,
-				opt);
+				opt, file);
 
 			_time_point end1;
 			calc_SF(points,
@@ -2510,17 +2513,14 @@ tsc_block_type calculate_scattering_factors(
         time_descriptions.push_back("Spherical Atoms");
     }
 
-
 	time_points.push_back(get_time());
 	time_descriptions.push_back("tsc calculation");
-
 	if (!opt.no_date)
 	{
 		write_timing_to_file(file,
 			time_points,
 			time_descriptions);
 	}
-
 	return blocky;
 }
 template itsc_block calculate_scattering_factors(options& opt,

@@ -78,16 +78,16 @@ private:
     bool needs_helper_grids_ = false;
 
     // Internal helper methods
-    void setupPrototypeGrids(const WFN &wave, const ivec &atom_types);
+    void setupPrototypeGrids(const WFN &wave, const ivec &atom_types, std::ostream& file = std::cout);
 
     void generateIntegrationGrids(const WFN &wave, const cell &unit_cell,
-        const ivec &atom_list);
+        const ivec &atom_list, std::ostream& file = std::cout);
     void getIntegrationGrid1D(const WFN &wave, const int atom_1, const int atom_2, const int num_points, const double padding);
 
     void calculateSphericalDensities(const WFN &wave, const cell &unit_cell, const ivec &atom_list, vec2 &single_spherical_density, vec2 &combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
     void calculateHirshfeldWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list);
-    std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid);
-    void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid);
+    std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid, std::ostream &file = std::cout);
+    void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid, std::ostream &file = std::cout);
     void pruneGrid();
 
     void addTimingPoint(const std::string &label) {
@@ -99,7 +99,7 @@ public:
 
     // Main interface methods
     void setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list = {},
-        const bvec &needs_grid = {}, const cell &unit_cell = cell(), const bool get_g = false);
+        const bvec &needs_grid = {}, const cell &unit_cell = cell(), const bool get_g = false, std::ostream& file = std::cout);
 
     void setup1DGridsForMolecule(const WFN &wave, const int atom_1, const int atom_2, const int gridpoints, const double padding);
 

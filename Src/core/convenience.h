@@ -318,14 +318,14 @@ bool unsaved_files(std::vector<WFN> &wavy);
 
 std::string trim(const std::string &s);
 
-inline void print_centered_text(const std::string &text, int &bar_width)
+inline void print_centered_text(const std::string &text, int &bar_width, std::ostream& file = std::cout)
 {
     const int text_length = static_cast<int>(text.length());
     const int total_padding = bar_width - text_length;
     const int padding_left = total_padding / 2;
     const int padding_right = (total_padding - padding_left) - 1;
 
-    std::cout << "["
+    file << "["
         << std::setw(padding_left) << std::setfill(' ') << ""
         << text
         << std::setw(padding_right) << std::setfill(' ') << ""
@@ -353,13 +353,13 @@ class ProgressBar
 public:
     ~ProgressBar();
 
-    ProgressBar(const unsigned long long &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
-        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize / 100 : 1)
+    ProgressBar(const unsigned long long &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "", std::ostream& stream_ = std::cout)
+		: worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize / 100 : 1), stream_(stream_)
     {
         int bw = bar_width_ + 2;
         // Write status text
-        print_centered_text(status_text_, bw);
-        linestart = std::cout.tellp();
+        print_centered_text(status_text_, bw, stream_);
+        linestart = stream_.tellp();
 #ifdef _WIN32
         initialize_taskbar_progress();
 #endif
@@ -370,7 +370,7 @@ public:
         progress_ = (float)workdone * workpart_;
     }
 
-    void update(std::ostream &os = std::cout)
+    void update()
     {
 #pragma omp critical
         {
@@ -378,14 +378,15 @@ public:
             if (workdone % percent_ == 0)
             {
                 set_progress();
-                write_progress(os);
+                write_progress();
             }
         }
     }
 
-    void write_progress(std::ostream &os = std::cout);
+    void write_progress();
 
 private:
+    std::ostream& stream_;
     const unsigned long long worksize_;
     const float workpart_;
     const unsigned long long percent_;
@@ -414,6 +415,8 @@ void readxyzMinMax_fromCIF(
     vec2 &cm);
 
 bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
+
+bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, std::ofstream& log3, bool debug);
 
 vec read_U_iso_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug);
 
@@ -643,7 +646,7 @@ public:
     {
         return pow(r, type) * std::exp(-exp * r * r) * coefficient;
 	};
-    double eval_gaussian_unnormalized(const double& rl, const double& r2) const
+    inline double eval_gaussian_unnormalized(const double& rl, const double& r2) const
     {
         return rl * std::exp(-exp * r2) * coefficient;
     };
@@ -739,6 +742,18 @@ struct options
     bool needs_Thakkar_fill = false;
     bool qct = false;
     bool do_XCW = false;
+    double xcw_lambda_step = 0.0;
+    double xcw_lambda_max = 0.0;
+    // Distributional (Gaussian) halting criterion, see tests/P1_test/XCW_plan.md
+    // and Src/core/xcw_halting.h/.cpp.
+    bool xcw_gaussian_halt = false;
+    double xcw_strong_cutoff = 3.0;
+    // Residual self-energy fitting criterion (XCW_plan.md sec. 6.2): fit
+    // against Energy + lambda * Sum_h diff_h^2/(sigma_h^2 * |H_h|^2) instead
+    // of the traditional, unweighted Energy + lambda * GoF^2. The 1/|H|^2
+    // weighting emphasizes low-order reflections, matching the residual
+    // Coulomb self-energy U_res of the residual electron density.
+    bool xcw_h2_weighting = false;
     bool calc_F_calc = false;
     bool rgbi = false;
     bool rgbi_no_sym = false;

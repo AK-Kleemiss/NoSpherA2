@@ -1,0 +1,32 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                            "P1_test_NA2.cif"Reading:                                "P1_test.hkl" done!
+Nr of reflections read from file: 3215
+Number of symmetry operations: 1
+Nr of reflections to be used: 3215
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 3215
+XCW orbital basis set: sto-3g-basis
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 102932 grid points.
+Total number of grid points after pruning: 102920
+AO values calculated for all grids.
+[                 Calculating XCW integrals...                ]
+[=============================================================] 100% 
+More detailed output in XCW.log file...
+XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion (-xcw_h2_weighting); Chi^2/GooF below are this weighted quantity, not the classical GoF.
+____________________________________________________________________________
+ Lambda		Chi^2	GooF	Total Energy	Perturbation	Target quantity 
+								(Eh)		   (a. u.)			(a. u.)
+____________________________________________________________________________
+	0.000	20.348	9.767	-1961.923538820		0.000		-1961.923538820
+	0.010	14.716	8.036	-1961.900839951		0.147		-1961.753684015
+Finished XCW fitting procedure.

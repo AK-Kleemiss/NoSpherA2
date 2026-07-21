@@ -279,6 +279,7 @@ public:
     const void set_ncen(const int& in) { ncen = in; };
     /** Number of MOs (including unoccupied). */
     const int& get_nmo() const { return nmo; };
+    void set_nmo(const int& in) { nmo = in; };
     /** Number of (optionally only occupied) MOs. */
     const int get_nmo(const bool& only_occ) const;
     /** Origin/file type code. */

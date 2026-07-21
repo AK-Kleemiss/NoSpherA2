@@ -1,7 +1,28 @@
 # Unit Test Status
-**Last updated: 2026-07-03** (pruned 4 stale `tests.toml` entries with non-existent CLI flags;
-regenerated `alanine_integrated_occ.good`; **201/201 ctest passing** after full rebuild — see
-Known Issues for a same-day transient 13-failure episode against a stale/partial build)
+**Last updated: 2026-07-20** (fixed three rounds of CI failures in the four XCW tests added the
+previous day: a macOS-only build error, then a missing `RESOURCE_LOCK` causing all four tests
+(sharing one output log file) to race and corrupt each other's output under CI's
+`CTEST_PARALLEL_LEVEL=4` on every platform. See Known Issues below.)
+
+**2026-07-19** (added the Gaussian/Anderson-Darling XCW halting criterion
+(`-xcw_gaussian_halt`) and the `1/|H|^2`-weighted residual self-energy fitting criterion
+(`-xcw_h2_weighting`), both opt-in and off by default. Three new tests added:
+`P1_test_XCW_full`, `P1_test_XCW_h2`, `P1_test_XCW_h2_full`, alongside the existing
+`P1_test_XCW`. See Known Issues below and `tests/P1_test/XCW_plan.md` for the full
+implementation status against the original spec, including an honest per-item checklist.)
+
+**2026-07-18** (fixed the `TomlIntegrationTests.P1_test_XCW` access violation:
+`GridManager::calculateMBISWeights`/`calculateEMBISWeights` ignored `config_.no_density_eval`
+and forced a real WFN density evaluation on XCW's MO-pruned dummy wavefunction, corrupting
+memory — see Known Issues below. `P1_test_XCW` is now enabled and passing in-process at
+`OMP_NUM_THREADS=20`. Last full validated baseline remains **201/201 ctest passing**; this adds
+one new passing test on top of that baseline, not yet re-counted into the total.)
+
+**2026-07-15** (added
+`TscBlockTests.BinaryFileRoundTripsWith32BitSizes` for buffered TSCB output and matching
+32-bit binary size fields; the first compile attempt lacked MSVC standard-library include paths,
+and the developer-environment retry exceeded the validation time window without producing a
+compiler error.)
 
 ## Test Harnesses
 
@@ -89,6 +110,10 @@ Added: 2026-06-14.
 | TFVC | TFVC | TFVC.good | no | ✅ passing |
 | TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
 | fchk_conversion | NiP3_fchk | good.fchk | **yes** | ✅ passing (tolerated numeric warn) |
+| P1_test_XCW | P1_test | P1_test_XCW.good | no | ✅ passing (added 2026-07-18, in-process only; see note below) |
+| P1_test_XCW_full | P1_test | P1_test_XCW_full.good | **yes** (`RUN_FULL_TEST=1`) | ✅ passing (added 2026-07-19, 11-step lambda scan to 0.1 with `-xcw_gaussian_halt`; see note below) |
+| P1_test_XCW_h2 | P1_test | P1_test_XCW_h2.good | no | ✅ passing (added 2026-07-19, 2-step scan with `-xcw_h2_weighting`; see note below) |
+| P1_test_XCW_h2_full | P1_test | P1_test_XCW_h2_full.good | **yes** (`RUN_FULL_TEST=1`) | ✅ passing (added 2026-07-19, 9-step lambda scan to 0.08 — capped below 0.1 due to an SCF convergence limitation of `-xcw_h2_weighting`, see note below) |
 
 ---
 
@@ -122,6 +147,174 @@ files generated before they can be registered.
 ---
 
 ## Known Issues
+
+- **XCW test output race condition (RESOURCE_LOCK), found and fixed 2026-07-20**: after the
+  `-b sto-3g` fix below was pushed, CI failed again on **all three platforms** (Linux, Windows,
+  macOS) with `P1_test_XCW` and `P1_test_XCW_h2` both producing visibly *interleaved, byte-level
+  corrupted* `NoSpherA2.log` content — lines from one test's output spliced into the middle of the
+  other's. Actual root cause: `P1_test_XCW`, `P1_test_XCW_full`, `P1_test_XCW_h2`, and
+  `P1_test_XCW_h2_full` all use `directory = "P1_test"` in `tests/tests.toml`, and NoSpherA2's log
+  filename (`"NoSpherA2.log"`, `Src/core/NoSpherA2.cpp`) is hardcoded, not configurable via CLI —
+  so all four write to the exact same file. The CI workflow sets `CTEST_PARALLEL_LEVEL: 4`
+  (`.github/workflows/c-cpp_all.yml`), and this repo already has an established mechanism for
+  exactly this scenario — `tests/src/SetIntegrationTestLocks.cmake`, applying `RESOURCE_LOCK` via
+  `set_tests_properties()` to serialize tests that share a directory (already used for the
+  sucrose/TFVC/RGBI/SALTED test groups) — but the new P1_test entry was simply never added when
+  these four tests were created. Fixed by adding it. Verified locally with
+  `CTEST_PARALLEL_LEVEL=4` (matching CI exactly): the two fast tests now run serially instead of
+  concurrently and both pass; a full local 225-test suite run with the same parallel level found
+  no other regressions (one unrelated pre-existing failure, `Nbo47.EpoxideGennboMatchesReferenceWhenAvailable`,
+  requires an external WSL/gennbo tool not present in this environment).
+
+  This likely means the **original** (pre-`sto-3g`) Linux `bad_alloc`/Windows `(Timeout)`
+  failures documented below were *also* substantially caused by this same race — two full XCW
+  quantum-chemistry runs racing on the same output file, and incidentally roughly doubling peak
+  CPU/RAM demand by running concurrently, rather than being purely a `def2-svp` resource-sizing
+  problem as diagnosed at the time. The `-b sto-3g` switch remains a real, worthwhile improvement
+  (faster/lighter tests that also regression-test the STO-3G L-shell fix), but the `RESOURCE_LOCK`
+  entry is the fix that actually addresses the failure mode observed on all three platforms.
+
+- **CI failures in the four new XCW tests, found and fixed 2026-07-20**: after
+  `P1_test_XCW`/`P1_test_XCW_full`/`P1_test_XCW_h2`/`P1_test_XCW_h2_full` were first pushed to CI,
+  three platform-specific failures surfaced:
+  - **macOS: build error**, `use of undeclared identifier 'vdSinCos'` at `Src/core/XCW.cpp`
+    (in `XCW::eval_I`). `vdSinCos` is an Intel MKL batched sin/cos call; macOS uses Apple
+    Accelerate instead of MKL (see `cmake/NoSpherA2Optimizations.cmake`) and has no equivalent
+    under that name. This is **pre-existing code** (commit `e7597d5`, predates the XCW work this
+    week) that had simply never been exercised by macOS CI before `P1_test_XCW` existed as an
+    automated test — the `mkl_set_num_threads_local` call two lines above it already had an
+    `#if !defined(__APPLE__)` guard, but the `vdSinCos` call itself didn't. Fixed by keeping the
+    batched `vdSinCos` path for non-Apple platforms and adding a per-element `__sincos` loop for
+    `__APPLE__`, mirroring the existing portable-sincos pattern already used in
+    `scattering_factors.cpp` (`sincos`/`__sincos`/plain `sin`+`cos` three-way split).
+  - **Linux: `std::bad_alloc`** thrown ~100ms into `P1_test_XCW`/`P1_test_XCW_h2`, and
+    **Windows: `(Timeout)`** on the same two tests plus (collaterally) the unrelated, previously
+    passing `DisorderTHPP`. Root cause: `def2-svp` for this 23-atom, 3215-reflection system needs
+    a multi-GB `I`-tensor (`packed_size = nmo*(nmo+1)/2` times `nr_small` complex doubles) and
+    took ~80s+ just for integral evaluation locally — too much for GitHub's standard shared
+    CI runners (4 vCPU, ~16GB RAM), and slow enough to drag the whole Windows ctest run past
+    its timeout. Fixed by switching all four tests to `-b sto-3g` (the now-fixed minimal basis,
+    see the entry below): far fewer basis functions, so both the `I`-tensor size and integral
+    evaluation time drop sharply. Locally, all four tests together now run in ~2 minutes total
+    (previously ~20+ minutes with `def2-svp`); the fast tests dropped from ~3 minutes to ~18
+    seconds each. This also turns each of these tests into a real regression test for the
+    STO-3G L-shell fix below, rather than only being smoke-tested manually. All four `.good`
+    files were regenerated against the new basis; convergence was re-verified for
+    `P1_test_XCW_h2_full`'s lambda=0.08 cap (still holds with STO-3G — SCF iteration counts stay
+    flat, 15 through 36, no escalation).
+
+- **Gaussian/Anderson-Darling XCW halting criterion + H²-weighted fitting criterion, added
+  2026-07-19**: two new opt-in `-do_XCW` features (`-xcw_gaussian_halt`,
+  `-xcw_h2_weighting`) implementing a distributional lambda-scan halting criterion and an
+  alternative `1/|H|²`-weighted fitting criterion, per `tests/P1_test/XCW_plan.md`
+  ("Distributional (Gaussian) Halting Criterion for XCW/XRW"). New module
+  `Src/core/xcw_halting.h`/`.cpp` (Anderson-Darling statistic, normal probability-plot fit,
+  skewness/kurtosis/Jarque-Bera, resolution-/intensity-binned ⟨z²⟩ trend, and a multi-degree
+  polynomial fit with AIC-based model selection used to extrapolate a stopping estimate when
+  the scan hasn't found an interior minimum yet). Both features are off by default with no
+  behavior change for existing `-do_XCW` users. `XCW_plan.md` now carries an honest per-item
+  checklist (§8) of what's actually implemented versus the original spec — the biggest gap is
+  §5 (free/working-set cross-validation): the current implementation computes everything on
+  the **full** reflection set, not a held-out free set, which was the spec's stated main
+  defense against XCW's structural overfitting. Test coverage: `P1_test_XCW` (2-step,
+  classical), `P1_test_XCW_full` (11-step to λ=0.1, `-xcw_gaussian_halt`, `RUN_FULL_TEST=1`),
+  `P1_test_XCW_h2` (2-step, `-xcw_h2_weighting`), `P1_test_XCW_h2_full` (9-step to λ=0.08,
+  `-xcw_h2_weighting`, `RUN_FULL_TEST=1`) — all passing.
+
+  **`-xcw_h2_weighting` SCF convergence instability at higher lambda**: for the P1 test system,
+  the `1/|H|²`-weighted SCF converges progressively more slowly as lambda increases (iteration
+  count 15 → 17 → 19 → 25 → 28 → 30 → 31 → 33 at λ=0.00–0.08, then jumps to 55 at λ=0.09) and
+  fails to converge by λ=0.10 within the default 100-iteration cap. This is why
+  `P1_test_XCW_h2_full` is capped at λ=0.08 rather than 0.1 like its classical counterpart —
+  not a test bug, a genuine numerical property of this weighting at this system's higher
+  lambda values, plausibly related to the slow/conditionally-convergent `Σ1/|H|²` series noted
+  in the plan's own §6.2 caveats. Not yet root-caused further (e.g. whether better
+  damping/DIIS settings would fix it, or it's inherent to the weighting) — see `XCW_plan.md`
+  §8 for the current status.
+
+- **`P1_test_XCW` access violation, root-caused and fixed 2026-07-18**: the in-process
+  `TomlIntegrationTests.P1_test_XCW` test reliably crashed (`0xC0000005`) inside
+  `GridManager::setup3DGridsForMolecule`, but only when driven through the in-process GoogleTest
+  harness — not the standalone `NoSpherA2.exe`. A debug-CRT build (`cmake --preset debug-windows
+  -DNOSPHERA2_BUILD_TESTS=ON`) reproduced it deterministically (independent of thread count) as a
+  clean `vector subscript out of range` assertion, which narrowed it to
+  `GridManager::calculateMBISWeights`/`calculateEMBISWeights`: both unconditionally called
+  `calculateNonSphericalDensities()` whenever `!non_spherical_densities_calculated_`, ignoring
+  `config_.no_density_eval`. `XCW::eval_I` (`Src/core/XCW.cpp`) sets `no_density_eval = true` and
+  fills `WFN_DENSITY` with a placeholder value itself *after* grid setup returns — it deliberately
+  skips real density evaluation on `dummy_wave`, which has had `delete_unoccupied_MOs()` called on
+  it. The `[defaults]` block in `tests/tests.toml` (and the equivalent hardcoded defaults in the
+  C++ harness, `tests/src/IntegrationTests.cpp`) injects `-all_charges` into every toml-driven
+  test, which triggers the MBIS/EMBIS "every scheme" branch inside
+  `GridManager::setup3DGridsForMolecule` — and that branch called the offending function on the
+  MO-pruned wavefunction, corrupting memory. It happened to not crash when run as a standalone
+  process (undefined-behavior heap read that landed in still-mapped memory there), but reliably
+  faulted in the larger, differently-laid-out in-process test binary.
+  Fix (`Src/core/GridManager.cpp`): guard both call sites with `&& !config_.no_density_eval`, and
+  gate the whole "every scheme" (`debug`/`all_charges`) computation in
+  `setup3DGridsForMolecule` on `!config_.no_density_eval` (`want_every_scheme`), since
+  MBIS/EMBIS are density-based and produce meaningless zero output without real density anyway —
+  unlike Hirshfeld, which stays available since it only needs spherical, not WFN, density.
+  A second, independent bug was found in the same investigation: `XCW::run_XCW_fitting()`
+  (`Src/core/XCW.cpp`) ended with `exit(0)`, which — when running in-process — terminates the
+  whole GoogleTest binary immediately, skipping the `EXPECT_TRUE(result.success)` golden-file
+  comparison entirely and making earlier "passing" runs a false positive rather than a real pass.
+  Replaced with falling off the end of the (void) function; `NoSpherA2.cpp`'s caller already does
+  the proper `log_file.flush(); std::cout.rdbuf(_coutbuf); return 0;` cleanup after the call
+  returns.
+  Also fixed as part of the same session: `make_MBIS_vectors`/`make_EMBIS_tensors`
+  (`Src/core/AtomGrid.cpp`/`.h`) hardcoded `std::cout` for their verbose per-iteration
+  convergence/"Promolecular charges" output; they now take an `std::ostream&` parameter
+  (default `std::cout`, so all other callers are unaffected) that `GridManager::calculateMBISWeights`/
+  `calculateEMBISWeights` forward from their own new `file` parameter, itself forwarded from
+  `setup3DGridsForMolecule`'s existing `file` parameter. XCW passes `XCW_log` through this chain
+  (via `scattering_factors.cpp`'s `calculate_scattering_factors(..., XCW_log, ...)`
+  call inside `XCW::create_tscb`), so that output now lands in `XCW.log` instead of leaking into
+  the shared `NoSpherA2.log`.
+  `P1_test_XCW`'s `tests.toml` args were changed from a bare `do_XCW = ""` flag to
+  `do_XCW = [0.01, 0.01]`, using a new `-do_XCW stepsize max_value` CLI form
+  (`Src/core/convenience.h`/`.cpp`, `options::xcw_lambda_step`/`xcw_lambda_max`, consumed in
+  `XCW::construct`) that limits the lambda scan to 2 steps (`lambda = 0.00, 0.01`) instead of the
+  previous hardcoded 10-step (`0.00`–`0.09`) default, cutting the test from several minutes to
+  ~2.5 minutes. The plain `-do_XCW` flag (no trailing numbers) is unaffected and now defaults to
+  `lambda_step = 0.01`, `lambda_max = 1.0` (101 steps) rather than the old hardcoded 10 steps —
+  this is a real behavior change for any existing non-test `-do_XCW` invocation without explicit
+  step/max arguments.
+  `tests/P1_test/P1_test_XCW.good` was regenerated from a real passing in-process run against
+  this new 2-step invocation (previous `.good` was captured from a manual standalone run that
+  never used the `-all_charges`/`-no_date` flags the test harness actually injects, so it could
+  not have matched even before this fix). Verified byte-identical against a standalone
+  `NoSpherA2.exe` run with the same arguments.
+  **Follow-up bug found 2026-07-19, root-caused and fixed**: while investigating whether
+  `P1_test_XCW` could use a smaller/faster orbital basis, a `-b <name>` override was wired into
+  `XCW::construct` (sets `settings.basis_set_name`, reusing the existing general-purpose `-b`
+  flag). Any basis other than the hardcoded default `def2-svp` (tried `3-21g` and `sto-3g`)
+  reliably crashed with a real access violation inside OCC's SOAD initial-guess step, reproduced
+  standalone (`NoSpherA2.exe -do_XCW 0.01 0.01 -b sto-3g ...` → `0xC0000005`), independent of the
+  `to_AOBasis()`/`XCW::setup_basis` code itself. A debug build (`cmake --preset debug-windows`)
+  turned this into a clean assertion: `Eigen/src/Core/Block.h:147`, an out-of-range block access
+  inside OCC's SOAD guess. Root cause was one level further down, in the **`BasisSetGenerator`
+  submodule** (not this repo): `BasisSetGenerator/src/create_basis_sets.py` grouped Basis Set
+  Exchange shells by `angular_momentum[0]` and only ever read `coefficients[0]`. Combined
+  `"L"`/`"SP"` shells — Basis Set Exchange's representation for classic Pople-style contractions,
+  `angular_momentum: [0, 1]` with two separate coefficient rows sharing one set of exponents —
+  always resolved to the s-type component, silently dropping the p-type coefficients entirely.
+  STO-3G and 3-21G both use this representation for every non-H/He element, so e.g. carbon ended
+  up with only a 1s + 2s basis and **no 2p functions at all** — hence the out-of-range Eigen
+  block access once OCC's SOAD guess tried to work with the (too-small) resulting `AOBasis`.
+  Fixed in the submodule (commit `2f6372b` on branch `fix-lshell-p-orbital-drop`, not yet pushed
+  to `origin/BasisSetGenerator`) by unrolling combined shells into their individual angular-
+  momentum components before grouping; also fixed `import bse` (no such installable package) to
+  `import basis_set_exchange as bse`, and generalized the script to regenerate all three of its
+  target CSVs instead of only `def2-svp`. Regenerated `STO-3G-basis.csv`/`3-21G-basis.csv` via a
+  freshly-installed `basis_set_exchange`; `def2-SVP-basis.csv` (this project's XCW default, never
+  affected since it has no combined L-shells) regenerated byte-identical as a regression check.
+  `Src/basis_data.cpp` (gitignored, generated from these CSVs by the `BasisSetConverter` tool at
+  build time) was regenerated and the project rebuilt. Verified fixed end-to-end: `-do_XCW -b
+  sto-3g` and `-b 3-21g` both now run a full, correct lambda scan instead of crashing; no
+  regression on `P1_test_XCW`/`P1_test_XCW_h2` (both use the unaffected default `def2-svp`). The
+  parent repo's submodule pointer was updated locally (commit `831975f`) but, like the submodule
+  commit itself, has not been pushed.
 
 - **Transient 13-test failure episode, 2026-07-03** (`alanine_occ`, `disorder_THPP`,
   `grown_water`, `Hybrid_mode`, `malbac_SF_ECP`, `rubredoxin_cmtc`, `sucrose_ptb`, `sucrose_SF`,

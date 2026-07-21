@@ -32,11 +32,15 @@ private:
     std::vector<ivec2> sym;
     std::vector<vec> trans;
 
+    vec apply_symmetry(const vec& pos, const int sym_op);
     bool check_special(const vec& pos1, const vec& pos2);
+	ivec find_applied_symmetry(std::vector<asym_atom>& asym_atoms);
+	void delete_symmetry(const ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl);
 
 public:
     //void get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
     void eval_symm(std::vector<asym_atom>& asym_atoms);
+    void apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms);
 
     cell()
     {

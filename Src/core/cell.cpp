@@ -3,13 +3,21 @@
 #include "convenience.h"
 #include "nos_math.h"
 
+vec cell::apply_symmetry(const vec& pos, const int sym_op) {
+    const vec trans_temp = { trans[0][sym_op], trans[1][sym_op], trans[2][sym_op] };
+    const vec2 rot_temp = { { (double)sym[0][0][sym_op], (double)sym[0][1][sym_op], (double)sym[0][2][sym_op] },
+                             { (double)sym[1][0][sym_op], (double)sym[1][1][sym_op], (double)sym[1][2][sym_op] },
+                             { (double)sym[2][0][sym_op], (double)sym[2][1][sym_op], (double)sym[2][2][sym_op] } };
+    vec temp_pos = self_dot(rot_temp, pos, false);
+    return { temp_pos[0] + trans_temp[0], temp_pos[1] + trans_temp[1], temp_pos[2] + trans_temp[2] };
+    // closing function
+}
+
 void cell::eval_symm(std::vector<asym_atom> &asym_atoms) {
     const int ncen = asym_atoms.size();
     vec pos(3);
     vec new_pos(3);
-    auto sym_ = sym;
-    auto trans_ = trans;
-    int num_sym = trans[0].size();
+    const int num_sym = trans[0].size();
     int idx = 0;
     for (asym_atom a : asym_atoms) {
         int count = 0;
@@ -48,4 +56,60 @@ bool cell::check_special(const vec &pos1, const vec &pos2) {
     }
     return special;
     //closing function
+}
+
+// Handles the processing of grown structures
+void cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms) {
+	const ivec applied_symmetry = find_applied_symmetry(asym_atoms);
+	delete_symmetry(applied_symmetry, hkl_enlarged, hkl);
+	// closing function
+}
+
+ivec cell::find_applied_symmetry(std::vector<asym_atom>& asym_atoms) {
+    ivec applied_symmetry;
+    const int num_sym_ops = sym[0][0].size();
+    const int ncen = asym_atoms.size();
+    auto frac_pos = [&](int i) -> vec {
+        return { asym_atoms[i].frac_pos[0], asym_atoms[i].frac_pos[1], asym_atoms[i].frac_pos[2] };
+        };
+    for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
+        int eligible = 0, matched = 0;
+        for (int a = 0; a < ncen; a++) {
+            if (asym_atoms[a].asym_fact > 0.99)
+                continue;
+            eligible++;
+            const vec new_pos = apply_symmetry(frac_pos(a), sym_op);
+            for (int b = 0; b < ncen; b++) {
+                if (b != a && check_special(new_pos, frac_pos(b))) {
+                    ++matched;
+                    break;
+                }
+            }
+        }
+        if (eligible == 0)
+            continue;
+        if (matched > 0 && matched < eligible)
+            throw std::runtime_error("Error: Incomplete symmetry found. Structure was not properly grown");
+        if (matched == eligible)
+            applied_symmetry.push_back(sym_op);
+    }
+    return applied_symmetry;
+}
+
+void cell::delete_symmetry(const ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl) {
+	const int nr = hkl.size();
+    std::vector<i3> hkl_vec(hkl.begin(), hkl.end());
+    for (int r = 0; r < nr; r++) {
+		vec hkl_temp = { (double)hkl_vec[r][0], (double)hkl_vec[r][1], (double)hkl_vec[r][2] };
+        for (int sym_op : applied_symmetry) {
+            const vec2 rot_temp = { { (double)sym[0][0][sym_op], (double)sym[0][1][sym_op], (double)sym[0][2][sym_op] },
+                                    { (double)sym[1][0][sym_op], (double)sym[1][1][sym_op], (double)sym[1][2][sym_op] },
+                                    { (double)sym[2][0][sym_op], (double)sym[2][1][sym_op], (double)sym[2][2][sym_op] } };
+            vec new_hkl = self_dot(rot_temp, hkl_temp, false);
+			i3 new_hkl_int = { (int)std::round(new_hkl[0]), (int)std::round(new_hkl[1]), (int)std::round(new_hkl[2]) };
+            hkl_enlarged.erase(new_hkl_int);
+            sym.erase(sym.begin() + sym_op);
+        }
+    }
+    // closing function
 }

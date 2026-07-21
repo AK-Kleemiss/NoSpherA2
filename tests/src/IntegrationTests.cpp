@@ -486,6 +486,47 @@ TEST(TomlIntegrationTests, DisorderTHPP)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, P1_test_XCW)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+// Longer lambda scan (11 steps vs. P1_test_XCW's 2), with -xcw_gaussian_halt
+// enabled so the Gaussian halting criterion (tests/P1_test/XCW_plan.md) gets
+// exercised against a real trajectory instead of two points. This takes
+// several minutes (a fresh SCF plus ~10 warm-started XCW steps), so it only
+// runs when RUN_FULL_TEST is set, matching the python harness's convention
+// documented in UNIT_TESTS_STATUS.md.
+TEST(TomlIntegrationTests, P1_test_XCW_full)
+{
+    if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
+        GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW lambda scan (several minutes)";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_full");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+// -xcw_h2_weighting variant of P1_test_XCW (2 lambda steps): fits against
+// the 1/|H|^2-weighted residual self-energy criterion instead of the
+// classical GoF^2 (see Src/core/xcw_halting.h and XCW::ensure_inv_H2_weights).
+TEST(TomlIntegrationTests, P1_test_XCW_h2)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+// -xcw_h2_weighting variant of P1_test_XCW_full (11 lambda steps, to
+// lambda=0.1). Slow, same RUN_FULL_TEST gating as P1_test_XCW_full.
+TEST(TomlIntegrationTests, P1_test_XCW_h2_full)
+{
+    if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
+        GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW H2-weighted lambda scan (several minutes)";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2_full");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, Fractal)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "fractal");

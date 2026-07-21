@@ -42,3 +42,16 @@ set_tests_properties(
     PROPERTIES
         RESOURCE_LOCK integration_SALTED
 )
+
+# Tests using tests/P1_test (all four write to the same tests/P1_test/NoSpherA2.log,
+# NoSpherA2's log filename is not currently configurable via CLI -- without this lock,
+# CTEST_PARALLEL_LEVEL > 1 races these against each other and corrupts the shared log
+# with interleaved output from concurrent runs, on every platform)
+set_tests_properties(
+    TomlIntegrationTests.P1_test_XCW
+    TomlIntegrationTests.P1_test_XCW_full
+    TomlIntegrationTests.P1_test_XCW_h2
+    TomlIntegrationTests.P1_test_XCW_h2_full
+    PROPERTIES
+        RESOURCE_LOCK integration_P1_test
+)
