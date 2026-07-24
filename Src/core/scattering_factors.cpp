@@ -922,11 +922,9 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					group_nr = std::stoi(fields[group_field]);
 				}
 				bool old_atom = false;
-				string atom_ID = std::to_string(get_atom_ID(
-					constants::get_Z_from_label(fields[type_field].c_str()) + 1, 
-					{stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])},
-					group_nr
-				));
+				std::string atom_ID = atomID(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]),
+					group_nr,
+					constants::get_Z_from_label(fields[type_field].c_str()) + 1).to_hex_string();
 #pragma omp parallel for reduction(|| : old_atom)
 				for (int run = 0; run < known_atoms.size(); run++)
 				{
@@ -2474,7 +2472,7 @@ tsc_block_type calculate_scattering_factors(
             hkl);
     }
 
-	std::vector<uint64_t> IDs(asym_atom_list.size());
+	std::vector<atomID> IDs(asym_atom_list.size());
 	for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++) {
 		IDs[atm_idx] = wavy->get_id_for_atom(asym_atom_list[atm_idx]);
 	}
