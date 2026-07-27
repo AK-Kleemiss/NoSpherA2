@@ -1875,6 +1875,22 @@ namespace NoSpherA2UnitTests
         EXPECT_NE(carbon.get_ID(), oxygen.get_ID());
     }
 
+    TEST_F(AtomTest, ID_IsAvailableWhenNoGroupWasAssigned)
+    {
+        /*
+         * group_nr feeds the int16_t data field of atomID, which throws on
+         * anything that field cannot hold. An atom only gets a group when the
+         * CIF reader matches it, so the default has to be usable on its own;
+         * every other test here sets one and so never exercises it.
+         */
+        atom value{ "Test", {}, 6, 0.0, 0.0, 0.0, 6 };
+        value.set_frac_coords(d3{ 0.1, 0.2, 0.3 });
+
+        atomID id;
+        EXPECT_NO_THROW({ id = value.get_ID(); });
+        EXPECT_EQ(id, atomID(0.1, 0.2, 0.3, 0, 6));
+    }
+
     TEST_F(AtomTest, ID_DifferentGroupsProduceDifferentIDs)
     {
         atom first =

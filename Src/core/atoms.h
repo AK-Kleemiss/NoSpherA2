@@ -404,7 +404,13 @@ private:
     //[2] = fourth order (D1111, D1112, D1113, D1122, D1123, D1133, D1222, D1223, D1233, D1333, D2222, D2223, D2233, D2333, D3333)
     vec2 ADPs;
     bool is_asym = false;
-    int group_nr = 90000;
+    /*
+     * Feeds the data field of atomID, which is an int16_t and rejects anything
+     * outside its range, so the default has to be a value that field can hold.
+     * Zero is what the rest of the code already means by "no group": it is what
+     * the CIF reader uses when the file carries no group column.
+     */
+    int group_nr = 0;
 public:
     atom();
     atom(const std::string& l, const atomID& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch);
