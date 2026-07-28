@@ -1,7 +1,9 @@
 # Unit Test Status
-**Last updated: 2026-07-03** (pruned 4 stale `tests.toml` entries with non-existent CLI flags;
-regenerated `alanine_integrated_occ.good`; **201/201 ctest passing** after full rebuild — see
-Known Issues for a same-day transient 13-failure episode against a stale/partial build)
+**Last updated: 2026-07-15** (added
+`TscBlockTests.BinaryFileRoundTripsWith32BitSizes` for buffered TSCB output and matching
+32-bit binary size fields; the first compile attempt lacked MSVC standard-library include paths,
+and the developer-environment retry exceeded the validation time window without producing a
+compiler error. Last full validated baseline remains **201/201 ctest passing**.)
 
 ## Test Harnesses
 
