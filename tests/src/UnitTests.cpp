@@ -418,14 +418,14 @@ namespace NoSpherA2UnitTests
             { cdouble(2.0, 0.0) },
             { cdouble(3.0, 0.0) }
         };
-        const std::vector<std::uint64_t> scatterer_ids = { 0xabc, 0xdef, 0xabc };
+        const std::vector<atomID> scatterer_ids = { {0.1, 0.1, 0.1, 0, 1 }, {0.5, 0.2, 0.4, 0, 2 }, {0.1, 0.1, 0.1, 0, 1 } };
         const std::vector<std::vector<int>> indices = { { 1 }, { 0 }, { 0 } };
 
         testing::internal::CaptureStdout();
         tsc_block<int, cdouble> block(form_factors, scatterer_ids, indices);
         const std::string output = testing::internal::GetCapturedStdout();
 
-        EXPECT_NE(output.find("WARNING: Duplicate scatterer_ID 0xabc"), std::string::npos);
+        EXPECT_NE(output.find("Warning: Duplicate scatterer: atomID(frac_x: 0.1, frac_y: 0.1, frac_z: 0.1, Z: 1, data: 0, reserved: 0)"), std::string::npos);
     }
 
     TEST(TscBlockTests, AppendWarnsForDuplicateScattererIds)
@@ -434,12 +434,12 @@ namespace NoSpherA2UnitTests
         const std::vector<std::vector<cdouble>> lhs_form_factors = {
             { cdouble(1.0, 0.0) }
         };
-        const std::vector<std::uint64_t> lhs_scatterer_ids = { 0xabc };
+        const std::vector<atomID> lhs_scatterer_ids{ {0.1, 0.1, 0.1, 0, 1 } };
         const std::vector<std::vector<cdouble>> rhs_form_factors = {
             { cdouble(2.0, 0.0) },
             { cdouble(3.0, 0.0) }
         };
-        const std::vector<std::uint64_t> rhs_scatterer_ids = { 0xabc, 0xdef };
+        const std::vector<atomID> rhs_scatterer_ids{ {0.1, 0.1, 0.1, 0, 1 }, {0.5, 0.2, 0.4, 0, 2 } };
 
         tsc_block<int, cdouble> lhs(lhs_form_factors, lhs_scatterer_ids, indices);
         tsc_block<int, cdouble> rhs(rhs_form_factors, rhs_scatterer_ids, indices);
@@ -449,7 +449,7 @@ namespace NoSpherA2UnitTests
         lhs.append(rhs, log);
         const std::string output = testing::internal::GetCapturedStdout();
 
-        EXPECT_NE(output.find("WARNING: Duplicate scatterer_ID 0xabc"), std::string::npos);
+        EXPECT_NE(output.find("Warning: Duplicate scatterer in append: atomID(frac_x: 0.1, frac_y: 0.1, frac_z: 0.1, Z: 1, data: 0, reserved: 0)"), std::string::npos);
         EXPECT_EQ(lhs.scatterer_size(), 2);
     }
 
@@ -1776,23 +1776,11 @@ namespace NoSpherA2UnitTests
     // -----------------------------------------------------------------------
     class AtomTest : public ::testing::Test {
     protected:
-        static constexpr std::uint64_t kZMask = scatterer_id_masks_d5::z_mask;
-        static constexpr std::uint64_t kAMask = scatterer_id_masks_d5::a_mask;
-        static constexpr std::uint64_t kBMask = scatterer_id_masks_d5::b_mask;
-        static constexpr std::uint64_t kCMask = scatterer_id_masks_d5::c_mask;
-        static constexpr std::uint64_t kASign = scatterer_id_masks_d5::a_sig;
-        static constexpr std::uint64_t kBSign = scatterer_id_masks_d5::b_sig;
-        static constexpr std::uint64_t kCSign = scatterer_id_masks_d5::c_sig;
-        static constexpr std::uint64_t kDatMask = scatterer_id_masks_d5::d_mask;
-
-        static constexpr std::int64_t kCoordinateMaximum = 0xFFFF;
-        static constexpr std::int64_t cell_m = 16;
-
         static atom make_atom()
         {
             return atom{
                 "C1",
-                std::uint64_t{0},
+                {},
                 6,
                 1.25,
                 -2.5,
@@ -1805,11 +1793,12 @@ namespace NoSpherA2UnitTests
             const int charge,
             const double x,
             const double y,
-            const double z)
+            const double z,
+            const int group_nr = 0)
         {
             atom result{
                 "Test",
-                std::uint64_t{0},
+                {},
                 charge,
                 0.0,
                 0.0,
@@ -1818,234 +1807,371 @@ namespace NoSpherA2UnitTests
             };
 
             result.set_frac_coords(d3{ x, y, z });
+            result.set_group_nr(group_nr);
             return result;
         }
 
-        static std::uint64_t extractA(const std::uint64_t id)
+        static atomID binary_roundtrip(const atomID& original)
         {
-            return (id & kAMask) >> 8;
-        }
+            std::stringstream buffer(
+                std::ios::in |
+                std::ios::out |
+                std::ios::binary
+            );
 
-        static std::uint64_t extractB(const std::uint64_t id)
-        {
-            return (id & kBMask) >> (8 + scatterer_id_masks_d5::a_shift);
-        }
+            original.write_atom_id(buffer);
+            buffer.seekg(0);
 
-        static std::uint64_t extractC(const std::uint64_t id)
-        {
-            return (id & kCMask) >> (8 + scatterer_id_masks_d5::a_shift * 2);
-        }
-
-        static std::uint64_t extractDat(const std::uint64_t id)
-        {
-            return (id & kDatMask) >> (8 + scatterer_id_masks_d5::a_shift * 3 + 3);
+            return atomID(buffer);
         }
     };
-
-    TEST_F(AtomTest, IDZeroFractionalCoordinatesReturnZero)
+    TEST_F(AtomTest, ID_WriteAndRead)
     {
         atom value =
-            make_atom_fractional(6, 0.0, 0.0, 0.0);
+            make_atom_fractional(6, 0.1, 0.2, 0.3, 0);
 
-        EXPECT_EQ(value.get_ID(), std::uint64_t{ 0 });
-    }
+        const atomID originalId = value.get_ID();
 
-    TEST_F(AtomTest, IDEncodesChargeCoordinatesAndDat)
-    {
-        atom value = make_atom_fractional(
-            6,
-            0.1,
-            0.4,
-            0.7
+        std::stringstream buffer(
+            std::ios::in |
+            std::ios::out |
+            std::ios::binary
         );
 
-        const std::uint64_t id = value.get_ID(2);
+        originalId.write_atom_id(buffer);
 
-        const double actualA = static_cast<double>(extractA(id)) / kCoordinateMaximum * cell_m;
-        const double actualB = static_cast<double>(extractB(id)) / kCoordinateMaximum * cell_m;
-        const double actualC = static_cast<double>(extractC(id)) / kCoordinateMaximum * cell_m;
+        EXPECT_EQ(buffer.str().size(), sizeof(atomID));
+        EXPECT_EQ(buffer.str().size(), 16);
 
-        EXPECT_EQ(id & kZMask, std::uint64_t{ 6 });
-        EXPECT_NEAR(actualA, 0.1, 1e-3);
-        EXPECT_NEAR(actualB, 0.4, 1e-3);
-        EXPECT_NEAR(actualC, 0.7, 1e-3);
-        EXPECT_EQ(extractDat(id), std::uint64_t{ 2 });
+        buffer.seekg(0);
+        const atomID readId(buffer);
+
+        EXPECT_EQ(originalId, readId);
     }
 
-    TEST_F(AtomTest, IDEncodesCoordinateSignsSeparatelyFromMagnitude)
+    TEST_F(AtomTest, ID_WriteAndReadPreservesNegativeCoordinates)
+    {
+        atom value =
+            make_atom_fractional(6, -1.25, 2.5, -3.75, -4);
+
+        const atomID originalId = value.get_ID();
+        const atomID readId = binary_roundtrip(originalId);
+
+        EXPECT_EQ(originalId, readId);
+    }
+
+    TEST_F(AtomTest, ID_IsDeterministic)
+    {
+        atom first =
+            make_atom_fractional(8, -0.125, 1.75, 12.5, 3);
+
+        atom second =
+            make_atom_fractional(8, -0.125, 1.75, 12.5, 3);
+
+        EXPECT_EQ(first.get_ID(), second.get_ID());
+    }
+
+    TEST_F(AtomTest, ID_DifferentCoordinatesProduceDifferentIDs)
+    {
+        atom first =
+            make_atom_fractional(6, 0.123456, 0.2, 0.3);
+
+        atom second =
+            make_atom_fractional(6, 0.123457, 0.2, 0.3);
+
+        /*
+         * The difference is 1e-6, which is comfortably larger than the
+         * approximately 7.45e-9 resolution of the signed 32-bit encoding
+         * over the range [-16, 16].
+         */
+        EXPECT_NE(first.get_ID(), second.get_ID());
+    }
+
+    TEST_F(AtomTest, ID_CoordinateSignAffectsID)
     {
         atom positive =
-            make_atom_fractional(6, 0.1, 0.2, 0.3);
+            make_atom_fractional(6, 1.25, 2.5, 3.75);
 
         atom negative =
-            make_atom_fractional(6, -0.1, -0.2, -0.3);
+            make_atom_fractional(6, -1.25, 2.5, 3.75);
 
-        const std::uint64_t positiveId = positive.get_ID();
-        const std::uint64_t negativeId = negative.get_ID();
+        EXPECT_NE(positive.get_ID(), negative.get_ID());
+    }
 
-        EXPECT_EQ(extractA(positiveId), extractA(negativeId));
-        EXPECT_EQ(extractB(positiveId), extractB(negativeId));
-        EXPECT_EQ(extractC(positiveId), extractC(negativeId));
+    TEST_F(AtomTest, ID_DifferentAtomicNumbersProduceDifferentIDs)
+    {
+        atom carbon =
+            make_atom_fractional(6, 0.1, 0.2, 0.3);
 
-        EXPECT_EQ(positiveId & (kASign | kBSign | kCSign), 0u);
-        EXPECT_EQ(
-            negativeId & (kASign | kBSign | kCSign),
-            kASign | kBSign | kCSign
+        atom oxygen =
+            make_atom_fractional(8, 0.1, 0.2, 0.3);
+
+        EXPECT_NE(carbon.get_ID(), oxygen.get_ID());
+    }
+
+    TEST_F(AtomTest, ID_IsAvailableWhenNoGroupWasAssigned)
+    {
+        /*
+         * group_nr feeds the int16_t data field of atomID, which throws on
+         * anything that field cannot hold. An atom only gets a group when the
+         * CIF reader matches it, so the default has to be usable on its own;
+         * every other test here sets one and so never exercises it.
+         */
+        atom value{ "Test", {}, 6, 0.0, 0.0, 0.0, 6 };
+        value.set_frac_coords(d3{ 0.1, 0.2, 0.3 });
+
+        atomID id;
+        EXPECT_NO_THROW({ id = value.get_ID(); });
+        EXPECT_EQ(id, atomID(0.1, 0.2, 0.3, 0, 6));
+    }
+
+    TEST_F(AtomTest, ID_DifferentGroupsProduceDifferentIDs)
+    {
+        atom first =
+            make_atom_fractional(6, 0.1, 0.2, 0.3, -1);
+
+        atom second =
+            make_atom_fractional(6, 0.1, 0.2, 0.3, 1);
+
+        EXPECT_NE(first.get_ID(), second.get_ID());
+    }
+
+    TEST_F(AtomTest, ID_SupportsCoordinateRangeBoundaries)
+    {
+        EXPECT_NO_THROW({
+            const atomID minimum(-16.0, -16.0, -16.0, 0, 6);
+            const atomID restored = binary_roundtrip(minimum);
+            EXPECT_EQ(minimum, restored);
+            });
+
+        EXPECT_NO_THROW({
+            const atomID maximum(16.0, 16.0, 16.0, 0, 6);
+            const atomID restored = binary_roundtrip(maximum);
+            EXPECT_EQ(maximum, restored);
+            });
+    }
+
+    TEST_F(AtomTest, ID_RejectsCoordinatesOutsideSupportedRange)
+    {
+        EXPECT_THROW(
+            (atomID{ 16.000001, 0.0, 0.0, 0, 6 }),
+            std::out_of_range
+        );
+
+        EXPECT_THROW(
+            (atomID{ -16.000001, 0.0, 0.0, 0, 6 }),
+            std::out_of_range
         );
     }
 
-    TEST_F(AtomTest, IDFractionalCoordinatesAreTruncated)
+    TEST_F(AtomTest, ID_RejectsNonFiniteCoordinates)
     {
-        atom value =
-            make_atom_fractional(6, 0.5, 0.5, 0.5);
+        const double infinity =
+            std::numeric_limits<double>::infinity();
 
-        const std::uint64_t id = value.get_ID();
+        const double nan =
+            std::numeric_limits<double>::quiet_NaN();
 
-        constexpr std::uint64_t expected = 0.5 * kCoordinateMaximum / cell_m;
+        EXPECT_THROW(
+            (atomID{ infinity, 0.0, 0.0, 0, 6 }),
+            std::invalid_argument
+        );
 
-        EXPECT_EQ(extractA(id), expected);
-        EXPECT_EQ(extractB(id), expected);
-        EXPECT_EQ(extractC(id), expected);
+        EXPECT_THROW(
+            (atomID{ nan, 0.0, 0.0, 0, 6 }),
+            std::invalid_argument
+        );
     }
 
-    TEST_F(AtomTest, IDIsCachedUntilExplicitlyReset)
+    TEST_F(AtomTest, ID_RejectsInvalidAtomicNumber)
     {
-        atom value =
-            make_atom_fractional(6, 0.1, 0.2, 0.3);
+        EXPECT_THROW(
+            (atomID{ 0.1, 0.2, 0.3, 0, 0 }),
+            std::out_of_range
+        );
 
-        const std::uint64_t originalId = value.get_ID(0);
-
-        value.set_frac_coords(d3{ 0.7, 0.8, 0.9 });
-        value.set_charge(8);
-
-        EXPECT_EQ(value.get_ID(3), originalId);
-
-        value.set_ID(0);
-
-        EXPECT_NE(value.get_ID(3), originalId);
+        EXPECT_THROW(
+            (atomID{ 0.1, 0.2, 0.3, 0, 256 }),
+            std::out_of_range
+        );
     }
 
-    TEST_F(AtomTest, IDToStringAndBack)
+    TEST_F(AtomTest, ID_RejectsDataOutsideInt16Range)
     {
-        atom value =
-            make_atom_fractional(6, 0.1, 0.2, 0.3);
+        EXPECT_THROW(
+            (atomID{
+                0.1,
+                0.2,
+                0.3,
+                static_cast<int>(
+                    std::numeric_limits<std::int16_t>::max()
+                ) + 1,
+                6
+                }),
+            std::out_of_range
+        );
 
-        const std::uint64_t originalId = value.get_ID(0);
-
-        const std::string idStr = std::to_string(originalId);
-        const std::uint64_t parsedId = std::stoull(idStr);
-
-        EXPECT_EQ(parsedId, originalId);
+        EXPECT_THROW(
+            (atomID{
+                0.1,
+                0.2,
+                0.3,
+                static_cast<int>(
+                    std::numeric_limits<std::int16_t>::min()
+                ) - 1,
+                6
+                }),
+            std::out_of_range
+        );
     }
 
+    TEST_F(AtomTest, ID_DefaultConstructedObjectIsNotInitialized)
+    {
+        const atomID id;
 
-// -----------------------------------------------------------------------
-// Non-trivial atom behavior
-// -----------------------------------------------------------------------
+        EXPECT_FALSE(id.is_initialized());
+    }
 
-TEST_F(AtomTest, DistanceToOtherAtomIsEuclideanDistance)
-{
-    const atom first{
-        "A",
-        std::uint64_t{1},
-        1,
-        1.0,
-        2.0,
-        3.0,
-        0
-    };
+    TEST_F(AtomTest, ID_CannotWriteUninitializedObject)
+    {
+        const atomID id;
 
-    const atom second{
-        "B",
-        std::uint64_t{2},
-        1,
-        4.0,
-        6.0,
-        3.0,
-        0
-    };
+        std::stringstream buffer(
+            std::ios::in |
+            std::ios::out |
+            std::ios::binary
+        );
 
-    EXPECT_NEAR(first.distance_to(second), 5.0, 1e-12);
-    EXPECT_NEAR(second.distance_to(first), 5.0, 1e-12);
-}
+        EXPECT_THROW(
+            id.write_atom_id(buffer),
+            std::runtime_error
+        );
+    }
 
-TEST_F(AtomTest, BasisSetSupportsAddingModifyingAndErasingEntries)
-{
-    atom value = make_atom();
+    TEST_F(AtomTest, ID_RejectsTruncatedBinaryInput)
+    {
+        /*
+         * A valid atomID requires 16 bytes, but this stream contains only 8.
+         */
+        const std::string incompleteData(8, '\0');
 
-    ASSERT_TRUE(value.push_back_basis_set(10.0, 0.1, 1, 0));
-    ASSERT_TRUE(value.push_back_basis_set(20.0, 0.2, 2, 1));
-    ASSERT_TRUE(value.push_back_basis_set(30.0, 0.3, 3, 2));
+        std::istringstream input(
+            incompleteData,
+            std::ios::in | std::ios::binary
+        );
 
-    value.set_basis_set_exponent(1, 25.0);
-    value.set_basis_set_coefficient(1, 0.25);
+        EXPECT_THROW(
+            (atomID{ input }),
+            std::runtime_error
+        );
+    }
+    // -----------------------------------------------------------------------
+    // Non-trivial atom behavior
+    // -----------------------------------------------------------------------
 
-    EXPECT_DOUBLE_EQ(value.get_basis_set_exponent(1), 25.0);
-    EXPECT_DOUBLE_EQ(value.get_basis_set_coefficient(1), 0.25);
+    TEST_F(AtomTest, DistanceToOtherAtomIsEuclideanDistance)
+    {
+        const atom first{
+            "A",
+            {},
+            1,
+            1.0,
+            2.0,
+            3.0,
+            0
+        };
 
-    value.erase_basis_set(0);
+        const atom second{
+            "B",
+            {},
+            1,
+            4.0,
+            6.0,
+            3.0,
+            0
+        };
 
-    ASSERT_EQ(value.get_basis_set_size(), 2u);
-    EXPECT_DOUBLE_EQ(value.get_basis_set_exponent(0), 25.0);
-    EXPECT_DOUBLE_EQ(value.get_basis_set_exponent(1), 30.0);
-}
+        EXPECT_NEAR(first.distance_to(second), 5.0, 1e-12);
+        EXPECT_NEAR(second.distance_to(first), 5.0, 1e-12);
+    }
 
-TEST_F(AtomTest, IndexedShellCountSetterExpandsAndZeroInitializesVector)
-{
-    atom value = make_atom();
+    TEST_F(AtomTest, BasisSetSupportsAddingModifyingAndErasingEntries)
+    {
+        atom value = make_atom();
 
-    value.set_shellcount(3u, 9u);
+        ASSERT_TRUE(value.push_back_basis_set(10.0, 0.1, 1, 0));
+        ASSERT_TRUE(value.push_back_basis_set(20.0, 0.2, 2, 1));
+        ASSERT_TRUE(value.push_back_basis_set(30.0, 0.3, 3, 2));
 
-    ASSERT_EQ(value.get_shellcount_size(), 4u);
-    EXPECT_EQ(value.get_shellcount(0u), 0u);
-    EXPECT_EQ(value.get_shellcount(1u), 0u);
-    EXPECT_EQ(value.get_shellcount(2u), 0u);
-    EXPECT_EQ(value.get_shellcount(3u), 9u);
-}
+        value.set_basis_set_exponent(1, 25.0);
+        value.set_basis_set_coefficient(1, 0.25);
 
-TEST_F(AtomTest, AssignmentPerformsDeepCopy)
-{
-    atom source{
-        "O1",
-        std::uint64_t{555},
-        8,
-        1.0,
-        2.0,
-        3.0,
-        -2,
-        2
-    };
+        EXPECT_DOUBLE_EQ(value.get_basis_set_exponent(1), 25.0);
+        EXPECT_DOUBLE_EQ(value.get_basis_set_coefficient(1), 0.25);
 
-    source.set_frac_coords(d3{ 0.1, 0.2, 0.3 });
-    source.set_shellcount(std::vector<unsigned int>{2u, 3u});
-    ASSERT_TRUE(source.push_back_basis_set(25.0, 0.75, 2, 1));
+        value.erase_basis_set(0);
 
-    atom destination;
-    destination = source;
+        ASSERT_EQ(value.get_basis_set_size(), 2u);
+        EXPECT_DOUBLE_EQ(value.get_basis_set_exponent(0), 25.0);
+        EXPECT_DOUBLE_EQ(value.get_basis_set_exponent(1), 30.0);
+    }
 
-    destination.set_label("Changed");
-    destination.set_basis_set_exponent(0, 999.0);
-    destination.set_shellcount(0u, 99u);
+    TEST_F(AtomTest, IndexedShellCountSetterExpandsAndZeroInitializesVector)
+    {
+        atom value = make_atom();
 
-    EXPECT_EQ(source.get_label(), "O1");
-    EXPECT_DOUBLE_EQ(source.get_basis_set_exponent(0), 25.0);
-    EXPECT_EQ(source.get_shellcount(0u), 2u);
+        value.set_shellcount(3u, 9u);
 
-    EXPECT_EQ(destination.get_label(), "Changed");
-    EXPECT_DOUBLE_EQ(destination.get_basis_set_exponent(0), 999.0);
-    EXPECT_EQ(destination.get_shellcount(0u), 99u);
-}
+        ASSERT_EQ(value.get_shellcount_size(), 4u);
+        EXPECT_EQ(value.get_shellcount(0u), 0u);
+        EXPECT_EQ(value.get_shellcount(1u), 0u);
+        EXPECT_EQ(value.get_shellcount(2u), 0u);
+        EXPECT_EQ(value.get_shellcount(3u), 9u);
+    }
 
-TEST_F(AtomTest, EqualityDetectsMeaningfulDifference)
-{
-    atom first = make_atom();
-    atom second = make_atom();
+    TEST_F(AtomTest, AssignmentPerformsDeepCopy)
+    {
+        atom source{
+            "O1",
+            {},
+            8,
+            1.0,
+            2.0,
+            3.0,
+            -2,
+            2
+        };
 
-    EXPECT_TRUE(first == second);
+        source.set_frac_coords(d3{ 0.1, 0.2, 0.3 });
+        source.set_shellcount(std::vector<unsigned int>{2u, 3u});
+        ASSERT_TRUE(source.push_back_basis_set(25.0, 0.75, 2, 1));
 
-    ASSERT_TRUE(second.push_back_basis_set(10.0, 0.5, 1, 0));
+        atom destination;
+        destination = source;
 
-    EXPECT_FALSE(first == second);
-}
+        destination.set_label("Changed");
+        destination.set_basis_set_exponent(0, 999.0);
+        destination.set_shellcount(0u, 99u);
+
+        EXPECT_EQ(source.get_label(), "O1");
+        EXPECT_DOUBLE_EQ(source.get_basis_set_exponent(0), 25.0);
+        EXPECT_EQ(source.get_shellcount(0u), 2u);
+
+        EXPECT_EQ(destination.get_label(), "Changed");
+        EXPECT_DOUBLE_EQ(destination.get_basis_set_exponent(0), 999.0);
+        EXPECT_EQ(destination.get_shellcount(0u), 99u);
+    }
+
+    TEST_F(AtomTest, EqualityDetectsMeaningfulDifference)
+    {
+        atom first = make_atom();
+        atom second = make_atom();
+
+        EXPECT_TRUE(first == second);
+
+        ASSERT_TRUE(second.push_back_basis_set(10.0, 0.5, 1, 0));
+
+        EXPECT_FALSE(first == second);
+    }
 
 } // namespace NoSpherA2UnitTests
