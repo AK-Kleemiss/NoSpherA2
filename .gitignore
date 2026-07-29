@@ -65,3 +65,9 @@ Lib/*
 /.vs
 /Windows/NoSpherA2/.vs
 /Windows/Windows_cuda/.vs
+/Windows/**/*.pdb
+/Windows/**/*.idb
+/Windows/**/*.tlog
+/Windows/**/*.recipe
+/Windows/**/*.pch
+/Windows/**/*.lib

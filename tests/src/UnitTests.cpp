@@ -459,7 +459,10 @@ namespace NoSpherA2UnitTests
             { cdouble(1.25, -0.5), cdouble(2.5, 0.75) },
             { cdouble(-3.0, 1.5), cdouble(4.25, -2.0) }
         };
-        const std::vector<std::uint64_t> scatterer_ids = { 0xabc, 0xdef };
+        const std::vector<atomID> scatterer_ids = {
+            atomID(0.1, 0.2, 0.3, 1, 6),
+            atomID(0.4, 0.5, 0.6, 2, 8)
+        };
         const std::vector<std::vector<int>> indices = {
             { 1, -2 }, { 0, 3 }, { -1, 4 }
         };
@@ -476,7 +479,7 @@ namespace NoSpherA2UnitTests
         ASSERT_EQ(restored.reflection_size(), indices[0].size());
         for (std::size_t scatterer = 0; scatterer < scatterer_ids.size(); ++scatterer)
         {
-            EXPECT_EQ(std::get<std::uint64_t>(restored.get_scatterer(scatterer)),
+            EXPECT_EQ(std::get<atomID>(restored.get_scatterer(scatterer)),
                 scatterer_ids[scatterer]);
             EXPECT_EQ(restored.get_sf_for_scatterer(scatterer), form_factors[scatterer]);
         }
