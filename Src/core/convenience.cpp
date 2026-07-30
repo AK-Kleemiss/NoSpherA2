@@ -2356,16 +2356,22 @@ void options::digest_options()
         else if (temp == "-group")
         {
             int n = 1;
-            while (i + n < argc && string(arguments[i + n]).find("-") == string::npos)
+            while (i + n < argc)
             {
+                const string& group_arg = arguments[i + n];
+                // Olex2 can emit a bare -group followed by an empty argument.
+                // Do not index or parse an empty string: doing so corrupts the
+                // CRT state and later manifests as a stack-buffer-overrun.
+                if (group_arg.empty() || group_arg.find("-") != string::npos)
+                    break;
                 int group;
-                if (arguments[i + 1][0] == '+')
-                    group = -stoi(arguments[i + n]);
+                if (group_arg[0] == '+')
+                    group = -stoi(group_arg);
                 else
-                    group = stoi(arguments[i + n]);
+                    group = stoi(group_arg);
                 groups[0].push_back(group), n++;
             }
-            i += n;
+            i += n - 1;
         }
         else if (temp == "-HDEF")
             properties.hdef = true;
@@ -2968,6 +2974,17 @@ void options::digest_options()
             get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
             exit(0);
         }
+    }
+
+    // SALTED predicts a density from atom positions.  Historically its
+    // calculation path read those positions through -wfn, although the CLI
+    // also documents -xyz for SALTED input.  Accept the documented form and
+    // preserve an explicitly supplied -wfn when both options are present.
+    if (SALTED && wfn.empty() && !xyz_file.empty())
+    {
+        wfn = xyz_file;
+        if (debug)
+            log_file << "Using -xyz input as the SALTED structure: " << wfn << endl;
     }
 };
 
