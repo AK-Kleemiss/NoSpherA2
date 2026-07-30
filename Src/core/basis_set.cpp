@@ -238,12 +238,12 @@ std::vector<double> prune_element_candidates_for_L(
 	const int n = static_cast<int>(unique_exps.size());
 	if (n <= 1) return unique_exps;
 
-	atom tmp_atom("H", 0, 1, 0.0, 0.0, 0.0, 1);
-	for (int i = 0; i < unique_exps.size(); i++) {
-		tmp_atom.push_back_basis_set(unique_exps[i], 1.0, L, i);
-	}
-	WFN tmp_wfn(e_origin::NOT_YET_DEFINED);
-	tmp_wfn.push_back_atom(tmp_atom);
+    atom tmp_atom("H", {}, 1, 0.0, 0.0, 0.0, 1);
+    for (int i = 0; i < unique_exps.size(); i++) {
+        tmp_atom.push_back_basis_set(unique_exps[i], 1.0, L, i);
+    }
+    WFN tmp_wfn(e_origin::NOT_YET_DEFINED);
+    tmp_wfn.push_back_atom(tmp_atom);
 
 	Int_Params tmp_params(tmp_wfn);
 	vec res;

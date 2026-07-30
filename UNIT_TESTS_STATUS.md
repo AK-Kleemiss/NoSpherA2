@@ -1,28 +1,9 @@
 # Unit Test Status
-**Last updated: 2026-07-20** (fixed three rounds of CI failures in the four XCW tests added the
-previous day: a macOS-only build error, then a missing `RESOURCE_LOCK` causing all four tests
-(sharing one output log file) to race and corrupt each other's output under CI's
-`CTEST_PARALLEL_LEVEL=4` on every platform. See Known Issues below.)
-
-**2026-07-19** (added the Gaussian/Anderson-Darling XCW halting criterion
-(`-xcw_gaussian_halt`) and the `1/|H|^2`-weighted residual self-energy fitting criterion
-(`-xcw_h2_weighting`), both opt-in and off by default. Three new tests added:
-`P1_test_XCW_full`, `P1_test_XCW_h2`, `P1_test_XCW_h2_full`, alongside the existing
-`P1_test_XCW`. See Known Issues below and `tests/P1_test/XCW_plan.md` for the full
-implementation status against the original spec, including an honest per-item checklist.)
-
-**2026-07-18** (fixed the `TomlIntegrationTests.P1_test_XCW` access violation:
-`GridManager::calculateMBISWeights`/`calculateEMBISWeights` ignored `config_.no_density_eval`
-and forced a real WFN density evaluation on XCW's MO-pruned dummy wavefunction, corrupting
-memory — see Known Issues below. `P1_test_XCW` is now enabled and passing in-process at
-`OMP_NUM_THREADS=20`. Last full validated baseline remains **201/201 ctest passing**; this adds
-one new passing test on top of that baseline, not yet re-counted into the total.)
-
-**2026-07-15** (added
+**Last updated: 2026-07-15** (added
 `TscBlockTests.BinaryFileRoundTripsWith32BitSizes` for buffered TSCB output and matching
 32-bit binary size fields; the first compile attempt lacked MSVC standard-library include paths,
 and the developer-environment retry exceeded the validation time window without producing a
-compiler error.)
+compiler error. Last full validated baseline remains **201/201 ctest passing**.)
 
 ## Test Harnesses
 

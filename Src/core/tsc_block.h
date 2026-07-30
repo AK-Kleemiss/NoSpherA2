@@ -7,13 +7,15 @@
 #include <limits>
 #include <type_traits>
 #include <unordered_set>
-using ScattererLabel = std::variant<std::string, std::uint64_t>;
+#include "atoms.h"
+
+using ScattererLabel = std::variant<std::string, atomID>;
 using ScattererLabels = std::vector<ScattererLabel>;
 
 template <typename T>
 concept ScattererValue =
 std::same_as<std::remove_cv_t<T>, std::string> ||
-std::same_as<std::remove_cv_t<T>, std::uint64_t> ||
+std::same_as<std::remove_cv_t<T>, atomID> ||
 std::same_as<std::remove_cv_t<T>, ScattererLabel>;
 
 template <typename numtype_index, typename numtype>
@@ -51,34 +53,29 @@ private:
         }
     }
 
-    static void warn_duplicate_scatterer_id(std::uint64_t id)
-    {
-        std::cout << "WARNING: Duplicate scatterer_ID 0x"
-            << std::hex << id << std::dec
-            << " in TSC block; identical scatterer_ID entries can lead to problems.\n";
-    }
-
-    static void warn_duplicate_scatterer_ids(const ScattererLabels& scatterers)
-    {
-        std::unordered_set<std::uint64_t> seen;
-        for (const auto& scatterer : scatterers)
-        {
-            if (!std::holds_alternative<std::uint64_t>(scatterer))
-                continue;
-
-            const std::uint64_t id = std::get<std::uint64_t>(scatterer);
-            if (!seen.insert(id).second)
-                warn_duplicate_scatterer_id(id);
-        }
-    }
-
     template <ScattererValue Label>
     static ScattererLabels make_scatterers(const std::vector<Label>& labels)
     {
+        std::unordered_set<ScattererLabel> seen;
+        seen.reserve(labels.size());
+
         ScattererLabels result;
         result.reserve(labels.size());
-        for (const auto& label : labels)
+
+        for (const auto& label : labels) {
+            if (!seen.insert(label).second) { // Slighty stupid printing of duplicates, as the type of the label can be string, atomID or the variant.
+                if constexpr (std::same_as<std::remove_cvref_t<Label>, std::string> || std::same_as<std::remove_cvref_t<Label>, atomID>) {
+                    std::cout << "Warning: Duplicate scatterer: " << label << std::endl;
+                }
+                else { //If it ist the variant, we have to use std::visit to print the value.
+                    std::cout << "Warning: Duplicate scatterer: ";
+                    std::visit([](const auto& value) { std::cout << value; }, label);
+                }
+                continue;
+            }
             result.emplace_back(label);
+        }
+
         return result;
     }
 
@@ -130,7 +127,6 @@ private:
     {
         sf_ = copy_and_validate_sf(given_sf);
         scatterers_ = make_scatterers(given_scatterers);
-        warn_duplicate_scatterer_ids(scatterers_);
 
         if constexpr (std::same_as<
             std::remove_cvref_t<IndexInput>,
@@ -150,7 +146,7 @@ private:
     [[nodiscard]] bool uses_ids() const
     {
         return !scatterers_.empty() &&
-            std::holds_alternative<std::uint64_t>(scatterers_.front());
+            std::holds_alternative<atomID>(scatterers_.front());
     }
 
     void validate_uniform_scatterer_type() const
@@ -253,7 +249,7 @@ private:
         {
             out << "\nSCATTERER_IDS:" << std::hex;
             for (const auto& scatterer : scatterers_)
-                out << ' ' << std::get<std::uint64_t>(scatterer);
+                out << ' ' << std::get<atomID>(scatterer).to_hex_string();
             out << std::dec;
         }
         else
@@ -272,13 +268,12 @@ private:
         std::int32_t payload_size;
         if (uses_ids())
         {
-            payload.resize(scatterers_.size() * sizeof(std::uint64_t));
+            payload.resize(scatterers_.size() * sizeof(atomID));
             char* destination = payload.data();
             for (const auto& scatterer : scatterers_)
             {
-                const std::uint64_t id = std::get<std::uint64_t>(scatterer);
-                std::memcpy(destination, &id, sizeof(id));
-                destination += sizeof(id);
+                std::memcpy(destination, &std::get<atomID>(scatterer), sizeof(atomID));
+                destination += sizeof(atomID);
             }
             payload_size = checked_binary_size(scatterers_.size(), "Scatterer count");
         }
@@ -309,14 +304,14 @@ private:
 
         if (id_payload)
         {
-            const std::string payload = read_bytes(in, count * sizeof(std::uint64_t));
+            const std::string payload = read_bytes(in, count * sizeof(atomID));
             scatterers_.reserve(count);
             for (std::size_t i = 0; i < count; ++i)
             {
-                std::uint64_t id{};
+                atomID id{};
                 std::memcpy(
                     &id,
-                    payload.data() + i * sizeof(std::uint64_t),
+                    payload.data() + i * sizeof(atomID),
                     sizeof(id));
                 scatterers_.emplace_back(id);
             }
@@ -396,7 +391,6 @@ private:
         if (reflection_size() == 0)
         {
             *this = std::forward<Block>(rhs);
-            warn_duplicate_scatterer_ids(scatterers_);
             return;
         }
 
@@ -409,8 +403,9 @@ private:
         {
             if (!existing.insert(rhs.scatterers_[i]).second)
             {
-                if (std::holds_alternative<std::uint64_t>(rhs.scatterers_[i]))
-                    warn_duplicate_scatterer_id(std::get<std::uint64_t>(rhs.scatterers_[i]));
+                std::cout << "Warning: Duplicate scatterer in append: ";
+                std::visit([](const auto& value) { std::cout << value; }, rhs.scatterers_[i]);
+                std::cout << std::endl;
                 continue;
             }
 
@@ -490,7 +485,6 @@ public:
         header_ = read_bytes(in, static_cast<std::size_t>(header_size));
 
         read_binary_scatterers(in);
-        warn_duplicate_scatterer_ids(scatterers_);
 
         const std::int32_t reflection_count = read_scalar<std::int32_t>(in);
         if (reflection_count < 0)
@@ -570,7 +564,7 @@ public:
             if (!uses_ids())
                 result.push_back(std::get<std::string>(scatterer));
             else {
-                result.push_back(std::to_string(std::get<uint64_t>(scatterer)));
+                result.push_back(std::get<atomID>(scatterer).to_hex_string());
             }
         return result;
     }
@@ -822,7 +816,7 @@ namespace tsc_merge_detail
         bool ids)
     {
         if (ids)
-            return static_cast<std::uint64_t>(std::stoull(token, nullptr, 16));
+            return atomID(token);
         return token;
     }
 
