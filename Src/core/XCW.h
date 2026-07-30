@@ -10,6 +10,7 @@
 
 class XCW {
 public:
+
 	// Constructor
 	XCW(const options& opt_in)
 		: settings(loadSettings())
@@ -20,21 +21,29 @@ public:
 
 	// Calculates F_calc without DW factors (=1), needs rework
 	//void calc_F_calc_fast();
+	
 	// Does the XCW fitting routine
 	void run_XCW_fitting();
 
 private:
 
-	// Structures
+
+	// STRUCTURES
+
+	// Data for contracted basis function
 	struct ao_data {
 		std::vector<primitive> prims;
 		d3 pos;
 		int m;
 	};
+
+	// Data for anomalous dispersion correction
 	struct anom_atom {
 		std::string identifier;
 		cdouble dispersion;
 	};
+
+	// Miscellaneous crystallographic data 
 	struct cryst_info {
 		int nr_small;
 		int nr;
@@ -43,10 +52,19 @@ private:
 		double inv_scale;
 		int ncen;
 		int nmo;
-		double GooF;
-		double chi2;
+		double GooF1;
+		double GooF2;
+		double weighted_GooF1;
+		double weighted_GooF2;
+		double criterion1;
+		double criterion2;
+		double weighted_criterion1;
+		double weighted_criterion2;
 		vec U_iso;
 	};
+
+	/* Data concerning convergence criteria, molecule information, basis set, etc.
+	   Also keeps track of the current state of convergence */
 	struct SCF_settings {
 		double quant_diff;
 		bool conv_quant_diff = false;
@@ -66,6 +84,7 @@ private:
 		bool grown;
 		int n_params;
 		int refine_against;
+		int XWR_type;
 		occ::qm::SpinorbitalKind hf_type;
 		double alpha;
 		double level_shift;
@@ -75,6 +94,7 @@ private:
 		int charge;
 		int multiplicity;
 
+		// Clears the convergence flags
 		void clear() {
 			conv_quant_diff = false;
 			conv_max_diis_error = false;
@@ -84,6 +104,8 @@ private:
 			apply_shift = true;
 			apply_damping = true;
 		}
+
+		// Performs the convergence check and sets flags accordingly
 		bool convergence_check() const {
 			if (conv_quant_diff == true && conv_max_diis_error == true && conv_gradient == true && conv_RMSP_diff == true && conv_MaxP_diff == true) {
 				return true;
@@ -92,6 +114,8 @@ private:
 				return false;
 			}
 		}
+
+		// Updates the SCF routine in regards to damping and level shift
 		void update(const double& diis_error, std::ostream& file, double& alpha) {
 			if (diis_error < diis_stop_damping && apply_damping == true) {
 				apply_damping = false;
@@ -103,78 +127,83 @@ private:
 				print_centered_message("***Turned off level shift***", 76, file);
 			}
 		}
+
 	};
 
 
+	// FUNCTIONS
+
 	// Constructor of the XCW class
 	void construct(const options& opt_in);
+
 	// Loads the convergence settings
 	SCF_settings loadSettings();
 
-
-	// Mathematical helper functions
-	// Helper function for coordinate transformation without building full tensors
+	// Helper function that transforms indices into voigt notation
 	void get_voigt_index(const ivec& indices, int& ADP_idx);
+
 	// Helper function for flattening the I tensor
 	size_t tri_index(int mu, int nu) const noexcept;
 	// Helper function for flattening the I tensor
 	size_t flattened_idx(int r, int mu, int nu) const noexcept;
+
 	// Converts the ADP matrix (just U) from cif format into reciprocal space
 	void U_cif2U_star();
 	// Converts all ADP tensors from reciprocal space into real space
 	void U_star2U_cart();
 
-
-	// Various helper functions
 	// Generates a list that links the symmetry operations to symmetry-generated reflexes for given reflex r
 	ivec generate_asym_lookup(const int r);
-	ivec2 generate_asym_lookup_(const int r);
+
 	// Sets up a molecule object from the asym_atoms
 	void setup_SCF_mol(occ::core::Molecule& mol);
+
 	// Sets up the basis set with a previously generated molecule and basis set from JKFit, where the Olex2 basis sets are now located
 	void setup_basis(occ::core::Molecule& mol, std::string& basis_set_name, occ::qm::AOBasis& occ_basis_set);
 
-
-	// Methods used for calculation of the I tensor
 	// Combined method used to save memory, calculates both the I tensor and the correction for F_calc from anomalous dispersion
 	void eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read);
+
 	// Evaluates the I tensor
-	// Needs: DW factors, phase factors, translational phase factors & XCW integrals
 	void eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase);
+
 	// Evaluates Debye-Waller factors
 	void eval_DW(cvec2& DW_fact);
+
 	// Evaluates the rotational contribution to the phase factors
 	void eval_phase(cvec2& phase_fact);
+
 	// Evaluates the translational contribution to the phase factors
 	void eval_translation_phase(cvec2& translation_phase);
+
 	// Creates primitive vectors from the basis set for calculating the XCW integrals
 	void create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set);
-	// Helper function that does eveything needed for XCW procedure
+
+	// Combined function that sets up the XCW procedure, evaluates I tensor (or loads it from file), sets up the Hartree-Fock object and evaluates anomalous dispersion correction
 	occ::qm::HartreeFock setup_XCW_procedure(bool read, bool safe);
 
-
-	// Methods used for calculation of F_calc
 	// Calculates F_calc
-	// Needs: I tensor, density matrix, anomalous dispersion correction
 	void calc_F_calc(const dMatrix2& D);
+
 	// Calculates direct corrections of the anomalous dispersion onto F_calc
-	// Needs: Anomalous dispersion information from CIF
 	void eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase);
+
 	// Parses the anomalous dispersion information from a CIF style .txt file
 	void parse_anom_atoms(std::vector<anom_atom>& anom_atoms);
 
-
-	// Methods used to determine various crystallographic parameters
 	// Evaluates the scaling factor for |F_calc| by least squares fitting
 	void eval_scale();
+
 	// Calculates quality criteria like GooF and chi^2. When
 	// opt->xcw_h2_weighting is set, both are computed with an additional
 	// 1/|H|^2 weighting (XCW_plan.md sec. 6.2, residual self-energy
 	// criterion) instead of the traditional unweighted sums.
 	void calc_criteria();
+
 	// Builds (once) the per-reflection 1/|H|^2 cache used by calc_criteria/
 	// calc_perturb when opt->xcw_h2_weighting is set. No-op otherwise.
 	void ensure_inv_H2_weights();
+
 	// Distributional (Gaussian) halting criterion (see xcw_halting.h and
 	// tests/P1_test/XCW_plan.md). Computes standardized residuals z_h from
 	// the current F_calc/obs/F_scale, evaluates the Anderson-Darling
@@ -182,10 +211,12 @@ private:
 	// result for the final lambda* recommendation. Only called when
 	// opt->xcw_gaussian_halt is set.
 	void evaluate_gaussian_halting(const double lambda);
+
 	// Prints the full per-lambda Gaussian-halting table (XCW_log only), then
 	// calls report_halting_progress_estimate(true). Called once at the end
 	// of run_XCW_fitting().
 	void report_gaussian_halting_summary();
+
 	// Prints the recommended lambda* = argmin A^2 so far (subject to the
 	// binned-trend test), a scan-boundary warning if that argmin sits at
 	// the last evaluated lambda, and -- fitting the A^2(lambda) trend so
@@ -198,40 +229,45 @@ private:
 	// is in gaussian_halt_history_ at call time, so periodic calls are
 	// naturally based on partial data.
 	void report_halting_progress_estimate(bool is_final);
+
 	// Builds the (once-cached) ordered list of Miller indices matching the
 	// index r used for obs[r]/F_calc[0][r] (see generate_asym_lookup),
 	// needed to look up per-reflection resolution for the binned trend
 	// test.
 	void ensure_hkl_ordered();
 
-
 	// Calculates the perturbation matrix elements
-	// Needs: I tensor, density matrix, F_calc, F_obs, sigma_obs, n_params & n_reflections
 	void calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf);
 
-
-	// Methods used for XCW fitting by run_XCW_fitting()
-	// Executes a single SCF solver
+	// Executes a single SCF solver (for specific lambda step)
 	void do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess);
+
 	// Executes a single SCF iteration
 	bool SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& e_diff_mem, double& quant, double& last_quant, occ::Mat& dm_last);
-	// Checks convergence for SCF cylce
+
+	// Checks convergence for SCF cycle
 	bool SCF_convergence_check(const double& e_diff, const double& gradient, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last);
+
 	// Computes the orbital gradient for usage as a convergence criterion
 	double compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf);
+
 	// Computes convergence criteria related to the density matrix (RMSP and MaxP)
 	void get_density_criteria(double& RMSP_diff, double& maxP_diff, const occ::Mat& dm, const occ::Mat& dm_last);
-	// Takes care of dynamic damping (very primitive)
+
+	// Takes care of dynamic damping
 	double dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& current_alpha, const double& e_diff, double& e_diff_mem);
+
 	// Applies level shift to fock matrix
 	void apply_level_shift(const occ::Mat& C_old, const occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& F_diis);
+
 	// Takes the SCF object from occ and creates the tscb file
 	void create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda);
+
 	// Builds the density matrix to use for structure factor calculations
 	void build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMatrix2& dm_ref, const occ::Mat& dm_old);
 
 
-	// Available lists and variables that are often used
+	// OBJECTS
 	ivec asym_atom_list;
 	vec2 k_pt;
 	// First F_calc (with anomalous dispersion), then anomalous correction

@@ -7,21 +7,31 @@
 
 void XCW::construct(const options& opt_in) {
 	opt = &opt_in;
-	if (opt_in.xcw_lambda_step > 0.0) {
-		settings.xcw_step_size = opt_in.xcw_lambda_step;
-		settings.num_xcw_steps = static_cast<int>(std::round(opt_in.xcw_lambda_max / opt_in.xcw_lambda_step)) + 1;
+
+	// Load XCW step size and number of steps
+	if (opt->xcw_lambda_step > 0.0) {
+		settings.xcw_step_size = opt->xcw_lambda_step;
+		settings.num_xcw_steps = static_cast<int>(std::round(opt->xcw_lambda_max / opt->xcw_lambda_step)) + 1;
 	}
-	if (!opt_in.basis_set.empty()) {
-		settings.basis_set_name = opt_in.basis_set;
+	else {
+		settings.xcw_step_size = 0.01;
+		settings.num_xcw_steps = 101; // Default values: 0.01 step size, 101 steps (0.0 to 1.0)
 	}
-	std::filesystem::path hkl_filename = opt_in.hkl;
-	std::filesystem::path cif = opt_in.cif;
+
+	// Set basis set name
+	if (!opt->basis_set.empty()) {
+		settings.basis_set_name = opt->basis_set;
+	}
+
+	// Read hkl and load cell
+	std::filesystem::path hkl_filename = opt->hkl;
+	std::filesystem::path cif = opt->cif;
 	std::ifstream cif_input(cif.c_str(), std::ios::in);
-	unit_cell = cell(cif, std::cout, opt_in.debug, opt_in.do_XCW);
-	hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt_in.twin_law, unit_cell, std::cout, obs, opt_in.debug);
+	unit_cell = cell(cif, std::cout, opt->debug, opt->do_XCW);
+	hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt->twin_law, unit_cell, std::cout, obs, opt->debug);
 	std::ofstream log3("log3.txt", std::ios::out);
 	bvec needs_grid;
-	read_atoms_from_CIF(cif_input, unit_cell, cryst.ncen, needs_grid, asym_atoms, opt_in.debug);
+	read_atoms_from_CIF(cif_input, unit_cell, cryst.ncen, needs_grid, asym_atoms, opt->debug);
 
 	// Generate WFN object from asym_atoms
 	dummy_wave.assign_charge(opt->charge);
@@ -35,22 +45,39 @@ void XCW::construct(const options& opt_in) {
 		temp_atom.set_charge(asym_atoms[at].type);
 		dummy_wave.push_back_atom(temp_atom);
 	}
+
+	// Load basis set & generate basis for each atom
 	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(settings.basis_set_name);
 	load_basis_into_WFN(dummy_wave, basis, false, true);
 
-	cryst.U_iso = read_U_iso_from_CIF(cif, dummy_wave, unit_cell, log3, opt_in.debug);
+	// Read isotropic displacement parameters
+	cryst.U_iso = read_U_iso_from_CIF(cif, dummy_wave, unit_cell, log3, opt->debug);
+
+	// Evaluate symmetry and assign asymmetry factors to each atom
 	unit_cell.eval_symm(asym_atoms);
+
+	// Load whether or not the structure is grown, find applied symmetries and delete the corresponding reflections
 	if (settings.grown) {
 		unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms);
 	}
+
+	// Generate k_pts and set the number of reflections
 	cryst.nr = hkl_enlarged.size();
 	cryst.nr_small = hkl.size();
-	make_k_pts(cryst.nr != 0 && hkl.size() == 0, opt_in.save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt_in.debug);
-	read_fracs_ADPs_from_CIF(cif, dummy_wave, log3, opt_in.debug);
+	make_k_pts(cryst.nr != 0 && hkl.size() == 0, opt->save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt->debug);
+
+	// Read ADPs
+	read_fracs_ADPs_from_CIF(cif, dummy_wave, log3, opt->debug);
+
+	// Prepare output files
 	XCW_log.open("XCW.log");
 	std::cout << "XCW orbital basis set: " << basis->get_name() << std::endl;
 	XCW_log << "XCW orbital basis set: " << basis->get_name() << std::endl;
+
+	// Precompute GooF scaling factor
 	cryst.inv_scale = 1.0 / (cryst.nr_small - settings.n_params);
+
+	// Set F_calc sizes
 	F_calc.resize(2);
 	F_calc[0].resize(cryst.nr_small, 0);
 	F_calc[1].resize(cryst.nr_small, 0);
@@ -68,14 +95,15 @@ XCW::SCF_settings XCW::loadSettings() {
 	settings.basis_set_name = "def2-svp";
 	settings.grown = false;
 	settings.n_params = 161;
-	// 1: Refine against F values
-	// 2: Refine against F^2 values
+	/* 1: Refine against F values
+	   2: Refine against F^2 values */
 	settings.refine_against = 1;
+	/* 1: Classical Jayatilaka XWR
+	   2: Ewald sum XWR */
+	settings.XWR_type = 1;
 	settings.hf_type = occ::qm::SpinorbitalKind::Restricted;
 	settings.alpha = 0.5;
 	settings.level_shift = 0.0;
-	settings.xcw_step_size = 0.01;
-	settings.num_xcw_steps = static_cast<int>(std::round(1.0 / settings.xcw_step_size)) + 1; // lambda max = 1.0 by default
 	settings.max_scf_iterations = 100;
 	settings.charge = 0;
 	settings.multiplicity = 1;
@@ -420,7 +448,7 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 			}
 		}
 	}
-	std::vector<ivec> asym_lookup(cryst.nr_small);
+	ivec2 asym_lookup(cryst.nr_small);
 	for (r = 0; r < cryst.nr_small; r++) {
 		asym_lookup[r] = generate_asym_lookup(r);
 	}
@@ -451,24 +479,80 @@ void XCW::eval_scale() {
 }
 
 void XCW::calc_criteria() {
-	ensure_inv_H2_weights();
-	const bool h2 = opt->xcw_h2_weighting;
 	double prefactor = 1.0 / static_cast<double>(cryst.nr_small - settings.n_params);
-	double sum_chi = 0;
-	double sum_goof = 0;
-#pragma omp parallel for reduction(+:sum_chi, sum_goof)
-	for (int i = 0; i < cryst.nr_small; i++) {
-		const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
-		const double diff = scaled_F_calc - obs[i].abs_F_obs;
-		const double diff2 = scaled_F_calc * scaled_F_calc - obs[i].F_obs2;
-		const double w = h2 ? inv_H2_[i] : 1.0;
-		const double weighted_chi = diff * diff / obs[i].sigma_obs * w;
-		const double weighted_goof = diff2 * diff2 / (obs[i].sigma_obs2 * obs[i].sigma_obs2) * w;
-		sum_chi += weighted_chi;
-		sum_goof += weighted_goof;
+	double sum_goof1 = 0, sum_goof2 = 0;
+	double sum_criterion1 = 0, sum_criterion2 = 0;
+	double sum_weighted_goof1 = 0, sum_weighted_goof2 = 0;
+	double sum_weighted_criterion1 = 0, sum_weighted_criterion2 = 0;
+	if (settings.XWR_type == 1) {
+		if (settings.refine_against == 1) {
+#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_criterion1)
+			for (int i = 0; i < cryst.nr_small; i++) {
+				const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
+				const double diff1_sq = std::pow(scaled_F_calc - obs[i].abs_F_obs, 2);
+				const double diff2 = (scaled_F_calc * scaled_F_calc) - obs[i].F_obs2;
+				const double inv_sigma_obs = 1.0 / obs[i].sigma_obs;
+				const double inv_sigma_obs2 = 1.0 / obs[i].sigma_obs2;
+				sum_goof1 += diff1_sq * inv_sigma_obs * inv_sigma_obs;
+				sum_criterion1 += diff1_sq * inv_sigma_obs;
+				sum_goof2 += diff2 * diff2 * inv_sigma_obs2 * inv_sigma_obs2;
+			}
+		}
+		else if (settings.refine_against == 2) {
+#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_criterion2)
+			for (int i = 0; i < cryst.nr_small; i++) {
+				const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
+				const double diff1 = scaled_F_calc - obs[i].abs_F_obs;
+				const double diff2_sq = std::pow((scaled_F_calc * scaled_F_calc) - obs[i].F_obs2, 2);
+				const double inv_sigma_obs = 1.0 / obs[i].sigma_obs;
+				const double inv_sigma_obs2 = 1.0 / obs[i].sigma_obs2;
+				sum_goof1 += diff1 * diff1 * inv_sigma_obs * inv_sigma_obs;
+				sum_goof2 += diff2_sq * inv_sigma_obs2 * inv_sigma_obs2;
+				sum_criterion2 += diff2_sq * inv_sigma_obs2;
+			}
+		}
 	}
-	cryst.chi2 = prefactor * sum_chi;
-	cryst.GooF = std::sqrt(prefactor * sum_goof);
+	else if (settings.XWR_type == 2) {
+		ensure_inv_H2_weights();
+		if (settings.refine_against == 1) {
+#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_weighted_goof1, sum_weighted_criterion1)
+			for (int i = 0; i < cryst.nr_small; i++) {
+				const double w = inv_H2_[i];
+				const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
+				const double diff1_sq = std::pow(scaled_F_calc - obs[i].abs_F_obs, 2);
+				const double diff2 = (scaled_F_calc * scaled_F_calc) - obs[i].F_obs2;
+				const double inv_sigma_obs1 = 1.0 / obs[i].sigma_obs;
+				const double inv_sigma_obs2 = 1.0 / obs[i].sigma_obs2;
+				sum_goof1 += diff1_sq * inv_sigma_obs1 * inv_sigma_obs1;
+				sum_weighted_goof1 += diff1_sq * inv_sigma_obs1 * inv_sigma_obs1 * w;
+				sum_weighted_criterion1 += diff1_sq * inv_sigma_obs1 * w;
+				sum_goof2 += diff2 * diff2 * inv_sigma_obs2 * inv_sigma_obs2;
+			}
+		}
+		else if (settings.refine_against == 2) {
+#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_weighted_goof2, sum_weighted_criterion2)
+			for (int i = 0; i < cryst.nr_small; i++) {
+				const double w = inv_H2_[i];
+				const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
+				const double diff1 = scaled_F_calc - obs[i].abs_F_obs;
+				const double diff2_sq = std::pow((scaled_F_calc * scaled_F_calc) - obs[i].F_obs2, 2);
+				const double inv_sigma_obs1 = 1.0 / obs[i].sigma_obs;
+				const double inv_sigma_obs2 = 1.0 / obs[i].sigma_obs2;
+				sum_goof1 += diff1 * diff1 * inv_sigma_obs1 * inv_sigma_obs1;
+				sum_goof2 += diff2_sq * inv_sigma_obs2 * inv_sigma_obs2;
+				sum_weighted_goof2 += diff2_sq * inv_sigma_obs2 * inv_sigma_obs2 * w;
+				sum_weighted_criterion2 += diff2_sq * inv_sigma_obs2 * w;
+			}
+		}
+	}
+	cryst.GooF1 = std::sqrt(prefactor * sum_goof1);
+	cryst.GooF2 = std::sqrt(prefactor * sum_goof2);
+	cryst.weighted_GooF1 = std::sqrt(prefactor * sum_weighted_goof1);
+	cryst.weighted_GooF2 = std::sqrt(prefactor * sum_weighted_goof2);
+	cryst.criterion1 = prefactor * sum_criterion1;
+	cryst.criterion2 = prefactor * sum_criterion2;
+	cryst.weighted_criterion1 = prefactor * sum_weighted_criterion1;
+	cryst.weighted_criterion2 = prefactor * sum_weighted_criterion2;
 }
 
 void XCW::ensure_hkl_ordered() {
@@ -759,32 +843,6 @@ ivec XCW::generate_asym_lookup(const int r) {
 	// closing function
 }
 
-ivec2 XCW::generate_asym_lookup_(const int r) {
-	ivec2 asym_list;
-	auto it = hkl.begin();
-	std::advance(it, r);
-	ivec3 rots = unit_cell.get_sym();
-	i3 tempv;
-	const i3& hkl_temp = *it;
-	for (int s = 0; s < rots[0][0].size(); s++) {
-		tempv = { 0, 0, 0 };
-		for (int h = 0; h < 3; h++) {
-			for (int j = 0; j < 3; j++) {
-				tempv[j] += hkl_temp[h] * rots[j][h][s];
-			}
-		}
-		int idx_ = 0;
-		auto idx = hkl_enlarged.find(tempv);
-		if (idx != hkl_enlarged.end()) {
-			idx_ = std::distance(hkl_enlarged.begin(), idx);
-		}
-		ivec temporary = { idx_, s };
-		asym_list.push_back(temporary);
-	}
-	return asym_list;
-	// closing function
-}
-
 size_t XCW::tri_index(int mu, int nu) const noexcept {
 	return mu * cryst.nmo - (mu * (mu - 1)) / 2 + (nu - mu);
 }
@@ -932,7 +990,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 	}
 	vec ao_grid_cutoff_squared(cryst.nmo);
-	for (int ao = 0; ao < cryst.nmo; ++ao) {
+	for (int ao = 0; ao < cryst.nmo; ao++) {
 		double ao_minimum_exponent = std::numeric_limits<double>::max();
 		for (const primitive& primitive : ao_data_shells[ao].prims) {
 			ao_minimum_exponent = std::min(ao_minimum_exponent, primitive.get_exp());
@@ -944,19 +1002,19 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	const int n_atom_grids = std::min(n_grids, cryst.ncen);
 	vec2 grid_radial_distances(n_atom_grids);
 	ivec2 ao_prefix_end(cryst.nmo, ivec(n_atom_grids));
-	for (int g = 0; g < n_atom_grids; ++g) {
+	for (int g = 0; g < n_atom_grids; g++) {
 		vec& radial_distances = grid_radial_distances[g];
 		radial_distances.resize(points[g]);
 		const double* x_ptr = grids[g][GridData::GridIndex::X].data();
 		const double* y_ptr = grids[g][GridData::GridIndex::Y].data();
 		const double* z_ptr = grids[g][GridData::GridIndex::Z].data();
-		for (int p = 0; p < points[g]; ++p) {
+		for (int p = 0; p < points[g]; p++) {
 			const double dx = x_ptr[p] - grid_positions[g][0];
 			const double dy = y_ptr[p] - grid_positions[g][1];
 			const double dz = z_ptr[p] - grid_positions[g][2];
 			radial_distances[p] = std::sqrt(dx * dx + dy * dy + dz * dz);
 		}
-		for (int ao = 0; ao < cryst.nmo; ++ao) {
+		for (int ao = 0; ao < cryst.nmo; ao++) {
 			const ao_data& ao_shell = ao_data_shells[ao];
 			const double dx = grid_positions[g][0] - ao_shell.pos[0];
 			const double dy = grid_positions[g][1] - ao_shell.pos[1];
@@ -986,7 +1044,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			mu_vals[mu][g].resize(points[g]);
 			double* local_mu_vals_ptr = mu_vals[mu][g].data();
 			const int prefix_end = g < n_atom_grids ? ao_prefix_end[mu][g] : points[g];
-			for (int p = 0; p < prefix_end; p++) {
+			for (int p = 0; p < points[g]; p++) {
+				//for (int p = 0; p < prefix_end; p++) {
 				d4 d_mu{ x_ptr[p] - mp0, y_ptr[p] - mp1 , z_ptr[p] - mp2 , 0 };
 				d_mu[3] = std::hypot(d_mu[0], d_mu[1], d_mu[2]);
 				if (d_mu[3] * d_mu[3] > ao_grid_cutoff_squared[mu]) {
@@ -1009,7 +1068,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				continue;
 			}
 			ivec& pair_grids = active_grids[pair_idx];
-			for (int g = 0; g < n_atom_grids; ++g) {
+			for (int g = 0; g < n_atom_grids; g++) {
 				const double mu_dx = grid_positions[g][0] - ao_data_shells[mu].pos[0];
 				const double mu_dy = grid_positions[g][1] - ao_data_shells[mu].pos[1];
 				const double mu_dz = grid_positions[g][2] - ao_data_shells[mu].pos[2];
@@ -1084,7 +1143,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 		block.tile_result_size = static_cast<int>(result_offset);
 		};
-	for (int g = 0; g < n_atom_grids; ++g) {
+	for (int g = 0; g < n_atom_grids; g++) {
 		const ivec& active_aos = grid_active_aos[g];
 		const vec& full_ao_values = grid_ao_values[g];
 		const vec& radial_distances = grid_radial_distances[g];
@@ -1102,7 +1161,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			for (int local_ao = 0; local_ao < static_cast<int>(active_aos.size()); ++local_ao) {
 				const double* full_row = full_ao_values.data() + static_cast<size_t>(local_ao) * points[g];
 				bool nonzero = false;
-				for (int p = point_start; p < point_end; ++p) {
+				for (int p = point_start; p < point_end; p++) {
 					if (full_row[p] != 0.0) {
 						nonzero = true;
 						break;
@@ -1130,8 +1189,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	// Main loop for computation of I
 	long long skipped_grids = 0;
 	long long screen_counter = 0;
-	for (int mu = 0; mu < cryst.nmo; ++mu) {
-		for (int nu = mu; nu < cryst.nmo; ++nu) {
+	for (int mu = 0; mu < cryst.nmo; mu++) {
+		for (int nu = mu; nu < cryst.nmo; nu++) {
 			screen_counter += skip[mu][nu];
 		}
 	}
@@ -1151,23 +1210,23 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		mkl_set_num_threads_local(1);
 #endif
 #pragma omp for schedule(dynamic, 1)
-	for (int r = 0; r < cryst.nr_small; r++) {
+		for (int r = 0; r < cryst.nr_small; r++) {
 
-		// Extract all k_pts needed for this r
-		for (int syms = 0; syms < num_syms; syms++) {
-			single_k_pts[syms] = { k_pt[0][asym_lookup[r][syms]], k_pt[1][asym_lookup[r][syms]], k_pt[2][asym_lookup[r][syms]] };
-		}
+			// Extract all k_pts needed for this r
+			for (int syms = 0; syms < num_syms; syms++) {
+				single_k_pts[syms] = { k_pt[0][asym_lookup[r][syms]], k_pt[1][asym_lookup[r][syms]], k_pt[2][asym_lookup[r][syms]] };
+			}
 
-		// Precompute weighted phase factors for integration
-		for (int syms = 0; syms < num_syms; syms++) {
-			for (int g = 0; g < n_grids; g++) {
-				phase[syms][g].resize(points[g]);
-				phase_angles.resize(points[g]);
-				phase_sines.resize(points[g]);
-				phase_cosines.resize(points[g]);
-				for (int p = 0; p < points[g]; p++) {
-					phase_angles[p] = single_k_pts[syms][0] * d1[g][p] + single_k_pts[syms][1] * d2[g][p] + single_k_pts[syms][2] * d3[g][p];
-				}
+			// Precompute weighted phase factors for integration
+			for (int syms = 0; syms < num_syms; syms++) {
+				for (int g = 0; g < n_grids; g++) {
+					phase[syms][g].resize(points[g]);
+					phase_angles.resize(points[g]);
+					phase_sines.resize(points[g]);
+					phase_cosines.resize(points[g]);
+					for (int p = 0; p < points[g]; p++) {
+						phase_angles[p] = single_k_pts[syms][0] * d1[g][p] + single_k_pts[syms][1] * d2[g][p] + single_k_pts[syms][2] * d3[g][p];
+					}
 #if defined(__APPLE__)
 					for (int p = 0; p < points[g]; p++) {
 						__sincos(phase_angles[p], &phase_sines[p], &phase_cosines[p]);
@@ -1175,90 +1234,91 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 #else
 					vdSinCos(points[g], phase_angles.data(), phase_sines.data(), phase_cosines.data());
 #endif
-				for (int p = 0; p < points[g]; p++) {
-					phase[syms][g][p] = cdouble(weights[g][p] * phase_cosines[p], weights[g][p] * phase_sines[p]);
+					for (int p = 0; p < points[g]; p++) {
+						phase[syms][g][p] = cdouble(weights[g][p] * phase_cosines[p], weights[g][p] * phase_sines[p]);
+					}
 				}
 			}
-		}
-		for (int g = 0; g < n_atom_grids; g++) {
-			grid_factors[g] = asym_atoms[g].asym_fact * DW_fact[g][r] * phase_fact[g][r];
-		}
-
-		for (int mu = 0; mu < cryst.nmo; mu++) {
-			for (int nu = mu; nu < cryst.nmo; nu++) {
-				if (!skip[mu][nu]) {
-					skipped_grids += static_cast<long long>(num_syms) * skipped_grids_per_pair[tri_index(mu, nu)];
-				}
-			}
-		}
-
-		const size_t base = static_cast<size_t>(r) * packed_size;
-		for (int syms = 0; syms < num_syms; syms++) {
 			for (int g = 0; g < n_atom_grids; g++) {
-				const cdouble factor = grid_factors[g] * translation_phase[r][syms];
-				for (const GridBlock& block : grid_blocks[g]) {
-					const ivec& active_aos = block.active_aos;
-					const int n_active = static_cast<int>(active_aos.size());
-					const int np = block.point_count;
-					const vec& ao_values = block.ao_values;
-					weighted_values.resize(ao_values.size());
-					tile_real_values.resize(block.tile_result_size);
-					tile_imag_values.resize(block.tile_result_size);
-					const cdouble* phase_values = phase[syms][g].data() + block.point_start;
-					for (int local_mu = 0; local_mu < n_active; ++local_mu) {
-						const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
-						double* weighted_row = weighted_values.data() + static_cast<size_t>(local_mu) * np;
-						for (int p = 0; p < np; ++p) {
-							weighted_row[p] = ao_row[p] * phase_values[p].real();
+				grid_factors[g] = asym_atoms[g].asym_fact * DW_fact[g][r] * phase_fact[g][r];
+			}
+
+			for (int mu = 0; mu < cryst.nmo; mu++) {
+				for (int nu = mu; nu < cryst.nmo; nu++) {
+					if (!skip[mu][nu]) {
+						skipped_grids += static_cast<long long>(num_syms) * skipped_grids_per_pair[tri_index(mu, nu)];
+					}
+				}
+			}
+
+			const size_t base = static_cast<size_t>(r) * packed_size;
+			for (int syms = 0; syms < num_syms; syms++) {
+				for (int g = 0; g < n_atom_grids; g++) {
+					const cdouble factor = grid_factors[g] * translation_phase[r][syms];
+					for (const GridBlock& block : grid_blocks[g]) {
+						const ivec& active_aos = block.active_aos;
+						const int n_active = static_cast<int>(active_aos.size());
+						const int np = block.point_count;
+						const vec& ao_values = block.ao_values;
+						weighted_values.resize(ao_values.size());
+						tile_real_values.resize(block.tile_result_size);
+						tile_imag_values.resize(block.tile_result_size);
+						const cdouble* phase_values = phase[syms][g].data() + block.point_start;
+						for (int local_mu = 0; local_mu < n_active; local_mu++) {
+							const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
+							double* weighted_row = weighted_values.data() + static_cast<size_t>(local_mu) * np;
+							for (int p = 0; p < np; p++) {
+								weighted_row[p] = ao_row[p] * phase_values[p].real();
+							}
 						}
-					}
-					for (const MatrixTile& tile : block.matrix_tiles) {
-						cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
-							ao_values.data() + static_cast<size_t>(tile.row_start) * np, np,
-							weighted_values.data() + static_cast<size_t>(tile.col_start) * np, np,
-							0.0, tile_real_values.data() + tile.result_offset, tile.col_count);
-					}
-					for (int local_mu = 0; local_mu < n_active; ++local_mu) {
-						const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
-						double* weighted_row = weighted_values.data() + static_cast<size_t>(local_mu) * np;
-						for (int p = 0; p < np; ++p) {
-							weighted_row[p] = ao_row[p] * phase_values[p].imag();
+						for (const MatrixTile& tile : block.matrix_tiles) {
+							cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
+								ao_values.data() + static_cast<size_t>(tile.row_start) * np, np,
+								weighted_values.data() + static_cast<size_t>(tile.col_start) * np, np,
+								0.0, tile_real_values.data() + tile.result_offset, tile.col_count);
 						}
-					}
-					for (const MatrixTile& tile : block.matrix_tiles) {
-						cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
-							ao_values.data() + static_cast<size_t>(tile.row_start) * np, np,
-							weighted_values.data() + static_cast<size_t>(tile.col_start) * np, np,
-							0.0, tile_imag_values.data() + tile.result_offset, tile.col_count);
-					}
-					for (const MatrixTile& tile : block.matrix_tiles) {
-						for (int tile_row = 0; tile_row < tile.row_count; ++tile_row) {
-							const int local_mu = tile.row_start + tile_row;
-							const int mu = active_aos[local_mu];
-							const int first_tile_col = (tile.row_start == tile.col_start) ? tile_row : 0;
-							for (int tile_col = first_tile_col; tile_col < tile.col_count; ++tile_col) {
-								const int local_nu = tile.col_start + tile_col;
-								const int nu = active_aos[local_nu];
-								if (!skip[mu][nu]) {
-									const size_t matrix_idx = tile.result_offset + static_cast<size_t>(tile_row) * tile.col_count + tile_col;
-									I[base + tri_index(mu, nu)] += cdouble(tile_real_values[matrix_idx], tile_imag_values[matrix_idx]) * factor;
+						for (int local_mu = 0; local_mu < n_active; local_mu++) {
+							const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
+							double* weighted_row = weighted_values.data() + static_cast<size_t>(local_mu) * np;
+							for (int p = 0; p < np; p++) {
+								weighted_row[p] = ao_row[p] * phase_values[p].imag();
+							}
+						}
+						for (const MatrixTile& tile : block.matrix_tiles) {
+							cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
+								ao_values.data() + static_cast<size_t>(tile.row_start) * np, np,
+								weighted_values.data() + static_cast<size_t>(tile.col_start) * np, np,
+								0.0, tile_imag_values.data() + tile.result_offset, tile.col_count);
+						}
+						for (const MatrixTile& tile : block.matrix_tiles) {
+							for (int tile_row = 0; tile_row < tile.row_count; tile_row++) {
+								const int local_mu = tile.row_start + tile_row;
+								const int mu = active_aos[local_mu];
+								const int first_tile_col = (tile.row_start == tile.col_start) ? tile_row : 0;
+								for (int tile_col = first_tile_col; tile_col < tile.col_count; tile_col++) {
+									const int local_nu = tile.col_start + tile_col;
+									const int nu = active_aos[local_nu];
+									if (!skip[mu][nu]) {
+										const size_t matrix_idx = tile.result_offset + static_cast<size_t>(tile_row) * tile.col_count + tile_col;
+										I[base + tri_index(mu, nu)] += cdouble(tile_real_values[matrix_idx], tile_imag_values[matrix_idx]) * factor;
+									}
 								}
 							}
 						}
 					}
 				}
 			}
+#pragma omp critical(XCW_progress_bar)
+			pb.update();
 		}
-		#pragma omp critical(XCW_progress_bar)
-		pb.update();
-	}
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = end - start;
 	const int number_integrals = packed_size;
 	XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
-	std::cout << std::endl << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
-	std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter / cryst.nr << " pairs of mu, nu (" << screen_counter / static_cast<double>(cryst.nr * number_integrals) * 100 << "%)" << std::endl;
+	std::cout << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << std::chrono::duration<double>(duration).count() << " seconds.\n";
+	std::cout << std::endl;
+	std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter / cryst.nr << " pairs of mu, nu (" << screen_counter / static_cast<double>(cryst.nr * number_integrals) * 100 << "%)\n";
 	std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / (static_cast<long long>(number_integrals) * cryst.nr * cryst.ncen) * 100 << "%)" << std::endl;
 }
 
@@ -1281,96 +1341,104 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 
 void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	ensure_inv_H2_weights();
-	const bool h2 = opt->xcw_h2_weighting;
-	switch (settings.refine_against) {
-	case 1: {
-		perturb.setZero(cryst.nmo, cryst.nmo);
-		const double prefactor = 2.0 * cryst.F_scale / (cryst.nr_small - settings.n_params);
-		const int packed_size = cryst.nmo * (cryst.nmo + 1) / 2;
+	perturb.setZero(cryst.nmo, cryst.nmo);
+	double prefactor = 2.0 * cryst.F_scale / (cryst.nr_small - settings.n_params);
+	const int packed_size = cryst.nmo * (cryst.nmo + 1) / 2;
+
+	// Funny switch statement that allows for quite readable code for the different perturbation types, just ignore the arithmetic, it's basically a switch for 2D-tuples of integers (detailed: move one of the integers 16 bits to the left and do binary OR to get a key that includes is unique for both int values)
 #pragma omp parallel
-		{
-			occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
+	{
+		occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
+		double* local_ptr = local.data();
+		switch ((static_cast<int>(settings.XWR_type) << 16) | static_cast<int>(settings.refine_against)) {
+		case (1 << 16) | 1: {
 #pragma omp for nowait
 			for (int r = 0; r < cryst.nr_small; r++) {
 				const double F_calc_abs = std::abs(F_calc[0][r]);
 				// There should be another sigma but somehow that does not seem to work
-				cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * F_calc_abs);
-				if (h2) {
-					precompute *= inv_H2_[r];
-				}
-				const size_t base = r * packed_size;
+				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * F_calc_abs);
+				size_t offset = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
-					size_t offset = base + tri_index(mu, mu);
-					for (int nu = mu; nu < cryst.nmo; ++nu) {
-						const double temp = std::real(precompute * I[offset]);
-						local(mu, nu) += temp;
-						++offset;
+					for (int nu = mu; nu < cryst.nmo; nu++) {
+						const cdouble& val = I[offset];
+						local_ptr[nu * cryst.nmo + mu] += precompute.real() * val.real() - precompute.imag() * val.imag();
+						offset++;
 					}
 				}
 			}
-#pragma omp critical
-			{
-				perturb += local;
+			break;
+		}
+		case (1 << 16) | 2: {
+			prefactor *= 2.0 * cryst.F_scale;
+			const double scale_sq = cryst.F_scale * cryst.F_scale;
+#pragma omp for nowait
+			for (int r = 0; r < cryst.nr_small; r++) {
+				const double F_calc_abs = std::pow(std::abs(F_calc[0][r]), 2);
+				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2);
+				size_t offset = r * packed_size;
+				for (int mu = 0; mu < cryst.nmo; mu++) {
+					for (int nu = mu; nu < cryst.nmo; nu++) {
+						const cdouble& val = I[offset];
+						local_ptr[nu * cryst.nmo + mu] += precompute.real() * val.real() - precompute.imag() * val.imag();
+						offset++;
+					}
+				}
 			}
+			break;
 		}
-		perturb *= prefactor;
-		for (int mu = 0; mu < cryst.nmo; mu++) {
-			for (int nu = mu + 1; nu < cryst.nmo; nu++) {
-				perturb(nu, mu) = perturb(mu, nu);
-			}
-		}
-		if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
-			perturb.conservativeResize(2 * cryst.nmo, Eigen::NoChange);
-			perturb.bottomRows(cryst.nmo) = perturb.topRows(cryst.nmo);
-		}
-		break;
-	}
-	case 2: {
-		perturb.setZero(cryst.nmo, cryst.nmo);
-		const double scale_sq = cryst.F_scale * cryst.F_scale;
-		const double prefactor = 4.0 * scale_sq / (cryst.nr_small - settings.n_params);
-		const int packed_size = cryst.nmo * (cryst.nmo + 1) / 2;
-#pragma omp parallel
-		{
-			occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
+		case (2 << 16) | 1: {
 #pragma omp for nowait
 			for (int r = 0; r < cryst.nr_small; r++) {
 				const double F_calc_abs = std::abs(F_calc[0][r]);
-				// There should be another sigma but somehow that does not seem to work
-				cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2);
-				if (h2) {
-					precompute *= inv_H2_[r];
-				}
-				const size_t base = r * packed_size;
+				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * F_calc_abs) * inv_H2_[r];
+				size_t offset = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
-					size_t offset = base + tri_index(mu, mu);
-					for (int nu = mu; nu < cryst.nmo; ++nu) {
-						const double temp = std::real(precompute * I[offset]);
-						local(mu, nu) += temp;
-						++offset;
+					for (int nu = mu; nu < cryst.nmo; nu++) {
+						const cdouble& val = I[offset];
+						local_ptr[nu * cryst.nmo + mu] += precompute.real() * val.real() - precompute.imag() * val.imag();
+						offset++;
 					}
 				}
 			}
+			break;
+		}
+		case (2 << 16) | 2: {
+			prefactor *= 2.0 * cryst.F_scale;
+			const double scale_sq = cryst.F_scale * cryst.F_scale;
+#pragma omp for nowait
+			for (int r = 0; r < cryst.nr_small; r++) {
+				const double F_calc_abs = std::pow(std::abs(F_calc[0][r]), 2);
+				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2) * inv_H2_[r];
+				size_t offset = r * packed_size;
+				for (int mu = 0; mu < cryst.nmo; mu++) {
+					for (int nu = mu; nu < cryst.nmo; nu++) {
+						const cdouble& val = I[offset];
+						local_ptr[nu * cryst.nmo + mu] += precompute.real() * val.real() - precompute.imag() * val.imag();
+						offset++;
+					}
+				}
+			}
+			break;
+		}
+		default:
+			XCW_log << "Invalid refinement option" << std::endl;
+		}
 #pragma omp critical
-			{
-				perturb += local;
-			}
+		{
+			perturb += local;
 		}
-		perturb *= prefactor;
-		for (int mu = 0; mu < cryst.nmo; mu++) {
-			for (int nu = mu + 1; nu < cryst.nmo; nu++) {
-				perturb(nu, mu) = perturb(mu, nu);
-			}
-		}
-		if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
-			perturb.conservativeResize(2 * cryst.nmo, Eigen::NoChange);
-			perturb.bottomRows(cryst.nmo) = perturb.topRows(cryst.nmo);
-		}
-		break;
 	}
-	default:
-		XCW_log << "Invalid refinement option" << std::endl;
+	perturb *= prefactor;
+	for (int mu = 0; mu < cryst.nmo; mu++) {
+		for (int nu = mu + 1; nu < cryst.nmo; nu++) {
+			perturb(nu, mu) = perturb(mu, nu);
+		}
 	}
+	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
+		perturb.conservativeResize(2 * cryst.nmo, Eigen::NoChange);
+		perturb.bottomRows(cryst.nmo) = perturb.topRows(cryst.nmo);
+	}
+	//closing function
 }
 
 void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
@@ -1507,7 +1575,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 			evaluate_gaussian_halting(lambda);
 		}
 
-		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << cryst.chi2 << "\t" << cryst.GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant;
+		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << cryst.criterion1 << "\t" << cryst.GooF2 << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.criterion1 << "\t\t" << std::fixed << std::setprecision(9) << quant;
 		if (opt->xcw_gaussian_halt && !gaussian_halt_history_.empty()) {
 			std::cout << "\t\t" << std::setprecision(4) << gaussian_halt_history_.back().A2;
 		}
@@ -1562,11 +1630,11 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.update_scf_energy(false);
 	const double ehf = scf.ctx.energy["electronic"];
 	const double e_diff = std::abs(ehf - ehf_last);
-	quant = scf.ctx.energy["total"] + lambda * cryst.chi2;
+	quant = scf.ctx.energy["total"] + lambda * cryst.criterion1;
 	scf.ctx.F += perturbation * lambda;
 
 	// Prints output line for iteration
-	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << cryst.chi2 << "\t" << cryst.GooF << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.chi2 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
+	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << cryst.criterion1 << "\t" << cryst.GooF2 << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.criterion1 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 	// DIIS extrapolation
 	occ::Mat F_diis = scf.convergence_accelerator.update(scf.ctx.mo.kind, scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
