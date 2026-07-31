@@ -56,10 +56,6 @@ private:
 		double GooF2;
 		double weighted_GooF1;
 		double weighted_GooF2;
-		double criterion1;
-		double criterion2;
-		double weighted_criterion1;
-		double weighted_criterion2;
 		vec U_iso;
 	};
 
@@ -119,12 +115,12 @@ private:
 		void update(const double& diis_error, std::ostream& file, double& alpha) {
 			if (diis_error < diis_stop_damping && apply_damping == true) {
 				apply_damping = false;
-				print_centered_message("***Turned off damping***", 76, file);
+				print_centered_message("***Turned off damping***", 84, file);
 				alpha = 0;
 			}
 			if (diis_error < diis_stop_shift && apply_shift == true) {
 				apply_shift = false;
-				print_centered_message("***Turned off level shift***", 76, file);
+				print_centered_message("***Turned off level shift***", 84, file);
 			}
 		}
 
@@ -165,7 +161,7 @@ private:
 	void eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read);
 
 	// Evaluates the I tensor
-	void eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase);
+	void eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids, double& number_integrals);
 
 	// Evaluates Debye-Waller factors
 	void eval_DW(cvec2& DW_fact);

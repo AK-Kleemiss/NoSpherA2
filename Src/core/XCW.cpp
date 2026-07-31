@@ -86,7 +86,7 @@ void XCW::construct(const options& opt_in) {
 XCW::SCF_settings XCW::loadSettings() {
 	SCF_settings settings;
 	settings.quant_diff = 1e-6;
-	settings.diis_stop_damping = 0.01;
+	settings.diis_stop_damping = 1e-3;
 	settings.max_diis_error = 1e-5;
 	settings.gradient = 1e-5;
 	settings.MaxP_diff = 1e-7;
@@ -479,80 +479,36 @@ void XCW::eval_scale() {
 }
 
 void XCW::calc_criteria() {
+	ensure_inv_H2_weights();
 	double prefactor = 1.0 / static_cast<double>(cryst.nr_small - settings.n_params);
 	double sum_goof1 = 0, sum_goof2 = 0;
-	double sum_criterion1 = 0, sum_criterion2 = 0;
 	double sum_weighted_goof1 = 0, sum_weighted_goof2 = 0;
-	double sum_weighted_criterion1 = 0, sum_weighted_criterion2 = 0;
-	if (settings.XWR_type == 1) {
-		if (settings.refine_against == 1) {
-#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_criterion1)
-			for (int i = 0; i < cryst.nr_small; i++) {
-				const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
-				const double diff1_sq = std::pow(scaled_F_calc - obs[i].abs_F_obs, 2);
-				const double diff2 = (scaled_F_calc * scaled_F_calc) - obs[i].F_obs2;
-				const double inv_sigma_obs = 1.0 / obs[i].sigma_obs;
-				const double inv_sigma_obs2 = 1.0 / obs[i].sigma_obs2;
-				sum_goof1 += diff1_sq * inv_sigma_obs * inv_sigma_obs;
-				sum_criterion1 += diff1_sq * inv_sigma_obs;
-				sum_goof2 += diff2 * diff2 * inv_sigma_obs2 * inv_sigma_obs2;
-			}
-		}
-		else if (settings.refine_against == 2) {
-#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_criterion2)
-			for (int i = 0; i < cryst.nr_small; i++) {
-				const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
-				const double diff1 = scaled_F_calc - obs[i].abs_F_obs;
-				const double diff2_sq = std::pow((scaled_F_calc * scaled_F_calc) - obs[i].F_obs2, 2);
-				const double inv_sigma_obs = 1.0 / obs[i].sigma_obs;
-				const double inv_sigma_obs2 = 1.0 / obs[i].sigma_obs2;
-				sum_goof1 += diff1 * diff1 * inv_sigma_obs * inv_sigma_obs;
-				sum_goof2 += diff2_sq * inv_sigma_obs2 * inv_sigma_obs2;
-				sum_criterion2 += diff2_sq * inv_sigma_obs2;
-			}
-		}
-	}
-	else if (settings.XWR_type == 2) {
-		ensure_inv_H2_weights();
-		if (settings.refine_against == 1) {
-#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_weighted_goof1, sum_weighted_criterion1)
-			for (int i = 0; i < cryst.nr_small; i++) {
-				const double w = inv_H2_[i];
-				const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
-				const double diff1_sq = std::pow(scaled_F_calc - obs[i].abs_F_obs, 2);
-				const double diff2 = (scaled_F_calc * scaled_F_calc) - obs[i].F_obs2;
-				const double inv_sigma_obs1 = 1.0 / obs[i].sigma_obs;
-				const double inv_sigma_obs2 = 1.0 / obs[i].sigma_obs2;
-				sum_goof1 += diff1_sq * inv_sigma_obs1 * inv_sigma_obs1;
-				sum_weighted_goof1 += diff1_sq * inv_sigma_obs1 * inv_sigma_obs1 * w;
-				sum_weighted_criterion1 += diff1_sq * inv_sigma_obs1 * w;
-				sum_goof2 += diff2 * diff2 * inv_sigma_obs2 * inv_sigma_obs2;
-			}
-		}
-		else if (settings.refine_against == 2) {
-#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_weighted_goof2, sum_weighted_criterion2)
-			for (int i = 0; i < cryst.nr_small; i++) {
-				const double w = inv_H2_[i];
-				const double scaled_F_calc = cryst.F_scale * std::abs(F_calc[0][i]);
-				const double diff1 = scaled_F_calc - obs[i].abs_F_obs;
-				const double diff2_sq = std::pow((scaled_F_calc * scaled_F_calc) - obs[i].F_obs2, 2);
-				const double inv_sigma_obs1 = 1.0 / obs[i].sigma_obs;
-				const double inv_sigma_obs2 = 1.0 / obs[i].sigma_obs2;
-				sum_goof1 += diff1 * diff1 * inv_sigma_obs1 * inv_sigma_obs1;
-				sum_goof2 += diff2_sq * inv_sigma_obs2 * inv_sigma_obs2;
-				sum_weighted_goof2 += diff2_sq * inv_sigma_obs2 * inv_sigma_obs2 * w;
-				sum_weighted_criterion2 += diff2_sq * inv_sigma_obs2 * w;
-			}
+	const double scale = cryst.F_scale;
+	const cdouble* F_calc_0 = F_calc[0].data();
+#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_weighted_goof1, sum_weighted_goof2)
+	for (int i = 0; i < cryst.nr_small; i++) {
+		const scattering_data& obs_ptr = obs[i];
+		const double scaled_F_calc = scale * std::abs(F_calc_0[i]);
+		const double scaled_difference = scaled_F_calc - obs_ptr.F_obs;
+		const double diff2 = (scaled_F_calc * scaled_F_calc) - obs_ptr.F_obs2;
+		const double inv_sigma_obs = 1.0 / obs_ptr.sigma_obs;
+		const double inv_sigma_obs2 = 1.0 / obs_ptr.sigma_obs2;
+		const double weighted_diff1 = scaled_difference * inv_sigma_obs;
+		const double weighted_diff2 = diff2 * inv_sigma_obs2;
+		const double weighted_diff1_sq = weighted_diff1 * weighted_diff1;
+		const double weighted_diff2_sq = weighted_diff2 * weighted_diff2;
+		sum_goof1 += weighted_diff1_sq;
+		sum_goof2 += weighted_diff2_sq;
+		if (settings.XWR_type == 2) {
+			const double w = inv_H2_[i];
+			sum_weighted_goof1 += weighted_diff1_sq * w;
+			sum_weighted_goof2 += weighted_diff2_sq * w;
 		}
 	}
 	cryst.GooF1 = std::sqrt(prefactor * sum_goof1);
 	cryst.GooF2 = std::sqrt(prefactor * sum_goof2);
 	cryst.weighted_GooF1 = std::sqrt(prefactor * sum_weighted_goof1);
 	cryst.weighted_GooF2 = std::sqrt(prefactor * sum_weighted_goof2);
-	cryst.criterion1 = prefactor * sum_criterion1;
-	cryst.criterion2 = prefactor * sum_criterion2;
-	cryst.weighted_criterion1 = prefactor * sum_weighted_criterion1;
-	cryst.weighted_criterion2 = prefactor * sum_weighted_criterion2;
 }
 
 void XCW::ensure_hkl_ordered() {
@@ -873,14 +829,22 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 			total_size_safe * sizeof(cdouble));
 	}
 	else {
-		eval_I(ao_data_shells, DW_fact, phase_fact, translation_phase);
+		double time_taken;
+		long long screen_counter = 0;
+		long long skipped_grids = 0;
+		double number_integrals = 0;
+		eval_I(ao_data_shells, DW_fact, phase_fact, translation_phase, time_taken, screen_counter, skipped_grids, number_integrals);
+		std::cout << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << time_taken << " seconds. \n";
+		std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter / cryst.nr << " pairs of mu, nu (" << screen_counter / static_cast<double>(cryst.nr * number_integrals) * 100 << "%) \n";
+		std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / (static_cast<long long>(number_integrals) * cryst.nr * cryst.ncen) * 100 << "%) \n";
+
 	}
 	eval_anom_disp(DW_fact, phase_fact, translation_phase);
 	// closing function
 }
 
-void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase) {
-
+void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids_, double& number_integrals) {
+	long long skipped_grids = 0;
 	const int packed_size = (cryst.nmo * (cryst.nmo + 1)) / 2;
 	I.assign(cryst.nr_small * packed_size, cdouble{});
 	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
@@ -1187,8 +1151,6 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// Main loop for computation of I
-	long long skipped_grids = 0;
-	long long screen_counter = 0;
 	for (int mu = 0; mu < cryst.nmo; mu++) {
 		for (int nu = mu; nu < cryst.nmo; nu++) {
 			screen_counter += skip[mu][nu];
@@ -1308,19 +1270,15 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					}
 				}
 			}
-#pragma omp critical(XCW_progress_bar)
 			pb.update();
 		}
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = end - start;
-	const int number_integrals = packed_size;
-	XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
-	std::cout << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << std::chrono::duration<double>(duration).count() << " seconds.\n";
-	std::cout << std::endl;
-	std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter / cryst.nr << " pairs of mu, nu (" << screen_counter / static_cast<double>(cryst.nr * number_integrals) * 100 << "%)\n";
-	std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / (static_cast<long long>(number_integrals) * cryst.nr * cryst.ncen) * 100 << "%)" << std::endl;
-}
+	number_integrals = packed_size;
+	skipped_grids_ = skipped_grids;
+	time_taken = std::chrono::duration<double>(duration).count();
+	XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;}
 
 void XCW::calc_F_calc(const dMatrix2& D) {
 	// Density matrix from occ is half of what I need, so times 2 and times (2x2)=4
@@ -1356,7 +1314,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			for (int r = 0; r < cryst.nr_small; r++) {
 				const double F_calc_abs = std::abs(F_calc[0][r]);
 				// There should be another sigma but somehow that does not seem to work
-				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * F_calc_abs);
+				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
 				size_t offset = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					for (int nu = mu; nu < cryst.nmo; nu++) {
@@ -1374,7 +1332,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 #pragma omp for nowait
 			for (int r = 0; r < cryst.nr_small; r++) {
 				const double F_calc_abs = std::pow(std::abs(F_calc[0][r]), 2);
-				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2);
+				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
 				size_t offset = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					for (int nu = mu; nu < cryst.nmo; nu++) {
@@ -1390,7 +1348,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 #pragma omp for nowait
 			for (int r = 0; r < cryst.nr_small; r++) {
 				const double F_calc_abs = std::abs(F_calc[0][r]);
-				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * F_calc_abs) * inv_H2_[r];
+				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs) * inv_H2_[r];
 				size_t offset = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					for (int nu = mu; nu < cryst.nmo; nu++) {
@@ -1408,7 +1366,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 #pragma omp for nowait
 			for (int r = 0; r < cryst.nr_small; r++) {
 				const double F_calc_abs = std::pow(std::abs(F_calc[0][r]), 2);
-				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2) * inv_H2_[r];
+				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2) * inv_H2_[r];
 				size_t offset = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					for (int nu = mu; nu < cryst.nmo; nu++) {
@@ -1475,13 +1433,13 @@ double XCW::dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const
 		new_alpha *= 0.75;
 		e_diff_mem = e_diff;
 		if (e_diff < 10 * scf.convergence_settings.energy_threshold) {
-			print_centered_message("***Turned off damping***", 76, XCW_log);
+			print_centered_message("***Turned off damping***", 84, XCW_log);
 			new_alpha = 0;
 		}
 		else {
 			std::stringstream print_;
 			print_ << "***Decreased damping to " << std::fixed << std::setprecision(3) << new_alpha << "***";
-			print_centered_message(print_.str(), 76, XCW_log);
+			print_centered_message(print_.str(), 84, XCW_log);
 		}
 	}
 	return new_alpha;
@@ -1533,10 +1491,10 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	settings.clear();
 
 	XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
-	XCW_log << "____________________________________________________________________________\n";
-	XCW_log << " Iteration	Chi^2	GooF	Total Energy	Perturbation	Target quantity \n";
-	XCW_log << "								(Eh)		   (a. u.)			(a. u.)\n";
-	XCW_log << "____________________________________________________________________________\n";
+	XCW_log << "____________________________________________________________________________________\n";
+	XCW_log << " Iteration	Criterion	GooF(F^2)	Total Energy	Perturbation	Target quantity \n";
+	XCW_log << "										(Eh)		   (a. u.)			(a. u.)\n";
+	XCW_log << "____________________________________________________________________________________\n";
 
 	// Compute first guess and update the energy according to this guess
 	if (has_guess) {
@@ -1557,16 +1515,15 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	occ::Mat dm_last = scf.ctx.mo.D;
 
 	do {
-
 		converged = SCF_iteration(scf, lambda, alpha, e_diff_mem, quant, last_quant, dm_last);
 
 	} while (!converged && scf.iter < scf.maxiter);
 
 	if (converged) {
-		XCW_log << "____________________________________________________________________________\n";
+		XCW_log << "____________________________________________________________________________________\n";
 		std::stringstream print_;
-		print_ << "***SCF converged in " << scf.iter + 1 << " iterations***";
-		print_centered_message(print_.str(), 76, XCW_log);
+		print_ << "***SCF converged in " << scf.iter << " iterations***";
+		print_centered_message(print_.str(), 84, XCW_log);
 
 		// Computed before the summary line below so its A^2 can be appended
 		// as an extra column (see run_XCW_fitting's header, which only adds
@@ -1575,7 +1532,27 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 			evaluate_gaussian_halting(lambda);
 		}
 
-		std::cout << "\t" << std::fixed << std::setprecision(3) << lambda << "\t" << std::fixed << std::setprecision(3) << cryst.criterion1 << "\t" << cryst.GooF2 << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.criterion1 << "\t\t" << std::fixed << std::setprecision(9) << quant;
+
+		double current_criterion = 0;
+		switch ((static_cast<int>(settings.XWR_type) << 16) | static_cast<int>(settings.refine_against)) {
+		case (1 << 16) | 1: {
+			current_criterion = cryst.GooF1;
+			break;
+		}
+		case (1 << 16) | 2: {
+			current_criterion = cryst.GooF2;
+			break;
+		}
+		case (2 << 16) | 1: {
+			current_criterion = cryst.weighted_GooF1;
+			break;					  
+		}							  
+		case (2 << 16) | 2: {		  
+			current_criterion = cryst.weighted_GooF2;
+			break;
+		}
+		}
+		std::cout << std::fixed << std::setprecision(3) << lambda << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * current_criterion << "\t\t" << std::fixed << std::setprecision(9) << quant;
 		if (opt->xcw_gaussian_halt && !gaussian_halt_history_.empty()) {
 			std::cout << "\t\t" << std::setprecision(4) << gaussian_halt_history_.back().A2;
 		}
@@ -1584,8 +1561,8 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		create_tscb(scf, lambda);
 	}
 	else {
-		XCW_log << "____________________________________________________________________________\n";
-		print_centered_message("***SCF did not converge***", 76, XCW_log);
+		XCW_log << "____________________________________________________________________________________\n";
+		print_centered_message("***SCF did not converge***", 84, XCW_log);
 	}
 	// closing function
 }
@@ -1630,11 +1607,33 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.update_scf_energy(false);
 	const double ehf = scf.ctx.energy["electronic"];
 	const double e_diff = std::abs(ehf - ehf_last);
-	quant = scf.ctx.energy["total"] + lambda * cryst.criterion1;
+
+	double current_criterion = 0;
+	switch ((static_cast<int>(settings.XWR_type) << 16) | static_cast<int>(settings.refine_against)) {
+	case (1 << 16) | 1: {
+		current_criterion = cryst.GooF1;
+		break;
+	}
+	case (1 << 16) | 2: {
+		current_criterion = cryst.GooF2;
+		break;
+	}
+	case (2 << 16) | 1: {
+		current_criterion = cryst.weighted_GooF1;
+		break;
+	}
+	case (2 << 16) | 2: {
+		current_criterion = cryst.weighted_GooF2;
+		break;
+	}
+	}
+	const double temp_penalty = current_criterion * lambda;
+	quant = scf.ctx.energy["total"] + temp_penalty;
+
 	scf.ctx.F += perturbation * lambda;
 
 	// Prints output line for iteration
-	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << cryst.criterion1 << "\t" << cryst.GooF2 << "\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * cryst.criterion1 << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
+	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 	// DIIS extrapolation
 	occ::Mat F_diis = scf.convergence_accelerator.update(scf.ctx.mo.kind, scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
@@ -1824,7 +1823,7 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read, bool safe) {
 
 void XCW::run_XCW_fitting() {
 
-	bool read = false;
+	bool read = true;
 	bool safe = false;
 	occ::qm::HartreeFock hf = setup_XCW_procedure(read, safe);
 	occ::qm::SCF scf(hf, settings.hf_type);
@@ -1838,14 +1837,14 @@ void XCW::run_XCW_fitting() {
 		XCW_log << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
 			<< "(-xcw_h2_weighting); Chi^2/GooF below are this weighted quantity, not the classical GoF." << std::endl;
 	}
-	std::cout << "____________________________________________________________________________\n";
-	std::cout << " Lambda\t\tChi^2\tGooF\tTotal Energy\tPerturbation\tTarget quantity ";
+	std::cout << "____________________________________________________________________________________\n";
+	std::cout << " Lambda\t\tCriterion\tGooF(F2)\tTotal Energy\tPerturbation\tTarget quantity ";
 	if (opt->xcw_gaussian_halt) {
 		std::cout << "\tA^2 (halt)";
 	}
 	std::cout << "\n";
-	std::cout << "								(Eh)		   (a. u.)			(a. u.)\n";
-	std::cout << "____________________________________________________________________________\n";
+	std::cout << "										(Eh)		   (a. u.)			(a. u.)\n";
+	std::cout << "____________________________________________________________________________________\n";
 
 	// Runs the lambda steps for XCW fitting
 	for (int step = 0; step < settings.num_xcw_steps; step++) {
