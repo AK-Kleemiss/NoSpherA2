@@ -1,9 +1,11 @@
 # Unit Test Status
-**Last updated: 2026-07-15** (added
-`TscBlockTests.BinaryFileRoundTripsWith32BitSizes` for buffered TSCB output and matching
-32-bit binary size fields; the first compile attempt lacked MSVC standard-library include paths,
-and the developer-environment retry exceeded the validation time window without producing a
-compiler error. Last full validated baseline remains **201/201 ctest passing**.)
+**Last updated: 2026-08-02** (updated
+`TscBlockTests.BinaryFileRoundTripsWith32BitSizes` so `SCATTERER_IDS` is inferred from
+`atomID` payloads, matching CCTBX `table_based::table_reader` for both `.tsc` and `.tscb`.
+`Nbo47.EpoxideGennboMatchesReferenceWhenAvailable` now skips when its optional
+`reference.nbo` fixture is absent. NBO File47 tests now use per-process temporary directories,
+preventing parallel CTest runs from deleting each other's generated files. Last full validated
+baseline remains **201/201 ctest passing**.)
 
 ## Test Harnesses
 

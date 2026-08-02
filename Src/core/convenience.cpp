@@ -2,6 +2,7 @@
 #include "convenience.h"
 #include "cell.h"
 #include "tsc_block.h"
+#include "tsc_label_converter.h"
 #include "test_functions.h"
 #include "integrator.h"
 #include "properties.h"
@@ -199,7 +200,11 @@ std::string help_message =
     "   -rgbi_basis    <nao|ano>                 Use the occupied NAO subset (default) or the full atom-local ANO set for RGBI.\n"
     "   -rgbi-groups    <GROUP> <GROUP> [...]    Run RGBI group analysis for comma-separated atom index groups/ranges, e.g. 0-5,7. Repeat for multiple groupings.\n"
     "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
-    "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
+    "   -tscb           <TABLE>.tscb              Convert a binary .tscb into a human-readable .tsc with the\n"
+    "                                            same basename.\n"
+    "   -tsc_labels     <TABLE> <CIF> [OUTPUT]   Match SCATTERER_IDS in a .tsc/.tscb to CIF atoms and write\n"
+    "                                            a label-based .tsc. Default output: <TABLE>.labels.tsc.\n"
+    "                                            Fails without writing output if any ID is unmatched or ambiguous.\n"
     "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
     "                                            If there is more than a single twin law to be used, use the twin command multiple times (and good luck with that structure...).\n"
     "   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n"
@@ -240,6 +245,7 @@ std::string help_message =
     "      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc (also works for tscb files)\n"
     "      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n"
     "      convert tsc:  NoSpherA2.exe -tscb A.tscb\n"
+    "      label tsc:    NoSpherA2.exe -tsc_labels A.tscb A.cif [A.labels.tsc]\n"
     "      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n"
     "      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
 std::string NoSpherA2_message(bool no_date)
@@ -2865,6 +2871,18 @@ void options::digest_options()
                 blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
             else
                 err_checkf(false, "Wrong file ending!", std::cout);
+            exit(0);
+        }
+        else if (temp == "-tsc_labels")
+        {
+            const std::filesystem::path table = arguments.at(i + 1);
+            const std::filesystem::path cif_file = arguments.at(i + 2);
+            std::filesystem::path output = table;
+            output.replace_extension(".labels.tsc");
+            if (i + 3 < argc && arguments[i + 3].find('-') != 0)
+                output = arguments[i + 3];
+            if (!convert_tsc_ids_to_labels(table, cif_file, output, std::cout))
+                exit(1);
             exit(0);
         }
         else if (temp == "-test_RI")

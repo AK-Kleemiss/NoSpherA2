@@ -2,6 +2,8 @@
 
 #include "core/wfn_class.h"
 
+#include <stdexcept>
+
 namespace {
 
 std::filesystem::path repo_root()
@@ -65,10 +67,21 @@ std::optional<int> parse_key_int(const std::string& text, const std::string& key
 
 std::filesystem::path make_temp_dir()
 {
-    const auto base = std::filesystem::temp_directory_path() / "nos_nbo47_test";
-    std::filesystem::remove_all(base);
-    std::filesystem::create_directories(base);
-    return base;
+    const auto parent = std::filesystem::temp_directory_path();
+    const auto timestamp = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+
+    // Each NBO test is registered as a separate CTest process.  They can run in
+    // parallel, so a shared directory (and remove_all) lets one test delete the
+    // .47 file another test has just produced.
+    for (unsigned int attempt = 0; attempt != 100; ++attempt) {
+        const auto directory = parent / ("nos_nbo47_test_" + std::to_string(timestamp) + "_" +
+                                         std::to_string(attempt));
+        if (std::filesystem::create_directory(directory)) {
+            return directory;
+        }
+    }
+
+    throw std::runtime_error("Could not create a unique NBO test directory");
 }
 
 std::string windows_path_to_wsl(std::filesystem::path path)
@@ -215,7 +228,9 @@ TEST(Nbo47, EpoxideGennboMatchesReferenceWhenAvailable)
     const auto input_gbw = fixture_dir / "epoxide.gbw";
     const auto reference_nbo = fixture_dir / "reference.nbo";
     ASSERT_TRUE(std::filesystem::exists(input_gbw));
-    ASSERT_TRUE(std::filesystem::exists(reference_nbo));
+    if (!std::filesystem::exists(reference_nbo)) {
+        GTEST_SKIP() << "NBO reference fixture is not available";
+    }
 
     const auto temp_dir = make_temp_dir();
     const auto generated_47 = temp_dir / "epoxide.47";
