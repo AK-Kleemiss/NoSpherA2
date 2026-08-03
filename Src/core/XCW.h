@@ -161,7 +161,7 @@ private:
 	void eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read);
 
 	// Evaluates the I tensor
-	void eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids, double& number_integrals);
+	void eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids);
 
 	// Evaluates Debye-Waller factors
 	void eval_DW(cvec2& DW_fact);

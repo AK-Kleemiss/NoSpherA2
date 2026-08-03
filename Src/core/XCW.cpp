@@ -832,19 +832,17 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 		double time_taken;
 		long long screen_counter = 0;
 		long long skipped_grids = 0;
-		double number_integrals = 0;
-		eval_I(ao_data_shells, DW_fact, phase_fact, translation_phase, time_taken, screen_counter, skipped_grids, number_integrals);
-		//eval_I(ao_data_shells, DW_fact, phase_fact, translation_phase);
+		eval_I(ao_data_shells, DW_fact, phase_fact, translation_phase, time_taken, screen_counter, skipped_grids);
 		std::cout << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << time_taken << " seconds. \n";
-		std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter / cryst.nr << " pairs of mu, nu (" << screen_counter / static_cast<double>(cryst.nr * number_integrals) * 100 << "%) \n";
-		std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / (static_cast<long long>(number_integrals) * cryst.nr * cryst.ncen) * 100 << "%) \n";
+		std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter << " unique pairs of mu, nu (" << static_cast<size_t>(screen_counter) / (static_cast<double>(cryst.nmo * (cryst.nmo + 1)) / 2) * 100.00 << "%) \n";
+		std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / ((static_cast<double>(cryst.nmo * (cryst.nmo + 1)) / 2) * cryst.nr * cryst.ncen) * 100.00 << "%) \n";
 
 	}
 	eval_anom_disp(DW_fact, phase_fact, translation_phase);
 	// closing function
 }
 
-void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids_, double& number_integrals) {
+void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids_) {
 	long long skipped_grids = 0;
 	const int packed_size = (cryst.nmo * (cryst.nmo + 1)) / 2;
 	I.assign(cryst.nr_small * packed_size, cdouble{});
@@ -918,12 +916,12 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			vec mu_eff;
 			double c = 0;
 			double mu_min = std::numeric_limits<double>::max();
-			for (int k = 0; k < mu_primitives.size(); ++k) {
+			for (int k = 0; k < mu_primitives.size(); k++) {
 				const double alpha = mu_primitives[k].get_exp();
 				const double l_k = mu_primitives[k].get_type() + 1;
 				const double l_half_k = l_k * 0.5;
 				double N_k = std::sqrt(0.25 * constants::INV_PI * (2 * l_k + 1)) * std::pow(l_k / alpha, l_half_k) * std::exp(-l_half_k);
-				for (int j = 0; j < nu_primitives.size(); ++j) {
+				for (int j = 0; j < nu_primitives.size(); j++) {
 					const double beta = nu_primitives[j].get_exp();
 					const double l_j = nu_primitives[j].get_type() + 1;
 					const double alpha_beta = alpha + beta;
@@ -1157,7 +1155,6 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			screen_counter += skip[mu][nu];
 		}
 	}
-	screen_counter *= cryst.nr_small;
 #pragma omp parallel reduction(+:skipped_grids)
 	{
 		vec2 single_k_pts(num_syms, vec(3));
@@ -1278,7 +1275,6 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = end - start;
-	number_integrals = packed_size;
 	skipped_grids_ = skipped_grids;
 	time_taken = std::chrono::duration<double>(duration).count();
 	XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
@@ -1317,7 +1313,6 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 #pragma omp for nowait
 			for (int r = 0; r < cryst.nr_small; r++) {
 				const double F_calc_abs = std::abs(F_calc[0][r]);
-				// There should be another sigma but somehow that does not seem to work
 				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
 				size_t offset = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
@@ -1331,12 +1326,12 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			break;
 		}
 		case (1 << 16) | 2: {
-			prefactor *= 2.0 * cryst.F_scale;
+			prefactor = 4.0 * cryst.F_scale * cryst.F_scale / (cryst.nr_small - settings.n_params);
 			const double scale_sq = cryst.F_scale * cryst.F_scale;
 #pragma omp for nowait
 			for (int r = 0; r < cryst.nr_small; r++) {
-				const double F_calc_abs = std::pow(std::abs(F_calc[0][r]), 2);
-				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
+				const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
+				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
 				size_t offset = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					for (int nu = mu; nu < cryst.nmo; nu++) {
@@ -1365,7 +1360,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			break;
 		}
 		case (2 << 16) | 2: {
-			prefactor *= 2.0 * cryst.F_scale;
+			prefactor = 4.0 * cryst.F_scale * cryst.F_scale / (cryst.nr_small - settings.n_params);
 			const double scale_sq = cryst.F_scale * cryst.F_scale;
 #pragma omp for nowait
 			for (int r = 0; r < cryst.nr_small; r++) {
