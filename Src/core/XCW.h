@@ -172,6 +172,7 @@ private:
 	// Evaluates the translational contribution to the phase factors
 	void eval_translation_phase(cvec2& translation_phase);
 
+
 	// Creates primitive vectors from the basis set for calculating the XCW integrals
 	void create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set);
 

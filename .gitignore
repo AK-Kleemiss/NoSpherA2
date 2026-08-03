@@ -72,3 +72,4 @@ Lib/*
 /Windows/**/*.recipe
 /Windows/**/*.pch
 /Windows/**/*.lib
+/Windows/NoSpherA2_LIB/Profile_x64

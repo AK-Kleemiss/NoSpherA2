@@ -91,10 +91,10 @@ XCW::SCF_settings XCW::loadSettings() {
 	settings.gradient = 1e-5;
 	settings.MaxP_diff = 1e-7;
 	settings.RMSP_diff = 5e-9;
-	settings.diis_stop_shift = 0.01;
+	settings.diis_stop_shift = 1e-2;
 	settings.basis_set_name = "def2-svp";
 	settings.grown = false;
-	settings.n_params = 161;
+	settings.n_params = 63;
 	/* 1: Refine against F values
 	   2: Refine against F^2 values */
 	settings.refine_against = 1;
@@ -834,6 +834,7 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 		long long skipped_grids = 0;
 		double number_integrals = 0;
 		eval_I(ao_data_shells, DW_fact, phase_fact, translation_phase, time_taken, screen_counter, skipped_grids, number_integrals);
+		//eval_I(ao_data_shells, DW_fact, phase_fact, translation_phase);
 		std::cout << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << time_taken << " seconds. \n";
 		std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter / cryst.nr << " pairs of mu, nu (" << screen_counter / static_cast<double>(cryst.nr * number_integrals) * 100 << "%) \n";
 		std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / (static_cast<long long>(number_integrals) * cryst.nr * cryst.ncen) * 100 << "%) \n";
@@ -1122,7 +1123,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				continue;
 			}
 			GridBlock block{ point_start, point_count };
-			for (int local_ao = 0; local_ao < static_cast<int>(active_aos.size()); ++local_ao) {
+			for (int local_ao = 0; local_ao < static_cast<int>(active_aos.size()); local_ao++) {
 				const double* full_row = full_ao_values.data() + static_cast<size_t>(local_ao) * points[g];
 				bool nonzero = false;
 				for (int p = point_start; p < point_end; p++) {
@@ -1161,7 +1162,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	{
 		vec2 single_k_pts(num_syms, vec(3));
 		cvec3 phase(num_syms, cvec2(n_grids));
-		cvec grid_factors(n_atom_grids);
+		cvec2 grid_factors(num_syms, cvec(n_atom_grids));
 		vec phase_angles;
 		vec phase_sines;
 		vec phase_cosines;
@@ -1202,7 +1203,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				}
 			}
 			for (int g = 0; g < n_atom_grids; g++) {
-				grid_factors[g] = asym_atoms[g].asym_fact * DW_fact[g][r] * phase_fact[g][r];
+				for (int syms = 0; syms < num_syms; syms++) {
+					grid_factors[syms][g] = asym_atoms[g].asym_fact * DW_fact[g][asym_lookup[r][syms]] * phase_fact[g][asym_lookup[r][syms]];
+				}
 			}
 
 			for (int mu = 0; mu < cryst.nmo; mu++) {
@@ -1216,7 +1219,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			const size_t base = static_cast<size_t>(r) * packed_size;
 			for (int syms = 0; syms < num_syms; syms++) {
 				for (int g = 0; g < n_atom_grids; g++) {
-					const cdouble factor = grid_factors[g] * translation_phase[r][syms];
+					const cdouble factor = grid_factors[syms][g] * translation_phase[r][syms];
 					for (const GridBlock& block : grid_blocks[g]) {
 						const ivec& active_aos = block.active_aos;
 						const int n_active = static_cast<int>(active_aos.size());
@@ -1278,7 +1281,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	number_integrals = packed_size;
 	skipped_grids_ = skipped_grids;
 	time_taken = std::chrono::duration<double>(duration).count();
-	XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;}
+	XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
+}
 
 void XCW::calc_F_calc(const dMatrix2& D) {
 	// Density matrix from occ is half of what I need, so times 2 and times (2x2)=4
@@ -1435,6 +1439,7 @@ double XCW::dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const
 		if (e_diff < 10 * scf.convergence_settings.energy_threshold) {
 			print_centered_message("***Turned off damping***", 84, XCW_log);
 			new_alpha = 0;
+			settings.apply_damping = false;
 		}
 		else {
 			std::stringstream print_;
@@ -1448,6 +1453,9 @@ double XCW::dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const
 
 void XCW::apply_level_shift(const occ::Mat& C_old, const occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& F_diis) {
 	const double temp_shift = scf.convergence_settings.effective_level_shift(scf.diis_error);
+	if (temp_shift < 1e-5) {
+		return;
+	}
 	const int nocc = scf.ctx.mo.Cocc.cols();
 	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Restricted) {
 		const occ::Mat SC_virt = scf.ctx.S * C_old.rightCols(cryst.nmo - nocc);
@@ -1545,9 +1553,9 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		}
 		case (2 << 16) | 1: {
 			current_criterion = cryst.weighted_GooF1;
-			break;					  
-		}							  
-		case (2 << 16) | 2: {		  
+			break;
+		}
+		case (2 << 16) | 2: {
 			current_criterion = cryst.weighted_GooF2;
 			break;
 		}
@@ -1558,7 +1566,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		}
 		std::cout << std::endl;
 
-		create_tscb(scf, lambda);
+		//create_tscb(scf, lambda);
 	}
 	else {
 		XCW_log << "____________________________________________________________________________________\n";
@@ -1822,8 +1830,7 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read, bool safe) {
 //}
 
 void XCW::run_XCW_fitting() {
-
-	bool read = true;
+	bool read = false;
 	bool safe = false;
 	occ::qm::HartreeFock hf = setup_XCW_procedure(read, safe);
 	occ::qm::SCF scf(hf, settings.hf_type);
@@ -1848,7 +1855,6 @@ void XCW::run_XCW_fitting() {
 
 	// Runs the lambda steps for XCW fitting
 	for (int step = 0; step < settings.num_xcw_steps; step++) {
-
 		occ::qm::SCF scf(hf, settings.hf_type);
 		double alpha = settings.alpha;
 		const double lambda = step * settings.xcw_step_size;
