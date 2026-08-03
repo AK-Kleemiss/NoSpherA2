@@ -470,7 +470,7 @@ namespace NoSpherA2UnitTests
             std::filesystem::temp_directory_path() / "nosphera2_tscb_32bit_roundtrip.tscb";
 
         tsc_block<int, cdouble> original(
-            form_factors, scatterer_ids, indices, "SCATTERER_IDS");
+            form_factors, scatterer_ids, indices);
         original.write_tscb_file({}, path);
         tsc_block<int, cdouble> restored(path);
         std::filesystem::remove(path);
