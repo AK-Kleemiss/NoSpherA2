@@ -16,6 +16,7 @@
 #include "basis_set.h"
 #include "SALTED_utilities.h"
 #include "GridManager.h"
+#include "cube.h"
 
 
 #ifdef PEOJECT_NAME
@@ -2125,6 +2126,152 @@ int make_atomic_grids_wrapper(
 	time_descriptions.push_back("combined density vectors");
 
 	return grid_manager.getTotalGridPoints();
+}
+
+itsc_block calculate_scattering_factors_from_cube(
+	options& opt,
+	WFN& wave,
+	const cube& density_cube,
+	std::ostream& file)
+{
+	using namespace std;
+	err_checkf(opt.cif != "", "Cube-density SF calculation requires -cif.", file);
+	err_checkf(filesystem::exists(opt.cif), "CIF " + opt.cif.string() + " does not exists!", file);
+	err_checkf(!opt.groups.empty() && !opt.groups[0].empty(), "No CIF disorder group selected. Use -group 0 for the default group.", file);
+	err_checkf(wave.get_ncen() != 0, "Cube file does not contain atom definitions in the header.", file);
+
+	vector<_time_point> time_points;
+	vector<string> time_descriptions;
+	time_points.push_back(get_time());
+
+	cell unit_cell(opt.cif, file, opt.debug);
+	ifstream cif_input(opt.cif.c_str(), ios::in);
+	ivec atom_type_list;
+	ivec asym_atom_to_type_list;
+	ivec asym_atom_list;
+	bvec needs_grid(wave.get_ncen(), false);
+	svec known_atoms;
+
+	auto labels = read_atoms_from_CIF(cif_input,
+		opt.groups[0],
+		unit_cell,
+		wave,
+		known_atoms,
+		atom_type_list,
+		asym_atom_to_type_list,
+		asym_atom_list,
+		needs_grid,
+		file,
+		opt.debug);
+
+	cif_input.close();
+	time_points.push_back(get_time());
+	time_descriptions.push_back("cif reading");
+
+	vec2 k_pt;
+	hkl_list hkl;
+	if (opt.m_hkl_list.size() != 0)
+	{
+		hkl = opt.m_hkl_list;
+	}
+	else if (opt.read_k_pts == false)
+	{
+		if (opt.dmin != 99.0)
+		{
+			if (opt.electron_diffraction)
+				generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+			else
+				generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+		}
+		else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+		{
+			generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
+		}
+		else
+		{
+			read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+		}
+		opt.m_hkl_list = hkl;
+	}
+
+	make_k_pts(
+		hkl.size() == 0,
+		opt.save_k_pts,
+		unit_cell,
+		hkl,
+		k_pt,
+		file,
+		opt.debug);
+
+	time_points.push_back(get_time());
+	time_descriptions.push_back("k-points preparation");
+
+	GridConfiguration config;
+	config.accuracy = opt.accuracy;
+	config.partition_type = opt.partition_type;
+	config.pbc = opt.pbc;
+	config.debug = opt.debug;
+	config.all_charges = opt.all_charges;
+	config.no_density_eval = true;
+
+	GridManager grid_manager(config);
+	grid_manager.setup3DGridsForMolecule(wave, asym_atom_list, needs_grid, unit_cell, false);
+	grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
+
+	vec2 d1, d2, d3, dens;
+	vec atom_electrons;
+	grid_manager.getDensityVectorsFromCube(wave, asym_atom_list, density_cube, d1, d2, d3, dens, atom_electrons);
+	time_points.push_back(get_time());
+	time_descriptions.push_back("combined density vectors");
+
+	file << "Table of Charges in electrons\n"
+		<< setw(10) << "Atom" << setw(12) << "CubePart" << endl;
+	for (int i = 0; i < labels.size(); i++)
+	{
+		const int atom_index = asym_atom_list[i];
+		file << setw(10) << labels[i]
+			<< fixed << setw(12) << setprecision(3) << wave.get_atom_charge(atom_index) - atom_electrons[i] << endl;
+	}
+	const double electron_sum = reduce(atom_electrons.begin(), atom_electrons.end(), 0.0);
+	file << setprecision(4) << "Total number of partitioned electrons from cube: " << electron_sum << endl;
+	time_points.push_back(get_time());
+	time_descriptions.push_back("calculate charges");
+
+	cvec2 sf;
+	_time_point end1;
+	calc_SF(grid_manager.getTotalGridPoints(),
+		k_pt,
+		d1, d2, d3, dens,
+		sf,
+		file,
+		time_points.front(),
+		end1,
+		opt.debug,
+		opt.no_date);
+	time_points.push_back(get_time());
+	time_descriptions.push_back("Fourier transform");
+
+	if (opt.electron_diffraction)
+	{
+		convert_to_ED(asym_atom_list, wave, sf, unit_cell, hkl);
+	}
+
+	vector<atomID> ids(asym_atom_list.size());
+	for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++)
+	{
+		ids[atm_idx] = wave.get_id_for_atom(asym_atom_list[atm_idx]);
+	}
+
+	itsc_block blocky(sf, ids, hkl);
+	time_points.push_back(get_time());
+	time_descriptions.push_back("tsc calculation");
+
+	if (!opt.no_date)
+	{
+		write_timing_to_file(file, time_points, time_descriptions);
+	}
+
+	return blocky;
 }
 
 /**

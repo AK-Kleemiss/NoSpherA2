@@ -4,6 +4,7 @@
 #include "wfn_class.h"
 #include "AtomGrid.h"
 #include "cell.h"
+class cube;
 template<typename AtomType>
 double make_sphericals(
     vec2 &dens,
@@ -109,6 +110,7 @@ public:
     PartitionResults calculatePartitionedCharges(const WFN &wave, const cell &unit_cell = cell());
 
     void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g = false);
+    void getDensityVectorsFromCube(const WFN &wave, const ivec &atom_list, const cube &density_cube, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, vec &atom_electrons);
 
     // Configuration and data access
     void setConfiguration(const GridConfiguration &config) { config_ = config; }

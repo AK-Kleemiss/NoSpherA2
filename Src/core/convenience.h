@@ -696,6 +696,7 @@ struct options
     std::vector<std::shared_ptr<BasisSet>> aux_basis;
     std::filesystem::path wfn;
     std::filesystem::path wfn2;
+    std::filesystem::path cube_density;
     std::filesystem::path fchk;
     std::string basis_set;
     std::filesystem::path hkl;

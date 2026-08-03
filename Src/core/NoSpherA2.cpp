@@ -399,6 +399,48 @@ int run_app(int argc, char **argv)
         std::cout << "Finished!" << endl;
         return 0;
     }
+    // Partition electron density read from a cube file and perform Fourier transform to TSC.
+    if (opt.cube_density != "")
+    {
+        err_checkf(opt.cif != "", "Cube-density SF calculation requires -cif.", log_file);
+        err_checkf(opt.hkl != "" || opt.dmin != 99.0 || opt.hkl_min_max[0][0] != -100,
+            "No hkl specified and no dmin value given", log_file);
+
+        WFN cube_wave(e_origin::cub);
+        cube density_cube(opt.cube_density, true, cube_wave, log_file, opt.debug);
+
+        if (opt.properties.integral_accuracy > 0)
+        {
+            log_file << "Refining cube grid (interpolative) to integral accuracy "
+                << opt.properties.integral_accuracy << "..." << std::endl;
+            density_cube.adaptive_refine(
+                [&density_cube](const d3& pos)
+                {
+                    return density_cube.get_interpolated_value(pos[0], pos[1], pos[2]);
+                },
+                opt.properties.integral_accuracy,
+                4,
+                2);
+        }
+
+        if (opt.groups.empty())
+            opt.groups.resize(1);
+        if (opt.groups[0].empty())
+            opt.groups[0].push_back(0);
+
+        itsc_block res = calculate_scattering_factors_from_cube(opt, cube_wave, density_cube, log_file);
+        log_file << "Writing tsc file... " << flush;
+        if (opt.binary_tsc)
+            res.write_tscb_file();
+        if (opt.old_tsc)
+            res.write_tsc_file(opt.cif);
+        log_file << " ... done!" << endl;
+
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf);
+        std::cout << "Finished!" << endl;
+        return 0;
+    }
     // This one has conversion to fchk and calculation of one single tsc file
     if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0 && !opt.do_XCW)
     {

@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "GridManager.h"
 #include "spherical_density.h"
+#include "cube.h"
 
 template<typename AtomType>
 double make_sphericals(
@@ -791,6 +792,100 @@ void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2
     }
     //Calculate final point count
     grid_data_.total_points = std::accumulate(num_points_per_atom->begin(), num_points_per_atom->end(), 0);
+}
+
+void GridManager::getDensityVectorsFromCube(const WFN &wave, const ivec &atom_list, const cube &density_cube, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, vec &atom_electrons) {
+    if (config_.debug) {
+        std::cout << "GridManager: Generating density vectors from cube..." << std::endl;
+    }
+
+    vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids;
+    ivec *num_points_per_atom = needs_helper_grids_ ? &grid_data_.helper_num_points_per_atom : &grid_data_.num_points_per_atom;
+
+    const double cutoff = config_.getCutoff();
+    GridData::GridIndex idx_single;
+    switch (config_.partition_type) {
+    case PartitionType::Becke:     idx_single = GridData::GridIndex::BECKE_WEIGHT;  break;
+    case PartitionType::TFVC:      idx_single = GridData::GridIndex::TFVC_WEIGHT;   break;
+    case PartitionType::Hirshfeld: idx_single = GridData::GridIndex::HIRSH_WEIGHT;  break;
+    case PartitionType::MBIS:      idx_single = GridData::GridIndex::MBIS_WEIGHT;   break;
+    case PartitionType::EMBIS:     idx_single = GridData::GridIndex::EMBIS_WEIGHT;  break;
+    default:
+        std::cout << "GridManager: Unknown partition type for density vectors!" << std::endl;
+        exit(1);
+        return;
+    }
+
+    const int atoms_needing_grids = atom_list.size();
+    d1.resize(atoms_needing_grids);
+    d2.resize(atoms_needing_grids);
+    d3.resize(atoms_needing_grids);
+    dens.resize(atoms_needing_grids);
+    atom_electrons.assign(atoms_needing_grids, 0.0);
+
+    int accepted_total_points = 0;
+    for (int g = 0; g < grid->size(); g++) {
+        vec2 &atomic_grid = (*grid)[g];
+        const int n_points = (*num_points_per_atom)[g];
+
+        int final_atoms = -1;
+        if (needs_helper_grids_) {
+            for (int i = 0; i < atom_list.size(); i++) {
+                if (atom_list[i] == g) {
+                    final_atoms = i;
+                    break;
+                }
+            }
+            if (final_atoms == -1) {
+                continue;
+            }
+        }
+        else {
+            final_atoms = g;
+        }
+
+        dens[final_atoms].resize(n_points);
+        d1[final_atoms].resize(n_points);
+        d2[final_atoms].resize(n_points);
+        d3[final_atoms].resize(n_points);
+
+        const double *w = atomic_grid[idx_single].data();
+        double *res = dens[final_atoms].data();
+
+        double *d1_ptr = d1[final_atoms].data();
+        double *d2_ptr = d2[final_atoms].data();
+        double *d3_ptr = d3[final_atoms].data();
+        const double *x = atomic_grid[GridData::GridIndex::X].data();
+        const double *y = atomic_grid[GridData::GridIndex::Y].data();
+        const double *z = atomic_grid[GridData::GridIndex::Z].data();
+        const double x0 = wave.get_atom_coordinate(atom_list[final_atoms], 0);
+        const double y0 = wave.get_atom_coordinate(atom_list[final_atoms], 1);
+        const double z0 = wave.get_atom_coordinate(atom_list[final_atoms], 2);
+
+        size_t accepted_points = 0;
+        double atom_sum = 0.0;
+        for (int p = 0; p < n_points; p++) {
+            const double rho = density_cube.get_interpolated_value(x[p], y[p], z[p]);
+            const double t = rho * w[p];
+            const int keep = std::fabs(t) >= cutoff;
+
+            res[accepted_points] = t;
+            d1_ptr[accepted_points] = x[p] - x0;
+            d2_ptr[accepted_points] = y[p] - y0;
+            d3_ptr[accepted_points] = z[p] - z0;
+            accepted_points += keep;
+            atom_sum += t;
+        }
+
+        d1[final_atoms].resize(accepted_points);
+        d2[final_atoms].resize(accepted_points);
+        d3[final_atoms].resize(accepted_points);
+        dens[final_atoms].resize(accepted_points);
+        atom_electrons[final_atoms] = atom_sum;
+        accepted_total_points += static_cast<int>(accepted_points);
+    }
+
+    grid_data_.total_points = accepted_total_points;
 }
 
 // Implementation of other methods...
