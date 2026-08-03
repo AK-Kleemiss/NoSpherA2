@@ -94,13 +94,13 @@ XCW::SCF_settings XCW::loadSettings() {
 	settings.diis_stop_shift = 1e-2;
 	settings.basis_set_name = "def2-svp";
 	settings.grown = false;
-	settings.n_params = 63;
+	settings.n_params = 177;
 	/* 1: Refine against F values
 	   2: Refine against F^2 values */
-	settings.refine_against = 1;
+	settings.refine_against = 2;
 	/* 1: Classical Jayatilaka XWR
 	   2: Ewald sum XWR */
-	settings.XWR_type = 1;
+	settings.XWR_type = 2;
 	settings.hf_type = occ::qm::SpinorbitalKind::Restricted;
 	settings.alpha = 0.5;
 	settings.level_shift = 0.0;
@@ -528,7 +528,7 @@ void XCW::ensure_hkl_ordered() {
 // needed beyond the defensive check below. Computed once and reused across
 // all SCF iterations and lambda steps, since it depends only on geometry.
 void XCW::ensure_inv_H2_weights() {
-	if (!opt->xcw_h2_weighting || !inv_H2_.empty()) {
+	if (settings.XWR_type == 1 || !inv_H2_.empty()) {
 		return;
 	}
 	ensure_hkl_ordered();
@@ -1364,8 +1364,8 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			const double scale_sq = cryst.F_scale * cryst.F_scale;
 #pragma omp for nowait
 			for (int r = 0; r < cryst.nr_small; r++) {
-				const double F_calc_abs = std::pow(std::abs(F_calc[0][r]), 2);
-				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs * F_calc_abs - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2) * inv_H2_[r];
+				const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
+				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2) * inv_H2_[r];
 				size_t offset = r * packed_size;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					for (int nu = mu; nu < cryst.nmo; nu++) {
@@ -1825,7 +1825,7 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read, bool safe) {
 //}
 
 void XCW::run_XCW_fitting() {
-	bool read = false;
+	bool read = true;
 	bool safe = false;
 	occ::qm::HartreeFock hf = setup_XCW_procedure(read, safe);
 	occ::qm::SCF scf(hf, settings.hf_type);
@@ -1833,11 +1833,11 @@ void XCW::run_XCW_fitting() {
 	bool has_guess = false;
 
 	std::cout << "More detailed output in XCW.log file..." << std::endl;
-	if (opt->xcw_h2_weighting) {
+	if (settings.XWR_type == 2) {
 		std::cout << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
-			<< "(-xcw_h2_weighting); Chi^2/GooF below are this weighted quantity, not the classical GoF." << std::endl;
+			<< "Criterion below is this weighted quantity, not the classical GoF." << std::endl;
 		XCW_log << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
-			<< "(-xcw_h2_weighting); Chi^2/GooF below are this weighted quantity, not the classical GoF." << std::endl;
+			<< "Criterion below are this weighted quantity, not the classical GoF." << std::endl;
 	}
 	std::cout << "____________________________________________________________________________________\n";
 	std::cout << " Lambda\t\tCriterion\tGooF(F2)\tTotal Energy\tPerturbation\tTarget quantity ";

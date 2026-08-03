@@ -3232,9 +3232,6 @@ void options::digest_options()
         else if (temp == "-xcw_strong_cutoff") {
             xcw_strong_cutoff = stod(arguments[i + 1]);
         }
-        else if (temp == "-xcw_h2_weighting") {
-            xcw_h2_weighting = true;
-        }
         else if (temp == "-anom_disp")
         {
             anom_disp_path = arguments[i + 1];

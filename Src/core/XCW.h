@@ -192,13 +192,13 @@ private:
 	void eval_scale();
 
 	// Calculates quality criteria like GooF and chi^2. When
-	// opt->xcw_h2_weighting is set, both are computed with an additional
+	// h2 weighting is set, both are computed with an additional
 	// 1/|H|^2 weighting (XCW_plan.md sec. 6.2, residual self-energy
 	// criterion) instead of the traditional unweighted sums.
 	void calc_criteria();
 
 	// Builds (once) the per-reflection 1/|H|^2 cache used by calc_criteria/
-	// calc_perturb when opt->xcw_h2_weighting is set. No-op otherwise.
+	// calc_perturb when h2 weighting is set. No-op otherwise.
 	void ensure_inv_H2_weights();
 
 	// Distributional (Gaussian) halting criterion (see xcw_halting.h and
