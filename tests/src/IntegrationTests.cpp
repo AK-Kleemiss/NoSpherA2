@@ -527,6 +527,37 @@ TEST(TomlIntegrationTests, P1_test_XCW_h2_full)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+// XCW test with F^2 criterion
+TEST(TomlIntegrationTests, P1_F2_test_XCW)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, P1_F2_test_XCW_full)
+{
+    if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
+        GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW lambda scan (several minutes)";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_full");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, P1_F2_test_XCW_h2)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_h2");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, P1_F2_test_XCW_h2_full)
+{
+    if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
+        GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW H2-weighted lambda scan (several minutes)";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_h2_full");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, Fractal)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "fractal");

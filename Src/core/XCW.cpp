@@ -85,7 +85,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	   2: Ewald sum XWR */
 	settings.XWR_type = 1;
 	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768;
-	int max_scf_iterations = 32768, charge = 0, multiplicity = 0, n_params = 32768, refine_against = 32768;
+	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
 	bool grown = false, safe_tensor = false, read_tensor = false;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
@@ -328,8 +328,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	if (alpha != 32768) settings.alpha = alpha;
 	if (level_shift != 32768) settings.level_shift = level_shift;
 	if (max_scf_iterations != 32768) settings.max_scf_iterations = max_scf_iterations;
-	if (charge != 0) settings.charge = charge;
-	if (multiplicity != 32768) settings.multiplicity = multiplicity;
+	settings.charge = (charge != 32768) ? charge : settings.charge;
+	settings.multiplicity = (multiplicity != 32768) ? multiplicity : settings.multiplicity;
 	if (n_params != 32768) settings.n_params = n_params;
 	if (refine_against != 32768) settings.refine_against = refine_against;
 	settings.xcw_start_value = (start != 32768) ? start : 0;
