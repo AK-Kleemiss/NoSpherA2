@@ -13,7 +13,7 @@ public:
 
 	// Constructor
 	XCW(const options& opt_in)
-		: settings(loadSettings())
+		: settings(loadSettings(opt_in.xcw_settings_path))
 	{
 		construct(opt_in);
 	};
@@ -84,11 +84,14 @@ private:
 		occ::qm::SpinorbitalKind hf_type;
 		double alpha;
 		double level_shift;
+		double xcw_start_value;
 		int num_xcw_steps;
 		double xcw_step_size;
 		int max_scf_iterations;
 		int charge;
 		int multiplicity;
+		bool safe_tensor;
+		bool read_tensor;
 
 		// Clears the convergence flags
 		void clear() {
@@ -133,7 +136,7 @@ private:
 	void construct(const options& opt_in);
 
 	// Loads the convergence settings
-	SCF_settings loadSettings();
+	SCF_settings loadSettings(const std::filesystem::path& settings_path);
 
 	// Helper function that transforms indices into voigt notation
 	void get_voigt_index(const ivec& indices, int& ADP_idx);

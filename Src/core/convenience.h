@@ -721,6 +721,7 @@ struct options
 	std::filesystem::path profiling_tests_root = "tests";
 	std::filesystem::path promol_nci_xyz1;
 	std::filesystem::path promol_nci_xyz2;
+	std::filesystem::path xcw_settings_path;
 	properties_options properties;
 	bool debug = false;
 	bool all_charges = false;

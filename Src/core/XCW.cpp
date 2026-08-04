@@ -8,21 +8,6 @@
 void XCW::construct(const options& opt_in) {
 	opt = &opt_in;
 
-	// Load XCW step size and number of steps
-	if (opt->xcw_lambda_step > 0.0) {
-		settings.xcw_step_size = opt->xcw_lambda_step;
-		settings.num_xcw_steps = static_cast<int>(std::round(opt->xcw_lambda_max / opt->xcw_lambda_step)) + 1;
-	}
-	else {
-		settings.xcw_step_size = 0.01;
-		settings.num_xcw_steps = 101; // Default values: 0.01 step size, 101 steps (0.0 to 1.0)
-	}
-
-	// Set basis set name
-	if (!opt->basis_set.empty()) {
-		settings.basis_set_name = opt->basis_set;
-	}
-
 	// Read hkl and load cell
 	std::filesystem::path hkl_filename = opt->hkl;
 	std::filesystem::path cif = opt->cif;
@@ -83,30 +68,283 @@ void XCW::construct(const options& opt_in) {
 	F_calc[1].resize(cryst.nr_small, 0);
 }
 
-XCW::SCF_settings XCW::loadSettings() {
+XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) {
+	auto lowercase = [](std::string s) {
+		std::transform(s.begin(), s.end(), s.begin(),
+			[](unsigned char c) { return std::tolower(c); });
+		return s;
+		};
+
 	SCF_settings settings;
-	settings.quant_diff = 1e-6;
-	settings.diis_stop_damping = 1e-3;
-	settings.max_diis_error = 1e-5;
-	settings.gradient = 1e-5;
-	settings.MaxP_diff = 1e-7;
-	settings.RMSP_diff = 5e-9;
-	settings.diis_stop_shift = 1e-2;
-	settings.basis_set_name = "def2-svp";
+
 	settings.grown = false;
-	settings.n_params = 177;
-	/* 1: Refine against F values
-	   2: Refine against F^2 values */
-	settings.refine_against = 2;
+	std::string conv_preset = "normal";
+	std::string speed_preset = "normal_conv";
+
 	/* 1: Classical Jayatilaka XWR
 	   2: Ewald sum XWR */
-	settings.XWR_type = 2;
-	settings.hf_type = occ::qm::SpinorbitalKind::Restricted;
-	settings.alpha = 0.5;
-	settings.level_shift = 0.0;
-	settings.max_scf_iterations = 100;
-	settings.charge = 0;
-	settings.multiplicity = 1;
+	settings.XWR_type = 1;
+	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768;
+	int max_scf_iterations = 32768, charge = 0, multiplicity = 0, n_params = 32768, refine_against = 32768;
+	std::string basis_set_name = "Undefined";
+	bool grown = false, safe_tensor = false, read_tensor = false;
+	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
+	if (!std::filesystem::exists(settings_path)) {
+		throw std::runtime_error("Settings file not found! Aborting run!");
+	}
+	else {
+
+		std::ifstream input(settings_path);
+		using Handler = std::function<void(std::istream&)>;
+		std::unordered_map<std::string, Handler> handlers;
+		handlers["conv"] = [&](std::istream& is) {
+			if (!(is >> quant_diff))
+				throw std::runtime_error("Expected value after 'conv'");
+			};
+
+		handlers["diis_damping"] = [&](std::istream& is) {
+			if (!(is >> diis_stop_damping))
+				throw std::runtime_error("Expected value after 'diis_damping'");
+			};
+
+		handlers["diis_shift"] = [&](std::istream& is) {
+			if (!(is >> diis_stop_shift))
+				throw std::runtime_error("Expected value after 'diis_shift'");
+			};
+
+		handlers["conv_diis"] = [&](std::istream& is) {
+			if (!(is >> max_diis_error))
+				throw std::runtime_error("Expected value after 'conv_diis'");
+			};
+
+		handlers["gradient"] = [&](std::istream& is) {
+			if (!(is >> gradient))
+				throw std::runtime_error("Expected value after 'gradient'");
+			};
+
+		handlers["maxp_diff"] = [&](std::istream& is) {
+			if (!(is >> MaxP_diff))
+				throw std::runtime_error("Expected value after 'MaxP_diff'");
+			};
+
+		handlers["rmsp_diff"] = [&](std::istream& is) {
+			if (!(is >> RMSP_diff))
+				throw std::runtime_error("Expected value after 'RMSP_diff'");
+			};
+
+		handlers["params"] = [&](std::istream& is) {
+			if (!(is >> n_params))
+				throw std::runtime_error("Expected value after 'params'");
+			};
+
+		handlers["damp"] = [&](std::istream& is) {
+			if (!(is >> alpha))
+				throw std::runtime_error("Expected value after 'damp'");
+			};
+
+		handlers["shift"] = [&](std::istream& is) {
+			if (!(is >> level_shift))
+				throw std::runtime_error("Expected value after 'shift'");
+			};
+
+		handlers["max_iter"] = [&](std::istream& is) {
+			if (!(is >> max_scf_iterations))
+				throw std::runtime_error("Expected value after 'max_iter'");
+			};
+
+		handlers["charge"] = [&](std::istream& is) {
+			if (!(is >> charge))
+				throw std::runtime_error("Expected value after 'charge'");
+			};
+
+		handlers["mult"] = [&](std::istream& is) {
+			if (!(is >> multiplicity))
+				throw std::runtime_error("Expected value after 'mult'");
+			};
+
+		handlers["f"] = [&](std::istream&) {
+			refine_against = 1;
+			};
+
+		handlers["f2"] = [&](std::istream&) {
+			refine_against = 2;
+			};
+
+		handlers["weighted"] = [&](std::istream&) {
+			settings.XWR_type = 2;
+			};
+
+		handlers["basis_set"] = [&](std::istream& is) {
+			if (!(is >> basis_set_name))
+				throw std::runtime_error("Expected basis set name");
+			};
+
+		handlers["start"] = [&](std::istream& is) {
+			if (!(is >> start))
+				throw std::runtime_error("Expected value after 'start'");
+			};
+
+		handlers["end"] = [&](std::istream& is) {
+			if (!(is >> end))
+				throw std::runtime_error("Expected value after 'end'");
+			};
+
+		handlers["step_size"] = [&](std::istream& is) {
+			if (!(is >> step_size))
+				throw std::runtime_error("Expected value after 'step_size'");
+			};
+
+		handlers["grown"] = [&](std::istream&) {
+			grown = true;
+			};
+
+		handlers["rhf"] = [&](std::istream&) {
+			hf_type = occ::qm::SpinorbitalKind::Restricted;
+			};
+
+		handlers["uhf"] = [&](std::istream&) {
+			hf_type = occ::qm::SpinorbitalKind::Unrestricted;
+			};
+
+		handlers["sloppy"] = [&](std::istream&) {
+			conv_preset = "sloppy";
+			};
+
+		handlers["normal"] = [&](std::istream&) {
+			conv_preset = "normal";
+			};
+
+		handlers["tight"] = [&](std::istream&) {
+			conv_preset = "tight";
+			};
+
+		handlers["very_tight"] = [&](std::istream&) {
+			conv_preset = "very_tight";
+			};
+
+		handlers["slow_conv"] = [&](std::istream&) {
+			speed_preset = "slow_conv";
+			};
+
+		handlers["normal_conv"] = [&](std::istream&) {
+			speed_preset = "normal_conv";
+			};
+
+		handlers["fast_conv"] = [&](std::istream&) {
+			speed_preset = "fast_conv";
+			};
+
+		handlers["safe"] = [&](std::istream&) {
+			safe_tensor = true;
+			};
+
+		handlers["read"] = [&](std::istream&) {
+			read_tensor = true;
+			};
+
+		std::string keyword;
+
+		while (input >> keyword)
+		{
+			std::transform(keyword.begin(), keyword.end(), keyword.begin(),
+				[](unsigned char c) { return std::tolower(c); });
+
+			auto it = handlers.find(keyword);
+			if (it == handlers.end()) {
+				throw std::runtime_error("Unknown keyword '" + keyword + "'");
+			}
+
+			it->second(input);
+		}
+	}
+
+	if (!(conv_preset == "default")) {
+		if (conv_preset == "sloppy") {
+			settings.quant_diff = 1e-6;
+			settings.max_diis_error = 1e-5;
+			settings.gradient = 1e-5;
+			settings.MaxP_diff = 1e-7;
+			settings.RMSP_diff = 5e-9;
+			settings.max_scf_iterations = 100;
+		}
+		else if (conv_preset == "normal") {
+			settings.quant_diff = 1e-6;
+			settings.max_diis_error = 1e-5;
+			settings.gradient = 1e-5;
+			settings.MaxP_diff = 1e-7;
+			settings.RMSP_diff = 5e-9;
+			settings.max_scf_iterations = 100;
+		}
+		else if (conv_preset == "tight") {
+			settings.quant_diff = 1e-6;
+			settings.max_diis_error = 1e-5;
+			settings.gradient = 1e-5;
+			settings.MaxP_diff = 1e-7;
+			settings.RMSP_diff = 5e-9;
+			settings.max_scf_iterations = 100;
+		}
+		else if (conv_preset == "very_tight") {
+			settings.quant_diff = 1e-6;
+			settings.max_diis_error = 1e-5;
+			settings.gradient = 1e-5;
+			settings.MaxP_diff = 1e-7;
+			settings.RMSP_diff = 5e-9;
+			settings.max_scf_iterations = 100;
+		}
+	}
+
+	if (!(speed_preset == "default")) {
+		if (speed_preset == "slow_conv") {
+			settings.alpha = 0.5;
+			settings.level_shift = 0.5;
+			settings.diis_stop_damping = 1e-3;
+			settings.diis_stop_shift = 1e-2;
+		}
+		else if (speed_preset == "normal_conv") {
+			settings.alpha = 0.5;
+			settings.level_shift = 0.5;
+			settings.diis_stop_damping = 1e-3;
+			settings.diis_stop_shift = 1e-2;
+		}
+		else if (speed_preset == "fast_conv") {
+			settings.alpha = 0.5;
+			settings.level_shift = 0.5;
+			settings.diis_stop_damping = 1e-3;
+			settings.diis_stop_shift = 1e-2;
+		}
+	}
+
+	if (basis_set_name == "Undefined") {
+		throw std::runtime_error("Basis set name not specified in settings file! Aborting run!");
+	}
+	settings.basis_set_name = basis_set_name;
+	if (quant_diff != 32768) settings.quant_diff = quant_diff;
+	if (diis_stop_damping != 32768) settings.diis_stop_damping = diis_stop_damping;
+	if (diis_stop_shift != 32768) settings.diis_stop_shift = diis_stop_shift;
+	if (max_diis_error != 32768) settings.max_diis_error = max_diis_error;
+	if (gradient != 32768) settings.gradient = gradient;
+	if (MaxP_diff != 32768) settings.MaxP_diff = MaxP_diff;
+	if (RMSP_diff != 32768) settings.RMSP_diff = RMSP_diff;
+	if (alpha != 32768) settings.alpha = alpha;
+	if (level_shift != 32768) settings.level_shift = level_shift;
+	if (max_scf_iterations != 32768) settings.max_scf_iterations = max_scf_iterations;
+	if (charge != 0) settings.charge = charge;
+	if (multiplicity != 32768) settings.multiplicity = multiplicity;
+	if (n_params != 32768) settings.n_params = n_params;
+	if (refine_against != 32768) settings.refine_against = refine_against;
+	settings.xcw_start_value = (start != 32768) ? start : 0;
+	settings.xcw_step_size = (step_size != 32768) ? step_size : 0.01;
+	if (end != 32768) {
+		settings.num_xcw_steps = static_cast<int>(std::round((end - settings.xcw_start_value) / settings.xcw_step_size)) + 1;
+	}
+	else {
+		settings.num_xcw_steps = static_cast<int>(std::round((1 - settings.xcw_start_value) / settings.xcw_step_size)) + 1;
+	}
+	settings.grown = grown;
+	settings.hf_type = hf_type;
+	settings.safe_tensor = safe_tensor;
+	settings.read_tensor = read_tensor;
+
 	return settings;
 }
 
@@ -1825,9 +2063,7 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read, bool safe) {
 //}
 
 void XCW::run_XCW_fitting() {
-	bool read = true;
-	bool safe = false;
-	occ::qm::HartreeFock hf = setup_XCW_procedure(read, safe);
+	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor, settings.safe_tensor);
 	occ::qm::SCF scf(hf, settings.hf_type);
 	occ::qm::Wavefunction last_wfn;
 	bool has_guess = false;
