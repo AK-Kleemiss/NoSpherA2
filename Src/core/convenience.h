@@ -745,6 +745,8 @@ struct options
     bool needs_Thakkar_fill = false;
     bool qct = false;
     bool do_XCW = false;
+	bool xcw_gaussian_halt = false;
+	double xcw_strong_cutoff = 3.0;
     bool calc_F_calc = false;
     bool rgbi = false;
     bool rgbi_no_sym = false;

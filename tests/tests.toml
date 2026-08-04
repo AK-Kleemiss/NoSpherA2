@@ -282,6 +282,7 @@ cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings.txt"
+no_date = ""
 
 # Longer lambda scan exercising the Gaussian halting criterion over a real
 # trajectory. Slow (several minutes); only run with RUN_FULL_TEST=1, see
@@ -299,6 +300,7 @@ cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings.txt"
+no_date = ""
 
 # h2_weighting variant of P1_test_XCW: fits against the 1/|H|^2-weighted
 # residual self-energy criterion instead of the classical GoF^2.
@@ -313,6 +315,7 @@ cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings.txt"
+no_date = ""
 
 # h2_weighting variant of P1_test_XCW_full, same RUN_FULL_TEST gating,
 # but capped at lambda=0.08 rather than 0.1: the 1/|H|^2-weighted SCF
@@ -333,6 +336,7 @@ cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings.txt"
+no_date = ""
 
 # P1_test_XCW against the F^2 criterion
 
@@ -346,6 +350,7 @@ cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings_f2.txt"
+no_date = ""
 
 [P1_F2_test_XCW_full]
 directory = "P1_test"
@@ -359,6 +364,7 @@ cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings_f2.txt"
+no_date = ""
 
 # h2_weighting variant of P1_F2_test_XCW: 
 
@@ -373,6 +379,7 @@ cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings_f2.txt"
+no_date = ""
 
 [P1_F2_test_XCW_h2_full]
 directory = "P1_test"
@@ -386,3 +393,4 @@ cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings_f2.txt"
+no_date = ""
