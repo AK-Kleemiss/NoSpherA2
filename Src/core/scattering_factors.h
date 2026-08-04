@@ -18,6 +18,7 @@
   * @brief Class representing the wavefunction.
   */
 class WFN;
+class cube;
 template class tsc_block<int, cdouble>;
 typedef tsc_block<int, cdouble> itsc_block;
 
@@ -254,6 +255,12 @@ cdouble sfac_bessel(
  * @param log_file The output stream to write the log to.
  */
 void calc_sfac_diffuse(const options& opt, std::ostream& log_file);
+
+itsc_block calculate_scattering_factors_from_cube(
+    options& opt,
+    WFN& wave,
+    const cube& density_cube,
+    std::ostream& file);
 
 struct hkl_sym {
     int h;

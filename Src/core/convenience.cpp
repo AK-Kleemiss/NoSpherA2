@@ -176,6 +176,9 @@ std::string help_message =
  "  -cif <file.cif>                    Structure and atom labels.\n"
  "  -wfn <file>                        Wavefunction input (.wfn, .wfx, .ffn,\n"
  "                                    .molden, .gbw, .xtb, or fchk/fch).\n"
+ "  -cube_density <file.cube>          Experimental/computed electron-density\n"
+ "                                    cube used for partitioned SF generation\n"
+ "                                    (requires -cif and -hkl/-dmin).\n"
  "  -occ <file.toml>                   Run an OCC wavefunction calculation.\n"
  "  -xyz <file.xyz>                    Atomic positions for IAM or SALTED.\n"
  "  -hkl <file.hkl>                    Reflection list.\n"
@@ -3202,6 +3205,11 @@ void options::digest_options()
         {
             wfn = arguments[i + 1];
             err_checkf(std::filesystem::exists(wfn), "Wavefunction does not exist!", std::cout);
+        }
+        else if (temp == "-cube_density" || temp == "-cube")
+        {
+            cube_density = arguments[i + 1];
+            err_checkf(std::filesystem::exists(cube_density), "Cube density file does not exist!", std::cout);
         }
         else if (temp == "-wfn_cif")
         {
