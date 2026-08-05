@@ -52,6 +52,8 @@ set_tests_properties(
     TomlIntegrationTests.P1_test_XCW_full
     TomlIntegrationTests.P1_test_XCW_h2
     TomlIntegrationTests.P1_test_XCW_h2_full
+    TomlIntegrationTests.P1_F2_test_XCW
+    TomlIntegrationTests.P1_F2_test_XCW_h2
     PROPERTIES
         RESOURCE_LOCK integration_P1_test
 )

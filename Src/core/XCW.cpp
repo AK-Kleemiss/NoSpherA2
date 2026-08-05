@@ -1386,7 +1386,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	vec2().swap(grid_radial_distances);
 	vec3().swap(mu_vals);
 
-	ProgressBar pb((unsigned long long)cryst.nr_small, 60, "=", "|", "Calculating XCW integrals...", std::cout);
+	std::optional<ProgressBar> pb;
+
+	if (!(opt->no_date)) {
+		pb.emplace((unsigned long long)cryst.nr_small, 60, "=", "|", "Calculating XCW integrals...", std::cout);
+	}
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// Main loop for computation of I
@@ -1510,14 +1514,16 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					}
 				}
 			}
-			pb.update();
+			if (!(opt->no_date) && pb) {
+				pb->update();
+			}
 		}
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = end - start;
 	skipped_grids_ = skipped_grids;
 	time_taken = std::chrono::duration<double>(duration).count();
-	if (!(opt->no_date)) {
+	if (!(opt->no_date) && pb) {
 		XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
 	}
 }
