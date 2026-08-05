@@ -2407,16 +2407,32 @@ void options::digest_options()
             err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
 
             std::vector<std::string> species{ "B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I" };
+            // These must match the hyperparameters the geometry-aid models were
+            // trained with, in
+            //   geometry-aid/multi_layer_classifier/c_only_training.py :: SOAP_HP
+            // and NOT the older values in geometry-aid/external_script.py.
+            //
+            // The feature count is the check: 11 species give 66 unique pairs,
+            // and the descriptor length is 66 * (max_radial+1)^2 * (max_angular+1).
+            //   old: 66 * 5^2 * 10 = 16,500
+            //   new: 66 * 7^2 * 13 = 42,042   <- what every shipped model expects
+            // A vector of the wrong length is rejected by the Python side; one of
+            // the right length computed with a different cutoff would not be, and
+            // would produce confident nonsense. Hence the arithmetic here.
+            //
+            // SALTED is unaffected: it builds its own FeatomicHyperParameters from
+            // config.nang1 / config.nang2 in SALTED_predictor.cpp. This struct is
+            // local to the -calc_featomic_descriptor branch.
             SALTED_Utils::FeatomicHyperParameters hyperparams{
-                .cutoff_radius = 2.5,
-                .max_radial = 4,
-                .max_angular = 9,
-                .atomic_gaussian_width = 0.15,
+                .cutoff_radius = 3.5,
+                .max_radial = 6,
+                .max_angular = 12,
+                .atomic_gaussian_width = 0.2,
                 .center_atom_weight = 1.0,
                 .species = species,
                 .neighspe = species,
                 .radial_basis = {.type = "Gto", .spline_accuracy = 1E-6 },
-                .cutoff_function = {.type = "ShiftedCosine", .width = 0.1 }
+                .cutoff_function = {.type = "ShiftedCosine", .width = 0.7 }
             };
 
             metatensor::TensorMap descriptor = SALTED_Utils::calculate_SOAP_Powerspectrum(SALTED_Utils::gen_featomic_system(wfn), hyperparams);
