@@ -2259,13 +2259,20 @@ itsc_block calculate_scattering_factors_from_cube(
 		convert_to_ED(asym_atom_list, wave, sf, unit_cell, hkl);
 	}
 
-	vector<atomID> ids(asym_atom_list.size());
-	for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++)
+	itsc_block blocky;
+	if (opt.label_tsc_output)
 	{
-		ids[atm_idx] = wave.get_id_for_atom(asym_atom_list[atm_idx]);
+		blocky = itsc_block(sf, labels, hkl);
 	}
-
-	itsc_block blocky(sf, ids, hkl);
+	else
+	{
+		vector<atomID> ids(asym_atom_list.size());
+		for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++)
+		{
+			ids[atm_idx] = wave.get_id_for_atom(asym_atom_list[atm_idx]);
+		}
+		blocky = itsc_block(sf, ids, hkl);
+	}
 	time_points.push_back(get_time());
 	time_descriptions.push_back("tsc calculation");
 
@@ -2622,12 +2629,19 @@ tsc_block_type calculate_scattering_factors(
             hkl);
     }
 
-	std::vector<atomID> IDs(asym_atom_list.size());
-	for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++) {
-		IDs[atm_idx] = wavy->get_id_for_atom(asym_atom_list[atm_idx]);
+	tsc_block_type blocky;
+	if (opt.label_tsc_output)
+	{
+		blocky = tsc_block_type(sf, labels, hkl);
 	}
-
-    tsc_block_type blocky(sf, IDs, hkl);
+	else
+	{
+		std::vector<atomID> IDs(asym_atom_list.size());
+		for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++) {
+			IDs[atm_idx] = wavy->get_id_for_atom(asym_atom_list[atm_idx]);
+		}
+		blocky = tsc_block_type(sf, IDs, hkl);
+	}
 
 
     if (opt.needs_Thakkar_fill)

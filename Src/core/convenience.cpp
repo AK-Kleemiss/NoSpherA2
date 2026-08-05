@@ -211,11 +211,12 @@ std::string help_message =
  "TSC/TSCB TABLE UTILITIES\n"
  "  -tscb <table.tsc|table.tscb>        Convert between text .tsc and binary\n"
  "                                    .tscb, preserving the basename.\n"
- "  -tsc_labels <table> <model.cif> [output.tsc]\n"
- "                                    Resolve SCATTERER_IDS against CIF atoms\n"
- "                                    and write a label-based .tsc. Default:\n"
- "                                    <table>.labels.tsc; ambiguous/unmatched\n"
- "                                    IDs cause no output to be written.\n"
+ "  -tsc_labels [<table> <model.cif> [output.tsc]]\n"
+ "                                    With table+cif: resolve SCATTERER_IDS\n"
+ "                                    against CIF atoms and write labels .tsc\n"
+ "                                    (default: <table>.labels.tsc). Without\n"
+ "                                    operands: force label-based scatterers in\n"
+ "                                    binary .tscb output (default behavior).\n"
  "  -merge <table ...>                 Merge .tsc/.tscb tables with checks.\n"
  "  -merge_nocheck <table ...>         Merge tables only when you know their\n"
  "                                    HKL indices are identical.\n\n"
@@ -2618,16 +2619,32 @@ void options::digest_options()
             err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
 
             std::vector<std::string> species{ "B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I" };
+            // These must match the hyperparameters the geometry-aid models were
+            // trained with, in
+            //   geometry-aid/multi_layer_classifier/c_only_training.py :: SOAP_HP
+            // and NOT the older values in geometry-aid/external_script.py.
+            //
+            // The feature count is the check: 11 species give 66 unique pairs,
+            // and the descriptor length is 66 * (max_radial+1)^2 * (max_angular+1).
+            //   old: 66 * 5^2 * 10 = 16,500
+            //   new: 66 * 7^2 * 13 = 42,042   <- what every shipped model expects
+            // A vector of the wrong length is rejected by the Python side; one of
+            // the right length computed with a different cutoff would not be, and
+            // would produce confident nonsense. Hence the arithmetic here.
+            //
+            // SALTED is unaffected: it builds its own FeatomicHyperParameters from
+            // config.nang1 / config.nang2 in SALTED_predictor.cpp. This struct is
+            // local to the -calc_featomic_descriptor branch.
             SALTED_Utils::FeatomicHyperParameters hyperparams{
-                .cutoff_radius = 2.5,
-                .max_radial = 4,
-                .max_angular = 9,
-                .atomic_gaussian_width = 0.15,
+                .cutoff_radius = 3.5,
+                .max_radial = 6,
+                .max_angular = 12,
+                .atomic_gaussian_width = 0.2,
                 .center_atom_weight = 1.0,
                 .species = species,
                 .neighspe = species,
                 .radial_basis = {.type = "Gto", .spline_accuracy = 1E-6 },
-                .cutoff_function = {.type = "ShiftedCosine", .width = 0.1 }
+                .cutoff_function = {.type = "ShiftedCosine", .width = 0.7 }
             };
 
             metatensor::TensorMap descriptor = SALTED_Utils::calculate_SOAP_Powerspectrum(SALTED_Utils::gen_featomic_system(wfn), hyperparams);
@@ -3157,27 +3174,42 @@ void options::digest_options()
         else if (temp == "-tscb")
         {
             std::filesystem::path name = arguments[i + 1];
-            tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
             string cif_name = "test.cif";
             if (name.extension() == ".tscb")
+            {
+                tsc_block<int, cdouble> blocky = read_tsc_table(name);
                 blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
+            }
             else if (name.extension() == ".tsc")
+            {
+                tsc_block<int, cdouble> blocky = read_tsc_table(name);
                 blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
+            }
             else
                 err_checkf(false, "Wrong file ending!", std::cout);
             exit(0);
         }
         else if (temp == "-tsc_labels")
         {
-            const std::filesystem::path table = arguments.at(i + 1);
-            const std::filesystem::path cif_file = arguments.at(i + 2);
-            std::filesystem::path output = table;
-            output.replace_extension(".labels.tsc");
-            if (i + 3 < argc && arguments[i + 3].find('-') != 0)
-                output = arguments[i + 3];
-            if (!convert_tsc_ids_to_labels(table, cif_file, output, std::cout))
-                exit(1);
-            exit(0);
+            const bool has_table_and_cif =
+                i + 2 < argc &&
+                arguments[i + 1].find('-') != 0 &&
+                arguments[i + 2].find('-') != 0;
+
+            if (has_table_and_cif)
+            {
+                const std::filesystem::path table = arguments.at(i + 1);
+                const std::filesystem::path cif_file = arguments.at(i + 2);
+                std::filesystem::path output = table;
+                output.replace_extension(".labels.tsc");
+                if (i + 3 < argc && arguments[i + 3].find('-') != 0)
+                    output = arguments[i + 3];
+                if (!convert_tsc_ids_to_labels(table, cif_file, output, std::cout))
+                    exit(1);
+                exit(0);
+            }
+
+            label_tsc_output = true;
         }
         else if (temp == "-test_RI")
         {
