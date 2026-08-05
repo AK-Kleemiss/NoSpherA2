@@ -1975,6 +1975,7 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	tsc_block<int, cdouble> result;
 	vec2 known_kpts_;
 	options* opt_ = const_cast<options*>(opt);
+	opt_->m_hkl_list = hkl_enlarged;
 	result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
 		*opt_,
 		sf_wave_vec,
