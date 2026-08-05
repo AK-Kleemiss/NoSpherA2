@@ -1809,7 +1809,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		}
 		std::cout << std::endl;
 
-		//create_tscb(scf, lambda);
+		create_tscb(scf, lambda);
 	}
 	else {
 		XCW_log << "____________________________________________________________________________________\n";
@@ -1819,11 +1819,25 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 }
 
 double XCW::compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
-	occ::Mat C = scf.molecular_orbitals().C;
-	occ::Mat Cocc = scf.molecular_orbitals().Cocc;
-	occ::Mat Cvir = C.rightCols(C.cols() - Cocc.cols());
-	occ::Mat G = 2.0 * Cvir.transpose() * scf.ctx.F * Cocc;
-	return G.norm();
+	if (settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
+		occ::Mat C = scf.molecular_orbitals().C;
+		occ::Mat Cocc = scf.molecular_orbitals().Cocc;
+		occ::Mat Cvir = C.rightCols(C.cols() - Cocc.cols());
+		occ::Mat G = 2.0 * Cvir.transpose() * scf.ctx.F * Cocc;
+		return G.norm();
+	}
+	else if (settings.hf_type == occ::qm::SpinorbitalKind::Unrestricted) {
+		occ::Mat C_alpha = scf.molecular_orbitals().C.topRows(cryst.nmo);
+		occ::Mat C_beta = scf.molecular_orbitals().C.bottomRows(cryst.nmo);
+		occ::Mat Cocc_alpha = scf.molecular_orbitals().Cocc.topRows(cryst.nmo);
+		occ::Mat Cocc_beta = scf.molecular_orbitals().Cocc.bottomRows(cryst.nmo);
+		occ::Mat Cvir_alpha = C_alpha.rightCols(C_alpha.cols() - Cocc_alpha.cols());
+		occ::Mat Cvir_beta = C_beta.rightCols(C_beta.cols() - Cocc_beta.cols());
+		occ::Mat G_alpha = Cvir_alpha.transpose() * scf.ctx.F.topRows(cryst.nmo) * Cocc_alpha;
+		occ::Mat G_beta = Cvir_beta.transpose() * scf.ctx.F.bottomRows(cryst.nmo) * Cocc_beta;
+		return (std::hypot(G_alpha.norm(), G_beta.norm()));
+	}
+	
 	// closing funciton
 }
 
