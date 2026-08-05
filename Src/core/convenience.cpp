@@ -211,11 +211,12 @@ std::string help_message =
  "TSC/TSCB TABLE UTILITIES\n"
  "  -tscb <table.tsc|table.tscb>        Convert between text .tsc and binary\n"
  "                                    .tscb, preserving the basename.\n"
- "  -tsc_labels <table> <model.cif> [output.tsc]\n"
- "                                    Resolve SCATTERER_IDS against CIF atoms\n"
- "                                    and write a label-based .tsc. Default:\n"
- "                                    <table>.labels.tsc; ambiguous/unmatched\n"
- "                                    IDs cause no output to be written.\n"
+ "  -tsc_labels [<table> <model.cif> [output.tsc]]\n"
+ "                                    With table+cif: resolve SCATTERER_IDS\n"
+ "                                    against CIF atoms and write labels .tsc\n"
+ "                                    (default: <table>.labels.tsc). Without\n"
+ "                                    operands: force label-based scatterers in\n"
+ "                                    binary .tscb output (default behavior).\n"
  "  -merge <table ...>                 Merge .tsc/.tscb tables with checks.\n"
  "  -merge_nocheck <table ...>         Merge tables only when you know their\n"
  "                                    HKL indices are identical.\n\n"
@@ -2963,27 +2964,42 @@ void options::digest_options()
         else if (temp == "-tscb")
         {
             std::filesystem::path name = arguments[i + 1];
-            tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
             string cif_name = "test.cif";
             if (name.extension() == ".tscb")
+            {
+                tsc_block<int, cdouble> blocky = read_tsc_table(name);
                 blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
+            }
             else if (name.extension() == ".tsc")
+            {
+                tsc_block<int, cdouble> blocky = read_tsc_table(name);
                 blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
+            }
             else
                 err_checkf(false, "Wrong file ending!", std::cout);
             exit(0);
         }
         else if (temp == "-tsc_labels")
         {
-            const std::filesystem::path table = arguments.at(i + 1);
-            const std::filesystem::path cif_file = arguments.at(i + 2);
-            std::filesystem::path output = table;
-            output.replace_extension(".labels.tsc");
-            if (i + 3 < argc && arguments[i + 3].find('-') != 0)
-                output = arguments[i + 3];
-            if (!convert_tsc_ids_to_labels(table, cif_file, output, std::cout))
-                exit(1);
-            exit(0);
+            const bool has_table_and_cif =
+                i + 2 < argc &&
+                arguments[i + 1].find('-') != 0 &&
+                arguments[i + 2].find('-') != 0;
+
+            if (has_table_and_cif)
+            {
+                const std::filesystem::path table = arguments.at(i + 1);
+                const std::filesystem::path cif_file = arguments.at(i + 2);
+                std::filesystem::path output = table;
+                output.replace_extension(".labels.tsc");
+                if (i + 3 < argc && arguments[i + 3].find('-') != 0)
+                    output = arguments[i + 3];
+                if (!convert_tsc_ids_to_labels(table, cif_file, output, std::cout))
+                    exit(1);
+                exit(0);
+            }
+
+            label_tsc_output = true;
         }
         else if (temp == "-test_RI")
         {

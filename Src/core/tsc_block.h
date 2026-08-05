@@ -536,6 +536,11 @@ public:
                 row.push_back(read_scalar<std::complex<double>>(in));
         }
 
+        // A valid TSCB stream should be consumed exactly here. Trailing bytes
+        // indicate an incompatible layout (for example, wrong HKL index width).
+        if (in.peek() != std::char_traits<char>::eof())
+            throw std::runtime_error("Unexpected trailing bytes in TSCB file; incompatible binary layout");
+
         validate_dimensions();
     }
 

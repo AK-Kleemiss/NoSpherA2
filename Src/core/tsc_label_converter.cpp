@@ -83,7 +83,7 @@ tsc_block<int, cdouble> read_text_tsc(const std::filesystem::path& table_file)
     return tsc_block<int, cdouble>(form_factors, scatterers, indices, header.header);
 }
 
-tsc_block<int, cdouble> read_tsc(const std::filesystem::path& table_file)
+tsc_block<int, cdouble> read_tsc_table_impl(const std::filesystem::path& table_file)
 {
     const std::string extension = uppercase(table_file.extension().string());
     if (extension == ".TSCB") return tsc_block<int, cdouble>(table_file);
@@ -92,12 +92,17 @@ tsc_block<int, cdouble> read_tsc(const std::filesystem::path& table_file)
 }
 }
 
+tsc_block<int, cdouble> read_tsc_table(const std::filesystem::path& table_file)
+{
+    return read_tsc_table_impl(table_file);
+}
+
 bool convert_tsc_ids_to_labels(const std::filesystem::path& table_file,
     const std::filesystem::path& cif_file, const std::filesystem::path& output_file,
     std::ostream& log)
 {
     try {
-        const tsc_block<int, cdouble> input = read_tsc(table_file);
+        const tsc_block<int, cdouble> input = read_tsc_table(table_file);
         std::unordered_map<atomID, std::string> labels;
         for (const auto& atom : read_cif_atoms(cif_file)) {
             if (!labels.emplace(atom.id, atom.label).second)

@@ -732,6 +732,7 @@ struct options
     bool no_date = false;
     bool gbw2wfn = false;
     bool old_tsc = false;
+    bool label_tsc_output = true;
     bool write_CIF = false;
     bool test = false;
     bool electron_diffraction = false;
