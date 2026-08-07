@@ -377,7 +377,7 @@ std::string build_date = ("This Executable was built on: " + std::string(__DATE_
 bool ensure_occ_data_path(const char *argv0)
 {
 #ifdef _WIN32
-    char *occ_data_path_env = nullptr;
+    char* occ_data_path_env = nullptr;
     size_t len = 0;
     errno_t err = _dupenv_s(&occ_data_path_env, &len, "OCC_DATA_PATH");
 
@@ -396,7 +396,7 @@ bool ensure_occ_data_path(const char *argv0)
         free(occ_data_path_env);
     }
 #else
-    const char *tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH");
+    const char* tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH");
     if (tmp_occ_data_path_env != nullptr)
     {
         std::string occ_data_path_env(tmp_occ_data_path_env);
@@ -1297,7 +1297,7 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     return true;
 }
 
-bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, const bool& debug)
 {
     using namespace std;
     vec2 Uij, Cijk, Dijkl;
@@ -1613,7 +1613,238 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
     return true;
 };
 
-vec read_U_iso_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::ofstream &log3, const bool &debug, const bool &grown, const ivec3 &symmetry_linking_list)
+{
+    using namespace std;
+    ifstream asym_cif_input(cif, std::ios::in);
+    asym_cif_input.clear();
+    asym_cif_input.seekg(0, asym_cif_input.beg);
+    string line;
+    int ncen;
+    if (!grown) {
+        ncen = wavy.get_ncen();
+    }
+    else {
+        ncen = symmetry_linking_list.size();
+    }
+    svec labels(ncen);
+
+    for (int i = 0; i < ncen; i++) {
+        labels[i] = wavy.get_atoms()[i].get_label();
+    }
+
+    while (getline(asym_cif_input, line)) {
+        if (!line.starts_with("loop_")) {
+            if (debug)
+                log3 << "This is not part of a loop. Moving on.";
+            continue;
+        }
+        if (debug)
+            log3 << "Found a loop!";
+        getline(asym_cif_input, line);
+        if (line.find("_atom_site_aniso_label") != string::npos) {
+            if (debug) {
+                log3 << "This loop contains anisotropic displacement parameters.";
+            }
+            ivec fields;
+            while (line.find("_atom_site_aniso") != string::npos && line.length() > 3) {
+                getline(asym_cif_input, line);
+                if (line.find("U_11") != string::npos)
+					fields.push_back(0);
+				else if (line.find("U_22") != string::npos)
+					fields.push_back(1);
+				else if (line.find("U_33") != string::npos)
+					fields.push_back(2);
+				else if (line.find("U_12") != string::npos)
+					fields.push_back(3);
+				else if (line.find("U_13") != string::npos)
+					fields.push_back(4);
+				else if (line.find("U_23") != string::npos)
+					fields.push_back(5);	
+            }
+            while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
+                std::vector<std::string> entries;
+                std::istringstream iss(line);
+                std::string token;
+                while (entries.size() < 7 && iss >> token)
+                    entries.push_back(token);
+                while (entries.size() < 7 && std::getline(asym_cif_input, line)) {
+                    std::istringstream nextLine(line);
+                    while (entries.size() < 7 && nextLine >> token)
+                        entries.push_back(token);
+                }
+                bool atom_found = false;
+                for (int a = 0; a < ncen; a++) {
+                    if (entries[0] == wavy.get_atom(a).get_label()) {
+						vec2 ADPs = wavy.get_atom(a).get_ADPs();
+                        if (ADPs.size() != 3)
+                            ADPs.resize(3);
+                        ADPs[0].resize(6);
+                        for (int i = 0; i < 6; i++) {
+							ADPs[0][fields[i]] = stof(entries[i + 1]);
+                        }
+                        wavy.set_atom_ADPs(a, ADPs);
+                        if (grown) {
+                            for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
+                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                            }
+                        }
+                        atom_found = true;
+                        break;
+                    }
+                }
+                if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
+                getline(asym_cif_input, line);
+            }
+        }
+        else if (line.find("_atom_site_anharm_GC_C_label") != string::npos) {
+			if (debug)
+				log3 << "This loop contains anharmonic Gram-Charlier coefficients C.";
+            ivec fields;
+            while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
+                getline(asym_cif_input, line);
+                if (line.find("C_111") != string::npos)
+                    fields.push_back(0);
+                else if (line.find("C_112") != string::npos)
+                    fields.push_back(1);
+                else if (line.find("C_113") != string::npos)
+                    fields.push_back(2);
+                else if (line.find("C_122") != string::npos)
+                    fields.push_back(3);
+                else if (line.find("C_123") != string::npos)
+                    fields.push_back(4);
+                else if (line.find("C_133") != string::npos)
+                    fields.push_back(5);
+                else if (line.find("C_222") != string::npos)
+                    fields.push_back(6);
+                else if (line.find("C_223") != string::npos)
+                    fields.push_back(7);
+                else if (line.find("C_233") != string::npos)
+                    fields.push_back(8);
+                else if (line.find("C_333") != string::npos)
+                    fields.push_back(9);   
+            }
+            while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
+                std::vector<std::string> entries;
+                std::istringstream iss(line);
+                std::string token;
+                while (entries.size() < 11 && iss >> token) {
+                    const int pos = token.find('(');
+                    entries.push_back(token);
+                }
+                while (entries.size() < 11 && std::getline(asym_cif_input, line)) {
+                    std::istringstream nextLine(line);
+                    while (entries.size() < 11 && nextLine >> token) {
+                        entries.push_back(token);
+                    }
+                }
+                bool atom_found = false;
+                for (int a = 0; a < ncen; a++) {
+                    if (entries[0] == wavy.get_atom(a).get_label()) {
+                        vec2 ADPs = wavy.get_atom(a).get_ADPs();
+                        if (ADPs.size() != 3)
+                            ADPs.resize(3);
+                        ADPs[1].resize(10);
+                        for (int i = 0; i < 10; i++) {
+                            ADPs[1][fields[i]] = stof(entries[i + 1]);
+                        }
+                        wavy.set_atom_ADPs(a, ADPs);
+                        if (grown) {
+                            for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
+                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                            }
+                        }
+                        atom_found = true;
+                        break;
+                    }
+                }
+                if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
+                getline(asym_cif_input, line);
+            }
+        }
+        else if (line.find("_atom_site_anharm_GC_D_label") != string::npos) {
+			if (debug)
+				log3 << "This loop contains anharmonic Gram-Charlier coefficients D.";
+            ivec fields;
+            while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
+                getline(asym_cif_input, line);
+                if (line.find("D_1111") != string::npos)
+                    fields.push_back(0);
+                else if (line.find("D_1112") != string::npos)
+                    fields.push_back(1);
+                else if (line.find("D_1113") != string::npos)
+                    fields.push_back(2);
+                else if (line.find("D_1122") != string::npos)
+                    fields.push_back(3);
+                else if (line.find("D_1123") != string::npos)
+                    fields.push_back(4);
+                else if (line.find("D_1133") != string::npos)
+                    fields.push_back(5);
+                else if (line.find("D_1222") != string::npos)
+                    fields.push_back(6);
+                else if (line.find("D_1223") != string::npos)
+                    fields.push_back(7);
+                else if (line.find("D_1233") != string::npos)
+                    fields.push_back(8);
+                else if (line.find("D_1333") != string::npos)
+                    fields.push_back(9);
+                else if (line.find("D_2222") != string::npos)
+                    fields.push_back(10);
+                else if (line.find("D_2223") != string::npos)
+                    fields.push_back(11);
+                else if (line.find("D_2233") != string::npos)
+                    fields.push_back(12);
+                else if (line.find("D_2333") != string::npos)
+                    fields.push_back(13);
+                else if (line.find("D_3333") != string::npos)
+                    fields.push_back(14);
+            }
+            while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
+                std::vector<std::string> entries;
+                std::istringstream iss(line);
+                std::string token;
+                while (entries.size() < 16 && iss >> token)
+                    entries.push_back(token);
+                while (entries.size() < 16 && std::getline(asym_cif_input, line)) {
+                    std::istringstream nextLine(line);
+                    while (entries.size() < 16 && nextLine >> token)
+                        entries.push_back(token);
+                }
+                bool atom_found = false;
+                for (int a = 0; a < ncen; a++) {
+                    if (entries[0] == wavy.get_atom(a).get_label()) {
+                        vec2 ADPs = wavy.get_atom(a).get_ADPs();
+                        if (ADPs.size() != 3)
+                            ADPs.resize(3);
+                        ADPs[2].resize(15);
+                        for (int i = 0; i < 15; i++) {
+                            ADPs[2][fields[i]] = stof(entries[i + 1]);
+                        }                
+                        wavy.set_atom_ADPs(a, ADPs);
+                        if (grown) {
+                            for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
+                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                            }
+                        }
+                        atom_found = true;
+                        break;
+                    }
+                }
+                if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
+                getline(asym_cif_input, line);
+            }
+        }
+        else {
+            if (debug)
+                log3 << "This was not the right loop. Moving on.";
+            continue;
+        }
+    }
+    return true;
+    // closing function
+};
+
+vec read_U_iso_from_CIF(const std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, const bool& debug)
 {
     using namespace std;
     vec U_iso;
@@ -2449,7 +2680,6 @@ void options::digest_options()
             np_descr.fortran_order = false;
             np_descr.shape = { static_cast<unsigned long>(sizes[0]), static_cast<unsigned long>(sizes[1]) };
             npy::write_npy("descriptor.npy", np_descr);
-
             exit(0);
         }
         else if (temp == "-fchk")
@@ -3043,9 +3273,28 @@ void options::digest_options()
         }
         else if (temp == "-do_XCW") {
             do_XCW = true;
+            // Optional trailing "stepsize max_value" to limit the lambda scan
+            // range, e.g. for quick tests: -do_XCW 0.01 0.01
+            // CURRENTLY NOT IN USE SINCE THIS IS HANDLED IN THE INPUT FILE
+            //if (i + 2 < argc &&
+            //    string(arguments[i + 1]).find("-") != 0 &&
+            //    string(arguments[i + 2]).find("-") != 0)
+            //{
+            //    xcw_lambda_step = stod(arguments[i + 1]);
+            //    xcw_lambda_max = stod(arguments[i + 2]);
+            //}
         }
         else if (temp == "-calc_F") {
             calc_F_calc = true;
+        }
+        else if (temp == "-xcw_gaussian_halt") {
+            xcw_gaussian_halt = true;
+        }
+        else if (temp == "-xcw_strong_cutoff") {
+            xcw_strong_cutoff = stod(arguments[i + 1]);
+        }
+        else if (temp == "-XCW_settings") {
+			xcw_settings_path = arguments[i + 1];
         }
         else if (temp == "-anom_disp")
         {
@@ -3272,7 +3521,7 @@ void print_duration(std::ostream &file, const std::string &description, const st
     if (total_duration.has_value())
     {
         double percentage = (double(duration.count()) / total_duration->count()) * 100.0;
-        std::cout << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
+        file << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
     };
     file << std::endl;
     // Disable setfill 0 again
@@ -3287,10 +3536,9 @@ void write_timing_to_file(std::ostream &file,
     // Check if either vector is empty
     if (time_points.empty() || descriptions.empty())
     {
-        std::cout << "Error: Empty vector passed to write_timing_to_file" << endl;
+        file << "Error: Empty vector passed to write_timing_to_file" << endl;
         return;
     }
-
     std::chrono::microseconds total_time = std::chrono::duration_cast<std::chrono::microseconds>(time_points.back() - time_points.front());
     file << "\n\n----------------------------- Time Breakdown! -----------------------------" << endl;
     file << "                                     mm:ss:ms" << endl;
@@ -3893,7 +4141,7 @@ ProgressBar::~ProgressBar()
 {
     progress_ = 100.0f;
     write_progress();
-    std::cout << std::endl;
+    stream_ << std::endl;
 #ifdef _WIN32
     if (taskbarList_)
     {
@@ -3903,7 +4151,7 @@ ProgressBar::~ProgressBar()
 #endif
 }
 
-void ProgressBar::write_progress(std::ostream &os)
+void ProgressBar::write_progress()
 {
     // No need to write once progress is 100%
     if (progress_ > 100.0f)
@@ -3911,28 +4159,28 @@ void ProgressBar::write_progress(std::ostream &os)
 
     // Move cursor to the first position on the same line
     // Check if os is a file stream
-    if (dynamic_cast<std::filebuf *>(std::cout.rdbuf()))
+    if (dynamic_cast<std::filebuf *>(stream_.rdbuf()))
     {
-        os.seekp(linestart); // Is a file stream
+        stream_.seekp(linestart); // Is a file stream
     }
     else
     {
-        os << "\r" << std::flush; // Is not a file stream
+        stream_ << "\r" << std::flush; // Is not a file stream
     }
 
     // Start bar
-    os << "[";
+    stream_ << "[";
 
     const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
     for (size_t i = 0; i <= completed; i++)
     {
-        os << fill_;
+        stream_ << fill_;
     }
 
     // End bar
     if (((progress_ < 100.0f) ? progress_ : 100.0f) == 100)
     {
-        os << "] 100% " << std::flush;
+        stream_ << "] 100% " << std::flush;
 #ifdef _WIN32
         if (taskbarList_)
         {
@@ -3943,7 +4191,7 @@ void ProgressBar::write_progress(std::ostream &os)
         return;
     }
 
-    os << std::flush;
+    stream_ << std::flush;
 
 #ifdef _WIN32
     // Update taskbar progress

@@ -13,6 +13,7 @@
 *.dll
 *.d
 *.o
+*.tlog
 
 #Explicit Files to ignore
 tests/alanine_integrated_occ/alanine.owf.fchk
@@ -71,3 +72,4 @@ Lib/*
 /Windows/**/*.recipe
 /Windows/**/*.pch
 /Windows/**/*.lib
+/Windows/NoSpherA2_LIB/Profile_x64

@@ -9,6 +9,7 @@
 #include "nos_math.h"
 #include "libCintMain.h"
 #include "basis_set.h"
+#include "cell.h"
 
 #include "occ/OrbitalDefs.h"
 long long int WFN::pre[9][5][5][9] = {};
@@ -130,10 +131,10 @@ constexpr unsigned int sum_subshells(unsigned int l, bool cartesian = true) {
 
 WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 {
-    // Only works with restricted WFNs for now
+	// Should work for unrestricted now, if something seems weird this is the place to check
     using namespace Eigen;
     using occ::gto::num_subshells;
-    origin = e_origin::OCC;
+    set_origin(e_origin::OCC);
     basis_set_name = occ_WF.basis.name();
     has_ECPs = occ_WF.basis.have_ecps();
     charge = occ_WF.charge();
@@ -164,7 +165,8 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
         std::cout);
 
     auto &mo = occ_WF.mo;
-    if (mo.kind != occ::qm::Restricted) throw std::runtime_error("This constructor only supports Restricted for now.");
+    const bool unrestricted = (mo.kind == occ::qm::Unrestricted);
+    const int n_spin = unrestricted ? 2 : 1;
     auto shell2atom = occ_WF.basis.shell_to_atom();
     vec con_coefs;
     VectorXd shellType(shells.size() + 1);
@@ -242,53 +244,70 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     double scalar;
 
     // confac = pow(8 * pow(exp[exp_run], 3) / constants::PI3, 0.25);
-    for (int n = 0; n < occ_WF.nbf; ++n)
-    {
-        basis_offset = 0;
-        write_cursor = 0;
-        occ = n < occ_WF.n_alpha() ? 2 : 0;
-        push_back_MO(n + 1, occ, mo.energies[n]);
-        MOs[n].assign_coefficients_size(nex);
-        coeffs_ptr = const_cast<double *>(MOs[n].get_coefficient_ptr());  //Casting away const-ness is bad practice, but in this case we know that the data will be modified and we need a non-const pointer to write into it.
-        for (const auto &shell : shells) {
-            l = shell.l;
-            p = (2.0 * l + 3.0) / 4.0;
-            scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25);
-            const auto &A = MappedMatrices[l];
-            n_sph = A.cols();
-            n_prim = shell.num_primitives();
-            n_cart = A.rows();
-            chunk_size = n_cart * n_prim;
-            const auto &exp_arr = shell.exponents.array();
-            // normalizing the contraction_coeffs
-            ArrayXd CC = shell.u_coefficients.array();
-            if (!from_file)
-                CC = VectorXd::NullaryExpr(CC.size(), [shell](const Index i) {
-                return shell.coeff_normalized(0, i);
-                    });
-            const VectorXd &contraction_coeffs = scalar * (2 * exp_arr).pow(p) * CC;
-            const auto &MOc = mo_go.C.block(basis_offset, n, n_sph, 1);
-            Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);
-            // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
-            dest_block = contraction_coeffs * (A * MOc).transpose();
+    for (int spin = 0; spin < n_spin; spin++) {
+        const int row_offset = unrestricted ? spin * occ_WF.nbf : 0;
+        const int nocc = unrestricted ? (spin == 0 ? occ_WF.n_alpha() : occ_WF.n_beta()) : occ_WF.n_alpha();
+        for (int n = 0; n < occ_WF.nbf; n++)
+        {
+            basis_offset = 0;
+            write_cursor = 0;
+            occ = (n < nocc) ? (unrestricted ? 1.0 : 2.0) : 0.0;
+            int energy_index = unrestricted ? spin * occ_WF.nbf + n : n;
+            push_back_MO(energy_index + 1, occ, mo.energies[energy_index], spin);
+            MO& currentMO = MOs.back();
+            currentMO.assign_coefficients_size(nex);
+			coeffs_ptr = const_cast<double*>(currentMO.get_coefficient_ptr());
+            for (const auto& shell : shells) {
+                l = shell.l;
+                p = (2.0 * l + 3.0) / 4.0;
+                scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25);
+                const auto& A = MappedMatrices[l];
+                n_sph = A.cols();
+                n_prim = shell.num_primitives();
+                n_cart = A.rows();
+                chunk_size = n_cart * n_prim;
+                const auto& exp_arr = shell.exponents.array();
+                // normalizing the contraction_coeffs
+                ArrayXd CC = shell.u_coefficients.array();
+                if (!from_file)
+                    CC = VectorXd::NullaryExpr(CC.size(), [shell](const Index i) {
+                    return shell.coeff_normalized(0, i);
+                        });
+                const VectorXd& contraction_coeffs = scalar * (2 * exp_arr).pow(p) * CC;
+                const auto& MOc = mo_go.C.block(row_offset + basis_offset, n, n_sph, 1);
+                Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);
+                // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
+                dest_block = contraction_coeffs * (A * MOc).transpose();
 
-            write_cursor += chunk_size;
-            basis_offset += n_sph;
+                write_cursor += chunk_size;
+                basis_offset += n_sph;
+            }
         }
     }
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
 
-    set_origin(e_origin::OCC);
     d_f_switch = false;
-    int nmo_ = occ_WF.mo.D.rows();
+    int nmo_ = occ_WF.mo.D.cols();
     DM = dMatrix2(nmo_, nmo_);
-    for (int i = 0; i < nmo_; i++) {
-        DM(i, i) = 2 * occ_WF.mo.D(i, i);
-        for (int j = i + 1; j < nmo_; j++) {
-            DM(i, j) = 2 * occ_WF.mo.D(i, j);
-            DM(j, i) = DM(i, j);
+    if (occ_WF.mo.kind == occ::qm::Restricted) {
+        for (int i = 0; i < nmo_; i++) {
+            DM(i, i) = 2 * occ_WF.mo.D(i, i);
+            for (int j = i + 1; j < nmo_; j++) {
+                DM(i, j) = 2 * occ_WF.mo.D(i, j);
+                DM(j, i) = DM(i, j);
+            }
         }
     }
+	else if (occ_WF.mo.kind == occ::qm::Unrestricted) {
+		for (int i = 0; i < nmo_; i++) {
+			DM(i, i) = occ_WF.mo.D(i, i) + occ_WF.mo.D(i + nmo_, i);
+			for (int j = i + 1; j < nmo_; j++) {
+				DM(i, j) = occ_WF.mo.D(i, j) + occ_WF.mo.D(i + nmo_, j);
+				DM(j, i) = DM(i, j);
+			}
+		}
+        is_unrestricted = true;
+	}
 }
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const atomID &ID)
@@ -1123,6 +1142,27 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
         err_checkf(push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i]), "Error while making atoms!!", file);
     return true;
 };
+
+std::vector<asym_atom> WFN::extract_xyz(const std::string& unit) {
+    std::vector<asym_atom> atoms;
+    const d3 dummy_coords({0, 0, 0});
+    for (int i = 0; i < ncen; i++) {
+        atom temp_atom = get_atom(i);
+        d3 temp_coords = temp_atom.get_pos();
+        if (isBohr == true && unit == "angstrom") {
+            temp_coords[0] = constants::bohr2ang(temp_coords[0]);
+            temp_coords[1] = constants::bohr2ang(temp_coords[1]);
+            temp_coords[2] = constants::bohr2ang(temp_coords[2]);
+        }
+        else if (isBohr == false && unit == "bohr") {
+            temp_coords[0] = constants::ang2bohr(temp_coords[0]);
+            temp_coords[1] = constants::ang2bohr(temp_coords[1]);
+            temp_coords[2] = constants::ang2bohr(temp_coords[2]);
+        }
+        atoms.emplace_back(asym_atom(temp_atom.get_label(), temp_atom.get_charge(), temp_coords, dummy_coords, 1.0, cdouble(0.0, 0.0)));
+	}
+    return atoms;
+}
 
 bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
 {

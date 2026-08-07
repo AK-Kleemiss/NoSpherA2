@@ -13,8 +13,8 @@
 
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
 void equicomb(int natoms, int nrad1, int nrad2,
-              const cvec4 &v1,
-              const cvec4 &v2,
+              const SALTEDDescriptors &v1,
+              const SALTEDDescriptors &v2,
               const vec &w3j,
               const ivec2 &llvec, const int &lam,
               const cvec2 &c2r, const int &featsize,
@@ -38,6 +38,20 @@ void equicomb(int natoms, int nrad1, int nrad2,
     const int l21 = static_cast<int>(l21_ll);
     const int llmax = (int)llvec[0].size();
 
+    struct TransformTerm {
+        int index;
+        double real;
+        double imag;
+    };
+    std::vector<std::vector<TransformTerm>> c2r_terms(l21);
+    for (int i = 0; i < l21; ++i) {
+        for (int j = 0; j < l21; ++j) {
+            const cdouble& value = c2r[i][j];
+            if (value.real() != 0.0 || value.imag() != 0.0) {
+                c2r_terms[i].push_back({ j, value.real(), value.imag() });
+            }
+        }
+    }
     const size_t required_p = static_cast<size_t>(natoms) * static_cast<size_t>(l21) * static_cast<size_t>(nfps);
     if (p.size() < required_p)
     {
@@ -74,34 +88,26 @@ void equicomb(int natoms, int nrad1, int nrad2,
                         l1 = llvec[0][il];
                         l2 = llvec[1][il];
                         limit_l1 = 2 * l1 + 1;
-
-                        const cdouble *v1_ptr = v1[iat][n1][l1].data();
-                        const cdouble *v2_ptr = v2[iat][n2][l2].data();
+                        const cdouble *v1_ptr = v1.block(iat, n1, l1);
+                        const cdouble *v2_ptr = v2.block(iat, n2, l2);
 
                         for (imu = 0; imu < l21; imu++)
                         {
-                            mu = imu - lam + l1;
                             double acc_real = 0.0;
                             double acc_imag = 0.0;
 
+                            mu = imu - lam + l1;
                             for (im1 = 0; im1 < limit_l1; ++im1)
                             {
                                 m2 = im1 - mu;
                                 if (abs(m2) <= l2)
                                 {
                                     im2 = m2 + l2;
-                                    const double wigner_val = *wigner_ptr;
-                                    const cdouble &v1_val = v1_ptr[im1];
-                                    const cdouble &v2_val = v2_ptr[im2];
-
-                                    const double& v1_r = v1_val.real();
-                                    const double& v1_i = v1_val.imag();
-                                    const double& v2_r = v2_val.real();
-                                    const double& v2_i = v2_val.imag();
-
-                                    acc_real += wigner_val * (v1_r * v2_r - v1_i * v2_i);
-                                    acc_imag += wigner_val * (v1_r * v2_i + v1_i * v2_r);
-                                    wigner_ptr++;
+                                    const double wigner_val = *wigner_ptr++;
+                                    const cdouble& v1_val = v1_ptr[im1];
+                                    const cdouble& v2_val = v2_ptr[im2];
+                                    acc_real += wigner_val * (v1_val.real() * v2_val.real() - v1_val.imag() * v2_val.imag());
+                                    acc_imag += wigner_val * (v1_val.real() * v2_val.imag() + v1_val.imag() * v2_val.real());
                                 }
                             }
                             pcmplx_real[imu] = acc_real;
@@ -112,18 +118,11 @@ void equicomb(int natoms, int nrad1, int nrad2,
                         for (i = 0; i < l21; ++i)
                         {
                             preal = 0.0;
-                            const cdouble *__restrict cvec_ptr = c2r[i].data();
                             const double *__restrict pvec_real_ptr = pcmplx_real.data();
                             const double *__restrict pvec_imag_ptr = pcmplx_imag.data();
-#if defined(_MSC_VER)
-#pragma loop(ivdep)
-#elif defined(__GNUC__) || defined(__clang__)
-#pragma GCC ivdep
-#endif
-                            for (j = 0; j < l21; ++j)
+                            for (const TransformTerm& term : c2r_terms[i])
                             {
-                                const cdouble &c2r_ih = cvec_ptr[j];
-                                preal += c2r_ih.real() * pvec_real_ptr[j] - c2r_ih.imag() * pvec_imag_ptr[j];
+                                preal += term.real * pvec_real_ptr[term.index] - term.imag * pvec_imag_ptr[term.index];
                             }
                             inner += preal * preal;
                             ptemp[i + limit_l1] = preal;
@@ -152,8 +151,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
 }
 
 void equicomb(int natoms, int nrad1, int nrad2,
-              cvec4 &v1,
-              cvec4 &v2,
+              const SALTEDDescriptors &v1,
+              const SALTEDDescriptors &v2,
               vec &w3j, int llmax,
               ivec2 &llvec, int lam,
               cvec2 &c2r, int featsize,
@@ -215,7 +214,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
                             if (abs(m2) <= l2)
                             {
                                 im2 = m2 + l2;
-                                pcmplx[imu] += w3j[iwig] * v1[l1][iat][im1][n1] * v2[l2][iat][im2][n2];
+                                pcmplx[imu] += w3j[iwig] * v1.block(iat, n1, l1)[im1] * v2.block(iat, n2, l2)[im2];
                                 iwig++;
                             }
                         }
