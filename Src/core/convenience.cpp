@@ -1297,7 +1297,7 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     return true;
 }
 
-bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug)
+bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, const bool& debug)
 {
     using namespace std;
     vec2 Uij, Cijk, Dijkl;
@@ -1613,15 +1613,20 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN& wavy, cell& unit_
     return true;
 };
 
-bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, std::ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::ofstream &log3, const bool &debug, const bool &grown, const ivec3 &symmetry_linking_list)
 {
     using namespace std;
-    vec2 Uij, Cijk, Dijkl;
     ifstream asym_cif_input(cif, std::ios::in);
     asym_cif_input.clear();
     asym_cif_input.seekg(0, asym_cif_input.beg);
     string line;
-    const int ncen = wavy.get_ncen();
+    int ncen;
+    if (!grown) {
+        ncen = wavy.get_ncen();
+    }
+    else {
+        ncen = symmetry_linking_list.size();
+    }
     svec labels(ncen);
 
     for (int i = 0; i < ncen; i++) {
@@ -1679,6 +1684,11 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, std::ofstre
 							ADPs[0][fields[i]] = stof(entries[i + 1]);
                         }
                         wavy.set_atom_ADPs(a, ADPs);
+                        if (grown) {
+                            for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
+                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                            }
+                        }
                         atom_found = true;
                         break;
                     }
@@ -1739,6 +1749,11 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, std::ofstre
                             ADPs[1][fields[i]] = stof(entries[i + 1]);
                         }
                         wavy.set_atom_ADPs(a, ADPs);
+                        if (grown) {
+                            for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
+                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                            }
+                        }
                         atom_found = true;
                         break;
                     }
@@ -1806,6 +1821,11 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, std::ofstre
                             ADPs[2][fields[i]] = stof(entries[i + 1]);
                         }                
                         wavy.set_atom_ADPs(a, ADPs);
+                        if (grown) {
+                            for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
+                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                            }
+                        }
                         atom_found = true;
                         break;
                     }
@@ -1824,7 +1844,7 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, std::ofstre
     // closing function
 };
 
-vec read_U_iso_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
+vec read_U_iso_from_CIF(const std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, const bool& debug)
 {
     using namespace std;
     vec U_iso;

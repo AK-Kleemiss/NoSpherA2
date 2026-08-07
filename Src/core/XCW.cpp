@@ -12,11 +12,38 @@ void XCW::construct(const options& opt_in) {
 	std::filesystem::path hkl_filename = opt->hkl;
 	std::filesystem::path cif = opt->cif;
 	std::ifstream cif_input(cif.c_str(), std::ios::in);
+	std::optional<std::filesystem::path> xyz_path;
+	std::optional<std::vector<asym_atom>> xyz_atoms;
+	if (settings.grown) {
+		if ((opt->xyz_file.empty())) {
+			std::cerr << "I need an xyz file to grow the crystal, but none was provided. Exiting." << std::endl;
+		}
+		xyz_path = opt->xyz_file;
+		WFN dummy_wave;
+		dummy_wave.read_xyz(*xyz_path, std::cout, opt->debug);
+		xyz_atoms = dummy_wave.extract_xyz("bohr");
+	}
 	unit_cell = cell(cif, std::cout, opt->debug, opt->do_XCW);
 	hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt->twin_law, unit_cell, std::cout, obs, opt->debug);
 	std::ofstream log3("log3.txt", std::ios::out);
 	bvec needs_grid;
 	read_atoms_from_CIF(cif_input, unit_cell, cryst.ncen, needs_grid, asym_atoms, opt->debug);
+
+	// Adds symmetry generated atoms
+	if (settings.grown) {
+		unit_cell.grow_asym_atoms(asym_atoms, xyz_atoms.value());
+	}
+
+	// Evaluate symmetry and assign asymmetry factors to each atom (also update ncen)
+	//The linking list is ordered like this: Asymmetric atom first, then symmetry generated atom, then index of symmetry operation that generated it
+	ivec3 symmetry_linking_list;
+	unit_cell.eval_symm(asym_atoms, cryst.ncen, symmetry_linking_list, settings.grown);
+	cryst.ncen = asym_atoms.size();
+
+	// Load whether or not the structure is grown, find applied symmetries and delete the corresponding reflections
+	if (settings.grown) {
+		unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list);
+	}
 
 	// Generate WFN object from asym_atoms
 	dummy_wave.assign_charge(opt->charge);
@@ -37,13 +64,8 @@ void XCW::construct(const options& opt_in) {
 
 	// Read isotropic displacement parameters
 	cryst.U_iso = read_U_iso_from_CIF(cif, dummy_wave, unit_cell, log3, opt->debug);
-
-	// Evaluate symmetry and assign asymmetry factors to each atom
-	unit_cell.eval_symm(asym_atoms);
-
-	// Load whether or not the structure is grown, find applied symmetries and delete the corresponding reflections
 	if (settings.grown) {
-		unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms);
+		cryst.grow_U_iso(asym_atoms, symmetry_linking_list);
 	}
 
 	// Generate k_pts and set the number of reflections
@@ -52,7 +74,7 @@ void XCW::construct(const options& opt_in) {
 	make_k_pts(cryst.nr != 0 && hkl.size() == 0, opt->save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt->debug);
 
 	// Read ADPs
-	read_fracs_ADPs_from_CIF(cif, dummy_wave, log3, opt->debug);
+	read_fracs_ADPs_from_CIF(cif, dummy_wave, log3, opt->debug, settings.grown, symmetry_linking_list);
 
 	// Prepare output files
 	XCW_log.open("XCW.log");

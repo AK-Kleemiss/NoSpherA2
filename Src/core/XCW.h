@@ -57,6 +57,17 @@ private:
 		double weighted_GooF1;
 		double weighted_GooF2;
 		vec U_iso;
+
+		void grow_U_iso(const std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list) {
+			for (int i = 0; i < asym_atoms.size(); ++i) {
+				if (asym_atoms[i].grown) {
+					continue;
+				}
+				for (int j = 0; j < symmetry_linking_list[i].size(); j++) {
+					U_iso[symmetry_linking_list[i][j][0]] = U_iso[i];
+				}
+			}
+		};
 	};
 
 	/* Data concerning convergence criteria, molecule information, basis set, etc.

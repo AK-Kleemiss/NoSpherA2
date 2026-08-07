@@ -9,6 +9,7 @@
 #include "nos_math.h"
 #include "libCintMain.h"
 #include "basis_set.h"
+#include "cell.h"
 
 #include "occ/OrbitalDefs.h"
 long long int WFN::pre[9][5][5][9] = {};
@@ -1141,6 +1142,27 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
         err_checkf(push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i]), "Error while making atoms!!", file);
     return true;
 };
+
+std::vector<asym_atom> WFN::extract_xyz(const std::string& unit) {
+    std::vector<asym_atom> atoms;
+    const d3 dummy_coords({0, 0, 0});
+    for (int i = 0; i < ncen; i++) {
+        atom temp_atom = get_atom(i);
+        d3 temp_coords = temp_atom.get_pos();
+        if (isBohr == true && unit == "angstrom") {
+            temp_coords[0] = constants::bohr2ang(temp_coords[0]);
+            temp_coords[1] = constants::bohr2ang(temp_coords[1]);
+            temp_coords[2] = constants::bohr2ang(temp_coords[2]);
+        }
+        else if (isBohr == false && unit == "bohr") {
+            temp_coords[0] = constants::ang2bohr(temp_coords[0]);
+            temp_coords[1] = constants::ang2bohr(temp_coords[1]);
+            temp_coords[2] = constants::ang2bohr(temp_coords[2]);
+        }
+        atoms.emplace_back(asym_atom(temp_atom.get_label(), temp_atom.get_charge(), temp_coords, dummy_coords, 1.0, cdouble(0.0, 0.0)));
+	}
+    return atoms;
+}
 
 bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
 {
