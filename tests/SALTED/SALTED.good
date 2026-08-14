@@ -12,7 +12,7 @@ Number of atoms in Wavefunction file: 14 Number of MOs: 0
 Using "model.salted" for the prediction
 Reading:                          "test_cysteine.cif" done!
 Generating hkl indices up to d=:              0.73... done!
-Nr of reflections generated:                  9856
+Nr of reflections generated:                 11385
 Number of symmetry operations:                   4
 Nr of reflections to be used:                 5692
 Generating k-points...                            ... done!
