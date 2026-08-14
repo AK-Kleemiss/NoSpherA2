@@ -14,7 +14,37 @@
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 
+static int run_app_impl(int argc, char **argv);
+
+// Wrapper around the actual application, so that an exception thrown deep inside a file
+// parser reports what went wrong instead of terminating the process with a fail-fast.
 int run_app(int argc, char **argv)
+{
+    // Remember the console before run_app_impl() redirects std::cout into NoSpherA2.log;
+    // by the time we get here in a catch block the log file has already been destroyed.
+    std::streambuf *const console = std::cout.rdbuf();
+    try
+    {
+        return run_app_impl(argc, argv);
+    }
+    catch (const std::exception &e)
+    {
+        std::cout.rdbuf(console);
+        std::cout << "\nNoSpherA2 stopped with an unhandled error: " << e.what()
+                  << "\n\tThis usually means one of the input files is malformed or an option is missing."
+                  << "\n\tThe last thing that was read is at the end of NoSpherA2.log." << std::endl;
+        return -1;
+    }
+    catch (...)
+    {
+        std::cout.rdbuf(console);
+        std::cout << "\nNoSpherA2 stopped with an unhandled error of unknown type."
+                  << "\n\tThe last thing that was read is at the end of NoSpherA2.log." << std::endl;
+        return -1;
+    }
+}
+
+static int run_app_impl(int argc, char **argv)
 {
     using namespace std;
     const std::filesystem::path cwd = std::filesystem::current_path();

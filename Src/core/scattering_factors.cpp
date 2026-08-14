@@ -462,17 +462,27 @@ void generate_hkl(const double& dmin,
 	file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
 	i3 hkl_;
 	string line, temp;
+	/* A reflection with spacing d has |h| <= a/d, and likewise for k and l with
+	b and c, in any cell: the bound is the real-space axis length times the
+	reciprocal radius. It is tight, so the loops have to reach it. They used to
+	stop one short and lean on a 0.01 A widening of dmin to make the difference
+	up, which is not the same thing - the slack that buys scales with the axis
+	length, so it covers the shortfall on a long axis and not on a short one.
+	For a dynamical calculation the list has to be complete rather than nearly
+	so: a single index the table misses is a failed refinement, not a slightly
+	worse number.
+	*/
 	const ivec extreme = {
-		int(unit_cell.get_a() / (dmin - 0.01)),
-		int(unit_cell.get_b() / (dmin - 0.01)),
-		int(unit_cell.get_c() / (dmin - 0.01)) };
+		int(std::floor(unit_cell.get_a() / dmin)),
+		int(std::floor(unit_cell.get_b() / dmin)),
+		int(std::floor(unit_cell.get_c() / dmin)) };
 	if (debug)
 		file << "extreme: " << extreme[0] << " " << extreme[1] << " " << extreme[2] << endl;
-	for (int h = -extreme[0]; h < extreme[0]; h++)
+	for (int h = -extreme[0]; h <= extreme[0]; h++)
 	{
-		for (int k = -extreme[1]; k < extreme[1]; k++)
+		for (int k = -extreme[1]; k <= extreme[1]; k++)
 		{
-			for (int l = -extreme[2]; l < extreme[2]; l++)
+			for (int l = -extreme[2]; l <= extreme[2]; l++)
 			{
 				hkl_ = { h, k, l };
 				hkl.emplace(hkl_);
@@ -575,8 +585,20 @@ void generate_hkl(const ivec2& hkl_min_max,
 	int h_max = std::max(abs(hkl_min_max[0][1]), abs(hkl_min_max[0][0])),
 		k_max = std::max(abs(hkl_min_max[1][1]), abs(hkl_min_max[1][0])),
 		l_max = std::max(abs(hkl_min_max[2][1]), abs(hkl_min_max[2][0]));
-	if (ED)
+	/* Doubling each axis of the measured box is not the same set as the
+	reflections out to half the measured spacing, and it is the latter a
+	dynamical calculation asks for. A box and a resolution shell are different
+	shapes: the shell reaches further along the shorter axes, so this leaves a
+	gap there. Olex2 sends -dmin for ED, which takes precedence over the box
+	and generates the right set; this stays for callers that pass only a box,
+	and says so rather than looking complete.
+	*/
+	if (ED) {
 		h_max *= 2, k_max *= 2, l_max *= 2;
+		file << "Warning: an ED table generated from an index box alone may be "
+			"short along the shorter axes; pass -dmin to generate to a resolution "
+			"instead.\n";
+	}
 	file << "Generating hkl between ["
 		<< setw(2) << -h_max << "," << setw(2) << h_max << "] ; ["
 		<< setw(2) << -k_max << "," << setw(2) << k_max << "] ; ["

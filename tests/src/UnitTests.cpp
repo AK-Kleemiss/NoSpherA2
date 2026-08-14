@@ -11,6 +11,7 @@
 #include "core/GridManager.h"
 #include "core/atoms.h"
 #include "core/tsc_block.h"
+#include "core/cell.h"
 
 static constexpr double PI_VAL = 3.14159265358979323846;
 
@@ -2175,6 +2176,104 @@ namespace NoSpherA2UnitTests
         ASSERT_TRUE(second.push_back_basis_set(10.0, 0.5, 1, 0));
 
         EXPECT_FALSE(first == second);
+    }
+
+    // ParseSymopTests — cell::parse_symop, the CIF symmetry operation reader
+    struct parsed_symop
+    {
+        int rot[3][3]{};
+        double trans[3]{};
+    };
+
+    static parsed_symop parse(const std::string& operation)
+    {
+        parsed_symop result;
+        std::ostringstream sink;
+        cell::parse_symop(operation, "test.cif", result.rot, result.trans, sink);
+        return result;
+    }
+
+    static void expect_rot(const parsed_symop& op, const int expected[3][3])
+    {
+        for (int comp = 0; comp < 3; comp++)
+            for (int axis = 0; axis < 3; axis++)
+                EXPECT_EQ(op.rot[comp][axis], expected[comp][axis])
+                    << "component " << comp << ", axis " << axis;
+    }
+
+    TEST(ParseSymopTest, Identity)
+    {
+        const parsed_symop op = parse("x,y,z");
+        const int expected[3][3] = { {1, 0, 0}, {0, 1, 0}, {0, 0, 1} };
+        expect_rot(op, expected);
+        EXPECT_DOUBLE_EQ(op.trans[0], 0.0);
+        EXPECT_DOUBLE_EQ(op.trans[1], 0.0);
+        EXPECT_DOUBLE_EQ(op.trans[2], 0.0);
+    }
+
+    // The operations of P 2_1 2_1 2_1, which used to abort the process because the
+    // translation was read with stof("x+1") instead of being split off the axis term.
+    TEST(ParseSymopTest, ScrewAxisWithTrailingFraction)
+    {
+        const parsed_symop op = parse("x+1/2,-y+1/2,-z");
+        const int expected[3][3] = { {1, 0, 0}, {0, -1, 0}, {0, 0, -1} };
+        expect_rot(op, expected);
+        EXPECT_DOUBLE_EQ(op.trans[0], 0.5);
+        EXPECT_DOUBLE_EQ(op.trans[1], 0.5);
+        EXPECT_DOUBLE_EQ(op.trans[2], 0.0);
+    }
+
+    TEST(ParseSymopTest, TranslationBeforeAxis)
+    {
+        const parsed_symop op = parse("1/2+X,1/2-Y,-Z");
+        const int expected[3][3] = { {1, 0, 0}, {0, -1, 0}, {0, 0, -1} };
+        expect_rot(op, expected);
+        EXPECT_DOUBLE_EQ(op.trans[0], 0.5);
+        EXPECT_DOUBLE_EQ(op.trans[1], 0.5);
+        EXPECT_DOUBLE_EQ(op.trans[2], 0.0);
+    }
+
+    TEST(ParseSymopTest, DecimalTranslationsAndWhitespace)
+    {
+        const parsed_symop op = parse(" 0.5 - x , y , 0.25 + z ");
+        const int expected[3][3] = { {-1, 0, 0}, {0, 1, 0}, {0, 0, 1} };
+        expect_rot(op, expected);
+        EXPECT_DOUBLE_EQ(op.trans[0], 0.5);
+        EXPECT_DOUBLE_EQ(op.trans[1], 0.0);
+        EXPECT_DOUBLE_EQ(op.trans[2], 0.25);
+    }
+
+    // Rhombohedral obverse setting: mixed axes in one component and thirds
+    TEST(ParseSymopTest, MixedAxesAndThirds)
+    {
+        const parsed_symop op = parse("-y+2/3,x-y+1/3,z+1/3");
+        const int expected[3][3] = { {0, -1, 0}, {1, -1, 0}, {0, 0, 1} };
+        expect_rot(op, expected);
+        EXPECT_NEAR(op.trans[0], 2.0 / 3.0, 1e-12);
+        EXPECT_NEAR(op.trans[1], 1.0 / 3.0, 1e-12);
+        EXPECT_NEAR(op.trans[2], 1.0 / 3.0, 1e-12);
+    }
+
+    TEST(ParseSymopTest, Inversion)
+    {
+        const parsed_symop op = parse("-x,-y,-z");
+        const int expected[3][3] = { {-1, 0, 0}, {0, -1, 0}, {0, 0, -1} };
+        expect_rot(op, expected);
+        EXPECT_DOUBLE_EQ(op.trans[0], 0.0);
+        EXPECT_DOUBLE_EQ(op.trans[1], 0.0);
+        EXPECT_DOUBLE_EQ(op.trans[2], 0.0);
+    }
+
+    // A malformed operation has to leave through error_check's exit(-1), not abort the
+    // process with a fail-fast. The message itself cannot be matched here because
+    // error_check reports on stdout while death tests only see stderr.
+    TEST(ParseSymopDeathTest, MalformedOperationExitsCleanly)
+    {
+        parsed_symop result;
+        EXPECT_EXIT(cell::parse_symop("x,y", "test.cif", result.rot, result.trans, std::cout),
+            ::testing::ExitedWithCode(static_cast<unsigned>(-1)), ".*");
+        EXPECT_EXIT(cell::parse_symop("x+1/0,y,z", "test.cif", result.rot, result.trans, std::cout),
+            ::testing::ExitedWithCode(static_cast<unsigned>(-1)), ".*");
     }
 
 } // namespace NoSpherA2UnitTests

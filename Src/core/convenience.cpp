@@ -183,9 +183,11 @@ std::string help_message =
  "  -xyz <file.xyz>                    Atomic positions for IAM or SALTED.\n"
  "  -hkl <file.hkl>                    Reflection list.\n"
  "  -dmin <angstrom>                   Generate reflections to this d-spacing\n"
- "                                    instead of reading -hkl.\n"
+ "                                    instead of reading -hkl.  Takes precedence\n"
+ "                                    over -hkl_min_max and -hkl.\n"
  "  -hkl_min_max hmin hmax kmin kmax lmin lmax\n"
- "                                    Explicit HKL bounds; replaces -hkl/-dmin.\n"
+ "                                    Explicit HKL bounds; used instead of -hkl,\n"
+ "                                    but only when -dmin is not given.\n"
  "  -IAM                               Use Thakkar independent-atom factors.\n"
  "  -acc <0..4>                        Numerical grid accuracy [2]; 4 is the\n"
  "                                    practical maximum.\n"
@@ -3705,10 +3707,14 @@ double vec_length(const vec &in)
 }
 
 namespace {
+    // Captured during static initialisation, so it still refers to the console after
+    // run_app() has redirected std::cout into NoSpherA2.log. A function local static
+    // would only be captured on the first error, by which time the redirect has happened
+    // and every error message would end up in the log file instead of on the console.
+    std::streambuf *const initial_coutbuf = std::cout.rdbuf();
     std::streambuf *original_coutbuf()
     {
-        static std::streambuf *buf = std::cout.rdbuf();
-        return buf;
+        return initial_coutbuf;
     }
 }
 

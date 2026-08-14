@@ -2,6 +2,7 @@
 
 #include "constants.h"
 #include "nos_math.h"
+#include "convenience.h"
 #include <filesystem>
 
 struct asym_atom {
@@ -35,6 +36,25 @@ private:
     bool check_special(const vec& pos1, const vec& pos2);
 
 public:
+    /**
+     * @brief Parses a CIF symmetry operation such as "-x+1/2,y,-z+1/2".
+     *
+     * Accepts the usual spellings of the three components: upper or lower case axis
+     * names, translations written as fractions ("1/2") or decimals ("0.5"), and the
+     * translation either before or after the axis term.
+     *
+     * @param operation the operation as read from the CIF
+     * @param filename the CIF it came from, only used for error messages
+     * @param rot [out] rotation part, rot[component][axis]
+     * @param translation [out] translation part, one value per component
+     * @param file where to report a malformed operation
+     */
+    static void parse_symop(const std::string& operation,
+        const std::filesystem::path& filename,
+        int rot[3][3],
+        double translation[3],
+        std::ostream& file);
+
     //void get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
     void eval_symm(std::vector<asym_atom>& asym_atoms);
 
@@ -57,6 +77,7 @@ public:
         if (debug)
             file << "starting to read cif!" << std::endl;
         file << "Reading: " << std::setw(44) << filename << std::flush;
+        err_checkf(std::filesystem::exists(filename), "The CIF " + filename.string() + " does not exist!", file);
         sym.resize(3);
         for (int i = 0; i < 3; i++)
             sym[i].resize(3);
@@ -370,28 +391,38 @@ public:
             {
                 if (line.find(cell_keywords[k]) != std::string::npos)
                 {
+                    const std::string value = line.substr(cell_keywords[k].length(), line.find("("));
+                    double parsed = 0.0;
+                    try
+                    {
+                        parsed = stod(value);
+                    }
+                    catch (const std::exception&)
+                    {
+                        err_checkf(false, "Could not read a number from \"" + cell_keywords[k] + value + "\" in " + filename.string() + "!", file);
+                    }
                     switch (k)
                     {
                     case 0:
-                        a = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+                        a = parsed;
                         break;
                     case 1:
-                        b = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+                        b = parsed;
                         break;
                     case 2:
-                        c = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+                        c = parsed;
                         break;
                     case 3:
-                        alpha = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+                        alpha = parsed;
                         break;
                     case 4:
-                        beta = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+                        beta = parsed;
                         break;
                     case 5:
-                        gamma = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+                        gamma = parsed;
                         break;
                     case 6:
-                        v = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+                        v = parsed;
                         break;
                     default:
                         file << "This is weird... should never get here... aborting!" << std::endl;
@@ -403,6 +434,13 @@ public:
             if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
                 break;
         }
+        // The cell volume is optional, everything else has to be there for the cell to make sense
+        std::string missing;
+        for (int k = 0; k < 6; k++)
+            if (!found[k])
+                missing += (missing.empty() ? "" : ", ") + cell_keywords[k];
+        err_checkf(missing.empty(), "The CIF " + filename.string() + " is missing " + missing + "!", file);
+
         ca = cos(constants::PI_180 * alpha);
         cb = cos(constants::PI_180 * beta);
         cg = cos(constants::PI_180 * gamma);
@@ -410,10 +448,11 @@ public:
         sb = sin(constants::PI_180 * beta);
         sg = sin(constants::PI_180 * gamma);
         V = a * b * c * sqrt(1 + 2 * ca * cb * cg - ca * ca - cb * cb - cg * cg);
-        if (V / v > 1.1 || V / v < 0.9)
+        err_checkf(V > 0.0, "The cell of " + filename.string() + " has a volume of 0, please check the cell parameters!", file);
+        if (found[6] && v > 0.0 && (V / v > 1.1 || V / v < 0.9))
         {
-            file << "Volume computed is more than 10% off, please check!" << std::endl;
-            return false;
+            err_checkf(false, "The volume computed from the cell parameters of " + filename.string() + " (" + std::to_string(V) +
+                " A^3) is more than 10% off the _cell_volume given in the file (" + std::to_string(v) + " A^3), please check!", file);
         }
         as = b * c * sa / V;
         bs = a * c * sb / V;
@@ -529,96 +568,13 @@ public:
                     int rot_from_cif[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
                     for (int i = 0; i < count_fields; i++)
                         s >> fields[i];
-                    svec vectors;
-                    vectors.resize(3);
-                    int column = 0;
-                    for (int c_ = 0; c_ < fields[operation_field].length(); c_++)
-                    {
-                        if (fields[operation_field][c_] != ',')
-                            vectors[column].push_back(fields[operation_field][c_]);
-                        else
-                            column++;
-                    }
-
-                    for (int x = 0; x < 3; x++)
-                    {
-                        if (vectors[x].find("X") != std::string::npos || vectors[x].find("x") != std::string::npos)
-                        {
-                            char sign = ' ';
-                            if (vectors[x].find("X") != std::string::npos && vectors[x].find("X") != 0)
-                                sign = vectors[x].at(vectors[x].find("X") - 1);
-                            else if (vectors[x].find("X") == 0)
-                                sign = '+';
-                            if (vectors[x].find("x") != std::string::npos && vectors[x].find("x") != 0)
-                                sign = vectors[x].at(vectors[x].find("x") - 1);
-                            else if (vectors[x].find("x") == 0)
-                                sign = '+';
-                            if (sign == '-')
-                                rot_from_cif[x][0] = -1;
-                            if (sign == '+')
-                                rot_from_cif[x][0] = 1;
-                        }
-                        if (vectors[x].find("Y") != std::string::npos || vectors[x].find("y") != std::string::npos)
-                        {
-                            char sign = ' ';
-                            if (vectors[x].find("Y") != std::string::npos && vectors[x].find("Y") != 0)
-                                sign = vectors[x].at(vectors[x].find("Y") - 1);
-                            else if (vectors[x].find("Y") == 0)
-                                sign = '+';
-                            if (vectors[x].find("y") != std::string::npos && vectors[x].find("y") != 0)
-                                sign = vectors[x].at(vectors[x].find("y") - 1);
-                            else if (vectors[x].find("y") == 0)
-                                sign = '+';
-                            if (sign == '-')
-                                rot_from_cif[x][1] = -1;
-                            if (sign == '+')
-                                rot_from_cif[x][1] = 1;
-                        }
-                        if (vectors[x].find("Z") != std::string::npos || vectors[x].find("z") != std::string::npos)
-                        {
-                            char sign = ' ';
-                            if (vectors[x].find("Z") != std::string::npos && vectors[x].find("Z") != 0)
-                                sign = vectors[x].at(vectors[x].find("Z") - 1);
-                            else if (vectors[x].find("Z") == 0)
-                                sign = '+';
-                            if (vectors[x].find("z") != std::string::npos && vectors[x].find("z") != 0)
-                                sign = vectors[x].at(vectors[x].find("z") - 1);
-                            else if (vectors[x].find("z") == 0)
-                                sign = '+';
-                            if (sign == '-')
-                                rot_from_cif[x][2] = -1;
-                            if (sign == '+')
-                                rot_from_cif[x][2] = 1;
-                        }
-                    }
-					double temp1, temp2;
-                    if (vectors[0].find("/") != std::string::npos) {
-                        int tmp_pos = vectors[0].find("/");
-                        temp1 = std::stof(vectors[0].substr(0, tmp_pos));
-                        temp2 = std::stof(vectors[0].substr(tmp_pos + 1, tmp_pos + 2));
-                        trans[0].push_back(temp1 / temp2);
-                    }
-                    else {
-                        trans[0].push_back(0);
-                    }
-                    if (vectors[1].find("/") != std::string::npos) {
-                        int tmp_pos = vectors[1].find("/");
-                        temp1 = std::stof(vectors[1].substr(0, tmp_pos));
-                        temp2 = std::stof(vectors[1].substr(tmp_pos + 1, tmp_pos + 2));
-                        trans[1].push_back(temp1 / temp2);
-                    }
-                    else {
-                        trans[1].push_back(0);
-                    }
-                    if (vectors[2].find("/") != std::string::npos) {
-                        int tmp_pos = vectors[2].find("/");
-                        temp1 = std::stof(vectors[2].substr(0, tmp_pos));
-                        temp2 = std::stof(vectors[2].substr(tmp_pos + 1, tmp_pos + 2));
-                        trans[2].push_back(temp1 / temp2);
-                    }
-                    else {
-                        trans[2].push_back(0);
-                    }
+                    err_checkf(operation_field < count_fields,
+                        "Could not find the _space_group_symop_operation_xyz column in the symmetry loop of " + filename.string() + "!", file);
+                    double trans_from_cif[3]{ 0.0, 0.0, 0.0 };
+                    parse_symop(fields[operation_field], filename, rot_from_cif, trans_from_cif, file);
+                    trans[0].push_back(trans_from_cif[0]);
+                    trans[1].push_back(trans_from_cif[1]);
+                    trans[2].push_back(trans_from_cif[2]);
                     bool already_known = false;
                     if (!do_XCW) {
                         if (debug)
@@ -661,5 +617,7 @@ public:
                 }
             }
         }
+        err_checkf(symm_found, "No symmetry operations found in " + filename.string() +
+            "! The CIF needs a loop_ containing _space_group_symop_operation_xyz.", file);
     };
 };
