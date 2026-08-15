@@ -468,6 +468,8 @@ public:
     /** Set fractional coordinates for atom (crystallography). */
     void set_atom_frac_coords(const int& nr, const d3& frac) { atoms[nr].set_frac_coords(frac); };
     void set_atom_group_nr(const int atm_nr, const int group_nr) { atoms[atm_nr].set_group_nr(group_nr); };
+    /** Set the CIF-derived SCATTERER_ID for atom. */
+    void set_id_for_atom(const int nr, const atomID& id) { atoms[nr].set_ID(id); };
     int get_atom_basis_set_id(const int& nr) const { return atoms[nr].get_basis_set_id(); };
     //----------Calcualtion of Properties-----------------
     /** Density at position (helper that allocates temporaries). */

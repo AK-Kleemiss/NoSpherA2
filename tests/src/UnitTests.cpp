@@ -1940,6 +1940,20 @@ namespace NoSpherA2UnitTests
         EXPECT_NE(first.get_ID(), second.get_ID());
     }
 
+    TEST_F(AtomTest, ID_IsRebuiltWhenCIFPartChanges)
+    {
+        atom value = make_atom_fractional(6, 0.1, 0.2, 0.3, 1);
+        const atomID part_one_id = value.get_ID();
+
+        // CIF matching can assign PART after an ID has already been requested.
+        value.set_group_nr(2);
+
+        // set_group_nr() updates the cached value, rather than leaving it empty
+        // for a later get_ID() call to reconstruct.
+        EXPECT_EQ(value.get_ID(), atomID(0.1, 0.2, 0.3, 2, 6));
+        EXPECT_NE(value.get_ID(), part_one_id);
+    }
+
     TEST_F(AtomTest, ID_SupportsCoordinateRangeBoundaries)
     {
         EXPECT_NO_THROW({

@@ -941,13 +941,27 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
 				int group_nr = 0;
-				if (group_field != -1 && fields[group_field] != ".") {
+				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?") {
 					group_nr = std::stoi(fields[group_field]);
 				}
+				// Filter PART before matching this CIF row to a WFN atom.  Disorder
+				// positions can be close enough to match an atom in another PART;
+				// doing this after the match overwrites that atom's coordinates/ID and
+				// corrupts the duplicate check of a later -mtc fragment.
+				if (!input_groups.empty() && group_field != -1 &&
+					std::find(input_groups.begin(), input_groups.end(), group_nr) == input_groups.end())
+				{
+					if (debug)
+						file << "Wrong part!" << endl;
+					getline(cif_input, line);
+					continue;
+				}
 				bool old_atom = false;
-				std::string atom_ID = atomID(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]),
+				const atomID cif_atom_id(
+					stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]),
 					group_nr,
-					constants::get_Z_from_label(fields[type_field].c_str()) + 1).to_hex_string();
+					constants::get_Z_from_label(fields[type_field].c_str()) + 1);
+				const std::string atom_ID = cif_atom_id.to_hex_string();
 #pragma omp parallel for reduction(|| : old_atom)
 				for (int run = 0; run < known_atoms.size(); run++)
 				{
@@ -974,6 +988,8 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					{
 						wave.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
                         wave.set_atom_group_nr(i, group_nr);
+						// Store exactly the identifier used above for the MTC duplicate check.
+						wave.set_id_for_atom(i, cif_atom_id);
 						string element = constants::atnr2letter(wave.get_atom_charge(i));
 						err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
 						string label = fields[label_field];
@@ -992,32 +1008,6 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								file << " checking disorder group: " << fields[group_field] << " vs. ";
 								for (int g = 0; g < input_groups.size(); g++)
 									file << input_groups[g] << ",";
-							}
-						}
-						if (input_groups.size() > 0)
-						{
-							bool yep = false;
-							for (int g = 0; g < input_groups.size(); g++)
-							{
-								if (group_field == -1) {
-									yep = true;
-									break;
-								}
-								if (fields[group_field].c_str()[0] == '.' && input_groups[g] == 0)
-								{
-									if (debug)
-										file << "appears to be group 0" << endl;
-									yep = true;
-									break;
-								}
-								else if (stoi(fields[group_field]) == input_groups[g])
-									yep = true;
-							}
-							if (!yep)
-							{
-								if (debug)
-									file << "Wrong part!" << endl;
-								continue;
 							}
 						}
 						if (label.find(element) == string::npos || label.find(element) > 2)

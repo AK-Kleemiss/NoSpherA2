@@ -474,7 +474,14 @@ public:
     vec2 get_ADPs() const { return ADPs; };
     bool get_is_asym() const { return is_asym; };
     void set_is_asym(const bool& val) { is_asym = val; };
-    void set_group_nr(const int group_nr) { this->group_nr = group_nr; };
+    // Fractional coordinates and disorder group form the CIF-derived
+    // SCATTERER_ID. Rebuild it when either value changes so a subsequent MTC
+    // comparison cannot reuse an ID from another PART.
+    void set_group_nr(const int group_nr) {
+        this->group_nr = group_nr;
+        if (charge >= 1 && charge <= 255)
+            ID = atomID(frac_coords[0], frac_coords[1], frac_coords[2], this->group_nr, charge);
+    };
     double distance_to(const atom& other) const;
 
     bool operator==(const atom& other) const;
