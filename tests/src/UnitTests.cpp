@@ -2278,6 +2278,15 @@ namespace NoSpherA2UnitTests
         EXPECT_DOUBLE_EQ(op.trans[2], 0.0);
     }
 
+    // error_check ends the process with exit(-1). Windows reports the full value back
+    // through GetExitCodeProcess, while POSIX wait() only carries the low 8 bits, so the
+    // same exit is observed as 0xFFFFFFFF on one and 255 on the other.
+#ifdef _WIN32
+    constexpr unsigned ERROR_CHECK_EXIT_CODE = static_cast<unsigned>(-1);
+#else
+    constexpr unsigned ERROR_CHECK_EXIT_CODE = 255u;
+#endif
+
     // A malformed operation has to leave through error_check's exit(-1), not abort the
     // process with a fail-fast. The message itself cannot be matched here because
     // error_check reports on stdout while death tests only see stderr.
@@ -2285,9 +2294,9 @@ namespace NoSpherA2UnitTests
     {
         parsed_symop result;
         EXPECT_EXIT(cell::parse_symop("x,y", "test.cif", result.rot, result.trans, std::cout),
-            ::testing::ExitedWithCode(static_cast<unsigned>(-1)), ".*");
+            ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
         EXPECT_EXIT(cell::parse_symop("x+1/0,y,z", "test.cif", result.rot, result.trans, std::cout),
-            ::testing::ExitedWithCode(static_cast<unsigned>(-1)), ".*");
+            ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
     }
 
 } // namespace NoSpherA2UnitTests
