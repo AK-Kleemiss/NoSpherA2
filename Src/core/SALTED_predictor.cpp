@@ -116,7 +116,18 @@ void SALTEDPredictor::setup_atomic_environment()
     atomic_symbols.reserve(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
-        atomic_symbols.emplace_back(wavy.get_atom_label(i));
+        std::string label = wavy.get_atom_label(i);
+        /* Deuterium is hydrogen as far as the electron density goes - the
+        models are trained on H and there is nothing for a D to predict from,
+        so without this a joint X-ray/neutron structure is refused outright:
+        "Excluded species: D". Only the nucleus differs, which this does not
+        see. 5MON carries 593 of them.
+        */
+        if (label == "D" || label == "d")
+        {
+            label = "H";
+        }
+        atomic_symbols.emplace_back(label);
     }
     // # Define system excluding atoms that belong to species not listed in SALTED input
     atomic_symbols = SALTED_Utils::filter_species(atomic_symbols, config.species);
