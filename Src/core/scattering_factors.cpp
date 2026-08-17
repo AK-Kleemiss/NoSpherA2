@@ -982,7 +982,14 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				{
 					for (int j = 0; j < 3; j++)
 					{
-						tolerances[j] = 2 * max(min(abs(precisions[j]), 1.0), 0.01);
+						/* The cap has to be well inside a bond length. It is derived
+						from the fractional precision, so it grows with the cell: on a
+						55-68 A protein cell it reached 1.3 A per axis and matched
+						HB_A:53 to a carbon 0.83 A away, after which the element test
+						dropped the atom as a mismatch. The cif and the xyz describe
+						the same model, so they agree far better than this.
+						*/
+						tolerances[j] = 2 * max(min(abs(precisions[j]), 0.1), 0.01);
 					}
 					if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
 					{
