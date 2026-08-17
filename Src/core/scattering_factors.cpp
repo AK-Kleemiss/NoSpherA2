@@ -2673,7 +2673,7 @@ tsc_block_type calculate_scattering_factors(
         }
         opt.m_hkl_list = hkl;
         opt.iam_switch = true; opt.no_date = true;
-        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, nr);
+        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, 0);
         opt.iam_switch = false; opt.no_date = false;
         blocky.append(std::move(blocky_thakkar), file);
         time_points.push_back(get_time());
