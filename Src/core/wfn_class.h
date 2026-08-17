@@ -234,6 +234,8 @@ public:
     bool read_fchk(const std::filesystem::path& filename, std::ostream& log, const bool debug = false);
     /** Read .xyz geometry (no MOs). */
     bool read_xyz(const std::filesystem::path& filename, std::ostream& file, const bool debug = false);
+    /** Extracts xyz position from the wavefunction and saves them as a list of asym_atom objects. Unit determines which unit is wanted in resulting list */
+    std::vector<asym_atom> extract_xyz(const std::string& unit);
     /** Read Molden format (.molden). */
     bool read_molden(const std::filesystem::path& filename, std::ostream& file, const bool debug = false);
     /** Read tonto orbital_energies and molecular_orbitals binary file. */
@@ -279,6 +281,7 @@ public:
     const void set_ncen(const int& in) { ncen = in; };
     /** Number of MOs (including unoccupied). */
     const int& get_nmo() const { return nmo; };
+    void set_nmo(const int& in) { nmo = in; };
     /** Number of (optionally only occupied) MOs. */
     const int get_nmo(const bool& only_occ) const;
     /** Origin/file type code. */

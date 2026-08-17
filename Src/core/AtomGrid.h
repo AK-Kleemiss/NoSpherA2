@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <iosfwd>
 
 class AtomGrid
 {
@@ -91,11 +92,13 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     const WFN &wavy,
     const vec3 &grid,
     const ivec &num_grid_points,
-    const bool debug = false);
+    const bool debug = false,
+    std::ostream &file = std::cout);
 
 std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     const WFN &wavy,
     const vec3 &grid,
     const ivec &num_grid_points,
     const bool debug = false,
-    const std::vector<std::pair<vec, vec>> MBIS_vectors = {});
+    const std::vector<std::pair<vec, vec>> MBIS_vectors = {},
+    std::ostream &file = std::cout);

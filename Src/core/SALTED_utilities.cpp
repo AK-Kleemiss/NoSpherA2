@@ -190,34 +190,34 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
 }
 
 // Reads the descriptor buffer and fills the expansion coefficients vector
-static cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+static SALTEDDescriptors get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
     int n_atoms = (int)featomic_system.size();
     int nspe = (int)parameters.species.size();
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
-    // cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
-    cvec4 omega(n_atoms, std::vector<cvec2>((size_t)nspe * parameters.max_radial, cvec2((size_t)parameters.max_angular + 1, cvec((size_t)2 * parameters.max_angular + 1, { 0.0, 0.0 }))));
+    const int nchannels = nspe * parameters.max_radial;
+    SALTEDDescriptors omega(n_atoms, nchannels, parameters.max_angular);
     for (int l = 0; l < parameters.max_angular + 1; ++l)
     {
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ (2 * l) + 1 })[0];
         metatensor::TensorBlock descriptor_block = descriptor.block_by_id(l);
         metatensor::NDArray<double> descriptor_values = descriptor_block.values();
 
-        // Perform the matrix multiplication and assignment
+        // descriptor_values is contiguous in its property (d) dimension. The
+        // packed l slab keeps the corresponding output m values contiguous.
         for (int a = 0; a < n_atoms; ++a)
         {
-            for (int c = 0; c < 2 * l + 1; ++c)
+            for (int r = 0; r < 2 * l + 1; ++r)
             {
-                for (int d = 0; d < nspe * parameters.max_radial; ++d)
+                for (int d = 0; d < nchannels; ++d)
                 {
-                    // omega[l][a][c][d] = 0.0;
-                    omega[a][d][l][c] = 0.0;
-                    for (int r = 0; r < 2 * l + 1; ++r)
+                    cdouble* output = omega.block(a, d, l);
+                    const double value = descriptor_values(a, r, d);
+                    for (int c = 0; c < 2 * l + 1; ++c)
                     {
-                        // omega[l][a][c][d] += conj(c2r[r][c]) * descriptor_values(a, r, d);
-                        omega[a][d][l][c] += conj(c2r[r][c]) * descriptor_values(a, r, d);
+                        output[c] += conj(c2r[r][c]) * value;
                     }
-                } /*cvec* v2_ptr = (cvec*)&v2[iat][l2][n2];*/
+                }
             }
         }
         c2r.clear();
@@ -227,7 +227,7 @@ static cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const 
 }
 
 
-cvec4 SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+SALTEDDescriptors SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
     metatensor::TensorMap descriptor = get_feats_projs(featomic_system, parameters);
     std::vector<uint8_t> descriptor_buffer = descriptor.save_buffer();

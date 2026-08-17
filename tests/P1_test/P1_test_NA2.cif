@@ -1,0 +1,145 @@
+data_P1_test
+_audit_creation_method            
+ 'Olex2: 2026.04.10 svn.r48fbca5a MSC:194435222 on WIN64, Python: 3.8.10, wxWidgets: 3.2.5 for OlexSys'
+_chemical_name_common              '?'
+_chemical_name_systematic          '?'
+_chemical_formula_moiety           'C7 H6 Cl N3 O4 S2'
+_chemical_formula_sum              'C7 H6 Cl N3 O4 S2'
+_chemical_formula_weight           295.73
+_chemical_melting_point            ?
+_space_group_crystal_system        'triclinic'
+_space_group_IT_number             1
+_space_group_name_H-M_alt          'P 1'
+_space_group_name_Hall             'P 1'
+loop_
+  _space_group_symop_id
+  _space_group_symop_operation_xyz
+ 1 +X,+Y,+Z
+
+_cell_length_a                     4.8819(3)
+_cell_length_b                     6.4182(4)
+_cell_length_c                     8.9900(7)
+_cell_angle_alpha                  74.040(6)
+_cell_angle_beta                   83.655(6)
+_cell_angle_gamma                  80.497(5)
+_cell_volume                       266.48(3)
+_cell_formula_units_Z              1
+_exptl_crystal_size_max            0.13
+_exptl_crystal_size_mid            0.11
+_exptl_crystal_size_min            0.07
+_diffrn_reflns_av_R_equivalents    0.0000
+_diffrn_reflns_av_unetI/netI       0.0141
+_diffrn_reflns_limit_h_max         6
+_diffrn_reflns_limit_h_min         -6
+_diffrn_reflns_limit_k_max         9
+_diffrn_reflns_limit_k_min         -9
+_diffrn_reflns_limit_l_max         12
+_diffrn_reflns_limit_l_min         -12
+_diffrn_reflns_number              3215
+_diffrn_reflns_theta_max           30.50
+_diffrn_reflns_theta_min           3.33
+_diffrn_ambient_temperature        273.15
+_diffrn_radiation_wavelength       0.71073
+_reflns_number_total               3215
+_refine_diff_density_max           0.15
+loop_
+  _atom_site_label
+  _atom_site_type_symbol
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_U_iso_or_equiv
+  _atom_site_adp_type
+  _atom_site_occupancy
+  _atom_site_refinement_flags_posn
+  _atom_site_site_symmetry_order
+  _atom_site_disorder_group
+ S1 S 1.215195 -0.045093 0.413747 0.021071 Uani 1 . 1 .
+ S2 S 0.607125 -0.207092 0.96406 0.022409 Uani 1 . 1 .
+ Cl3 Cl 0.281252 0.296299 0.854188 0.043527 Uani 1 . 1 .
+ C4 C 0.686632 -0.019042 0.784748 0.021255 Uani 1 . 1 .
+ C5 C 0.89902 -0.089385 0.686643 0.020739 Uani 1 . 1 .
+ H5 H 1.009993 -0.253969 0.720678 0.02489 Uiso 1 R 1 .
+ o6 O 1.092412 -0.176189 0.342855 0.046211 Uani 1 . 1 .
+ O7 O 0.311672 -0.201173 0.986913 0.032978 Uani 1 . 1 .
+ n8 N 0.912339 0.40701 0.362277 0.037684 Uani 1 . 1 .
+ H8 H 0.796887 0.559321 0.330684 0.04522 Uiso 1 R 1 .
+ C9 C 0.970095 0.050662 0.544658 0.019873 Uani 1 . 1 .
+ o10 O 1.462901 -0.14622 0.489328 0.034983 Uani 1 . 1 .
+ C11 C 0.834611 0.265117 0.500854 0.025425 Uani 1 . 1 .
+ o12 O 0.777014 -0.409737 0.962422 0.032807 Uani 1 . 1 .
+ N13 N 0.704616 -0.121525 1.099241 0.0323 Uani 1 . 1 .
+ C14 C 0.546337 0.195402 0.739849 0.027068 Uani 1 . 1 .
+ n15 N 1.284093 0.170279 0.281142 0.040043 Uani 1 . 1 .
+ C16 C 1.128409 0.358136 0.266956 0.038113 Uani 1 . 1 .
+ H16 H 1.178846 0.489027 0.167455 0.04574 Uiso 1 R 1 .
+ C18 C 0.620919 0.336626 0.599906 0.033168 Uani 1 . 1 .
+ H18 H 0.513603 0.502571 0.567198 0.0398 Uiso 1 R 1 .
+ h2 H 0.579272 0.011473 1.121874 0.06317 Uiso 1 . 1 .
+ h3 H 0.911273 -0.115246 1.090172 0.0639 Uiso 1 . 1 .
+
+loop_
+  _atom_site_aniso_label
+  _atom_site_aniso_U_11
+  _atom_site_aniso_U_22
+  _atom_site_aniso_U_33
+  _atom_site_aniso_U_23
+  _atom_site_aniso_U_13
+  _atom_site_aniso_U_12
+ S1 0.021522 0.022312 0.01856 -0.005126 0.002748 -0.003895
+ S2 0.018704 0.027587 0.018382 -0.003545 0.003113 -0.003157
+ Cl3 0.043691 0.038369 0.042392 -0.014869 0.011678 0.009214
+ C4 0.020538 0.022234 0.019175 -0.005559 0.002099 0.000077
+ C5 0.022835 0.017478 0.017332 -0.001501 0.003074 0.001941
+ o6 0.04174 0.06494 0.047806 -0.038833 0.012094 -0.021441
+ O7 0.021566 0.044588 0.030367 -0.005562 0.003066 -0.008305
+ n8 0.046326 0.021565 0.033723 0.004941 0.006815 0.000497
+ C9 0.02251 0.017833 0.016902 -0.002406 0.001563 -0.001706
+ o10 0.025855 0.040674 0.032982 -0.005278 -0.000272 0.002114
+ C11 0.031822 0.016228 0.023237 -0.000439 0.002188 -0.000025
+ o12 0.034867 0.027134 0.029537 -0.000871 0.00619 -0.001614
+ N13 0.028772 0.046281 0.021309 -0.00912 -0.000152 -0.004342
+ C14 0.029485 0.02216 0.025805 -0.005966 0.003102 0.003152
+ n15 0.043113 0.034804 0.028499 0.004141 0.014891 0.00064
+ C16 0.044496 0.028995 0.028081 0.00793 0.00896 -0.002889
+ C18 0.038985 0.019888 0.032973 -0.003421 0.006074 0.005916
+ 
+loop_
+  _atom_site_anharm_GC_C_label
+  _atom_site_anharm_GC_C_111
+  _atom_site_anharm_GC_C_112
+  _atom_site_anharm_GC_C_113
+  _atom_site_anharm_GC_C_122
+  _atom_site_anharm_GC_C_123
+  _atom_site_anharm_GC_C_133
+  _atom_site_anharm_GC_C_222
+  _atom_site_anharm_GC_C_223
+  _atom_site_anharm_GC_C_233
+  _atom_site_anharm_GC_C_333
+ S1 -0.0000008(11) -0.0000002(6) -0.0000008(4) -0.0000003(5) 0.0000003(3)
+ 0.0000000(2) -0.0000018(6) 0.0000001(3) 0.0000001(2) -0.0000003(2)
+ Cl3 0.0000146(11) 0.0000017(6) 0.0000009(4) 0.0000025(5) -0.0000006(2)
+ 0.0000005(2) -0.0000011(6) -0.0000011(3) 0.00000040(19) -0.0000007(2)
+
+loop_
+  _atom_site_anharm_GC_D_label
+  _atom_site_anharm_GC_D_1111
+  _atom_site_anharm_GC_D_1112
+  _atom_site_anharm_GC_D_1113
+  _atom_site_anharm_GC_D_1122
+  _atom_site_anharm_GC_D_1123
+  _atom_site_anharm_GC_D_1133
+  _atom_site_anharm_GC_D_1222
+  _atom_site_anharm_GC_D_1223
+  _atom_site_anharm_GC_D_1233
+  _atom_site_anharm_GC_D_1333
+  _atom_site_anharm_GC_D_2222
+  _atom_site_anharm_GC_D_2223
+  _atom_site_anharm_GC_D_2233
+  _atom_site_anharm_GC_D_2333
+  _atom_site_anharm_GC_D_3333
+ Cl3 0.0000006(2) -0.00000014(9) -0.00000014(6) 0.00000005(6) 0.00000001(3)
+ 0.00000004(3) 0.00000008(6) -0.00000006(2) -0.000000006(18) -0.00000001(2)
+ 0.00000024(9) -0.00000005(4) 0.00000001(2) -0.000000010(18) 0.00000005(2)
+
+

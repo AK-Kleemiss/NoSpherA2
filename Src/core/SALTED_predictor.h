@@ -3,6 +3,7 @@
 
 #include "convenience.h"
 #include "SALTED_io.h"
+#include "SALTED_utilities.h"
 #include "wfn_class.h"
 
 class SALTEDPredictor
@@ -32,7 +33,7 @@ private:
     std::unordered_map<std::string, std::vector<int>> atom_idx{};
     
     std::unordered_map<std::string, int> natom_dict{}, lmax{}, nmax{};
-    cvec4 v1, v2;
+    SALTEDDescriptors v1, v2;
     void setup_atomic_environment();
 
     vec weights{};
