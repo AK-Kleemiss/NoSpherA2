@@ -128,3 +128,7 @@ target_link_libraries(
         occ_main
         featomic::static
 )
+
+if(MSVC)
+    target_compile_options(NoSpherA2Core PRIVATE /Zi)
+endif()
