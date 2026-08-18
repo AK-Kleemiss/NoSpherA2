@@ -35,6 +35,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
     file.populate_config(config);
 
+    lam_group_limit = (opt_in.tsc_block_size > 0) ? 1 : 0;
     bool i_know_all = true;
 #pragma omp parallel for reduction(&& : i_know_all)
     for (int a = 0; a < wavy_in.get_ncen(); a++)
@@ -240,9 +241,31 @@ vec SALTEDPredictor::predict()
 {
     using namespace std;
     // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
-    vec2 pvec(SALTED_Utils::get_lmax_max(lmax) + 1);
-    for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
+    // How many lambda blocks are alive at once.
+    //
+    // A block is natoms * (2*lam+1) * featsize doubles; holding all of them sums
+    // to (nang+1)^2 times a single block - 13.9 GB for 8,566 atoms, most of what
+    // the prediction uses. Holding fewer bounds that, at the cost of revisiting
+    // each species once per group instead of once in total.
+    //
+    // Streaming the tsc is the signal that memory is the binding constraint, so
+    // -tsc_block selects the lean setting; otherwise everything is held, which is
+    // the original loop order exactly.
+    const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
+    const int lam_group = (lam_group_limit > 0) ? lam_group_limit : (lmax_max + 1);
+    ivec featsize(lmax_max + 1);
+    std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
+    for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
+        psi_nm[spe_idx].resize(lmax[config.species[spe_idx]] + 1);
+    // The only quantity that crosses lambda: set at lam = 0, reused above it when
+    // zeta != 1. One per species, and small.
+    std::vector<dMatrix2> kernell0(config.species.size());
+    for (int lam0 = 0; lam0 <= lmax_max; lam0 += lam_group)
     {
+        const int lam1 = std::min(lam0 + lam_group, lmax_max + 1);
+        vec2 pg(lam1 - lam0);
+        for (int lam = lam0; lam < lam1; lam++)
+        {
         int llmax = 0;
         unordered_map<int, ivec> lvalues{};
         for (int l1 = 0; l1 < config.nang1 + 1; l1++)
@@ -270,7 +293,7 @@ vec SALTEDPredictor::predict()
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({2 * lam + 1})[0];
 
         featsize[lam] = config.nspe1 * config.nspe2 * config.nrad1 * config.nrad2 * llmax;
-        vec p;
+        vec &p = pg[lam - lam0];
         ivec2 llvec_t = transpose<int>(llvec);
         if (config.sparsify)
         {
@@ -284,29 +307,22 @@ vec SALTEDPredictor::predict()
             p.assign((size_t)natoms * ((size_t)2 * lam + 1) * featsize[lam], 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1);
         }
-        // p is dead after this; moving avoids duplicating a block that is
-        // natoms * (2*lam+1) * featsize doubles - gigabytes on a protein.
-        pvec[lam] = std::move(p);
-    }
-
-    std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
-    for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
-    {
-        const string spe = config.species[spe_idx];
-        psi_nm[spe_idx].resize(lmax[spe] + 1);
-
-        if (atom_idx.find(spe) == atom_idx.end())
-        {
-            continue;
         }
-        dMatrix2 kernell0_nm;
-        for (int lam = 0; lam < lmax[spe] + 1; ++lam)
+        // Species-outer within the group, so a species walks several consecutive
+        // lambdas and keeps its sparse matrices hot.
+        for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
+        {
+            const string spe = config.species[spe_idx];
+            if (atom_idx.find(spe) == atom_idx.end()) continue;
+            for (int lam = lam0; lam < lam1; lam++)
+            {
+                if (lam > lmax[spe]) continue;
         {
             int lam2_1 = 2 * lam + 1;
             int row_size = featsize[lam] * lam2_1; // Size of a block of rows
 
             dMatrix2 pvec_lam(atom_idx[spe].size() * lam2_1, featsize[lam]);
-            dMatrixRef2 _pvec(pvec[lam].data(), natoms, featsize[lam] * lam2_1);
+            dMatrixRef2 _pvec(pg[lam - lam0].data(), natoms, featsize[lam] * lam2_1);
             double* pvec_ptr = pvec_lam.data();
             for (const int idx : atom_idx[spe])
             {
@@ -324,7 +340,7 @@ vec SALTEDPredictor::predict()
 
                 if (lam == 0)
                 {
-                    kernell0_nm = kernel_nm;
+                    kernell0[spe_idx] = kernel_nm;
                     kernel_nm = elementWiseExponentiation(kernel_nm, config.zeta);
                 }
                 else
@@ -333,7 +349,7 @@ vec SALTEDPredictor::predict()
                     {
                         for (size_t i2 = 0; i2 < Mspe[spe]; ++i2)
                         {
-                            double scale_factor = pow(kernell0_nm(i1, i2), config.zeta - 1);
+                            double scale_factor = pow(kernell0[spe_idx](i1, i2), config.zeta - 1);
                             size_t base_i = i1 * lam2_1;
                             size_t base_j = i2 * lam2_1;
                             for (size_t i = 0; i < lam2_1; ++i)
@@ -349,9 +365,9 @@ vec SALTEDPredictor::predict()
                 psi_nm[spe_idx][lam] = dot(kernel_nm, Vmat[spe + to_string(lam)], false, false);
             }
         }
+            }
+        }
     }
-    pvec.clear();
-    pvec.shrink_to_fit();
 
     unordered_map<string, dMatrix1> C{};
     unordered_map<string, int> ispe{};

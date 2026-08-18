@@ -37,6 +37,9 @@ private:
     // exactly conj(v1), so it is not stored at all and equicomb conjugates on
     // read. Saves a full duplicate of an array that is gigabytes on a protein.
     bool v2_is_conj_of_v1 = false;
+    // Lambda blocks held at once; 0 means all. Set in the constructor, where the
+    // options are in scope: streaming the tsc implies memory is the constraint.
+    int lam_group_limit = 0;
     void setup_atomic_environment();
 
     vec weights{};
