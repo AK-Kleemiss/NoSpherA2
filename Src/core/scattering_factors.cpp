@@ -2325,7 +2325,8 @@ tsc_block_type calculate_scattering_factors(
 	std::ostream& file,
 	svec& known_atoms,
 	const int& nr,
-	vec2* kpts
+	vec2* kpts,
+	salted_part_prep* prep_out
 ) {
 	using namespace std;
 	int nat = 0;
@@ -2460,6 +2461,21 @@ tsc_block_type calculate_scattering_factors(
 	}
 
     if (opt.iam_switch) {
+        if (prep_out != NULL)
+        {
+            // hand back what a per-block spherical calculation needs and stop
+            const std::vector<i3> hv(hkl.begin(), hkl.end());
+            prep_out->asym_atom_list = asym_atom_list;
+            prep_out->labels = labels;
+            prep_out->atom_type_list = atom_type_list;
+            prep_out->asym_atom_to_type_list = asym_atom_to_type_list;
+            prep_out->hkl_v = hv;
+            prep_out->k_of_reflection.resize(hv.size());
+            for (size_t s = 0; s < hv.size(); s++)
+                prep_out->k_of_reflection[s] =
+                    constants::bohr2ang(constants::FOUR_PI * unit_cell.get_stl_of_hkl(hv[s]));
+            return tsc_block_type();
+        }
         vector<Thakkar> spherical_atoms;
         spherical_atoms.reserve(atom_type_list.size());
         for (int i = 0; i < atom_type_list.size(); i++)
@@ -2525,6 +2541,19 @@ tsc_block_type calculate_scattering_factors(
 		file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Calculation of Charges");
+
+		if (prep_out != NULL)
+		{
+			// -mtc streaming: the reflection loop lives outside this call, so hand
+			// back everything that does not depend on reflections and stop here.
+			prep_out->coefs = std::move(coefs);
+			prep_out->asym_atom_list = asym_atom_list;
+			prep_out->labels = labels;
+			prep_out->atoms = calculator.wavy.get_atoms_ptr();
+			prep_out->k_pt = k_pt;
+			prep_out->hkl_v.assign(hkl.begin(), hkl.end());
+			return tsc_block_type();
+		}
 
 		if (stream_tsc)
 		{
@@ -2784,18 +2813,176 @@ tsc_block_type calculate_scattering_factors(
 
 	return blocky;
 }
+// ---------------------------------------------------------------------------
+// Streaming a combined (-mtc) table, one block of reflections at a time
+// ---------------------------------------------------------------------------
+//
+// A disordered structure is calculated as several "parts". The ordinary path
+// runs one part to completion, then the next, and merges the finished tables:
+//
+//     for each part:  compute EVERY reflection  ->  append to the table
+//
+// That needs the whole table in memory, because a part contributes rows and
+// every row spans every reflection.
+//
+// This turns the loops inside out:
+//
+//     prepare every part once            (no reflections involved yet)
+//     for each block of reflections:
+//         for each part: compute just this block
+//         hand the assembled block to the writer
+//
+// The inversion is only possible because everything expensive in a part - the
+// CIF reading and the SALTED density prediction - does not depend on which
+// reflections we ask for. Prepared once and kept, it costs nothing to reuse
+// for every block. That is what salted_part_prep holds.
+//
+// THE SUBTLE PART: ROW ORDER.
+//
+// The rows of the finished file must appear in exactly the order the merging
+// path would have produced, or every value is attributed to the wrong atom -
+// a file of the right size, full of plausible, misassigned numbers, which no
+// error message would ever reveal.
+//
+// It works out to a plain concatenation, for a reason worth stating: each part
+// is prepared with the labels of the parts before it (the growing "known"
+// list), exactly as the sequential code does. read_atoms_from_CIF skips any
+// atom already in that list, so a part never claims an atom an earlier one
+// covered and no duplicates arise. Prepare the parts against an empty list
+// instead and they would overlap - silently, and wrongly.
+//
+// Atoms of species the SALTED model does not know are erased from every part,
+// so they are missing at this stage. The old path computed a whole second
+// table of spherical (Thakkar) form factors for them and appended it; here
+// they are simply extra rows of each block. A Thakkar factor depends only on
+// the element and the reflection, so it needs no prediction and chunks freely.
+// ---------------------------------------------------------------------------
+bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file, vec2* known_kpts)
+{
+	const size_t n_parts = opt.combined_tsc_calc_files.size();
+	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2
+		|| opt.electron_diffraction || opt.iam_switch)
+		return false;
+
+	std::vector<std::shared_ptr<SALTEDPredictor>> preds;
+	std::vector<salted_part_prep> preps;
+	svec known;
+	for (size_t i = 0; i < n_parts; i++)
+	{
+		auto pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
+		if (!pred->basis_set_loaded())
+			load_basis_into_WFN(pred->wavy, BasisSetLibrary::get_basis_set(pred->get_dfbasis_name()));
+		salted_part_prep prep;
+		calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
+			opt, *pred, file, known, static_cast<int>(i), known_kpts, &prep);
+		for (const auto& l : prep.labels) known.push_back(l);
+		preds.push_back(pred);
+		preps.push_back(std::move(prep));
+	}
+
+	// Atoms of species the model does not know were erased from every part, so
+	// they are still missing. The old path recomputed a whole second table for
+	// them and appended it; here they become extra rows of each block.
+	salted_part_prep spherical;
+	bool have_spherical = false;
+	if (opt.needs_Thakkar_fill)
+	{
+		std::vector<WFN> tempy;
+		tempy.emplace_back(opt.combined_tsc_calc_files[0]);
+		// Pin the reflections: the whole-table path set m_hkl_list before its
+		// recursive fill for exactly this reason. Without it the spherical prep can
+		// build its own list and k_of_reflection ends up a different length from the
+		// parts, which is read off the end below.
+		opt.m_hkl_list.clear();
+		for (const auto& h : preps[0].hkl_v) opt.m_hkl_list.emplace(h);
+		const bool iam_was = opt.iam_switch;
+		opt.iam_switch = true;
+		calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+			opt, tempy, file, known, 0, known_kpts, &spherical);
+		opt.iam_switch = iam_was;
+		have_spherical = !spherical.asym_atom_list.empty();
+		if (have_spherical)
+			err_checkf(spherical.k_of_reflection.size() == preps[0].hkl_v.size(),
+				"Spherical remainder covers " + std::to_string(spherical.k_of_reflection.size()) +
+				" reflections, the parts cover " + std::to_string(preps[0].hkl_v.size()), file);
+		file << "Spherical remainder: " << spherical.asym_atom_list.size()
+			 << " atom(s) the model does not know" << std::endl;
+	}
+
+	ScattererLabels ids;
+	for (size_t p = 0; p < preps.size(); p++)
+		for (size_t a = 0; a < preps[p].asym_atom_list.size(); a++)
+		{
+			if (opt.label_tsc_output) ids.emplace_back(preps[p].labels[a]);
+			else ids.emplace_back(preds[p]->wavy.get_id_for_atom(preps[p].asym_atom_list[a]));
+		}
+	if (have_spherical)
+		for (size_t a = 0; a < spherical.asym_atom_list.size(); a++)
+			ids.emplace_back(spherical.labels[a]);
+
+	const size_t n_refl = preps[0].hkl_v.size();
+	const size_t bs = std::min(opt.tsc_block_size, n_refl ? n_refl : 1);
+	file << "Streaming combined tsc: " << ids.size() << " scatterers, "
+		<< n_refl << " reflections, blocks of " << bs << std::endl;
+
+	tsc_stream_writer<int, cdouble> writer("experimental.tscb", ids, std::string(), n_refl, 2);
+	size_t block_id = 0;
+	for (size_t lo = 0; lo < n_refl; lo += bs)
+	{
+		const size_t hi = std::min(lo + bs, n_refl);
+		std::vector<std::vector<int>> idx(3, std::vector<int>(hi - lo));
+		for (size_t r = lo; r < hi; r++)
+			for (int dm = 0; dm < 3; dm++)
+				idx[dm][r - lo] = preps[0].hkl_v[r][dm];
+
+		cvec2 combined;
+		combined.reserve(ids.size());
+		for (size_t p = 0; p < preps.size(); p++)
+		{
+			vec2 k_slice(3, vec(hi - lo));
+			for (size_t r = lo; r < hi; r++)
+				for (int dm = 0; dm < 3; dm++)
+					k_slice[dm][r - lo] = preps[p].k_pt[dm][r];
+			cvec2 chunk;
+			calc_SF_SALTED(k_slice, preps[p].coefs, *preps[p].atoms, preps[p].asym_atom_list, chunk);
+			for (auto& row : chunk) combined.push_back(std::move(row));
+		}
+		if (have_spherical)
+		{
+			std::vector<Thakkar> spheres;
+			spheres.reserve(spherical.atom_type_list.size());
+			for (size_t t = 0; t < spherical.atom_type_list.size(); t++)
+				spheres.emplace_back(spherical.atom_type_list[t]);
+			for (size_t a = 0; a < spherical.asym_atom_list.size(); a++)
+			{
+				cvec row(hi - lo);
+				for (size_t r = lo; r < hi; r++)
+					row[r - lo] = spheres[spherical.asym_atom_to_type_list[a]]
+						.get_form_factor(spherical.k_of_reflection[r]);
+				combined.push_back(std::move(row));
+			}
+		}
+		writer.submit(block_id++, std::move(idx), std::move(combined));
+	}
+	writer.finish();
+	opt.tsc_written_by_stream = true;
+	return true;
+}
+
 template itsc_block calculate_scattering_factors(options& opt,
 	std::vector<WFN>& calculator,
 	std::ostream& file,
 	svec& known_atoms,
 	const int& nr,
-	vec2* kpts);
+	vec2* kpts,
+	salted_part_prep* prep_out);
 template itsc_block calculate_scattering_factors(options& opt,
 	SALTEDPredictor& calculator,
 	std::ostream& file,
 	svec& known_atoms,
 	const int& nr,
-	vec2* kpts);
+	vec2* kpts,
+	salted_part_prep* prep_out);
 
 
 /**

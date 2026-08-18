@@ -325,6 +325,16 @@ static int run_app_impl(int argc, char **argv)
         svec known_scatterer;
         vec2 known_kpts;
         tsc_block<int, cdouble> result;
+        // Streamed combined table, when eligible: parts prepared first, then one
+        // pass over reflection blocks. Falls through to the loop below otherwise.
+        if (stream_mtc_salted(opt, wavy, log_file, &known_kpts))
+        {
+            log_file.flush();
+            std::cout.rdbuf(_coutbuf);
+            std::cout << "Finished!" << endl;
+            return 0;
+        }
+
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
             known_scatterer = result.get_scatterers_string();
