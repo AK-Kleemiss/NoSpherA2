@@ -366,6 +366,16 @@ static int run_app_impl(int argc, char **argv)
             }
         }
 
+        if (opt.tsc_written_by_stream)
+        {
+            // the streamed path already wrote the file block by block; writing
+            // the (empty) in-memory block now would truncate it
+            log_file << "tsc written by the streaming path" << endl;
+            log_file.flush();
+            std::cout.rdbuf(_coutbuf);
+            std::cout << "Finished!" << endl;
+            return 0;
+        }
         known_scatterer = result.get_scatterers_string();
         log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
         _time_point start = get_time();
@@ -414,6 +424,11 @@ static int run_app_impl(int argc, char **argv)
         //use atoms of group 0
         opt.groups[0].push_back(0);
         itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, wavy, log_file, empty, 0);
+        if (opt.tsc_written_by_stream)
+        {
+            log_file << "tsc written by the streaming path" << endl;
+        }
+        else {
         log_file << "Writing tsc file... " << flush;
         if (opt.binary_tsc)
             res.write_tscb_file();
@@ -424,6 +439,7 @@ static int run_app_impl(int argc, char **argv)
         log_file << " ... done!" << endl;
         if (opt.write_CIF)
             write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+        }
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
@@ -597,6 +613,11 @@ static int run_app_impl(int argc, char **argv)
 
                 delete temp_pred;
             }
+            if (opt.tsc_written_by_stream)
+            {
+                log_file << "tsc written by the streaming path" << endl;
+            }
+            else {
             log_file << "Writing tsc file... " << flush;
             if (opt.binary_tsc)
                 res.write_tscb_file();
@@ -607,6 +628,7 @@ static int run_app_impl(int argc, char **argv)
             log_file << " ... done!" << endl;
             if (opt.write_CIF)
                 write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+            }
         }
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again

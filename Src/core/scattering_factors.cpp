@@ -5,6 +5,7 @@
  */
 #include "pch.h"
 #include "tsc_block.h"
+#include "tsc_stream.h"
 #include "scattering_factors.h"
 #include "convenience.h"
 #include "cell.h"
@@ -2440,11 +2441,23 @@ tsc_block_type calculate_scattering_factors(
 
 	time_points.push_back(get_time());
 	time_descriptions.push_back("k-points preparation");
+	// Streaming emits the table in reflection blocks instead of holding
+	// scatterers x reflections x 16 bytes at once. Only the plain single-part
+	// SALTED path is routed this way so far; -mtc still needs every reflection
+	// resident because parts are combined by scatterer.
+	const bool stream_tsc = opt.tsc_block_size > 0
+		&& !opt.needs_Thakkar_fill
+		&& !opt.iam_switch
+		&& !opt.electron_diffraction
+		&& opt.combined_tsc_calc_files.size() <= 1;
 	cvec2 sf;
-	sf.resize(asym_atom_list.size());
+	if (!stream_tsc)
+	{
+		sf.resize(asym_atom_list.size());
 #pragma omp parallel for
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        sf[i].resize(hkl.size());
+		for (int i = 0; i < asym_atom_list.size(); i++)
+			sf[i].resize(hkl.size());
+	}
 
     if (opt.iam_switch) {
         vector<Thakkar> spherical_atoms;
@@ -2513,6 +2526,44 @@ tsc_block_type calculate_scattering_factors(
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Calculation of Charges");
 
+		if (stream_tsc)
+		{
+			// calc_SF_SALTED sizes its output from the k-points handed to it, so a
+			// sliced k_pt needs no change on its side; the chunking is a loop around
+			// an unmodified kernel.
+			ScattererLabels stream_ids;
+			if (opt.label_tsc_output)
+				for (const auto& l : labels) stream_ids.emplace_back(l);
+			else
+				for (size_t a = 0; a < asym_atom_list.size(); a++)
+					stream_ids.emplace_back(wavy->get_id_for_atom(asym_atom_list[a]));
+
+			const std::vector<i3> hkl_v(hkl.begin(), hkl.end());
+			const size_t n_refl = hkl_v.size();
+			const size_t bs = std::min(opt.tsc_block_size, n_refl ? n_refl : 1);
+			file << "Streaming tsc in blocks of " << bs << " reflections" << endl;
+			tsc_stream_writer<int, cdouble> writer(
+				"experimental.tscb", stream_ids, std::string(), n_refl, 2);
+			size_t block_id = 0;
+			for (size_t lo = 0; lo < n_refl; lo += bs)
+			{
+				const size_t hi = std::min(lo + bs, n_refl);
+				vec2 k_slice(3, vec(hi - lo));
+				std::vector<std::vector<int>> idx(3, std::vector<int>(hi - lo));
+				for (size_t r = lo; r < hi; r++)
+					for (int dm = 0; dm < 3; dm++)
+					{
+						k_slice[dm][r - lo] = k_pt[dm][r];
+						idx[dm][r - lo] = hkl_v[r][dm];
+					}
+				cvec2 chunk;
+				calc_SF_SALTED(k_slice, coefs, calculator.wavy.get_atoms(), asym_atom_list, chunk);
+				writer.submit(block_id++, std::move(idx), std::move(chunk));
+			}
+			writer.finish();
+			opt.tsc_written_by_stream = true;
+		}
+		else
 		calc_SF_SALTED(
 			k_pt,
 			coefs,
@@ -2609,12 +2660,52 @@ tsc_block_type calculate_scattering_factors(
             time_points.push_back(get_time());
             time_descriptions.push_back("Calculation of Charges");
 
+            if (stream_tsc)
+            {
+                // calc_SF_SALTED sizes its output from the k-points it is given,
+                // so a sliced k_pt needs no change on its side.
+                ScattererLabels stream_ids;
+                if (opt.label_tsc_output)
+                    for (const auto& l : labels) stream_ids.emplace_back(l);
+                else
+                    for (size_t a = 0; a < asym_atom_list.size(); a++)
+                        stream_ids.emplace_back(wavy->get_id_for_atom(asym_atom_list[a]));
+
+                const std::vector<i3> hkl_v(hkl.begin(), hkl.end());
+                const size_t n_refl = hkl_v.size();
+                const size_t bs = std::min(opt.tsc_block_size, n_refl ? n_refl : 1);
+                file << "Streaming tsc in blocks of " << bs << " reflections" << endl;
+                tsc_stream_writer<int, cdouble> writer(
+                    opt.binary_tsc ? "experimental.tscb" : "experimental.tsc",
+                    stream_ids, std::string(), n_refl, 2);
+                size_t block_id = 0;
+                for (size_t lo = 0; lo < n_refl; lo += bs)
+                {
+                    const size_t hi = std::min(lo + bs, n_refl);
+                    vec2 k_slice(3, vec(hi - lo));
+                    std::vector<std::vector<int>> idx(3, std::vector<int>(hi - lo));
+                    for (size_t r = lo; r < hi; r++)
+                        for (int dm = 0; dm < 3; dm++)
+                        {
+                            k_slice[dm][r - lo] = k_pt[dm][r];
+                            idx[dm][r - lo] = hkl_v[r][dm];
+                        }
+                    cvec2 chunk;
+                    calc_SF_SALTED(k_slice, coefs, wavy_aux.get_atoms(), asym_atom_list, chunk);
+                    writer.submit(block_id++, std::move(idx), std::move(chunk));
+                }
+                writer.finish();
+                opt.tsc_written_by_stream = true;
+            }
+            else
+            {
             calc_SF_SALTED(
                 k_pt,
                 coefs,
                 wavy_aux.get_atoms(),
                 asym_atom_list,
                 sf);
+            }
             file << setw(12 * 4 + 2) << "... done!" << endl;
             time_points.push_back(get_time());
             time_descriptions.push_back("Fourier transform");
