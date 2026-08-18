@@ -397,7 +397,10 @@ private:
     float progress_;
     std::streampos linestart;
 #ifdef _WIN32
-    ITaskbarList3 *taskbarList_;
+    // Assigned only inside initialize_taskbar_progress()'s SUCCEEDED checks;
+    // without this the destructor makes a virtual call through whatever was
+    // on the stack whenever COM refuses.
+    ITaskbarList3 *taskbarList_ = nullptr;
 
     void initialize_taskbar_progress();
 #endif
@@ -739,6 +742,14 @@ struct options
     bool ECP = false;
     bool RI_FIT = false;
     bool needs_Thakkar_fill = false;
+    // Reflections per streamed block. The structure-factor array is
+    // scatterers x reflections x 16 bytes and dominates memory, so emitting
+    // it in blocks is what lets a large protein run on a small machine.
+    // 0 keeps the original single-allocation path.
+    size_t tsc_block_size = 0;
+    // set once a streamed run has written the file itself, so the caller
+    // does not then overwrite it with an empty one-shot block
+    bool tsc_written_by_stream = false;
     bool qct = false;
     bool do_XCW = false;
     bool calc_F_calc = false;

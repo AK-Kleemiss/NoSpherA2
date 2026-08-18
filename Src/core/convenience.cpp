@@ -2491,6 +2491,10 @@ void options::digest_options()
             hirshfeld_surface = arguments[i + 1];
             hirshfeld_surface2 = arguments[i + 2];
         }
+        else if (temp == "-tsc_block")
+        {
+            tsc_block_size = static_cast<size_t>(std::stoll(arguments[i + 1]));
+        }
         else if (temp == "-hkl")
         {
             hkl = arguments[i + 1];
@@ -3905,6 +3909,7 @@ ProgressBar::~ProgressBar()
     {
         taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NOPROGRESS);
         taskbarList_->Release();
+        taskbarList_ = nullptr;
     }
 #endif
 }
