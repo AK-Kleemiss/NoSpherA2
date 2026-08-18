@@ -2845,11 +2845,23 @@ tsc_block_type calculate_scattering_factors(
 // error message would ever reveal.
 //
 // It works out to a plain concatenation, for a reason worth stating: each part
-// is prepared with the labels of the parts before it (the growing "known"
+// is prepared with the identifiers of the parts before it (the growing "known"
 // list), exactly as the sequential code does. read_atoms_from_CIF skips any
 // atom already in that list, so a part never claims an atom an earlier one
 // covered and no duplicates arise. Prepare the parts against an empty list
 // instead and they would overlap - silently, and wrongly.
+//
+// WHAT GOES IN THAT LIST MATTERS, and it is not obvious. The sequential path
+// passes result.get_scatterers_string(), which is the atomID hex string unless
+// labels were explicitly requested. Atom LABELS are not unique across disorder
+// parts - the same label legitimately appears in several - so filling the list
+// with labels makes a later part skip atoms it should have kept.
+//
+// That mistake was made here and cost a table that was 760 KB short on a
+// four-part structure: the right size to look plausible, silently missing rows.
+// Three-part 1EJG did not reveal it; four-part 3NIR did. If this is ever
+// changed, check it against a structure with several parts and compare the
+// bytes, not the size.
 //
 // Atoms of species the SALTED model does not know are erased from every part,
 // so they are missing at this stage. The old path computed a whole second
@@ -2875,7 +2887,18 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		salted_part_prep prep;
 		calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
 			opt, *pred, file, known, static_cast<int>(i), known_kpts, &prep);
-		for (const auto& l : prep.labels) known.push_back(l);
+		// Feed the NEXT part exactly what the sequential path feeds it:
+		// result.get_scatterers_string(), which is the atomID hex string unless
+		// labels were requested. Labels are NOT unique across disorder parts - the
+		// same label appears in several - so passing those makes a later part skip
+		// atoms it should keep, and the table silently loses rows.
+		for (size_t a = 0; a < prep.asym_atom_list.size(); a++)
+		{
+			if (opt.label_tsc_output)
+				known.push_back(prep.labels[a]);
+			else
+				known.push_back(pred->wavy.get_id_for_atom(prep.asym_atom_list[a]).to_hex_string());
+		}
 		preds.push_back(pred);
 		preps.push_back(std::move(prep));
 	}

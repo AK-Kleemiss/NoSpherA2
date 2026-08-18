@@ -31,7 +31,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
               const ivec2 &llvec, const int &lam,
               const cvec2 &c2r, const int &featsize,
               const int &nfps, const std::vector<int64_t> &vfps,
-              vec &p)
+              vec &p,
+              bool v2_is_conj_of_v1)
 {
     if (natoms < 0 || nrad1 < 0 || nrad2 < 0 || lam < 0 || featsize < 0 || nfps < 0)
     {
@@ -61,19 +62,23 @@ void equicomb(int natoms, int nrad1, int nrad2,
     // featsize, wigner_ptr runs through w3j with no bound, and vfps indexes
     // ptemp. A structure missing a species the model knows makes those
     // disagree, so check here rather than run off the end inside the threads.
+    // When the two descriptor sets are identical v2 is not stored at all and
+    // conj(v1) is read instead, so every check below has to look at the array
+    // actually used - not at v2, which is deliberately empty in that case.
+    const cvec4 &v2_src = v2_is_conj_of_v1 ? v1 : v2;
     const size_t shells = static_cast<size_t>(nrad1) * nrad2 * llmax;
     if (shells > static_cast<size_t>(featsize))
     {
         equicomb_bail("equicomb: featsize " + std::to_string(featsize) +
             " is smaller than nrad1*nrad2*llmax " + std::to_string(shells));
     }
-    if (v1.size() < static_cast<size_t>(natoms) || v2.size() < static_cast<size_t>(natoms))
+    if (v1.size() < static_cast<size_t>(natoms) || v2_src.size() < static_cast<size_t>(natoms))
     {
         equicomb_bail("equicomb: expansion coefficients hold fewer atoms than requested");
     }
     for (int chk = 0; chk < natoms; ++chk)
     {
-        if (v1[chk].size() < static_cast<size_t>(nrad1) || v2[chk].size() < static_cast<size_t>(nrad2))
+        if (v1[chk].size() < static_cast<size_t>(nrad1) || v2_src[chk].size() < static_cast<size_t>(nrad2))
         {
             equicomb_bail("equicomb: atom " + std::to_string(chk) +
                 " carries fewer radial channels than the model expects");
@@ -88,7 +93,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
         {
             equicomb_bail("equicomb: negative angular momentum in llvec");
         }
-        if (v1[0][0].size() <= static_cast<size_t>(cl1) || v2[0][0].size() <= static_cast<size_t>(cl2))
+        if (v1[0][0].size() <= static_cast<size_t>(cl1) || v2_src[0][0].size() <= static_cast<size_t>(cl2))
         {
             equicomb_bail("equicomb: llvec asks for l beyond the expansion coefficients");
         }
@@ -116,7 +121,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
 
     // Initialize p with zeros
     std::fill(p.begin(), p.begin() + static_cast<std::ptrdiff_t>(required_p), 0.0);
-    const vec f_vec(featsize, 0.0);
 
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m2;
@@ -146,7 +150,11 @@ void equicomb(int natoms, int nrad1, int nrad2,
                         limit_l1 = 2 * l1 + 1;
 
                         const cdouble *v1_ptr = v1[iat][n1][l1].data();
-                        const cdouble *v2_ptr = v2[iat][n2][l2].data();
+                        // conj(v1) when the two descriptor sets are the same; the
+                        // sign flip below is exact, so results do not change
+                        const cdouble *v2_ptr =
+                            v2_src[iat][n2][l2].data();
+                        const double v2_sign = v2_is_conj_of_v1 ? -1.0 : 1.0;
 
                         for (imu = 0; imu < l21; imu++)
                         {
@@ -167,7 +175,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
                                     const double& v1_r = v1_val.real();
                                     const double& v1_i = v1_val.imag();
                                     const double& v2_r = v2_val.real();
-                                    const double& v2_i = v2_val.imag();
+                                    const double v2_i = v2_sign * v2_val.imag();
 
                                     acc_real += wigner_val * (v1_r * v2_r - v1_i * v2_i);
                                     acc_imag += wigner_val * (v1_r * v2_i + v1_i * v2_r);
@@ -227,7 +235,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
               vec &w3j, int llmax,
               ivec2 &llvec, int lam,
               cvec2 &c2r, int featsize,
-              vec &p)
+              vec &p,
+              bool v2_is_conj_of_v1)
 {
     if (natoms < 0 || nrad1 < 0 || nrad2 < 0 || llmax < 0 || lam < 0 || featsize < 0)
     {
@@ -285,7 +294,12 @@ void equicomb(int natoms, int nrad1, int nrad2,
                             if (abs(m2) <= l2)
                             {
                                 im2 = m2 + l2;
-                                pcmplx[imu] += w3j[iwig] * v1[l1][iat][im1][n1] * v2[l2][iat][im2][n2];
+                                // v2 is conj(v1) elementwise when the two descriptor
+                                // sets match, so the same value is available from v1
+                                // whatever the index order happens to be here
+                                pcmplx[imu] += w3j[iwig] * v1[l1][iat][im1][n1] *
+                                    (v2_is_conj_of_v1 ? std::conj(v1[l2][iat][im2][n2])
+                                                      : v2[l2][iat][im2][n2]);
                                 iwig++;
                             }
                         }

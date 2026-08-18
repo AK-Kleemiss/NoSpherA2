@@ -196,7 +196,21 @@ static cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const 
     int nspe = (int)parameters.species.size();
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
     // cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
-    cvec4 omega(n_atoms, std::vector<cvec2>((size_t)nspe * parameters.max_radial, cvec2((size_t)parameters.max_angular + 1, cvec((size_t)2 * parameters.max_angular + 1, { 0.0, 0.0 }))));
+    // SHAPE, NOT SIZE: this array was allocated as a rectangle and used as a
+    // triangle.
+    //
+    // A spherical harmonic of degree l has 2l+1 components, not 2*nang+1. The
+    // old allocation was a rectangle sized for the largest l and used as a
+    // triangle: for nang=8 that is 9*17=153 slots per (atom, radial channel)
+    // of which only sum(2l+1) = (nang+1)^2 = 81 are ever written or read, so
+    // 47% of a multi-gigabyte array was allocated and zeroed for nothing.
+    //
+    // Only the innermost lengths change, so every omega[a][d][l][c] access
+    // stays exactly as it was - nothing indexes past 2l+1.
+    cvec2 per_channel((size_t)parameters.max_angular + 1);
+    for (int l = 0; l <= parameters.max_angular; ++l)
+        per_channel[l].assign((size_t)2 * l + 1, { 0.0, 0.0 });
+    cvec4 omega(n_atoms, std::vector<cvec2>((size_t)nspe * parameters.max_radial, per_channel));
     for (int l = 0; l < parameters.max_angular + 1; ++l)
     {
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ (2 * l) + 1 })[0];

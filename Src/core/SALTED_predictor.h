@@ -33,6 +33,10 @@ private:
     
     std::unordered_map<std::string, int> natom_dict{}, lmax{}, nmax{};
     cvec4 v1, v2;
+    // Set when the two descriptor hyperparameter sets are identical: v2 is then
+    // exactly conj(v1), so it is not stored at all and equicomb conjugates on
+    // read. Saves a full duplicate of an array that is gigabytes on a protein.
+    bool v2_is_conj_of_v1 = false;
     void setup_atomic_environment();
 
     vec weights{};

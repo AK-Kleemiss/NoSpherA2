@@ -184,11 +184,22 @@ void SALTEDPredictor::setup_atomic_environment()
     }
     else
     {
-        v2 = v1;
+        // Same hyperparameters, so the second descriptor set would be an exact
+        // duplicate of the first. Record that instead of copying it: equicomb
+        // then reads conj(v1) where it would have read v2. Conjugation only
+        // flips the sign of the imaginary part, which is exact in IEEE
+        // arithmetic, so the result is bit-identical - and v2 is a copy of an
+        // array that runs to gigabytes on a protein.
+        v2_is_conj_of_v1 = true;
+        v2.clear();
     }
 
-    // Calculate the conjugate of v2 and store it back in v2, to avoid recalculating it in the equicomb function
-    calculateConjugate(v2);
+    // Conjugate v2 once here rather than per use in equicomb. Skipped when v2
+    // is just conj(v1): there is nothing to conjugate, equicomb applies it.
+    if (!v2_is_conj_of_v1)
+        calculateConjugate(v2);
+    std::cout << "Descriptor sets " << (v2_is_conj_of_v1 ? "identical: sharing one copy"
+                                                        : "differ: two copies held") << std::endl;
     // END RASCALINE
 }
 
@@ -265,15 +276,17 @@ vec SALTEDPredictor::predict()
         {
             int nfps = static_cast<int>(vfps[lam].size());
             p.assign((size_t)natoms * ((size_t)2 * lam + 1) * nfps, 0.0);
-            equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p);
+            equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p, v2_is_conj_of_v1);
             featsize[lam] = nfps;
         }
         else
         {
             p.assign((size_t)natoms * ((size_t)2 * lam + 1) * featsize[lam], 0.0);
-            equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
+            equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1);
         }
-        pvec[lam] = p;
+        // p is dead after this; moving avoids duplicating a block that is
+        // natoms * (2*lam+1) * featsize doubles - gigabytes on a protein.
+        pvec[lam] = std::move(p);
     }
 
     std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
