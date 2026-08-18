@@ -370,18 +370,34 @@ public:
         progress_ = (float)workdone * workpart_;
     }
 
-    void update(std::ostream &os = std::cout)
+    // Called once per unit of work - once per reflection in the structure-factor
+    // loop, so hundreds of thousands of times on a protein. The whole body used
+    // to sit in an omp critical, serialising every worker on every item purely to
+    // redraw a bar that only changes about a hundred times.
+    //
+    // workdone is atomic, so the count needs no lock. The lock is taken only when
+    // this call is the one that crosses a reporting boundary, which is what keeps
+    // the redraws from interleaving. n lets a caller report a batch at once.
+    void update(std::ostream &os = std::cout, const unsigned long long n = 1)
     {
-#pragma omp critical
+        update_calls_.fetch_add(1, std::memory_order_relaxed);
+        const unsigned long long before = workdone.fetch_add(n);
+        const unsigned long long after = before + n;
+        if (before / percent_ != after / percent_)
         {
-            workdone += 1;
-            if (workdone % percent_ == 0)
+#pragma omp critical
             {
+                bar_writes_.fetch_add(1, std::memory_order_relaxed);
                 set_progress();
                 write_progress(os);
             }
         }
     }
+
+    // How often callers asked, and how often that actually needed the lock.
+    unsigned long long update_calls() const { return update_calls_.load(); }
+    unsigned long long bar_writes() const { return bar_writes_.load(); }
+    static bool report_counts;   // set from the -debug flag
 
     void write_progress(std::ostream &os = std::cout);
 
@@ -394,6 +410,8 @@ private:
     std::string remainder_;
     std::string status_text_;
     std::atomic<unsigned long long> workdone;
+    std::atomic<unsigned long long> update_calls_{0};
+    std::atomic<unsigned long long> bar_writes_{0};
     float progress_;
     std::streampos linestart;
 #ifdef _WIN32

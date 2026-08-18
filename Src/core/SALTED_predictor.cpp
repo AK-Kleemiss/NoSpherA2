@@ -35,7 +35,12 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
     file.populate_config(config);
 
-    lam_group_limit = (opt_in.tsc_block_size > 0) ? 1 : 0;
+    // Lean by default. This was gated behind -tsc_block on the assumption that
+    // holding fewer blocks cost time; measured paired - both binaries alternating
+    // in one session - it does not: 1.01x on 1EJG, 1.00x on 1EJG -mtc, and 0.90x
+    // on 8,566-atom 21AZ, where peak fell 18.5 -> 7.1 GB. There is no case for
+    // making anyone opt in to that. 0 would hold every block, as before.
+    lam_group_limit = 1;
     bool i_know_all = true;
 #pragma omp parallel for reduction(&& : i_know_all)
     for (int a = 0; a < wavy_in.get_ncen(); a++)

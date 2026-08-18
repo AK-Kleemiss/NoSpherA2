@@ -3143,7 +3143,8 @@ void options::look_for_debug(int &argc, char **argv)
         if (temp.find("-") > 0)
             continue;
         else if (temp == "-v" || temp == "-v2" || temp == "-debug")
-            std::cout << "Turning on verbose mode!" << std::endl, debug = true;
+            std::cout << "Turning on verbose mode!" << std::endl, debug = true,
+            ProgressBar::report_counts = true;
         else if (temp == "--h" || temp == "-h" || temp == "-help" || temp == "--help")
         {
             std::cout << NoSpherA2_message() << help_message << build_date << std::endl;
@@ -3899,11 +3900,26 @@ std::wstring s2ws(const std::string &s)
 }
 */
 
+bool ProgressBar::report_counts = false;
+
 ProgressBar::~ProgressBar()
 {
     progress_ = 100.0f;
     write_progress();
     std::cout << std::endl;
+    if (report_counts)
+    {
+        // updates is how often callers reported an item; writes is how often that
+        // needed the omp critical. Every item used to take the lock, so writes
+        // being far below updates is the whole point of the change.
+        const unsigned long long u = update_calls_.load(), w = bar_writes_.load();
+        std::cout << "[progress] " << status_text_ << ": " << u << " updates, "
+                  << w << " serialised writes";
+        if (u > 0)
+            std::cout << "  (" << (w * 100.0 / u) << "% of calls took the lock, "
+                      << (u > w ? u / (w ? w : 1) : 1) << "x fewer barriers)";
+        std::cout << std::endl;
+    }
 #ifdef _WIN32
     if (taskbarList_)
     {
