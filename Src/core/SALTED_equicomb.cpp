@@ -11,6 +11,18 @@
 
 #include "constants.h"
 
+// Guard failures have to survive: the program log is buffered and the progress
+// bar seeks back over it, and an uncaught throw leaves no message at all.
+static void equicomb_bail(const std::string &msg)
+{
+    std::ofstream f("equicomb_error.txt", std::ios::app);
+    f << msg << std::endl;
+    f.close();
+    std::cerr << msg << std::endl;
+    std::cerr.flush();
+    throw std::out_of_range(msg);
+}
+
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
 void equicomb(int natoms, int nrad1, int nrad2,
               const cvec4 &v1,
@@ -42,6 +54,64 @@ void equicomb(int natoms, int nrad1, int nrad2,
     if (p.size() < required_p)
     {
         throw std::out_of_range("equicomb: output buffer p is smaller than required size");
+    }
+
+    // The walks below trust sizes taken from the model file, not from the
+    // structure: ifeat advances nrad1*nrad2*llmax times into a buffer sized by
+    // featsize, wigner_ptr runs through w3j with no bound, and vfps indexes
+    // ptemp. A structure missing a species the model knows makes those
+    // disagree, so check here rather than run off the end inside the threads.
+    const size_t shells = static_cast<size_t>(nrad1) * nrad2 * llmax;
+    if (shells > static_cast<size_t>(featsize))
+    {
+        equicomb_bail("equicomb: featsize " + std::to_string(featsize) +
+            " is smaller than nrad1*nrad2*llmax " + std::to_string(shells));
+    }
+    if (v1.size() < static_cast<size_t>(natoms) || v2.size() < static_cast<size_t>(natoms))
+    {
+        equicomb_bail("equicomb: expansion coefficients hold fewer atoms than requested");
+    }
+    for (int chk = 0; chk < natoms; ++chk)
+    {
+        if (v1[chk].size() < static_cast<size_t>(nrad1) || v2[chk].size() < static_cast<size_t>(nrad2))
+        {
+            equicomb_bail("equicomb: atom " + std::to_string(chk) +
+                " carries fewer radial channels than the model expects");
+        }
+    }
+    // w3j is consumed once per (n1,n2) shell pair, one entry per surviving m2
+    size_t w3j_needed = 0;
+    for (int chk = 0; chk < llmax; ++chk)
+    {
+        const int cl1 = llvec[0][chk], cl2 = llvec[1][chk];
+        if (cl1 < 0 || cl2 < 0)
+        {
+            equicomb_bail("equicomb: negative angular momentum in llvec");
+        }
+        if (v1[0][0].size() <= static_cast<size_t>(cl1) || v2[0][0].size() <= static_cast<size_t>(cl2))
+        {
+            equicomb_bail("equicomb: llvec asks for l beyond the expansion coefficients");
+        }
+        for (int cmu = 0; cmu < l21; ++cmu)
+        {
+            const int cm = cmu - lam + cl1;
+            for (int cm1 = 0; cm1 < 2 * cl1 + 1; ++cm1)
+            {
+                if (abs(cm1 - cm) <= cl2) ++w3j_needed;
+            }
+        }
+    }
+    if (w3j.size() < w3j_needed)
+    {
+        equicomb_bail("equicomb: w3j holds " + std::to_string(w3j.size()) +
+            " entries, the shell loop consumes " + std::to_string(w3j_needed));
+    }
+    for (int chk = 0; chk < nfps; ++chk)
+    {
+        if (vfps[chk] < 0 || static_cast<size_t>(vfps[chk]) >= static_cast<size_t>(featsize))
+        {
+            equicomb_bail("equicomb: vfps entry " + std::to_string(chk) + " is outside featsize");
+        }
     }
 
     // Initialize p with zeros
