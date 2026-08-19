@@ -177,6 +177,7 @@ void SALTEDPredictor::setup_atomic_environment()
 
     featomic::SimpleSystem featomic_system = SALTED_Utils::gen_featomic_system(config.predict_filename);
     // RASCALINE (Generate descriptors)
+    const auto _t_desc = std::chrono::steady_clock::now();
     v1 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp);
 
     if ((config.nrad2 != config.nrad1) || (config.nang2 != config.nang1) || (config.sig2 != config.sig1) || (config.rcut2 != config.rcut1) || (config.neighspe2 != config.neighspe1))
@@ -202,6 +203,10 @@ void SALTEDPredictor::setup_atomic_environment()
 
     // Conjugate v2 once here rather than per use in equicomb. Skipped when v2
     // is just conj(v1): there is nothing to conjugate, equicomb applies it.
+    if (ProgressBar::report_counts)
+        std::cout << "[stages] featomic descriptors "
+                  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_desc).count()
+                  << " s" << std::endl;
     if (!v2_is_conj_of_v1)
         calculateConjugate(v2);
     std::cout << "Descriptor sets " << (v2_is_conj_of_v1 ? "identical: sharing one copy"
@@ -245,6 +250,10 @@ void SALTEDPredictor::read_model_data() {
 vec SALTEDPredictor::predict()
 {
     using namespace std;
+    const auto _t_predict_start = std::chrono::steady_clock::now();
+    auto _elapsed = [](const std::chrono::steady_clock::time_point &from)
+    { return std::chrono::duration<double>(std::chrono::steady_clock::now() - from).count(); };
+    double _t_equicomb = 0.0, _t_kernels = 0.0;
     // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     // How many lambda blocks are alive at once.
     //
@@ -269,6 +278,7 @@ vec SALTEDPredictor::predict()
     {
         const int lam1 = std::min(lam0 + lam_group, lmax_max + 1);
         vec2 pg(lam1 - lam0);
+        const auto _t_eq = std::chrono::steady_clock::now();
         for (int lam = lam0; lam < lam1; lam++)
         {
         int llmax = 0;
@@ -313,6 +323,8 @@ vec SALTEDPredictor::predict()
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1);
         }
         }
+        _t_equicomb += _elapsed(_t_eq);
+        const auto _t_kn = std::chrono::steady_clock::now();
         // Species-outer within the group, so a species walks several consecutive
         // lambdas and keeps its sparse matrices hot.
         for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
@@ -372,6 +384,7 @@ vec SALTEDPredictor::predict()
         }
             }
         }
+        _t_kernels += _elapsed(_t_kn);
     }
 
     unordered_map<string, dMatrix1> C{};
@@ -479,6 +492,15 @@ vec SALTEDPredictor::predict()
     // coeffs.fortran_order = false;
     // coeffs.shape = { unsigned long(pred_coefs.size()) };
     // npy::write_npy("folder_model.npy", coeffs);
+    if (ProgressBar::report_counts)
+    {
+        const double total = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - _t_predict_start).count();
+        std::cout << "[stages] predict " << total << " s = equicomb " << _t_equicomb
+                  << " s (" << (100.0 * _t_equicomb / total) << "%) + kernels "
+                  << _t_kernels << " s (" << (100.0 * _t_kernels / total)
+                  << "%) + rest " << (total - _t_equicomb - _t_kernels) << " s" << std::endl;
+    }
     return pred_coefs;
 }
 

@@ -125,6 +125,39 @@ void equicomb(int natoms, int nrad1, int nrad2,
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m2;
     double inner, normfact, preal;
+    // Which (im1, im2) pairs contribute is decided by |im1 - mu| <= l2, and that
+    // depends only on (il, imu, lam) - never on n1 or n2. The test was being
+    // re-evaluated inside the n1 x n2 loop, which runs nrad1*nrad2 times per atom
+    // per lambda, and the iterations that fail it do no work.
+    //
+    // Enumerate the survivors once, in exactly the order the walking wigner_ptr
+    // consumed them: same values, same operations, same summation order, no branch.
+    struct w3j_term { int im1, im2; double w; };
+    std::vector<w3j_term> terms;
+    std::vector<int> term_start(static_cast<size_t>(llmax) * l21 + 1, 0);
+    {
+        size_t w_idx = 0;
+        for (int til = 0; til < llmax; ++til)
+        {
+            const int tl1 = llvec[0][til], tl2 = llvec[1][til];
+            for (int timu = 0; timu < l21; ++timu)
+            {
+                term_start[static_cast<size_t>(til) * l21 + timu] = static_cast<int>(terms.size());
+                const int tmu = timu - lam + tl1;
+                for (int tim1 = 0; tim1 < 2 * tl1 + 1; ++tim1)
+                {
+                    const int tm2 = tim1 - tmu;
+                    if (abs(tm2) <= tl2)
+                    {
+                        terms.push_back({ tim1, tm2 + tl2, w3j[w_idx] });
+                        ++w_idx;
+                    }
+                }
+            }
+        }
+        term_start[static_cast<size_t>(llmax) * l21] = static_cast<int>(terms.size());
+    }
+
     ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
 #pragma omp parallel 
     {
@@ -142,12 +175,10 @@ void equicomb(int natoms, int nrad1, int nrad2,
             {
                 for (n2 = 0; n2 < nrad2; ++n2)
                 {
-                    wigner_ptr = w3j.data();
                     for (il = 0; il < llmax; ++il)
                     {
                         l1 = llvec[0][il];
                         l2 = llvec[1][il];
-                        limit_l1 = 2 * l1 + 1;
 
                         const cdouble *v1_ptr = v1[iat][n1][l1].data();
                         // conj(v1) when the two descriptor sets are the same; the
@@ -158,29 +189,24 @@ void equicomb(int natoms, int nrad1, int nrad2,
 
                         for (imu = 0; imu < l21; imu++)
                         {
-                            mu = imu - lam + l1;
                             double acc_real = 0.0;
                             double acc_imag = 0.0;
 
-                            for (im1 = 0; im1 < limit_l1; ++im1)
+                            const int t_lo = term_start[static_cast<size_t>(il) * l21 + imu];
+                            const int t_hi = term_start[static_cast<size_t>(il) * l21 + imu + 1];
+                            for (int t = t_lo; t < t_hi; ++t)
                             {
-                                m2 = im1 - mu;
-                                if (abs(m2) <= l2)
-                                {
-                                    im2 = m2 + l2;
-                                    const double wigner_val = *wigner_ptr;
-                                    const cdouble &v1_val = v1_ptr[im1];
-                                    const cdouble &v2_val = v2_ptr[im2];
+                                const w3j_term &term = terms[t];
+                                const cdouble &v1_val = v1_ptr[term.im1];
+                                const cdouble &v2_val = v2_ptr[term.im2];
 
-                                    const double& v1_r = v1_val.real();
-                                    const double& v1_i = v1_val.imag();
-                                    const double& v2_r = v2_val.real();
-                                    const double v2_i = v2_sign * v2_val.imag();
+                                const double& v1_r = v1_val.real();
+                                const double& v1_i = v1_val.imag();
+                                const double& v2_r = v2_val.real();
+                                const double v2_i = v2_sign * v2_val.imag();
 
-                                    acc_real += wigner_val * (v1_r * v2_r - v1_i * v2_i);
-                                    acc_imag += wigner_val * (v1_r * v2_i + v1_i * v2_r);
-                                    wigner_ptr++;
-                                }
+                                acc_real += term.w * (v1_r * v2_r - v1_i * v2_i);
+                                acc_imag += term.w * (v1_r * v2_i + v1_i * v2_r);
                             }
                             pcmplx_real[imu] = acc_real;
                             pcmplx_imag[imu] = acc_imag;
