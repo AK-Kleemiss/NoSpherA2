@@ -203,6 +203,21 @@ void equicomb(int natoms, int nrad1, int nrad2,
         vec ptemp(l21 * featsize, 0.0);
         vec pcmplx_real(l21);
         vec pcmplx_imag(l21);
+        // w * v1 depends on n1 but not on n2, and the n2 loop below runs nrad2
+        // times, so that product was being formed nrad2 times over. Build it once
+        // per (atom, n1) instead. Real and imaginary parts live in separate arrays
+        // so the inner loop reads plain double streams rather than picking fields
+        // out of a complex.
+        //
+        // The conjugation sign is deliberately NOT folded in here. It looks like it
+        // could be, since multiplying by -1 is exact, but conj(v2) puts that sign on
+        // v1_i*v2_i in the real accumulator and on v1_r*v2_i in the imaginary one,
+        // so one signed copy of w*v1 cannot serve both. Folding it anyway moved the
+        // form factors by 5% of the largest one - not a rounding effect, a wrong
+        // answer. It is applied by choosing between two forms of the inner loop,
+        // which costs one branch per (il, imu) rather than a multiply per term.
+        vec wv1_re(total_terms, 0.0);
+        vec wv1_im(total_terms, 0.0);
         const double *wigner_ptr = NULL;
         int limit_l1 = 0;
 #pragma omp for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m2, inner, normfact, preal) schedule(dynamic, 1)
@@ -212,6 +227,21 @@ void equicomb(int natoms, int nrad1, int nrad2,
             ifeat = 0;
             for (n1 = 0; n1 < nrad1; ++n1)
             {
+                for (int fl = 0; fl < llmax; ++fl)
+                {
+                    const cdouble *__restrict v1_fill = v1[iat][n1][llvec[0][fl]].data();
+                    for (int fmu = 0; fmu < l21; ++fmu)
+                    {
+                        const w3j_run &fr = runs[static_cast<size_t>(fl) * l21 + fmu];
+                        for (int k = 0; k < fr.count; ++k)
+                        {
+                            const double wk = w3j[static_cast<size_t>(fr.w_off) + k];
+                            const cdouble &av = v1_fill[fr.im1_begin + k];
+                            wv1_re[static_cast<size_t>(fr.w_off) + k] = wk * av.real();
+                            wv1_im[static_cast<size_t>(fr.w_off) + k] = wk * av.imag();
+                        }
+                    }
+                }
                 for (n2 = 0; n2 < nrad2; ++n2)
                 {
                     for (il = 0; il < llmax; ++il)
@@ -219,12 +249,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
                         l1 = llvec[0][il];
                         l2 = llvec[1][il];
 
-                        const cdouble *v1_ptr = v1[iat][n1][l1].data();
-                        // conj(v1) when the two descriptor sets are the same; the
-                        // sign flip below is exact, so results do not change
+                        // v2 is conj(v1) when the two descriptor sets are the same
                         const cdouble *v2_ptr =
                             v2_src[iat][n2][l2].data();
-                        const double v2_sign = v2_is_conj_of_v1 ? -1.0 : 1.0;
 
                         for (imu = 0; imu < l21; imu++)
                         {
@@ -232,18 +259,28 @@ void equicomb(int natoms, int nrad1, int nrad2,
                             double acc_imag = 0.0;
 
                             const w3j_run &run = runs[static_cast<size_t>(il) * l21 + imu];
-                            const cdouble *__restrict a = v1_ptr + run.im1_begin;
+                            const double *__restrict ar = wv1_re.data() + run.w_off;
+                            const double *__restrict ai = wv1_im.data() + run.w_off;
                             const cdouble *__restrict b = v2_ptr + run.im2_begin;
-                            const double *__restrict w = w3j.data() + run.w_off;
-                            for (int k = 0; k < run.count; ++k)
+                            if (v2_is_conj_of_v1)
                             {
-                                const double v1_r = a[k].real();
-                                const double v1_i = a[k].imag();
-                                const double v2_r = b[k].real();
-                                const double v2_i = v2_sign * b[k].imag();
-
-                                acc_real += w[k] * (v1_r * v2_r - v1_i * v2_i);
-                                acc_imag += w[k] * (v1_r * v2_i + v1_i * v2_r);
+                                for (int k = 0; k < run.count; ++k)
+                                {
+                                    const double v2_r = b[k].real();
+                                    const double v2_i = b[k].imag();
+                                    acc_real += ar[k] * v2_r + ai[k] * v2_i;
+                                    acc_imag += ai[k] * v2_r - ar[k] * v2_i;
+                                }
+                            }
+                            else
+                            {
+                                for (int k = 0; k < run.count; ++k)
+                                {
+                                    const double v2_r = b[k].real();
+                                    const double v2_i = b[k].imag();
+                                    acc_real += ar[k] * v2_r - ai[k] * v2_i;
+                                    acc_imag += ar[k] * v2_i + ai[k] * v2_r;
+                                }
                             }
                             pcmplx_real[imu] = acc_real;
                             pcmplx_imag[imu] = acc_imag;
