@@ -279,6 +279,10 @@ void SALTEDPredictor::setup_atomic_environment()
 
 
 void SALTEDPredictor::read_model_data() {
+    // How long the model costs to get off disk decides whether a lazy loader
+    // needs to be asynchronous or merely lazy: the total bytes are the same
+    // either way, only the moment changes.
+    const auto _t_model = std::chrono::steady_clock::now();
     const std::filesystem::path _SALTEDpath = SALTED_DIR / config.salted_filename;
     SALTED_BINARY_FILE file(_SALTEDpath);
     if (config.field) {
@@ -345,6 +349,9 @@ void SALTEDPredictor::read_model_data() {
         std::cout << "[model] power_env_sparse " << mb(pes) << " MB + projectors " << mb(vm)
                   << " MB + wigner " << mb(wg) << " MB + weights " << mb(weights.size())
                   << " MB = " << mb(pes + vm + wg + weights.size()) << " MB" << std::endl;
+        std::cout << "[model] read in "
+                  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_model).count()
+                  << " s" << std::endl;
         std::cout << "[model] per lambda:";
         for (const auto &[lam, sz] : per_lam) std::cout << " l" << lam << "=" << mb(sz);
         std::cout << " MB" << std::endl;
