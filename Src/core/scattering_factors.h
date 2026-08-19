@@ -187,7 +187,10 @@ svec read_atoms_from_CIF(
     ivec& asym_atom_list,
     bvec& needs_grid,
     std::ostream& file,
-    const bool debug = false);
+    const bool debug = false,
+    // A spherical fill of a disorder part that has nothing left to fill
+    // legitimately finds no atoms. Everywhere else zero means a broken CIF.
+    const bool allow_empty = false);
 
 
 /**

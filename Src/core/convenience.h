@@ -760,6 +760,10 @@ struct options
     bool ECP = false;
     bool RI_FIT = false;
     bool needs_Thakkar_fill = false;
+    // Set only around a spherical fill: a disorder part whose missing atoms were
+    // already covered by an earlier part legitimately yields none, and that must
+    // not read as a broken CIF.
+    bool allow_empty_asym = false;
     // Reflections per streamed block. The structure-factor array is
     // scatterers x reflections x 16 bytes and dominates memory, so emitting
     // it in blocks is what lets a large protein run on a small machine.

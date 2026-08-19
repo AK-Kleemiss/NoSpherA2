@@ -851,7 +851,8 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 	ivec& asym_atom_list,
 	bvec& needs_grid,
 	std::ostream& file,
-	const bool debug)
+	const bool debug,
+	const bool allow_empty)
 {
 	using namespace std;
 	if (debug)
@@ -1123,7 +1124,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 	}
 
 	err_checkf(asym_atom_list.size() <= wave.get_ncen(), "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
-	err_checkf(asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
+	err_checkf(allow_empty || asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
 
 	for (int i = 0; i < atom_type_list.size(); i++)
 		err_checkf((atom_type_list[i] <= 113 || atom_type_list[i] == 119) && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
@@ -2391,9 +2392,20 @@ tsc_block_type calculate_scattering_factors(
 		asym_atom_list,
 		needs_grid,
 		file,
-		opt.debug);
+		opt.debug,
+		opt.allow_empty_asym);
 
 	cif_input.close();
+
+	// A spherical fill walks every disorder part, and a part whose missing atoms
+	// were already covered by an earlier part has nothing to contribute. That is
+	// not an error, it is the normal end of the walk - but only when the caller
+	// said so, because everywhere else no asymmetric atoms means a broken CIF.
+	if (asym_atom_list.empty())
+	{
+		if (prep_out) *prep_out = salted_part_prep();
+		return tsc_block_type();
+	}
 
 	if (opt.debug)
 		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
@@ -2803,9 +2815,9 @@ tsc_block_type calculate_scattering_factors(
             fill_nr = nr;
         }
         opt.m_hkl_list = hkl;
-        opt.iam_switch = true; opt.no_date = true;
+        opt.iam_switch = true; opt.no_date = true; opt.allow_empty_asym = true;
         tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
-        opt.iam_switch = false; opt.no_date = false;
+        opt.iam_switch = false; opt.no_date = false; opt.allow_empty_asym = false;
         blocky.append(std::move(blocky_thakkar), file);
         time_points.push_back(get_time());
         time_descriptions.push_back("Spherical Atoms");
@@ -2927,6 +2939,12 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	// part, feeding `known` as we go so no atom is produced twice.
 	std::vector<salted_part_prep> spherical(n_parts);
 	std::vector<char> have_spherical(n_parts, 0);
+	// The scatterer list must be all atomIDs or all labels - a table with both
+	// is rejected on write. salted_part_prep::labels holds hex STRINGS, while the
+	// predicted parts contribute atomID objects, so the spherical rows have to be
+	// converted here rather than passed through. This never showed up until a
+	// streamed -mtc run first had a spherical remainder to append.
+	std::vector<ScattererLabels> spherical_ids(n_parts);
 	bool any_spherical = false;
 	if (opt.needs_Thakkar_fill)
 	{
@@ -2938,6 +2956,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		for (const auto& h : preps[0].hkl_v) opt.m_hkl_list.emplace(h);
 		const bool iam_was = opt.iam_switch;
 		opt.iam_switch = true;
+		opt.allow_empty_asym = true;
 		size_t n_filled = 0;
 		// The whole list, not one file: the index also selects opt.groups[nr], so a
 		// one-element vector with nr = i either reads past the end or asks the wrong
@@ -2959,23 +2978,36 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 				" reflections, the parts cover " + std::to_string(preps[0].hkl_v.size()), file);
 			for (size_t a = 0; a < spherical[i].labels.size(); a++)
 				known.push_back(spherical[i].labels[a]);
+			for (size_t a = 0; a < spherical[i].asym_atom_list.size(); a++)
+			{
+				if (opt.label_tsc_output)
+					spherical_ids[i].emplace_back(spherical[i].labels[a]);
+				else
+					spherical_ids[i].emplace_back(tempy[i].get_id_for_atom(spherical[i].asym_atom_list[a]));
+			}
 		}
 		opt.iam_switch = iam_was;
+		opt.allow_empty_asym = false;
 		file << "Spherical remainder: " << n_filled
 			 << " atom(s) the model cannot predict" << std::endl;
 	}
 
+	// Part by part, each spherical remainder straight after its own predicted
+	// atoms. The sequential path appends the fill to each part as it goes, so
+	// collecting all the spherical rows at the end instead gives the same
+	// scatterers in a different order - and then the two paths cannot be compared
+	// byte for byte, which is the only check that keeps them honest.
 	ScattererLabels ids;
 	for (size_t p = 0; p < preps.size(); p++)
+	{
 		for (size_t a = 0; a < preps[p].asym_atom_list.size(); a++)
 		{
 			if (opt.label_tsc_output) ids.emplace_back(preps[p].labels[a]);
 			else ids.emplace_back(preds[p]->wavy.get_id_for_atom(preps[p].asym_atom_list[a]));
 		}
-	for (size_t p = 0; p < n_parts; p++)
-		if (have_spherical[p])
-			for (size_t a = 0; a < spherical[p].asym_atom_list.size(); a++)
-				ids.emplace_back(spherical[p].labels[a]);
+		for (const auto& sid : spherical_ids[p])
+			ids.emplace_back(sid);
+	}
 
 	const size_t n_refl = preps[0].hkl_v.size();
 	const size_t bs = std::min(opt.tsc_block_size, n_refl ? n_refl : 1);
@@ -3003,10 +3035,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			cvec2 chunk;
 			calc_SF_SALTED(k_slice, preps[p].coefs, *preps[p].atoms, preps[p].asym_atom_list, chunk);
 			for (auto& row : chunk) combined.push_back(std::move(row));
-		}
-		// Same order as the id list above: every part's spherical rows, in part order
-		for (size_t p = 0; p < n_parts; p++)
-		{
+			// this part's spherical remainder, where the id list put it
 			if (!have_spherical[p]) continue;
 			std::vector<Thakkar> spheres;
 			spheres.reserve(spherical[p].atom_type_list.size());
