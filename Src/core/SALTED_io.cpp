@@ -384,6 +384,30 @@ void SALTED_BINARY_FILE::read_dataset(std::vector<T>& data, std::vector<size_t>&
         read_exact_bytes(file, data.data(), static_cast<std::streamsize>(size * sizeof(T)), "dataset payload");
 }
 
+// Same walk as read_dataset, without the payload. Used for species the structure
+// does not contain: their shape is still needed to index the flat weight vector,
+// their numbers never are.
+void SALTED_BINARY_FILE::skip_dataset(std::vector<size_t>& dims, const size_t element_size) {
+    int ndims;
+    read_exact(file, ndims, "dataset dimension count");
+    err_checkf(ndims >= 0 && ndims <= kMaxSaltedDatasetDims,
+        "Invalid SALTED dataset dimension count: " + std::to_string(ndims), std::cout);
+    dims.assign(static_cast<size_t>(ndims), 0);
+    for (int i = 0; i < ndims; i++) {
+        uint32_t dim = 0;
+        read_exact(file, dim, "dataset dimension " + std::to_string(i));
+        dims[i] = static_cast<size_t>(dim);
+    }
+    size_t size = 1;
+    for (const size_t dim : dims) {
+        err_checkf(dim <= kMaxSaltedDatasetValues && size <= kMaxSaltedDatasetValues / std::max<size_t>(dim, 1),
+            "SALTED dataset is unreasonably large or dimension product overflows", std::cout);
+        size *= dim;
+    }
+    file.seekg(static_cast<std::streamoff>(size * element_size), std::ios::cur);
+    err_checkf(file.good(), "Could not step over a SALTED dataset payload", std::cout);
+}
+
 template <typename T>
 T SALTED_BINARY_FILE::read_generic_blocks(const std::string& key, std::function<void(T&, int)> process_block) {
     err_checkf(header_end != -1, "Header not read yet! Aborting", std::cout);
@@ -459,29 +483,44 @@ vec SALTED_BINARY_FILE::read_weights() {
     return weights;
 }
 
-std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_projectors() {
-    return read_lambda_based_data("PROJ");
+std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_projectors(
+    const std::unordered_set<std::string>* wanted,
+    std::unordered_map<std::string, std::array<size_t, 2>>* dims_out) {
+    return read_lambda_based_data("PROJ", wanted, dims_out);
 }
 
-std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_features() {
-    return read_lambda_based_data("FEATS");
+std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_features(
+    const std::unordered_set<std::string>* wanted) {
+    return read_lambda_based_data("FEATS", wanted);
 }
 
-std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_data(const std::string& key) {
+std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_data(
+    const std::string& key,
+    const std::unordered_set<std::string>* wanted,
+    std::unordered_map<std::string, std::array<size_t, 2>>* dims_out) {
     return read_generic_blocks<std::unordered_map<std::string, dMatrix2>>(key,
-        [this, &key](std::unordered_map<std::string, dMatrix2>& container, int i) {
+        [this, &key, wanted, dims_out](std::unordered_map<std::string, dMatrix2>& container, int i) {
             std::string element = read_string_remove_NULL(5);
             int nlambda;
             read_exact(file, nlambda, "lambda count for " + element);
             err_checkf(nlambda >= 0 && nlambda <= kMaxSaltedBlocks,
                 "Invalid SALTED lambda count for " + element + ": " + std::to_string(nlambda), std::cout);
+            const bool load = (wanted == nullptr) || (wanted->find(element) != wanted->end());
             for (int lam = 0; lam < nlambda; lam++) {
                 std::vector<size_t> dims;
-                vec data;
-                read_dataset(data, dims);
-                err_checkf(dims.size() == 2,
-                    "Expected 2D SALTED " + key + " dataset for " + element + " lambda " + std::to_string(lam), std::cout);
-                container[element + std::to_string(lam)] = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
+                if (load) {
+                    vec data;
+                    read_dataset(data, dims);
+                    err_checkf(dims.size() == 2,
+                        "Expected 2D SALTED " + key + " dataset for " + element + " lambda " + std::to_string(lam), std::cout);
+                    container[element + std::to_string(lam)] = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
+                }
+                else {
+                    skip_dataset(dims, sizeof(double));
+                    err_checkf(dims.size() == 2,
+                        "Expected 2D SALTED " + key + " dataset for " + element + " lambda " + std::to_string(lam), std::cout);
+                }
+                if (dims_out) (*dims_out)[element + std::to_string(lam)] = { dims[0], dims[1] };
             }
         }
     );

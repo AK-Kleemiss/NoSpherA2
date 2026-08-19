@@ -291,10 +291,26 @@ void SALTEDPredictor::read_model_data() {
     if (config.sparsify) vfps = file.read_fps();
 
 
-    std::unordered_map<std::string, dMatrix2> features = file.read_features();
-    Vmat = file.read_projectors();
+    // Only the species this structure actually contains need their model data.
+    // The model knows every species it was trained on; a protein uses five of
+    // them, alanine four. The rest are read for their SHAPE alone, because
+    // `weights` is one flat vector laid out over every species the model knows
+    // and the offset of a present species depends on the sizes of the absent ones
+    // in front of it. Shapes are two integers; the payload is hundreds of MB.
+    std::unordered_set<std::string> present;
+    for (const std::string &spe : config.species)
+        if (atom_idx.find(spe) != atom_idx.end()) present.insert(spe);
+
+    std::unordered_map<std::string, dMatrix2> features = file.read_features(&present);
+    Vmat = file.read_projectors(&present, &proj_dims);
     std::string key;
+    // features is the largest thing in the model file and it dies with this
+    // function, so hand its blocks over rather than copying them: at zeta != 1
+    // power_env_sparse WAS a full second copy, and both were alive at once.
+    // Erasing each block as it is consumed releases the memory during the loop
+    // instead of all at once at the end, which is what the peak actually sees.
     for (std::string spe : config.species) {
+        if (present.find(spe) == present.end()) continue;
         for (int lam = 0; lam < lmax[spe] + 1; lam++) {
             key = spe + std::to_string(lam);
             if (lam == 0) Mspe[spe] = (int)features[key].extent(0);
@@ -303,9 +319,35 @@ void SALTEDPredictor::read_model_data() {
                 power_env_sparse[key] = dot(Vmat[key], features[key], true, false); //Transpose the first matrix
             }
             else {
-                power_env_sparse[key] = features[key];
+                power_env_sparse[key] = std::move(features[key]);
             }
+            features.erase(key);
         }
+    }
+
+    // What the model actually costs, and how it splits by lambda. The prediction
+    // walks one lambda at a time, so the per-lambda figure is the floor a lazy
+    // loader could reach - worth knowing before writing one.
+    if (ProgressBar::report_counts)
+    {
+        auto mb = [](const size_t doubles) { return doubles * sizeof(double) / 1048576.0; };
+        size_t pes = 0, vm = 0, wg = 0;
+        std::map<int, size_t> per_lam;
+        for (const std::string &spe : present)
+            for (int lam = 0; lam < lmax[spe] + 1; lam++)
+            {
+                const std::string k = spe + std::to_string(lam);
+                const size_t p = power_env_sparse[k].extent(0) * power_env_sparse[k].extent(1);
+                const size_t v = Vmat[k].extent(0) * Vmat[k].extent(1);
+                pes += p; vm += v; per_lam[lam] += p + v;
+            }
+        for (const auto &[lam, w] : wigner3j) wg += w.size();
+        std::cout << "[model] power_env_sparse " << mb(pes) << " MB + projectors " << mb(vm)
+                  << " MB + wigner " << mb(wg) << " MB + weights " << mb(weights.size())
+                  << " MB = " << mb(pes + vm + wg + weights.size()) << " MB" << std::endl;
+        std::cout << "[model] per lambda:";
+        for (const auto &[lam, sz] : per_lam) std::cout << " l" << lam << "=" << mb(sz);
+        std::cout << " MB" << std::endl;
     }
 }
 
@@ -460,20 +502,21 @@ vec SALTEDPredictor::predict()
         {
             for (int l = 0; l < lmax[spe] + 1; ++l)
             {
-                // Check if Vmat[spe + to_string(l)][0] exists
-                if (Vmat[spe + to_string(l)].size() == 0)
+                // The projector data for an absent species was never loaded; its
+                // shape was, and the shape is all this accounting needs.
+                const auto dim_it = proj_dims.find(spe + to_string(l));
+                if (dim_it == proj_dims.end() || dim_it->second[1] == 0)
                 {
                    std::cout << "The projector for species " << spe << " and l = " << l << " does not exist. This is a problem with the model, not NoSpherA2." << endl;
                    std::cout << "Continuing with the next species..., make sure there is no: " << spe << " in the structure you are trying to predict!!!!" << endl;
-                    l = lmax[spe] + 1;
-                    continue;
+                    break;
                 }
 
                 // for (int n = 0; n < nmax[spe + to_string(l)]; ++n)
                 //{
                 //     isize += static_cast<int>(Vmat[spe + to_string(l)][0].size());
                 // }
-                isize += static_cast<int>(Vmat[spe + to_string(l)].extent(1)) * nmax[spe + to_string(l)];
+                isize += static_cast<int>(dim_it->second[1]) * nmax[spe + to_string(l)];
             }
             continue;
         }

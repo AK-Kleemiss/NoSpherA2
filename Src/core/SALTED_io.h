@@ -1,6 +1,8 @@
 #pragma once
 
 #include "convenience.h"
+#include <unordered_set>
+#include <array>
 #include "npy.h"
 
 std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path);
@@ -76,11 +78,22 @@ private:
     template <typename T>
     void read_dataset(std::vector<T>& data, std::vector<size_t>& dims);
 
+    // Read a dataset's shape and step over its payload. A structure uses only the
+    // species it actually contains, but the flat `weights` vector is laid out over
+    // every species the model knows, so the SHAPE of an absent species is still
+    // needed to find where a present one starts. The numbers are not.
+    void skip_dataset(std::vector<size_t>& dims, const size_t element_size);
+
     std::string read_string_remove_NULL(const int lengh);
 
     template <typename T>
     T read_generic_blocks(const std::string& key, std::function<void(T&, int)> process_block);
-    std::unordered_map<std::string, dMatrix2> read_lambda_based_data(const std::string& key);
+    // wanted == nullptr loads everything, as before. Otherwise only those species
+    // are materialised and the rest contribute their shape alone.
+    std::unordered_map<std::string, dMatrix2> read_lambda_based_data(
+        const std::string& key,
+        const std::unordered_set<std::string>* wanted = nullptr,
+        std::unordered_map<std::string, std::array<size_t, 2>>* dims_out = nullptr);
 
 public:
     SALTED_BINARY_FILE(const std::filesystem::path& fpath, const bool debug_in = false) : filepath(fpath) {
@@ -102,8 +115,11 @@ public:
     std::unordered_map<std::string, vec> read_averages();
     std::unordered_map<int, vec> read_wigners();
     vec read_weights();
-    std::unordered_map<std::string, dMatrix2> read_projectors();
-    std::unordered_map<std::string, dMatrix2> read_features();
+    std::unordered_map<std::string, dMatrix2> read_projectors(
+        const std::unordered_set<std::string>* wanted = nullptr,
+        std::unordered_map<std::string, std::array<size_t, 2>>* dims_out = nullptr);
+    std::unordered_map<std::string, dMatrix2> read_features(
+        const std::unordered_set<std::string>* wanted = nullptr);
 
     const bool basis_set_defined() { return table_of_contents.find("BASIS") != table_of_contents.end(); }
     std::shared_ptr<BasisSet> read_basis_set();

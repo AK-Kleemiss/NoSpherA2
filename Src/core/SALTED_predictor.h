@@ -44,6 +44,10 @@ private:
 
     vec weights{};
     std::unordered_map<std::string, dMatrix2> Vmat{};
+    // Projector SHAPES for every species the model knows, present or not. The
+    // flat weight vector is laid out over all of them, so an absent species
+    // still has to contribute its width to the offset arithmetic.
+    std::unordered_map<std::string, std::array<size_t, 2>> proj_dims{};
     std::unordered_map<std::string, int> Mspe{};
     std::unordered_map<int, std::vector<int64_t>> vfps{};
     std::unordered_map<int, vec> wigner3j{};
