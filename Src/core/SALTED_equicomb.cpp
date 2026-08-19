@@ -197,6 +197,12 @@ void equicomb(int natoms, int nrad1, int nrad2,
                   << ", " << total_terms << " wigner terms" << std::endl;
     }
 
+    int empty_environments = 0;
+
+    // Scoped: the bar rewinds to its own line when it is destroyed, so anything
+    // printed after the loop but before that is silently overwritten. The empty
+    // environment warning below was lost exactly that way.
+    {
     ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
 #pragma omp parallel 
     {
@@ -329,7 +335,22 @@ void equicomb(int natoms, int nrad1, int nrad2,
                 }
             }
 
-            normfact = 1.0 / sqrt(inner);
+            // An empty environment gives a descriptor of all zeros, so inner is 0
+            // and 1/sqrt(inner) is +inf. Multiplying the zero descriptor by it
+            // yields NaN for every feature, which reaches the form factors. Zero is
+            // the meaningful answer instead: no environment information, so the
+            // kernel contributes nothing and the atom keeps the species average the
+            // model adds separately. For any inner > 0 this is the old expression.
+            if (inner > 0.0)
+            {
+                normfact = 1.0 / sqrt(inner);
+            }
+            else
+            {
+                normfact = 0.0;
+#pragma omp atomic
+                ++empty_environments;
+            }
             const int offset = iat * l21 * nfps;
             for (i = 0; i < nfps; ++i)
             {
@@ -344,6 +365,24 @@ void equicomb(int natoms, int nrad1, int nrad2,
             }
             //pb.update(std::cout);
         }
+    }
+    }
+
+    // Said once per run, on the first lambda that sees it - NOT gated on lam == 0.
+    // An atom with no neighbours still has an l = 0 descriptor, because its own
+    // density is spherically symmetric; it is only the equivariant lam >= 1 parts
+    // that vanish, which is exactly what an empty environment means. Zeroing those
+    // leaves the atom spherical, which is the right answer for it. +inf left it NaN.
+    static bool warned_empty_environment = false;
+    if (empty_environments > 0 && !warned_empty_environment)
+    {
+        warned_empty_environment = true;
+        std::cout << "WARNING: " << empty_environments << " atom(s) have no neighbour"
+                  << " inside the descriptor cutoff.\n"
+                  << "         Their environment singles out no direction, so their"
+                  << " predicted density stays spherical.\n"
+                  << "         Isolated solvent is the usual cause."
+                  << std::endl;
     }
 }
 
@@ -437,7 +476,10 @@ void equicomb(int natoms, int nrad1, int nrad2,
                 }
             }
         }
+        // See the note in the sparsified overload: an empty environment would make
+        // this zero and every feature NaN.
         normfact = sqrt(inner);
+        const double inv_normfact = (normfact > 0.0) ? (1.0 / normfact) : 0.0;
         for (ifeat = 0; ifeat < featsize; ++ifeat)
         {
             for (imu = 0; imu < l21; ++imu)
@@ -445,7 +487,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
                 const size_t out_idx = static_cast<size_t>(iat) * static_cast<size_t>(l21) * static_cast<size_t>(featsize)
                     + static_cast<size_t>(imu) * static_cast<size_t>(featsize)
                     + static_cast<size_t>(ifeat);
-                p[out_idx] = ptemp[imu][ifeat] / normfact;
+                p[out_idx] = ptemp[imu][ifeat] * inv_normfact;
             }
         }
     }
