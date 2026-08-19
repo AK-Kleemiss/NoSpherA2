@@ -382,6 +382,9 @@ public:
     /** Retrieve shared basis set pointer. */
     const std::shared_ptr<std::array<std::vector<primitive>, 118>> get_basis_set_ptr() const { return basis_set; };
     //-------------------atom handling--------------------------------------------------------------
+    /** True when the stored coordinates are Bohr rather than Angstrom.
+        Anything comparing a coordinate against a length in Angstrom needs this. */
+    bool get_isBohr() const { return isBohr; };
     /** Cartesian coordinate value of atom nr along axis (0..2). */
     const double get_atom_coordinate(const unsigned int& nr, const unsigned int& axis) const;
     const d3 get_atom_pos(const unsigned int& nr) const;

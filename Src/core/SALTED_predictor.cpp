@@ -41,26 +41,89 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     // on 8,566-atom 21AZ, where peak fell 18.5 -> 7.1 GB. There is no case for
     // making anyone opt in to that. 0 would hold every block, as before.
     lam_group_limit = 1;
-    bool i_know_all = true;
-#pragma omp parallel for reduction(&& : i_know_all)
-    for (int a = 0; a < wavy_in.get_ncen(); a++)
+
+    // Two kinds of atom cannot be predicted, and both are handed to the spherical
+    // Thakkar fill instead of guessed at:
+    //
+    //  1. a species the model was never trained on;
+    //  2. an atom with nothing inside the descriptor cutoff.
+    //
+    // The second is the subtler one. An atom with an empty environment has a
+    // descriptor that singles out no direction: the l = 0 part is fine, because
+    // its own density is spherically symmetric, but every equivariant lam >= 1
+    // component is exactly zero. The normalisation 1/sqrt(inner) is then +inf and
+    // the prediction comes out NaN. 3NIR shipped two such atoms - an oxygen 4.07 A
+    // from anything and a hydrogen at 5.05 A, against a 4.0 A cutoff - as NaN
+    // columns running the length of its tsc.
+    //
+    // Removing them disturbs nobody: the test is symmetric, so an atom with
+    // nothing within rcut is also nobody's neighbour within rcut, and every other
+    // atom's environment is exactly what it was.
+    //
+    // The test here is purely geometric, while featomic additionally ignores
+    // neighbours whose species is outside neighspe. An atom with neighbours but no
+    // ALLOWED ones therefore still reaches equicomb - the zero guard there catches
+    // it, leaves it spherical rather than NaN, and says so in the log.
+    const int ncen_in = wavy_in.get_ncen();
+    std::vector<char> use_thakkar(ncen_in, 0);
+    for (int a = 0; a < ncen_in; a++)
         if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
-            i_know_all = false;
-    if (!i_know_all)
+            use_thakkar[a] = 1;
+    const int n_unknown = static_cast<int>(std::count(use_thakkar.begin(), use_thakkar.end(), (char)1));
+
+    const double rcut = std::min(config.rcut1, config.rcut2);
+    // rcut is in Angstrom, the coordinates may not be
+    const double rcut_internal = wavy_in.get_isBohr() ? constants::ang2bohr(rcut) : rcut;
+    const double cut_sq = rcut_internal * rcut_internal;
+    int n_isolated = 0;
+#pragma omp parallel for reduction(+ : n_isolated)
+    for (int a = 0; a < ncen_in; a++)
     {
-        std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
-        for (int a = 0; a < wavy_in.get_ncen(); a++)
+        if (use_thakkar[a]) continue;
+        bool lonely = true;
+        for (int b = 0; b < ncen_in && lonely; b++)
         {
-            if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
+            if (b == a) continue;
+            double d_sq = 0.0;
+            for (unsigned int ax = 0; ax < 3; ax++)
             {
-                std::cout << constants::atnr2letter(wavy_in.get_atom_charge(a)) << " ";
+                const double dx = wavy_in.get_atom_coordinate(a, ax) - wavy_in.get_atom_coordinate(b, ax);
+                d_sq += dx * dx;
             }
+            if (d_sq < cut_sq) lonely = false;
         }
-        std::cout << "\nI will fill out these atoms using spherical Thakkar densities!\n";
-        wavy = wavy_in; // make a copy of initial wavefunction, to leave the initial one untouched!
-        for (int a = wavy_in.get_ncen() - 1; a >= 0; a--)
+        if (lonely)
         {
-            if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
+            use_thakkar[a] = 1;   // distinct indices, and char so there is no bitfield to race on
+            ++n_isolated;
+        }
+    }
+
+    if (n_unknown + n_isolated > 0)
+    {
+        if (n_unknown > 0)
+        {
+            std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
+            for (int a = 0; a < ncen_in; a++)
+            {
+                if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
+                {
+                    std::cout << constants::atnr2letter(wavy_in.get_atom_charge(a)) << " ";
+                }
+            }
+            std::cout << std::endl;
+        }
+        if (n_isolated > 0)
+        {
+            std::cout << "WARNING: " << n_isolated << " atom(s) have no neighbour within the "
+                      << rcut << " A descriptor cutoff, so there is no environment to predict from."
+                      << " Isolated solvent is the usual cause." << std::endl;
+        }
+        std::cout << "I will fill out these atoms using spherical Thakkar densities!\n";
+        wavy = wavy_in; // make a copy of initial wavefunction, to leave the initial one untouched!
+        for (int a = ncen_in - 1; a >= 0; a--)
+        {
+            if (use_thakkar[a])
             {
                 wavy.erase_atom(a);
             }

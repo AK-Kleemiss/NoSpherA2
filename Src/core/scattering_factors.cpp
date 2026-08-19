@@ -2784,16 +2784,27 @@ tsc_block_type calculate_scattering_factors(
     {
         file << "Performing the remaining calculation of spherical atoms..." << std::endl;
         opt.needs_Thakkar_fill = false;
+        // nr is not only an index into this vector: it also picks opt.groups[nr],
+        // which is what decides WHICH disorder parts the fill takes atoms from, and
+        // the part's cif. Handing over a one-element vector and nr = 0 therefore
+        // asked for part 0's atoms no matter which part was being filled, so an
+        // atom belonging only to a later part was never restored - 3NIR came out
+        // with 1025 scatterers where it has 1026. Build the whole list instead, so
+        // the index means the same thing in all three places. (Passing nr with a
+        // one-element vector is the variant that reads tempy[1] and crashes.)
         vector<WFN> tempy;
+        int fill_nr = 0;
         if (!opt.wfn.empty()) {
             tempy.emplace_back(opt.wfn);
         }
         else {
-            tempy.emplace_back(opt.combined_tsc_calc_files[nr]);
+            for (const auto& part_file : opt.combined_tsc_calc_files)
+                tempy.emplace_back(part_file);
+            fill_nr = nr;
         }
         opt.m_hkl_list = hkl;
         opt.iam_switch = true; opt.no_date = true;
-        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, 0);
+        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
         opt.iam_switch = false; opt.no_date = false;
         blocky.append(std::move(blocky_thakkar), file);
         time_points.push_back(get_time());
@@ -2903,15 +2914,22 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		preps.push_back(std::move(prep));
 	}
 
-	// Atoms of species the model does not know were erased from every part, so
-	// they are still missing. The old path recomputed a whole second table for
-	// them and appended it; here they become extra rows of each block.
-	salted_part_prep spherical;
-	bool have_spherical = false;
+	// Atoms the model cannot predict - an unknown species, or nothing inside the
+	// descriptor cutoff - were erased from every part, so they are still missing.
+	// The old path recomputed a whole second table for them and appended it; here
+	// they become extra rows of each block.
+	//
+	// ONE PASS OVER PART 0 IS NOT ENOUGH. A part file only yields the atoms that
+	// belong to the parts it covers, so a missing atom that belongs to part 3 can
+	// only come out of part 3's file. Filling from part 0 alone silently dropped
+	// it: 3NIR came out with 1025 scatterers where it has 1026, which is exactly
+	// the kind of shortfall that looks plausible in a file listing. Walk every
+	// part, feeding `known` as we go so no atom is produced twice.
+	std::vector<salted_part_prep> spherical(n_parts);
+	std::vector<char> have_spherical(n_parts, 0);
+	bool any_spherical = false;
 	if (opt.needs_Thakkar_fill)
 	{
-		std::vector<WFN> tempy;
-		tempy.emplace_back(opt.combined_tsc_calc_files[0]);
 		// Pin the reflections: the whole-table path set m_hkl_list before its
 		// recursive fill for exactly this reason. Without it the spherical prep can
 		// build its own list and k_of_reflection ends up a different length from the
@@ -2920,16 +2938,31 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		for (const auto& h : preps[0].hkl_v) opt.m_hkl_list.emplace(h);
 		const bool iam_was = opt.iam_switch;
 		opt.iam_switch = true;
-		calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
-			opt, tempy, file, known, 0, known_kpts, &spherical);
-		opt.iam_switch = iam_was;
-		have_spherical = !spherical.asym_atom_list.empty();
-		if (have_spherical)
-			err_checkf(spherical.k_of_reflection.size() == preps[0].hkl_v.size(),
-				"Spherical remainder covers " + std::to_string(spherical.k_of_reflection.size()) +
+		size_t n_filled = 0;
+		// The whole list, not one file: the index also selects opt.groups[nr], so a
+		// one-element vector with nr = i either reads past the end or asks the wrong
+		// part for its atoms. See the note in the sequential path above.
+		std::vector<WFN> tempy;
+		for (const auto& part_file : opt.combined_tsc_calc_files)
+			tempy.emplace_back(part_file);
+		for (size_t i = 0; i < n_parts; i++)
+		{
+			calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+				opt, tempy, file, known, static_cast<int>(i), known_kpts, &spherical[i]);
+			have_spherical[i] = spherical[i].asym_atom_list.empty() ? 0 : 1;
+			if (!have_spherical[i]) continue;
+			any_spherical = true;
+			n_filled += spherical[i].asym_atom_list.size();
+			err_checkf(spherical[i].k_of_reflection.size() == preps[0].hkl_v.size(),
+				"Spherical remainder of part " + std::to_string(i + 1) + " covers " +
+				std::to_string(spherical[i].k_of_reflection.size()) +
 				" reflections, the parts cover " + std::to_string(preps[0].hkl_v.size()), file);
-		file << "Spherical remainder: " << spherical.asym_atom_list.size()
-			 << " atom(s) the model does not know" << std::endl;
+			for (size_t a = 0; a < spherical[i].labels.size(); a++)
+				known.push_back(spherical[i].labels[a]);
+		}
+		opt.iam_switch = iam_was;
+		file << "Spherical remainder: " << n_filled
+			 << " atom(s) the model cannot predict" << std::endl;
 	}
 
 	ScattererLabels ids;
@@ -2939,9 +2972,10 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			if (opt.label_tsc_output) ids.emplace_back(preps[p].labels[a]);
 			else ids.emplace_back(preds[p]->wavy.get_id_for_atom(preps[p].asym_atom_list[a]));
 		}
-	if (have_spherical)
-		for (size_t a = 0; a < spherical.asym_atom_list.size(); a++)
-			ids.emplace_back(spherical.labels[a]);
+	for (size_t p = 0; p < n_parts; p++)
+		if (have_spherical[p])
+			for (size_t a = 0; a < spherical[p].asym_atom_list.size(); a++)
+				ids.emplace_back(spherical[p].labels[a]);
 
 	const size_t n_refl = preps[0].hkl_v.size();
 	const size_t bs = std::min(opt.tsc_block_size, n_refl ? n_refl : 1);
@@ -2970,18 +3004,20 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			calc_SF_SALTED(k_slice, preps[p].coefs, *preps[p].atoms, preps[p].asym_atom_list, chunk);
 			for (auto& row : chunk) combined.push_back(std::move(row));
 		}
-		if (have_spherical)
+		// Same order as the id list above: every part's spherical rows, in part order
+		for (size_t p = 0; p < n_parts; p++)
 		{
+			if (!have_spherical[p]) continue;
 			std::vector<Thakkar> spheres;
-			spheres.reserve(spherical.atom_type_list.size());
-			for (size_t t = 0; t < spherical.atom_type_list.size(); t++)
-				spheres.emplace_back(spherical.atom_type_list[t]);
-			for (size_t a = 0; a < spherical.asym_atom_list.size(); a++)
+			spheres.reserve(spherical[p].atom_type_list.size());
+			for (size_t t = 0; t < spherical[p].atom_type_list.size(); t++)
+				spheres.emplace_back(spherical[p].atom_type_list[t]);
+			for (size_t a = 0; a < spherical[p].asym_atom_list.size(); a++)
 			{
 				cvec row(hi - lo);
 				for (size_t r = lo; r < hi; r++)
-					row[r - lo] = spheres[spherical.asym_atom_to_type_list[a]]
-						.get_form_factor(spherical.k_of_reflection[r]);
+					row[r - lo] = spheres[spherical[p].asym_atom_to_type_list[a]]
+						.get_form_factor(spherical[p].k_of_reflection[r]);
 				combined.push_back(std::move(row));
 			}
 		}
