@@ -284,7 +284,10 @@ void SALTEDPredictor::read_model_data() {
     // either way, only the moment changes.
     const auto _t_model = std::chrono::steady_clock::now();
     const std::filesystem::path _SALTEDpath = SALTED_DIR / config.salted_filename;
-    SALTED_BINARY_FILE file(_SALTEDpath);
+    // Kept open for the whole prediction: the feature and projector matrices are
+    // fetched lambda by lambda as the loop reaches them, not up front.
+    model_file = std::make_unique<SALTED_BINARY_FILE>(_SALTEDpath);
+    SALTED_BINARY_FILE &file = *model_file;
     if (config.field) {
         err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
     }
@@ -305,28 +308,24 @@ void SALTEDPredictor::read_model_data() {
     for (const std::string &spe : config.species)
         if (atom_idx.find(spe) != atom_idx.end()) present.insert(spe);
 
-    std::unordered_map<std::string, dMatrix2> features = file.read_features(&present);
-    Vmat = file.read_projectors(&present, &proj_dims);
-    std::string key;
-    // features is the largest thing in the model file and it dies with this
-    // function, so hand its blocks over rather than copying them: at zeta != 1
-    // power_env_sparse WAS a full second copy, and both were alive at once.
-    // Erasing each block as it is consumed releases the memory during the loop
-    // instead of all at once at the end, which is what the peak actually sees.
-    for (std::string spe : config.species) {
-        if (present.find(spe) == present.end()) continue;
-        for (int lam = 0; lam < lmax[spe] + 1; lam++) {
-            key = spe + std::to_string(lam);
-            if (lam == 0) Mspe[spe] = (int)features[key].extent(0);
+    // Nothing large is read here. Both blocks are INDEXED - offset and shape per
+    // (species, lambda) - and the matrices are fetched in load_model_lambda()
+    // when the prediction reaches that lambda, then dropped again. Each block is
+    // used exactly once per run, so the bytes read are the same as before.
+    feat_index = file.index_lambda_based_data("FEATS");
+    proj_index = file.index_lambda_based_data("PROJ");
+    model_species = present;
 
-            if (config.zeta == 1.0) {
-                power_env_sparse[key] = dot(Vmat[key], features[key], true, false); //Transpose the first matrix
-            }
-            else {
-                power_env_sparse[key] = std::move(features[key]);
-            }
-            features.erase(key);
-        }
+    // The two things the rest of the run needs from the shapes alone:
+    //  - Mspe, the number of sparse environments of a present species;
+    //  - the projector width of EVERY species the model knows, present or not,
+    //    because `weights` is one flat vector laid out over all of them.
+    for (const auto &[k, ref] : proj_index)
+        proj_dims[k] = { ref.rows, ref.cols };
+    for (const std::string &spe : present)
+    {
+        const auto it = feat_index.find(spe + "0");
+        if (it != feat_index.end()) Mspe[spe] = static_cast<int>(it->second.rows);
     }
 
     // What the model actually costs, and how it splits by lambda. The prediction
@@ -341,15 +340,19 @@ void SALTEDPredictor::read_model_data() {
             for (int lam = 0; lam < lmax[spe] + 1; lam++)
             {
                 const std::string k = spe + std::to_string(lam);
-                const size_t p = power_env_sparse[k].extent(0) * power_env_sparse[k].extent(1);
-                const size_t v = Vmat[k].extent(0) * Vmat[k].extent(1);
+                const auto f = feat_index.find(k), pr = proj_index.find(k);
+                const size_t p = (f == feat_index.end()) ? 0 : f->second.rows * f->second.cols;
+                const size_t v = (pr == proj_index.end()) ? 0 : pr->second.rows * pr->second.cols;
                 pes += p; vm += v; per_lam[lam] += p + v;
             }
         for (const auto &[lam, w] : wigner3j) wg += w.size();
-        std::cout << "[model] power_env_sparse " << mb(pes) << " MB + projectors " << mb(vm)
+        size_t worst = 0;
+        for (const auto &[lam, sz] : per_lam) worst = std::max(worst, sz);
+        std::cout << "[model] features " << mb(pes) << " MB + projectors " << mb(vm)
                   << " MB + wigner " << mb(wg) << " MB + weights " << mb(weights.size())
-                  << " MB = " << mb(pes + vm + wg + weights.size()) << " MB" << std::endl;
-        std::cout << "[model] read in "
+                  << " MB = " << mb(pes + vm + wg + weights.size()) << " MB if held whole;"
+                  << " lazily, the largest lambda is " << mb(worst) << " MB" << std::endl;
+        std::cout << "[model] indexed in "
                   << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_model).count()
                   << " s" << std::endl;
         std::cout << "[model] per lambda:";
@@ -359,13 +362,55 @@ void SALTEDPredictor::read_model_data() {
 }
 
 
+// Fetch the model matrices for one lambda, use them, drop them.
+//
+// The prediction visits each lambda exactly once, and within a lambda it needs
+// power_env_sparse and Vmat for every species present. Nothing above that
+// lambda is touched again afterwards - the weight accounting downstream works
+// off psi_nm and the projector SHAPES, both of which outlive the matrices - so
+// the blocks can be let go as soon as the kernels for that lambda are built.
+//
+// The bytes read over a run are exactly what they were when everything was
+// loaded up front; only the moment changes. What changes with it is the peak:
+// the largest single lambda instead of all of them at once.
+void SALTEDPredictor::load_model_lambda(const int lam)
+{
+    if (!model_file) return;
+    for (const std::string &spe : model_species)
+    {
+        if (lam > lmax[spe]) continue;
+        const std::string key = spe + std::to_string(lam);
+        if (power_env_sparse.find(key) != power_env_sparse.end()) continue;
+        const auto pr = proj_index.find(key);
+        const auto ft = feat_index.find(key);
+        if (pr == proj_index.end() || ft == feat_index.end()) continue;
+        Vmat[key] = model_file->load_block(pr->second);
+        dMatrix2 feats = model_file->load_block(ft->second);
+        if (config.zeta == 1.0)
+            power_env_sparse[key] = dot(Vmat[key], feats, true, false);
+        else
+            power_env_sparse[key] = std::move(feats);
+    }
+}
+
+void SALTEDPredictor::free_model_lambda(const int lam)
+{
+    if (!model_file) return;
+    for (const std::string &spe : model_species)
+    {
+        const std::string key = spe + std::to_string(lam);
+        power_env_sparse.erase(key);
+        Vmat.erase(key);
+    }
+}
+
 vec SALTEDPredictor::predict()
 {
     using namespace std;
     const auto _t_predict_start = std::chrono::steady_clock::now();
     auto _elapsed = [](const std::chrono::steady_clock::time_point &from)
     { return std::chrono::duration<double>(std::chrono::steady_clock::now() - from).count(); };
-    double _t_equicomb = 0.0, _t_kernels = 0.0;
+    double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_io = 0.0;
     // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     // How many lambda blocks are alive at once.
     //
@@ -436,6 +481,12 @@ vec SALTEDPredictor::predict()
         }
         }
         _t_equicomb += _elapsed(_t_eq);
+        // Deliberately after the descriptors, not before: the model is only needed
+        // by the kernels, and the descriptor stage is where memory is already
+        // highest. Holding it across equicomb would raise the peak for nothing.
+        const auto _t_ld = std::chrono::steady_clock::now();
+        for (int lam = lam0; lam < lam1; lam++) load_model_lambda(lam);
+        _t_model_io += _elapsed(_t_ld);
         const auto _t_kn = std::chrono::steady_clock::now();
         // Species-outer within the group, so a species walks several consecutive
         // lambdas and keeps its sparse matrices hot.
@@ -497,6 +548,8 @@ vec SALTEDPredictor::predict()
             }
         }
         _t_kernels += _elapsed(_t_kn);
+        // Nothing above this lambda reads these matrices again.
+        for (int lam = lam0; lam < lam1; lam++) free_model_lambda(lam);
     }
 
     unordered_map<string, dMatrix1> C{};
@@ -612,7 +665,9 @@ vec SALTEDPredictor::predict()
         std::cout << "[stages] predict " << total << " s = equicomb " << _t_equicomb
                   << " s (" << (100.0 * _t_equicomb / total) << "%) + kernels "
                   << _t_kernels << " s (" << (100.0 * _t_kernels / total)
-                  << "%) + rest " << (total - _t_equicomb - _t_kernels) << " s" << std::endl;
+                  << "%) + model I/O " << _t_model_io << " s ("
+                  << (100.0 * _t_model_io / total) << "%) + rest "
+                  << (total - _t_equicomb - _t_kernels - _t_model_io) << " s" << std::endl;
     }
     return pred_coefs;
 }

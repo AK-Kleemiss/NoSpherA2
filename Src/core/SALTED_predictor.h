@@ -48,6 +48,12 @@ private:
     // flat weight vector is laid out over all of them, so an absent species
     // still has to contribute its width to the offset arithmetic.
     std::unordered_map<std::string, std::array<size_t, 2>> proj_dims{};
+    // Held open for the whole prediction, with an offset+shape index per
+    // (species, lambda) instead of the matrices themselves.
+    std::unique_ptr<SALTED_BINARY_FILE> model_file{};
+    std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> feat_index{};
+    std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> proj_index{};
+    std::unordered_set<std::string> model_species{};
     std::unordered_map<std::string, int> Mspe{};
     std::unordered_map<int, std::vector<int64_t>> vfps{};
     std::unordered_map<int, vec> wigner3j{};
@@ -55,6 +61,10 @@ private:
     std::unordered_map<std::string, vec> av_coefs{};
     std::unordered_map<int, int> featsize{};
     void read_model_data();
+    // Fetch / drop the model matrices of one lambda. read_model_data() only
+    // indexes the file; these do the reading, as the prediction reaches them.
+    void load_model_lambda(const int lam);
+    void free_model_lambda(const int lam);
 
     vec predict();
 };

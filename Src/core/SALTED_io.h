@@ -82,7 +82,8 @@ private:
     // species it actually contains, but the flat `weights` vector is laid out over
     // every species the model knows, so the SHAPE of an absent species is still
     // needed to find where a present one starts. The numbers are not.
-    void skip_dataset(std::vector<size_t>& dims, const size_t element_size);
+    void skip_dataset(std::vector<size_t>& dims, const size_t element_size,
+                      std::streamoff* payload_offset = nullptr);
 
     std::string read_string_remove_NULL(const int lengh);
 
@@ -120,6 +121,15 @@ public:
         std::unordered_map<std::string, std::array<size_t, 2>>* dims_out = nullptr);
     std::unordered_map<std::string, dMatrix2> read_features(
         const std::unordered_set<std::string>* wanted = nullptr);
+
+    // Where a matrix lives in the file and how big it is, without reading it.
+    // The prediction walks one lambda at a time and uses each block exactly
+    // once, so the blocks can be fetched when that lambda comes round and let go
+    // afterwards. The bytes read over a run are identical either way; only the
+    // moment changes, and with it how much is resident at the peak.
+    struct block_ref { std::streamoff offset = 0; size_t rows = 0, cols = 0; };
+    std::unordered_map<std::string, block_ref> index_lambda_based_data(const std::string& key);
+    dMatrix2 load_block(const block_ref& ref);
 
     const bool basis_set_defined() { return table_of_contents.find("BASIS") != table_of_contents.end(); }
     std::shared_ptr<BasisSet> read_basis_set();
