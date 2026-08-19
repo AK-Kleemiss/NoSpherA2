@@ -130,32 +130,71 @@ void equicomb(int natoms, int nrad1, int nrad2,
     // re-evaluated inside the n1 x n2 loop, which runs nrad1*nrad2 times per atom
     // per lambda, and the iterations that fail it do no work.
     //
-    // Enumerate the survivors once, in exactly the order the walking wigner_ptr
-    // consumed them: same values, same operations, same summation order, no branch.
-    struct w3j_term { int im1, im2; double w; };
-    std::vector<w3j_term> terms;
-    std::vector<int> term_start(static_cast<size_t>(llmax) * l21 + 1, 0);
+    // The survivors are more than a subset. |im1 - mu| <= l2 selects a CONTIGUOUS
+    // run of im1, and im2 = im1 - mu + l2 advances in lockstep with it, so a group
+    // needs no index list at all: a first index, a length and an offset into w3j
+    // describe it completely. The inner loop then reads three unit-stride streams
+    // instead of gathering two indices out of a term list for every term.
+    //
+    // w3j is consumed in exactly (il, imu, im1) order, which is why the weights of
+    // one group are a contiguous slice of it and no copy of them is needed here.
+    //
+    // Same values, same operations, same summation order: the result is unchanged.
+    struct w3j_run { int im1_begin, im2_begin, count, w_off; };
+    std::vector<w3j_run> runs(static_cast<size_t>(llmax) * l21, w3j_run{0, 0, 0, 0});
+    size_t total_terms = 0;
     {
-        size_t w_idx = 0;
+        int w_idx = 0;
         for (int til = 0; til < llmax; ++til)
         {
             const int tl1 = llvec[0][til], tl2 = llvec[1][til];
             for (int timu = 0; timu < l21; ++timu)
             {
-                term_start[static_cast<size_t>(til) * l21 + timu] = static_cast<int>(terms.size());
                 const int tmu = timu - lam + tl1;
-                for (int tim1 = 0; tim1 < 2 * tl1 + 1; ++tim1)
-                {
-                    const int tm2 = tim1 - tmu;
-                    if (abs(tm2) <= tl2)
-                    {
-                        terms.push_back({ tim1, tm2 + tl2, w3j[w_idx] });
-                        ++w_idx;
-                    }
-                }
+                const int lo = std::max(0, tmu - tl2);
+                const int hi = std::min(2 * tl1, tmu + tl2);
+                const int cnt = (hi >= lo) ? (hi - lo + 1) : 0;
+                runs[static_cast<size_t>(til) * l21 + timu] = { lo, lo - tmu + tl2, cnt, w_idx };
+                w_idx += cnt;
             }
         }
-        term_start[static_cast<size_t>(llmax) * l21] = static_cast<int>(terms.size());
+        total_terms = static_cast<size_t>(w_idx);
+    }
+
+    // The complex-to-real matrix is a mirror-pair transform: row i couples only
+    // column i and column l21-1-i, so every row holds exactly two nonzeros (the
+    // middle row holds one). The transform below was walking all l21 columns of
+    // every row, which for lam = 5 multiplies by 119 exact zeros out of 121.
+    //
+    // Adding a term that is exactly zero does not change a finite sum, so dropping
+    // those terms - while keeping the survivors in ascending column order, which is
+    // the order the dense loop added them in - leaves the result bit for bit the
+    // same. The structure is read off c2r rather than assumed, and anything that
+    // does not fit two-per-row falls back to the dense walk, so a future transform
+    // cannot silently lose terms here.
+    struct c2r_entry { int j; double re, im; };
+    std::vector<c2r_entry> c2r_nz(static_cast<size_t>(l21) * 2, c2r_entry{0, 0.0, 0.0});
+    std::vector<int> c2r_cnt(l21, 0);
+    bool c2r_is_sparse = (c2r.size() >= static_cast<size_t>(l21));
+    for (int i2 = 0; i2 < l21 && c2r_is_sparse; ++i2)
+    {
+        if (c2r[i2].size() < static_cast<size_t>(l21)) { c2r_is_sparse = false; break; }
+        int cnt = 0;
+        for (int j2 = 0; j2 < l21; ++j2)
+        {
+            const cdouble &e = c2r[i2][j2];
+            if (e.real() == 0.0 && e.imag() == 0.0) continue;
+            if (cnt == 2) { c2r_is_sparse = false; break; }
+            c2r_nz[static_cast<size_t>(i2) * 2 + cnt] = { j2, e.real(), e.imag() };
+            ++cnt;
+        }
+        c2r_cnt[i2] = cnt;
+    }
+    if (ProgressBar::report_counts)
+    {
+        std::cout << "[equicomb] lam " << lam << ": c2r "
+                  << (c2r_is_sparse ? "sparse (2 per row)" : "dense fallback")
+                  << ", " << total_terms << " wigner terms" << std::endl;
     }
 
     ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
@@ -192,45 +231,61 @@ void equicomb(int natoms, int nrad1, int nrad2,
                             double acc_real = 0.0;
                             double acc_imag = 0.0;
 
-                            const int t_lo = term_start[static_cast<size_t>(il) * l21 + imu];
-                            const int t_hi = term_start[static_cast<size_t>(il) * l21 + imu + 1];
-                            for (int t = t_lo; t < t_hi; ++t)
+                            const w3j_run &run = runs[static_cast<size_t>(il) * l21 + imu];
+                            const cdouble *__restrict a = v1_ptr + run.im1_begin;
+                            const cdouble *__restrict b = v2_ptr + run.im2_begin;
+                            const double *__restrict w = w3j.data() + run.w_off;
+                            for (int k = 0; k < run.count; ++k)
                             {
-                                const w3j_term &term = terms[t];
-                                const cdouble &v1_val = v1_ptr[term.im1];
-                                const cdouble &v2_val = v2_ptr[term.im2];
+                                const double v1_r = a[k].real();
+                                const double v1_i = a[k].imag();
+                                const double v2_r = b[k].real();
+                                const double v2_i = v2_sign * b[k].imag();
 
-                                const double& v1_r = v1_val.real();
-                                const double& v1_i = v1_val.imag();
-                                const double& v2_r = v2_val.real();
-                                const double v2_i = v2_sign * v2_val.imag();
-
-                                acc_real += term.w * (v1_r * v2_r - v1_i * v2_i);
-                                acc_imag += term.w * (v1_r * v2_i + v1_i * v2_r);
+                                acc_real += w[k] * (v1_r * v2_r - v1_i * v2_i);
+                                acc_imag += w[k] * (v1_r * v2_i + v1_i * v2_r);
                             }
                             pcmplx_real[imu] = acc_real;
                             pcmplx_imag[imu] = acc_imag;
                         }
                         //recycling this variable
                         limit_l1 = l21 * ifeat;
-                        for (i = 0; i < l21; ++i)
+                        const double *__restrict pvec_real_ptr = pcmplx_real.data();
+                        const double *__restrict pvec_imag_ptr = pcmplx_imag.data();
+                        if (c2r_is_sparse)
                         {
-                            preal = 0.0;
-                            const cdouble *__restrict cvec_ptr = c2r[i].data();
-                            const double *__restrict pvec_real_ptr = pcmplx_real.data();
-                            const double *__restrict pvec_imag_ptr = pcmplx_imag.data();
+                            for (i = 0; i < l21; ++i)
+                            {
+                                preal = 0.0;
+                                const c2r_entry *__restrict row = &c2r_nz[static_cast<size_t>(i) * 2];
+                                const int nz = c2r_cnt[i];
+                                for (int k = 0; k < nz; ++k)
+                                {
+                                    preal += row[k].re * pvec_real_ptr[row[k].j] - row[k].im * pvec_imag_ptr[row[k].j];
+                                }
+                                inner += preal * preal;
+                                ptemp[i + limit_l1] = preal;
+                            }
+                        }
+                        else
+                        {
+                            for (i = 0; i < l21; ++i)
+                            {
+                                preal = 0.0;
+                                const cdouble *__restrict cvec_ptr = c2r[i].data();
 #if defined(_MSC_VER)
 #pragma loop(ivdep)
 #elif defined(__GNUC__) || defined(__clang__)
 #pragma GCC ivdep
 #endif
-                            for (j = 0; j < l21; ++j)
-                            {
-                                const cdouble &c2r_ih = cvec_ptr[j];
-                                preal += c2r_ih.real() * pvec_real_ptr[j] - c2r_ih.imag() * pvec_imag_ptr[j];
+                                for (j = 0; j < l21; ++j)
+                                {
+                                    const cdouble &c2r_ih = cvec_ptr[j];
+                                    preal += c2r_ih.real() * pvec_real_ptr[j] - c2r_ih.imag() * pvec_imag_ptr[j];
+                                }
+                                inner += preal * preal;
+                                ptemp[i + limit_l1] = preal;
                             }
-                            inner += preal * preal;
-                            ptemp[i + limit_l1] = preal;
                         }
                         ifeat++;
                     }
