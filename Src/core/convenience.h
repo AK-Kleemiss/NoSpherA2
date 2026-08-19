@@ -768,7 +768,20 @@ struct options
     // scatterers x reflections x 16 bytes and dominates memory, so emitting
     // it in blocks is what lets a large protein run on a small machine.
     // 0 keeps the original single-allocation path.
-    size_t tsc_block_size = 0;
+    // Reflections per block when writing the tsc. Streaming is the default,
+    // because holding the whole table is what puts a protein out of reach of a
+    // small machine: 1IEE holds 3.5 GB of table, 21AZ holds 22 GB.
+    //
+    // Measured on 1EJG - block 0 (hold everything) against 100, 250, 500, 1000,
+    // 2500 and 5000, two rounds with the sizes rotated so this host's drift falls
+    // on every arm. Every size produced the SAME tsc hash, and the times spanned
+    // 24.9 to 26.0 s with no trend in block size; that spread is the machine, not
+    // the blocking. Peak fell 1822 -> 1541 MB and did not vary with the size,
+    // because the live buffer is small next to the prediction itself.
+    //
+    // 1000 keeps that buffer near 3 * scatterers * blocksize * 16 bytes: 144 MB on
+    // a 3,000-atom structure, 411 MB on 8,566. 0 restores the old behaviour.
+    size_t tsc_block_size = 1000;
     // set once a streamed run has written the file itself, so the caller
     // does not then overwrite it with an empty one-shot block
     bool tsc_written_by_stream = false;

@@ -2463,6 +2463,17 @@ tsc_block_type calculate_scattering_factors(
 		&& !opt.iam_switch
 		&& !opt.electron_diffraction
 		&& opt.combined_tsc_calc_files.size() <= 1;
+	// Say so rather than quietly using several GB more. A single-wavefunction run
+	// that needs a spherical fill still holds the whole table, because the fill is
+	// appended as a second table afterwards; the -mtc path emits those rows per
+	// block instead and does not have this restriction.
+	if (opt.tsc_block_size > 0 && !stream_tsc && opt.needs_Thakkar_fill
+		&& !opt.iam_switch && !opt.electron_diffraction
+		&& opt.combined_tsc_calc_files.size() <= 1)
+		file << "NOTE: some atoms need a spherical fill, which this path appends as a"
+		     << " second table," << std::endl
+		     << "      so the tsc is held whole instead of streamed."
+		     << " Peak memory will be higher." << std::endl;
 	cvec2 sf;
 	if (!stream_tsc)
 	{
