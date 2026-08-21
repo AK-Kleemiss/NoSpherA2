@@ -1,0 +1,44 @@
+# VMD visualization for promolecular NCI/RDG analysis
+# Load with: vmd -e unit_surrounding_nci.vmd
+display projection Orthographic
+display depthcue off
+axes location Off
+color Display Background white
+color scale method BGR
+
+mol new "D:/Git/NoSpherA2/tests/intermolecular_nci/unit.xyz" type xyz waitfor all
+set frag1 [molinfo top]
+mol delrep 0 $frag1
+mol representation CPK
+mol color Name
+mol selection all
+mol material Opaque
+mol addrep $frag1
+
+mol new "D:/Git/NoSpherA2/tests/intermolecular_nci/surrounding.xyz" type xyz waitfor all
+set frag2 [molinfo top]
+mol delrep 0 $frag2
+mol representation CPK
+mol color Name
+mol selection all
+mol material Opaque
+mol addrep $frag2
+
+mol new "D:/Git/NoSpherA2/tests/intermolecular_nci/unit_surrounding_signed_rho.cube" type cube first 0 last -1 step 1 waitfor 1 volsets {0 }
+set nci [molinfo top]
+mol delrep 0 $nci
+mol addfile "D:/Git/NoSpherA2/tests/intermolecular_nci/unit_surrounding_rdg.cube" type cube first 0 last -1 step 1 waitfor 1 volsets {0 } $nci
+while {[molinfo $nci get numreps] > 0} {
+    mol delrep 0 $nci
+}
+mol addrep $nci
+mol modselect 0 $nci all
+mol modstyle 0 $nci Isosurface 0.5 1 0 0 1 1
+mol modcolor 0 $nci Volume 0
+mol modmaterial 0 $nci Opaque
+mol colupdate 0 $nci on
+mol scaleminmax $nci 0 -2.0 2.0
+color scale method BGR
+color scale midpoint 0.5
+
+display resetview

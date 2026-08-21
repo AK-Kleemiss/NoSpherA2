@@ -93,6 +93,10 @@ struct salted_part_prep
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     vec k_of_reflection;
+    // stl of the same reflections. Only the electron-diffraction form of the
+    // spherical rows needs it, and recovering it from k would mean undoing a
+    // 4*pi and a unit conversion, so it is carried rather than inverted.
+    vec stl_of_reflection;
 };
 
 /**

@@ -1,0 +1,252 @@
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  error_check + 0x169   (D:\Git\NoSpherA2\Src\core\convenience.cpp:3733)
+   8  options::digest_options + 0x16a1   (D:\Git\NoSpherA2\Src\core\convenience.cpp:2184)
+   9  run_app_impl + 0xf4   (D:\Git\NoSpherA2\Src\core\NoSpherA2.cpp:56)
+  10  run_app + 0x21   (D:\Git\NoSpherA2\Src\core\NoSpherA2.cpp:28)
+  11  __scrt_common_main_seh + 0x10f   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:288)
+  12  BaseThreadInitThunk + 0x17
+  13  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  error_check + 0x169   (D:\Git\NoSpherA2\Src\core\convenience.cpp:3733)
+   8  options::digest_options + 0x16a1   (D:\Git\NoSpherA2\Src\core\convenience.cpp:2184)
+   9  run_app_impl + 0xf4   (D:\Git\NoSpherA2\Src\core\NoSpherA2.cpp:56)
+  10  run_app + 0x21   (D:\Git\NoSpherA2\Src\core\NoSpherA2.cpp:28)
+  11  __scrt_common_main_seh + 0x10f   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:288)
+  12  BaseThreadInitThunk + 0x17
+  13  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  error_check + 0x169   (D:\Git\NoSpherA2\Src\core\convenience.cpp:3733)
+   8  options::digest_options + 0x16a1   (D:\Git\NoSpherA2\Src\core\convenience.cpp:2184)
+   9  run_app_impl + 0xf4   (D:\Git\NoSpherA2\Src\core\NoSpherA2.cpp:56)
+  10  run_app + 0x21   (D:\Git\NoSpherA2\Src\core\NoSpherA2.cpp:28)
+  11  __scrt_common_main_seh + 0x10f   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:288)
+  12  BaseThreadInitThunk + 0x17
+  13  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  0x00007ff68127a0cf
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  0x00007ff6826e7086
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
+
+=== exit() called ===
+   0  n2_write_trace + 0xaf   (D:\Git\NoSpherA2\app\exit_diagnostics.h:42)
+   1  bsearch_s + 0x255
+   2  execute_onexit_table + 0x87
+   3  execute_onexit_table + 0x3d
+   4  wcsnicmp_l + 0x299
+   5  wcsnicmp_l + 0x22b
+   6  logbf + 0x26a
+   7  __scrt_common_main_seh + 0x176   (D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:295)
+   8  BaseThreadInitThunk + 0x17
+   9  RtlUserThreadStart + 0x2c
