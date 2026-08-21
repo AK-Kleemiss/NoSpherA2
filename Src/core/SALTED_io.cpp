@@ -524,10 +524,15 @@ dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
     if (ref.rows == 0 || ref.cols == 0) return dMatrix2{};
     file.clear();
     file.seekg(ref.offset, std::ios::beg);
-    vec data(ref.rows * ref.cols);
-    read_exact_bytes(file, data.data(),
-        static_cast<std::streamsize>(data.size() * sizeof(double)), "lazily loaded dataset");
-    return reshape<dMatrix2>(data, Shape2D{ ref.rows, ref.cols });
+    // Straight into the matrix. Reading into a vec and reshaping would allocate
+    // the whole block twice and memcpy between them, and this runs over the whole
+    // 800 MB model once per part - reshape() copies, it does not adopt.
+    using ext_t = typename dMatrix2::extents_type;
+    dMatrix2 out(ext_t(ref.rows, ref.cols));
+    read_exact_bytes(file, out.data(),
+        static_cast<std::streamsize>(ref.rows * ref.cols * sizeof(double)),
+        "lazily loaded dataset");
+    return out;
 }
 
 std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_data(
