@@ -240,6 +240,70 @@ std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int length) {
     return trim(std::string(string_out.begin(), string_out.end()));
 }
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
+// A raw positioned read of the model blocks. std::ifstream costs about 2.7x the
+// same bytes read this way; see the note in the header for why the file is not
+// mapped instead.
+void SALTED_BINARY_FILE::open_raw() {
+#ifdef _WIN32
+    if (raw_handle_) return;
+    HANDLE fh = CreateFileW(filepath.wstring().c_str(), GENERIC_READ, FILE_SHARE_READ,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (fh != INVALID_HANDLE_VALUE) raw_handle_ = fh;
+#else
+    if (raw_fd_ >= 0) return;
+    raw_fd_ = ::open(filepath.string().c_str(), O_RDONLY);
+#endif
+}
+
+void SALTED_BINARY_FILE::close_raw() {
+#ifdef _WIN32
+    if (raw_handle_) { CloseHandle(static_cast<HANDLE>(raw_handle_)); raw_handle_ = nullptr; }
+#else
+    if (raw_fd_ >= 0) { ::close(raw_fd_); raw_fd_ = -1; }
+#endif
+}
+
+// false means "could not", and every caller falls back to the stream.
+bool SALTED_BINARY_FILE::read_at(std::streamoff offset, void* dest, std::size_t bytes) {
+    char* out = static_cast<char*>(dest);
+#ifdef _WIN32
+    if (!raw_handle_) return false;
+    std::size_t done = 0;
+    while (done < bytes)
+    {
+        const DWORD want = static_cast<DWORD>(std::min<std::size_t>(bytes - done, 1u << 30));
+        OVERLAPPED ov{};
+        const unsigned long long at = static_cast<unsigned long long>(offset) + done;
+        ov.Offset = static_cast<DWORD>(at & 0xFFFFFFFFull);
+        ov.OffsetHigh = static_cast<DWORD>(at >> 32);
+        DWORD got = 0;
+        if (!ReadFile(static_cast<HANDLE>(raw_handle_), out + done, want, &got, &ov) || got == 0)
+            return false;
+        done += got;
+    }
+    return true;
+#else
+    if (raw_fd_ < 0) return false;
+    std::size_t done = 0;
+    while (done < bytes)
+    {
+        const ssize_t got = ::pread(raw_fd_, out + done, bytes - done,
+            static_cast<off_t>(offset) + static_cast<off_t>(done));
+        if (got <= 0) return false;
+        done += static_cast<std::size_t>(got);
+    }
+    return true;
+#endif
+}
+
 void SALTED_BINARY_FILE::open_file() {
     //Check if file exists and if it is already open
     err_checkf(std::filesystem::exists(filepath), "Couldn't open or find " + filepath.string() + ", leaving", std::cout);
@@ -501,6 +565,7 @@ std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_features(
 // index is what lets the prediction fetch a lambda when it needs it.
 std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref>
 SALTED_BINARY_FILE::index_lambda_based_data(const std::string& key) {
+    open_raw();   // the blocks this indexes are read through it
     return read_generic_blocks<std::unordered_map<std::string, block_ref>>(key,
         [this, &key](std::unordered_map<std::string, block_ref>& container, int i) {
             std::string element = read_string_remove_NULL(5);
@@ -522,16 +587,19 @@ SALTED_BINARY_FILE::index_lambda_based_data(const std::string& key) {
 
 dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
     if (ref.rows == 0 || ref.cols == 0) return dMatrix2{};
-    file.clear();
-    file.seekg(ref.offset, std::ios::beg);
     // Straight into the matrix. Reading into a vec and reshaping would allocate
     // the whole block twice and memcpy between them, and this runs over the whole
     // 800 MB model once per part - reshape() copies, it does not adopt.
     using ext_t = typename dMatrix2::extents_type;
     dMatrix2 out(ext_t(ref.rows, ref.cols));
-    read_exact_bytes(file, out.data(),
-        static_cast<std::streamsize>(ref.rows * ref.cols * sizeof(double)),
-        "lazily loaded dataset");
+    const std::size_t bytes = ref.rows * ref.cols * sizeof(double);
+    if (!read_at(ref.offset, out.data(), bytes))
+    {
+        file.clear();
+        file.seekg(ref.offset, std::ios::beg);
+        read_exact_bytes(file, out.data(), static_cast<std::streamsize>(bytes),
+            "lazily loaded dataset");
+    }
     return out;
 }
 

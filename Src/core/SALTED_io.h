@@ -72,6 +72,25 @@ private:
     int header_end = -1;
 
     void open_file();
+    // The model file is read once per part and its blocks are large. Going through
+    // std::ifstream costs about 2.7x what the same bytes cost read positionally
+    // from the OS, so the blocks are read through a raw handle instead.
+    //
+    // Mapping the file was tried and rejected. It reached the same speed, but the
+    // touched pages join the working set and stay: +0.5 GB on alanine and +3.0 GB
+    // on four-part 3NIR, to buy 2.5 s. They are file-backed and evictable, so the
+    // cost is softer than heap - but this whole branch exists to fit inside 8 GB,
+    // and a positioned read is as fast without occupying anything.
+    //
+    // Zero-copy was never on the table either way: 81 of the 96 payloads in this
+    // format begin at an offset that is not a multiple of 8, because every block
+    // header carries a 5-byte species tag, so a span of double over the file would
+    // be misaligned. That needs a format change, not a reader change.
+    void open_raw();
+    void close_raw();
+    bool read_at(std::streamoff offset, void* dest, std::size_t bytes);
+    void* raw_handle_ = nullptr;   // Windows HANDLE; unused elsewhere
+    int raw_fd_ = -1;              // POSIX descriptor; unused on Windows
     bool read_header();
     
 
@@ -104,10 +123,13 @@ public:
     };
 
     ~SALTED_BINARY_FILE() {
+        close_raw();
         if (file.is_open()) {
             file.close();
         }
     };
+    SALTED_BINARY_FILE(const SALTED_BINARY_FILE&) = delete;            // owns a file handle
+    SALTED_BINARY_FILE& operator=(const SALTED_BINARY_FILE&) = delete;
 
     void populate_config(Config& config_in);
 
