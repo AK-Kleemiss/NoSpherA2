@@ -51,6 +51,43 @@ static int run_app_impl(int argc, char **argv)
 
     ofstream log_file("NoSpherA2.log", ios::out);
     std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+
+    // EVERY exit path has to put std::cout back, and four of them did not - the
+    // ordinary end of this function among them. Leaving it redirected points the
+    // stream at a streambuf that dies with log_file a few lines later, which is
+    // harmless for a process that is about to end and poison for one that is not:
+    // the in-process test runner calls this in the same process as everything
+    // else, so afterwards nothing reached the real stdout and every later test
+    // that captures it saw an empty string.
+    //
+    // A guard rather than a fifth manual restore, so the next new return cannot
+    // reintroduce it, and so an exception unwinding out of here is covered too.
+    // Declared AFTER log_file, therefore destroyed BEFORE it - cout is off the
+    // file buffer while that buffer is still alive.
+    //
+    // The explicit restores further down are left in place: they are needed where
+    // the code goes on to write to the console before returning, and restoring
+    // twice to the same buffer is a no-op.
+    // The FORMAT STATE has to go back too, and that is the half that actually bit.
+    // This code sets fixed/setprecision on std::cout freely, and those flags are
+    // sticky on the stream object: afterwards a bare `0.1` prints as `0.10000000`.
+    // Restoring only the buffer left that behind, and a later test looking for
+    // "frac_x: 0.1" in a warning found "frac_x: 0.10000000" instead - which is why
+    // the two duplicate-scatterer tests passed alone and failed in a full run.
+    struct cout_restorer
+    {
+        std::streambuf *saved_buf;
+        std::ios::fmtflags saved_flags;
+        std::streamsize saved_precision;
+        std::streamsize saved_width;
+        ~cout_restorer()
+        {
+            std::cout.rdbuf(saved_buf);
+            std::cout.flags(saved_flags);
+            std::cout.precision(saved_precision);
+            std::cout.width(saved_width);
+        }
+    } restore_cout{_coutbuf, std::cout.flags(), std::cout.precision(), std::cout.width()};
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
