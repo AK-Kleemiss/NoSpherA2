@@ -16,4 +16,7 @@ Number of symmetry operations: 2
 Nr of reflections to be used: 3318
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 3318
-Writing tsc file...  ... done!
+Streaming tsc in blocks of 1000 reflections
+[               Generating scattering factors...              ]
+[#############################################################] 100% 
+tsc written by the streaming path

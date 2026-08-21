@@ -764,6 +764,10 @@ struct options
     // already covered by an earlier part legitimately yields none, and that must
     // not read as a broken CIF.
     bool allow_empty_asym = false;
+    // Set only while a spherical fill is being computed for somebody else. Such a
+    // call must RETURN a block for the caller to append or emit; if it streamed it
+    // would write experimental.tscb out from under the table being built.
+    bool spherical_fill = false;
     // Reflections per streamed block. The structure-factor array is
     // scatterers x reflections x 16 bytes and dominates memory, so emitting
     // it in blocks is what lets a large protein run on a small machine.
