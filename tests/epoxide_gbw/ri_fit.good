@@ -42,7 +42,8 @@ Table of Charges in electrons
        H3a     0.483
        H3b     0.411
 Total number of analytical Electrons: 24.1586
+Streaming tsc in blocks of 1000 reflections
 [               Generating scattering factors...              ]
 [#############################################################] 100% 
                                          ... done!
-Writing tsc file...  ... done!
+tsc written by the streaming path

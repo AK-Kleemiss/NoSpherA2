@@ -1646,11 +1646,15 @@ cdouble sfac_bessel(
 }
 
 //TODO�: This breaks if the aux_basis is contracted... Need to fix that!
+// progress: when the caller is streaming, it owns ONE bar spanning the whole
+// table and passes it in. Without this every block drew its own bar - 33 of them
+// for the epoxide test, and about 160 for an 8,566-atom protein.
 void calc_SF_SALTED(const vec2& k_pt,
 	const vec& coefs,
 	const std::vector<atom>& atom_list,
 	const ivec& asym_atom_list,
-	cvec2& sf)
+	cvec2& sf,
+	ProgressBar* progress = nullptr)
 {
 	const int num_atoms = (int)atom_list.size();
 	const int num_asym_atoms = (int)asym_atom_list.size();
@@ -1690,7 +1694,10 @@ void calc_SF_SALTED(const vec2& k_pt,
 	}
 
 	sf.resize(num_asym_atoms);
-	ProgressBar pb(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
+	std::unique_ptr<ProgressBar> local_pb;
+	if (!progress)
+		local_pb = std::make_unique<ProgressBar>(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
+	ProgressBar& pb = progress ? *progress : *local_pb;
 
 #pragma omp parallel shared(pb, sf)
 	{
@@ -2596,6 +2603,9 @@ tsc_block_type calculate_scattering_factors(
 			file << "Streaming tsc in blocks of " << bs << " reflections" << endl;
 			tsc_stream_writer<int, cdouble> writer(
 				"experimental.tscb", stream_ids, std::string(), n_refl, 2);
+			// One bar for the whole table, not one per block. Scoped so it finishes
+			// before anything else is written - the bar rewinds to its own line.
+			ProgressBar stream_pb(n_refl, 60, "#", " ", "Generating scattering factors...");
 			size_t block_id = 0;
 			for (size_t lo = 0; lo < n_refl; lo += bs)
 			{
@@ -2609,7 +2619,7 @@ tsc_block_type calculate_scattering_factors(
 						idx[dm][r - lo] = hkl_v[r][dm];
 					}
 				cvec2 chunk;
-				calc_SF_SALTED(k_slice, coefs, calculator.wavy.get_atoms(), asym_atom_list, chunk);
+				calc_SF_SALTED(k_slice, coefs, calculator.wavy.get_atoms(), asym_atom_list, chunk, &stream_pb);
 				writer.submit(block_id++, std::move(idx), std::move(chunk));
 			}
 			writer.finish();
@@ -2730,6 +2740,8 @@ tsc_block_type calculate_scattering_factors(
                 tsc_stream_writer<int, cdouble> writer(
                     opt.binary_tsc ? "experimental.tscb" : "experimental.tsc",
                     stream_ids, std::string(), n_refl, 2);
+                // One bar for the whole table, not one per block.
+                ProgressBar stream_pb(n_refl, 60, "#", " ", "Generating scattering factors...");
                 size_t block_id = 0;
                 for (size_t lo = 0; lo < n_refl; lo += bs)
                 {
@@ -2743,7 +2755,7 @@ tsc_block_type calculate_scattering_factors(
                             idx[dm][r - lo] = hkl_v[r][dm];
                         }
                     cvec2 chunk;
-                    calc_SF_SALTED(k_slice, coefs, wavy_aux.get_atoms(), asym_atom_list, chunk);
+                    calc_SF_SALTED(k_slice, coefs, wavy_aux.get_atoms(), asym_atom_list, chunk, &stream_pb);
                     writer.submit(block_id++, std::move(idx), std::move(chunk));
                 }
                 writer.finish();
@@ -3026,6 +3038,8 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		<< n_refl << " reflections, blocks of " << bs << std::endl;
 
 	tsc_stream_writer<int, cdouble> writer("experimental.tscb", ids, std::string(), n_refl, 2);
+	// One bar over every part and every block, rather than one per call.
+	ProgressBar stream_pb(n_refl * preps.size(), 60, "#", " ", "Generating scattering factors...");
 	size_t block_id = 0;
 	for (size_t lo = 0; lo < n_refl; lo += bs)
 	{
@@ -3044,7 +3058,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 				for (int dm = 0; dm < 3; dm++)
 					k_slice[dm][r - lo] = preps[p].k_pt[dm][r];
 			cvec2 chunk;
-			calc_SF_SALTED(k_slice, preps[p].coefs, *preps[p].atoms, preps[p].asym_atom_list, chunk);
+			calc_SF_SALTED(k_slice, preps[p].coefs, *preps[p].atoms, preps[p].asym_atom_list, chunk, &stream_pb);
 			for (auto& row : chunk) combined.push_back(std::move(row));
 			// this part's spherical remainder, where the id list put it
 			if (!have_spherical[p]) continue;
