@@ -54,4 +54,5 @@ Streaming tsc in blocks of 1000 reflections
 [               Generating scattering factors...              ]
 [#############################################################] 100% 
                                           ... done!
-tsc written by the streaming path
+Writing tsc file...  ... done!
+  (written block by block while the factors were computed)
