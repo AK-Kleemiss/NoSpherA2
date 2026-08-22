@@ -2260,7 +2260,8 @@ void stream_blocks(options& opt,
     FillBlock fill_block)
 {
     const size_t n_refl = hkl_v.size();
-    const size_t bs = std::min(opt.tsc_block_size, n_refl ? n_refl : 1);
+    const size_t derived = opt.tsc_block_for(n_refl, ids.size());
+    const size_t bs = std::min(derived ? derived : n_refl, n_refl ? n_refl : 1);
     file << "Streaming tsc in blocks of " << bs << " reflections" << std::endl;
 
     tsc_stream_writer<int, cdouble> writer(name, ids, std::string(), n_refl, 2);
@@ -2685,7 +2686,14 @@ tsc_block_type calculate_scattering_factors(
 	//                        needs every part present. stream_mtc_salted() at the
 	//                        bottom of this file turns those loops inside out and
 	//                        streams it anyway; this is the single-part path.
-	const bool stream_tsc = opt.tsc_block_size > 0
+	//
+	// The block size itself comes from opt.tsc_block_for, which holds the table
+	// whole when -mem says it fits: a resident table needs no queue and no writer
+	// thread, so where memory allows it, it is the faster of the two.
+	// Not named tsc_block: that is the class template this function instantiates
+	// further down, and a local of the same name hides it.
+	const size_t block_reflections = opt.tsc_block_for(hkl.size(), asym_atom_list.size());
+	const bool stream_tsc = block_reflections > 0
 		&& prep_out == NULL
 		&& !opt.spherical_fill
 		&& opt.combined_tsc_calc_files.size() <= 1;
@@ -2758,7 +2766,7 @@ tsc_block_type calculate_scattering_factors(
                                 : cdouble(f, 0.0);
                         }
                     }
-                    progress.update(std::cout, hi - lo);
+                    progress.update(hi - lo);
                     return chunk;
                 });
         }

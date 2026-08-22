@@ -7,6 +7,7 @@
 #include "basis_set.h"
 #include "xcw_halting.h"
 #include <occ/qm/hf.h>
+#include "i_tensor_stream.h"
 
 class XCW {
 public:
@@ -103,6 +104,11 @@ private:
 		int multiplicity;
 		bool safe_tensor;
 		bool read_tensor;
+		// Largest I tensor held resident, in MB. Above it the tensor goes to disk
+		// and is read back a window of reflections at a time; 0 means no limit,
+		// which is the original behaviour. Set with `i_tensor_mb <n>` in the XCW
+		// settings, or `stream` for the default budget.
+		size_t i_tensor_max_mb;
 
 		// Clears the convergence flags
 		void clear() {
@@ -192,6 +198,12 @@ private:
 
 	// Combined function that sets up the XCW procedure, evaluates I tensor (or loads it from file), sets up the Hartree-Fock object and evaluates anomalous dispersion correction
 	occ::qm::HartreeFock setup_XCW_procedure(bool read, bool safe);
+
+	// I tensor storage: held resident, or written to disk and read back a window
+	// of reflections at a time. See decide_i_storage.
+	void decide_i_storage();
+	void open_i_stream_for_reading();
+	std::filesystem::path i_tensor_path() const;
 
 	// Calculates F_calc
 	void calc_F_calc(const dMatrix2& D);
@@ -283,7 +295,12 @@ private:
 	vec2 k_pt;
 	// First F_calc (with anomalous dispersion), then anomalous correction
 	cvec2 F_calc;
+	// Held resident only while it fits settings.i_tensor_max_mb; otherwise empty
+	// and i_file_ carries the tensor. Read through i_block(r) either way.
 	cvec I;
+	i_tensor_file i_file_;
+	bool i_streamed_ = false;
+	int i_window_ = 0;
 	std::vector<asym_atom> asym_atoms;
 	std::vector<scattering_data> obs;
 	hkl_list hkl;

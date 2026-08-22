@@ -110,6 +110,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
 	bool grown = false, safe_tensor = false, read_tensor = false;
+	// 0 = hold the whole tensor, which is what every run did before this existed.
+	size_t i_tensor_max_mb = 0;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
 	if (!std::filesystem::exists(settings_path)) {
 		throw std::runtime_error("Settings file not found! Aborting run!");
@@ -264,6 +266,20 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 			read_tensor = true;
 			};
 
+		// The tensor is nr_small blocks of nmo(nmo+1)/2 complex doubles and grows
+		// quadratically with the basis, so on anything past a minimal basis it is
+		// the largest thing in the process. `stream` puts it on disk with a
+		// default budget; `i_tensor_mb <n>` names the budget.
+		handlers["stream"] = [&](std::istream&) {
+			if (i_tensor_max_mb == 0) i_tensor_max_mb = 2048;
+			};
+
+		handlers["i_tensor_mb"] = [&](std::istream& in2) {
+			long long mb = 0;
+			in2 >> mb;
+			i_tensor_max_mb = (mb > 0) ? static_cast<size_t>(mb) : 0;
+			};
+
 		std::string keyword;
 
 		while (input >> keyword)
@@ -366,6 +382,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.hf_type = hf_type;
 	settings.safe_tensor = safe_tensor;
 	settings.read_tensor = read_tensor;
+	settings.i_tensor_max_mb = i_tensor_max_mb;
 
 	return settings;
 }
@@ -1072,6 +1089,10 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 	eval_phase(phase_fact);
 	eval_DW(DW_fact);
 	eval_translation_phase(translation_phase);
+	if (read && settings.i_tensor_max_mb > 0) {
+		throw std::runtime_error("XCW: `read` loads the whole I tensor and cannot be combined "
+			"with a memory budget (`stream` / `i_tensor_mb`). Drop one of the two.");
+	}
 	if (read) {
 		std::ifstream in("I_tensor", std::ios::binary);
 		if (!in)
@@ -1084,9 +1105,18 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 		in.read(reinterpret_cast<char*>(&nmo_safe), sizeof(nmo_safe));
 		in.read(reinterpret_cast<char*>(&num_elements_safe), sizeof(num_elements_safe));
 		in.read(reinterpret_cast<char*>(&total_size_safe), sizeof(total_size_safe));
-		I.resize(total_size_safe);
+		if (total_size_safe < 0 ||
+			static_cast<size_t>(nr_safe) * num_elements_safe != static_cast<size_t>(total_size_safe)) {
+			// The count is stored as an int and wraps past 2^31 elements, so a
+			// large tensor reads back a plausible-looking negative or truncated
+			// size and the file is silently short. Say so rather than proceed.
+			throw std::runtime_error("XCW: I_tensor element count does not match nr * packed - "
+				"the file was written by a build that stored the count as a 32-bit int "
+				"and this tensor is too large for that. Recompute it.");
+		}
+		I.resize(static_cast<size_t>(total_size_safe));
 		in.read(reinterpret_cast<char*>(I.data()),
-			total_size_safe * sizeof(cdouble));
+			static_cast<std::streamsize>(total_size_safe) * sizeof(cdouble));
 	}
 	else {
 		double time_taken;
@@ -1104,10 +1134,67 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 	// closing function
 }
 
+// Whether the tensor is held or streamed, and how large a window to read back.
+//
+// The choice is a budget, not a structure-size test: the same molecule at a
+// bigger basis crosses the line while nothing about the crystallography changes,
+// because the tensor is quadratic in nmo and only linear in the reflection count.
+void XCW::decide_i_storage() {
+	const size_t per_block = i_tensor_file::block_bytes(cryst.nmo);
+	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo);
+
+	// The XCW settings file wins if it named a budget; otherwise -mem does, if it
+	// was given. Neither is the same as "no budget": without either, the tensor is
+	// held, which is what every run did before this existed.
+	size_t budget = settings.i_tensor_max_mb * 1024ULL * 1024ULL;
+	const char *source = "i_tensor_mb";
+	if (budget == 0 && opt->mem_given && opt->mem > 0.0) {
+		budget = static_cast<size_t>(opt->mem * 1024.0 * 1024.0);
+		source = "-mem";
+	}
+
+	// items_within_budget returns 0 for "hold everything", which is both the
+	// fastest arrangement and the right answer whenever the tensor fits: no file,
+	// no re-reading it twice per SCF iteration.
+	const size_t w = items_within_budget(static_cast<size_t>(cryst.nr_small), per_block, budget);
+	i_streamed_ = (w != 0);
+	if (!i_streamed_) {
+		std::cout << std::fixed << std::setprecision(2)
+		          << "I tensor held in memory: " << (total / 1048576.0) << " MB";
+		if (budget > 0)
+			std::cout << " (fits the " << (budget / 1048576.0) << " MB " << source << " budget)";
+		std::cout << std::endl;
+		return;
+	}
+	i_window_ = static_cast<int>(std::min(w, static_cast<size_t>(cryst.nr_small)));
+	i_file_.create(i_tensor_path(), cryst.nr_small, cryst.nmo);
+	std::cout << std::fixed << std::setprecision(2)
+	          << "I tensor streamed to disk: " << (total / 1048576.0) << " MB total, "
+	          << i_window_ << " of " << cryst.nr_small << " reflections resident ("
+	          << (i_window_ * per_block / 1048576.0) << " MB) to fit the "
+	          << (budget / 1048576.0) << " MB " << source << " budget" << std::endl;
+	if (i_window_ == 1 && per_block > budget)
+		std::cout << "  NOTE: one reflection alone is " << (per_block / 1048576.0)
+		          << " MB, over the budget. Running one at a time." << std::endl;
+}
+
+std::filesystem::path XCW::i_tensor_path() const {
+	return std::filesystem::path("I_tensor_stream.bin");
+}
+
+void XCW::open_i_stream_for_reading() {
+	i_file_.open(i_tensor_path(), static_cast<size_t>(i_window_));
+}
+
 void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids_) {
 	long long skipped_grids = 0;
 	const int packed_size = (cryst.nmo * (cryst.nmo + 1)) / 2;
-	I.assign(cryst.nr_small * packed_size, cdouble{});
+	// nr_small * packed_size deliberately in size_t: both are int and their
+	// product passes 2^31 at nmo = 500 with 20k reflections, which is a size this
+	// code is meant to reach.
+	decide_i_storage();
+	if (!i_streamed_)
+		I.assign(static_cast<size_t>(cryst.nr_small) * packed_size, cdouble{});
 	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
 
 	cvec XCW_integrals;
@@ -1432,6 +1519,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		vec weighted_values;
 		vec tile_real_values;
 		vec tile_imag_values;
+		// One reflection's worth of tensor, used only while streaming. Each r
+		// touches nothing but its own block, so no ordering is needed on the way
+		// out: the file is reflection-major and the writer seeks to r's offset.
+		cvec blk;
+		if (i_streamed_) blk.assign(packed_size, cdouble{});
 #if !defined(__APPLE__)
 		mkl_set_num_threads_local(1);
 #endif
@@ -1479,7 +1571,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				}
 			}
 
-			const size_t base = static_cast<size_t>(r) * packed_size;
+			if (i_streamed_) std::fill(blk.begin(), blk.end(), cdouble{});
+			cdouble *const I_r = i_streamed_ ? blk.data()
+			                                 : I.data() + static_cast<size_t>(r) * packed_size;
 			for (int syms = 0; syms < num_syms; syms++) {
 				for (int g = 0; g < n_atom_grids; g++) {
 					const cdouble factor = grid_factors[syms][g] * translation_phase[r][syms];
@@ -1528,7 +1622,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 									const int nu = active_aos[local_nu];
 									if (!skip[mu][nu]) {
 										const size_t matrix_idx = tile.result_offset + static_cast<size_t>(tile_row) * tile.col_count + tile_col;
-										I[base + tri_index(mu, nu)] += cdouble(tile_real_values[matrix_idx], tile_imag_values[matrix_idx]) * factor;
+										I_r[tri_index(mu, nu)] += cdouble(tile_real_values[matrix_idx], tile_imag_values[matrix_idx]) * factor;
 									}
 								}
 							}
@@ -1536,10 +1630,21 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					}
 				}
 			}
+			if (i_streamed_) {
+				// A write is packed_size * 16 bytes against a whole reflection's
+				// worth of integration, so the lock is not on the hot path - but
+				// it is measured rather than assumed, see the [i_tensor] line.
+#pragma omp critical(i_tensor_write)
+				i_file_.write_block(r, blk.data());
+			}
 			if (!(opt->no_date) && pb) {
 				pb->update();
 			}
 		}
+	}
+	if (i_streamed_) {
+		i_file_.finish_write();
+		open_i_stream_for_reading();
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = end - start;
@@ -1552,103 +1657,105 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 
 void XCW::calc_F_calc(const dMatrix2& D) {
 	// Density matrix from occ is half of what I need, so times 2 and times (2x2)=4
-#pragma omp parallel for schedule(static)
-	for (int r = 0; r < cryst.nr_small; ++r) {
-		cdouble sum = F_calc[1][r];
-		size_t base = r * (cryst.nmo * (cryst.nmo + 1)) / 2;
-		for (int mu = 0; mu < cryst.nmo; mu++) {
-			sum += 2.0 * I[base] * D(mu, mu);
-			base++;
-			for (int nu = mu + 1; nu < cryst.nmo; nu++, base++) {
-				sum += 4.0 * I[base] * D(mu, nu);
-			}
+	//
+	// Streamed or resident, the walk is the same: reflection r reads its own block
+	// and nothing else, so the only difference is where the block comes from. The
+	// outer loop is one window when the tensor is resident, which is the original
+	// single pass exactly.
+	const size_t packed = static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2;
+	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
+	// The parallel region wraps the window loop rather than sitting inside it.
+	// A narrow window means many windows, and entering a region per window pays
+	// team startup and a barrier every time for a few reflections of work.
+	// omp single does the read; its implicit barrier is what stops a thread
+	// running ahead into a window that has not been loaded yet.
+#pragma omp parallel
+	{
+	for (int r0 = 0; r0 < cryst.nr_small; r0 += step) {
+		const int r1 = std::min(r0 + step, cryst.nr_small);
+		if (i_streamed_) {
+#pragma omp single
+			i_file_.load(r0, r1);
 		}
-		F_calc[0][r] = sum;
+#pragma omp for schedule(static)
+		for (int r = r0; r < r1; ++r) {
+			const cdouble* I_r = i_streamed_ ? i_file_.block(r)
+			                                 : I.data() + static_cast<size_t>(r) * packed;
+			cdouble sum = F_calc[1][r];
+			size_t k = 0;
+			for (int mu = 0; mu < cryst.nmo; mu++) {
+				sum += 2.0 * I_r[k] * D(mu, mu);
+				k++;
+				for (int nu = mu + 1; nu < cryst.nmo; nu++, k++) {
+					sum += 4.0 * I_r[k] * D(mu, nu);
+				}
+			}
+			F_calc[0][r] = sum;
+		}
+	}
 	}
 }
 
 void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	ensure_inv_H2_weights();
 	perturb.setZero(cryst.nmo, cryst.nmo);
-	double prefactor = 2.0 * cryst.F_scale / (cryst.nr_small - settings.n_params);
-	const int packed_size = cryst.nmo * (cryst.nmo + 1) / 2;
+	const size_t packed = static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2;
 
-	// Funny switch statement that allows for quite readable code for the different perturbation types, just ignore the arithmetic, it's basically a switch for 2D-tuples of integers (detailed: move one of the integers 16 bits to the left and do binary OR to get a key that includes is unique for both int values)
+	// The four (XWR_type, refine_against) combinations differed only in the scalar
+	// formed per reflection and in the prefactor; the loop over the tensor was
+	// written out four times identically. Factoring the scalar out leaves one walk
+	// over I, which is what lets the streamed and resident paths share it.
+	const int key = (static_cast<int>(settings.XWR_type) << 16) | static_cast<int>(settings.refine_against);
+	const bool against_F2 = (static_cast<int>(settings.refine_against) == 2);
+	const bool weighted = (static_cast<int>(settings.XWR_type) == 2);
+	const bool valid = (key == ((1 << 16) | 1) || key == ((1 << 16) | 2) ||
+	                    key == ((2 << 16) | 1) || key == ((2 << 16) | 2));
+	if (!valid) XCW_log << "Invalid refinement option" << std::endl;
+	const double scale_sq = cryst.F_scale * cryst.F_scale;
+	const double prefactor = against_F2
+		? 4.0 * scale_sq / (cryst.nr_small - settings.n_params)
+		: 2.0 * cryst.F_scale / (cryst.nr_small - settings.n_params);
+
+	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
+	// One region, one accumulator per thread, one reduction - however many windows
+	// the budget implies. Allocating and reducing an nmo x nmo matrix per window
+	// is what made a narrow window expensive out of proportion to its I/O.
 #pragma omp parallel
 	{
 		occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
 		double* local_ptr = local.data();
-		switch ((static_cast<int>(settings.XWR_type) << 16) | static_cast<int>(settings.refine_against)) {
-		case (1 << 16) | 1: {
-#pragma omp for nowait
-			for (int r = 0; r < cryst.nr_small; r++) {
-				const double F_calc_abs = std::abs(F_calc[0][r]);
-				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
-				size_t offset = r * packed_size;
+		for (int r0 = 0; valid && r0 < cryst.nr_small; r0 += step) {
+			const int r1 = std::min(r0 + step, cryst.nr_small);
+			if (i_streamed_) {
+#pragma omp single
+				i_file_.load(r0, r1);
+			}
+			// No nowait: the next window's read must not start until every
+			// thread has finished reading this one out of the buffer.
+#pragma omp for
+			for (int r = r0; r < r1; r++) {
+				cdouble precompute;
+				if (against_F2) {
+					const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
+					precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
+				}
+				else {
+					const double F_calc_abs = std::abs(F_calc[0][r]);
+					precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
+				}
+				if (weighted) precompute *= inv_H2_[r];
+
+				const cdouble* I_r = i_streamed_ ? i_file_.block(r)
+				                                 : I.data() + static_cast<size_t>(r) * packed;
+				size_t offset = 0;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					for (int nu = mu; nu < cryst.nmo; nu++) {
-						const cdouble& val = I[offset];
+						const cdouble& val = I_r[offset];
 						local_ptr[nu * cryst.nmo + mu] += precompute.real() * val.real() - precompute.imag() * val.imag();
 						offset++;
 					}
 				}
 			}
-			break;
-		}
-		case (1 << 16) | 2: {
-			prefactor = 4.0 * cryst.F_scale * cryst.F_scale / (cryst.nr_small - settings.n_params);
-			const double scale_sq = cryst.F_scale * cryst.F_scale;
-#pragma omp for nowait
-			for (int r = 0; r < cryst.nr_small; r++) {
-				const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
-				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
-				size_t offset = r * packed_size;
-				for (int mu = 0; mu < cryst.nmo; mu++) {
-					for (int nu = mu; nu < cryst.nmo; nu++) {
-						const cdouble& val = I[offset];
-						local_ptr[nu * cryst.nmo + mu] += precompute.real() * val.real() - precompute.imag() * val.imag();
-						offset++;
-					}
-				}
-			}
-			break;
-		}
-		case (2 << 16) | 1: {
-#pragma omp for nowait
-			for (int r = 0; r < cryst.nr_small; r++) {
-				const double F_calc_abs = std::abs(F_calc[0][r]);
-				const cdouble precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs) * inv_H2_[r];
-				size_t offset = r * packed_size;
-				for (int mu = 0; mu < cryst.nmo; mu++) {
-					for (int nu = mu; nu < cryst.nmo; nu++) {
-						const cdouble& val = I[offset];
-						local_ptr[nu * cryst.nmo + mu] += precompute.real() * val.real() - precompute.imag() * val.imag();
-						offset++;
-					}
-				}
-			}
-			break;
-		}
-		case (2 << 16) | 2: {
-			prefactor = 4.0 * cryst.F_scale * cryst.F_scale / (cryst.nr_small - settings.n_params);
-			const double scale_sq = cryst.F_scale * cryst.F_scale;
-#pragma omp for nowait
-			for (int r = 0; r < cryst.nr_small; r++) {
-				const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
-				const cdouble precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2) * inv_H2_[r];
-				size_t offset = r * packed_size;
-				for (int mu = 0; mu < cryst.nmo; mu++) {
-					for (int nu = mu; nu < cryst.nmo; nu++) {
-						const cdouble& val = I[offset];
-						local_ptr[nu * cryst.nmo + mu] += precompute.real() * val.real() - precompute.imag() * val.imag();
-						offset++;
-					}
-				}
-			}
-			break;
-		}
-		default:
-			XCW_log << "Invalid refinement option" << std::endl;
 		}
 #pragma omp critical
 		{
@@ -2032,6 +2139,17 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read, bool safe) {
 		int nr_safe = cryst.nr_small;
 		int nmo_safe = cryst.nmo;
 		int num_elements_safe = (cryst.nmo * (cryst.nmo + 1)) / 2;
+		if (i_streamed_) {
+			std::cout << "I tensor is streamed; it is already on disk as "
+			          << i_tensor_path().string() << ", not rewriting it as I_tensor."
+			          << std::endl;
+			return hf;
+		}
+		if (I.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+			throw std::runtime_error("XCW: I tensor has " + std::to_string(I.size()) +
+				" elements, more than the I_tensor format's 32-bit count can hold. "
+				"Use `stream` instead of `safe`.");
+		}
 		int total_size_safe = static_cast<int>(I.size());
 		out.write(reinterpret_cast<const char*>(&nr_safe), sizeof(nr_safe));
 		out.write(reinterpret_cast<const char*>(&nmo_safe), sizeof(nmo_safe));

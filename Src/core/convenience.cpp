@@ -194,6 +194,8 @@ std::string help_message =
  "                                    a block at a time instead of being held\n"
  "                                    whole, which is what keeps a protein\n"
  "                                    inside a small machine. 0 holds it all.\n"
+ "                                    Derived from -mem when that is given\n"
+ "                                    and this is not.\n"
  "  -acc <0..4>                        Numerical grid accuracy [2]; 4 is the\n"
  "                                    practical maximum.\n"
  "  -group <n ...>                     CIF disorder groups for the asymmetric\n"
@@ -213,7 +215,13 @@ std::string help_message =
  "  -ri_fit [basis ...]                RI partitioning; omit a basis or use\n"
  "                                    auto_aux to generate one automatically.\n"
  "  -cpus <n>                          Maximum worker threads [all available].\n"
- "  -mem <MB>                          Memory limit for grid calculations.\n"
+ "  -mem <MB>                          Memory budget for everything sliceable\n"
+ "                                    [unset]. When given, the tsc block size\n"
+ "                                    and the XCW I tensor window are chosen\n"
+ "                                    to fit it, and anything that fits whole\n"
+ "                                    is held whole, that being the fastest\n"
+ "                                    arrangement. An explicit -tsc_block or\n"
+ "                                    XCW i_tensor_mb overrides it.\n"
  "  -pbc <n>                           Periodic-boundary setting.\n\n"
  "TSC/TSCB TABLE UTILITIES\n"
  "  -tscb <table.tsc|table.tscb>        Convert between text .tsc and binary\n"
@@ -305,6 +313,25 @@ std::string help_message =
  "                                    coefficients.\n"
  "  -convert_XCW <stdout> <lambda-step> Convert Tonto XCW lambda-step output.\n"
  "  -do_XCW  -calc_F  -anom_disp <file> XCW/Fcalc/anomalous-dispersion modes.\n"
+ "  -XCW_settings <file>                Keywords for -do_XCW. Besides the\n"
+ "                                    refinement settings, three control how\n"
+ "                                    the I tensor - nr_refl blocks of\n"
+ "                                    nmo(nmo+1)/2 complex doubles, quadratic\n"
+ "                                    in the basis and usually the largest\n"
+ "                                    thing in the process - is kept:\n"
+ "                                      stream          put it on disk and\n"
+ "                                                      read a window of\n"
+ "                                                      reflections at a time\n"
+ "                                      i_tensor_mb <n> the same, with the\n"
+ "                                                      budget named in MB\n"
+ "                                      safe / read     write or reuse the\n"
+ "                                                      whole tensor as\n"
+ "                                                      I_tensor (not\n"
+ "                                                      combinable with a\n"
+ "                                                      budget)\n"
+ "                                    Without any of them the tensor is held\n"
+ "                                    in memory, which is the fastest and what\n"
+ "                                    -mem also picks whenever it fits.\n"
  "  -partitioning_test  -NNLS_TEST      Run internal partitioning/NNLS tests.\n"
  "  -test_RI  -RI_WFN_DIFF              RI fitting diagnostics (after -wfn and\n"
  "                                    -ri_fit).\n"
@@ -2729,6 +2756,7 @@ void options::digest_options()
         else if (temp == "-tsc_block")
         {
             tsc_block_size = static_cast<size_t>(std::stoll(arguments[i + 1]));
+            tsc_block_given = true;
         }
         else if (temp == "-hkl")
         {
@@ -2756,6 +2784,7 @@ void options::digest_options()
         else if (temp == "-mem")
         {
             mem = stod(arguments[i + 1]); // In MB
+            mem_given = true;
             vec a;
             size_t vec_max_size = a.max_size();
             double doubel_max_size = static_cast<double>(vec_max_size * sizeof(double)) * 1e-6;
@@ -3387,6 +3416,18 @@ void options::digest_options()
     }
 };
 
+namespace {
+    // Captured during static initialisation, so it still refers to the console after
+    // run_app() has redirected std::cout into NoSpherA2.log. A function local static
+    // would only be captured on the first error, by which time the redirect has happened
+    // and every error message would end up in the log file instead of on the console.
+    std::streambuf *const initial_coutbuf = std::cout.rdbuf();
+    std::streambuf *original_coutbuf()
+    {
+        return initial_coutbuf;
+    }
+}
+
 void options::look_for_debug(int &argc, char **argv)
 {
     // This loop figures out command line options
@@ -3401,6 +3442,10 @@ void options::look_for_debug(int &argc, char **argv)
             ProgressBar::report_counts = true;
         else if (temp == "--h" || temp == "-h" || temp == "-help" || temp == "--help")
         {
+            // run_app() has already pointed std::cout at NoSpherA2.log, and the
+            // exit() below unwinds nothing, so without this the entire help text
+            // is written to the log file and the console stays empty.
+            std::cout.rdbuf(original_coutbuf());
             std::cout << NoSpherA2_message() << help_message << build_date << std::endl;
             exit(0);
         }
@@ -3964,17 +4009,6 @@ double vec_length(const vec &in)
     return sqrt(sum);
 }
 
-namespace {
-    // Captured during static initialisation, so it still refers to the console after
-    // run_app() has redirected std::cout into NoSpherA2.log. A function local static
-    // would only be captured on the first error, by which time the redirect has happened
-    // and every error message would end up in the log file instead of on the console.
-    std::streambuf *const initial_coutbuf = std::cout.rdbuf();
-    std::streambuf *original_coutbuf()
-    {
-        return initial_coutbuf;
-    }
-}
 
 void error_check(const bool condition, const std::source_location loc, const std::string &error_message, std::ostream &log_file)
 {

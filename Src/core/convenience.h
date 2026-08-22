@@ -346,6 +346,34 @@ inline void print_centered_message(const std::string& text, int bar_width, std::
 		<< std::endl;
 }
 
+// How many items to keep resident inside a memory budget.
+//
+// Everything in this program that can be sliced is sliced the same way: a list
+// of equal-sized items consumed in order, reducing into something small. A .tscb
+// is reflections by scatterers, the XCW I tensor is reflections by AO pairs, a
+// SALTED prediction is lambda blocks. So the rule for choosing a window belongs
+// in one place rather than being re-derived at each of them.
+//
+// Returns 0 for "hold all of them", which is what every one of those consumers
+// is fastest doing - no file, no re-reads, no window bookkeeping - and is
+// therefore the answer whenever the whole thing fits. A budget of 0 means no
+// limit was asked for, which is also "hold all of them".
+//
+// The fits-test is written as a division rather than n_items * item_bytes: that
+// product is exactly the quantity that overflows on the structures this exists
+// to serve.
+inline size_t items_within_budget(const size_t n_items, const size_t item_bytes, const size_t budget_bytes)
+{
+    if (budget_bytes == 0 || n_items == 0 || item_bytes == 0)
+        return 0;
+    if (n_items <= budget_bytes / item_bytes)
+        return 0;
+    const size_t n = budget_bytes / item_bytes;
+    // A single item larger than the whole budget still has to be processed; one
+    // at a time is the least we can do, and refusing would be worse.
+    return n ? n : 1;
+}
+
 //-------------------------Progress_bar--------------------------------------------------
 // LMS: My implementation of a progress bar, I would like it to stay within one line that is compatible with parallel loops
 class ProgressBar
@@ -699,6 +727,10 @@ struct options
     d3 sfac_diffuse = { 0.0, 0.0, 0.0 };
     double dmin = 99.0;
     double mem = 1000.0; // In MB
+    // Set only when -mem was passed. Without it nothing derives a window from
+    // mem and every default stands as it was; with it, mem becomes the budget
+    // that the tsc block size and the XCW I tensor window are chosen to fit.
+    bool mem_given = false;
     double efield = 0.005;
     ivec2 groups;
     ivec2 hkl_min_max{ {-100, 100}, {-100, 100}, {-100, 100} };
@@ -789,6 +821,25 @@ struct options
     // 1000 keeps that buffer near 3 * scatterers * blocksize * 16 bytes: 144 MB on
     // a 3,000-atom structure, 411 MB on 8,566. 0 restores the old behaviour.
     size_t tsc_block_size = 1000;
+    // Set only when -tsc_block was passed, so an explicit block size wins over
+    // one derived from -mem rather than being silently overridden by it.
+    bool tsc_block_given = false;
+    // Reflections to hold at once when writing a table of n_scat scatterers, or 0
+    // for the whole table. An explicit -tsc_block wins; failing that -mem picks
+    // the largest window it can afford, and holds the table whole when it fits,
+    // that being the fastest arrangement; failing both, the 1000 default stands.
+    //
+    // The live cost of a block is about three copies of scatterers x block x 16
+    // bytes - the producer's, the queue's and the writer's - which is what the
+    // budget is spent against.
+    size_t tsc_block_for(const size_t n_refl, const size_t n_scat) const
+    {
+        if (tsc_block_given || !mem_given || mem <= 0.0)
+            return tsc_block_size;
+        const size_t item = 3 * (n_scat ? n_scat : 1) * sizeof(std::complex<double>);
+        return items_within_budget(n_refl, item, static_cast<size_t>(mem * 1024.0 * 1024.0));
+    }
+
     // set once a streamed run has written the file itself, so the caller
     // does not then overwrite it with an empty one-shot block
     bool tsc_written_by_stream = false;
