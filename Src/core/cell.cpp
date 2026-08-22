@@ -2,6 +2,116 @@
 #include "cell.h"
 #include "convenience.h"
 #include "nos_math.h"
+#include <cctype>
+
+namespace {
+    /**
+     * @brief Evaluates the numerical factor of a single term of a symmetry operation.
+     *
+     * Understands an empty string (the implicit 1 of "x"), a plain number ("2", "0.5")
+     * and a fraction ("1/2").
+     *
+     * @param number the factor as written in the CIF, without its sign
+     * @param value [out] the evaluated factor
+     * @return whether the string could be evaluated
+     */
+    bool eval_symop_factor(const std::string &number, double &value) {
+        if (number.empty()) {
+            value = 1.0;
+            return true;
+        }
+        auto to_double = [](const std::string &s, double &out) {
+            if (s.empty())
+                return false;
+            try {
+                size_t used = 0;
+                out = std::stod(s, &used);
+                return used == s.length();
+            }
+            catch (const std::exception &) {
+                return false;
+            }
+        };
+        const size_t slash = number.find('/');
+        if (slash == std::string::npos)
+            return to_double(number, value);
+        double numerator = 0.0, denominator = 0.0;
+        if (!to_double(number.substr(0, slash), numerator))
+            return false;
+        if (!to_double(number.substr(slash + 1), denominator))
+            return false;
+        if (denominator == 0.0)
+            return false;
+        value = numerator / denominator;
+        return true;
+    }
+}
+
+void cell::parse_symop(const std::string &operation,
+                       const std::filesystem::path &filename,
+                       int rot[3][3],
+                       double translation[3],
+                       std::ostream &file) {
+    const std::string where = " of symmetry operation \"" + operation + "\" in " + filename.string() + "!";
+    // Split into the three comma separated components, dropping any whitespace
+    svec components(3);
+    int column = 0;
+    for (const char c : operation) {
+        if (c == ',') {
+            column++;
+            err_checkf(column < 3, "Found more than 3 comma separated components" + where, file);
+        }
+        else if (!std::isspace(static_cast<unsigned char>(c)))
+            components[column].push_back(c);
+    }
+    err_checkf(column == 2, "Expected 3 comma separated components" + where, file);
+
+    for (int comp = 0; comp < 3; comp++) {
+        const std::string &s = components[comp];
+        err_checkf(!s.empty(), "Component " + std::to_string(comp + 1) + " is empty" + where, file);
+        rot[comp][0] = rot[comp][1] = rot[comp][2] = 0;
+        translation[comp] = 0.0;
+        // Walk the signed terms, each of which is either an axis (optionally scaled) or a translation
+        size_t pos = 0;
+        while (pos < s.length()) {
+            double sign = 1.0;
+            if (s[pos] == '+')
+                pos++;
+            else if (s[pos] == '-')
+                sign = -1.0, pos++;
+            size_t end = pos;
+            while (end < s.length() && s[end] != '+' && s[end] != '-')
+                end++;
+            err_checkf(end > pos, "Found an empty term" + where, file);
+            std::string term = s.substr(pos, end - pos);
+            pos = end;
+            // Pull out the axis name, if this term has one; what remains is its factor
+            int axis = -1;
+            for (size_t k = 0; k < term.length() && axis == -1; k++) {
+                switch (term[k]) {
+                case 'x': case 'X': axis = 0; break;
+                case 'y': case 'Y': axis = 1; break;
+                case 'z': case 'Z': axis = 2; break;
+                default: continue;
+                }
+                term.erase(k, 1);
+            }
+            // "2*x" carries the same information as "2x"
+            term.erase(std::remove(term.begin(), term.end(), '*'), term.end());
+            double factor = 0.0;
+            err_checkf(eval_symop_factor(term, factor), "Could not interpret the factor \"" + term + "\"" + where, file);
+            if (axis == -1) {
+                translation[comp] += sign * factor;
+                continue;
+            }
+            const double coefficient = sign * factor;
+            const int rounded = static_cast<int>(std::lround(coefficient));
+            err_checkf(std::abs(coefficient - rounded) < 1e-6,
+                       "The rotation coefficient " + std::to_string(coefficient) + " is not an integer" + where, file);
+            rot[comp][axis] += rounded;
+        }
+    }
+}
 
 vec cell::apply_symmetry(const vec& pos, const int sym_op) {
 	const vec trans_temp = { trans[0][sym_op], trans[1][sym_op], trans[2][sym_op] };

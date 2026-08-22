@@ -14,13 +14,83 @@
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 
+static int run_app_impl(int argc, char **argv);
+
+// Wrapper around the actual application, so that an exception thrown deep inside a file
+// parser reports what went wrong instead of terminating the process with a fail-fast.
 int run_app(int argc, char **argv)
+{
+    // Remember the console before run_app_impl() redirects std::cout into NoSpherA2.log;
+    // by the time we get here in a catch block the log file has already been destroyed.
+    std::streambuf *const console = std::cout.rdbuf();
+    try
+    {
+        return run_app_impl(argc, argv);
+    }
+    catch (const std::exception &e)
+    {
+        std::cout.rdbuf(console);
+        std::cout << "\nNoSpherA2 stopped with an unhandled error: " << e.what()
+                  << "\n\tThis usually means one of the input files is malformed or an option is missing."
+                  << "\n\tThe last thing that was read is at the end of NoSpherA2.log." << std::endl;
+        return -1;
+    }
+    catch (...)
+    {
+        std::cout.rdbuf(console);
+        std::cout << "\nNoSpherA2 stopped with an unhandled error of unknown type."
+                  << "\n\tThe last thing that was read is at the end of NoSpherA2.log." << std::endl;
+        return -1;
+    }
+}
+
+static int run_app_impl(int argc, char **argv)
 {
     using namespace std;
     const std::filesystem::path cwd = std::filesystem::current_path();
 
     ofstream log_file("NoSpherA2.log", ios::out);
     std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+
+    // Put std::cout back the way it was found - buffer AND format state - however
+    // this function is left.
+    //
+    // EVERY exit path has to do this, and four of them did not, the ordinary end of
+    // the function among them. Leaving it redirected points std::cout at a
+    // streambuf that dies with log_file a few lines later: harmless for a process
+    // about to end, poison for one that is not. The in-process test runner calls
+    // this in the same process as everything else, so afterwards nothing reached
+    // the real stdout and every later test that captured it saw an empty string.
+    //
+    // The FORMAT STATE is the half that actually bit. This code sets
+    // fixed/setprecision on std::cout freely and those flags are sticky on the
+    // stream object, so afterwards a bare `0.1` prints as `0.10000000`. Restoring
+    // only the buffer left that behind: a later test looking for "frac_x: 0.1" in a
+    // warning found "frac_x: 0.10000000" instead, which is why the two
+    // duplicate-scatterer tests passed alone and failed in a full run.
+    //
+    // A guard rather than a fifth manual restore, so a newly added return cannot
+    // reintroduce the bug and an exception unwinding through here is covered too.
+    // Declared AFTER log_file and therefore destroyed BEFORE it, so std::cout comes
+    // off the file buffer while that buffer is still alive.
+    //
+    // The explicit restores further down stay: they are needed where the code goes
+    // on to write to the console before returning, and restoring twice to the same
+    // buffer is a no-op.
+    struct cout_restorer
+    {
+        std::streambuf *saved_buf;
+        std::ios::fmtflags saved_flags;
+        std::streamsize saved_precision;
+        std::streamsize saved_width;
+        ~cout_restorer()
+        {
+            std::cout.rdbuf(saved_buf);
+            std::cout.flags(saved_flags);
+            std::cout.precision(saved_precision);
+            std::cout.width(saved_width);
+        }
+    } restore_cout{_coutbuf, std::cout.flags(), std::cout.precision(), std::cout.width()};
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
@@ -295,6 +365,22 @@ int run_app(int argc, char **argv)
         svec known_scatterer;
         vec2 known_kpts;
         tsc_block<int, cdouble> result;
+        // Streamed combined table, when eligible: parts prepared first, then one
+        // pass over reflection blocks. Falls through to the loop below otherwise.
+        if (stream_mtc_salted(opt, wavy, log_file, &known_kpts))
+        {
+            // Olex2 reads this literal line out of the log to decide whether the
+            // calculation succeeded, so it has to be here too. This early return is
+            // the path a multi-part protein actually takes, and it was the one site
+            // of four that never said it.
+            log_file << "Writing tsc file...  ... done!" << endl;
+            log_file << "  (written block by block while the factors were computed)" << endl;
+            log_file.flush();
+            std::cout.rdbuf(_coutbuf);
+            std::cout << "Finished!" << endl;
+            return 0;
+        }
+
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
             known_scatterer = result.get_scatterers_string();
@@ -336,6 +422,23 @@ int run_app(int argc, char **argv)
             }
         }
 
+        if (opt.tsc_written_by_stream)
+        {
+            // the streamed path already wrote the file block by block; writing
+            // the (empty) in-memory block now would truncate it
+            // Olex2 decides whether NoSpherA2 succeeded by looking for this exact
+            // line in its log: the nsa2 utilities test the log lines against the
+            // literal "Writing tsc file...  ... done!". A streamed run writes a
+            // perfectly good table and used to say so in different words, which
+            // every shipping Olex2 read as a failed calculation. The wording is a
+            // contract with the caller, not a message to a human.
+            log_file << "Writing tsc file...  ... done!" << endl;
+            log_file << "  (written block by block while the factors were computed)" << endl;
+            log_file.flush();
+            std::cout.rdbuf(_coutbuf);
+            std::cout << "Finished!" << endl;
+            return 0;
+        }
         known_scatterer = result.get_scatterers_string();
         log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
         _time_point start = get_time();
@@ -384,16 +487,32 @@ int run_app(int argc, char **argv)
         //use atoms of group 0
         opt.groups[0].push_back(0);
         itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, wavy, log_file, empty, 0);
-        log_file << "Writing tsc file... " << flush;
-        if (opt.binary_tsc)
-            res.write_tscb_file();
-        if (opt.old_tsc)
+        // The streamed path wrote the file block by block as it went; `res` is the
+        // empty placeholder it returned, and writing that now would truncate it.
+        if (opt.tsc_written_by_stream)
         {
-            res.write_tsc_file(opt.cif);
+            // Olex2 decides whether NoSpherA2 succeeded by looking for this exact
+            // line in its log: the nsa2 utilities test the log lines against the
+            // literal "Writing tsc file...  ... done!". A streamed run writes a
+            // perfectly good table and used to say so in different words, which
+            // every shipping Olex2 read as a failed calculation. The wording is a
+            // contract with the caller, not a message to a human.
+            log_file << "Writing tsc file...  ... done!" << endl;
+            log_file << "  (written block by block while the factors were computed)" << endl;
         }
-        log_file << " ... done!" << endl;
-        if (opt.write_CIF)
-            write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+        else
+        {
+            log_file << "Writing tsc file... " << flush;
+            if (opt.binary_tsc)
+                res.write_tscb_file();
+            if (opt.old_tsc)
+            {
+                res.write_tsc_file(opt.cif);
+            }
+            log_file << " ... done!" << endl;
+            if (opt.write_CIF)
+                write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+        }
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
@@ -567,16 +686,31 @@ int run_app(int argc, char **argv)
 
                 delete temp_pred;
             }
-            log_file << "Writing tsc file... " << flush;
-            if (opt.binary_tsc)
-                res.write_tscb_file();
-            if (opt.old_tsc)
+            // as above: the streamed path already wrote the file itself
+            if (opt.tsc_written_by_stream)
             {
-                res.write_tsc_file(opt.cif);
+                // Olex2 decides whether NoSpherA2 succeeded by looking for this
+                // exact line in its log: the nsa2 utilities test the log lines
+                // against the literal "Writing tsc file...  ... done!". A streamed
+                // run writes a perfectly good table and used to say so in different
+                // words, which every shipping Olex2 read as a failed calculation.
+                // The wording is a contract with the caller, not a message.
+                log_file << "Writing tsc file...  ... done!" << endl;
+                log_file << "  (written block by block while the factors were computed)" << endl;
             }
-            log_file << " ... done!" << endl;
-            if (opt.write_CIF)
-                write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+            else
+            {
+                log_file << "Writing tsc file... " << flush;
+                if (opt.binary_tsc)
+                    res.write_tscb_file();
+                if (opt.old_tsc)
+                {
+                    res.write_tsc_file(opt.cif);
+                }
+                log_file << " ... done!" << endl;
+                if (opt.write_CIF)
+                    write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+            }
         }
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again

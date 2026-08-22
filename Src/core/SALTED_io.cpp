@@ -240,6 +240,70 @@ std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int length) {
     return trim(std::string(string_out.begin(), string_out.end()));
 }
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
+// A raw positioned read of the model blocks. std::ifstream costs about 2.7x the
+// same bytes read this way; see the note in the header for why the file is not
+// mapped instead.
+void SALTED_BINARY_FILE::open_raw() {
+#ifdef _WIN32
+    if (raw_handle_) return;
+    HANDLE fh = CreateFileW(filepath.wstring().c_str(), GENERIC_READ, FILE_SHARE_READ,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (fh != INVALID_HANDLE_VALUE) raw_handle_ = fh;
+#else
+    if (raw_fd_ >= 0) return;
+    raw_fd_ = ::open(filepath.string().c_str(), O_RDONLY);
+#endif
+}
+
+void SALTED_BINARY_FILE::close_raw() {
+#ifdef _WIN32
+    if (raw_handle_) { CloseHandle(static_cast<HANDLE>(raw_handle_)); raw_handle_ = nullptr; }
+#else
+    if (raw_fd_ >= 0) { ::close(raw_fd_); raw_fd_ = -1; }
+#endif
+}
+
+// false means "could not", and every caller falls back to the stream.
+bool SALTED_BINARY_FILE::read_at(std::streamoff offset, void* dest, std::size_t bytes) {
+    char* out = static_cast<char*>(dest);
+#ifdef _WIN32
+    if (!raw_handle_) return false;
+    std::size_t done = 0;
+    while (done < bytes)
+    {
+        const DWORD want = static_cast<DWORD>(std::min<std::size_t>(bytes - done, 1u << 30));
+        OVERLAPPED ov{};
+        const unsigned long long at = static_cast<unsigned long long>(offset) + done;
+        ov.Offset = static_cast<DWORD>(at & 0xFFFFFFFFull);
+        ov.OffsetHigh = static_cast<DWORD>(at >> 32);
+        DWORD got = 0;
+        if (!ReadFile(static_cast<HANDLE>(raw_handle_), out + done, want, &got, &ov) || got == 0)
+            return false;
+        done += got;
+    }
+    return true;
+#else
+    if (raw_fd_ < 0) return false;
+    std::size_t done = 0;
+    while (done < bytes)
+    {
+        const ssize_t got = ::pread(raw_fd_, out + done, bytes - done,
+            static_cast<off_t>(offset) + static_cast<off_t>(done));
+        if (got <= 0) return false;
+        done += static_cast<std::size_t>(got);
+    }
+    return true;
+#endif
+}
+
 void SALTED_BINARY_FILE::open_file() {
     //Check if file exists and if it is already open
     err_checkf(std::filesystem::exists(filepath), "Couldn't open or find " + filepath.string() + ", leaving", std::cout);
@@ -384,6 +448,32 @@ void SALTED_BINARY_FILE::read_dataset(std::vector<T>& data, std::vector<size_t>&
         read_exact_bytes(file, data.data(), static_cast<std::streamsize>(size * sizeof(T)), "dataset payload");
 }
 
+// Same walk as read_dataset, without the payload. Used for species the structure
+// does not contain: their shape is still needed to index the flat weight vector,
+// their numbers never are.
+void SALTED_BINARY_FILE::skip_dataset(std::vector<size_t>& dims, const size_t element_size,
+                                      std::streamoff* payload_offset) {
+    int ndims;
+    read_exact(file, ndims, "dataset dimension count");
+    err_checkf(ndims >= 0 && ndims <= kMaxSaltedDatasetDims,
+        "Invalid SALTED dataset dimension count: " + std::to_string(ndims), std::cout);
+    dims.assign(static_cast<size_t>(ndims), 0);
+    for (int i = 0; i < ndims; i++) {
+        uint32_t dim = 0;
+        read_exact(file, dim, "dataset dimension " + std::to_string(i));
+        dims[i] = static_cast<size_t>(dim);
+    }
+    size_t size = 1;
+    for (const size_t dim : dims) {
+        err_checkf(dim <= kMaxSaltedDatasetValues && size <= kMaxSaltedDatasetValues / std::max<size_t>(dim, 1),
+            "SALTED dataset is unreasonably large or dimension product overflows", std::cout);
+        size *= dim;
+    }
+    if (payload_offset) *payload_offset = static_cast<std::streamoff>(file.tellg());
+    file.seekg(static_cast<std::streamoff>(size * element_size), std::ios::cur);
+    err_checkf(file.good(), "Could not step over a SALTED dataset payload", std::cout);
+}
+
 template <typename T>
 T SALTED_BINARY_FILE::read_generic_blocks(const std::string& key, std::function<void(T&, int)> process_block) {
     err_checkf(header_end != -1, "Header not read yet! Aborting", std::cout);
@@ -459,17 +549,25 @@ vec SALTED_BINARY_FILE::read_weights() {
     return weights;
 }
 
-std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_projectors() {
-    return read_lambda_based_data("PROJ");
+std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_projectors(
+    const std::unordered_set<std::string>* wanted,
+    std::unordered_map<std::string, std::array<size_t, 2>>* dims_out) {
+    return read_lambda_based_data("PROJ", wanted, dims_out);
 }
 
-std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_features() {
-    return read_lambda_based_data("FEATS");
+std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_features(
+    const std::unordered_set<std::string>* wanted) {
+    return read_lambda_based_data("FEATS", wanted);
 }
 
-std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_data(const std::string& key) {
-    return read_generic_blocks<std::unordered_map<std::string, dMatrix2>>(key,
-        [this, &key](std::unordered_map<std::string, dMatrix2>& container, int i) {
+// One pass over a block that reads no numbers: for every (species, lambda) it
+// records where the matrix starts and how big it is, then steps over it. That
+// index is what lets the prediction fetch a lambda when it needs it.
+std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref>
+SALTED_BINARY_FILE::index_lambda_based_data(const std::string& key) {
+    open_raw();   // the blocks this indexes are read through it
+    return read_generic_blocks<std::unordered_map<std::string, block_ref>>(key,
+        [this, &key](std::unordered_map<std::string, block_ref>& container, int i) {
             std::string element = read_string_remove_NULL(5);
             int nlambda;
             read_exact(file, nlambda, "lambda count for " + element);
@@ -477,11 +575,61 @@ std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_
                 "Invalid SALTED lambda count for " + element + ": " + std::to_string(nlambda), std::cout);
             for (int lam = 0; lam < nlambda; lam++) {
                 std::vector<size_t> dims;
-                vec data;
-                read_dataset(data, dims);
+                std::streamoff payload = 0;
+                skip_dataset(dims, sizeof(double), &payload);
                 err_checkf(dims.size() == 2,
                     "Expected 2D SALTED " + key + " dataset for " + element + " lambda " + std::to_string(lam), std::cout);
-                container[element + std::to_string(lam)] = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
+                container[element + std::to_string(lam)] = block_ref{ payload, dims[0], dims[1] };
+            }
+        }
+    );
+}
+
+dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
+    if (ref.rows == 0 || ref.cols == 0) return dMatrix2{};
+    // Straight into the matrix. Reading into a vec and reshaping would allocate
+    // the whole block twice and memcpy between them, and this runs over the whole
+    // 800 MB model once per part - reshape() copies, it does not adopt.
+    using ext_t = typename dMatrix2::extents_type;
+    dMatrix2 out(ext_t(ref.rows, ref.cols));
+    const std::size_t bytes = ref.rows * ref.cols * sizeof(double);
+    if (!read_at(ref.offset, out.data(), bytes))
+    {
+        file.clear();
+        file.seekg(ref.offset, std::ios::beg);
+        read_exact_bytes(file, out.data(), static_cast<std::streamsize>(bytes),
+            "lazily loaded dataset");
+    }
+    return out;
+}
+
+std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_data(
+    const std::string& key,
+    const std::unordered_set<std::string>* wanted,
+    std::unordered_map<std::string, std::array<size_t, 2>>* dims_out) {
+    return read_generic_blocks<std::unordered_map<std::string, dMatrix2>>(key,
+        [this, &key, wanted, dims_out](std::unordered_map<std::string, dMatrix2>& container, int i) {
+            std::string element = read_string_remove_NULL(5);
+            int nlambda;
+            read_exact(file, nlambda, "lambda count for " + element);
+            err_checkf(nlambda >= 0 && nlambda <= kMaxSaltedBlocks,
+                "Invalid SALTED lambda count for " + element + ": " + std::to_string(nlambda), std::cout);
+            const bool load = (wanted == nullptr) || (wanted->find(element) != wanted->end());
+            for (int lam = 0; lam < nlambda; lam++) {
+                std::vector<size_t> dims;
+                if (load) {
+                    vec data;
+                    read_dataset(data, dims);
+                    err_checkf(dims.size() == 2,
+                        "Expected 2D SALTED " + key + " dataset for " + element + " lambda " + std::to_string(lam), std::cout);
+                    container[element + std::to_string(lam)] = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
+                }
+                else {
+                    skip_dataset(dims, sizeof(double));
+                    err_checkf(dims.size() == 2,
+                        "Expected 2D SALTED " + key + " dataset for " + element + " lambda " + std::to_string(lam), std::cout);
+                }
+                if (dims_out) (*dims_out)[element + std::to_string(lam)] = { dims[0], dims[1] };
             }
         }
     );

@@ -183,10 +183,17 @@ std::string help_message =
  "  -xyz <file.xyz>                    Atomic positions for IAM or SALTED.\n"
  "  -hkl <file.hkl>                    Reflection list.\n"
  "  -dmin <angstrom>                   Generate reflections to this d-spacing\n"
- "                                    instead of reading -hkl.\n"
+ "                                    instead of reading -hkl.  Takes precedence\n"
+ "                                    over -hkl_min_max and -hkl.\n"
  "  -hkl_min_max hmin hmax kmin kmax lmin lmax\n"
- "                                    Explicit HKL bounds; replaces -hkl/-dmin.\n"
+ "                                    Explicit HKL bounds; used instead of -hkl,\n"
+ "                                    but only when -dmin is not given.\n"
  "  -IAM                               Use Thakkar independent-atom factors.\n"
+ "  -tsc_block <n>                     Reflections per block when writing the\n"
+ "                                    tsc [1000]. The table is streamed to disk\n"
+ "                                    a block at a time instead of being held\n"
+ "                                    whole, which is what keeps a protein\n"
+ "                                    inside a small machine. 0 holds it all.\n"
  "  -acc <0..4>                        Numerical grid accuracy [2]; 4 is the\n"
  "                                    practical maximum.\n"
  "  -group <n ...>                     CIF disorder groups for the asymmetric\n"
@@ -2719,6 +2726,10 @@ void options::digest_options()
             hirshfeld_surface = arguments[i + 1];
             hirshfeld_surface2 = arguments[i + 2];
         }
+        else if (temp == "-tsc_block")
+        {
+            tsc_block_size = static_cast<size_t>(std::stoll(arguments[i + 1]));
+        }
         else if (temp == "-hkl")
         {
             hkl = arguments[i + 1];
@@ -3386,7 +3397,8 @@ void options::look_for_debug(int &argc, char **argv)
         if (temp.find("-") > 0)
             continue;
         else if (temp == "-v" || temp == "-v2" || temp == "-debug")
-            std::cout << "Turning on verbose mode!" << std::endl, debug = true;
+            std::cout << "Turning on verbose mode!" << std::endl, debug = true,
+            ProgressBar::report_counts = true;
         else if (temp == "--h" || temp == "-h" || temp == "-help" || temp == "--help")
         {
             std::cout << NoSpherA2_message() << help_message << build_date << std::endl;
@@ -3953,10 +3965,14 @@ double vec_length(const vec &in)
 }
 
 namespace {
+    // Captured during static initialisation, so it still refers to the console after
+    // run_app() has redirected std::cout into NoSpherA2.log. A function local static
+    // would only be captured on the first error, by which time the redirect has happened
+    // and every error message would end up in the log file instead of on the console.
+    std::streambuf *const initial_coutbuf = std::cout.rdbuf();
     std::streambuf *original_coutbuf()
     {
-        static std::streambuf *buf = std::cout.rdbuf();
-        return buf;
+        return initial_coutbuf;
     }
 }
 
@@ -4137,16 +4153,32 @@ std::wstring s2ws(const std::string &s)
 }
 */
 
+bool ProgressBar::report_counts = false;
+
 ProgressBar::~ProgressBar()
 {
     progress_ = 100.0f;
     write_progress();
     stream_ << std::endl;
+    if (report_counts)
+    {
+        // updates is how often callers reported an item; writes is how often that
+        // needed the omp critical. Every item used to take the lock, so writes
+        // being far below updates is the whole point of the change.
+        const unsigned long long u = update_calls_.load(), w = bar_writes_.load();
+        stream_ << "[progress] " << status_text_ << ": " << u << " updates, "
+                << w << " serialised writes";
+        if (u > 0)
+            stream_ << "  (" << (w * 100.0 / u) << "% of calls took the lock, "
+                    << (u > w ? u / (w ? w : 1) : 1) << "x fewer barriers)";
+        stream_ << std::endl;
+    }
 #ifdef _WIN32
     if (taskbarList_)
     {
         taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NOPROGRESS);
         taskbarList_->Release();
+        taskbarList_ = nullptr;
     }
 #endif
 }

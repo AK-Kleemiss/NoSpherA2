@@ -12,7 +12,10 @@ void equicomb(int natoms, int nrad1, int nrad2,
     const ivec2& llvec, const int& lam,
     const cvec2& c2r, const int& featsize,
     const int& nfps, const std::vector<int64_t>& vfps,
-    vec& p);
+    vec& p,
+    // v2 identical to conj(v1): read v1 and flip the sign instead of
+    // holding a second copy of the same gigabytes
+    bool v2_is_conj_of_v1 = false);
 
 //Normal implementation
 void equicomb(int natoms, int nrad1, int nrad2,
@@ -21,4 +24,5 @@ void equicomb(int natoms, int nrad1, int nrad2,
     vec& w3j, int llmax,
     ivec2& llvec, int lam,
     cvec2& c2r, int featsize,
-    vec& p);
+    vec& p,
+    bool v2_is_conj_of_v1 = false);

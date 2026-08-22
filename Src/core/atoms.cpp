@@ -193,6 +193,8 @@ double atom::get_frac_coordinate(const unsigned int& axis) const {
 
 void atom::set_frac_coords(const d3& frac) {
     frac_coords = frac;
+    if (charge >= 1 && charge <= 255)
+        ID = atomID(frac_coords[0], frac_coords[1], frac_coords[2], group_nr, charge);
 };
 
 bool atom::operator==(const atom& other) const {

@@ -35,26 +35,95 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
     file.populate_config(config);
 
-    bool i_know_all = true;
-#pragma omp parallel for reduction(&& : i_know_all)
-    for (int a = 0; a < wavy_in.get_ncen(); a++)
+    // Lean by default. This was gated behind -tsc_block on the assumption that
+    // holding fewer blocks cost time; measured paired - both binaries alternating
+    // in one session - it does not: 1.01x on 1EJG, 1.00x on 1EJG -mtc, and 0.90x
+    // on 8,566-atom 21AZ, where peak fell 18.5 -> 7.1 GB. There is no case for
+    // making anyone opt in to that. 0 would hold every block, as before.
+    lam_group_limit = 1;
+
+    // Two kinds of atom cannot be predicted, and both are handed to the spherical
+    // Thakkar fill instead of guessed at:
+    //
+    //  1. a species the model was never trained on;
+    //  2. an atom with nothing inside the descriptor cutoff.
+    //
+    // The second is the subtler one. An atom with an empty environment has a
+    // descriptor that singles out no direction: the l = 0 part is fine, because
+    // its own density is spherically symmetric, but every equivariant lam >= 1
+    // component is exactly zero. The normalisation 1/sqrt(inner) is then +inf and
+    // the prediction comes out NaN. 3NIR shipped two such atoms - an oxygen 4.07 A
+    // from anything and a hydrogen at 5.05 A, against a 4.0 A cutoff - as NaN
+    // columns running the length of its tsc.
+    //
+    // Removing them disturbs nobody: the test is symmetric, so an atom with
+    // nothing within rcut is also nobody's neighbour within rcut, and every other
+    // atom's environment is exactly what it was.
+    //
+    // The test here is purely geometric, while featomic additionally ignores
+    // neighbours whose species is outside neighspe. An atom with neighbours but no
+    // ALLOWED ones therefore still reaches equicomb - the zero guard there catches
+    // it, leaves it spherical rather than NaN, and says so in the log.
+    const int ncen_in = wavy_in.get_ncen();
+    std::vector<char> use_thakkar(ncen_in, 0);
+    for (int a = 0; a < ncen_in; a++)
         if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
-            i_know_all = false;
-    if (!i_know_all)
+            use_thakkar[a] = 1;
+    const int n_unknown = static_cast<int>(std::count(use_thakkar.begin(), use_thakkar.end(), (char)1));
+
+    const double rcut = std::min(config.rcut1, config.rcut2);
+    // rcut is in Angstrom, the coordinates may not be
+    const double rcut_internal = wavy_in.get_isBohr() ? constants::ang2bohr(rcut) : rcut;
+    const double cut_sq = rcut_internal * rcut_internal;
+    int n_isolated = 0;
+#pragma omp parallel for reduction(+ : n_isolated)
+    for (int a = 0; a < ncen_in; a++)
     {
-        std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
-        for (int a = 0; a < wavy_in.get_ncen(); a++)
+        if (use_thakkar[a]) continue;
+        bool lonely = true;
+        for (int b = 0; b < ncen_in && lonely; b++)
         {
-            if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
+            if (b == a) continue;
+            double d_sq = 0.0;
+            for (unsigned int ax = 0; ax < 3; ax++)
             {
-                std::cout << constants::atnr2letter(wavy_in.get_atom_charge(a)) << " ";
+                const double dx = wavy_in.get_atom_coordinate(a, ax) - wavy_in.get_atom_coordinate(b, ax);
+                d_sq += dx * dx;
             }
+            if (d_sq < cut_sq) lonely = false;
         }
-        std::cout << "\nI will fill out these atoms using spherical Thakkar densities!\n";
-        wavy = wavy_in; // make a copy of initial wavefunction, to leave the initial one untouched!
-        for (int a = wavy_in.get_ncen() - 1; a >= 0; a--)
+        if (lonely)
         {
-            if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
+            use_thakkar[a] = 1;   // distinct indices, and char so there is no bitfield to race on
+            ++n_isolated;
+        }
+    }
+
+    if (n_unknown + n_isolated > 0)
+    {
+        if (n_unknown > 0)
+        {
+            std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
+            for (int a = 0; a < ncen_in; a++)
+            {
+                if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
+                {
+                    std::cout << constants::atnr2letter(wavy_in.get_atom_charge(a)) << " ";
+                }
+            }
+            std::cout << std::endl;
+        }
+        if (n_isolated > 0)
+        {
+            std::cout << "WARNING: " << n_isolated << " atom(s) have no neighbour within the "
+                      << rcut << " A descriptor cutoff, so there is no environment to predict from."
+                      << " Isolated solvent is the usual cause." << std::endl;
+        }
+        std::cout << "I will fill out these atoms using spherical Thakkar densities!\n";
+        wavy = wavy_in; // make a copy of initial wavefunction, to leave the initial one untouched!
+        for (int a = ncen_in - 1; a >= 0; a--)
+        {
+            if (use_thakkar[a])
             {
                 wavy.erase_atom(a);
             }
@@ -108,7 +177,18 @@ void SALTEDPredictor::setup_atomic_environment()
     atomic_symbols.reserve(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
-        atomic_symbols.emplace_back(wavy.get_atom_label(i));
+        std::string label = wavy.get_atom_label(i);
+        /* Deuterium is hydrogen as far as the electron density goes - the
+        models are trained on H and there is nothing for a D to predict from,
+        so without this a joint X-ray/neutron structure is refused outright:
+        "Excluded species: D". Only the nucleus differs, which this does not
+        see. 5MON carries 593 of them.
+        */
+        if (label == "D" || label == "d")
+        {
+            label = "H";
+        }
+        atomic_symbols.emplace_back(label);
     }
     // # Define system excluding atoms that belong to species not listed in SALTED input
     atomic_symbols = SALTED_Utils::filter_species(atomic_symbols, config.species);
@@ -152,6 +232,7 @@ void SALTEDPredictor::setup_atomic_environment()
 
     featomic::SimpleSystem featomic_system = SALTED_Utils::gen_featomic_system(config.predict_filename);
     // RASCALINE (Generate descriptors)
+    const auto _t_desc = std::chrono::steady_clock::now();
     v1 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp);
 
     if ((config.nrad2 != config.nrad1) || (config.nang2 != config.nang1) || (config.sig2 != config.sig1) || (config.rcut2 != config.rcut1) || (config.neighspe2 != config.neighspe1))
@@ -165,18 +246,40 @@ void SALTEDPredictor::setup_atomic_environment()
     }
     else
     {
-        v2 = v1;
+        // Same hyperparameters, so the second descriptor set would be an exact
+        // duplicate of the first. Record that instead of copying it: equicomb
+        // then reads conj(v1) where it would have read v2. Conjugation only
+        // flips the sign of the imaginary part, which is exact in IEEE
+        // arithmetic, so the result is bit-identical - and v2 is a copy of an
+        // array that runs to gigabytes on a protein.
+        v2_is_conj_of_v1 = true;
+        v2.clear();
     }
 
-    // Calculate the conjugate of v2 and store it back in v2, to avoid recalculating it in the equicomb function
-    calculateConjugate(v2);
+    // Conjugate v2 once here rather than per use in equicomb. Skipped when v2
+    // is just conj(v1): there is nothing to conjugate, equicomb applies it.
+    if (ProgressBar::report_counts)
+        std::cout << "[stages] featomic descriptors "
+                  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_desc).count()
+                  << " s" << std::endl;
+    if (!v2_is_conj_of_v1)
+        calculateConjugate(v2);
+    std::cout << "Descriptor sets " << (v2_is_conj_of_v1 ? "identical: sharing one copy"
+                                                        : "differ: two copies held") << std::endl;
     // END RASCALINE
 }
 
 
 void SALTEDPredictor::read_model_data() {
+    // How long the model costs to get off disk decides whether a lazy loader
+    // needs to be asynchronous or merely lazy: the total bytes are the same
+    // either way, only the moment changes.
+    const auto _t_model = std::chrono::steady_clock::now();
     const std::filesystem::path _SALTEDpath = SALTED_DIR / config.salted_filename;
-    SALTED_BINARY_FILE file(_SALTEDpath);
+    // Kept open for the whole prediction: the feature and projector matrices are
+    // fetched lambda by lambda as the loop reaches them, not up front.
+    model_file = std::make_unique<SALTED_BINARY_FILE>(_SALTEDpath);
+    SALTED_BINARY_FILE &file = *model_file;
     if (config.field) {
         err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
     }
@@ -187,40 +290,146 @@ void SALTEDPredictor::read_model_data() {
     if (config.sparsify) vfps = file.read_fps();
 
 
-    std::unordered_map<std::string, dMatrix2> features = file.read_features();
-    Vmat = file.read_projectors();
-    std::string key;
-    for (std::string spe : config.species) {
-        for (int lam = 0; lam < lmax[spe] + 1; lam++) {
-            key = spe + std::to_string(lam);
-            if (lam == 0) Mspe[spe] = (int)features[key].extent(0);
+    // Only the species this structure actually contains need their model data.
+    // The model knows every species it was trained on; a protein uses five of
+    // them, alanine four. The rest are read for their SHAPE alone, because
+    // `weights` is one flat vector laid out over every species the model knows
+    // and the offset of a present species depends on the sizes of the absent ones
+    // in front of it. Shapes are two integers; the payload is hundreds of MB.
+    std::unordered_set<std::string> present;
+    for (const std::string &spe : config.species)
+        if (atom_idx.find(spe) != atom_idx.end()) present.insert(spe);
 
-            if (config.zeta == 1.0) {
-                power_env_sparse[key] = dot(Vmat[key], features[key], true, false); //Transpose the first matrix
+    // Nothing large is read here. Both blocks are INDEXED - offset and shape per
+    // (species, lambda) - and the matrices are fetched in load_model_lambda()
+    // when the prediction reaches that lambda, then dropped again. Each block is
+    // used exactly once per run, so the bytes read are the same as before.
+    feat_index = file.index_lambda_based_data("FEATS");
+    proj_index = file.index_lambda_based_data("PROJ");
+    model_species = present;
+
+    // The two things the rest of the run needs from the shapes alone:
+    //  - Mspe, the number of sparse environments of a present species;
+    //  - the projector width of EVERY species the model knows, present or not,
+    //    because `weights` is one flat vector laid out over all of them.
+    for (const auto &[k, ref] : proj_index)
+        proj_dims[k] = { ref.rows, ref.cols };
+    for (const std::string &spe : present)
+    {
+        const auto it = feat_index.find(spe + "0");
+        if (it != feat_index.end()) Mspe[spe] = static_cast<int>(it->second.rows);
+    }
+
+    // What the model actually costs, and how it splits by lambda. The prediction
+    // walks one lambda at a time, so the per-lambda figure is the floor a lazy
+    // loader could reach - worth knowing before writing one.
+    if (ProgressBar::report_counts)
+    {
+        auto mb = [](const size_t doubles) { return doubles * sizeof(double) / 1048576.0; };
+        size_t pes = 0, vm = 0, wg = 0;
+        std::map<int, size_t> per_lam;
+        for (const std::string &spe : present)
+            for (int lam = 0; lam < lmax[spe] + 1; lam++)
+            {
+                const std::string k = spe + std::to_string(lam);
+                const auto f = feat_index.find(k), pr = proj_index.find(k);
+                const size_t p = (f == feat_index.end()) ? 0 : f->second.rows * f->second.cols;
+                const size_t v = (pr == proj_index.end()) ? 0 : pr->second.rows * pr->second.cols;
+                pes += p; vm += v; per_lam[lam] += p + v;
             }
-            else {
-                power_env_sparse[key] = features[key];
-            }
-        }
+        for (const auto &[lam, w] : wigner3j) wg += w.size();
+        size_t worst = 0;
+        for (const auto &[lam, sz] : per_lam) worst = std::max(worst, sz);
+        std::cout << "[model] features " << mb(pes) << " MB + projectors " << mb(vm)
+                  << " MB + wigner " << mb(wg) << " MB + weights " << mb(weights.size())
+                  << " MB = " << mb(pes + vm + wg + weights.size()) << " MB if held whole;"
+                  << " lazily, the largest lambda is " << mb(worst) << " MB" << std::endl;
+        std::cout << "[model] indexed in "
+                  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_model).count()
+                  << " s" << std::endl;
+        std::cout << "[model] per lambda:";
+        for (const auto &[lam, sz] : per_lam) std::cout << " l" << lam << "=" << mb(sz);
+        std::cout << " MB" << std::endl;
     }
 }
 
 
+// Fetch the model matrices for one lambda, use them, drop them.
+//
+// The prediction visits each lambda exactly once, and within a lambda it needs
+// power_env_sparse and Vmat for every species present. Nothing above that
+// lambda is touched again afterwards - the weight accounting downstream works
+// off psi_nm and the projector SHAPES, both of which outlive the matrices - so
+// the blocks can be let go as soon as the kernels for that lambda are built.
+//
+// The bytes read over a run are exactly what they were when everything was
+// loaded up front; only the moment changes. What changes with it is the peak:
+// the largest single lambda instead of all of them at once.
+void SALTEDPredictor::load_model_lambda(const int lam)
+{
+    if (!model_file) return;
+    for (const std::string &spe : model_species)
+    {
+        if (lam > lmax[spe]) continue;
+        const std::string key = spe + std::to_string(lam);
+        if (power_env_sparse.find(key) != power_env_sparse.end()) continue;
+        const auto pr = proj_index.find(key);
+        const auto ft = feat_index.find(key);
+        if (pr == proj_index.end() || ft == feat_index.end()) continue;
+        Vmat[key] = model_file->load_block(pr->second);
+        dMatrix2 feats = model_file->load_block(ft->second);
+        if (config.zeta == 1.0)
+            power_env_sparse[key] = dot(Vmat[key], feats, true, false);
+        else
+            power_env_sparse[key] = std::move(feats);
+    }
+}
+
+void SALTEDPredictor::free_model_lambda(const int lam)
+{
+    if (!model_file) return;
+    for (const std::string &spe : model_species)
+    {
+        const std::string key = spe + std::to_string(lam);
+        power_env_sparse.erase(key);
+        Vmat.erase(key);
+    }
+}
+
 vec SALTEDPredictor::predict()
 {
     using namespace std;
-    // Process each lambda block immediately after equicomb. This keeps only one
-    // large descriptor block alive instead of retaining every lambda in pvec.
+    const auto _t_predict_start = std::chrono::steady_clock::now();
+    auto _elapsed = [](const std::chrono::steady_clock::time_point &from)
+    { return std::chrono::duration<double>(std::chrono::steady_clock::now() - from).count(); };
+    double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_io = 0.0;
+    // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
+    // How many lambda blocks are alive at once.
+    //
+    // A block is natoms * (2*lam+1) * featsize doubles; holding all of them sums
+    // to (nang+1)^2 times a single block - 13.9 GB for 8,566 atoms, most of what
+    // the prediction uses. Holding fewer bounds that, at the cost of revisiting
+    // each species once per group instead of once in total.
+    //
+    // Streaming the tsc is the signal that memory is the binding constraint, so
+    // -tsc_block selects the lean setting; otherwise everything is held, which is
+    // the original loop order exactly.
     const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
+    const int lam_group = (lam_group_limit > 0) ? lam_group_limit : (lmax_max + 1);
+    ivec featsize(lmax_max + 1);
     std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
-    std::vector<dMatrix2> kernell0_nm(config.species.size());
-    for (int spe_idx = 0; spe_idx < static_cast<int>(config.species.size()); ++spe_idx)
-    {
+    for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
         psi_nm[spe_idx].resize(lmax[config.species[spe_idx]] + 1);
-    }
-
-    for (int lam = 0; lam < lmax_max + 1; lam++)
+    // The only quantity that crosses lambda: set at lam = 0, reused above it when
+    // zeta != 1. One per species, and small.
+    std::vector<dMatrix2> kernell0(config.species.size());
+    for (int lam0 = 0; lam0 <= lmax_max; lam0 += lam_group)
     {
+        const int lam1 = std::min(lam0 + lam_group, lmax_max + 1);
+        vec2 pg(lam1 - lam0);
+        const auto _t_eq = std::chrono::steady_clock::now();
+        for (int lam = lam0; lam < lam1; lam++)
+        {
         int llmax = 0;
         unordered_map<int, ivec> lvalues{};
         for (int l1 = 0; l1 < config.nang1 + 1; l1++)
@@ -248,32 +457,44 @@ vec SALTEDPredictor::predict()
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({2 * lam + 1})[0];
 
         featsize[lam] = config.nspe1 * config.nspe2 * config.nrad1 * config.nrad2 * llmax;
-        vec p;
+        vec &p = pg[lam - lam0];
         ivec2 llvec_t = transpose<int>(llvec);
         if (config.sparsify)
         {
             int nfps = static_cast<int>(vfps[lam].size());
             p.assign((size_t)natoms * ((size_t)2 * lam + 1) * nfps, 0.0);
-            equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p);
+            equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p, v2_is_conj_of_v1);
             featsize[lam] = nfps;
         }
         else
         {
             p.assign((size_t)natoms * ((size_t)2 * lam + 1) * featsize[lam], 0.0);
-            equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
+            equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1);
         }
-        for (int spe_idx = 0; spe_idx < static_cast<int>(config.species.size()); ++spe_idx)
+        }
+        _t_equicomb += _elapsed(_t_eq);
+        // Deliberately after the descriptors, not before: the model is only needed
+        // by the kernels, and the descriptor stage is where memory is already
+        // highest. Holding it across equicomb would raise the peak for nothing.
+        const auto _t_ld = std::chrono::steady_clock::now();
+        for (int lam = lam0; lam < lam1; lam++) load_model_lambda(lam);
+        _t_model_io += _elapsed(_t_ld);
+        const auto _t_kn = std::chrono::steady_clock::now();
+        // Species-outer within the group, so a species walks several consecutive
+        // lambdas and keeps its sparse matrices hot.
+        for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
         {
-            const string& spe = config.species[spe_idx];
-            if (lam > lmax[spe] || atom_idx.find(spe) == atom_idx.end())
+            const string spe = config.species[spe_idx];
+            if (atom_idx.find(spe) == atom_idx.end()) continue;
+            for (int lam = lam0; lam < lam1; lam++)
             {
-                continue;
-            }
+                if (lam > lmax[spe]) continue;
+        {
             int lam2_1 = 2 * lam + 1;
             int row_size = featsize[lam] * lam2_1; // Size of a block of rows
 
             dMatrix2 pvec_lam(atom_idx[spe].size() * lam2_1, featsize[lam]);
-            dMatrixRef2 _pvec(p.data(), natoms, featsize[lam] * lam2_1);
+            dMatrixRef2 _pvec(pg[lam - lam0].data(), natoms, featsize[lam] * lam2_1);
             double* pvec_ptr = pvec_lam.data();
             for (const int idx : atom_idx[spe])
             {
@@ -291,7 +512,7 @@ vec SALTEDPredictor::predict()
 
                 if (lam == 0)
                 {
-                    kernell0_nm[spe_idx] = kernel_nm;
+                    kernell0[spe_idx] = kernel_nm;
                     kernel_nm = elementWiseExponentiation(kernel_nm, config.zeta);
                 }
                 else
@@ -300,7 +521,7 @@ vec SALTEDPredictor::predict()
                     {
                         for (size_t i2 = 0; i2 < Mspe[spe]; ++i2)
                         {
-                            double scale_factor = pow(kernell0_nm[spe_idx](i1, i2), config.zeta - 1);
+                            double scale_factor = pow(kernell0[spe_idx](i1, i2), config.zeta - 1);
                             size_t base_i = i1 * lam2_1;
                             size_t base_j = i2 * lam2_1;
                             for (size_t i = 0; i < lam2_1; ++i)
@@ -316,6 +537,11 @@ vec SALTEDPredictor::predict()
                 psi_nm[spe_idx][lam] = dot(kernel_nm, Vmat[spe + to_string(lam)], false, false);
             }
         }
+            }
+        }
+        _t_kernels += _elapsed(_t_kn);
+        // Nothing above this lambda reads these matrices again.
+        for (int lam = lam0; lam < lam1; lam++) free_model_lambda(lam);
     }
 
     unordered_map<string, dMatrix1> C{};
@@ -328,20 +554,21 @@ vec SALTEDPredictor::predict()
         {
             for (int l = 0; l < lmax[spe] + 1; ++l)
             {
-                // Check if Vmat[spe + to_string(l)][0] exists
-                if (Vmat[spe + to_string(l)].size() == 0)
+                // The projector data for an absent species was never loaded; its
+                // shape was, and the shape is all this accounting needs.
+                const auto dim_it = proj_dims.find(spe + to_string(l));
+                if (dim_it == proj_dims.end() || dim_it->second[1] == 0)
                 {
                    std::cout << "The projector for species " << spe << " and l = " << l << " does not exist. This is a problem with the model, not NoSpherA2." << endl;
                    std::cout << "Continuing with the next species..., make sure there is no: " << spe << " in the structure you are trying to predict!!!!" << endl;
-                    l = lmax[spe] + 1;
-                    continue;
+                    break;
                 }
 
                 // for (int n = 0; n < nmax[spe + to_string(l)]; ++n)
                 //{
                 //     isize += static_cast<int>(Vmat[spe + to_string(l)][0].size());
                 // }
-                isize += static_cast<int>(Vmat[spe + to_string(l)].extent(1)) * nmax[spe + to_string(l)];
+                isize += static_cast<int>(dim_it->second[1]) * nmax[spe + to_string(l)];
             }
             continue;
         }
@@ -423,6 +650,17 @@ vec SALTEDPredictor::predict()
     // coeffs.fortran_order = false;
     // coeffs.shape = { unsigned long(pred_coefs.size()) };
     // npy::write_npy("folder_model.npy", coeffs);
+    if (ProgressBar::report_counts)
+    {
+        const double total = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - _t_predict_start).count();
+        std::cout << "[stages] predict " << total << " s = equicomb " << _t_equicomb
+                  << " s (" << (100.0 * _t_equicomb / total) << "%) + kernels "
+                  << _t_kernels << " s (" << (100.0 * _t_kernels / total)
+                  << "%) + model I/O " << _t_model_io << " s ("
+                  << (100.0 * _t_model_io / total) << "%) + rest "
+                  << (total - _t_equicomb - _t_kernels - _t_model_io) << " s" << std::endl;
+    }
     return pred_coefs;
 }
 

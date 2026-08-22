@@ -13,11 +13,11 @@ Number of protons: 24
 Number of electrons: 24.000000
 Reading:                                "epoxide.cif" done!
 Generating hkl indices up to d=:              0.40... done!
-Nr of reflections generated:                 29568
+Nr of reflections generated:                 32637
 Number of symmetry operations:                   2
-Nr of reflections to be used:                16275
+Nr of reflections to be used:                16318
 Generating k-points...                            ... done!
-Number of k-points to evaluate: 16275
+Number of k-points to evaluate: 16318
 
 Generating densities... 
 
@@ -42,7 +42,9 @@ Table of Charges in electrons
        H3a     0.483
        H3b     0.411
 Total number of analytical Electrons: 24.1586
+Streaming tsc in blocks of 1000 reflections
 [               Generating scattering factors...              ]
 [#############################################################] 100% 
                                          ... done!
 Writing tsc file...  ... done!
+  (written block by block while the factors were computed)

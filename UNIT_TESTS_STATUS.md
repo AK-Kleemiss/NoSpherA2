@@ -1,11 +1,15 @@
 # Unit Test Status
-**Last updated: 2026-08-02** (updated
+**Last updated: 2026-08-15** (added `AtomTest.ID_IsRebuiltWhenCIFPartChanges`, made the
+CIF reader store and immediately rebuild its PART-aware `SCATTERER_ID`, and moved PART filtering ahead of WFN matching
+to prevent another PART from overwriting atom IDs during `-mtc`; validation pending.)
+
+The previous 2026-08-02 update
 `TscBlockTests.BinaryFileRoundTripsWith32BitSizes` so `SCATTERER_IDS` is inferred from
 `atomID` payloads, matching CCTBX `table_based::table_reader` for both `.tsc` and `.tscb`.
 `Nbo47.EpoxideGennboMatchesReferenceWhenAvailable` now skips when its optional
 `reference.nbo` fixture is absent. NBO File47 tests now use per-process temporary directories,
 preventing parallel CTest runs from deleting each other's generated files. Last full validated
-baseline remains **201/201 ctest passing**.)
+baseline remains **201/201 ctest passing**.
 
 ## Test Harnesses
 

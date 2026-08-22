@@ -333,7 +333,9 @@ bool WFN::push_back_atom(const atom &given)
 bool WFN::erase_atom(const int &nr)
 {
     err_checkf(nr < ncen, "unreasonable atom number", std::cout);
-    removeElement(atoms, atoms[nr]);
+    // By index: removeElement matches by value, and the value it is given
+    // is a reference into the vector std::remove then shifts under it.
+    atoms.erase(atoms.begin() + nr);
     ncen--;
     return true;
 };

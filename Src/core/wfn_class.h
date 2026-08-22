@@ -385,6 +385,9 @@ public:
     /** Retrieve shared basis set pointer. */
     const std::shared_ptr<std::array<std::vector<primitive>, 118>> get_basis_set_ptr() const { return basis_set; };
     //-------------------atom handling--------------------------------------------------------------
+    /** True when the stored coordinates are Bohr rather than Angstrom.
+        Anything comparing a coordinate against a length in Angstrom needs this. */
+    bool get_isBohr() const { return isBohr; };
     /** Cartesian coordinate value of atom nr along axis (0..2). */
     const double get_atom_coordinate(const unsigned int& nr, const unsigned int& axis) const;
     const d3 get_atom_pos(const unsigned int& nr) const;
@@ -471,6 +474,8 @@ public:
     /** Set fractional coordinates for atom (crystallography). */
     void set_atom_frac_coords(const int& nr, const d3& frac) { atoms[nr].set_frac_coords(frac); };
     void set_atom_group_nr(const int atm_nr, const int group_nr) { atoms[atm_nr].set_group_nr(group_nr); };
+    /** Set the CIF-derived SCATTERER_ID for atom. */
+    void set_id_for_atom(const int nr, const atomID& id) { atoms[nr].set_ID(id); };
     int get_atom_basis_set_id(const int& nr) const { return atoms[nr].get_basis_set_id(); };
     //----------Calcualtion of Properties-----------------
     /** Density at position (helper that allocates temporaries). */

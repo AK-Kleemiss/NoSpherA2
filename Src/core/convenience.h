@@ -370,18 +370,34 @@ public:
 		progress_ = (float)workdone * workpart_;
 	}
 
-	void update()
+	// Called once per unit of work - once per reflection in the structure-factor
+	// loop, so hundreds of thousands of times on a protein. The whole body used
+	// to sit in an omp critical, serialising every worker on every item purely to
+	// redraw a bar that only changes about a hundred times.
+	//
+	// workdone is atomic, so the count needs no lock. The lock is taken only when
+	// this call is the one that crosses a reporting boundary, which is what keeps
+	// the redraws from interleaving. n lets a caller report a batch at once.
+	void update(const unsigned long long n = 1)
 	{
-#pragma omp critical
+		update_calls_.fetch_add(1, std::memory_order_relaxed);
+		const unsigned long long before = workdone.fetch_add(n);
+		const unsigned long long after = before + n;
+		if (before / percent_ != after / percent_)
 		{
-			workdone += 1;
-			if (workdone % percent_ == 0)
+#pragma omp critical
 			{
+				bar_writes_.fetch_add(1, std::memory_order_relaxed);
 				set_progress();
 				write_progress();
 			}
 		}
 	}
+
+	// How often callers asked, and how often that actually needed the lock.
+	unsigned long long update_calls() const { return update_calls_.load(); }
+	unsigned long long bar_writes() const { return bar_writes_.load(); }
+	static bool report_counts;   // set from the -debug flag
 
 	void write_progress();
 
@@ -395,11 +411,16 @@ private:
 	std::string remainder_;
 	std::string status_text_;
 	std::atomic<unsigned long long> workdone;
+	std::atomic<unsigned long long> update_calls_{0};
+	std::atomic<unsigned long long> bar_writes_{0};
 	float progress_;
 	std::streampos linestart;
 	bool finished_ = false;
 #ifdef _WIN32
-	ITaskbarList3* taskbarList_;
+	// Assigned only inside initialize_taskbar_progress()'s SUCCEEDED checks;
+	// without this the destructor makes a virtual call through whatever was
+	// on the stack whenever COM refuses.
+	ITaskbarList3* taskbarList_ = nullptr;
 
 	void initialize_taskbar_progress();
 #endif
@@ -737,13 +758,40 @@ struct options
     bool no_date = false;
     bool gbw2wfn = false;
     bool old_tsc = false;
-    bool label_tsc_output = true;
+    bool label_tsc_output = false;
     bool write_CIF = false;
     bool test = false;
     bool electron_diffraction = false;
     bool ECP = false;
     bool RI_FIT = false;
     bool needs_Thakkar_fill = false;
+    // Set only around a spherical fill: a disorder part whose missing atoms were
+    // already covered by an earlier part legitimately yields none, and that must
+    // not read as a broken CIF.
+    bool allow_empty_asym = false;
+    // Set only while a spherical fill is being computed for somebody else. Such a
+    // call must RETURN a block for the caller to append or emit; if it streamed it
+    // would write experimental.tscb out from under the table being built.
+    bool spherical_fill = false;
+    // Reflections per block when writing the tsc. The structure-factor array is
+    // scatterers x reflections x 16 bytes and dominates memory, so streaming it
+    // out a block at a time is what puts a large protein within reach of a small
+    // machine: 1IEE holds 3.5 GB of table, 21AZ holds 22 GB. Streaming is the
+    // default; 0 restores the original single-allocation path.
+    //
+    // Measured on 1EJG - block 0 (hold everything) against 100, 250, 500, 1000,
+    // 2500 and 5000, two rounds with the sizes rotated so this host's drift falls
+    // on every arm. Every size produced the SAME tsc hash, and the times spanned
+    // 24.9 to 26.0 s with no trend in block size; that spread is the machine, not
+    // the blocking. Peak fell 1822 -> 1541 MB and did not vary with the size,
+    // because the live buffer is small next to the prediction itself.
+    //
+    // 1000 keeps that buffer near 3 * scatterers * blocksize * 16 bytes: 144 MB on
+    // a 3,000-atom structure, 411 MB on 8,566. 0 restores the old behaviour.
+    size_t tsc_block_size = 1000;
+    // set once a streamed run has written the file itself, so the caller
+    // does not then overwrite it with an empty one-shot block
+    bool tsc_written_by_stream = false;
     bool qct = false;
     bool do_XCW = false;
 	bool xcw_gaussian_halt = false;
