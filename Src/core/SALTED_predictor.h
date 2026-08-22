@@ -3,6 +3,7 @@
 
 #include "convenience.h"
 #include "SALTED_io.h"
+#include "SALTED_utilities.h"
 #include "wfn_class.h"
 
 class SALTEDPredictor
@@ -32,10 +33,10 @@ private:
     std::unordered_map<std::string, std::vector<int>> atom_idx{};
     
     std::unordered_map<std::string, int> natom_dict{}, lmax{}, nmax{};
-    cvec4 v1, v2;
+    SALTEDDescriptors v1, v2;
     // Set when the two descriptor hyperparameter sets are identical: v2 is then
-    // exactly conj(v1), so it is not stored at all and equicomb conjugates on
-    // read. Saves a full duplicate of an array that is gigabytes on a protein.
+    // exactly conj(v1), so it is not filled at all and equicomb conjugates on
+    // read. Saves a full duplicate of a slab that is gigabytes on a protein.
     bool v2_is_conj_of_v1 = false;
     // Lambda blocks held at once; 0 means all. Set in the constructor, where the
     // options are in scope: streaming the tsc implies memory is the constraint.

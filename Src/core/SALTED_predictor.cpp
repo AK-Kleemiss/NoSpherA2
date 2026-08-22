@@ -160,20 +160,12 @@ const std::string SALTEDPredictor::get_dfbasis_name() const
     return config.dfbasis;
 }
 
-void calculateConjugate(std::vector<std::vector<std::vector<std::vector<std::complex<double>>>>> &v2)
+void calculateConjugate(SALTEDDescriptors& v2)
 {
 #pragma omp parallel for
-    for (int i = 0; i < v2.size(); ++i)
+    for (int i = 0; i < static_cast<int>(v2.values().size()); ++i)
     {
-        auto &vec3d = v2[i];
-        for (auto &vec2d : vec3d)
-        {
-            for (auto &vec1d : vec2d)
-            {
-                std::transform(vec1d.begin(), vec1d.end(), vec1d.begin(), [](const std::complex<double> &val)
-                               { return std::conj(val); });
-            }
-        }
+        v2.values()[i] = std::conj(v2.values()[i]);
     }
 }
 

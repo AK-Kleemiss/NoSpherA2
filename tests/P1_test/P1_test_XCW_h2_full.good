@@ -1,0 +1,38 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                            "P1_test_NA2.cif"Reading:                                "P1_test.hkl" done!
+Nr of reflections read from file: 3215
+Number of symmetry operations: 1
+Nr of reflections to be used: 3215
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 3215
+XCW orbital basis set: sto-3g-basis
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 102932 grid points.
+Total number of grid points after pruning: 102920
+AO values calculated for all grids.
+Screened out 1473 unique pairs of mu, nu (27.50%) 
+Skipped evaluation of 60229810 grids (15.21%) 
+More detailed output in XCW.log file...
+XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
+____________________________________________________________________________________
+ Lambda		Criterion	GooF(F2)	Total Energy	Perturbation	Target quantity 	A^2 (halt)
+										(Eh)		   (a. u.)			(a. u.)
+____________________________________________________________________________________
+0.000		9.792		4.695		-1961.923538820		0.000		-1961.923538820		188.1281
+0.010		6.284		3.703		-1961.787956103		0.063		-1961.725112979		121.0900
+0.020		5.810		3.519		-1961.704294224		0.116		-1961.588093456		110.8811
+____________________________________________________________________________
+Recommended halting lambda* = 0.02000 (A^2=110.8811) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+  candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
+  candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
+WARNING: A^2 is still falling at the last evaluated lambda (0.02000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. Not enough points yet to extrapolate an estimate (need >= 5 evaluated lambda steps).
+Finished XCW fitting procedure.

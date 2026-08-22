@@ -25,8 +25,8 @@ static void equicomb_bail(const std::string &msg)
 
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
 void equicomb(int natoms, int nrad1, int nrad2,
-              const cvec4 &v1,
-              const cvec4 &v2,
+              const SALTEDDescriptors &v1,
+              const SALTEDDescriptors &v2,
               const vec &w3j,
               const ivec2 &llvec, const int &lam,
               const cvec2 &c2r, const int &featsize,
@@ -62,27 +62,17 @@ void equicomb(int natoms, int nrad1, int nrad2,
     // featsize, wigner_ptr runs through w3j with no bound, and vfps indexes
     // ptemp. A structure missing a species the model knows makes those
     // disagree, so check here rather than run off the end inside the threads.
-    // When the two descriptor sets are identical v2 is not stored at all and
-    // conj(v1) is read instead, so every check below has to look at the array
-    // actually used - not at v2, which is deliberately empty in that case.
-    const cvec4 &v2_src = v2_is_conj_of_v1 ? v1 : v2;
+    // The descriptors themselves are not checked: SALTEDDescriptors is one slab
+    // whose extent is fixed by (natoms, nchannels, lmax) at construction, so
+    // there are no per-atom sizes left that could disagree with each other.
+    // When the two descriptor sets are identical v2 is not filled at all and
+    // conj(v1) is read instead, so the loop must read v2_src, never v2.
+    const SALTEDDescriptors &v2_src = v2_is_conj_of_v1 ? v1 : v2;
     const size_t shells = static_cast<size_t>(nrad1) * nrad2 * llmax;
     if (shells > static_cast<size_t>(featsize))
     {
         equicomb_bail("equicomb: featsize " + std::to_string(featsize) +
             " is smaller than nrad1*nrad2*llmax " + std::to_string(shells));
-    }
-    if (v1.size() < static_cast<size_t>(natoms) || v2_src.size() < static_cast<size_t>(natoms))
-    {
-        equicomb_bail("equicomb: expansion coefficients hold fewer atoms than requested");
-    }
-    for (int chk = 0; chk < natoms; ++chk)
-    {
-        if (v1[chk].size() < static_cast<size_t>(nrad1) || v2_src[chk].size() < static_cast<size_t>(nrad2))
-        {
-            equicomb_bail("equicomb: atom " + std::to_string(chk) +
-                " carries fewer radial channels than the model expects");
-        }
     }
     // w3j is consumed once per (n1,n2) shell pair, one entry per surviving m2
     size_t w3j_needed = 0;
@@ -92,10 +82,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
         if (cl1 < 0 || cl2 < 0)
         {
             equicomb_bail("equicomb: negative angular momentum in llvec");
-        }
-        if (v1[0][0].size() <= static_cast<size_t>(cl1) || v2_src[0][0].size() <= static_cast<size_t>(cl2))
-        {
-            equicomb_bail("equicomb: llvec asks for l beyond the expansion coefficients");
         }
         for (int cmu = 0; cmu < l21; ++cmu)
         {
@@ -235,7 +221,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
             {
                 for (int fl = 0; fl < llmax; ++fl)
                 {
-                    const cdouble *__restrict v1_fill = v1[iat][n1][llvec[0][fl]].data();
+                    const cdouble *__restrict v1_fill = v1.block(iat, n1, llvec[0][fl]);
                     for (int fmu = 0; fmu < l21; ++fmu)
                     {
                         const w3j_run &fr = runs[static_cast<size_t>(fl) * l21 + fmu];
@@ -256,8 +242,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
                         l2 = llvec[1][il];
 
                         // v2 is conj(v1) when the two descriptor sets are the same
-                        const cdouble *v2_ptr =
-                            v2_src[iat][n2][l2].data();
+                        const cdouble *v2_ptr = v2_src.block(iat, n2, l2);
 
                         for (imu = 0; imu < l21; imu++)
                         {
@@ -387,8 +372,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
 }
 
 void equicomb(int natoms, int nrad1, int nrad2,
-              cvec4 &v1,
-              cvec4 &v2,
+              const SALTEDDescriptors &v1,
+              const SALTEDDescriptors &v2,
               vec &w3j, int llmax,
               ivec2 &llvec, int lam,
               cvec2 &c2r, int featsize,
@@ -454,9 +439,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
                                 // v2 is conj(v1) elementwise when the two descriptor
                                 // sets match, so the same value is available from v1
                                 // whatever the index order happens to be here
-                                pcmplx[imu] += w3j[iwig] * v1[l1][iat][im1][n1] *
-                                    (v2_is_conj_of_v1 ? std::conj(v1[l2][iat][im2][n2])
-                                                      : v2[l2][iat][im2][n2]);
+                                pcmplx[imu] += w3j[iwig] * v1.block(iat, n1, l1)[im1] *
+                                    (v2_is_conj_of_v1 ? std::conj(v1.block(iat, n2, l2)[im2])
+                                                      : v2.block(iat, n2, l2)[im2]);
                                 iwig++;
                             }
                         }
