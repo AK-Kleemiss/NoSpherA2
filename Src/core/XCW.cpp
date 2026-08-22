@@ -1139,6 +1139,21 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 // The choice is a budget, not a structure-size test: the same molecule at a
 // bigger basis crosses the line while nothing about the crystallography changes,
 // because the tensor is quadratic in nmo and only linear in the reflection count.
+//
+// SPEND THE BUDGET, DO NOT MINIMISE IT. Measured on P1_test (3215 reflections,
+// nmo 103, 263 MB tensor), three window sizes interleaved, medians of 3, all
+// producing identical lambda tables:
+//
+//     window            median    peak      vs resident
+//     all 3215 refl      88.1 s   493 MB    -
+//     391 refl (12%)     95.4 s   212 MB    1.08x time, 2.3x less memory
+//     12 refl (0.4%)    104.1 s   197 MB    1.18x time, 2.5x less memory
+//
+// The memory saving saturates almost at once - a window only has to be small
+// against the whole - while the time cost keeps growing as the window narrows.
+// Dropping from 12% to 0.4% resident buys 15 MB and costs another 9%. So the
+// useful setting is the largest window that fits, which is what
+// items_within_budget returns, and holding everything whenever it fits at all.
 void XCW::decide_i_storage() {
 	const size_t per_block = i_tensor_file::block_bytes(cryst.nmo);
 	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo);
