@@ -366,6 +366,12 @@ static int run_app_impl(int argc, char **argv)
         // pass over reflection blocks. Falls through to the loop below otherwise.
         if (stream_mtc_salted(opt, wavy, log_file, &known_kpts))
         {
+            // Olex2 reads this literal line out of the log to decide whether the
+            // calculation succeeded, so it has to be here too. This early return is
+            // the path a multi-part protein actually takes, and it was the one site
+            // of four that never said it.
+            log_file << "Writing tsc file...  ... done!" << endl;
+            log_file << "  (written block by block while the factors were computed)" << endl;
             log_file.flush();
             std::cout.rdbuf(_coutbuf);
             std::cout << "Finished!" << endl;
@@ -417,7 +423,14 @@ static int run_app_impl(int argc, char **argv)
         {
             // the streamed path already wrote the file block by block; writing
             // the (empty) in-memory block now would truncate it
-            log_file << "tsc written by the streaming path" << endl;
+            // Olex2 decides whether NoSpherA2 succeeded by looking for this exact
+            // line in its log: the nsa2 utilities test the log lines against the
+            // literal "Writing tsc file...  ... done!". A streamed run writes a
+            // perfectly good table and used to say so in different words, which
+            // every shipping Olex2 read as a failed calculation. The wording is a
+            // contract with the caller, not a message to a human.
+            log_file << "Writing tsc file...  ... done!" << endl;
+            log_file << "  (written block by block while the factors were computed)" << endl;
             log_file.flush();
             std::cout.rdbuf(_coutbuf);
             std::cout << "Finished!" << endl;
@@ -473,7 +486,14 @@ static int run_app_impl(int argc, char **argv)
         itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, wavy, log_file, empty, 0);
         if (opt.tsc_written_by_stream)
         {
-            log_file << "tsc written by the streaming path" << endl;
+            // Olex2 decides whether NoSpherA2 succeeded by looking for this exact
+            // line in its log: the nsa2 utilities test the log lines against the
+            // literal "Writing tsc file...  ... done!". A streamed run writes a
+            // perfectly good table and used to say so in different words, which
+            // every shipping Olex2 read as a failed calculation. The wording is a
+            // contract with the caller, not a message to a human.
+            log_file << "Writing tsc file...  ... done!" << endl;
+            log_file << "  (written block by block while the factors were computed)" << endl;
         }
         else {
         log_file << "Writing tsc file... " << flush;
@@ -662,7 +682,14 @@ static int run_app_impl(int argc, char **argv)
             }
             if (opt.tsc_written_by_stream)
             {
-                log_file << "tsc written by the streaming path" << endl;
+                // Olex2 decides whether NoSpherA2 succeeded by looking for this
+                // exact line in its log: the nsa2 utilities test the log lines
+                // against the literal "Writing tsc file...  ... done!". A streamed
+                // run writes a perfectly good table and used to say so in different
+                // words, which every shipping Olex2 read as a failed calculation.
+                // The wording is a contract with the caller, not a message.
+                log_file << "Writing tsc file...  ... done!" << endl;
+                log_file << "  (written block by block while the factors were computed)" << endl;
             }
             else {
             log_file << "Writing tsc file... " << flush;
