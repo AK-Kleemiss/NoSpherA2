@@ -768,13 +768,11 @@ struct options
     // call must RETURN a block for the caller to append or emit; if it streamed it
     // would write experimental.tscb out from under the table being built.
     bool spherical_fill = false;
-    // Reflections per streamed block. The structure-factor array is
-    // scatterers x reflections x 16 bytes and dominates memory, so emitting
-    // it in blocks is what lets a large protein run on a small machine.
-    // 0 keeps the original single-allocation path.
-    // Reflections per block when writing the tsc. Streaming is the default,
-    // because holding the whole table is what puts a protein out of reach of a
-    // small machine: 1IEE holds 3.5 GB of table, 21AZ holds 22 GB.
+    // Reflections per block when writing the tsc. The structure-factor array is
+    // scatterers x reflections x 16 bytes and dominates memory, so streaming it
+    // out a block at a time is what puts a large protein within reach of a small
+    // machine: 1IEE holds 3.5 GB of table, 21AZ holds 22 GB. Streaming is the
+    // default; 0 restores the original single-allocation path.
     //
     // Measured on 1EJG - block 0 (hold everything) against 100, 250, 500, 1000,
     // 2500 and 5000, two rounds with the sizes rotated so this host's drift falls

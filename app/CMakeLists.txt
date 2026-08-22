@@ -48,9 +48,3 @@ set_target_properties(
 
 
 nosphera2_copy_runtime_libraries(NoSpherA2)
-
-if(MSVC)
-    # Symbols for the exit trace. /Zi does not affect optimisation.
-    target_compile_options(NoSpherA2 PRIVATE /Zi)
-    target_link_options(NoSpherA2 PRIVATE /DEBUG /OPT:REF /OPT:ICF)
-endif()
