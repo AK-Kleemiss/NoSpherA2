@@ -1692,16 +1692,24 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 	// team startup and a barrier every time for a few reflections of work.
 	// omp single does the read; its implicit barrier is what stops a thread
 	// running ahead into a window that has not been loaded yet.
+	// load() reads a file and can throw, but it runs inside omp single and an
+	// exception must not leave an OpenMP structured block. Record it and rethrow
+	// after the region; the compute loop skips its work once one is pending.
+	std::string io_error;
 #pragma omp parallel
 	{
 	for (int r0 = 0; r0 < cryst.nr_small; r0 += step) {
 		const int r1 = std::min(r0 + step, cryst.nr_small);
 		if (i_streamed_) {
 #pragma omp single
-			i_file_.load(r0, r1);
+			{
+				try { i_file_.load(r0, r1); }
+				catch (const std::exception &e) { io_error = e.what(); }
+			}
 		}
 #pragma omp for schedule(static)
 		for (int r = r0; r < r1; ++r) {
+			if (!io_error.empty()) continue;
 			const cdouble* I_r = i_streamed_ ? i_file_.block(r)
 			                                 : I.data() + static_cast<size_t>(r) * packed;
 			cdouble sum = F_calc[1][r];
@@ -1717,6 +1725,7 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 		}
 	}
 	}
+	if (!io_error.empty()) throw std::runtime_error(io_error);
 }
 
 void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
@@ -1740,6 +1749,8 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 		: 2.0 * cryst.F_scale / (cryst.nr_small - settings.n_params);
 
 	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
+	// See calc_F_calc: an exception must not leave an OpenMP structured block.
+	std::string io_error;
 	// One region, one accumulator per thread, one reduction - however many windows
 	// the budget implies. Allocating and reducing an nmo x nmo matrix per window
 	// is what made a narrow window expensive out of proportion to its I/O.
@@ -1751,12 +1762,16 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			const int r1 = std::min(r0 + step, cryst.nr_small);
 			if (i_streamed_) {
 #pragma omp single
-				i_file_.load(r0, r1);
+				{
+					try { i_file_.load(r0, r1); }
+					catch (const std::exception &e) { io_error = e.what(); }
+				}
 			}
 			// No nowait: the next window's read must not start until every
 			// thread has finished reading this one out of the buffer.
 #pragma omp for
 			for (int r = r0; r < r1; r++) {
+				if (!io_error.empty()) continue;
 				cdouble precompute;
 				if (against_F2) {
 					const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
@@ -1785,6 +1800,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			perturb += local;
 		}
 	}
+	if (!io_error.empty()) throw std::runtime_error(io_error);
 	perturb *= prefactor;
 	for (int mu = 0; mu < cryst.nmo; mu++) {
 		for (int nu = mu + 1; nu < cryst.nmo; nu++) {
@@ -2146,7 +2162,7 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	//Roby_information Roby(sf_wave_vec[0]);
 }
 
-occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read, bool safe) {
+occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor, bool save_tensor) {
 	std::vector<ao_data> ao_data_shells;
 	occ::core::Molecule mol;
 	setup_SCF_mol(mol);
@@ -2154,8 +2170,8 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read, bool safe) {
 	setup_basis(mol, settings.basis_set_name, occ_basis_set);
 	occ::qm::HartreeFock hf(occ_basis_set);
 	create_prims(ao_data_shells, occ_basis_set);
-	eval_I_anom_disp(ao_data_shells, read);
-	if (safe) {
+	eval_I_anom_disp(ao_data_shells, read_tensor);
+	if (save_tensor) {
 		std::ofstream out("I_tensor", std::ios::binary);
 		if (!out)
 			throw std::runtime_error("Cannot open file for writing");
