@@ -59,6 +59,11 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NosMainFolder)Src/core</AdditionalIncludeDirectories>
     </ClCompile>
+    <PostBuildEvent>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy $(SolutionDir)..\..\build\Release_x64\NoSpherA2.exe D:\devel\rundir-py3\ 
+copy $(SolutionDir)..\..\build\Release_x64\libiomp5md.dll D:\devel\rundir-py3\ 
+copy $(SolutionDir)..\..\build\Release_x64\tbb12.dll D:\devel\rundir-py3\</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc" />

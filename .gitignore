@@ -71,3 +71,6 @@ Lib/*
 /Windows/**/*.recipe
 /Windows/**/*.pch
 /Windows/**/*.lib
+*.iobj
+*.ipdb
+*.ilk
