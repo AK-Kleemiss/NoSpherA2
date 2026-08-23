@@ -826,9 +826,8 @@ public:
             static_assert(std::is_trivially_copyable_v<T>);
             if (buffer.size() + sizeof(T) > buffer_capacity)
                 flush_buffer();
-            const std::size_t offset = buffer.size();
-            buffer.resize(offset + sizeof(T));
-            std::memcpy(buffer.data() + offset, &value, sizeof(T));
+            const char *const bytes = reinterpret_cast<const char *>(&value);
+            buffer.insert(buffer.end(), bytes, bytes + sizeof(T));
         };
 
         for (std::size_t reflection = 0; reflection < reflection_count; ++reflection)
