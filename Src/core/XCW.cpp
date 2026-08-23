@@ -1174,13 +1174,21 @@ void XCW::decide_i_storage() {
 	const size_t w = items_within_budget(static_cast<size_t>(cryst.nr_small), per_block, budget);
 	i_streamed_ = (w != 0);
 	if (!i_streamed_) {
-		std::cout << std::fixed << std::setprecision(2)
-		          << "I tensor held in memory: " << (total / 1048576.0) << " MB";
-		if (budget > 0)
-			std::cout << " (fits the " << (budget / 1048576.0) << " MB " << source << " budget)";
-		std::cout << std::endl;
+		// Announced only when someone asked about memory - a budget was set, or
+		// -debug. Holding the whole tensor is what every XCW run did before this
+		// existed, so saying so unconditionally is a new line on every run that
+		// carries no news, and it shifts every reference output by one line.
+		if (budget > 0 || ProgressBar::report_counts) {
+			std::cout << std::fixed << std::setprecision(2)
+			          << "I tensor held in memory: " << (total / 1048576.0) << " MB";
+			if (budget > 0)
+				std::cout << " (fits the " << (budget / 1048576.0) << " MB " << source << " budget)";
+			std::cout << std::endl;
+		}
 		return;
 	}
+	// Streaming, by contrast, always says so: it is a change in how the run
+	// behaves, not a report on the status quo.
 	i_window_ = static_cast<int>(std::min(w, static_cast<size_t>(cryst.nr_small)));
 	i_file_.create(i_tensor_path(), cryst.nr_small, cryst.nmo);
 	std::cout << std::fixed << std::setprecision(2)
