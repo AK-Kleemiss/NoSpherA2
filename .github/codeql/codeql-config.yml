@@ -1,0 +1,31 @@
+name: "NoSpherA2 CodeQL configuration"
+
+# Scan what we can actually fix.
+#
+# occ/, libcint/ and featomic/ are submodules of upstream projects, and
+# occ/src/3rdparty/ is vendored inside one of them. Findings there are not ours
+# to patch: a local fix means carrying a diff against upstream forever, and the
+# finding reappears the moment the submodule is bumped. Anything real in those
+# trees belongs in an upstream issue, not in this repository's alert list.
+#
+# This is not cosmetic. Of 234 open alerts, 128 were in these paths - more than
+# half the list, none of them actionable here, all of them crowding out the ones
+# that are. A security dashboard nobody can act on is a dashboard nobody reads.
+#
+# build/ is generated: CMake fetches dependencies into build/*/_deps, so scanning
+# it reports third-party code a second time and reports it against a path that
+# does not exist in a fresh clone.
+paths-ignore:
+  - occ
+  - libcint
+  - featomic
+  - build
+  - "**/3rdparty/**"
+  - "**/_deps/**"
+
+# Kept explicit rather than relying on the default, so that adding a directory
+# above cannot silently narrow what is scanned in Src/ and app/.
+paths:
+  - Src
+  - app
+  - tests/src

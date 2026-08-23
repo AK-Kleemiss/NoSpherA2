@@ -776,9 +776,8 @@ public:
         auto append = [&buffer]<typename T>(const T& value)
         {
             static_assert(std::is_trivially_copyable_v<T>);
-            const std::size_t offset = buffer.size();
-            buffer.resize(offset + sizeof(T));
-            std::memcpy(buffer.data() + offset, &value, sizeof(T));
+            const char *const bytes = reinterpret_cast<const char *>(&value);
+            buffer.insert(buffer.end(), bytes, bytes + sizeof(T));
         };
         for (std::size_t r = 0; r < n; ++r)
         {

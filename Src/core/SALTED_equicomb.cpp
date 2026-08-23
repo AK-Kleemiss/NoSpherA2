@@ -192,7 +192,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
 #pragma omp parallel 
     {
-        vec ptemp(l21 * featsize, 0.0);
+        vec ptemp(static_cast<size_t>(l21) * featsize, 0.0);
         vec pcmplx_real(l21);
         vec pcmplx_imag(l21);
         // w * v1 depends on n1 but not on n2, and the n2 loop below runs nrad2

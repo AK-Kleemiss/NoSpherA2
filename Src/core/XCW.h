@@ -197,7 +197,7 @@ private:
 	void create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set);
 
 	// Combined function that sets up the XCW procedure, evaluates I tensor (or loads it from file), sets up the Hartree-Fock object and evaluates anomalous dispersion correction
-	occ::qm::HartreeFock setup_XCW_procedure(bool read, bool safe);
+	occ::qm::HartreeFock setup_XCW_procedure(bool read_tensor, bool save_tensor);
 
 	// I tensor storage: held resident, or written to disk and read back a window
 	// of reflections at a time. See decide_i_storage.

@@ -255,7 +255,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
             std::cout << "make_chi: No molecular orbitals found, skipping chi calculation." << std::endl;
         return vec(0); // Default to all pairs being "far apart" if no MOs
     }
-    vec chi(ncen * ncen, 0.0);
+    vec chi(static_cast<size_t>(ncen) * ncen, 0.0);
     std::vector<std::vector<bool>> neighbours(ncen, bvec(ncen, true));
     double rijx2, rijy2, rijz2, xdist, disth;
     for (int a = 0; a < wfn.get_ncen(); a++) {

@@ -1,5 +1,6 @@
 #pragma once
 #include "convenience.h"
+#include <cassert>
 
 // The XCW I tensor is nr_small blocks of nmo*(nmo+1)/2 complex doubles, one block
 // per reflection, and every consumer walks it in reflection order: calc_F_calc
@@ -40,6 +41,11 @@ public:
         return static_cast<size_t>(nr) * block_bytes(nmo);
     }
 
+    i_tensor_file() = default;
+    // Owns a FILE*. A copy would fclose the same handle twice, and both objects
+    // would seek each other's position out from under them.
+    i_tensor_file(const i_tensor_file &) = delete;
+    i_tensor_file &operator=(const i_tensor_file &) = delete;
     ~i_tensor_file() { close(); }
 
     void close()
@@ -90,6 +96,39 @@ public:
             fread(&nmo64, sizeof(nmo64), 1, f_) != 1 ||
             fread(&packed64, sizeof(packed64), 1, f_) != 1)
             throw std::runtime_error("i_tensor_file: truncated header");
+        // Everything below is derived from bytes that came off disk, and is then
+        // used to size an allocation and to compute seek offsets. A truncated,
+        // stale or hostile file must be rejected here rather than turned into a
+        // huge allocation or a read past the end. This is the input validation
+        // the CWE-20 alerts on the freads above are actually asking for - the
+        // freads themselves already check their return values.
+        if (nr64 <= 0 || nmo64 <= 0 || packed64 <= 0)
+            throw std::runtime_error("i_tensor_file: " + p.string() +
+                " has a non-positive dimension in its header");
+        if (nr64 > (1LL << 31) || nmo64 > (1LL << 20))
+            throw std::runtime_error("i_tensor_file: " + p.string() +
+                " claims implausible dimensions (nr " + std::to_string(nr64) +
+                ", nmo " + std::to_string(nmo64) + ")");
+        // packed is a function of nmo, so the header has to agree with itself.
+        const int64_t packed_expected = nmo64 * (nmo64 + 1) / 2;
+        if (packed64 != packed_expected)
+            throw std::runtime_error("i_tensor_file: " + p.string() + " header is inconsistent: "
+                "packed " + std::to_string(packed64) + " but nmo " + std::to_string(nmo64) +
+                " implies " + std::to_string(packed_expected));
+        // And the file has to be the size the header implies. This is what
+        // catches a run killed halfway through writing, and any file left by the
+        // older format whose element count was stored as a 32-bit int.
+        std::error_code ec;
+        const auto on_disk = std::filesystem::file_size(p, ec);
+        if (!ec)
+        {
+            const size_t expect = header_bytes_ +
+                static_cast<size_t>(nr64) * static_cast<size_t>(packed64) * sizeof(cdouble);
+            if (static_cast<size_t>(on_disk) != expect)
+                throw std::runtime_error("i_tensor_file: " + p.string() + " is " +
+                    std::to_string(on_disk) + " bytes, but its header implies " +
+                    std::to_string(expect) + " - truncated or written by another format");
+        }
         nr_ = static_cast<int>(nr64); nmo_ = static_cast<int>(nmo64);
         packed_ = static_cast<size_t>(packed64);
         path_ = p;
@@ -109,6 +148,9 @@ public:
     // pointers handed out by block() stay valid until the next load.
     void load(const int r0, const int r1)
     {
+        if (r0 < 0 || r1 < r0 || r1 > nr_)
+            throw std::runtime_error("i_tensor_file: load(" + std::to_string(r0) + ", " +
+                std::to_string(r1) + ") is outside 0.." + std::to_string(nr_));
         const size_t n = static_cast<size_t>(r1 - r0);
         if (n > window_blocks_)
             throw std::runtime_error("i_tensor_file: load of " + std::to_string(n) +
@@ -120,8 +162,15 @@ public:
         loaded_first_ = r0; loaded_last_ = r1;
     }
 
+    // assert, not throw: this is called from inside an omp for, once per
+    // reflection, and an exception leaving an OpenMP structured block is
+    // undefined behaviour - it would turn a bounds violation into a terminate
+    // rather than a message. The window bounds are checked for real in load(),
+    // which runs before the region; this catches a caller that walks outside
+    // the window it asked for, in debug, at no cost in release.
     const cdouble *block(const int r) const
     {
+        assert(r >= loaded_first_ && r < loaded_last_ && "reflection outside the loaded window");
         return window_.data() + static_cast<size_t>(r - loaded_first_) * packed_;
     }
 
@@ -132,7 +181,7 @@ public:
     const std::filesystem::path &path() const { return path_; }
 
 private:
-    static const size_t header_bytes_ = 4 * sizeof(int64_t);
+    static constexpr size_t header_bytes_ = 4 * sizeof(int64_t);
 
     size_t offset_of(const int r) const
     {
