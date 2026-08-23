@@ -235,10 +235,73 @@ SALTEDDescriptors SALTED_Utils::calculate_SALTED_descriptors(const featomic::Sim
 }
 
 
+namespace
+{
+    // **Building the calculator is the whole cost; running it is nearly free.**
+    //
+    // Measured on FLOWOFFICE, 6 August 2026, with the geometry-aid
+    // hyperparameters (11 species, max_radial 6, max_angular 12,
+    // spline_accuracy 1e-6):
+    //
+    //     -h, process startup only                0.12 s
+    //     -wfn, parse the molecule, no descriptor 0.12 s
+    //     descriptor,    2 atoms                  0.74 s
+    //     descriptor,   30 atoms                  0.90 s
+    //     descriptor, 1000 atoms                  1.57 s
+    //
+    // That is a fixed 0.72 s plus 0.0009 s per atom: for an ordinary structure
+    // about ninety per cent of the call has nothing to do with the molecule.
+    // It is `featomic::Calculator`'s constructor splining the radial integral
+    // for every (n, l) pair to `spline_accuracy`, which depends only on the
+    // hyperparameters. Compute the same splines once and every structure after
+    // the first costs what it should.
+    //
+    // Keyed on the parameter JSON, so a caller that changes any hyperparameter
+    // gets a new calculator rather than a silently wrong one -- the failure
+    // this guards against is the same one the feature-count arithmetic in
+    // `convenience.cpp` guards against, a descriptor of the right shape
+    // computed with the wrong settings.
+    //
+    // `featomic::Calculator` is move-only, hence the indirection. It is **not
+    // safe to use one calculator from several threads at once**; the only
+    // caller of `calculate_SOAP_Powerspectrum` is the descriptor path, which is
+    // serial, and SALTED builds its own calculator in `get_feats_projs` and is
+    // unaffected by this cache.
+    featomic::Calculator& cached_calculator(const std::string& name, const std::string& json)
+    {
+        static std::map<std::string, std::unique_ptr<featomic::Calculator>> cache;
+        const std::string key = name + '\n' + json;
+        auto found = cache.find(key);
+        if (found == cache.end())
+        {
+            found = cache.emplace(key, std::make_unique<featomic::Calculator>(name, json)).first;
+        }
+        return *found->second;
+    }
+}
+
 //FEATOMIC POWER Spectrum
 metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters) {
-    // create the calculator with its name and parameters
-    auto calculator = featomic::Calculator("soap_power_spectrum", parameters.to_json().c_str());
+    // **Phase timings, off unless NOSPHERA2_TIME_SOAP is set.** The batch flag
+    // was built on the theory that the fixed 0.72 s per call was the
+    // calculator's constructor. It is not: measured 6 August 2026, twelve
+    // structures in one process took 0.72 s for the first and 0.69 s for the
+    // twelfth, no decay whatever, so caching the calculator bought only the
+    // 0.28 s of process startup it also avoided. The cost is somewhere in what
+    // follows, and guessing again would be the same mistake twice.
+    const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr;
+    auto mark = std::chrono::steady_clock::now();
+    auto lap = [&mark](const char* what, bool on) {
+        if (!on) return;
+        const auto now = std::chrono::steady_clock::now();
+        std::cout << "  SOAP_PHASE " << what << " "
+                  << std::chrono::duration<double>(now - mark).count() << std::endl;
+        mark = now;
+    };
+
+    // Built once per set of hyperparameters and kept: see `cached_calculator`.
+    auto& calculator = cached_calculator("soap_power_spectrum", parameters.to_json());
+    lap("calculator", time_phases);
 
     std::vector<std::array<int32_t,3>> keys_array;
     for (const std::string& center_type : parameters.species)
@@ -274,13 +337,17 @@ metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::Simpl
     calc_opts.selected_keys = keys_selection;
     // run the calculation
     // Initialize descriptor directly from computation result
+    lap("keys", time_phases);
     metatensor::TensorMap descriptor = calculator.compute(featomic_system, calc_opts);
+    lap("compute", time_phases);
 
     // The descriptor is a metatensor `TensorMap`, containing multiple blocks.
     // We can transform it to a single block containing a dense representation,
     // with one sample for each atom-centered environment.
     descriptor = descriptor.keys_to_samples("center_type");
+    lap("keys_to_samples", time_phases);
     descriptor = descriptor.keys_to_properties(svec{ "neighbor_1_type" , "neighbor_2_type" });
+    lap("keys_to_properties", time_phases);
 
     return descriptor;
 }

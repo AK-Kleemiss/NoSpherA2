@@ -73,3 +73,6 @@ Lib/*
 /Windows/**/*.pch
 /Windows/**/*.lib
 /Windows/NoSpherA2_LIB/Profile_x64
+*.iobj
+*.ipdb
+*.ilk
