@@ -30,6 +30,35 @@ set(
     "${PROJECT_SOURCE_DIR}/Src/basis_data.cpp"
 )
 
+# The generated source depends on the CSVs it is generated FROM, not only on the
+# converter that reads them.
+#
+# Without this the rule only ever fired when BasisSetConverter itself was rebuilt,
+# so adding or editing a basis set left a stale basis_data.cpp in place - and it
+# is .gitignore'd, so nothing in the repository showed a difference either. That
+# is how this checkout ended up with 98 basis sets against 117 CSVs: STO-3G was
+# missing, and every XCW test failed with "Basis set sto-3g not defined" until the
+# file was deleted by hand.
+#
+# CONFIGURE_DEPENDS re-globs at build time, so a NEW csv triggers a reconfigure;
+# naming the files in DEPENDS below covers an EDITED one. Both are needed - the
+# glob alone would not notice a change to a file already in the list.
+file(
+    GLOB NOSPHERA2_BASIS_SET_FILES
+    CONFIGURE_DEPENDS
+    "${NOSPHERA2_BASIS_SET_DIRECTORY}/*.csv"
+)
+
+if(NOT NOSPHERA2_BASIS_SET_FILES)
+    # Not fatal: the converter target would already be missing if the submodule
+    # were absent. But silence here means a stale basis_data.cpp again, so say so.
+    message(WARNING
+        "No .csv basis sets found in ${NOSPHERA2_BASIS_SET_DIRECTORY} - "
+        "basis_data.cpp will not regenerate when basis sets change. "
+        "Is the BasisSetGenerator submodule checked out?"
+    )
+endif()
+
 add_custom_command(
     OUTPUT
         "${NOSPHERA2_GENERATED_BASIS_SOURCE}"
@@ -41,6 +70,7 @@ add_custom_command(
 
     DEPENDS
         BasisSetConverter
+        ${NOSPHERA2_BASIS_SET_FILES}
 
     WORKING_DIRECTORY
         "${PROJECT_SOURCE_DIR}/BasisSetGenerator"
