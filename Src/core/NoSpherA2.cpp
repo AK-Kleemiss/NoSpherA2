@@ -14,7 +14,37 @@
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 
+static int run_app_impl(int argc, char **argv);
+
+// Wrapper around the actual application, so that an exception thrown deep inside a file
+// parser reports what went wrong instead of terminating the process with a fail-fast.
 int run_app(int argc, char **argv)
+{
+    // Remember the console before run_app_impl() redirects std::cout into NoSpherA2.log;
+    // by the time we get here in a catch block the log file has already been destroyed.
+    std::streambuf *const console = std::cout.rdbuf();
+    try
+    {
+        return run_app_impl(argc, argv);
+    }
+    catch (const std::exception &e)
+    {
+        std::cout.rdbuf(console);
+        std::cout << "\nNoSpherA2 stopped with an unhandled error: " << e.what()
+                  << "\n\tThis usually means one of the input files is malformed or an option is missing."
+                  << "\n\tThe last thing that was read is at the end of NoSpherA2.log." << std::endl;
+        return -1;
+    }
+    catch (...)
+    {
+        std::cout.rdbuf(console);
+        std::cout << "\nNoSpherA2 stopped with an unhandled error of unknown type."
+                  << "\n\tThe last thing that was read is at the end of NoSpherA2.log." << std::endl;
+        return -1;
+    }
+}
+
+static int run_app_impl(int argc, char **argv)
 {
     using namespace std;
     const std::filesystem::path cwd = std::filesystem::current_path();
@@ -396,6 +426,48 @@ int run_app(int argc, char **argv)
             write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
+        std::cout << "Finished!" << endl;
+        return 0;
+    }
+    // Partition electron density read from a cube file and perform Fourier transform to TSC.
+    if (opt.cube_density != "")
+    {
+        err_checkf(opt.cif != "", "Cube-density SF calculation requires -cif.", log_file);
+        err_checkf(opt.hkl != "" || opt.dmin != 99.0 || opt.hkl_min_max[0][0] != -100,
+            "No hkl specified and no dmin value given", log_file);
+
+        WFN cube_wave(e_origin::cub);
+        cube density_cube(opt.cube_density, true, cube_wave, log_file, opt.debug);
+
+        if (opt.properties.integral_accuracy > 0)
+        {
+            log_file << "Refining cube grid (interpolative) to integral accuracy "
+                << opt.properties.integral_accuracy << "..." << std::endl;
+            density_cube.adaptive_refine(
+                [&density_cube](const d3& pos)
+                {
+                    return density_cube.get_interpolated_value(pos[0], pos[1], pos[2]);
+                },
+                opt.properties.integral_accuracy,
+                4,
+                2);
+        }
+
+        if (opt.groups.empty())
+            opt.groups.resize(1);
+        if (opt.groups[0].empty())
+            opt.groups[0].push_back(0);
+
+        itsc_block res = calculate_scattering_factors_from_cube(opt, cube_wave, density_cube, log_file);
+        log_file << "Writing tsc file... " << flush;
+        if (opt.binary_tsc)
+            res.write_tscb_file();
+        if (opt.old_tsc)
+            res.write_tsc_file(opt.cif);
+        log_file << " ... done!" << endl;
+
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf);
         std::cout << "Finished!" << endl;
         return 0;
     }

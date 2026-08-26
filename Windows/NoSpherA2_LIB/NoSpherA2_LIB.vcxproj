@@ -116,6 +116,7 @@
     <ClInclude Include="..\..\Src\core\test_functions.h" />
     <ClInclude Include="..\..\Src\core\Thakkar_coefs.h" />
     <ClInclude Include="..\..\Src\core\tsc_block.h" />
+    <ClInclude Include="..\..\Src\core\tsc_label_converter.h" />
     <ClInclude Include="..\..\Src\core\wfn_class.h" />
     <ClInclude Include="..\..\Src\core\XCW.h" />
   </ItemGroup>
@@ -153,6 +154,7 @@
     <ClCompile Include="..\..\Src\core\SALTED_predictor.cpp" />
     <ClCompile Include="..\..\Src\core\SALTED_utilities.cpp" />
     <ClCompile Include="..\..\Src\core\scattering_factors.cpp" />
+    <ClCompile Include="..\..\Src\core\tsc_label_converter.cpp" />
     <ClCompile Include="..\..\Src\core\sphere_lebedev_rule.cpp" />
     <ClCompile Include="..\..\Src\core\spherical_density.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_class.cpp" />

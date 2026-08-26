@@ -2,6 +2,7 @@
 #include "convenience.h"
 #include "cell.h"
 #include "tsc_block.h"
+#include "tsc_label_converter.h"
 #include "test_functions.h"
 #include "integrator.h"
 #include "properties.h"
@@ -162,86 +163,178 @@ namespace {
 }
 
 std::string help_message =
-("\n----------------------------------------------------------------------------\n"
-    "          These commands and arguments are known by NoSpherA2:\n"
-    "----------------------------------------------------------------------------\n\n"
-    ":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n"
-    "   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n"
-    "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (tested for OCC)\n"
-    "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename [requires -b and -d]\n"
-    "   -occ            <FILENAME>.toml          Runs a wavefunction calculation for OCC. Requires using OCC input\n"
-    "   -b              <FILENAME>               Read this basis set\n"
-    "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
-    "   -dmin           <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
-    "   -hkl_min_max    <6 Numbers>              Performs calculation on hkl range defined by the 6 numbers. (replaces dmin and hkl)\n"
-    "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
-    "                                            [1]: def2-ECP\n"
-    "                                            [2]: xTB\n"
-    "                                            [3]: pTB\n"
-    "   --help/-help/--h                         print this help\n"
-    "   -cpus           <NUMBER>                 Sets the number of available threads to use. Defaults to all available CPUs"
-    "   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n"
-    "   -v2                                      Even more stuff\n"
-    "   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n"
-    "   -charge         <NUMBER>                 Input charge of wavefunction (otherwise attempted to be read from the wfn)\n"
-    "   -method         <METHOD NAME>            Can be [RKS] or RHF to distinguish between DFT and HF\n"
-    "   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n"
-    "   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n"
-    "   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n"
-    "   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors. Use is discouraged!\n"
-    "   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n"
-    "   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n"
-    "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.\n"
-    "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
-    "   -TFVC                                    Use the Topological Fuzzy Voronoi Cells (TFVC) partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
-    "   -rgbi                                    Run Roby-Gould Bond Index analysis.\n"
-    "   -rgbi_no_sym                             Run RGBI without atomic O_h symmetrization.\n"
-    "   -rgbi_basis    <nao|ano>                 Use the occupied NAO subset (default) or the full atom-local ANO set for RGBI.\n"
-    "   -rgbi-groups    <GROUP> <GROUP> [...]    Run RGBI group analysis for comma-separated atom index groups/ranges, e.g. 0-5,7. Repeat for multiple groupings.\n"
-    "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
-    "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
-    "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
-    "                                            If there is more than a single twin law to be used, use the twin command multiple times (and good luck with that structure...).\n"
-    "   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n"
-    "   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n"
-    "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
-    "                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n"
-    "                                            without spaces.\n"
-    "   -salted         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n"
-    "   -ri_fit         <Aux Basis> <BETA>       Uses RI-Fitting to partition the electron density. If Aux Basis == 'auto' a optinal beta value can be given.\n"
-    "   -mtc_mult       <List of multiplicity>   Matching multiplicity for -cmtc and -mtc wavefucntions\n"
-    "   -mtc_charge     <List of charges>        Matching charges for -cmtc and -mtc wavefucntions\n"
-    "   -mtc_ECP        <List of ECP modes>      Matching ECP modes for -cmtc and -mtc wavefucntions\n"
-    "   -profiling      [tests_root]             Runs the internal profiling suite (all test paths). Optional root defaults to ./tests\n"
-    "   -promol_nci      <frag1.xyz> <frag2.xyz> [rcut1] [rcut2] [rho_abs_max] [rdg_max]\n"
-    "                                            Promolecular NCI/RDG analysis from two XYZ fragments using Thakkar spherical atom densities.\n"
-    "                                            Put -resolution and -radius before -promol_nci if overriding their defaults.\n"
-    "                                            Defaults: rcut1=0.95 dominant-fragment discard, rcut2=0.75 fragment-sum keep;\n"
-    "                                            output: <frag1>_<frag2>_signed_rho.cube,\n"
-    "                                            <frag1>_<frag2>_rdg.cube, <frag1>_<frag2>_values.dat,\n"
-    "                                            <frag1>_<frag2>_nci.vmd, and <frag1>_<frag2>_plot.py.\n"
-    "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
-    "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
-   "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
-    "   -qtaim_eli  <rho.cube> <eli.cube> <atoms> [bg]  QTAIM basin masking of an ELI cube:\n"
-    "                                            Runs QTAIM topological analysis on <rho.cube>, keeps ELI values only for voxels\n"
-    "                                            in the basins of the specified atoms, sets all other voxels to <bg> (default 0),\n"
-    "                                            and shrinks the output grid to the tight bounding box of the selected region.\n"
-    "                                            <atoms>: comma-separated 0-based atom indices, e.g. 0,3,7\n"
-    "                                            <bg>:    background value for non-selected voxels (default 0)\n"
-    "                                            Output:  <eli_stem>_qtaim_masked.cube next to the input ELI file.\n"
-    "               Alternative (WFN mode):      -qtaim_eli <wfn_file> <atoms> [resolution] [radius] [bg]\n"
-    "                                            Computes rho and ELI grids from the wavefunction, then applies masking.\n"
-    "   -cmtc            <List of .wfns + parts> Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
-    "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
-    "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
-    "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3 -mtc_charge 0 0 0 -mtc_mult 1 1 1 -mtc_ECP 0 0 0\n"
-    "      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n"
-    "      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc (also works for tscb files)\n"
-    "      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n"
-    "      convert tsc:  NoSpherA2.exe -tscb A.tscb\n"
-    "      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n"
-    "      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
+("\n============================================================================\n"
+ " NoSpherA2 -- non-spherical scattering factors and density analysis\n"
+ "============================================================================\n"
+ "Syntax: NoSpherA2 [options]\n"
+ "Values in [brackets] are optional.  Repeatable options may be supplied more\n"
+ "than once.  Input files and options may be given in any order unless noted.\n\n"
+ "GETTING STARTED\n"
+ "  HAR/TSC:  -cif model.cif -hkl data.hkl -wfn wavefunction.wfx -acc 2\n"
+ "  IAM TSC:  -cif model.cif -hkl data.hkl -xyz model.xyz -IAM -acc 2\n\n"
+ "CORE INPUT AND SCATTERING-FACTOR CALCULATION\n"
+ "  -cif <file.cif>                    Structure and atom labels.\n"
+ "  -wfn <file>                        Wavefunction input (.wfn, .wfx, .ffn,\n"
+ "                                    .molden, .gbw, .xtb, or fchk/fch).\n"
+ "  -cube_density <file.cube>          Experimental/computed electron-density\n"
+ "                                    cube used for partitioned SF generation\n"
+ "                                    (requires -cif and -hkl/-dmin).\n"
+ "  -occ <file.toml>                   Run an OCC wavefunction calculation.\n"
+ "  -xyz <file.xyz>                    Atomic positions for IAM or SALTED.\n"
+ "  -hkl <file.hkl>                    Reflection list.\n"
+ "  -dmin <angstrom>                   Generate reflections to this d-spacing\n"
+ "                                    instead of reading -hkl.  Takes precedence\n"
+ "                                    over -hkl_min_max and -hkl.\n"
+ "  -hkl_min_max hmin hmax kmin kmax lmin lmax\n"
+ "                                    Explicit HKL bounds; used instead of -hkl,\n"
+ "                                    but only when -dmin is not given.\n"
+ "  -IAM                               Use Thakkar independent-atom factors.\n"
+ "  -acc <0..4>                        Numerical grid accuracy [2]; 4 is the\n"
+ "                                    practical maximum.\n"
+ "  -group <n ...>                     CIF disorder groups for the asymmetric\n"
+ "                                    unit (prefix a number with + to invert).\n"
+ "  -charge <n>  -mult <n>             Override charge/multiplicity read from\n"
+ "                                    the wavefunction.\n"
+ "  -method <RKS|RHF>                  Select DFT or Hartree-Fock treatment.\n"
+ "  -ECP [1|2|3]                       Apply ECP correction: 1=def2, 2=xTB,\n"
+ "                                    3=pTB.  Alias: -ecp.\n"
+ "  -ED                                Electron-diffraction scattering factors.\n"
+ "  -twin <9 values>                   Add a 3x3 twin law; may be repeated.\n"
+ "  -old_tsc                           Request the legacy TSC format.\n\n"
+ "PARTITIONING, BASIS, AND PERFORMANCE\n"
+ "  -b <basis>  -d <directory>          Basis name/file and Tonto-style basis\n"
+ "                                    directory (also needed for -fchk).\n"
+ "  -Becke | -TFVC | -mbis | -embis    Select partitioning (default Hirshfeld).\n"
+ "  -ri_fit [basis ...]                RI partitioning; omit a basis or use\n"
+ "                                    auto_aux to generate one automatically.\n"
+ "  -cpus <n>                          Maximum worker threads [all available].\n"
+ "  -mem <MB>                          Memory limit for grid calculations.\n"
+ "  -pbc <n>                           Periodic-boundary setting.\n\n"
+ "TSC/TSCB TABLE UTILITIES\n"
+ "  -tscb <table.tsc|table.tscb>        Convert between text .tsc and binary\n"
+ "                                    .tscb, preserving the basename.\n"
+ "  -tsc_labels [<table> <model.cif> [output.tsc]]\n"
+ "                                    With table+cif: resolve SCATTERER_IDS\n"
+ "                                    against CIF atoms and write labels .tsc\n"
+ "                                    (default: <table>.labels.tsc). Without\n"
+ "                                    operands: force label-based scatterers in\n"
+ "                                    binary .tscb output (default behavior).\n"
+ "  -merge <table ...>                 Merge .tsc/.tscb tables with checks.\n"
+ "  -merge_nocheck <table ...>         Merge tables only when you know their\n"
+ "                                    HKL indices are identical.\n\n"
+ "MULTI-FRAGMENT WORKFLOWS\n"
+ "  -mtc <wfn groups ...>              Multi-TSC calculation: alternating\n"
+ "                                    wavefunction and comma-separated groups.\n"
+ "  -cmtc <wfn cif groups ...>          CIF-based multi-TSC: alternating\n"
+ "                                    wavefunction, CIF, and groups.\n"
+ "  -mtc_mult <n ...>                  Per-input multiplicities for -mtc/-cmtc.\n"
+ "  -mtc_charge <n ...>                Per-input charges (negative: n<value>).\n"
+ "  -mtc_ECP <mode ...>                Per-input ECP modes.\n"
+ "  -Cation <label ...>  -Anion <label ...>\n"
+ "                                    Explicit ionic fragment labels.\n\n"
+ "DENSITY, PROPERTIES, AND ANALYSIS\n"
+ "  -rho_cube <wfn>                    Write an electron-density cube.\n"
+ "  -elf  -eli  -lap  -rdg  -esp       Request ELF, ELI, Laplacian, RDG, or\n"
+ "                                    electrostatic-potential properties.\n"
+ "  -def  -HDEF                        Request deformation density or HDEF.\n"
+ "  -MO <number|all>                   Generate a molecular-orbital property.\n"
+ "  -radius <angstrom>  -resolution <angstrom>\n"
+ "                                    Grid settings for property calculations.\n"
+ "  -hirsh <atom-index>                Hirshfeld analysis for one atom.\n"
+ "  -hirshfeld_surface <wfn1> <wfn2>  Hirshfeld-surface analysis.\n"
+ "  -rgbi                              Roby-Gould bond-index analysis.\n"
+ "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization.\n"
+ "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO [nao] or ANO.\n"
+ "  -rgbi-groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
+ "                                    for multiple group sets.\n"
+ "  -promol_nci <a.xyz> <b.xyz> [rcut1 rcut2 rho_max rdg_max]\n"
+ "                                    Promolecular NCI/RDG outputs. Defaults:\n"
+ "                                    rcut1=0.95 and rcut2=0.75.\n"
+ "  -promol_nci_single_thread          Disable NCI parallel processing.\n"
+ "  -qtaim_eli <rho.cube> <eli.cube> <atoms> [background]\n"
+ "  -qtaim_eli <wfn> <atoms> [resolution radius background]\n"
+ "                                    Keep ELI only in QTAIM basins of 0-based,\n"
+ "                                    comma-separated atom indices.\n"
+ "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n\n"
+ "CONVERSION, ML, AND SPECIALISED TOOLS\n"
+ "  -gbw2wfn -wfn <file.gbw>            Convert GBW input to .wfn.\n"
+ "  -convert_to_47 <wfn>               Write an NBO File47 (.47).\n"
+ "  -fchk <output.fchk>                Write FCHK output (requires -b and -d).\n"
+ "  -SALTED <model-dir>                Predict density with a SALTED model.\n"
+ "  -SALTED_COEFS <model-dir>          Write SALTED_COEFS.npy (requires -wfn).\n"
+ "  -RI_CUBE <coefficients.npy>        Write an RI density cube; use -wfn and\n"
+ "                                    -ri_fit first.\n"
+ "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn and\n"
+ "                                    -ri_fit first.\n"
+ "  -combine_mos <wfn1> <wfn2>          Combine molecular orbitals.\n"
+ "  -cmos1 <MO ...>  -cmos2 <MO ...>   MO selections for -combine_mos.\n"
+ "  -QCT                               Enter the legacy QCT workflow.\n\n"
+ "DIAGNOSTICS AND INTERNAL TOOLS\n"
+ "  -v | -v2 | -debug                  Verbose diagnostic output.\n"
+ "  -profiling [tests-root]            Run the internal profiling suite\n"
+ "                                    [./tests]. Alias: -profile.\n"
+ "  -no-date                           Suppress date information in output.\n"
+ "  -draw_orbits l,m[,resolution,radius]\n"
+ "                                    Draw a spherical-harmonic orbital.\n"
+ "  -eli_analysis <wfn> <resolution> <radius>\n"
+ "  -ewal_sum <cube> [kmax] [accuracy] Ewald sum of a cube.\n"
+ "  -atom_dens <wfn> [alpha-MOs beta-MOs]\n"
+ "  -atom_dens_diff <gbw1> <gbw2>      Difference density from two GBW files.\n"
+ "  -spherical_aver_fukui <wfn1> <wfn2>\n"
+ "  -spherical_aver_hirsh <wfn>\n"
+ "  -dipole_moments  -polarizabilities <7 wfn files>\n"
+ "  -calc_featomic_descriptor           Write descriptor.npy (requires -wfn).\n"
+ "  -SALTED_Training                    Create SALTED training data.\n"
+ "  -all_charges                        Print all calculated atomic charges.\n"
+ "  -atom_sfac <wfn1> <wfn2>            Compare atom-centred scattering factors.\n"
+ "  -density_difference <wfn>           Use a second wavefunction for a\n"
+ "                                    density-difference calculation.\n"
+ "  -e_field <value>                    Apply an external electric field.\n"
+ "  -fractal <name>                     Enable the legacy fractal workflow.\n"
+ "  -get_g                              Enable reciprocal-space g calculation.\n"
+ "  -refine [accuracy]                  Set refinement integral accuracy [0.1].\n"
+ "  -rgbi_EVs                           Include RGBI eigenvectors.\n"
+ "  -sfac_diffuse x y z cif wfn dmin    Calculate diffuse scattering factors.\n\n"
+ "EXPERIMENTAL AND DEVELOPER COMMANDS\n"
+ "  -coef <file>                        Use externally supplied SALTED\n"
+ "                                    coefficients.\n"
+ "  -convert_XCW <stdout> <lambda-step> Convert Tonto XCW lambda-step output.\n"
+ "  -do_XCW  -calc_F  -anom_disp <file> XCW/Fcalc/anomalous-dispersion modes.\n"
+ "  -partitioning_test  -NNLS_TEST      Run internal partitioning/NNLS tests.\n"
+ "  -test_RI  -RI_WFN_DIFF              RI fitting diagnostics (after -wfn and\n"
+ "                                    -ri_fit).\n"
+ "  -wfn_cif                            Write a CIF from the wavefunction.\n"
+ "  -lukas_test                          SALTED density diagnostic.\n"
+ "  -calc_dens_1D [atom1 atom2 points padding]\n"
+ "                                    One-dimensional density between atoms.\n"
+ "  -spherical_harmonic  -spherical_atoms\n"
+ "                                    Internal spherical-atom diagnostics.\n"
+ "  -test                               Enable test mode.\n\n"
+ "HELP\n"
+ "  -h, --h, -help, --help              Show this message.\n\n"
+ "EXAMPLES\n"
+ "  Normal HAR\n"
+ "    NoSpherA2 -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
+ "  Independent-atom (Thakkar) TSC\n"
+ "    NoSpherA2 -cif A.cif -hkl A.hkl -xyz A.xyz -IAM -acc 1 -cpus 7\n"
+ "  Disorder / multi-TSC\n"
+ "    NoSpherA2 -cif A.cif -hkl A.hkl -acc 1 -cpus 7 \\\n"
+ "      -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3 \\\n"
+ "      -mtc_charge 0 0 0 -mtc_mult 1 1 1 -mtc_ECP 0 0 0\n"
+ "  Fragment HAR\n"
+ "    NoSpherA2 -cif A.cif -hkl A.hkl -acc 1 -cpus 7 \\\n"
+ "      -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 \\\n"
+ "      3_2.wfn 3_2.cif 0,2\n"
+ "  Merge tables\n"
+ "    NoSpherA2 -merge A.tsc B.tsc C.tsc\n"
+ "    NoSpherA2 -merge_nocheck A.tsc B.tsc C.tsc  # only identical HKLs\n"
+ "  Convert, label, and GBW conversion\n"
+ "    NoSpherA2 -tscb A.tscb\n"
+ "    NoSpherA2 -tsc_labels A.tscb A.cif A.labels.tsc\n"
+ "    NoSpherA2 -gbw2wfn -wfn A.gbw\n"
+ "  Twin law\n"
+ "    NoSpherA2 -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 \\\n"
+ "      -twin -1 0 0 0 -1 0 0 0 -1\n");
 std::string NoSpherA2_message(bool no_date)
 {
     std::string t = "    _   __     _____       __              ___   ___\n";
@@ -2317,16 +2410,32 @@ void options::digest_options()
             err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
 
             std::vector<std::string> species{ "B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I" };
+            // These must match the hyperparameters the geometry-aid models were
+            // trained with, in
+            //   geometry-aid/multi_layer_classifier/c_only_training.py :: SOAP_HP
+            // and NOT the older values in geometry-aid/external_script.py.
+            //
+            // The feature count is the check: 11 species give 66 unique pairs,
+            // and the descriptor length is 66 * (max_radial+1)^2 * (max_angular+1).
+            //   old: 66 * 5^2 * 10 = 16,500
+            //   new: 66 * 7^2 * 13 = 42,042   <- what every shipped model expects
+            // A vector of the wrong length is rejected by the Python side; one of
+            // the right length computed with a different cutoff would not be, and
+            // would produce confident nonsense. Hence the arithmetic here.
+            //
+            // SALTED is unaffected: it builds its own FeatomicHyperParameters from
+            // config.nang1 / config.nang2 in SALTED_predictor.cpp. This struct is
+            // local to the -calc_featomic_descriptor branch.
             SALTED_Utils::FeatomicHyperParameters hyperparams{
-                .cutoff_radius = 2.5,
-                .max_radial = 4,
-                .max_angular = 9,
-                .atomic_gaussian_width = 0.15,
+                .cutoff_radius = 3.5,
+                .max_radial = 6,
+                .max_angular = 12,
+                .atomic_gaussian_width = 0.2,
                 .center_atom_weight = 1.0,
                 .species = species,
                 .neighspe = species,
                 .radial_basis = {.type = "Gto", .spline_accuracy = 1E-6 },
-                .cutoff_function = {.type = "ShiftedCosine", .width = 0.1 }
+                .cutoff_function = {.type = "ShiftedCosine", .width = 0.7 }
             };
 
             metatensor::TensorMap descriptor = SALTED_Utils::calculate_SOAP_Powerspectrum(SALTED_Utils::gen_featomic_system(wfn), hyperparams);
@@ -2356,16 +2465,22 @@ void options::digest_options()
         else if (temp == "-group")
         {
             int n = 1;
-            while (i + n < argc && string(arguments[i + n]).find("-") == string::npos)
+            while (i + n < argc)
             {
+                const string& group_arg = arguments[i + n];
+                // Olex2 can emit a bare -group followed by an empty argument.
+                // Do not index or parse an empty string: doing so corrupts the
+                // CRT state and later manifests as a stack-buffer-overrun.
+                if (group_arg.empty() || group_arg.find("-") != string::npos)
+                    break;
                 int group;
-                if (arguments[i + 1][0] == '+')
-                    group = -stoi(arguments[i + n]);
+                if (group_arg[0] == '+')
+                    group = -stoi(group_arg);
                 else
-                    group = stoi(arguments[i + n]);
+                    group = stoi(group_arg);
                 groups[0].push_back(group), n++;
             }
-            i += n;
+            i += n - 1;
         }
         else if (temp == "-HDEF")
             properties.hdef = true;
@@ -2851,15 +2966,42 @@ void options::digest_options()
         else if (temp == "-tscb")
         {
             std::filesystem::path name = arguments[i + 1];
-            tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
             string cif_name = "test.cif";
             if (name.extension() == ".tscb")
+            {
+                tsc_block<int, cdouble> blocky = read_tsc_table(name);
                 blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
+            }
             else if (name.extension() == ".tsc")
+            {
+                tsc_block<int, cdouble> blocky = read_tsc_table(name);
                 blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
+            }
             else
                 err_checkf(false, "Wrong file ending!", std::cout);
             exit(0);
+        }
+        else if (temp == "-tsc_labels")
+        {
+            const bool has_table_and_cif =
+                i + 2 < argc &&
+                arguments[i + 1].find('-') != 0 &&
+                arguments[i + 2].find('-') != 0;
+
+            if (has_table_and_cif)
+            {
+                const std::filesystem::path table = arguments.at(i + 1);
+                const std::filesystem::path cif_file = arguments.at(i + 2);
+                std::filesystem::path output = table;
+                output.replace_extension(".labels.tsc");
+                if (i + 3 < argc && arguments[i + 3].find('-') != 0)
+                    output = arguments[i + 3];
+                if (!convert_tsc_ids_to_labels(table, cif_file, output, std::cout))
+                    exit(1);
+                exit(0);
+            }
+
+            label_tsc_output = true;
         }
         else if (temp == "-test_RI")
         {
@@ -2887,6 +3029,11 @@ void options::digest_options()
         {
             wfn = arguments[i + 1];
             err_checkf(std::filesystem::exists(wfn), "Wavefunction does not exist!", std::cout);
+        }
+        else if (temp == "-cube_density" || temp == "-cube")
+        {
+            cube_density = arguments[i + 1];
+            err_checkf(std::filesystem::exists(cube_density), "Cube density file does not exist!", std::cout);
         }
         else if (temp == "-wfn_cif")
         {
@@ -2968,6 +3115,17 @@ void options::digest_options()
             get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
             exit(0);
         }
+    }
+
+    // SALTED predicts a density from atom positions.  Historically its
+    // calculation path read those positions through -wfn, although the CLI
+    // also documents -xyz for SALTED input.  Accept the documented form and
+    // preserve an explicitly supplied -wfn when both options are present.
+    if (SALTED && wfn.empty() && !xyz_file.empty())
+    {
+        wfn = xyz_file;
+        if (debug)
+            log_file << "Using -xyz input as the SALTED structure: " << wfn << endl;
     }
 };
 
@@ -3549,10 +3707,14 @@ double vec_length(const vec &in)
 }
 
 namespace {
+    // Captured during static initialisation, so it still refers to the console after
+    // run_app() has redirected std::cout into NoSpherA2.log. A function local static
+    // would only be captured on the first error, by which time the redirect has happened
+    // and every error message would end up in the log file instead of on the console.
+    std::streambuf *const initial_coutbuf = std::cout.rdbuf();
     std::streambuf *original_coutbuf()
     {
-        static std::streambuf *buf = std::cout.rdbuf();
-        return buf;
+        return initial_coutbuf;
     }
 }
 

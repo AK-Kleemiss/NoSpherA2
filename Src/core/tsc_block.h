@@ -12,6 +12,12 @@
 using ScattererLabel = std::variant<std::string, atomID>;
 using ScattererLabels = std::vector<ScattererLabel>;
 
+// CCTBX smtbx::structure_factors::table_based::table_reader reads each
+// SCATTERER_IDS entry as a raw scatterer_id_big (three int32 coordinates,
+// one int16 data field, Z, and reserved), i.e. exactly 16 bytes.
+static_assert(sizeof(atomID) == 16,
+    "atomID must remain binary-compatible with CCTBX scatterer_id_big");
+
 template <typename T>
 concept ScattererValue =
 std::same_as<std::remove_cv_t<T>, std::string> ||
@@ -292,6 +298,28 @@ private:
         write_bytes(out, payload.data(), payload.size());
     }
 
+    [[nodiscard]] std::string binary_header() const
+    {
+        std::istringstream input(header_);
+        std::string result = uses_ids() ? "SCATTERER_IDS" : "";
+        std::string line;
+
+        // The scatterer encoding is a property of the data, rather than a
+        // caller-supplied header detail. Remove any stale marker; the
+        // matching marker, when needed, was written as the first line above.
+        while (std::getline(input, line))
+        {
+            if (line == "SCATTERER_IDS")
+                continue;
+
+            if (!result.empty())
+                result.push_back('\n');
+            result += line;
+        }
+
+        return result;
+    }
+
     void read_binary_scatterers(std::istream& in)
     {
         const std::int32_t count = read_scalar<std::int32_t>(in);
@@ -508,6 +536,11 @@ public:
                 row.push_back(read_scalar<std::complex<double>>(in));
         }
 
+        // A valid TSCB stream should be consumed exactly here. Trailing bytes
+        // indicate an incompatible layout (for example, wrong HKL index width).
+        if (in.peek() != std::char_traits<char>::eof())
+            throw std::runtime_error("Unexpected trailing bytes in TSCB file; incompatible binary layout");
+
         validate_dimensions();
     }
 
@@ -712,10 +745,11 @@ public:
         std::ofstream out(name, std::ios::binary | std::ios::trunc);
         check_stream(out, "Failed to open TSCB file for writing");
 
+        const std::string binary_file_header = binary_header();
         const std::int32_t header_size =
-            checked_binary_size(header_.size(), "Header size");
+            checked_binary_size(binary_file_header.size(), "Header size");
         write_scalar(out, header_size);
-        write_bytes(out, header_.data(), header_.size());
+        write_bytes(out, binary_file_header.data(), binary_file_header.size());
 
         write_binary_scatterers(out);
 

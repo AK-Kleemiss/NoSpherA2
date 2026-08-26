@@ -1,7 +1,15 @@
 # Unit Test Status
-**Last updated: 2026-07-03** (pruned 4 stale `tests.toml` entries with non-existent CLI flags;
-regenerated `alanine_integrated_occ.good`; **201/201 ctest passing** after full rebuild — see
-Known Issues for a same-day transient 13-failure episode against a stale/partial build)
+**Last updated: 2026-08-15** (added `AtomTest.ID_IsRebuiltWhenCIFPartChanges`, made the
+CIF reader store and immediately rebuild its PART-aware `SCATTERER_ID`, and moved PART filtering ahead of WFN matching
+to prevent another PART from overwriting atom IDs during `-mtc`; validation pending.)
+
+The previous 2026-08-02 update
+`TscBlockTests.BinaryFileRoundTripsWith32BitSizes` so `SCATTERER_IDS` is inferred from
+`atomID` payloads, matching CCTBX `table_based::table_reader` for both `.tsc` and `.tscb`.
+`Nbo47.EpoxideGennboMatchesReferenceWhenAvailable` now skips when its optional
+`reference.nbo` fixture is absent. NBO File47 tests now use per-process temporary directories,
+preventing parallel CTest runs from deleting each other's generated files. Last full validated
+baseline remains **201/201 ctest passing**.
 
 ## Test Harnesses
 

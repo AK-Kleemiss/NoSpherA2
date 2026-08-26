@@ -696,6 +696,7 @@ struct options
     std::vector<std::shared_ptr<BasisSet>> aux_basis;
     std::filesystem::path wfn;
     std::filesystem::path wfn2;
+    std::filesystem::path cube_density;
     std::filesystem::path fchk;
     std::string basis_set;
     std::filesystem::path hkl;
@@ -731,6 +732,7 @@ struct options
     bool no_date = false;
     bool gbw2wfn = false;
     bool old_tsc = false;
+    bool label_tsc_output = false;
     bool write_CIF = false;
     bool test = false;
     bool electron_diffraction = false;

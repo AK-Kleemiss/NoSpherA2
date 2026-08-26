@@ -16,6 +16,7 @@
 #include "basis_set.h"
 #include "SALTED_utilities.h"
 #include "GridManager.h"
+#include "cube.h"
 
 
 #ifdef PEOJECT_NAME
@@ -461,17 +462,27 @@ void generate_hkl(const double& dmin,
 	file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
 	i3 hkl_;
 	string line, temp;
+	/* A reflection with spacing d has |h| <= a/d, and likewise for k and l with
+	b and c, in any cell: the bound is the real-space axis length times the
+	reciprocal radius. It is tight, so the loops have to reach it. They used to
+	stop one short and lean on a 0.01 A widening of dmin to make the difference
+	up, which is not the same thing - the slack that buys scales with the axis
+	length, so it covers the shortfall on a long axis and not on a short one.
+	For a dynamical calculation the list has to be complete rather than nearly
+	so: a single index the table misses is a failed refinement, not a slightly
+	worse number.
+	*/
 	const ivec extreme = {
-		int(unit_cell.get_a() / (dmin - 0.01)),
-		int(unit_cell.get_b() / (dmin - 0.01)),
-		int(unit_cell.get_c() / (dmin - 0.01)) };
+		int(std::floor(unit_cell.get_a() / dmin)),
+		int(std::floor(unit_cell.get_b() / dmin)),
+		int(std::floor(unit_cell.get_c() / dmin)) };
 	if (debug)
 		file << "extreme: " << extreme[0] << " " << extreme[1] << " " << extreme[2] << endl;
-	for (int h = -extreme[0]; h < extreme[0]; h++)
+	for (int h = -extreme[0]; h <= extreme[0]; h++)
 	{
-		for (int k = -extreme[1]; k < extreme[1]; k++)
+		for (int k = -extreme[1]; k <= extreme[1]; k++)
 		{
-			for (int l = -extreme[2]; l < extreme[2]; l++)
+			for (int l = -extreme[2]; l <= extreme[2]; l++)
 			{
 				hkl_ = { h, k, l };
 				hkl.emplace(hkl_);
@@ -574,8 +585,20 @@ void generate_hkl(const ivec2& hkl_min_max,
 	int h_max = std::max(abs(hkl_min_max[0][1]), abs(hkl_min_max[0][0])),
 		k_max = std::max(abs(hkl_min_max[1][1]), abs(hkl_min_max[1][0])),
 		l_max = std::max(abs(hkl_min_max[2][1]), abs(hkl_min_max[2][0]));
-	if (ED)
+	/* Doubling each axis of the measured box is not the same set as the
+	reflections out to half the measured spacing, and it is the latter a
+	dynamical calculation asks for. A box and a resolution shell are different
+	shapes: the shell reaches further along the shorter axes, so this leaves a
+	gap there. Olex2 sends -dmin for ED, which takes precedence over the box
+	and generates the right set; this stays for callers that pass only a box,
+	and says so rather than looking complete.
+	*/
+	if (ED) {
 		h_max *= 2, k_max *= 2, l_max *= 2;
+		file << "Warning: an ED table generated from an index box alone may be "
+			"short along the shorter axes; pass -dmin to generate to a resolution "
+			"instead.\n";
+	}
 	file << "Generating hkl between ["
 		<< setw(2) << -h_max << "," << setw(2) << h_max << "] ; ["
 		<< setw(2) << -k_max << "," << setw(2) << k_max << "] ; ["
@@ -918,13 +941,27 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
 				int group_nr = 0;
-				if (group_field != -1 && fields[group_field] != ".") {
+				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?") {
 					group_nr = std::stoi(fields[group_field]);
 				}
+				// Filter PART before matching this CIF row to a WFN atom.  Disorder
+				// positions can be close enough to match an atom in another PART;
+				// doing this after the match overwrites that atom's coordinates/ID and
+				// corrupts the duplicate check of a later -mtc fragment.
+				if (!input_groups.empty() && group_field != -1 &&
+					std::find(input_groups.begin(), input_groups.end(), group_nr) == input_groups.end())
+				{
+					if (debug)
+						file << "Wrong part!" << endl;
+					getline(cif_input, line);
+					continue;
+				}
 				bool old_atom = false;
-				std::string atom_ID = atomID(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]),
+				const atomID cif_atom_id(
+					stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]),
 					group_nr,
-					constants::get_Z_from_label(fields[type_field].c_str()) + 1).to_hex_string();
+					constants::get_Z_from_label(fields[type_field].c_str()) + 1);
+				const std::string atom_ID = cif_atom_id.to_hex_string();
 #pragma omp parallel for reduction(|| : old_atom)
 				for (int run = 0; run < known_atoms.size(); run++)
 				{
@@ -945,12 +982,21 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				{
 					for (int j = 0; j < 3; j++)
 					{
-						tolerances[j] = 2 * max(min(abs(precisions[j]), 1.0), 0.01);
+						/* The cap has to be well inside a bond length. It is derived
+						from the fractional precision, so it grows with the cell: on a
+						55-68 A protein cell it reached 1.3 A per axis and matched
+						HB_A:53 to a carbon 0.83 A away, after which the element test
+						dropped the atom as a mismatch. The cif and the xyz describe
+						the same model, so they agree far better than this.
+						*/
+						tolerances[j] = 2 * max(min(abs(precisions[j]), 0.1), 0.01);
 					}
 					if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
 					{
 						wave.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
                         wave.set_atom_group_nr(i, group_nr);
+						// Store exactly the identifier used above for the MTC duplicate check.
+						wave.set_id_for_atom(i, cif_atom_id);
 						string element = constants::atnr2letter(wave.get_atom_charge(i));
 						err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
 						string label = fields[label_field];
@@ -969,32 +1015,6 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								file << " checking disorder group: " << fields[group_field] << " vs. ";
 								for (int g = 0; g < input_groups.size(); g++)
 									file << input_groups[g] << ",";
-							}
-						}
-						if (input_groups.size() > 0)
-						{
-							bool yep = false;
-							for (int g = 0; g < input_groups.size(); g++)
-							{
-								if (group_field == -1) {
-									yep = true;
-									break;
-								}
-								if (fields[group_field].c_str()[0] == '.' && input_groups[g] == 0)
-								{
-									if (debug)
-										file << "appears to be group 0" << endl;
-									yep = true;
-									break;
-								}
-								else if (stoi(fields[group_field]) == input_groups[g])
-									yep = true;
-							}
-							if (!yep)
-							{
-								if (debug)
-									file << "Wrong part!" << endl;
-								continue;
 							}
 						}
 						if (label.find(element) == string::npos || label.find(element) > 2)
@@ -2127,6 +2147,159 @@ int make_atomic_grids_wrapper(
 	return grid_manager.getTotalGridPoints();
 }
 
+itsc_block calculate_scattering_factors_from_cube(
+	options& opt,
+	WFN& wave,
+	const cube& density_cube,
+	std::ostream& file)
+{
+	using namespace std;
+	err_checkf(opt.cif != "", "Cube-density SF calculation requires -cif.", file);
+	err_checkf(filesystem::exists(opt.cif), "CIF " + opt.cif.string() + " does not exists!", file);
+	err_checkf(!opt.groups.empty() && !opt.groups[0].empty(), "No CIF disorder group selected. Use -group 0 for the default group.", file);
+	err_checkf(wave.get_ncen() != 0, "Cube file does not contain atom definitions in the header.", file);
+
+	vector<_time_point> time_points;
+	vector<string> time_descriptions;
+	time_points.push_back(get_time());
+
+	cell unit_cell(opt.cif, file, opt.debug);
+	ifstream cif_input(opt.cif.c_str(), ios::in);
+	ivec atom_type_list;
+	ivec asym_atom_to_type_list;
+	ivec asym_atom_list;
+	bvec needs_grid(wave.get_ncen(), false);
+	svec known_atoms;
+
+	auto labels = read_atoms_from_CIF(cif_input,
+		opt.groups[0],
+		unit_cell,
+		wave,
+		known_atoms,
+		atom_type_list,
+		asym_atom_to_type_list,
+		asym_atom_list,
+		needs_grid,
+		file,
+		opt.debug);
+
+	cif_input.close();
+	time_points.push_back(get_time());
+	time_descriptions.push_back("cif reading");
+
+	vec2 k_pt;
+	hkl_list hkl;
+	if (opt.m_hkl_list.size() != 0)
+	{
+		hkl = opt.m_hkl_list;
+	}
+	else if (opt.read_k_pts == false)
+	{
+		if (opt.dmin != 99.0)
+		{
+			if (opt.electron_diffraction)
+				generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+			else
+				generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+		}
+		else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+		{
+			generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
+		}
+		else
+		{
+			read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+		}
+		opt.m_hkl_list = hkl;
+	}
+
+	make_k_pts(
+		hkl.size() == 0,
+		opt.save_k_pts,
+		unit_cell,
+		hkl,
+		k_pt,
+		file,
+		opt.debug);
+
+	time_points.push_back(get_time());
+	time_descriptions.push_back("k-points preparation");
+
+	GridConfiguration config;
+	config.accuracy = opt.accuracy;
+	config.partition_type = opt.partition_type;
+	config.pbc = opt.pbc;
+	config.debug = opt.debug;
+	config.all_charges = opt.all_charges;
+	config.no_density_eval = true;
+
+	GridManager grid_manager(config);
+	grid_manager.setup3DGridsForMolecule(wave, asym_atom_list, needs_grid, unit_cell, false);
+	grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
+
+	vec2 d1, d2, d3, dens;
+	vec atom_electrons;
+	grid_manager.getDensityVectorsFromCube(wave, asym_atom_list, density_cube, d1, d2, d3, dens, atom_electrons);
+	time_points.push_back(get_time());
+	time_descriptions.push_back("combined density vectors");
+
+	file << "Table of Charges in electrons\n"
+		<< setw(10) << "Atom" << setw(12) << "CubePart" << endl;
+	for (int i = 0; i < labels.size(); i++)
+	{
+		const int atom_index = asym_atom_list[i];
+		file << setw(10) << labels[i]
+			<< fixed << setw(12) << setprecision(3) << wave.get_atom_charge(atom_index) - atom_electrons[i] << endl;
+	}
+	const double electron_sum = reduce(atom_electrons.begin(), atom_electrons.end(), 0.0);
+	file << setprecision(4) << "Total number of partitioned electrons from cube: " << electron_sum << endl;
+	time_points.push_back(get_time());
+	time_descriptions.push_back("calculate charges");
+
+	cvec2 sf;
+	_time_point end1;
+	calc_SF(grid_manager.getTotalGridPoints(),
+		k_pt,
+		d1, d2, d3, dens,
+		sf,
+		file,
+		time_points.front(),
+		end1,
+		opt.debug,
+		opt.no_date);
+	time_points.push_back(get_time());
+	time_descriptions.push_back("Fourier transform");
+
+	if (opt.electron_diffraction)
+	{
+		convert_to_ED(asym_atom_list, wave, sf, unit_cell, hkl);
+	}
+
+	itsc_block blocky;
+	if (opt.label_tsc_output)
+	{
+		blocky = itsc_block(sf, labels, hkl);
+	}
+	else
+	{
+		vector<atomID> ids(asym_atom_list.size());
+		for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++)
+		{
+			ids[atm_idx] = wave.get_id_for_atom(asym_atom_list[atm_idx]);
+		}
+		blocky = itsc_block(sf, ids, hkl);
+	}
+	time_points.push_back(get_time());
+	time_descriptions.push_back("tsc calculation");
+
+	if (!opt.no_date)
+	{
+		write_timing_to_file(file, time_points, time_descriptions);
+	}
+
+	return blocky;
+}
+
 /**
  * @brief Calculates scattering factors using the provided calculator and options.
  *
@@ -2472,20 +2645,19 @@ tsc_block_type calculate_scattering_factors(
             hkl);
     }
 
-	std::vector<atomID> IDs(asym_atom_list.size());
-	for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++) {
-		IDs[atm_idx] = wavy->get_id_for_atom(asym_atom_list[atm_idx]);
+	tsc_block_type blocky;
+	if (opt.label_tsc_output)
+	{
+		blocky = tsc_block_type(sf, labels, hkl);
 	}
-
-  //  tsc_block_type blocky(
-  //      sf,
-  //      IDs,
-  //      hkl,
-		//"SCATTERER_IDS");
-    tsc_block_type blocky(
-        sf,
-        labels,
-        hkl);
+	else
+	{
+		std::vector<atomID> IDs(asym_atom_list.size());
+		for (int atm_idx = 0; atm_idx < asym_atom_list.size(); atm_idx++) {
+			IDs[atm_idx] = wavy->get_id_for_atom(asym_atom_list[atm_idx]);
+		}
+		blocky = tsc_block_type(sf, IDs, hkl);
+	}
 
 
     if (opt.needs_Thakkar_fill)

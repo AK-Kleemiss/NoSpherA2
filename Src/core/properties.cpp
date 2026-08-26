@@ -564,8 +564,14 @@ void Calc_Prop(
 
     rho_contrib.evaluate_on_grid(
         [&](const d3 &pos_grid, const i3 &, const i3 &mapped_idx) {
-            if (!is_within_radius(pos_grid, atoms, radius_bohr))
+            if (!is_within_radius(pos_grid, atoms, radius_bohr)) {
+                // RDG visualizations use 101.0 as an explicit mask value outside
+                // the calculation radius. Other properties retain their zero
+                // background.
+                if (Cubes[cube_type::RDG].get_loaded())
+                    Cubes[cube_type::RDG].set_value(mapped_idx[0], mapped_idx[1], mapped_idx[2], 101.0);
                 return 0.0;
+            }
 
             const PropValues values = compute_prop_values(Cubes, wavy, pos_grid);
             accumulate_prop_values(Cubes, mapped_idx, values);
