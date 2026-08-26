@@ -543,7 +543,6 @@ void XCW::eval_DW(cvec2& DW_fact) {
 	DW_fact.resize(cryst.ncen, cvec(cryst.nr, 0));
 	//Converts angstrom to bohr OR MORE IMPORTANTLY reciprocal bohr to reciprocal angstrom
 	const double angstrom2bohr = constants::ang2bohr(1);
-	const double scale = angstrom2bohr / constants::TWO_PI;
 	std::vector<int> level;
 	level.reserve(cryst.ncen);
 	//Figure out which level of anisotropic displacements parameters are avaialable
@@ -576,8 +575,8 @@ void XCW::eval_DW(cvec2& DW_fact) {
 		q[h][1] = k_pt[1][h];
 		q[h][2] = k_pt[2][h];
 	}
-	std::transform(q.begin(), q.end(), q.begin(), [scale](std::vector<double>& vec) {
-		std::transform(vec.begin(), vec.end(), vec.begin(), [scale](double x) { return x * scale; });
+	std::transform(q.begin(), q.end(), q.begin(), [angstrom2bohr](std::vector<double>& vec) {
+		std::transform(vec.begin(), vec.end(), vec.begin(), [angstrom2bohr](double x) { return x * angstrom2bohr; });
 		return vec; });
 	for (int a = 0; a < cryst.ncen; a++) {
 		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
@@ -592,7 +591,7 @@ void XCW::eval_DW(cvec2& DW_fact) {
 			// Isotropic
 			double U = cryst.U_iso[a], temp;
 			for (int r = 0; r < cryst.nr; r++) {
-				temp = -0.5 * (constants::TWO_PI * constants::TWO_PI) * U * (q[r][0] * q[r][0] + q[r][1] * q[r][1] + q[r][2] * q[r][2]);
+				temp = -0.5 * U * (q[r][0] * q[r][0] + q[r][1] * q[r][1] + q[r][2] * q[r][2]);
 				DW_fact[a][r] = std::exp(temp);
 			}
 			break;
@@ -602,7 +601,7 @@ void XCW::eval_DW(cvec2& DW_fact) {
 			double temp1;
 			for (int h = 0; h < cryst.nr; h++) {
 				vec q_ = { q[h][0], q[h][1], q[h][2] };
-				temp1 = -0.5 * (constants::TWO_PI * constants::TWO_PI) * dot_BLAS(dot(Uij, q_, true), q_, false);
+				temp1 = -0.5 * dot_BLAS(dot(Uij, q_, true), q_, false);
 				DW_fact[a][h] = std::exp(temp1);
 			}
 			break;
@@ -612,8 +611,11 @@ void XCW::eval_DW(cvec2& DW_fact) {
 			double temp1, temp2;
 			for (int h = 0; h < cryst.nr; h++) {
 				vec q_ = { q[h][0], q[h][1], q[h][2] };
-				temp1 = -0.5 * (constants::TWO_PI * constants::TWO_PI) * dot_BLAS(dot(Uij, q_, true), q_, false);
-				temp2 = -1.0 / 6.0 * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
+				//temp2 = -1.0 / 6.0 * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
+				//	+ 3 * ADPs[1][1] * q_[0] * q_[0] * q_[1] + 3 * ADPs[1][2] * q_[0] * q_[0] * q_[2] + 3 * ADPs[1][3] * q_[0] * q_[1] * q_[1] + 3 * ADPs[1][5] * q_[0] * q_[2] * q_[2] + 3 * ADPs[1][7] * q_[1] * q_[1] * q_[2] + 3 * ADPs[1][8] * q_[1] * q_[2] * q_[2]
+				//	+ 6 * ADPs[1][4] * q_[0] * q_[1] * q_[2]);
+				temp1 = -0.5 * dot_BLAS(dot(Uij, q_, true), q_, false);
+				temp2 = -1.0 / 6.0 * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
 					+ 3 * ADPs[1][1] * q_[0] * q_[0] * q_[1] + 3 * ADPs[1][2] * q_[0] * q_[0] * q_[2] + 3 * ADPs[1][3] * q_[0] * q_[1] * q_[1] + 3 * ADPs[1][5] * q_[0] * q_[2] * q_[2] + 3 * ADPs[1][7] * q_[1] * q_[1] * q_[2] + 3 * ADPs[1][8] * q_[1] * q_[2] * q_[2]
 					+ 6 * ADPs[1][4] * q_[0] * q_[1] * q_[2]);
 				DW_fact[a][h] = std::exp(temp1) * cdouble(1, temp2);
@@ -625,11 +627,18 @@ void XCW::eval_DW(cvec2& DW_fact) {
 			double temp1, temp2, temp3;
 			for (int h = 0; h < cryst.nr; h++) {
 				vec q_ = { q[h][0], q[h][1], q[h][2] };
-				temp1 = -0.5 * (constants::TWO_PI * constants::TWO_PI) * dot_BLAS(dot(Uij, q_, true), q_, false);
-				temp2 = -1.0 / 6.0 * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
+				//temp2 = -1.0 / 6.0 * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
+				//	+ 3 * ADPs[1][1] * q_[0] * q_[0] * q_[1] + 3 * ADPs[1][2] * q_[0] * q_[0] * q_[2] + 3 * ADPs[1][3] * q_[0] * q_[1] * q_[1] + 3 * ADPs[1][5] * q_[0] * q_[2] * q_[2] + 3 * ADPs[1][7] * q_[1] * q_[1] * q_[2] + 3 * ADPs[1][8] * q_[1] * q_[2] * q_[2]
+				//	+ 6 * ADPs[1][4] * q_[0] * q_[1] * q_[2]);
+				//temp3 = (1.0 / 24.0) * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[2][0] * q_[0] * q_[0] * q_[0] * q_[0] + 4.0 * ADPs[2][1] * q_[0] * q_[0] * q_[0] * q_[1] + 4.0 * ADPs[2][2] * q_[0] * q_[0] * q_[0] * q_[2]
+				//	+ 6.0 * ADPs[2][3] * q_[0] * q_[0] * q_[1] * q_[1] + 12.0 * ADPs[2][4] * q_[0] * q_[0] * q_[1] * q_[2] + 6.0 * ADPs[2][5] * q_[0] * q_[0] * q_[2] * q_[2] + 4.0 * ADPs[2][6] * q_[0] * q_[1] * q_[1] * q_[1] + 12.0 * ADPs[2][7] * q_[0] * q_[1] * q_[1] * q_[2]
+				//	+ 12.0 * ADPs[2][8] * q_[0] * q_[1] * q_[2] * q_[2] + 4.0 * ADPs[2][9] * q_[0] * q_[2] * q_[2] * q_[2] + ADPs[2][10] * q_[1] * q_[1] * q_[1] * q_[1] + 4.0 * ADPs[2][11] * q_[1] * q_[1] * q_[1] * q_[2] + 6.0 * ADPs[2][12] * q_[1] * q_[1] * q_[2] * q_[2]
+				//	+ 4.0 * ADPs[2][13] * q_[1] * q_[2] * q_[2] * q_[2] + ADPs[2][14] * q_[2] * q_[2] * q_[2] * q_[2]);
+				temp1 = -0.5 * dot_BLAS(dot(Uij, q_, true), q_, false);
+				temp2 = -1.0 / 6.0 * (ADPs[1][0] * q_[0] * q_[0] * q_[0] + ADPs[1][6] * q_[1] * q_[1] * q_[1] + ADPs[1][9] * q_[2] * q_[2] * q_[2]
 					+ 3 * ADPs[1][1] * q_[0] * q_[0] * q_[1] + 3 * ADPs[1][2] * q_[0] * q_[0] * q_[2] + 3 * ADPs[1][3] * q_[0] * q_[1] * q_[1] + 3 * ADPs[1][5] * q_[0] * q_[2] * q_[2] + 3 * ADPs[1][7] * q_[1] * q_[1] * q_[2] + 3 * ADPs[1][8] * q_[1] * q_[2] * q_[2]
 					+ 6 * ADPs[1][4] * q_[0] * q_[1] * q_[2]);
-				temp3 = (1.0 / 24.0) * (constants::TWO_PI * constants::TWO_PI * constants::TWO_PI * constants::TWO_PI) * (ADPs[2][0] * q_[0] * q_[0] * q_[0] * q_[0] + 4.0 * ADPs[2][1] * q_[0] * q_[0] * q_[0] * q_[1] + 4.0 * ADPs[2][2] * q_[0] * q_[0] * q_[0] * q_[2]
+				temp3 = (1.0 / 24.0) * (ADPs[2][0] * q_[0] * q_[0] * q_[0] * q_[0] + 4.0 * ADPs[2][1] * q_[0] * q_[0] * q_[0] * q_[1] + 4.0 * ADPs[2][2] * q_[0] * q_[0] * q_[0] * q_[2]
 					+ 6.0 * ADPs[2][3] * q_[0] * q_[0] * q_[1] * q_[1] + 12.0 * ADPs[2][4] * q_[0] * q_[0] * q_[1] * q_[2] + 6.0 * ADPs[2][5] * q_[0] * q_[0] * q_[2] * q_[2] + 4.0 * ADPs[2][6] * q_[0] * q_[1] * q_[1] * q_[1] + 12.0 * ADPs[2][7] * q_[0] * q_[1] * q_[1] * q_[2]
 					+ 12.0 * ADPs[2][8] * q_[0] * q_[1] * q_[2] * q_[2] + 4.0 * ADPs[2][9] * q_[0] * q_[2] * q_[2] * q_[2] + ADPs[2][10] * q_[1] * q_[1] * q_[1] * q_[1] + 4.0 * ADPs[2][11] * q_[1] * q_[1] * q_[1] * q_[2] + 6.0 * ADPs[2][12] * q_[1] * q_[1] * q_[2] * q_[2]
 					+ 4.0 * ADPs[2][13] * q_[1] * q_[2] * q_[2] * q_[2] + ADPs[2][14] * q_[2] * q_[2] * q_[2] * q_[2]);
@@ -644,23 +653,12 @@ void XCW::eval_DW(cvec2& DW_fact) {
 
 void XCW::eval_phase(cvec2& phase_fact) {
 	phase_fact.resize(cryst.ncen, cvec(cryst.nr, 0));
-	const double bohr2angstrom = constants::bohr2ang(1);
-	const double angstrom2bohr = constants::ang2bohr(1);
-	const double scale = angstrom2bohr / constants::TWO_PI;
 	cdouble exponent;
-	vec2 cm = { { unit_cell.get_cm(0,0), unit_cell.get_cm(0,1), unit_cell.get_cm(0,2)},
-							{ unit_cell.get_cm(1,0), unit_cell.get_cm(1,1), unit_cell.get_cm(1,2)},
-							{ unit_cell.get_cm(2,0), unit_cell.get_cm(2,1), unit_cell.get_cm(2,2)} };
-	std::transform(cm.begin(), cm.end(), cm.begin(), [bohr2angstrom](std::vector<double>& vec) {
-		std::transform(vec.begin(), vec.end(), vec.begin(), [bohr2angstrom](double x) { return x * bohr2angstrom; });
-		return vec; });
 	for (int at = 0; at < cryst.ncen; at++) {
-		vec pos_frac = { asym_atoms[at].frac_pos[0], asym_atoms[at].frac_pos[1], asym_atoms[at].frac_pos[2] };
-		vec new_pos_cart = dot(cm, pos_frac, true);
+		vec pos_cart = { asym_atoms[at].pos[0], asym_atoms[at].pos[1], asym_atoms[at].pos[2] };
 		for (int r = 0; r < cryst.nr; r++) {
 			vec q = { k_pt[0][r], k_pt[1][r], k_pt[2][r] };
-			std::transform(q.begin(), q.end(), q.begin(), [scale](double x) { return x * scale; });
-			exponent = cdouble(0, constants::TWO_PI * dot_BLAS(q, new_pos_cart, false));
+			exponent = cdouble(0, dot_BLAS(q, pos_cart, false));
 			phase_fact[at][r] = std::exp(exponent);
 		}
 	}
@@ -670,7 +668,6 @@ void XCW::eval_translation_phase(cvec2& translation_phase) {
 	translation_phase.resize(cryst.nr_small, cvec(unit_cell.get_trans()[0].size(), 0));
 	const double angstrom2bohr = constants::ang2bohr(1);
 	const double bohr2angstrom = constants::bohr2ang(1);
-	const double scale = angstrom2bohr / constants::TWO_PI;
 	vec2 trans = unit_cell.get_trans();
 	vec2 cm = { { unit_cell.get_cm(0,0), unit_cell.get_cm(0,1), unit_cell.get_cm(0,2)},
 								  { unit_cell.get_cm(1,0), unit_cell.get_cm(1,1), unit_cell.get_cm(1,2)},
@@ -681,11 +678,11 @@ void XCW::eval_translation_phase(cvec2& translation_phase) {
 	for (int r = 0; r < cryst.nr_small; r++) {
 		ivec asym_list = generate_asym_lookup(r);
 		vec q_temp = { k_pt[0][asym_list[0]], k_pt[1][asym_list[0]], k_pt[2][asym_list[0]] };
-		std::transform(q_temp.begin(), q_temp.end(), q_temp.begin(), [scale](double x) { return x * scale; });
+		std::transform(q_temp.begin(), q_temp.end(), q_temp.begin(), [angstrom2bohr](double x) { return x * angstrom2bohr; });
 		for (int t = 0; t < trans[0].size(); t++) {
 			vec trans_temp = { trans[0][t], trans[1][t], trans[2][t] };
 			trans_temp = dot(cm, trans_temp, true);
-			cdouble exponent(0, constants::TWO_PI * dot_BLAS(q_temp, trans_temp, false));
+			cdouble exponent(0, dot_BLAS(q_temp, trans_temp, false));
 			translation_phase[r][t] = std::exp(exponent);
 		}
 	}
@@ -1276,7 +1273,6 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			const double& np0 = nu_prims.pos[0];
 			const double& np1 = nu_prims.pos[1];
 			const double& np2 = nu_prims.pos[2];
-
 			const double dist0 = mp0 - np0;
 			const double dist1 = mp1 - np1;
 			const double dist2 = mp2 - np2;
@@ -1315,28 +1311,34 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 	}
 
-	// Precompute mu_vals for all grids
+	// Grid screening
 	constexpr double maximum_ao_grid_cutoff = 12;
 	constexpr double minimum_ao_grid_cutoff = 12;
 	double minimum_primitive_exponent = std::numeric_limits<double>::max();
-	for (const ao_data& ao_shell : ao_data_shells) {
-		for (const primitive& primitive : ao_shell.prims) {
-			minimum_primitive_exponent = std::min(minimum_primitive_exponent, primitive.get_exp());
-		}
-	}
 	vec ao_grid_cutoff_squared(cryst.nmo);
-	for (int ao = 0; ao < cryst.nmo; ao++) {
-		double ao_minimum_exponent = std::numeric_limits<double>::max();
-		for (const primitive& primitive : ao_data_shells[ao].prims) {
-			ao_minimum_exponent = std::min(ao_minimum_exponent, primitive.get_exp());
+	{
+		vec ao_minimum_exponent(cryst.nmo);
+		for (int ao = 0; ao < cryst.nmo; ao++) {
+			double min_exp = std::numeric_limits<double>::max();
+			for (const primitive& prim : ao_data_shells[ao].prims) {
+				min_exp = std::min(min_exp, prim.get_exp());
+			}
+			ao_minimum_exponent[ao] = min_exp;
+			minimum_primitive_exponent = std::min(minimum_primitive_exponent, min_exp);
 		}
-		const double adaptive_cutoff = maximum_ao_grid_cutoff * std::sqrt(minimum_primitive_exponent / ao_minimum_exponent);
-		const double cutoff = std::clamp(adaptive_cutoff, minimum_ao_grid_cutoff, maximum_ao_grid_cutoff);
-		ao_grid_cutoff_squared[ao] = cutoff * cutoff;
+		for (int ao = 0; ao < cryst.nmo; ao++) {
+			const double adaptive_cutoff = maximum_ao_grid_cutoff * std::sqrt(minimum_primitive_exponent / ao_minimum_exponent[ao]);
+			const double cutoff = std::clamp(adaptive_cutoff, minimum_ao_grid_cutoff, maximum_ao_grid_cutoff);
+			ao_grid_cutoff_squared[ao] = cutoff * cutoff;
+		}
 	}
+
 	const int n_atom_grids = std::min(n_grids, cryst.ncen);
-	vec2 grid_radial_distances(n_atom_grids);
 	ivec2 ao_prefix_end(cryst.nmo, ivec(n_atom_grids));
+	bvec2 ao_within_cutoff(cryst.nmo, bvec(n_atom_grids));
+
+	// Compute radial distance for every grid point
+	vec2 grid_radial_distances(n_atom_grids);
 	for (int g = 0; g < n_atom_grids; g++) {
 		vec& radial_distances = grid_radial_distances[g];
 		radial_distances.resize(points[g]);
@@ -1349,20 +1351,29 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			const double dz = z_ptr[p] - grid_positions[g][2];
 			radial_distances[p] = std::sqrt(dx * dx + dy * dy + dz * dz);
 		}
-		for (int ao = 0; ao < cryst.nmo; ao++) {
-			const ao_data& ao_shell = ao_data_shells[ao];
+	}
+
+#pragma omp parallel for schedule(static)
+	for (int ao = 0; ao < cryst.nmo; ao++) {
+		const ao_data& ao_shell = ao_data_shells[ao];
+		const double cutoff2 = ao_grid_cutoff_squared[ao];
+		const double cutoff = std::sqrt(cutoff2);
+		bvec& within_row = ao_within_cutoff[ao];
+		ivec& prefix_row = ao_prefix_end[ao];
+		// Compute distance between grid center and AO center
+		for (int g = 0; g < n_atom_grids; g++) {
 			const double dx = grid_positions[g][0] - ao_shell.pos[0];
 			const double dy = grid_positions[g][1] - ao_shell.pos[1];
 			const double dz = grid_positions[g][2] - ao_shell.pos[2];
-			if (dx * dx + dy * dy + dz * dz < 1e-12) {
-				const double cutoff = std::sqrt(ao_grid_cutoff_squared[ao]);
-				ao_prefix_end[ao][g] = static_cast<int>(std::upper_bound(radial_distances.begin(), radial_distances.end(), cutoff) - radial_distances.begin());
-			}
-			else {
-				ao_prefix_end[ao][g] = points[g];
-			}
+			const double d2 = dx * dx + dy * dy + dz * dz;
+			within_row[g] = d2 <= cutoff2;
+			prefix_row[g] = (d2 < 1e-12)
+				? static_cast<int>(std::upper_bound(grid_radial_distances[g].begin(), grid_radial_distances[g].end(), cutoff) - grid_radial_distances[g].begin())
+				: points[g];
 		}
 	}
+
+	// Precompute AO values
 	vec3 mu_vals(cryst.nmo, vec2(n_grids));
 #pragma omp parallel for schedule(dynamic)
 	for (mu = 0; mu < cryst.nmo; mu++) {
@@ -1379,8 +1390,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			mu_vals[mu][g].resize(points[g]);
 			double* local_mu_vals_ptr = mu_vals[mu][g].data();
 			const int prefix_end = g < n_atom_grids ? ao_prefix_end[mu][g] : points[g];
-			for (int p = 0; p < points[g]; p++) {
-				//for (int p = 0; p < prefix_end; p++) {
+			for (int p = 0; p < prefix_end; p++) {
 				d4 d_mu{ x_ptr[p] - mp0, y_ptr[p] - mp1 , z_ptr[p] - mp2 , 0 };
 				d_mu[3] = std::hypot(d_mu[0], d_mu[1], d_mu[2]);
 				if (d_mu[3] * d_mu[3] > ao_grid_cutoff_squared[mu]) {
@@ -1397,22 +1407,17 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	ivec2 active_grids(packed_size);
 	ivec skipped_grids_per_pair(packed_size, 0);
 	for (mu = 0; mu < cryst.nmo; mu++) {
+		const std::vector<bool>& mu_within = ao_within_cutoff[mu];
 		for (nu = mu; nu < cryst.nmo; nu++) {
-			const size_t pair_idx = tri_index(mu, nu);
 			if (skip[mu][nu]) {
 				continue;
 			}
+			const bvec& nu_within = ao_within_cutoff[nu];
+			const size_t pair_idx = tri_index(mu, nu);
 			ivec& pair_grids = active_grids[pair_idx];
+			pair_grids.reserve(n_atom_grids);
 			for (int g = 0; g < n_atom_grids; g++) {
-				const double mu_dx = grid_positions[g][0] - ao_data_shells[mu].pos[0];
-				const double mu_dy = grid_positions[g][1] - ao_data_shells[mu].pos[1];
-				const double mu_dz = grid_positions[g][2] - ao_data_shells[mu].pos[2];
-				const double nu_dx = grid_positions[g][0] - ao_data_shells[nu].pos[0];
-				const double nu_dy = grid_positions[g][1] - ao_data_shells[nu].pos[1];
-				const double nu_dz = grid_positions[g][2] - ao_data_shells[nu].pos[2];
-				const double distance_mu = mu_dx * mu_dx + mu_dy * mu_dy + mu_dz * mu_dz;
-				const double distance_nu = nu_dx * nu_dx + nu_dy * nu_dy + nu_dz * nu_dz;
-				if (distance_mu <= ao_grid_cutoff_squared[mu] && distance_nu <= ao_grid_cutoff_squared[nu]) {
+				if (mu_within[g] && nu_within[g]) {
 					pair_grids.push_back(g);
 				}
 			}
@@ -1425,10 +1430,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		ivec& active_aos = grid_active_aos[g];
 		vec& values = grid_ao_values[g];
 		for (int mu = 0; mu < cryst.nmo; mu++) {
-			const double dx = grid_positions[g][0] - ao_data_shells[mu].pos[0];
-			const double dy = grid_positions[g][1] - ao_data_shells[mu].pos[1];
-			const double dz = grid_positions[g][2] - ao_data_shells[mu].pos[2];
-			if (dx * dx + dy * dy + dz * dz > ao_grid_cutoff_squared[mu]) {
+			if (!ao_within_cutoff[mu][g]) {
 				continue;
 			}
 			active_aos.push_back(mu);
@@ -1436,6 +1438,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			values.insert(values.end(), values_for_ao.begin(), values_for_ao.end());
 		}
 	}
+
+	// Tile the grid points for each atom into blocks of size 64
 	struct MatrixTile {
 		int row_start;
 		int row_count;
@@ -1485,7 +1489,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		const int inner_end = static_cast<int>(std::upper_bound(radial_distances.begin(), radial_distances.end(), minimum_ao_grid_cutoff) - radial_distances.begin());
 		const int middle_end = static_cast<int>(std::upper_bound(radial_distances.begin(), radial_distances.end(), maximum_ao_grid_cutoff) - radial_distances.begin());
 		const std::array<int, 4> block_bounds{ 0, inner_end, middle_end, points[g] };
-		for (int block_index = 0; block_index < 3; ++block_index) {
+		for (int block_index = 0; block_index < 3; block_index++) {
 			const int point_start = block_bounds[block_index];
 			const int point_end = block_bounds[block_index + 1];
 			const int point_count = point_end - point_start;
@@ -1525,10 +1529,13 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 	auto start = std::chrono::high_resolution_clock::now();
 
-	// Main loop for computation of I
+	// Bookkeeping skipped pairs and grids
 	for (int mu = 0; mu < cryst.nmo; mu++) {
 		for (int nu = mu; nu < cryst.nmo; nu++) {
 			screen_counter += skip[mu][nu];
+			if (!skip[mu][nu]) {
+				skipped_grids += static_cast<long long>(num_syms) * skipped_grids_per_pair[tri_index(mu, nu)];
+			}
 		}
 	}
 #pragma omp parallel reduction(+:skipped_grids)
@@ -1539,7 +1546,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		vec phase_angles;
 		vec phase_sines;
 		vec phase_cosines;
-		vec weighted_values;
+		vec weighted_values_real;
+		vec weighted_values_imag;
 		vec tile_real_values;
 		vec tile_imag_values;
 		// One reflection's worth of tensor, used only while streaming. Each r
@@ -1552,14 +1560,10 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 #endif
 #pragma omp for schedule(dynamic, 1)
 		for (int r = 0; r < cryst.nr_small; r++) {
-
-			// Extract all k_pts needed for this r
-			for (int syms = 0; syms < num_syms; syms++) {
-				single_k_pts[syms] = { k_pt[0][asym_lookup[r][syms]], k_pt[1][asym_lookup[r][syms]], k_pt[2][asym_lookup[r][syms]] };
-			}
-
+			const int* asym_lookup_r = asym_lookup[r].data();
 			// Precompute weighted phase factors for integration
 			for (int syms = 0; syms < num_syms; syms++) {
+				single_k_pts[syms] = { k_pt[0][asym_lookup_r[syms]], k_pt[1][asym_lookup_r[syms]], k_pt[2][asym_lookup_r[syms]] };
 				for (int g = 0; g < n_grids; g++) {
 					phase[syms][g].resize(points[g]);
 					phase_angles.resize(points[g]);
@@ -1580,23 +1584,30 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					}
 				}
 			}
+			// Precompute asym factor, DW factor, phase factor products
 			for (int g = 0; g < n_atom_grids; g++) {
+				const double asym_fact = asym_atoms[g].asym_fact;
+				const cdouble* DW_fact_g = DW_fact[g].data();
+				const cdouble* phase_fact_g = phase_fact[g].data();
 				for (int syms = 0; syms < num_syms; syms++) {
-					grid_factors[syms][g] = asym_atoms[g].asym_fact * DW_fact[g][asym_lookup[r][syms]] * phase_fact[g][asym_lookup[r][syms]];
+					const int idx = asym_lookup_r[syms];
+					const double DW_im = DW_fact_g[idx].imag();
+					const double phase_im = phase_fact_g[idx].imag();
+					const double DW_re = DW_fact_g[idx].real();
+					const double phase_re = phase_fact_g[idx].real();
+					grid_factors[syms][g] = cdouble(asym_fact * (DW_re * phase_re - DW_im * phase_im),
+													asym_fact * (DW_re * phase_im + DW_im * phase_re));
 				}
 			}
 
-			for (int mu = 0; mu < cryst.nmo; mu++) {
-				for (int nu = mu; nu < cryst.nmo; nu++) {
-					if (!skip[mu][nu]) {
-						skipped_grids += static_cast<long long>(num_syms) * skipped_grids_per_pair[tri_index(mu, nu)];
-					}
-				}
-			}
-
+<<<<<<< Updated upstream
 			if (i_streamed_) std::fill(blk.begin(), blk.end(), cdouble{});
 			cdouble *const I_r = i_streamed_ ? blk.data()
 			                                 : I.data() + static_cast<size_t>(r) * packed_size;
+=======
+			// Main loop for computation of I
+			const size_t base = static_cast<size_t>(r) * packed_size;
+>>>>>>> Stashed changes
 			for (int syms = 0; syms < num_syms; syms++) {
 				for (int g = 0; g < n_atom_grids; g++) {
 					const cdouble factor = grid_factors[syms][g] * translation_phase[r][syms];
@@ -1605,36 +1616,34 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 						const int n_active = static_cast<int>(active_aos.size());
 						const int np = block.point_count;
 						const vec& ao_values = block.ao_values;
-						weighted_values.resize(ao_values.size());
+						weighted_values_real.resize(ao_values.size());
+						weighted_values_imag.resize(ao_values.size());
 						tile_real_values.resize(block.tile_result_size);
 						tile_imag_values.resize(block.tile_result_size);
 						const cdouble* phase_values = phase[syms][g].data() + block.point_start;
+
 						for (int local_mu = 0; local_mu < n_active; local_mu++) {
 							const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
-							double* weighted_row = weighted_values.data() + static_cast<size_t>(local_mu) * np;
+							double* real_weighted_row = weighted_values_real.data() + static_cast<size_t>(local_mu) * np;
+							double* imag_weighted_row = weighted_values_imag.data() + static_cast<size_t>(local_mu) * np;
 							for (int p = 0; p < np; p++) {
-								weighted_row[p] = ao_row[p] * phase_values[p].real();
+								real_weighted_row[p] = ao_row[p] * phase_values[p].real();
+								imag_weighted_row[p] = ao_row[p] * phase_values[p].imag();
 							}
 						}
+
 						for (const MatrixTile& tile : block.matrix_tiles) {
 							cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
 								ao_values.data() + static_cast<size_t>(tile.row_start) * np, np,
-								weighted_values.data() + static_cast<size_t>(tile.col_start) * np, np,
+								weighted_values_real.data() + static_cast<size_t>(tile.col_start) * np, np,
 								0.0, tile_real_values.data() + tile.result_offset, tile.col_count);
-						}
-						for (int local_mu = 0; local_mu < n_active; local_mu++) {
-							const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
-							double* weighted_row = weighted_values.data() + static_cast<size_t>(local_mu) * np;
-							for (int p = 0; p < np; p++) {
-								weighted_row[p] = ao_row[p] * phase_values[p].imag();
-							}
-						}
-						for (const MatrixTile& tile : block.matrix_tiles) {
 							cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
 								ao_values.data() + static_cast<size_t>(tile.row_start) * np, np,
-								weighted_values.data() + static_cast<size_t>(tile.col_start) * np, np,
+								weighted_values_imag.data() + static_cast<size_t>(tile.col_start) * np, np,
 								0.0, tile_imag_values.data() + tile.result_offset, tile.col_count);
 						}
+
+						// Retiling
 						for (const MatrixTile& tile : block.matrix_tiles) {
 							for (int tile_row = 0; tile_row < tile.row_count; tile_row++) {
 								const int local_mu = tile.row_start + tile_row;
@@ -1671,7 +1680,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = end - start;
-	skipped_grids_ = skipped_grids;
+	skipped_grids_ = skipped_grids * cryst.nr_small;
 	time_taken = std::chrono::duration<double>(duration).count();
 	if (!(opt->no_date) && pb) {
 		XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
@@ -2005,7 +2014,7 @@ double XCW::compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& s
 		occ::Mat G_beta = Cvir_beta.transpose() * scf.ctx.F.bottomRows(cryst.nmo) * Cocc_beta;
 		return (std::hypot(G_alpha.norm(), G_beta.norm()));
 	}
-	
+
 	// closing funciton
 }
 
