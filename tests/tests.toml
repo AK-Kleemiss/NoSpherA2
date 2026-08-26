@@ -91,6 +91,43 @@ DEF = true
 eli = true
 resolution = 1.5
 
+# Fukui functions f+/f-/f0 and the dual descriptor, frontier-orbital
+# approximation. Deliberately uses sucrose.fchk and NOT the sucrose.wfx that the
+# [properties] test above uses: that wfx stores only the 91 occupied orbitals, so
+# it has no LUMO and the Fukui functions cannot be formed from it at all. The
+# fchk carries all 432 orbitals, hence 91 occupied and 341 virtual.
+# The golden file pins the detected frontier pair (HOMO = MO 90, LUMO = MO 91)
+# and the integrated norms of f+ and f-, so it validates the frontier-orbital
+# detection and the grid integration rather than merely that the run exited 0.
+[fukui]
+directory = "sucrose_fchk_SF"
+good = "fukui.good"
+actual = "sucrose_fukui.dat"
+
+[fukui.args]
+wfn = "sucrose.fchk"
+fukui = true
+resolution = 0.8
+radius = 3.0
+
+# The same thing through the PERIODIC path, i.e. with a -cif. This is the path
+# Olex2 actually drives (cubes_maps.calculate_cubes always passes -cif), and it
+# is a different code path in cube::evaluate_on_grid: it sweeps each index over
+# [-size, 2*size) and wraps, so it costs ~27x and accumulates into shared voxels.
+# The test above, having no -cif, never touches it. Resolution is deliberately
+# coarse to keep the 27x affordable.
+[fukui_pbc]
+directory = "sucrose_fchk_SF"
+good = "fukui_pbc.good"
+actual = "sucrose_fukui.dat"
+
+[fukui_pbc.args]
+wfn = "sucrose.fchk"
+cif = "sucrose.cif"
+fukui = true
+resolution = 1.5
+radius = 2.0
+
 [intermolecular_nci]
 directory = "intermolecular_nci"
 good = "good.dat"

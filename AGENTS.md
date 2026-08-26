@@ -166,6 +166,15 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-08-25, `ctest --preset release-windows` reports **258/258 passing, 0 failed**
+(569 s; 5 skipped, all pre-existing: the four `full = true` XCW cases and the optional
+`Nbo47.EpoxideGennboMatchesReferenceWhenAvailable` fixture). This baseline includes the
+new `-fukui` feature: 7 `FukuiTests` unit cases and the `TomlIntegrationTests.Fukui` /
+`TomlIntegrationTests.FukuiPBC` golden-file cases. It also confirms that fixing
+`WFN::read_fchk` to record `path` — which changes fchk-driven cube filenames from a
+stem-less `_rho.cube` to `<stem>_rho.cube` — regressed nothing. See
+`UNIT_TESTS_STATUS.md` for the Fukui traps and the grid-convergence validation.
+
 As of 2026-07-18, `TomlIntegrationTests.P1_test_XCW` (in-process, `release-windows`,
 `OMP_NUM_THREADS=20`) passes after fixing a real access violation: `GridManager::calculateMBISWeights`/
 `calculateEMBISWeights` ignored `config_.no_density_eval` and forced an invalid WFN density

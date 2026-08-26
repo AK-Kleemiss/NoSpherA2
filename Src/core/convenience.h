@@ -77,6 +77,9 @@ struct properties_options
 	bool hirsh = false;
 	bool s_rho = false;
 	bool all_mos = false;
+	// Fukui functions f+/f-/f0 and the dual descriptor, in the
+	// frontier-orbital (frozen-orbital) approximation.
+	bool fukui = false;
 	double resolution = 0.1;
 	double radius = 2.0;
 	double integral_accuracy = -1;
@@ -94,7 +97,7 @@ struct properties_options
 	ivec MO_numbers;
 	int hirsh_number = 0;
 	bool calc() const {
-		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || MO_numbers.size() > 0;
+		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || MO_numbers.size() > 0;
 	}
 	size_t n_grid_points() const {
 		size_t result = static_cast<size_t>(NbSteps[0]) * NbSteps[1] * NbSteps[2];
@@ -854,6 +857,10 @@ struct options
     RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
     ivec3 rgbi_group_sets;
     bool fract = false;
+    // Standalone conceptual-DFT reactivity analysis (-fukui_analysis). Handled in
+    // run_app_impl rather than at parse time, so its output survives; see the
+    // comment where the flag is parsed.
+    bool fukui_analysis_run = false;
     bool profiling = false;
     bool promol_nci = false;
     bool get_g = false;

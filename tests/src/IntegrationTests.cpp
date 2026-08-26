@@ -594,6 +594,18 @@ TEST(TomlIntegrationTests, IntermolecularNCI)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, Fukui)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "fukui");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, FukuiPBC)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "fukui_pbc");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, RiFit)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit");

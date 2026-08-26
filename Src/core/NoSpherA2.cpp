@@ -123,6 +123,16 @@ static int run_app_impl(int argc, char **argv)
         std::cout << "Starting QCT menu..." << endl;
         return QCT(opt, wavy);
     }
+    // Conceptual-DFT reactivity analysis of a single wavefunction and quit.
+    // Restores the console first: this command exists to be read by a person, so
+    // its table belongs on stdout rather than buried in NoSpherA2.log.
+    if (opt.fukui_analysis_run)
+    {
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
+        fukui_analysis(opt, std::cout);
+        return 0;
+    }
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
     {
