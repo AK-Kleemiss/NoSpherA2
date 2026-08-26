@@ -963,8 +963,8 @@ std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN &wavy) {
 vec change_basis_sq(const vec &in, const vec &transformation, int size) {
 
     // new = transform^T * in * tranform
-    vec result(size * size);
-    vec temp(size * size);
+    vec result(static_cast<size_t>(size) * size);
+    vec temp(static_cast<size_t>(size) * size);
     // first we do temp = t^T * i
     cblas_dgemm(CblasRowMajor,
         CblasTrans, CblasNoTrans,
@@ -1037,8 +1037,8 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 
     // 1. Memory Allocation for Submatrices
     // Using flat std::vectors to ensure contiguous memory for MKL
-    vec D_sub(n * n, 0.0); // called P in tonto
-    vec S_sub(n * n, 0.0); // called S in tonto
+    vec D_sub(static_cast<size_t>(n) * n, 0.0); // called P in tonto
+    vec S_sub(static_cast<size_t>(n) * n, 0.0); // called S in tonto
     get_submatrices(D_full, S_full, D_sub, S_sub, atom_indices);
 
     // Tonto's atomic spherical averaging applies the local point group to the
@@ -1049,7 +1049,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
         symmetrize_atomic_matrix_oh(atomic_density, shell_angular_momenta, spherical);
         D_sub = atomic_density.container();
     }
-    vec Rho(n * n);        // To store target density
+    vec Rho(static_cast<size_t>(n) * n);        // To store target density
 
     vec V = S_sub;
     vec W(n);
@@ -1082,7 +1082,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     for (int i = 0; i < n; i++)
         W[i] = abs(W[i]) < 1E-10 ? 0.0 : 1.0 / W[i];
 
-    vec Temp2(n * n, 0.0);
+    vec Temp2(static_cast<size_t>(n) * n, 0.0);
     double *T;
     int in, jn;
     for (int i = 0; i < n; i++) {
@@ -1135,8 +1135,8 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     vec sorted_evecs;
     vec omitted_evals;
     vec omitted_evecs;
-    sorted_evecs.reserve(n * n);
-    omitted_evecs.reserve(n * n);
+    sorted_evecs.reserve(static_cast<size_t>(n) * n);
+    omitted_evecs.reserve(static_cast<size_t>(n) * n);
 
     if (EVs) {
         std::cout << "Eigenvalues of projected density P (unsorted):\n";
@@ -1256,7 +1256,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 double Roby_information::projection_matrix_and_expectation(const ivec &indices, const ivec &eigvals, const ivec &eigvecs, dMatrix2 *given_NAO, dMatrix2 *proj_out) {
     const int n = indices.size();
     //vec D_Sub(n * n, 0.0);
-    vec S_Sub(n * n, 0.0);
+    vec S_Sub(static_cast<size_t>(n) * n, 0.0);
     get_submatrix(overlap_matrix, S_Sub, indices);
     dMatrix2 S = reshape<dMatrix2>(S_Sub, Shape2D(n, n));
     int atom = -1;
@@ -1282,7 +1282,7 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
     if (given_NAO != nullptr && !eigvals.empty() && !eigvecs.empty()) {
         const int n1 = eigvals.size();
         const int n2 = eigvecs.size();
-        vec NAO_sub(n1 * n2);
+        vec NAO_sub(static_cast<size_t>(n1) * n2);
         get_submatrix(*given_NAO, NAO_sub, eigvals, eigvecs);
         NAOs = reshape<dMatrix2>(NAO_sub, Shape2D(n1, n2));
     }
@@ -1314,7 +1314,7 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
         const int n2 = eigvecs.size();
         if (n1 == 0 || n2 == 0)
             return zero_projection();
-        vec NAO_sub(n1 * n2);
+        vec NAO_sub(static_cast<size_t>(n1) * n2);
         if (given_NAO == nullptr)
             given_NAO = &total_NAOs;
         get_submatrix(*given_NAO, NAO_sub, eigvals, eigvecs);
@@ -1476,7 +1476,7 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
                 }
                 ivec local_indices(indices[a.get_nr() - 1].size());
                 std::iota(local_indices.begin(), local_indices.end(), 0);
-                vec S_sub(n_local * n_local, 0.0);
+                vec S_sub(static_cast<size_t>(n_local) * n_local, 0.0);
                 get_submatrix(overlap_matrix, S_sub, indices[a.get_nr() - 1]);
                 const dMatrix2 atomic_overlap = reshape<dMatrix2>(S_sub, Shape2D(n_local, n_local));
                 auto ano = calculateAtomicNAO(atomic_density, atomic_overlap,
@@ -1570,11 +1570,11 @@ void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(
     err_checkf(indices_a != nullptr, "No NAO data found for atom " + std::to_string(index_a), std::cout);
     err_checkf(indices_b != nullptr, "No NAO data found for atom " + std::to_string(index_b), std::cout);
 
-    vec Sub_overlap(n_a * n_ab);
+    vec Sub_overlap(static_cast<size_t>(n_a) * n_ab);
     get_submatrix(overlap_matrix, Sub_overlap, *indices_a, pair_matrix_indices);
     dMatrix2 Sa = reshape<dMatrix2>(Sub_overlap, Shape2D(n_a, n_ab));
     PAS = dot<dMatrix2>(projection_matrices[index_a], Sa, false, false);
-    Sub_overlap.clear(); Sub_overlap.resize(n_b * n_ab);
+    Sub_overlap.clear(); Sub_overlap.resize(static_cast<size_t>(n_b) * n_ab);
     get_submatrix(overlap_matrix, Sub_overlap, *indices_b, pair_matrix_indices);
     dMatrix2 Sb = reshape<dMatrix2>(Sub_overlap, Shape2D(n_b, n_ab));
     PBS = dot<dMatrix2>(projection_matrices[index_b], Sb, false, false);
@@ -1707,7 +1707,7 @@ dMatrix2 Roby_information::build_group_PAS(const ivec &group_atom_indices, const
     const int n_G = static_cast<int>(group_bf.size());
     err_checkf(n_G > 0, "RGBI group PAS has no basis functions for the requested atom group.", std::cout);
     err_checkf(n_ab > 0, "RGBI group PAS has no pair basis functions.", std::cout);
-    vec sub_S(n_G * n_ab, 0.0);
+    vec sub_S(static_cast<size_t>(n_G) * n_ab, 0.0);
     get_submatrix(overlap_matrix, sub_S, group_bf, bond_bf_indices);
     dMatrix2 S_G = reshape<dMatrix2>(sub_S, Shape2D(n_G, n_ab));
     // PAS = P_G (n_G × n_G) × S_G (n_G × n_ab) → (n_G × n_ab)
@@ -1931,7 +1931,7 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
                     Ionic_Operator(n_a + r, n_a + c) = -P_GB(r, c);
 
             // Sub-overlap → sqrt → solve eigenproblem
-            vec S_Sub(n_ab * n_ab, 0.0);
+            vec S_Sub(static_cast<size_t>(n_ab) * n_ab, 0.0);
             get_submatrix(overlap_matrix, S_Sub, bond_bf);
             vec V = S_Sub;
             vec W(n_ab);
@@ -2262,7 +2262,7 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 #endif
         // get matching suboverlap matrix
         const int n = bond_indices.size();
-        vec S_Sub(n * n, 0.0);
+        vec S_Sub(static_cast<size_t>(n) * n, 0.0);
         get_submatrix(overlap_matrix, S_Sub, bond_indices);
         //dMatrix2 S = reshape<dMatrix2>(S_Sub, Shape2D(n, n));
 

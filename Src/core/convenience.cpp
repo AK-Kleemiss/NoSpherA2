@@ -189,6 +189,13 @@ std::string help_message =
  "                                    Explicit HKL bounds; used instead of -hkl,\n"
  "                                    but only when -dmin is not given.\n"
  "  -IAM                               Use Thakkar independent-atom factors.\n"
+ "  -tsc_block <n>                     Reflections per block when writing the\n"
+ "                                    tsc [1000]. The table is streamed to disk\n"
+ "                                    a block at a time instead of being held\n"
+ "                                    whole, which is what keeps a protein\n"
+ "                                    inside a small machine. 0 holds it all.\n"
+ "                                    Derived from -mem when that is given\n"
+ "                                    and this is not.\n"
  "  -acc <0..4>                        Numerical grid accuracy [2]; 4 is the\n"
  "                                    practical maximum.\n"
  "  -group <n ...>                     CIF disorder groups for the asymmetric\n"
@@ -208,7 +215,13 @@ std::string help_message =
  "  -ri_fit [basis ...]                RI partitioning; omit a basis or use\n"
  "                                    auto_aux to generate one automatically.\n"
  "  -cpus <n>                          Maximum worker threads [all available].\n"
- "  -mem <MB>                          Memory limit for grid calculations.\n"
+ "  -mem <MB>                          Memory budget for everything sliceable\n"
+ "                                    [unset]. When given, the tsc block size\n"
+ "                                    and the XCW I tensor window are chosen\n"
+ "                                    to fit it, and anything that fits whole\n"
+ "                                    is held whole, that being the fastest\n"
+ "                                    arrangement. An explicit -tsc_block or\n"
+ "                                    XCW i_tensor_mb overrides it.\n"
  "  -pbc <n>                           Periodic-boundary setting.\n\n"
  "TSC/TSCB TABLE UTILITIES\n"
  "  -tscb <table.tsc|table.tscb>        Convert between text .tsc and binary\n"
@@ -300,6 +313,30 @@ std::string help_message =
  "                                    coefficients.\n"
  "  -convert_XCW <stdout> <lambda-step> Convert Tonto XCW lambda-step output.\n"
  "  -do_XCW  -calc_F  -anom_disp <file> XCW/Fcalc/anomalous-dispersion modes.\n"
+ "  -XCW_settings <file>                Keywords for -do_XCW. Besides the\n"
+ "                                    refinement settings, three control how\n"
+ "                                    the I tensor - nr_refl blocks of\n"
+ "                                    nmo(nmo+1)/2 complex doubles, quadratic\n"
+ "                                    in the basis and usually the largest\n"
+ "                                    thing in the process - is kept:\n"
+ "                                      stream          put it on disk and\n"
+ "                                                      read a window of\n"
+ "                                                      reflections at a time\n"
+ "                                      i_tensor_mb <n> the same, with the\n"
+ "                                                      budget named in MB\n"
+ "                                      safe / read     write or reuse the\n"
+ "                                                      whole tensor as\n"
+ "                                                      I_tensor (not\n"
+ "                                                      combinable with a\n"
+ "                                                      budget)\n"
+ "                                    Without any of them the tensor is held\n"
+ "                                    in memory, which is the fastest and what\n"
+ "                                    -mem also picks whenever it fits.\n"
+ "                                    Prefer a GENEROUS budget: holding 12%\n"
+ "                                    of the tensor cost 8% more time than\n"
+ "                                    holding all of it, while shrinking to\n"
+ "                                    0.4% saved a further 7% of memory and\n"
+ "                                    cost another 9% of time.\n"
  "  -partitioning_test  -NNLS_TEST      Run internal partitioning/NNLS tests.\n"
  "  -test_RI  -RI_WFN_DIFF              RI fitting diagnostics (after -wfn and\n"
  "                                    -ri_fit).\n"
@@ -379,7 +416,7 @@ std::string build_date = ("This Executable was built on: " + std::string(__DATE_
 bool ensure_occ_data_path(const char *argv0)
 {
 #ifdef _WIN32
-    char *occ_data_path_env = nullptr;
+    char* occ_data_path_env = nullptr;
     size_t len = 0;
     errno_t err = _dupenv_s(&occ_data_path_env, &len, "OCC_DATA_PATH");
 
@@ -398,7 +435,7 @@ bool ensure_occ_data_path(const char *argv0)
         free(occ_data_path_env);
     }
 #else
-    const char *tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH");
+    const char* tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH");
     if (tmp_occ_data_path_env != nullptr)
     {
         std::string occ_data_path_env(tmp_occ_data_path_env);
@@ -1299,7 +1336,7 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     return true;
 }
 
-bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, const bool& debug)
 {
     using namespace std;
     vec2 Uij, Cijk, Dijkl;
@@ -1615,7 +1652,238 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
     return true;
 };
 
-vec read_U_iso_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::ofstream &log3, const bool &debug, const bool &grown, const ivec3 &symmetry_linking_list)
+{
+    using namespace std;
+    ifstream asym_cif_input(cif, std::ios::in);
+    asym_cif_input.clear();
+    asym_cif_input.seekg(0, asym_cif_input.beg);
+    string line;
+    int ncen;
+    if (!grown) {
+        ncen = wavy.get_ncen();
+    }
+    else {
+        ncen = symmetry_linking_list.size();
+    }
+    svec labels(ncen);
+
+    for (int i = 0; i < ncen; i++) {
+        labels[i] = wavy.get_atoms()[i].get_label();
+    }
+
+    while (getline(asym_cif_input, line)) {
+        if (!line.starts_with("loop_")) {
+            if (debug)
+                log3 << "This is not part of a loop. Moving on.";
+            continue;
+        }
+        if (debug)
+            log3 << "Found a loop!";
+        getline(asym_cif_input, line);
+        if (line.find("_atom_site_aniso_label") != string::npos) {
+            if (debug) {
+                log3 << "This loop contains anisotropic displacement parameters.";
+            }
+            ivec fields;
+            while (line.find("_atom_site_aniso") != string::npos && line.length() > 3) {
+                getline(asym_cif_input, line);
+                if (line.find("U_11") != string::npos)
+					fields.push_back(0);
+				else if (line.find("U_22") != string::npos)
+					fields.push_back(1);
+				else if (line.find("U_33") != string::npos)
+					fields.push_back(2);
+				else if (line.find("U_12") != string::npos)
+					fields.push_back(3);
+				else if (line.find("U_13") != string::npos)
+					fields.push_back(4);
+				else if (line.find("U_23") != string::npos)
+					fields.push_back(5);	
+            }
+            while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
+                std::vector<std::string> entries;
+                std::istringstream iss(line);
+                std::string token;
+                while (entries.size() < 7 && iss >> token)
+                    entries.push_back(token);
+                while (entries.size() < 7 && std::getline(asym_cif_input, line)) {
+                    std::istringstream nextLine(line);
+                    while (entries.size() < 7 && nextLine >> token)
+                        entries.push_back(token);
+                }
+                bool atom_found = false;
+                for (int a = 0; a < ncen; a++) {
+                    if (entries[0] == wavy.get_atom(a).get_label()) {
+						vec2 ADPs = wavy.get_atom(a).get_ADPs();
+                        if (ADPs.size() != 3)
+                            ADPs.resize(3);
+                        ADPs[0].resize(6);
+                        for (int i = 0; i < 6; i++) {
+							ADPs[0][fields[i]] = stof(entries[i + 1]);
+                        }
+                        wavy.set_atom_ADPs(a, ADPs);
+                        if (grown) {
+                            for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
+                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                            }
+                        }
+                        atom_found = true;
+                        break;
+                    }
+                }
+                if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
+                getline(asym_cif_input, line);
+            }
+        }
+        else if (line.find("_atom_site_anharm_GC_C_label") != string::npos) {
+			if (debug)
+				log3 << "This loop contains anharmonic Gram-Charlier coefficients C.";
+            ivec fields;
+            while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
+                getline(asym_cif_input, line);
+                if (line.find("C_111") != string::npos)
+                    fields.push_back(0);
+                else if (line.find("C_112") != string::npos)
+                    fields.push_back(1);
+                else if (line.find("C_113") != string::npos)
+                    fields.push_back(2);
+                else if (line.find("C_122") != string::npos)
+                    fields.push_back(3);
+                else if (line.find("C_123") != string::npos)
+                    fields.push_back(4);
+                else if (line.find("C_133") != string::npos)
+                    fields.push_back(5);
+                else if (line.find("C_222") != string::npos)
+                    fields.push_back(6);
+                else if (line.find("C_223") != string::npos)
+                    fields.push_back(7);
+                else if (line.find("C_233") != string::npos)
+                    fields.push_back(8);
+                else if (line.find("C_333") != string::npos)
+                    fields.push_back(9);   
+            }
+            while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
+                std::vector<std::string> entries;
+                std::istringstream iss(line);
+                std::string token;
+                while (entries.size() < 11 && iss >> token) {
+                    const int pos = token.find('(');
+                    entries.push_back(token);
+                }
+                while (entries.size() < 11 && std::getline(asym_cif_input, line)) {
+                    std::istringstream nextLine(line);
+                    while (entries.size() < 11 && nextLine >> token) {
+                        entries.push_back(token);
+                    }
+                }
+                bool atom_found = false;
+                for (int a = 0; a < ncen; a++) {
+                    if (entries[0] == wavy.get_atom(a).get_label()) {
+                        vec2 ADPs = wavy.get_atom(a).get_ADPs();
+                        if (ADPs.size() != 3)
+                            ADPs.resize(3);
+                        ADPs[1].resize(10);
+                        for (int i = 0; i < 10; i++) {
+                            ADPs[1][fields[i]] = stof(entries[i + 1]);
+                        }
+                        wavy.set_atom_ADPs(a, ADPs);
+                        if (grown) {
+                            for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
+                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                            }
+                        }
+                        atom_found = true;
+                        break;
+                    }
+                }
+                if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
+                getline(asym_cif_input, line);
+            }
+        }
+        else if (line.find("_atom_site_anharm_GC_D_label") != string::npos) {
+			if (debug)
+				log3 << "This loop contains anharmonic Gram-Charlier coefficients D.";
+            ivec fields;
+            while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
+                getline(asym_cif_input, line);
+                if (line.find("D_1111") != string::npos)
+                    fields.push_back(0);
+                else if (line.find("D_1112") != string::npos)
+                    fields.push_back(1);
+                else if (line.find("D_1113") != string::npos)
+                    fields.push_back(2);
+                else if (line.find("D_1122") != string::npos)
+                    fields.push_back(3);
+                else if (line.find("D_1123") != string::npos)
+                    fields.push_back(4);
+                else if (line.find("D_1133") != string::npos)
+                    fields.push_back(5);
+                else if (line.find("D_1222") != string::npos)
+                    fields.push_back(6);
+                else if (line.find("D_1223") != string::npos)
+                    fields.push_back(7);
+                else if (line.find("D_1233") != string::npos)
+                    fields.push_back(8);
+                else if (line.find("D_1333") != string::npos)
+                    fields.push_back(9);
+                else if (line.find("D_2222") != string::npos)
+                    fields.push_back(10);
+                else if (line.find("D_2223") != string::npos)
+                    fields.push_back(11);
+                else if (line.find("D_2233") != string::npos)
+                    fields.push_back(12);
+                else if (line.find("D_2333") != string::npos)
+                    fields.push_back(13);
+                else if (line.find("D_3333") != string::npos)
+                    fields.push_back(14);
+            }
+            while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
+                std::vector<std::string> entries;
+                std::istringstream iss(line);
+                std::string token;
+                while (entries.size() < 16 && iss >> token)
+                    entries.push_back(token);
+                while (entries.size() < 16 && std::getline(asym_cif_input, line)) {
+                    std::istringstream nextLine(line);
+                    while (entries.size() < 16 && nextLine >> token)
+                        entries.push_back(token);
+                }
+                bool atom_found = false;
+                for (int a = 0; a < ncen; a++) {
+                    if (entries[0] == wavy.get_atom(a).get_label()) {
+                        vec2 ADPs = wavy.get_atom(a).get_ADPs();
+                        if (ADPs.size() != 3)
+                            ADPs.resize(3);
+                        ADPs[2].resize(15);
+                        for (int i = 0; i < 15; i++) {
+                            ADPs[2][fields[i]] = stof(entries[i + 1]);
+                        }                
+                        wavy.set_atom_ADPs(a, ADPs);
+                        if (grown) {
+                            for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
+                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                            }
+                        }
+                        atom_found = true;
+                        break;
+                    }
+                }
+                if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
+                getline(asym_cif_input, line);
+            }
+        }
+        else {
+            if (debug)
+                log3 << "This was not the right loop. Moving on.";
+            continue;
+        }
+    }
+    return true;
+    // closing function
+};
+
+vec read_U_iso_from_CIF(const std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, const bool& debug)
 {
     using namespace std;
     vec U_iso;
@@ -2451,7 +2719,6 @@ void options::digest_options()
             np_descr.fortran_order = false;
             np_descr.shape = { static_cast<unsigned long>(sizes[0]), static_cast<unsigned long>(sizes[1]) };
             npy::write_npy("descriptor.npy", np_descr);
-
             exit(0);
         }
         else if (temp == "-fchk")
@@ -2491,6 +2758,11 @@ void options::digest_options()
             hirshfeld_surface = arguments[i + 1];
             hirshfeld_surface2 = arguments[i + 2];
         }
+        else if (temp == "-tsc_block")
+        {
+            tsc_block_size = static_cast<size_t>(std::stoll(arguments[i + 1]));
+            tsc_block_given = true;
+        }
         else if (temp == "-hkl")
         {
             hkl = arguments[i + 1];
@@ -2517,6 +2789,7 @@ void options::digest_options()
         else if (temp == "-mem")
         {
             mem = stod(arguments[i + 1]); // In MB
+            mem_given = true;
             vec a;
             size_t vec_max_size = a.max_size();
             double doubel_max_size = static_cast<double>(vec_max_size * sizeof(double)) * 1e-6;
@@ -3045,9 +3318,28 @@ void options::digest_options()
         }
         else if (temp == "-do_XCW") {
             do_XCW = true;
+            // Optional trailing "stepsize max_value" to limit the lambda scan
+            // range, e.g. for quick tests: -do_XCW 0.01 0.01
+            // CURRENTLY NOT IN USE SINCE THIS IS HANDLED IN THE INPUT FILE
+            //if (i + 2 < argc &&
+            //    string(arguments[i + 1]).find("-") != 0 &&
+            //    string(arguments[i + 2]).find("-") != 0)
+            //{
+            //    xcw_lambda_step = stod(arguments[i + 1]);
+            //    xcw_lambda_max = stod(arguments[i + 2]);
+            //}
         }
         else if (temp == "-calc_F") {
             calc_F_calc = true;
+        }
+        else if (temp == "-xcw_gaussian_halt") {
+            xcw_gaussian_halt = true;
+        }
+        else if (temp == "-xcw_strong_cutoff") {
+            xcw_strong_cutoff = stod(arguments[i + 1]);
+        }
+        else if (temp == "-XCW_settings") {
+			xcw_settings_path = arguments[i + 1];
         }
         else if (temp == "-anom_disp")
         {
@@ -3129,6 +3421,18 @@ void options::digest_options()
     }
 };
 
+namespace {
+    // Captured during static initialisation, so it still refers to the console after
+    // run_app() has redirected std::cout into NoSpherA2.log. A function local static
+    // would only be captured on the first error, by which time the redirect has happened
+    // and every error message would end up in the log file instead of on the console.
+    std::streambuf *const initial_coutbuf = std::cout.rdbuf();
+    std::streambuf *original_coutbuf()
+    {
+        return initial_coutbuf;
+    }
+}
+
 void options::look_for_debug(int &argc, char **argv)
 {
     // This loop figures out command line options
@@ -3139,9 +3443,14 @@ void options::look_for_debug(int &argc, char **argv)
         if (temp.find("-") > 0)
             continue;
         else if (temp == "-v" || temp == "-v2" || temp == "-debug")
-            std::cout << "Turning on verbose mode!" << std::endl, debug = true;
+            std::cout << "Turning on verbose mode!" << std::endl, debug = true,
+            ProgressBar::report_counts = true;
         else if (temp == "--h" || temp == "-h" || temp == "-help" || temp == "--help")
         {
+            // run_app() has already pointed std::cout at NoSpherA2.log, and the
+            // exit() below unwinds nothing, so without this the entire help text
+            // is written to the log file and the console stays empty.
+            std::cout.rdbuf(original_coutbuf());
             std::cout << NoSpherA2_message() << help_message << build_date << std::endl;
             exit(0);
         }
@@ -3274,7 +3583,7 @@ void print_duration(std::ostream &file, const std::string &description, const st
     if (total_duration.has_value())
     {
         double percentage = (double(duration.count()) / total_duration->count()) * 100.0;
-        std::cout << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
+        file << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
     };
     file << std::endl;
     // Disable setfill 0 again
@@ -3289,10 +3598,9 @@ void write_timing_to_file(std::ostream &file,
     // Check if either vector is empty
     if (time_points.empty() || descriptions.empty())
     {
-        std::cout << "Error: Empty vector passed to write_timing_to_file" << endl;
+        file << "Error: Empty vector passed to write_timing_to_file" << endl;
         return;
     }
-
     std::chrono::microseconds total_time = std::chrono::duration_cast<std::chrono::microseconds>(time_points.back() - time_points.front());
     file << "\n\n----------------------------- Time Breakdown! -----------------------------" << endl;
     file << "                                     mm:ss:ms" << endl;
@@ -3706,17 +4014,6 @@ double vec_length(const vec &in)
     return sqrt(sum);
 }
 
-namespace {
-    // Captured during static initialisation, so it still refers to the console after
-    // run_app() has redirected std::cout into NoSpherA2.log. A function local static
-    // would only be captured on the first error, by which time the redirect has happened
-    // and every error message would end up in the log file instead of on the console.
-    std::streambuf *const initial_coutbuf = std::cout.rdbuf();
-    std::streambuf *original_coutbuf()
-    {
-        return initial_coutbuf;
-    }
-}
 
 void error_check(const bool condition, const std::source_location loc, const std::string &error_message, std::ostream &log_file)
 {
@@ -3895,21 +4192,37 @@ std::wstring s2ws(const std::string &s)
 }
 */
 
+bool ProgressBar::report_counts = false;
+
 ProgressBar::~ProgressBar()
 {
     progress_ = 100.0f;
     write_progress();
-    std::cout << std::endl;
+    stream_ << std::endl;
+    if (report_counts)
+    {
+        // updates is how often callers reported an item; writes is how often that
+        // needed the omp critical. Every item used to take the lock, so writes
+        // being far below updates is the whole point of the change.
+        const unsigned long long u = update_calls_.load(), w = bar_writes_.load();
+        stream_ << "[progress] " << status_text_ << ": " << u << " updates, "
+                << w << " serialised writes";
+        if (u > 0)
+            stream_ << "  (" << (w * 100.0 / u) << "% of calls took the lock, "
+                    << (u > w ? u / (w ? w : 1) : 1) << "x fewer barriers)";
+        stream_ << std::endl;
+    }
 #ifdef _WIN32
     if (taskbarList_)
     {
         taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NOPROGRESS);
         taskbarList_->Release();
+        taskbarList_ = nullptr;
     }
 #endif
 }
 
-void ProgressBar::write_progress(std::ostream &os)
+void ProgressBar::write_progress()
 {
     // No need to write once progress is 100%
     if (progress_ > 100.0f)
@@ -3917,28 +4230,28 @@ void ProgressBar::write_progress(std::ostream &os)
 
     // Move cursor to the first position on the same line
     // Check if os is a file stream
-    if (dynamic_cast<std::filebuf *>(std::cout.rdbuf()))
+    if (dynamic_cast<std::filebuf *>(stream_.rdbuf()))
     {
-        os.seekp(linestart); // Is a file stream
+        stream_.seekp(linestart); // Is a file stream
     }
     else
     {
-        os << "\r" << std::flush; // Is not a file stream
+        stream_ << "\r" << std::flush; // Is not a file stream
     }
 
     // Start bar
-    os << "[";
+    stream_ << "[";
 
     const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
     for (size_t i = 0; i <= completed; i++)
     {
-        os << fill_;
+        stream_ << fill_;
     }
 
     // End bar
     if (((progress_ < 100.0f) ? progress_ : 100.0f) == 100)
     {
-        os << "] 100% " << std::flush;
+        stream_ << "] 100% " << std::flush;
 #ifdef _WIN32
         if (taskbarList_)
         {
@@ -3949,7 +4262,7 @@ void ProgressBar::write_progress(std::ostream &os)
         return;
     }
 
-    os << std::flush;
+    stream_ << std::flush;
 
 #ifdef _WIN32
     // Update taskbar progress

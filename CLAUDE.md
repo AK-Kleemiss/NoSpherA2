@@ -179,6 +179,18 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-07-18, `TomlIntegrationTests.P1_test_XCW` (in-process, `release-windows`,
+`OMP_NUM_THREADS=20`) passes after fixing a real access violation: `GridManager::calculateMBISWeights`/
+`calculateEMBISWeights` ignored `config_.no_density_eval` and forced an invalid WFN density
+evaluation on XCW's MO-pruned dummy wavefunction. A separate `exit(0)` in
+`XCW::run_XCW_fitting()` was also removed — it silently killed the in-process test binary before
+GoogleTest's own pass/fail assertion ran, so earlier "passing" runs of this test were a false
+positive rather than a real pass. See `UNIT_TESTS_STATUS.md` Known Issues for the full
+root-cause writeup, including a still-open follow-up: any XCW orbital basis other than the
+hardcoded default `def2-svp` (selectable via the newly wired `-b` flag) crashes with a separate,
+unrelated access violation in OCC's SOAD initial guess. This was not re-run against the full
+`ctest` suite this session; the last full-suite baseline remains the 2026-07-03 note below.
+
 As of 2026-07-03, `ctest --preset release-windows` reports **201/201 passing** after a full
 rebuild (following the Thakkar cubic-spline interpolation change in
 `Src/core/spherical_density.h` / `Src/core/GridManager.cpp`, Hirshfeld-weight density

@@ -27,6 +27,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableASAN>false</EnableASAN>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -74,6 +75,11 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)..\..\build\$(Configuration)_$(Platform)\</OutDir>
   </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
@@ -119,6 +125,7 @@
     <ClInclude Include="..\..\Src\core\tsc_label_converter.h" />
     <ClInclude Include="..\..\Src\core\wfn_class.h" />
     <ClInclude Include="..\..\Src\core\XCW.h" />
+    <ClInclude Include="..\..\Src\core\xcw_halting.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Src\core\pch.cpp">
@@ -159,5 +166,6 @@
     <ClCompile Include="..\..\Src\core\spherical_density.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_class.cpp" />
     <ClCompile Include="..\..\Src\core\XCW.cpp" />
+    <ClCompile Include="..\..\Src\core\xcw_halting.cpp" />
   </ItemGroup>
 </Project>
