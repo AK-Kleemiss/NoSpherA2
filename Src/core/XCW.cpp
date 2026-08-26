@@ -1313,7 +1313,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 
 	// Grid screening
 	constexpr double maximum_ao_grid_cutoff = 12;
-	constexpr double minimum_ao_grid_cutoff = 12;
+	constexpr double minimum_ao_grid_cutoff = 11;
 	double minimum_primitive_exponent = std::numeric_limits<double>::max();
 	vec ao_grid_cutoff_squared(cryst.nmo);
 	{
@@ -1600,14 +1600,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				}
 			}
 
-<<<<<<< Updated upstream
 			if (i_streamed_) std::fill(blk.begin(), blk.end(), cdouble{});
 			cdouble *const I_r = i_streamed_ ? blk.data()
 			                                 : I.data() + static_cast<size_t>(r) * packed_size;
-=======
 			// Main loop for computation of I
 			const size_t base = static_cast<size_t>(r) * packed_size;
->>>>>>> Stashed changes
 			for (int syms = 0; syms < num_syms; syms++) {
 				for (int g = 0; g < n_atom_grids; g++) {
 					const cdouble factor = grid_factors[syms][g] * translation_phase[r][syms];
