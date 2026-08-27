@@ -237,36 +237,18 @@ SALTEDDescriptors SALTED_Utils::calculate_SALTED_descriptors(const featomic::Sim
 
 namespace
 {
-    // **Building the calculator is the whole cost; running it is nearly free.**
-    //
-    // Measured on FLOWOFFICE, 6 August 2026, with the geometry-aid
-    // hyperparameters (11 species, max_radial 6, max_angular 12,
-    // spline_accuracy 1e-6):
-    //
-    //     -h, process startup only                0.12 s
-    //     -wfn, parse the molecule, no descriptor 0.12 s
-    //     descriptor,    2 atoms                  0.74 s
-    //     descriptor,   30 atoms                  0.90 s
-    //     descriptor, 1000 atoms                  1.57 s
-    //
-    // That is a fixed 0.72 s plus 0.0009 s per atom: for an ordinary structure
-    // about ninety per cent of the call has nothing to do with the molecule.
-    // It is `featomic::Calculator`'s constructor splining the radial integral
-    // for every (n, l) pair to `spline_accuracy`, which depends only on the
-    // hyperparameters. Compute the same splines once and every structure after
-    // the first costs what it should.
+    // Constructing a calculator splines the radial integral for every (n, l)
+    // pair to `spline_accuracy`, which depends only on the hyperparameters, so
+    // it is computed once and kept.
     //
     // Keyed on the parameter JSON, so a caller that changes any hyperparameter
-    // gets a new calculator rather than a silently wrong one -- the failure
-    // this guards against is the same one the feature-count arithmetic in
-    // `convenience.cpp` guards against, a descriptor of the right shape
-    // computed with the wrong settings.
+    // gets a new calculator rather than a silently wrong one -- a descriptor of
+    // the right shape computed with the wrong settings.
     //
-    // `featomic::Calculator` is move-only, hence the indirection. It is **not
-    // safe to use one calculator from several threads at once**; the only
-    // caller of `calculate_SOAP_Powerspectrum` is the descriptor path, which is
-    // serial, and SALTED builds its own calculator in `get_feats_projs` and is
-    // unaffected by this cache.
+    // `featomic::Calculator` is move-only, hence the indirection, and it is not
+    // safe to use one calculator from several threads at once. The only caller
+    // of `calculate_SOAP_Powerspectrum` is the serial descriptor path; SALTED
+    // builds its own calculator in `get_feats_projs`.
     featomic::Calculator& cached_calculator(const std::string& name, const std::string& json)
     {
         static std::map<std::string, std::unique_ptr<featomic::Calculator>> cache;
@@ -282,13 +264,8 @@ namespace
 
 //FEATOMIC POWER Spectrum
 metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters) {
-    // **Phase timings, off unless NOSPHERA2_TIME_SOAP is set.** The batch flag
-    // was built on the theory that the fixed 0.72 s per call was the
-    // calculator's constructor. It is not: measured 6 August 2026, twelve
-    // structures in one process took 0.72 s for the first and 0.69 s for the
-    // twelfth, no decay whatever, so caching the calculator bought only the
-    // 0.28 s of process startup it also avoided. The cost is somewhere in what
-    // follows, and guessing again would be the same mistake twice.
+    // Phase timings, off unless NOSPHERA2_TIME_SOAP is set. Caching the
+    // calculator does not remove the fixed per-call cost; it is in what follows.
     const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr;
     auto mark = std::chrono::steady_clock::now();
     auto lap = [&mark](const char* what, bool on) {

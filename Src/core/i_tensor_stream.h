@@ -2,48 +2,26 @@
 #include "convenience.h"
 #include <cassert>
 
-// The XCW I tensor is nr_small blocks of nmo*(nmo+1)/2 complex doubles, one block
-// per reflection, and every consumer walks it in reflection order: calc_F_calc
-// reads block r to produce F_calc[0][r], calc_perturb reads block r again to
-// accumulate an nmo x nmo matrix. Nothing ever needs two blocks at once.
-//
-// That is the same shape as a .tscb - reflection-major records consumed in order,
-// reducing into something small - and it admits the same treatment. Keeping the
-// tensor on disk and holding a window of blocks makes memory a choice rather than
-// a function of the reflection count:
-//
-//     resident = window * nmo*(nmo+1)/2 * 16 bytes
-//
-// instead of nr_small times the same block. For sto-3g on the P1 test that is
-// 276 MB either way and irrelevant; the point is the basis-set scaling, which is
-// quadratic in nmo, so a triple-zeta basis on the same data is 25x that and a
-// larger structure is out of reach entirely.
-//
-// C stdio, not std::ifstream: measured on a 3.5 GB file, fread reads at
-// 2.85-2.90 GB/s against 1.26-1.41 for ifstream, and chunking the stream does not
-// close the gap - the stream itself is the cost. Only the 64-bit seek needs an
-// #if, because fseek takes a long.
+// The XCW I tensor is nr blocks of nmo*(nmo+1)/2 complex doubles, one per reflection, and
+// every consumer walks it in reflection order, so only a window need be resident:
+//     resident = window * nmo*(nmo+1)/2 * 16 bytes,  quadratic in nmo.
+// C stdio, not ifstream, for read speed; only the 64-bit seek needs an #if.
 class i_tensor_file
 {
 public:
-    // Bytes of one reflection's block.
     static size_t block_bytes(const int nmo)
     {
         return static_cast<size_t>(nmo) * (nmo + 1) / 2 * sizeof(cdouble);
     }
 
-    // What the whole tensor would cost resident. size_t, deliberately: the
-    // original header wrote the element count as an int, which wraps at 2^31
-    // elements - 34 GB - and silently truncates the file for exactly the
-    // structures this class exists to serve.
+    // size_t, not int: the element count wraps at 2^31 elements (34 GB) and truncates.
     static size_t total_bytes(const int nr, const int nmo)
     {
         return static_cast<size_t>(nr) * block_bytes(nmo);
     }
 
     i_tensor_file() = default;
-    // Owns a FILE*. A copy would fclose the same handle twice, and both objects
-    // would seek each other's position out from under them.
+    // Owns a FILE*: a copy would fclose the same handle twice and fight over the position.
     i_tensor_file(const i_tensor_file &) = delete;
     i_tensor_file &operator=(const i_tensor_file &) = delete;
     ~i_tensor_file() { close(); }
@@ -55,10 +33,7 @@ public:
         window_.shrink_to_fit();
     }
 
-    // ---- writing -------------------------------------------------------
-    // Blocks arrive in whatever order the workers finish them, so the writer
-    // holds them by index and seeks. The file is laid out reflection-major, so
-    // block r starts at header_bytes + r * block_bytes.
+    // Blocks arrive in whatever order the workers finish them, so the writer seeks by index.
     void create(const std::filesystem::path &p, const int nr, const int nmo)
     {
         close();
@@ -83,7 +58,6 @@ public:
 
     void finish_write() { if (f_) fflush(f_); }
 
-    // ---- reading -------------------------------------------------------
     void open(const std::filesystem::path &p, const size_t window_blocks)
     {
         close();
@@ -96,12 +70,8 @@ public:
             fread(&nmo64, sizeof(nmo64), 1, f_) != 1 ||
             fread(&packed64, sizeof(packed64), 1, f_) != 1)
             throw std::runtime_error("i_tensor_file: truncated header");
-        // Everything below is derived from bytes that came off disk, and is then
-        // used to size an allocation and to compute seek offsets. A truncated,
-        // stale or hostile file must be rejected here rather than turned into a
-        // huge allocation or a read past the end. This is the input validation
-        // the CWE-20 alerts on the freads above are actually asking for - the
-        // freads themselves already check their return values.
+        // These header fields size an allocation and compute seek offsets, so a stale or
+        // truncated file must be rejected here, not read past the end.
         if (nr64 <= 0 || nmo64 <= 0 || packed64 <= 0)
             throw std::runtime_error("i_tensor_file: " + p.string() +
                 " has a non-positive dimension in its header");
@@ -109,15 +79,11 @@ public:
             throw std::runtime_error("i_tensor_file: " + p.string() +
                 " claims implausible dimensions (nr " + std::to_string(nr64) +
                 ", nmo " + std::to_string(nmo64) + ")");
-        // packed is a function of nmo, so the header has to agree with itself.
         const int64_t packed_expected = nmo64 * (nmo64 + 1) / 2;
         if (packed64 != packed_expected)
             throw std::runtime_error("i_tensor_file: " + p.string() + " header is inconsistent: "
                 "packed " + std::to_string(packed64) + " but nmo " + std::to_string(nmo64) +
                 " implies " + std::to_string(packed_expected));
-        // And the file has to be the size the header implies. This is what
-        // catches a run killed halfway through writing, and any file left by the
-        // older format whose element count was stored as a 32-bit int.
         std::error_code ec;
         const auto on_disk = std::filesystem::file_size(p, ec);
         if (!ec)
@@ -144,8 +110,7 @@ public:
         loaded_first_ = -1; loaded_last_ = -1;
     }
 
-    // Read reflections [r0, r1) into the window. Call from one thread; the
-    // pointers handed out by block() stay valid until the next load.
+    // Call from one thread; pointers handed out by block() stay valid until the next load.
     void load(const int r0, const int r1)
     {
         if (r0 < 0 || r1 < r0 || r1 > nr_)
@@ -162,12 +127,8 @@ public:
         loaded_first_ = r0; loaded_last_ = r1;
     }
 
-    // assert, not throw: this is called from inside an omp for, once per
-    // reflection, and an exception leaving an OpenMP structured block is
-    // undefined behaviour - it would turn a bounds violation into a terminate
-    // rather than a message. The window bounds are checked for real in load(),
-    // which runs before the region; this catches a caller that walks outside
-    // the window it asked for, in debug, at no cost in release.
+    // assert, not throw: called inside an omp for, and an exception leaving an OpenMP
+    // structured block is undefined behaviour. Real bounds checking happens in load().
     const cdouble *block(const int r) const
     {
         assert(r >= loaded_first_ && r < loaded_last_ && "reflection outside the loaded window");

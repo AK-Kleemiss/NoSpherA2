@@ -77,8 +77,7 @@ struct properties_options
 	bool hirsh = false;
 	bool s_rho = false;
 	bool all_mos = false;
-	// Fukui functions f+/f-/f0 and the dual descriptor, in the
-	// frontier-orbital (frozen-orbital) approximation.
+	//Fukui functions f+/f-/f0 and the dual descriptor, frozen-orbital approximation
 	bool fukui = false;
 	double resolution = 0.1;
 	double radius = 2.0;
@@ -87,10 +86,7 @@ struct properties_options
 	double promol_nci_rcut2 = 0.75;
 	double promol_nci_rho_abs_max = 0.5;
 	double promol_nci_rdg_max = 1.0;
-	// The promolecular NCI _values.dat writer parallelizes over grid points with
-	// dynamic OpenMP scheduling, so row order (not the values themselves) is
-	// non-deterministic between runs. Force it to run single-threaded for
-	// reproducible output ordering, e.g. for golden-file test generation.
+	//The _values.dat writer schedules grid points dynamically, so row order (not the values) varies between runs; forces single-threaded for golden files
 	bool promol_nci_single_threaded = false;
 	std::array<int, 3> NbSteps = { 0, 0, 0 };
 	std::array<double, 6> MinMax = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
@@ -154,10 +150,8 @@ const double array_length(const array& in, const array& in2)
 
 d3 vec_diff(const d3& a, const d3& b);
 
-// Function to compute cross product
 d3 vec_cross(const d3& a, const d3& b);
 
-// Function to compute dot product
 double vec_dot(const d3& a, const d3& b);
 
 constexpr const std::complex<double> c_one(0, 1.0);
@@ -349,22 +343,8 @@ inline void print_centered_message(const std::string& text, int bar_width, std::
 		<< std::endl;
 }
 
-// How many items to keep resident inside a memory budget.
-//
-// Everything in this program that can be sliced is sliced the same way: a list
-// of equal-sized items consumed in order, reducing into something small. A .tscb
-// is reflections by scatterers, the XCW I tensor is reflections by AO pairs, a
-// SALTED prediction is lambda blocks. So the rule for choosing a window belongs
-// in one place rather than being re-derived at each of them.
-//
-// Returns 0 for "hold all of them", which is what every one of those consumers
-// is fastest doing - no file, no re-reads, no window bookkeeping - and is
-// therefore the answer whenever the whole thing fits. A budget of 0 means no
-// limit was asked for, which is also "hold all of them".
-//
-// The fits-test is written as a division rather than n_items * item_bytes: that
-// product is exactly the quantity that overflows on the structures this exists
-// to serve.
+//How many equal-sized items to keep resident inside a memory budget; 0 means "hold all of them", as does a budget of 0
+//The fits-test is a division rather than n_items * item_bytes because that product is exactly what overflows on the structures this serves
 inline size_t items_within_budget(const size_t n_items, const size_t item_bytes, const size_t budget_bytes)
 {
     if (budget_bytes == 0 || n_items == 0 || item_bytes == 0)
@@ -372,8 +352,7 @@ inline size_t items_within_budget(const size_t n_items, const size_t item_bytes,
     if (n_items <= budget_bytes / item_bytes)
         return 0;
     const size_t n = budget_bytes / item_bytes;
-    // A single item larger than the whole budget still has to be processed; one
-    // at a time is the least we can do, and refusing would be worse.
+    //a single item larger than the whole budget still has to be processed, one at a time
     return n ? n : 1;
 }
 
@@ -388,7 +367,6 @@ public:
 		: worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize / 100 : 1), stream_(stream_)
 	{
 		int bw = bar_width_ + 2;
-		// Write status text
 		print_centered_text(status_text_, bw, stream_);
 		linestart = stream_.tellp();
 #ifdef _WIN32
@@ -401,14 +379,7 @@ public:
 		progress_ = (float)workdone * workpart_;
 	}
 
-	// Called once per unit of work - once per reflection in the structure-factor
-	// loop, so hundreds of thousands of times on a protein. The whole body used
-	// to sit in an omp critical, serialising every worker on every item purely to
-	// redraw a bar that only changes about a hundred times.
-	//
-	// workdone is atomic, so the count needs no lock. The lock is taken only when
-	// this call is the one that crosses a reporting boundary, which is what keeps
-	// the redraws from interleaving. n lets a caller report a batch at once.
+	//Called once per reflection; workdone is atomic, so only the call that crosses a reporting boundary takes the lock instead of serialising every worker on the redraw
 	void update(const unsigned long long n = 1)
 	{
 		update_calls_.fetch_add(1, std::memory_order_relaxed);
@@ -448,9 +419,7 @@ private:
 	std::streampos linestart;
 	bool finished_ = false;
 #ifdef _WIN32
-	// Assigned only inside initialize_taskbar_progress()'s SUCCEEDED checks;
-	// without this the destructor makes a virtual call through whatever was
-	// on the stack whenever COM refuses.
+	//Assigned only inside initialize_taskbar_progress()'s SUCCEEDED checks; without the initialiser the destructor calls through stack garbage when COM refuses
 	ITaskbarList3* taskbarList_ = nullptr;
 
 	void initialize_taskbar_progress();
@@ -566,9 +535,7 @@ constexpr unsigned int doublefactorial(int n)
 template <typename T>
 void removeElement(std::vector<T>& vec, const T& x)
 {
-	// Use std::remove to shift elements and get the new end iterator
 	auto new_end = std::remove(vec.begin(), vec.end(), x);
-	// Erase the elements from the new end to the actual end
 	vec.erase(new_end, vec.end());
 }
 
@@ -714,25 +681,14 @@ struct ECP_primitive : primitive
 
 //---------------- Object for handling all input options -------------------------------
 struct options
-	/**
-	 * @brief The `options` class represents a collection of options and settings for a program.
-	 *
-	 * It contains various member variables that store different configuration parameters.
-	 * These parameters control the behavior and functionality of the program.
-	 *
-	 * The `options` class also provides constructors and member functions to initialize and manipulate these parameters.
-	 *
-	 * @note This class is used to configure the behavior of a specific program and may have different member variables and functions depending on the program's requirements.
-	 */
+	/** @brief All command line options and settings controlling a run. */
 {
     std::ostream &log_file;
     double d_sfac_scan = 0.0;
     d3 sfac_diffuse = { 0.0, 0.0, 0.0 };
     double dmin = 99.0;
     double mem = 1000.0; // In MB
-    // Set only when -mem was passed. Without it nothing derives a window from
-    // mem and every default stands as it was; with it, mem becomes the budget
-    // that the tsc block size and the XCW I tensor window are chosen to fit.
+    //Set only when -mem was passed; only then is mem a budget the tsc block size and XCW I tensor window are fitted to
     bool mem_given = false;
     double efield = 0.005;
     ivec2 groups;
@@ -800,41 +756,17 @@ struct options
     bool ECP = false;
     bool RI_FIT = false;
     bool needs_Thakkar_fill = false;
-    // Set only around a spherical fill: a disorder part whose missing atoms were
-    // already covered by an earlier part legitimately yields none, and that must
-    // not read as a broken CIF.
+    //Set around a spherical fill, where a disorder part already covered by an earlier one legitimately yields no atoms and must not read as a broken CIF
     bool allow_empty_asym = false;
-    // Set only while a spherical fill is being computed for somebody else. Such a
-    // call must RETURN a block for the caller to append or emit; if it streamed it
-    // would write experimental.tscb out from under the table being built.
+    //Set while a spherical fill runs for somebody else: it must RETURN a block, not stream experimental.tscb out from under the table being built
     bool spherical_fill = false;
-    // Reflections per block when writing the tsc. The structure-factor array is
-    // scatterers x reflections x 16 bytes and dominates memory, so streaming it
-    // out a block at a time is what puts a large protein within reach of a small
-    // machine: 1IEE holds 3.5 GB of table, 21AZ holds 22 GB. Streaming is the
-    // default; 0 restores the original single-allocation path.
-    //
-    // Measured on 1EJG - block 0 (hold everything) against 100, 250, 500, 1000,
-    // 2500 and 5000, two rounds with the sizes rotated so this host's drift falls
-    // on every arm. Every size produced the SAME tsc hash, and the times spanned
-    // 24.9 to 26.0 s with no trend in block size; that spread is the machine, not
-    // the blocking. Peak fell 1822 -> 1541 MB and did not vary with the size,
-    // because the live buffer is small next to the prediction itself.
-    //
-    // 1000 keeps that buffer near 3 * scatterers * blocksize * 16 bytes: 144 MB on
-    // a 3,000-atom structure, 411 MB on 8,566. 0 restores the old behaviour.
+    //Reflections per block when streaming the tsc; 0 restores the single allocation of the whole scatterers x reflections x 16 byte table
+    //The exact block size is not performance-critical
     size_t tsc_block_size = 1000;
-    // Set only when -tsc_block was passed, so an explicit block size wins over
-    // one derived from -mem rather than being silently overridden by it.
+    //Set only when -tsc_block was passed, so an explicit block size wins over one derived from -mem
     bool tsc_block_given = false;
-    // Reflections to hold at once when writing a table of n_scat scatterers, or 0
-    // for the whole table. An explicit -tsc_block wins; failing that -mem picks
-    // the largest window it can afford, and holds the table whole when it fits,
-    // that being the fastest arrangement; failing both, the 1000 default stands.
-    //
-    // The live cost of a block is about three copies of scatterers x block x 16
-    // bytes - the producer's, the queue's and the writer's - which is what the
-    // budget is spent against.
+    //Reflections to hold at once for n_scat scatterers, 0 for the whole table; -tsc_block wins, then -mem, then the default
+    //A block costs about three copies of n_scat * block * 16 bytes - producer, queue and writer - which is what the budget is spent against
     size_t tsc_block_for(const size_t n_refl, const size_t n_scat) const
     {
         if (tsc_block_given || !mem_given || mem <= 0.0)
@@ -843,8 +775,7 @@ struct options
         return items_within_budget(n_refl, item, static_cast<size_t>(mem * 1024.0 * 1024.0));
     }
 
-    // set once a streamed run has written the file itself, so the caller
-    // does not then overwrite it with an empty one-shot block
+    //set once a streamed run wrote the file itself, so the caller does not overwrite it with an empty one-shot block
     bool tsc_written_by_stream = false;
     bool qct = false;
     bool do_XCW = false;
@@ -857,9 +788,7 @@ struct options
     RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
     ivec3 rgbi_group_sets;
     bool fract = false;
-    // Standalone conceptual-DFT reactivity analysis (-fukui_analysis). Handled in
-    // run_app_impl rather than at parse time, so its output survives; see the
-    // comment where the flag is parsed.
+    //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
     bool fukui_analysis_run = false;
     bool profiling = false;
     bool promol_nci = false;
@@ -873,24 +802,9 @@ struct options
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 
-	/**
-	 * @brief Looks for debug mode in the command line arguments.
-	 *
-	 * This function searches for a specific debug flag in the command line arguments
-	 * and modifies the `argc` and `argv` parameters accordingly and stores them internally
-	 *
-	 * @param argc The number of command line arguments.
-	 * @param argv An array of C-style strings representing the command line arguments.
-	 *
-	 */
+	/** @brief Finds the debug flag, removes it from argc/argv and stores the rest internally. */
 	void look_for_debug(int& argc, char** argv);
-	/**
-	 * @brief Digests the options.
-	 *
-	 * This function is responsible for digesting the options and performing the necessary actions based on the selected options.
-	 *
-	 * @note Make sure to call this function after looking for debug.
-	 */
+	/** @brief Digests the options; call only after look_for_debug(). */
 	//file, format and conversion options
 	bool digest_io_options(const std::string &temp, int &i);
 	//resources, accuracy and general run control

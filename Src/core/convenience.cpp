@@ -160,62 +160,32 @@ namespace {
         }
     }
 
-    // **One definition of the geometry-aid hyperparameters, used by both the
-    // single-structure and the batch flag.** Two copies of this block would be
-    // the worst kind of bug available here: a descriptor of the right length
-    // computed with the wrong settings is not rejected by anything downstream
-    // and produces confident nonsense.
-    //
-    // These must match what the geometry-aid models were trained with, in
-    //   geometry-aid/multi_layer_classifier/c_only_training.py :: SOAP_HP
-    // and NOT the older values in geometry-aid/external_script.py.
-    //
-    // The feature count is the check: 11 species give 66 unique pairs, and the
-    // descriptor length is 66 * (max_radial+1)^2 * (max_angular+1).
-    //   old: 66 * 5^2 * 10 = 16,500
-    //   new: 66 * 7^2 * 13 = 42,042   <- what every shipped model expects
-    //
-    // SALTED is unaffected: it builds its own FeatomicHyperParameters from
+    // One definition of the geometry-aid hyperparameters, for both the single
+    // structure and the batch flag. They must match what the models were
+    // trained with, in geometry-aid/multi_layer_classifier/c_only_training.py
+    // :: SOAP_HP, NOT the older values in geometry-aid/external_script.py.
+    // A descriptor of the right length computed with the wrong settings is
+    // rejected by nothing downstream. The feature count is the check: 11
+    // species give 66 unique pairs and the length is
+    // 66 * (max_radial+1)^2 * (max_angular+1) = 66 * 7^2 * 13 = 42,042.
+    // SALTED is unaffected; it builds its own FeatomicHyperParameters from
     // config.nang1 / config.nang2 in SALTED_predictor.cpp.
-    // **The one field that differs between the two shipped model families.**
     //
-    // geometry-aid trains two variants and saves the hyperparameters beside
-    // each model, which is what settles this:
-    //
-    //   c_only : cutoff radius 3.5   trained on all-carbon input
-    //   dirty  : cutoff radius 3.0   trained on partly *wrong* labels
-    //
-    // Every other field is identical -- smoothing 0.7, density width 0.2,
-    // max_angular 12, max_radial 6, spline 1e-6 -- so both descriptors are
-    // 42,042 long and nothing downstream needs to change shape.
-    //
-    // The distinction matters because only the `dirty` model can be *iterated*.
-    // Dora's thesis pipeline predicts, relabels the atoms, and recomputes the
-    // descriptor on the relabelled structure -- SOAP is species-aware, so
-    // correcting one atom improves its neighbours' descriptors. Feeding
-    // relabelled input to `c_only` is out of distribution for it, which is why
-    // an earlier attempt at exactly this scored oxygen at 0.05 against 0.44 and
-    // was abandoned. It was the wrong model, not the wrong idea.
-    //
-    // Default stays 3.5 so existing behaviour and every shipped result is
-    // unchanged; `-geometry_aid_cutoff 3.0` selects the iterable variant.
+    // The cutoff radius is the one field that differs between the two shipped
+    // model families: 3.5 for `c_only`, trained on all-carbon input, and 3.0
+    // for `dirty`. Both descriptors are 42,042 long. Only `dirty` may be
+    // iterated (predict, relabel, recompute); relabelled input is out of
+    // distribution for `c_only`.
     double geometry_aid_cutoff_radius = 3.5;
 
     SALTED_Utils::FeatomicHyperParameters geometry_aid_hyperparameters()
     {
         const std::vector<std::string> species{ "B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I" };
 
-        // **Diagnostic override, never for production output.** Two guesses at
-        // where the fixed ~0.7 s of a descriptor call goes have been wrong: it
-        // is not the calculator constructor (0.010 s, and cached it makes no
-        // difference to a batch) and it is not the 65 empty species pairs
-        // (compute is flat in both atom count and element count). What is left
-        // is the radial-integral splining, which depends only on
-        // `spline_accuracy` -- so loosening it is the one measurement that
-        // settles it. A descriptor computed at a different accuracy is **not**
-        // comparable with any trained model, hence the warning: a vector of the
-        // right length computed with the wrong settings is rejected by nothing
-        // downstream and produces confident nonsense.
+        // Diagnostic override, never for production output. A descriptor
+        // computed at a different spline accuracy is not comparable with any
+        // trained model, and nothing downstream rejects it -- hence the
+        // warning.
         double spline_accuracy = 1E-6;
         if (const char* override_accuracy = std::getenv("NOSPHERA2_SPLINE_ACCURACY"))
         {
@@ -227,11 +197,7 @@ namespace {
 
         // Same diagnostic, for the two parameters that set the descriptor's
         // size: 66 pairs * (max_radial+1)^2 * (max_angular+1) = 42,042 today.
-        // The question these answer is whether a *retrained* model on a smaller
-        // descriptor would be cheaper to evaluate, which is the only remaining
-        // way to cut the fixed cost inside `compute` -- everything else has
-        // been measured and ruled out. Changing either invalidates every
-        // shipped model, hence the same warning.
+        // Changing either invalidates every shipped model.
         int max_radial = 6, max_angular = 12;
         if (const char* override_radial = std::getenv("NOSPHERA2_MAX_RADIAL"))
         {
@@ -259,17 +225,10 @@ namespace {
         };
     }
 
-    // ---- geometry-aid classifier, evaluated here instead of in Python ------
-    //
-    // Olex2 used to get 42,042 doubles per atom on disk and do the PCA and the
-    // three dense layers itself. Measured per call: 0.006 s to write the npy,
-    // 0.020 s to read it, 0.139 s to decompress the model npz, 0.030 s for the
-    // projection and 0.008 s for the layers -- about 0.20 s of a 1.07 s call,
-    // removable at **no cost in accuracy** because it is the same arithmetic.
-    //
-    // The weights come from `geometry_aid_model.bin`, produced once by
-    // `make_geometry_aid_bin.py`. The `.npz` is a deflated ZIP and there is no
-    // zlib here; a flat file avoids adding a zip reader to this codebase.
+    // geometry-aid classifier: the PCA and the three dense layers Olex2 used to
+    // run in Python, same arithmetic. The weights come from
+    // `geometry_aid_model.bin`, produced by `make_geometry_aid_bin.py`; the
+    // `.npz` it replaces is a deflated ZIP and there is no zlib here.
     struct GeometryAidModel
     {
         int n_features = 0, n_components = 0, n_layers = 0, n_classes = 0;
@@ -370,12 +329,9 @@ namespace {
         return found->second;
     }
 
-    // (n_atoms, n_classes) row-major probabilities.
-    //
-    // Summation order is not numpy's, so the last bits will differ from the
-    // Python route. That is fine and it is checked the way it matters:
-    // `bench_geometry_cpp.py` requires the **argmax and the full ranking** to
-    // agree on every atom, which is what the assignment actually consumes.
+    // (n_atoms, n_classes) row-major probabilities. Summation order is not
+    // numpy's, so the last bits differ from the Python route;
+    // `bench_geometry_cpp.py` checks the argmax and the full ranking instead.
     vec classify_descriptor(const double* descriptor, size_t n_atoms,
         size_t n_features, const GeometryAidModel& m)
     {
@@ -388,17 +344,12 @@ namespace {
         const size_t k = static_cast<size_t>(m.n_components);
         vec projected(n_atoms*k, 0.0);
 
-        // **(x - mean) . C^T  ==  x . C^T  -  mean . C^T**, and only the first
-        // term touches the descriptor. That matters because the descriptor is
-        // sparse in exactly the way the mean is not: an all-carbon .xyz -- what
-        // Olex2 sends on the first pass -- populates one of the 66 species-pair
-        // blocks, so 637 of 42,042 entries are non-zero. Centring first
-        // destroys that: `row[f] - mean[f]` is non-zero wherever the *mean* is,
-        // which is nearly everywhere, and the skip below never fires.
-        //
-        // Written the obvious way this measured 0.302 s against numpy's 0.038,
-        // eight times slower than the thing it was replacing. With the constant
-        // term lifted out it is a sparse row times a dense matrix.
+        // (x - mean) . C^T  ==  x . C^T  -  mean . C^T, and only the first term
+        // touches the descriptor. Centring first destroys its sparsity: an
+        // all-carbon .xyz -- what Olex2 sends on the first pass -- populates one
+        // of the 66 species-pair blocks, so 637 of 42,042 entries are non-zero,
+        // but `row[f] - mean[f]` is non-zero wherever the mean is and the skip
+        // below never fires.
         const double* mean_projection = m.mean_projection.data();
 #pragma omp parallel for
         for (long long a = 0; a < static_cast<long long>(n_atoms); ++a)
@@ -3608,17 +3559,11 @@ bool options::digest_ri_options(const std::string &temp, int &i)
     using namespace std;
     const int argc = (int)arguments.size();
     if (temp == "-geometry_aid_cutoff") {
-        // **Selects which geometry-aid model family the descriptor is for.**
-        // Must appear BEFORE the flag that computes anything, like -wfn --
-        // the descriptor flags exit(0) as soon as they have run.
-        //
-        //   3.5  (default)  the `c_only` models, trained on all-carbon input
-        //   3.0             the `dirty` models, trained on partly wrong
-        //                   labels and the only ones that can be iterated
-        //
-        // A descriptor computed at the wrong cutoff is 42,042 long either
-        // way and is rejected by nothing downstream, so the value used is
-        // echoed rather than applied silently.
+        // Selects the geometry-aid model family: 3.5 the `c_only` models,
+        // 3.0 the `dirty` ones. Must appear BEFORE the flag that computes
+        // anything -- the descriptor flags exit(0) as soon as they have run.
+        // A descriptor at the wrong cutoff is 42,042 long either way and is
+        // rejected by nothing downstream, so the value used is echoed.
         // `arguments`, not `argv` -- this parser walks a vector<string>.
         err_chkf(i + 1 < arguments.size(),
                  "-geometry_aid_cutoff needs a radius in Angstrom", std::cout);
@@ -3710,23 +3655,15 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         exit(failed && !done ? 1 : 0);
     }
     else if (temp == "-calc_featomic_descriptors") {
-        // **Many structures in one process.** Building the featomic
-        // calculator splines the radial integral for every (n, l) pair and
-        // costs a fixed 0.72 s; the descriptor itself costs about 0.0009 s
-        // per atom. Measured 6 August 2026: 2 atoms 0.74 s, 30 atoms 0.90 s,
-        // 1000 atoms 1.57 s. One structure per process therefore spends
-        // roughly ninety per cent of its time on setup that does not depend
-        // on the molecule at all.
+        // Many structures in one process: a descriptor call carries a fixed
+        // setup cost of roughly 0.7 s against about 0.0009 s per atom, and
+        // `calculate_SOAP_Powerspectrum` keeps its calculator for the lifetime
+        // of the process (see `cached_calculator`).
         //
-        // `calculate_SOAP_Powerspectrum` keeps the calculator for the
-        // lifetime of the process (see `cached_calculator`), so everything
-        // after the first entry here pays only the marginal cost.
-        //
-        // The list file is **one structure path per line**, and the
-        // descriptor is written beside it as `<path>.npy`. One field per
-        // line deliberately: an output column would need quoting rules, and
-        // paths with spaces in them are ordinary on Windows.
-        // Blank lines and lines beginning with '#' are ignored.
+        // The list file is one structure path per line; blank lines and lines
+        // beginning with '#' are ignored. Each descriptor is written beside its
+        // structure as `<path>.npy` -- one field per line, so paths with spaces
+        // need no quoting rules.
         const std::filesystem::path list_file = arguments[i + 1];
         err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
 
@@ -3749,9 +3686,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         size_t done = 0, failed = 0;
         for (const std::filesystem::path& structure : jobs)
         {
-            // **One bad structure must not cost the other 999.** A batch is
-            // the whole point of this flag, and a list of ten thousand
-            // peaks files will contain one that cannot be parsed.
+            // One unreadable structure must not abort the rest of the batch.
             if (!std::filesystem::exists(structure))
             {
                 std::cout << "MISSING " << structure.string() << std::endl;

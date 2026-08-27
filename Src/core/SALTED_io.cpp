@@ -248,9 +248,7 @@ std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int length) {
 #include <unistd.h>
 #endif
 
-// A raw positioned read of the model blocks. std::ifstream costs about 2.7x the
-// same bytes read this way; see the note in the header for why the file is not
-// mapped instead.
+// Raw positioned read of the model blocks; see the header for why not mapped.
 void SALTED_BINARY_FILE::open_raw() {
 #ifdef _WIN32
     if (raw_handle_) return;
@@ -448,9 +446,7 @@ void SALTED_BINARY_FILE::read_dataset(std::vector<T>& data, std::vector<size_t>&
         read_exact_bytes(file, data.data(), static_cast<std::streamsize>(size * sizeof(T)), "dataset payload");
 }
 
-// Same walk as read_dataset, without the payload. Used for species the structure
-// does not contain: their shape is still needed to index the flat weight vector,
-// their numbers never are.
+// Same walk as read_dataset, without the payload: shape only.
 void SALTED_BINARY_FILE::skip_dataset(std::vector<size_t>& dims, const size_t element_size,
                                       std::streamoff* payload_offset) {
     int ndims;
@@ -560,9 +556,7 @@ std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_features(
     return read_lambda_based_data("FEATS", wanted);
 }
 
-// One pass over a block that reads no numbers: for every (species, lambda) it
-// records where the matrix starts and how big it is, then steps over it. That
-// index is what lets the prediction fetch a lambda when it needs it.
+// Records payload offset and shape per (species, lambda), reading no numbers.
 std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref>
 SALTED_BINARY_FILE::index_lambda_based_data(const std::string& key) {
     open_raw();   // the blocks this indexes are read through it
@@ -587,9 +581,7 @@ SALTED_BINARY_FILE::index_lambda_based_data(const std::string& key) {
 
 dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
     if (ref.rows == 0 || ref.cols == 0) return dMatrix2{};
-    // Straight into the matrix. Reading into a vec and reshaping would allocate
-    // the whole block twice and memcpy between them, and this runs over the whole
-    // 800 MB model once per part - reshape() copies, it does not adopt.
+    // Read straight into the matrix; reshape() copies rather than adopting.
     using ext_t = typename dMatrix2::extents_type;
     dMatrix2 out(ext_t(ref.rows, ref.cols));
     const std::size_t bytes = ref.rows * ref.cols * sizeof(double);
