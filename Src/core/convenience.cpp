@@ -2688,6 +2688,1335 @@ double get_decimal_precision_from_CIF_number(std::string &given_string)
         return 0.005;
 };
 
+//file, format and conversion options
+bool options::digest_io_options(const std::string &temp, int &i)
+{
+    using namespace std;
+    const int argc = (int)arguments.size();
+    if (temp == "-b")
+        basis_set = arguments[i + 1];
+    else if (temp == "-coef")
+    {
+        coef_file = arguments[i + 1];
+        err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist", std::cout);
+        SALTED = true;
+    }
+    else if (temp == "-cif")
+    {
+        cif = arguments[i + 1];
+        err_checkf(std::filesystem::exists(cif), "CIF doesn't exist", std::cout);
+    }
+    else if (temp == "-convert_to_47") {
+        err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
+        std::filesystem::path _wfn = arguments[i + 1];
+        WFN wavy(e_origin::NOT_YET_DEFINED);
+        wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
+        wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout);
+        exit(0);
+    }
+    else if (temp == "-d")
+        basis_set_path = arguments[i + 1];
+    else if (temp == "-fchk")
+        fchk = arguments[i + 1];
+    else if (temp == "-gbw2wfn")
+        gbw2wfn = true;
+    else if (temp == "-hkl")
+    {
+        hkl = arguments[i + 1];
+        err_checkf(std::filesystem::exists(hkl), "hkl doesn't exist", std::cout);
+    }
+    else if (temp == "-wfn")
+    {
+        wfn = arguments[i + 1];
+        err_checkf(std::filesystem::exists(wfn), "Wavefunction does not exist!", std::cout);
+    }
+    else if (temp == "-wfn_cif")
+    {
+        write_CIF = true;
+    }
+    else if (temp == "-xyz")
+    {
+        xyz_file = arguments[i + 1];
+    }
+    else
+        return false;
+    return true;
+};
+
+//resources, accuracy and general run control
+bool options::digest_run_options(const std::string &temp, int &i)
+{
+    using namespace std;
+    const int argc = (int)arguments.size();
+    if (temp == "-acc")
+        accuracy = stoi(arguments[i + 1]);
+    else if (temp == "-Anion")
+    {
+        int n = 1;
+        string store;
+        if (debug)
+            std::cout << "Looking for Anions!" << endl;
+        while (i + n < argc && string(arguments[i + n]).find("-") != 0)
+        {
+            if (i + n - 1 > arguments.size())
+                break;
+            store = arguments[i + n];
+            svec Z = split_string<string>(store, " ");
+            for (int r = 0; r < Z.size(); r++)
+            {
+                if (debug)
+                    std::cout << Z[r] << endl;
+                Anions.push_back(Z[r]);
+            }
+            n++;
+        }
+    }
+    else if (temp == "-Cation")
+    {
+        int n = 1;
+        string store;
+        if (debug)
+            std::cout << "Looking for Cations!" << endl;
+        while (i + n < argc && string(arguments[i + n]).find("-") != 0)
+        {
+            if (i + n - 1 > arguments.size())
+                break;
+            store = arguments[i + n];
+            svec Z = split_string<string>(store, " ");
+            for (int r = 0; r < Z.size(); r++)
+            {
+                if (debug)
+                    std::cout << Z[r] << endl;
+                Cations.push_back(Z[r]);
+            }
+            n++;
+        }
+    }
+    else if (temp == "-charge")
+    {
+        charge = stoi(arguments[i + 1]);
+    }
+    else if (temp == "-cpus")
+    {
+        threads = stoi(arguments[i + 1]);
+        MKL_Set_Num_Threads(threads);
+#ifdef _OPENMP
+        omp_set_num_threads(threads);
+        omp_set_dynamic(0);
+#endif
+    }
+    else if (temp == "-dmin")
+        dmin = stod(arguments[i + 1]);
+    else if (temp == "-e_field")
+        efield = stod(arguments[i + 1]);
+    else if (temp == "-ECP" || temp == "-ecp" || temp == "-Ecp")
+    {
+        ECP = true;
+        if (argc >= i + 2 && string(arguments[i + 1]).find("-") != 0)
+        {
+            ECP_mode = stoi(arguments[i + 1]);
+        }
+    }
+    else if (temp == "-group")
+    {
+        int n = 1;
+        while (i + n < argc)
+        {
+            const string& group_arg = arguments[i + n];
+            // Olex2 can emit a bare -group followed by an empty argument.
+            // Do not index or parse an empty string: doing so corrupts the
+            // CRT state and later manifests as a stack-buffer-overrun.
+            if (group_arg.empty() || group_arg.find("-") != string::npos)
+                break;
+            int group;
+            if (group_arg[0] == '+')
+                group = -stoi(group_arg);
+            else
+                group = stoi(group_arg);
+            groups[0].push_back(group), n++;
+        }
+        i += n - 1;
+    }
+    else if (temp == "-hkl_min_max")
+    {
+        int h_min(stoi(arguments[i + 1]));
+        int h_max(stoi(arguments[i + 2]));
+        int k_min(stoi(arguments[i + 3]));
+        int k_max(stoi(arguments[i + 4]));
+        int l_min(stoi(arguments[i + 5]));
+        int l_max(stoi(arguments[i + 6]));
+        hkl_min_max = { {h_min, h_max}, {k_min, k_max}, {l_min, l_max} };
+    }
+    else if (temp == "-mem")
+    {
+        mem = stod(arguments[i + 1]); // In MB
+        mem_given = true;
+        vec a;
+        size_t vec_max_size = a.max_size();
+        double doubel_max_size = static_cast<double>(vec_max_size * sizeof(double)) * 1e-6;
+        if (mem > doubel_max_size)
+        {
+            std::cout << "Max memory set to " << mem << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << 50000 << " MB." << endl;
+            mem = 50000.0;
+        }
+    }
+    else if (temp == "-method")
+        method = arguments[i + 1];
+    else if (temp == "-mult")
+        mult = stoi(arguments[i + 1]);
+    else if (temp == "-no-date" || temp == "-no_date")
+        no_date = true;
+    else if (temp == "-pbc")
+        pbc = stoi(arguments[i + 1]);
+    else if (temp == "-profiling" || temp == "-profile")
+    {
+        profiling = true;
+        if (i + 1 < argc && arguments[i + 1].find("-") != 0)
+        {
+            profiling_tests_root = arguments[i + 1];
+        }
+    }
+    else if (temp == "-radius")
+        properties.radius = stod(arguments[i + 1]);
+    else if (temp == "-resolution")
+        properties.resolution = stod(arguments[i + 1]);
+    else if (temp == "-refine")
+        argc > i + 1 ? properties.integral_accuracy = stod(arguments[i + 1]) : properties.integral_accuracy = 0.1;
+    else if (temp.find("-rkpts") < 1)
+        read_k_pts = true;
+    else if (temp == "-skpts")
+        save_k_pts = true;
+    else if (temp == "-twin")
+    {
+        twin_law.resize(twin_law.size() + 1);
+        twin_law.back().resize(9);
+        for (int twl = 0; twl < 9; twl++)
+            twin_law.back()[twl] = stod(arguments[i + 1 + twl]);
+        if (debug)
+        {
+            std::cout << "twin_law: ";
+            for (int twl = 0; twl < 9; twl++)
+                std::cout << setw(7) << setprecision(2) << twin_law.back()[twl];
+            std::cout << endl;
+        }
+        i += 9;
+    }
+    else
+        return false;
+    return true;
+};
+
+//partitioning schemes, scattering factors and tsc tables
+bool options::digest_partition_options(const std::string &temp, int &i)
+{
+    using namespace std;
+    const int argc = (int)arguments.size();
+    if (temp == "-atom_sfac")
+    {
+        std::cout << NoSpherA2_message() << endl;
+        wfn = arguments[i + 1];
+        wfn2 = arguments[i + 2];
+        err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
+        WFN wavy(e_origin::NOT_YET_DEFINED);
+        wavy.read_known_wavefunction_format(wfn, std::cout, debug);
+        wavy.delete_unoccupied_MOs();
+
+        WFN wavy2(e_origin::NOT_YET_DEFINED);
+        wavy2.read_known_wavefunction_format(wfn2, std::cout, debug);
+        wavy2.delete_unoccupied_MOs();
+
+        bvec needs_grid(wavy.get_ncen(), false);
+        needs_grid[0] = true;
+        GridConfiguration conf;
+        conf.partition_type = PartitionType::Hirshfeld;
+        conf.accuracy = 4;
+        GridManager grid(conf);
+        vec2 d1, d2, d3, dens;
+        vec2 d1_2, d2_2, d3_2, dens_2;
+
+        cell unit_cell(10.0, 10.0, 10.0, 90, 90, 90);
+        ivec asym_atom_list(1, 0);
+        // Setup grids for the molecule
+        auto grid2 = grid;
+        grid.setup3DGridsForMolecule(wavy, asym_atom_list, needs_grid, unit_cell);
+        grid.getDensityVectors(wavy, asym_atom_list, d1, d2, d3, dens);
+        grid2.setup3DGridsForMolecule(wavy2, asym_atom_list, needs_grid, unit_cell);
+        grid2.getDensityVectors(wavy2, asym_atom_list, d1_2, d2_2, d3_2, dens_2);
+
+        for (int j = 0; j < d1.size(); j++)
+        {
+            for (int p = 0; p < d1[0].size(); p++)
+            {
+                dens[j][p] -= dens_2[j][p];
+            }
+        }
+
+        // Calculate partitioned charges
+        PartitionResults results = grid.calculatePartitionedCharges(wavy, unit_cell);
+
+        grid.printChargeTable({ "Fe" }, wavy, asym_atom_list, std::cout, results);
+
+        const int points = grid.getTotalGridPoints();
+        for (double k = 0.001; k < 10; k += 0.002) {
+            cdouble res = calc_spherically_averaged_at_k(d1, d2, d3, dens, k);
+            std::cout << "k: " << k << " sfac: " << setprecision(9) << setw(16) << scientific << res.real() << " " << setprecision(9) << setw(16) << scientific << res.imag() << endl;
+        }
+        exit(0);
+    }
+    else if (temp == "-becke" || temp == "-BECKE" || temp == "-Becke")
+        partition_type = PartitionType::Becke;
+    else if (temp == "-cmtc")
+    {
+        cif_based_combined_tsc_calc = true;
+        int n = 1;
+        string delimiter = ",";
+        groups.pop_back();
+        while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+        {
+            combined_tsc_calc_files.push_back(arguments[i + n]);
+            n++;
+            combined_tsc_calc_cifs.push_back(arguments[i + n]);
+            n++;
+            const string _temp = arguments[i + n];
+            if (_temp.find(delimiter) == string::npos) {
+                if (debug)
+                    std::cout << "--Delimiter not found, using ." << endl;
+                delimiter = ".";
+            }
+            groups.push_back(split_string<int>(_temp, delimiter));
+            if (debug)
+            {
+                std::cout << "--Group: " << _temp << endl << "--";
+                for (int run = 0; run < groups[groups.size() - 1].size(); run++)
+                    std::cout << groups[groups.size() - 1][run] << " ";
+                std::cout << endl;
+            }
+            n++;
+        }
+    }
+    else if (temp == "-def" || temp == "-DEF")
+        properties.def = true;
+    else if (temp == "-ED")
+        electron_diffraction = true;
+    else if (temp == "-embis" || temp == "-EMBIS")
+    {
+        partition_type = PartitionType::EMBIS;
+    }
+    else if (temp == "-HDEF")
+        properties.hdef = true;
+    else if (temp == "-hirsh")
+        properties.hirsh = true, properties.hirsh_number = stoi(arguments[i + 1]);
+    else if (temp == "-tsc_block")
+    {
+        tsc_block_size = static_cast<size_t>(std::stoll(arguments[i + 1]));
+        tsc_block_given = true;
+    }
+    else if (temp == "-IAM")
+        iam_switch = true;
+    else if (temp == "-mbis" || temp == "-MBIS")
+    {
+        partition_type = PartitionType::MBIS;
+    }
+    else if (temp == "-merge")
+    {
+        pathvec filenames;
+        int n = 1;
+        while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+        {
+            filenames.push_back(arguments[i + n]);
+            n++;
+        }
+        merge_tscs("combine", filenames, old_tsc);
+        exit(0);
+    }
+    else if (temp == "-merge_nocheck")
+    {
+        pathvec filenames;
+        int n = 1;
+        while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+        {
+            filenames.push_back(arguments[i + n]);
+            n++;
+        }
+        merge_tscs_without_checks("combine", filenames, old_tsc);
+        exit(0);
+    }
+    else if (temp == "-mtc")
+    {
+        combined_tsc_calc = true;
+        int n = 1;
+        string delimiter = ",";
+        groups.pop_back();
+        while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+        {
+            combined_tsc_calc_files.push_back(arguments[i + n]);
+            n++;
+            const string _temp = arguments[i + n];
+            if (_temp.find(delimiter) == string::npos) {
+                if (debug)
+                    std::cout << "--Delimiter not found, using ." << endl;
+                delimiter = ".";
+            }
+            groups.push_back(split_string<int>(_temp, delimiter));
+            if (debug)
+            {
+                std::cout << "--Group: " << _temp << endl << "--";
+                for (int run = 0; run < groups[groups.size() - 1].size(); run++)
+                    std::cout << groups[groups.size() - 1][run] << " ";
+                std::cout << endl;
+            }
+            n++;
+        }
+    }
+    else if (temp == "-mtc_mult")
+    {
+        int n = 1;
+        while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+        {
+            combined_tsc_calc_mult.push_back(stoi(arguments[i + n]));
+            n++;
+        }
+    }
+    else if (temp == "-mtc_charge")
+    {
+        int n = 1;
+        while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+        {
+            if (arguments[i + n][0] == 'n')
+                combined_tsc_calc_charge.push_back(-stoi(arguments[i + n].substr(1)));
+            else
+                combined_tsc_calc_charge.push_back(stoi(arguments[i + n]));
+            n++;
+        }
+    }
+    else if (temp == "-mtc_ECP")
+    {
+        int m = 1;
+        while (i + m < argc && string(arguments[i + m]).find("-") > 0)
+        {
+            combined_tsc_calc_ECP.push_back(stoi(arguments[i + m]));
+            m++;
+        }
+    }
+    else if (temp == "-SALTED" || temp == "-salted")
+    {
+        SALTED = true;
+        salted_model_dir = arguments[i + 1];
+    }
+    else if (temp == "-SALTED_COEFS" || temp == "-salted_coefs")
+    {
+        salted_model_dir = arguments[i + 1];
+
+        //Check that wfn is not empty
+        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+
+        WFN wavy(wfn);
+        SALTEDPredictor SP(wavy, *this);
+        filesystem::path salted_model_path = SP.get_salted_filename();
+        log_file << "Using " << salted_model_path << " for the prediction" << endl;
+        if (!SP.basis_set_loaded()) {
+            const string df_basis_name = SP.get_dfbasis_name();
+            std::shared_ptr<BasisSet> _aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
+            load_basis_into_WFN(SP.wavy, _aux_basis);
+        }
+        vec coefs = SP.gen_SALTED_densities();
+        npy::npy_data<double> np_coeffs;
+        np_coeffs.data = coefs;
+        np_coeffs.fortran_order = false;
+        np_coeffs.shape = { static_cast<unsigned long>(coefs.size()) };
+        npy::write_npy("SALTED_COEFS.npy", np_coeffs);
+    }
+    else if (temp == "-SALTED_Training") {
+        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction.", std::cout);
+        err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+
+        WFN wavy(wfn);
+        WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+
+        create_SALTED_training_data(wavy, wavy_aux);
+        exit(0);
+    }
+    else if (temp == "-sfac_diffuse")
+    {
+        sfac_diffuse[0] = fromString<double>(arguments[i + 1]);
+        sfac_diffuse[1] = fromString<double>(arguments[i + 2]);
+        sfac_diffuse[2] = fromString<double>(arguments[i + 3]);
+        cif = arguments[i + 4];
+        wfn = arguments[i + 5];
+        dmin = fromString<double>(arguments[i + 6]);
+        calc_sfac_diffuse(*this, std::cout);
+    }
+    else if (temp == "-old_tsc")
+    {
+        old_tsc = true;
+    }
+    else if (temp == "-tfvc" || temp == "-TFVC")
+    {
+        partition_type = PartitionType::TFVC;
+    }
+    else if (temp == "-tscb")
+    {
+        std::filesystem::path name = arguments[i + 1];
+        string cif_name = "test.cif";
+        if (name.extension() == ".tscb")
+        {
+            tsc_block<int, cdouble> blocky = read_tsc_table(name);
+            blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
+        }
+        else if (name.extension() == ".tsc")
+        {
+            tsc_block<int, cdouble> blocky = read_tsc_table(name);
+            blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
+        }
+        else
+            err_checkf(false, "Wrong file ending!", std::cout);
+        exit(0);
+    }
+    else if (temp == "-tsc_labels")
+    {
+        const bool has_table_and_cif =
+            i + 2 < argc &&
+            arguments[i + 1].find('-') != 0 &&
+            arguments[i + 2].find('-') != 0;
+
+        if (has_table_and_cif)
+        {
+            const std::filesystem::path table = arguments.at(i + 1);
+            const std::filesystem::path cif_file = arguments.at(i + 2);
+            std::filesystem::path output = table;
+            output.replace_extension(".labels.tsc");
+            if (i + 3 < argc && arguments[i + 3].find('-') != 0)
+                output = arguments[i + 3];
+            if (!convert_tsc_ids_to_labels(table, cif_file, output, std::cout))
+                exit(1);
+            exit(0);
+        }
+
+        label_tsc_output = true;
+    }
+    else if (temp == "-anom_disp")
+    {
+        anom_disp_path = arguments[i + 1];
+    }
+    else if (temp == "-occ")
+    {
+        occ = arguments[i + 1];
+        err_checkf(std::filesystem::exists(occ), "OCC input doesn't exist!", std::cout);
+
+    }
+    else
+        return false;
+    return true;
+};
+
+//cube and property evaluation
+bool options::digest_property_options(const std::string &temp, int &i)
+{
+    using namespace std;
+    const int argc = (int)arguments.size();
+    if (temp == "-all_charges")
+        all_charges = true;
+    else if (temp == "-laplacian_bonds")
+    {
+        wfn = arguments[i + 1];
+        bondwise_laplacian_plots(wfn);
+        exit(0);
+    }
+    else if (temp == "-atom_dens")
+    {
+        std::cout << NoSpherA2_message() << endl;
+        wfn = arguments[i + 1];
+        err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
+        ivec val_MOs;
+        ivec val_MOs_beta;
+        if (argc >= i + 3)
+        {
+            val_MOs = split_string<int>(arguments[i + 2], ",");
+            std::cout << "Alpha MOs to keep: ";
+            for (int j = 0; j < val_MOs.size(); j++)
+                std::cout << val_MOs[j] << " ";
+            std::cout << endl;
+            val_MOs_beta = split_string<int>(arguments[i + 3], ",");
+            std::cout << "Beta MOs to keep: ";
+            for (int j = 0; j < val_MOs_beta.size(); j++)
+                std::cout << val_MOs_beta[j] << " ";
+            std::cout << endl;
+        }
+        spherically_averaged_density(*this, val_MOs, val_MOs_beta);
+        exit(0);
+    }
+    else if (temp == "-combine_mos")
+    {
+        combine_mo.push_back(arguments[i + 1]);
+        combine_mo.push_back(arguments[i + 2]);
+        do_combine_mo(*this);
+        exit(0);
+    }
+    else if (temp == "-cmos1")
+    {
+        int j = 1;
+        while (i + j < argc && arguments[i + j].find("-") >= 1)
+        {
+            cmo1.push_back(stoi(arguments[i + j]));
+            j++;
+        }
+    }
+    else if (temp == "-cmos2")
+    {
+        int j = 1;
+        while (i + j < argc && arguments[i + j].find("-") >= 1)
+        {
+            cmo2.push_back(stoi(arguments[i + j]));
+            j++;
+        }
+    }
+    else if (temp == "-density_difference" || temp == "-density-difference")
+    {
+        wfn2 = arguments[i + 1];
+    }
+    else if (temp == "-dipole_moments")
+    {
+        dipole_moments(*this);
+        exit(0);
+    }
+    // Visualize the specified orbital using spherical harmonics.
+    // Call as -draw_orbits lambda,m,resolution,radius
+    // Where resolution and radius are optional
+    else if (temp == "-draw_orbits")
+    {
+        vec opts = split_string<double>(arguments[i + 1], ",");
+        int l = static_cast<int>(opts[0]);
+        int m = static_cast<int>(opts[1]);
+        properties.resolution = 0.025;
+        properties.radius = 3.5;
+        if (opts.size() >= 3)
+        {
+            properties.resolution = opts[2];
+        }
+        if (opts.size() == 4)
+        {
+            properties.radius = opts[3];
+        }
+
+        draw_orbital(l, m, properties.resolution, properties.radius);
+        exit(0);
+    }
+    else if (temp == "-eli")
+        properties.eli = true;
+    else if (temp == "-eli_analysis") {
+        err_checkf(argc >= i + 4, "Not enough arguments for -eli_analysis\nPlease provide at least wfn, resolution and radius!", std::cout);
+        wfn = arguments[i + 1];
+        properties.resolution = stod(arguments[i + 2]);
+        properties.radius = stod(arguments[i + 3]);
+        ELI_analysis(wfn, *this);
+        exit(0);
+    }
+    else if (temp == "-qtaim_eli") {
+        // Cube-files mode:  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [<bg_value>]
+        // WFN mode:         -qtaim_eli <wfn_file> <atoms_csv> [<resolution>] [<radius>] [<bg_value>]
+        err_checkf(i + 2 < argc,
+            "Usage:\n"
+            "  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [bg_value]\n"
+            "  -qtaim_eli <wfn_file> <atoms_csv> [resolution] [radius] [bg_value]\n"
+            "atoms_csv: comma-separated 0-based atom indices, e.g. 0,3,7\n"
+            "bg_value:  value assigned to non-selected voxels (default 0)",
+            std::cout);
+
+        std::filesystem::path arg1 = arguments[i + 1];
+        const bool cube_mode = (arg1.extension() == ".cube");
+
+        std::filesystem::path rho_path, eli_path_arg;
+        std::string atoms_csv;
+        double bg_val = 0.0;
+
+        if (cube_mode) {
+            err_checkf(i + 3 < argc,
+                "Cube mode requires: -qtaim_eli <rho.cube> <eli.cube> <atoms_csv>", std::cout);
+            rho_path     = arg1;
+            eli_path_arg = arguments[i + 2];
+            atoms_csv    = arguments[i + 3];
+            if (i + 4 < argc) bg_val = stod(arguments[i + 4]);
+        } else {
+            rho_path  = arg1;  // wfn path
+            atoms_csv = arguments[i + 2];
+            if (i + 3 < argc && !std::filesystem::path(arguments[i + 3]).has_extension())
+                ; // next arg looks like atoms_csv already consumed; nothing extra
+            if (i + 3 < argc) {
+                try { properties.resolution = stod(arguments[i + 3]); }
+                catch (...) { /* optional — might be bg_val */ }
+            }
+            if (i + 4 < argc) {
+                try { properties.radius = stod(arguments[i + 4]); }
+                catch (...) {}
+            }
+            if (i + 5 < argc) {
+                try { bg_val = stod(arguments[i + 5]); }
+                catch (...) {}
+            }
+        }
+
+        // Parse comma-separated 0-based atom indices
+        std::vector<int> indices;
+        {
+            std::stringstream ss(atoms_csv);
+            std::string tok;
+            while (std::getline(ss, tok, ',')) {
+                std::string t = trim(tok);
+                if (!t.empty()) indices.push_back(std::stoi(t));
+            }
+        }
+        err_checkf(!indices.empty(), "No atom indices parsed from: " + atoms_csv, std::cout);
+
+        run_QTAIM_ELI_mask(rho_path, eli_path_arg, indices, bg_val, *this, log_file);
+        exit(0);
+    }
+    else if (temp == "-elf")
+        properties.elf = true;
+    else if (temp == "-esp")
+        properties.esp = true;
+    else if (temp == "-fukui" || temp == "-Fukui")
+        properties.fukui = true;
+    else if (temp == "-fukui_analysis")
+    {
+        // Only records the request; the analysis itself runs from
+        // run_app_impl.
+        //
+        // Doing the work here instead - the pattern -dipole_moments,
+        // -laplacian_bonds and friends use - would put the whole table in
+        // NoSpherA2.log and nothing on the terminal, because run_app_impl
+        // has already pointed std::cout at that log file by the time
+        // digest_options() runs. (Verified: -dipole_moments prints nothing
+        // to stdout and 2.9 kB to the log.) That is tolerable for a
+        // side-effect command and useless for one whose entire output is
+        // meant to be read, so this one is dispatched later, where the
+        // console buffer can be restored first.
+        fukui_analysis_run = true;
+        // Wavefunction may be given inline (-fukui_analysis mol.gbw) or with
+        // the usual -wfn. The inline form is the point of the flag, so it
+        // wins, but only if the next token is not itself an option.
+        if (i + 1 < argc && arguments[i + 1][0] != '-')
+        {
+            wfn = arguments[i + 1];
+            i++;
+        }
+    }
+    else if (temp == "-ewal_sum")
+    {
+        // bool read, WFN& wave, std::ostream& file,
+        WFN *temp_w = new WFN(e_origin::cub);
+        cube residual(arguments[i + 1], true, *temp_w, std::cout);
+        if (argc >= i + 3)
+        {
+            int k_max = stoi(arguments[i + 2]);
+            if (argc >= i + 4)
+                residual.ewald_sum(k_max, stod(arguments[i + 3]));
+            else
+                residual.ewald_sum(k_max);
+        }
+        else
+            residual.ewald_sum();
+        delete (temp_w);
+        exit(0);
+    }
+    else if (temp == "-fractal")
+        fract = true, fract_name = arguments[i + 1];
+    else if (temp == "-get_g")
+        get_g = true;
+    else if (temp == "-hirshfeld_surface")
+    {
+        hirshfeld_surface = arguments[i + 1];
+        hirshfeld_surface2 = arguments[i + 2];
+    }
+    else if (temp == "-lap")
+        properties.lap = true;
+    else if (temp == "-MO")
+    {
+        if (string(arguments[i + 1]) != "all")
+            properties.MO_numbers.push_back(stoi(arguments[i + 1]));
+        else
+            properties.all_mos = true;
+    }
+    else if (temp == "-polarizabilities")
+    {
+        pol_wfns = { arguments[i + 1],
+                    arguments[i + 2],
+                    arguments[i + 3],
+                    arguments[i + 4],
+                    arguments[i + 5],
+                    arguments[i + 6],
+                    arguments[i + 7] };
+    }
+    else if (temp == "-QCT" || temp == "-qct")
+        qct = true;
+    else if (temp == "-promol_nci")
+    {
+        err_checkf(i + 2 < argc,
+            "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max]",
+            std::cout);
+        promol_nci = true;
+        promol_nci_xyz1 = arguments[i + 1];
+        promol_nci_xyz2 = arguments[i + 2];
+        err_checkf(std::filesystem::exists(promol_nci_xyz1), "First XYZ file doesn't exist: " + promol_nci_xyz1.string(), std::cout);
+        err_checkf(std::filesystem::exists(promol_nci_xyz2), "Second XYZ file doesn't exist: " + promol_nci_xyz2.string(), std::cout);
+
+        double *optional_values[] = {
+            &properties.promol_nci_rcut1,
+            &properties.promol_nci_rcut2,
+            &properties.promol_nci_rho_abs_max,
+            &properties.promol_nci_rdg_max
+        };
+        int optional_index = 0;
+        while (optional_index < 4 && i + 3 + optional_index < argc)
+        {
+            try
+            {
+                size_t consumed = 0;
+                const std::string &candidate = arguments[i + 3 + optional_index];
+                const double value = std::stod(candidate, &consumed);
+                if (consumed != candidate.size())
+                    break;
+                *optional_values[optional_index] = value;
+                optional_index++;
+            }
+            catch (...)
+            {
+                break;
+            }
+        }
+
+        i += 2 + optional_index;
+    }
+    else if (temp == "-promol_nci_single_thread")
+        properties.promol_nci_single_threaded = true;
+    else if (temp == "-rdg")
+        properties.rdg = true;
+    else if (temp == "-rho_cube")
+    {
+        string wfn_name = arguments[i + 1];
+        std::cout << "Reading wavefunction: " << wfn_name << endl;
+        WFN wavy = WFN(wfn_name);
+        std::cout << "Assigning ECPs" << endl;
+        if (ECP)
+            wavy.set_has_ECPs(true);
+        std::cout << "Starting cube calculation" << endl;
+        wavy.write_rho_cube();
+        exit(0);
+    }
+    else if (temp.find("-s_rho") < 1)
+        properties.s_rho = true;
+    else if (temp == "-atom_dens_diff")
+    {
+        filesystem::path name_wfn_1 = arguments[i + 1];
+        filesystem::path name_wfn_2 = arguments[i + 2];
+
+        subtract_dens_from_gbw(name_wfn_1, name_wfn_2, 2, 0.05);
+        exit(0);
+    }
+    else if (temp == "-spherical_aver_fukui")
+    {
+        filesystem::path wfn1_name = arguments[i + 1];
+        filesystem::path wfn2_name = arguments[i + 2];
+        WFN *wavy1 = new WFN(wfn1_name);
+        WFN *wavy2 = new WFN(wfn2_name);
+        ofstream outputFile("fukui_averaged_density_wfn.dat");
+        for (double r = 0.001; r < 10.0; r += 0.001)
+        {
+            // double dens = calc_grid_averaged_at_r_from_cube(cube_from_file, r, 360, 5800);
+            double dens = calc_fukui_averaged_at_r(*wavy1, *wavy2, r, 5810, 5810);
+            outputFile << r << " " << dens << "\n";
+        }
+        outputFile.close();
+        std::cout << "Data written to output.dat" << endl;
+        delete (wavy1);
+        delete (wavy2);
+        exit(0);
+    }
+    else if (temp == "-spherical_aver_hirsh")
+    {
+        string wfn_name = arguments[i + 1];
+        std::cout << "Reading wavefunction: " << wfn_name << endl;
+        WFN *wavy = new WFN(wfn_name);
+        std::cout << "Assigning ECPs" << endl;
+        if (ECP)
+            wavy->set_has_ECPs(true);
+        std::cout << "Starting spherical averaging" << endl;
+        double dens;
+
+        for (int index_atom = 0; index_atom < wavy->get_ncen(); index_atom += 1)
+        {
+            ofstream outputFile("hirsh_averaged_density_" + std::to_string(index_atom) + ".dat");
+            for (double r = 0.001; r < 5.0; r += 0.002)
+            {
+                dens = calc_hirsh_grid_averaged_at_r(*wavy, index_atom, r, 360, 5800);
+                outputFile << r << " " << dens << "\n";
+            }
+            outputFile.close();
+        }
+        std::cout << "Data written to output.dat" << endl;
+        delete (wavy);
+        exit(0);
+    }
+    else if (temp == "-spherical_harmonic")
+    {
+        spherical_harmonic_test();
+        exit(0);
+    }
+    else if (temp == "-spherical_atoms") {
+        write_spherical_atoms();
+        exit(0);
+    }
+    else if (temp == "-cube_density" || temp == "-cube")
+    {
+        cube_density = arguments[i + 1];
+        err_checkf(std::filesystem::exists(cube_density), "Cube density file does not exist!", std::cout);
+    }
+    else if (temp == "-calc_dens_1D")
+    {
+        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -calc_dens_1D to specify a wavefunction.", std::cout);
+        err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -calc_dens_1D to specify an auxiliary basis set.", std::cout);
+        int atom_idx_1 = 0;
+        int atom_idx_2 = 1;
+        int gridpoints = 1000;
+        double padding = 2.0;
+        if (string(arguments[i + 1]).find("-") != 0) {
+            atom_idx_1 = stoi(arguments[i + 1]);
+        }
+        if (string(arguments[i + 2]).find("-") != 0) {
+            atom_idx_2 = stoi(arguments[i + 2]);
+        }
+        if (string(arguments[i + 3]).find("-") != 0) {
+            gridpoints = stoi(arguments[i + 3]);
+        }
+        if (string(arguments[i + 4]).find("-") != 0) {
+            padding = stod(arguments[i + 4]);
+        }
+
+        WFN wavy(wfn);
+        string out = "Calculating 1D density between atoms " + wavy.get_atom_label(atom_idx_1) + " (" + std::to_string(atom_idx_1) + ") and " + wavy.get_atom_label(atom_idx_2) + " (" + std::to_string(atom_idx_2) + ") with " + std::to_string(gridpoints) + " gridpoints and " + std::to_string(padding) + " Angstrom padding.";
+        std::cout << out << std::endl;
+        get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
+        exit(0);
+    }
+    else
+        return false;
+    return true;
+};
+
+//RI fitting, featomic descriptors and atom classification
+bool options::digest_ri_options(const std::string &temp, int &i)
+{
+    using namespace std;
+    const int argc = (int)arguments.size();
+    if (temp == "-geometry_aid_cutoff") {
+        // **Selects which geometry-aid model family the descriptor is for.**
+        // Must appear BEFORE the flag that computes anything, like -wfn --
+        // the descriptor flags exit(0) as soon as they have run.
+        //
+        //   3.5  (default)  the `c_only` models, trained on all-carbon input
+        //   3.0             the `dirty` models, trained on partly wrong
+        //                   labels and the only ones that can be iterated
+        //
+        // A descriptor computed at the wrong cutoff is 42,042 long either
+        // way and is rejected by nothing downstream, so the value used is
+        // echoed rather than applied silently.
+        // `arguments`, not `argv` -- this parser walks a vector<string>.
+        err_chkf(i + 1 < arguments.size(),
+                 "-geometry_aid_cutoff needs a radius in Angstrom", std::cout);
+        geometry_aid_cutoff_radius = std::stod(arguments[++i]);
+        std::cout << "  geometry-aid SOAP cutoff radius set to "
+                  << geometry_aid_cutoff_radius << " A ("
+                  << (geometry_aid_cutoff_radius > 3.25 ? "c_only" : "dirty")
+                  << " model family)" << std::endl;
+    }
+    else if (temp == "-calc_featomic_descriptor") {
+        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
+        // Unchanged behaviour, down to the output file name: Olex2 calls
+        // exactly this and reads `descriptor.npy` from the working
+        // directory. The hyperparameters moved to a shared function so the
+        // batch flag below cannot drift away from them.
+        write_featomic_descriptor(wfn, "descriptor.npy", geometry_aid_hyperparameters());
+        exit(0);
+    }
+    else if (temp == "-classify_atoms") {
+        // -wfn <structure> -classify_atoms <model.bin> [<out.npy>]
+        //
+        // Writes class probabilities, one row per atom, in the class order
+        // the model carries. Default output `probabilities.npy`, matching
+        // the way `-calc_featomic_descriptor` defaults to descriptor.npy.
+        err_chkf(!wfn.empty(), "No structure specified! Use -wfn BEFORE -classify_atoms.", std::cout);
+        const std::filesystem::path model_path = arguments[i + 1];
+        err_chkf(std::filesystem::exists(model_path),
+            "The geometry-aid model does not exist: " + model_path.string(), std::cout);
+        std::filesystem::path out_path = "probabilities.npy";
+        if (i + 2 < arguments.size() && !arguments[i + 2].empty() && arguments[i + 2][0] != '-')
+            out_path = arguments[i + 2];
+        write_geometry_aid_probabilities(wfn, out_path, model_path,
+            geometry_aid_hyperparameters());
+        exit(0);
+    }
+    else if (temp == "-classify_atoms_list") {
+        // The batch form: -classify_atoms_list <list> <model.bin>, one
+        // structure path per line, each written as <path>.probs.npy.
+        const std::filesystem::path list_file = arguments[i + 1];
+        const std::filesystem::path model_path = arguments[i + 2];
+        err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
+        err_chkf(std::filesystem::exists(model_path), "The geometry-aid model does not exist: " + model_path.string(), std::cout);
+
+        std::vector<std::filesystem::path> jobs;
+        {
+            std::ifstream list(list_file);
+            std::string line;
+            while (std::getline(list, line))
+            {
+                const std::string entry = trim(line);
+                if (entry.empty() || entry[0] == '#') continue;
+                jobs.push_back(std::filesystem::path(entry));
+            }
+        }
+        err_chkf(!jobs.empty(), "The structure list is empty: " + list_file.string(), std::cout);
+
+        const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
+        const auto started = std::chrono::steady_clock::now();
+        size_t done = 0, failed = 0;
+        for (const std::filesystem::path& structure : jobs)
+        {
+            if (!std::filesystem::exists(structure))
+            {
+                std::cout << "MISSING " << structure.string() << std::endl;
+                ++failed;
+                continue;
+            }
+            try
+            {
+                const auto one = std::chrono::steady_clock::now();
+                std::filesystem::path out_path = structure;
+                out_path += ".probs.npy";
+                write_geometry_aid_probabilities(structure, out_path, model_path, hyperparams);
+                std::cout << "PROBABILITIES " << out_path.string() << " seconds="
+                          << std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count()
+                          << std::endl;
+                ++done;
+            }
+            catch (const std::exception& e)
+            {
+                std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
+                ++failed;
+            }
+        }
+        const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+        std::cout << "BATCH done=" << done << " failed=" << failed
+                  << " seconds=" << total
+                  << " per_structure=" << (done ? total / done : 0.0) << std::endl;
+        exit(failed && !done ? 1 : 0);
+    }
+    else if (temp == "-calc_featomic_descriptors") {
+        // **Many structures in one process.** Building the featomic
+        // calculator splines the radial integral for every (n, l) pair and
+        // costs a fixed 0.72 s; the descriptor itself costs about 0.0009 s
+        // per atom. Measured 6 August 2026: 2 atoms 0.74 s, 30 atoms 0.90 s,
+        // 1000 atoms 1.57 s. One structure per process therefore spends
+        // roughly ninety per cent of its time on setup that does not depend
+        // on the molecule at all.
+        //
+        // `calculate_SOAP_Powerspectrum` keeps the calculator for the
+        // lifetime of the process (see `cached_calculator`), so everything
+        // after the first entry here pays only the marginal cost.
+        //
+        // The list file is **one structure path per line**, and the
+        // descriptor is written beside it as `<path>.npy`. One field per
+        // line deliberately: an output column would need quoting rules, and
+        // paths with spaces in them are ordinary on Windows.
+        // Blank lines and lines beginning with '#' are ignored.
+        const std::filesystem::path list_file = arguments[i + 1];
+        err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
+
+        std::vector<std::filesystem::path> jobs;
+        {
+            std::ifstream list(list_file);
+            std::string line;
+            while (std::getline(list, line))
+            {
+                const std::string entry = trim(line);
+                if (entry.empty() || entry[0] == '#')
+                    continue;
+                jobs.push_back(std::filesystem::path(entry));
+            }
+        }
+        err_chkf(!jobs.empty(), "The structure list is empty: " + list_file.string(), std::cout);
+
+        const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
+        const auto started = std::chrono::steady_clock::now();
+        size_t done = 0, failed = 0;
+        for (const std::filesystem::path& structure : jobs)
+        {
+            // **One bad structure must not cost the other 999.** A batch is
+            // the whole point of this flag, and a list of ten thousand
+            // peaks files will contain one that cannot be parsed.
+            if (!std::filesystem::exists(structure))
+            {
+                std::cout << "MISSING " << structure.string() << std::endl;
+                ++failed;
+                continue;
+            }
+            try
+            {
+                const auto one = std::chrono::steady_clock::now();
+                std::filesystem::path out_path = structure;
+                out_path += ".npy";
+                write_featomic_descriptor(structure, out_path, hyperparams);
+                const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count();
+                std::cout << "DESCRIPTOR " << out_path.string() << " seconds=" << seconds << std::endl;
+                ++done;
+            }
+            catch (const std::exception& e)
+            {
+                std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
+                ++failed;
+            }
+        }
+        const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+        std::cout << "BATCH done=" << done << " failed=" << failed
+                  << " seconds=" << total
+                  << " per_structure=" << (done ? total / done : 0.0) << std::endl;
+        exit(failed && !done ? 1 : 0);
+    }
+    else if (temp == "-rgbi")
+        rgbi = true;
+    else if (temp == "-rgbi_no_sym") {
+        rgbi = true;
+        rgbi_no_sym = true;
+    }
+    else if (temp == "-rgbi_EVs") {
+        rgbi_EVs = true;
+    }
+    else if (temp == "-rgbi_basis") {
+        err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);
+        rgbi = true;
+        std::string basis = arguments[i + 1];
+        std::transform(basis.begin(), basis.end(), basis.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (basis == "nao")
+            rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
+        else if (basis == "ano")
+            rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
+        else
+            err_checkf(false, "Invalid -rgbi_basis value '" + basis + "'. Use 'nao' or 'ano'.", std::cout);
+    }
+    else if (temp == "-rgbi-groups") {
+        int n = 1;
+        ivec2 group_set;
+        while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
+            group_set.push_back(parse_rgbi_group_indices(arguments[i + n]));
+            n++;
+        }
+        if (!group_set.empty()) {
+            validate_rgbi_group_set(group_set);
+            rgbi_group_sets.push_back(group_set);
+        }
+        i += n - 1;
+        rgbi = true;
+    }
+    else if (temp == "-RI_FIT" || temp == "-ri_fit")
+    {
+        RI_FIT = true;
+        partition_type = PartitionType::RI;
+        int next_basis_set = i + 1;
+        // Check if next argument is a valid basis set name or a new argument starting with "-"
+        while (next_basis_set < argc && arguments[next_basis_set].find("-") != 0) {
+            if (arguments[next_basis_set] == "auto_aux") {
+                double beta = 2.0;
+                //Check if the next argument is a valid double
+                if (next_basis_set + 1 < argc && arguments[next_basis_set + 1].find("-") != 0) {
+                    beta = std::stod(arguments[next_basis_set + 1]);
+                }
+                aux_basis.push_back(std::make_shared<BasisSet>());
+                break;
+            }
+            err_chkf(BasisSetLibrary::check_basis_set_exists(arguments[next_basis_set]),
+                "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
+            aux_basis.push_back(BasisSetLibrary::get_basis_set(arguments[next_basis_set]));
+            next_basis_set++;
+        }
+        if (aux_basis.size() == 0) {
+            cout << "No basis set specified. Falling back to automatic generation using beta = 2.0!" << endl;
+            aux_basis.push_back(std::make_shared<BasisSet>());
+        }
+    }
+    else if (temp == "-write_ri_coefs") {
+        WFN wavy(wfn);
+        WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+        DensityFitting::CONFIG config;
+        config.analyze_quality = debug;
+        //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+        //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+        vec ri_coefs = DensityFitting::density_fit(wavy, wavy_aux, config);
+        npy::npy_data<double> np_coeffs;
+        np_coeffs.data = ri_coefs;
+        np_coeffs.fortran_order = false;
+        np_coeffs.shape = { static_cast<unsigned long>(ri_coefs.size()) };
+        npy::write_npy("RI_COEFS.npy", np_coeffs);
+        exit(0);
+    }
+    else if (temp == "-RI_CUBE" || temp == "-ri_cube")
+    {
+        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+        err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+        std::string coef_file = arguments[i + 1];
+        std::vector<unsigned long> shape{};
+        bool fortran_order;
+        vec coefs{};
+
+        npy::LoadArrayFromNumpy(coef_file, shape, fortran_order, coefs);
+
+
+        WFN wavy(wfn);
+        WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+
+        int nr_coefs = 0;
+        for (const atom &atm : wavy_aux.get_atoms()) {
+            int prim = 0;
+            for (int shell = 0; shell < atm.get_shellcount_size(); shell++) {
+                const int type = atm.get_basis_set_entry(prim).get_type();
+                nr_coefs += 2 * type + 1;
+                prim += atm.get_shellcount(shell);
+            }
+        }
+
+        std::cout << coefs.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
+
+        // First name of coef_file, second name of xyz file
+        cube_from_coef_npy(coefs, wavy_aux);
+
+        // std::string aux_basis = arguments[i + 1];
+        //gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
+        //gen_CUBE_for_RI(wavy, "def2_universal_jkfit", this);
+        //gen_CUBE_for_RI(wavy, "combo-basis-fit", this);
+        //gen_CUBE_for_RI(wavy, "cc-pvqz-jkfit", this);
+
+        exit(0);
+    }
+
+    else if (temp == "-test_RI")
+    {
+        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction.", std::cout);
+        err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+
+
+        WFN wavy(wfn);
+        WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+        DensityFitting::demonstrate_enhanced_density_fitting(wavy, wavy_aux);
+        exit(0);
+
+    }
+    else if (temp == "-RI_WFN_DIFF") {
+        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -RI_WFN_DIFF to specify a wavefunction.", std::cout);
+        err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -RI_WFN_DIFF to specify an auxiliary basis set.", std::cout);
+        WFN wavy(wfn);
+        WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+        DensityFitting::QM_RI_difference_cube(wavy, wavy_aux);
+        exit(0);
+
+        //exit(0);
+    }
+    else
+        return false;
+    return true;
+};
+
+//X-ray constrained wavefunction fitting
+bool options::digest_xcw_options(const std::string &temp, int &i)
+{
+    using namespace std;
+    const int argc = (int)arguments.size();
+    if (temp == "-convert_XCW")
+    {
+        err_checkf(argc >= i + 3, "Not enough arguments for -convert_XCW\nPlease provide at least stdout name and lambda step!", std::cout);
+        std::string stdo = arguments[i + 1];
+        std::string step = arguments[i + 2];
+        convert_tonto_XCW_lambda_steps(stdo, step, debug, *this);
+        exit(0);
+    }
+    else if (temp == "-do_XCW") {
+        do_XCW = true;
+        // Optional trailing "stepsize max_value" to limit the lambda scan
+        // range, e.g. for quick tests: -do_XCW 0.01 0.01
+        // CURRENTLY NOT IN USE SINCE THIS IS HANDLED IN THE INPUT FILE
+        //if (i + 2 < argc &&
+        //    string(arguments[i + 1]).find("-") != 0 &&
+        //    string(arguments[i + 2]).find("-") != 0)
+        //{
+        //    xcw_lambda_step = stod(arguments[i + 1]);
+        //    xcw_lambda_max = stod(arguments[i + 2]);
+        //}
+    }
+    else if (temp == "-calc_F") {
+        calc_F_calc = true;
+    }
+    else if (temp == "-xcw_gaussian_halt") {
+        xcw_gaussian_halt = true;
+    }
+    else if (temp == "-xcw_strong_cutoff") {
+        xcw_strong_cutoff = stod(arguments[i + 1]);
+    }
+    else if (temp == "-XCW_settings") {
+			xcw_settings_path = arguments[i + 1];
+    }
+    else
+        return false;
+    return true;
+};
+
+//development and test-only switches
+bool options::digest_dev_options(const std::string &temp, int &i)
+{
+    using namespace std;
+    if (temp == "-lahvatest")
+    {
+        //_test_lahva();
+        exit(0);
+    }
+    else if (temp == "-NNLS_TEST")
+    {
+        test_NNLS();
+        exit(0);
+    }
+    else if (temp == "-test")
+        std::cout << "Running in test mode!" << endl, test = true;
+    else if (temp == "-partitioning_test")
+    {
+        calc_partition_densities();
+    }
+    else if (temp == "-lukas_test")
+    {
+        //Check that wfn is not empty
+        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+        err_chkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED option BEFORE -lukas_test to specify a model directory.", std::cout);
+
+        WFN wavy(wfn);
+        SALTEDPredictor SP(wavy, *this);
+        string df_basis_name = SP.get_dfbasis_name();
+        filesystem::path salted_model_path = SP.get_salted_filename();
+        log_file << "Using " << salted_model_path << " for the prediction" << endl;
+        if (!SP.basis_set_loaded()) {
+            std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
+            load_basis_into_WFN(SP.wavy, aux_basis);
+        }
+        vec coefs = SP.gen_SALTED_densities();
+
+        cube atom_cube = calc_cube_ML(coefs, SP.wavy);
+        atom_cube.write_file("DBA_total.cube");
+
+        for (int atm_idx = 0; atm_idx < wavy.get_ncen(); atm_idx++) {
+            atom_cube = calc_cube_ML(coefs, SP.wavy, atm_idx);
+            atom_cube.write_file("DBA_atom_" + std::to_string(atm_idx) + ".cube");
+        }
+    }
+    else
+        return false;
+    return true;
+};
+
+
 void options::digest_options()
 {
     using namespace std;
@@ -2697,7 +4026,6 @@ void options::digest_options()
         std::cout << " Recap of input:\nsize: " << arguments.size() << endl;
     }
     // This loop figures out command line options
-    int argc = (int)arguments.size();
     for (int i = 0; i < arguments.size(); i++)
     {
         if (debug)
@@ -2705,1266 +4033,20 @@ void options::digest_options()
         string temp = arguments[i];
         if (temp.find("-") > 0)
             continue;
-        if (temp == "-acc")
-            accuracy = stoi(arguments[i + 1]);
-        if (temp == "-all_charges")
-            all_charges = true;
-        else if (temp == "-Anion")
-        {
-            int n = 1;
-            string store;
-            if (debug)
-                std::cout << "Looking for Anions!" << endl;
-            while (i + n < argc && string(arguments[i + n]).find("-") != 0)
-            {
-                if (i + n - 1 > arguments.size())
-                    break;
-                store = arguments[i + n];
-                svec Z = split_string<string>(store, " ");
-                for (int r = 0; r < Z.size(); r++)
-                {
-                    if (debug)
-                        std::cout << Z[r] << endl;
-                    Anions.push_back(Z[r]);
-                }
-                n++;
-            }
-        }
-        else if (temp == "-laplacian_bonds")
-        {
-            wfn = arguments[i + 1];
-            bondwise_laplacian_plots(wfn);
-            exit(0);
-        }
-        else if (temp == "-atom_dens")
-        {
-            std::cout << NoSpherA2_message() << endl;
-            wfn = arguments[i + 1];
-            err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
-            ivec val_MOs;
-            ivec val_MOs_beta;
-            if (argc >= i + 3)
-            {
-                val_MOs = split_string<int>(arguments[i + 2], ",");
-                std::cout << "Alpha MOs to keep: ";
-                for (int j = 0; j < val_MOs.size(); j++)
-                    std::cout << val_MOs[j] << " ";
-                std::cout << endl;
-                val_MOs_beta = split_string<int>(arguments[i + 3], ",");
-                std::cout << "Beta MOs to keep: ";
-                for (int j = 0; j < val_MOs_beta.size(); j++)
-                    std::cout << val_MOs_beta[j] << " ";
-                std::cout << endl;
-            }
-            spherically_averaged_density(*this, val_MOs, val_MOs_beta);
-            exit(0);
-        }
-        else if (temp == "-atom_sfac")
-        {
-            std::cout << NoSpherA2_message() << endl;
-            wfn = arguments[i + 1];
-            wfn2 = arguments[i + 2];
-            err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
-            WFN wavy(e_origin::NOT_YET_DEFINED);
-            wavy.read_known_wavefunction_format(wfn, std::cout, debug);
-            wavy.delete_unoccupied_MOs();
-
-            WFN wavy2(e_origin::NOT_YET_DEFINED);
-            wavy2.read_known_wavefunction_format(wfn2, std::cout, debug);
-            wavy2.delete_unoccupied_MOs();
-
-            bvec needs_grid(wavy.get_ncen(), false);
-            needs_grid[0] = true;
-            GridConfiguration conf;
-            conf.partition_type = PartitionType::Hirshfeld;
-            conf.accuracy = 4;
-            GridManager grid(conf);
-            vec2 d1, d2, d3, dens;
-            vec2 d1_2, d2_2, d3_2, dens_2;
-
-            cell unit_cell(10.0, 10.0, 10.0, 90, 90, 90);
-            ivec asym_atom_list(1, 0);
-            // Setup grids for the molecule
-            auto grid2 = grid;
-            grid.setup3DGridsForMolecule(wavy, asym_atom_list, needs_grid, unit_cell);
-            grid.getDensityVectors(wavy, asym_atom_list, d1, d2, d3, dens);
-            grid2.setup3DGridsForMolecule(wavy2, asym_atom_list, needs_grid, unit_cell);
-            grid2.getDensityVectors(wavy2, asym_atom_list, d1_2, d2_2, d3_2, dens_2);
-
-            for (int j = 0; j < d1.size(); j++)
-            {
-                for (int p = 0; p < d1[0].size(); p++)
-                {
-                    dens[j][p] -= dens_2[j][p];
-                }
-            }
-
-            // Calculate partitioned charges
-            PartitionResults results = grid.calculatePartitionedCharges(wavy, unit_cell);
-
-            grid.printChargeTable({ "Fe" }, wavy, asym_atom_list, std::cout, results);
-
-            const int points = grid.getTotalGridPoints();
-            for (double k = 0.001; k < 10; k += 0.002) {
-                cdouble res = calc_spherically_averaged_at_k(d1, d2, d3, dens, k);
-                std::cout << "k: " << k << " sfac: " << setprecision(9) << setw(16) << scientific << res.real() << " " << setprecision(9) << setw(16) << scientific << res.imag() << endl;
-            }
-            exit(0);
-        }
-        else if (temp == "-b")
-            basis_set = arguments[i + 1];
-        else if (temp == "-becke" || temp == "-BECKE" || temp == "-Becke")
-            partition_type = PartitionType::Becke;
-        else if (temp == "-lahvatest")
-        {
-            //_test_lahva();
-            exit(0);
-        }
-        else if (temp == "-Cation")
-        {
-            int n = 1;
-            string store;
-            if (debug)
-                std::cout << "Looking for Cations!" << endl;
-            while (i + n < argc && string(arguments[i + n]).find("-") != 0)
-            {
-                if (i + n - 1 > arguments.size())
-                    break;
-                store = arguments[i + n];
-                svec Z = split_string<string>(store, " ");
-                for (int r = 0; r < Z.size(); r++)
-                {
-                    if (debug)
-                        std::cout << Z[r] << endl;
-                    Cations.push_back(Z[r]);
-                }
-                n++;
-            }
-        }
-        else if (temp == "-charge")
-        {
-            charge = stoi(arguments[i + 1]);
-        }
-        else if (temp == "-coef")
-        {
-            coef_file = arguments[i + 1];
-            err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist", std::cout);
-            SALTED = true;
-        }
-        else if (temp == "-cif")
-        {
-            cif = arguments[i + 1];
-            err_checkf(std::filesystem::exists(cif), "CIF doesn't exist", std::cout);
-        }
-        else if (temp == "-cpus")
-        {
-            threads = stoi(arguments[i + 1]);
-            MKL_Set_Num_Threads(threads);
-#ifdef _OPENMP
-            omp_set_num_threads(threads);
-            omp_set_dynamic(0);
-#endif
-        }
-        else if (temp == "-cmtc")
-        {
-            cif_based_combined_tsc_calc = true;
-            int n = 1;
-            string delimiter = ",";
-            groups.pop_back();
-            while (i + n < argc && string(arguments[i + n]).find("-") > 0)
-            {
-                combined_tsc_calc_files.push_back(arguments[i + n]);
-                n++;
-                combined_tsc_calc_cifs.push_back(arguments[i + n]);
-                n++;
-                const string _temp = arguments[i + n];
-                if (_temp.find(delimiter) == string::npos) {
-                    if (debug)
-                        std::cout << "--Delimiter not found, using ." << endl;
-                    delimiter = ".";
-                }
-                groups.push_back(split_string<int>(_temp, delimiter));
-                if (debug)
-                {
-                    std::cout << "--Group: " << _temp << endl << "--";
-                    for (int run = 0; run < groups[groups.size() - 1].size(); run++)
-                        std::cout << groups[groups.size() - 1][run] << " ";
-                    std::cout << endl;
-                }
-                n++;
-            }
-        }
-        else if (temp == "-combine_mos")
-        {
-            combine_mo.push_back(arguments[i + 1]);
-            combine_mo.push_back(arguments[i + 2]);
-            do_combine_mo(*this);
-            exit(0);
-        }
-        else if (temp == "-cmos1")
-        {
-            int j = 1;
-            while (i + j < argc && arguments[i + j].find("-") >= 1)
-            {
-                cmo1.push_back(stoi(arguments[i + j]));
-                j++;
-            }
-        }
-        else if (temp == "-cmos2")
-        {
-            int j = 1;
-            while (i + j < argc && arguments[i + j].find("-") >= 1)
-            {
-                cmo2.push_back(stoi(arguments[i + j]));
-                j++;
-            }
-        }
-        else if (temp == "-convert_to_47") {
-            err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
-            std::filesystem::path _wfn = arguments[i + 1];
-            WFN wavy(e_origin::NOT_YET_DEFINED);
-            wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
-            wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout);
-            exit(0);
-        }
-        else if (temp == "-convert_XCW")
-        {
-            err_checkf(argc >= i + 3, "Not enough arguments for -convert_XCW\nPlease provide at least stdout name and lambda step!", std::cout);
-            std::string stdo = arguments[i + 1];
-            std::string step = arguments[i + 2];
-            convert_tonto_XCW_lambda_steps(stdo, step, debug, *this);
-            exit(0);
-        }
-        else if (temp == "-def" || temp == "-DEF")
-            properties.def = true;
-        else if (temp == "-density_difference" || temp == "-density-difference")
-        {
-            wfn2 = arguments[i + 1];
-        }
-        else if (temp == "-dmin")
-            dmin = stod(arguments[i + 1]);
-        else if (temp == "-d")
-            basis_set_path = arguments[i + 1];
-        else if (temp == "-dipole_moments")
-        {
-            dipole_moments(*this);
-            exit(0);
-        }
-        // Visualize the specified orbital using spherical harmonics.
-        // Call as -draw_orbits lambda,m,resolution,radius
-        // Where resolution and radius are optional
-        else if (temp == "-draw_orbits")
-        {
-            vec opts = split_string<double>(arguments[i + 1], ",");
-            int l = static_cast<int>(opts[0]);
-            int m = static_cast<int>(opts[1]);
-            properties.resolution = 0.025;
-            properties.radius = 3.5;
-            if (opts.size() >= 3)
-            {
-                properties.resolution = opts[2];
-            }
-            if (opts.size() == 4)
-            {
-                properties.radius = opts[3];
-            }
-
-            draw_orbital(l, m, properties.resolution, properties.radius);
-            exit(0);
-        }
-        else if (temp == "-e_field")
-            efield = stod(arguments[i + 1]);
-        else if (temp == "-ECP" || temp == "-ecp" || temp == "-Ecp")
-        {
-            ECP = true;
-            if (argc >= i + 2 && string(arguments[i + 1]).find("-") != 0)
-            {
-                ECP_mode = stoi(arguments[i + 1]);
-            }
-        }
-        else if (temp == "-ED")
-            electron_diffraction = true;
-        else if (temp == "-eli")
-            properties.eli = true;
-        else if (temp == "-eli_analysis") {
-            err_checkf(argc >= i + 4, "Not enough arguments for -eli_analysis\nPlease provide at least wfn, resolution and radius!", std::cout);
-            wfn = arguments[i + 1];
-            properties.resolution = stod(arguments[i + 2]);
-            properties.radius = stod(arguments[i + 3]);
-            ELI_analysis(wfn, *this);
-            exit(0);
-        }
-        else if (temp == "-qtaim_eli") {
-            // Cube-files mode:  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [<bg_value>]
-            // WFN mode:         -qtaim_eli <wfn_file> <atoms_csv> [<resolution>] [<radius>] [<bg_value>]
-            err_checkf(i + 2 < argc,
-                "Usage:\n"
-                "  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [bg_value]\n"
-                "  -qtaim_eli <wfn_file> <atoms_csv> [resolution] [radius] [bg_value]\n"
-                "atoms_csv: comma-separated 0-based atom indices, e.g. 0,3,7\n"
-                "bg_value:  value assigned to non-selected voxels (default 0)",
-                std::cout);
-
-            std::filesystem::path arg1 = arguments[i + 1];
-            const bool cube_mode = (arg1.extension() == ".cube");
-
-            std::filesystem::path rho_path, eli_path_arg;
-            std::string atoms_csv;
-            double bg_val = 0.0;
-
-            if (cube_mode) {
-                err_checkf(i + 3 < argc,
-                    "Cube mode requires: -qtaim_eli <rho.cube> <eli.cube> <atoms_csv>", std::cout);
-                rho_path     = arg1;
-                eli_path_arg = arguments[i + 2];
-                atoms_csv    = arguments[i + 3];
-                if (i + 4 < argc) bg_val = stod(arguments[i + 4]);
-            } else {
-                rho_path  = arg1;  // wfn path
-                atoms_csv = arguments[i + 2];
-                if (i + 3 < argc && !std::filesystem::path(arguments[i + 3]).has_extension())
-                    ; // next arg looks like atoms_csv already consumed; nothing extra
-                if (i + 3 < argc) {
-                    try { properties.resolution = stod(arguments[i + 3]); }
-                    catch (...) { /* optional — might be bg_val */ }
-                }
-                if (i + 4 < argc) {
-                    try { properties.radius = stod(arguments[i + 4]); }
-                    catch (...) {}
-                }
-                if (i + 5 < argc) {
-                    try { bg_val = stod(arguments[i + 5]); }
-                    catch (...) {}
-                }
-            }
-
-            // Parse comma-separated 0-based atom indices
-            std::vector<int> indices;
-            {
-                std::stringstream ss(atoms_csv);
-                std::string tok;
-                while (std::getline(ss, tok, ',')) {
-                    std::string t = trim(tok);
-                    if (!t.empty()) indices.push_back(std::stoi(t));
-                }
-            }
-            err_checkf(!indices.empty(), "No atom indices parsed from: " + atoms_csv, std::cout);
-
-            run_QTAIM_ELI_mask(rho_path, eli_path_arg, indices, bg_val, *this, log_file);
-            exit(0);
-        }
-        else if (temp == "-elf")
-            properties.elf = true;
-        else if (temp == "-embis" || temp == "-EMBIS")
-        {
-            partition_type = PartitionType::EMBIS;
-        }
-        else if (temp == "-esp")
-            properties.esp = true;
-        else if (temp == "-fukui" || temp == "-Fukui")
-            properties.fukui = true;
-        else if (temp == "-fukui_analysis")
-        {
-            // Only records the request; the analysis itself runs from
-            // run_app_impl.
-            //
-            // Doing the work here instead - the pattern -dipole_moments,
-            // -laplacian_bonds and friends use - would put the whole table in
-            // NoSpherA2.log and nothing on the terminal, because run_app_impl
-            // has already pointed std::cout at that log file by the time
-            // digest_options() runs. (Verified: -dipole_moments prints nothing
-            // to stdout and 2.9 kB to the log.) That is tolerable for a
-            // side-effect command and useless for one whose entire output is
-            // meant to be read, so this one is dispatched later, where the
-            // console buffer can be restored first.
-            fukui_analysis_run = true;
-            // Wavefunction may be given inline (-fukui_analysis mol.gbw) or with
-            // the usual -wfn. The inline form is the point of the flag, so it
-            // wins, but only if the next token is not itself an option.
-            if (i + 1 < argc && arguments[i + 1][0] != '-')
-            {
-                wfn = arguments[i + 1];
-                i++;
-            }
-        }
-        else if (temp == "-ewal_sum")
-        {
-            // bool read, WFN& wave, std::ostream& file,
-            WFN *temp_w = new WFN(e_origin::cub);
-            cube residual(arguments[i + 1], true, *temp_w, std::cout);
-            if (argc >= i + 3)
-            {
-                int k_max = stoi(arguments[i + 2]);
-                if (argc >= i + 4)
-                    residual.ewald_sum(k_max, stod(arguments[i + 3]));
-                else
-                    residual.ewald_sum(k_max);
-            }
-            else
-                residual.ewald_sum();
-            delete (temp_w);
-            exit(0);
-        }
-        else if (temp == "-geometry_aid_cutoff") {
-            // **Selects which geometry-aid model family the descriptor is for.**
-            // Must appear BEFORE the flag that computes anything, like -wfn --
-            // the descriptor flags exit(0) as soon as they have run.
-            //
-            //   3.5  (default)  the `c_only` models, trained on all-carbon input
-            //   3.0             the `dirty` models, trained on partly wrong
-            //                   labels and the only ones that can be iterated
-            //
-            // A descriptor computed at the wrong cutoff is 42,042 long either
-            // way and is rejected by nothing downstream, so the value used is
-            // echoed rather than applied silently.
-            // `arguments`, not `argv` -- this parser walks a vector<string>.
-            err_chkf(i + 1 < arguments.size(),
-                     "-geometry_aid_cutoff needs a radius in Angstrom", std::cout);
-            geometry_aid_cutoff_radius = std::stod(arguments[++i]);
-            std::cout << "  geometry-aid SOAP cutoff radius set to "
-                      << geometry_aid_cutoff_radius << " A ("
-                      << (geometry_aid_cutoff_radius > 3.25 ? "c_only" : "dirty")
-                      << " model family)" << std::endl;
-        }
-        else if (temp == "-calc_featomic_descriptor") {
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
-            // Unchanged behaviour, down to the output file name: Olex2 calls
-            // exactly this and reads `descriptor.npy` from the working
-            // directory. The hyperparameters moved to a shared function so the
-            // batch flag below cannot drift away from them.
-            write_featomic_descriptor(wfn, "descriptor.npy", geometry_aid_hyperparameters());
-            exit(0);
-        }
-        else if (temp == "-classify_atoms") {
-            // -wfn <structure> -classify_atoms <model.bin> [<out.npy>]
-            //
-            // Writes class probabilities, one row per atom, in the class order
-            // the model carries. Default output `probabilities.npy`, matching
-            // the way `-calc_featomic_descriptor` defaults to descriptor.npy.
-            err_chkf(!wfn.empty(), "No structure specified! Use -wfn BEFORE -classify_atoms.", std::cout);
-            const std::filesystem::path model_path = arguments[i + 1];
-            err_chkf(std::filesystem::exists(model_path),
-                "The geometry-aid model does not exist: " + model_path.string(), std::cout);
-            std::filesystem::path out_path = "probabilities.npy";
-            if (i + 2 < arguments.size() && !arguments[i + 2].empty() && arguments[i + 2][0] != '-')
-                out_path = arguments[i + 2];
-            write_geometry_aid_probabilities(wfn, out_path, model_path,
-                geometry_aid_hyperparameters());
-            exit(0);
-        }
-        else if (temp == "-classify_atoms_list") {
-            // The batch form: -classify_atoms_list <list> <model.bin>, one
-            // structure path per line, each written as <path>.probs.npy.
-            const std::filesystem::path list_file = arguments[i + 1];
-            const std::filesystem::path model_path = arguments[i + 2];
-            err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
-            err_chkf(std::filesystem::exists(model_path), "The geometry-aid model does not exist: " + model_path.string(), std::cout);
-
-            std::vector<std::filesystem::path> jobs;
-            {
-                std::ifstream list(list_file);
-                std::string line;
-                while (std::getline(list, line))
-                {
-                    const std::string entry = trim(line);
-                    if (entry.empty() || entry[0] == '#') continue;
-                    jobs.push_back(std::filesystem::path(entry));
-                }
-            }
-            err_chkf(!jobs.empty(), "The structure list is empty: " + list_file.string(), std::cout);
-
-            const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
-            const auto started = std::chrono::steady_clock::now();
-            size_t done = 0, failed = 0;
-            for (const std::filesystem::path& structure : jobs)
-            {
-                if (!std::filesystem::exists(structure))
-                {
-                    std::cout << "MISSING " << structure.string() << std::endl;
-                    ++failed;
-                    continue;
-                }
-                try
-                {
-                    const auto one = std::chrono::steady_clock::now();
-                    std::filesystem::path out_path = structure;
-                    out_path += ".probs.npy";
-                    write_geometry_aid_probabilities(structure, out_path, model_path, hyperparams);
-                    std::cout << "PROBABILITIES " << out_path.string() << " seconds="
-                              << std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count()
-                              << std::endl;
-                    ++done;
-                }
-                catch (const std::exception& e)
-                {
-                    std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
-                    ++failed;
-                }
-            }
-            const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-            std::cout << "BATCH done=" << done << " failed=" << failed
-                      << " seconds=" << total
-                      << " per_structure=" << (done ? total / done : 0.0) << std::endl;
-            exit(failed && !done ? 1 : 0);
-        }
-        else if (temp == "-calc_featomic_descriptors") {
-            // **Many structures in one process.** Building the featomic
-            // calculator splines the radial integral for every (n, l) pair and
-            // costs a fixed 0.72 s; the descriptor itself costs about 0.0009 s
-            // per atom. Measured 6 August 2026: 2 atoms 0.74 s, 30 atoms 0.90 s,
-            // 1000 atoms 1.57 s. One structure per process therefore spends
-            // roughly ninety per cent of its time on setup that does not depend
-            // on the molecule at all.
-            //
-            // `calculate_SOAP_Powerspectrum` keeps the calculator for the
-            // lifetime of the process (see `cached_calculator`), so everything
-            // after the first entry here pays only the marginal cost.
-            //
-            // The list file is **one structure path per line**, and the
-            // descriptor is written beside it as `<path>.npy`. One field per
-            // line deliberately: an output column would need quoting rules, and
-            // paths with spaces in them are ordinary on Windows.
-            // Blank lines and lines beginning with '#' are ignored.
-            const std::filesystem::path list_file = arguments[i + 1];
-            err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
-
-            std::vector<std::filesystem::path> jobs;
-            {
-                std::ifstream list(list_file);
-                std::string line;
-                while (std::getline(list, line))
-                {
-                    const std::string entry = trim(line);
-                    if (entry.empty() || entry[0] == '#')
-                        continue;
-                    jobs.push_back(std::filesystem::path(entry));
-                }
-            }
-            err_chkf(!jobs.empty(), "The structure list is empty: " + list_file.string(), std::cout);
-
-            const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
-            const auto started = std::chrono::steady_clock::now();
-            size_t done = 0, failed = 0;
-            for (const std::filesystem::path& structure : jobs)
-            {
-                // **One bad structure must not cost the other 999.** A batch is
-                // the whole point of this flag, and a list of ten thousand
-                // peaks files will contain one that cannot be parsed.
-                if (!std::filesystem::exists(structure))
-                {
-                    std::cout << "MISSING " << structure.string() << std::endl;
-                    ++failed;
-                    continue;
-                }
-                try
-                {
-                    const auto one = std::chrono::steady_clock::now();
-                    std::filesystem::path out_path = structure;
-                    out_path += ".npy";
-                    write_featomic_descriptor(structure, out_path, hyperparams);
-                    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count();
-                    std::cout << "DESCRIPTOR " << out_path.string() << " seconds=" << seconds << std::endl;
-                    ++done;
-                }
-                catch (const std::exception& e)
-                {
-                    std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
-                    ++failed;
-                }
-            }
-            const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-            std::cout << "BATCH done=" << done << " failed=" << failed
-                      << " seconds=" << total
-                      << " per_structure=" << (done ? total / done : 0.0) << std::endl;
-            exit(failed && !done ? 1 : 0);
-        }
-        else if (temp == "-fchk")
-            fchk = arguments[i + 1];
-        else if (temp == "-fractal")
-            fract = true, fract_name = arguments[i + 1];
-        else if (temp == "-gbw2wfn")
-            gbw2wfn = true;
-        else if (temp == "-get_g")
-            get_g = true;
-        else if (temp == "-group")
-        {
-            int n = 1;
-            while (i + n < argc)
-            {
-                const string& group_arg = arguments[i + n];
-                // Olex2 can emit a bare -group followed by an empty argument.
-                // Do not index or parse an empty string: doing so corrupts the
-                // CRT state and later manifests as a stack-buffer-overrun.
-                if (group_arg.empty() || group_arg.find("-") != string::npos)
-                    break;
-                int group;
-                if (group_arg[0] == '+')
-                    group = -stoi(group_arg);
-                else
-                    group = stoi(group_arg);
-                groups[0].push_back(group), n++;
-            }
-            i += n - 1;
-        }
-        else if (temp == "-HDEF")
-            properties.hdef = true;
-        else if (temp == "-hirsh")
-            properties.hirsh = true, properties.hirsh_number = stoi(arguments[i + 1]);
-        else if (temp == "-hirshfeld_surface")
-        {
-            hirshfeld_surface = arguments[i + 1];
-            hirshfeld_surface2 = arguments[i + 2];
-        }
-        else if (temp == "-tsc_block")
-        {
-            tsc_block_size = static_cast<size_t>(std::stoll(arguments[i + 1]));
-            tsc_block_given = true;
-        }
-        else if (temp == "-hkl")
-        {
-            hkl = arguments[i + 1];
-            err_checkf(std::filesystem::exists(hkl), "hkl doesn't exist", std::cout);
-        }
-        else if (temp == "-hkl_min_max")
-        {
-            int h_min(stoi(arguments[i + 1]));
-            int h_max(stoi(arguments[i + 2]));
-            int k_min(stoi(arguments[i + 3]));
-            int k_max(stoi(arguments[i + 4]));
-            int l_min(stoi(arguments[i + 5]));
-            int l_max(stoi(arguments[i + 6]));
-            hkl_min_max = { {h_min, h_max}, {k_min, k_max}, {l_min, l_max} };
-        }
-        else if (temp == "-IAM")
-            iam_switch = true;
-        else if (temp == "-lap")
-            properties.lap = true;
-        else if (temp == "-mbis" || temp == "-MBIS")
-        {
-            partition_type = PartitionType::MBIS;
-        }
-        else if (temp == "-mem")
-        {
-            mem = stod(arguments[i + 1]); // In MB
-            mem_given = true;
-            vec a;
-            size_t vec_max_size = a.max_size();
-            double doubel_max_size = static_cast<double>(vec_max_size * sizeof(double)) * 1e-6;
-            if (mem > doubel_max_size)
-            {
-                std::cout << "Max memory set to " << mem << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << 50000 << " MB." << endl;
-                mem = 50000.0;
-            }
-        }
-        else if (temp == "-method")
-            method = arguments[i + 1];
-        else if (temp == "-merge")
-        {
-            pathvec filenames;
-            int n = 1;
-            while (i + n < argc && string(arguments[i + n]).find("-") > 0)
-            {
-                filenames.push_back(arguments[i + n]);
-                n++;
-            }
-            merge_tscs("combine", filenames, old_tsc);
-            exit(0);
-        }
-        else if (temp == "-merge_nocheck")
-        {
-            pathvec filenames;
-            int n = 1;
-            while (i + n < argc && string(arguments[i + n]).find("-") > 0)
-            {
-                filenames.push_back(arguments[i + n]);
-                n++;
-            }
-            merge_tscs_without_checks("combine", filenames, old_tsc);
-            exit(0);
-        }
-        //Not an else if: MSVC counts each one as a nested block and C1061 trips at 128
-        if (temp == "-MO")
-        {
-            if (string(arguments[i + 1]) != "all")
-                properties.MO_numbers.push_back(stoi(arguments[i + 1]));
-            else
-                properties.all_mos = true;
-        }
-        else if (temp == "-mtc")
-        {
-            combined_tsc_calc = true;
-            int n = 1;
-            string delimiter = ",";
-            groups.pop_back();
-            while (i + n < argc && string(arguments[i + n]).find("-") > 0)
-            {
-                combined_tsc_calc_files.push_back(arguments[i + n]);
-                n++;
-                const string _temp = arguments[i + n];
-                if (_temp.find(delimiter) == string::npos) {
-                    if (debug)
-                        std::cout << "--Delimiter not found, using ." << endl;
-                    delimiter = ".";
-                }
-                groups.push_back(split_string<int>(_temp, delimiter));
-                if (debug)
-                {
-                    std::cout << "--Group: " << _temp << endl << "--";
-                    for (int run = 0; run < groups[groups.size() - 1].size(); run++)
-                        std::cout << groups[groups.size() - 1][run] << " ";
-                    std::cout << endl;
-                }
-                n++;
-            }
-        }
-        else if (temp == "-mtc_mult")
-        {
-            int n = 1;
-            while (i + n < argc && string(arguments[i + n]).find("-") > 0)
-            {
-                combined_tsc_calc_mult.push_back(stoi(arguments[i + n]));
-                n++;
-            }
-        }
-        else if (temp == "-mtc_charge")
-        {
-            int n = 1;
-            while (i + n < argc && string(arguments[i + n]).find("-") > 0)
-            {
-                if (arguments[i + n][0] == 'n')
-                    combined_tsc_calc_charge.push_back(-stoi(arguments[i + n].substr(1)));
-                else
-                    combined_tsc_calc_charge.push_back(stoi(arguments[i + n]));
-                n++;
-            }
-        }
-        else if (temp == "-mtc_ECP")
-        {
-            int m = 1;
-            while (i + m < argc && string(arguments[i + m]).find("-") > 0)
-            {
-                combined_tsc_calc_ECP.push_back(stoi(arguments[i + m]));
-                m++;
-            }
-        }
-        else if (temp == "-mult")
-            mult = stoi(arguments[i + 1]);
-        else if (temp == "-NNLS_TEST")
-        {
-            test_NNLS();
-            exit(0);
-        }
-        else if (temp == "-no-date" || temp == "-no_date")
-            no_date = true;
-        else if (temp == "-pbc")
-            pbc = stoi(arguments[i + 1]);
-        else if (temp == "-polarizabilities")
-        {
-            pol_wfns = { arguments[i + 1],
-                        arguments[i + 2],
-                        arguments[i + 3],
-                        arguments[i + 4],
-                        arguments[i + 5],
-                        arguments[i + 6],
-                        arguments[i + 7] };
-        }
-        else if (temp == "-QCT" || temp == "-qct")
-            qct = true;
-        else if (temp == "-profiling" || temp == "-profile")
-        {
-            profiling = true;
-            if (i + 1 < argc && arguments[i + 1].find("-") != 0)
-            {
-                profiling_tests_root = arguments[i + 1];
-            }
-        }
-        else if (temp == "-promol_nci")
-        {
-            err_checkf(i + 2 < argc,
-                "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max]",
-                std::cout);
-            promol_nci = true;
-            promol_nci_xyz1 = arguments[i + 1];
-            promol_nci_xyz2 = arguments[i + 2];
-            err_checkf(std::filesystem::exists(promol_nci_xyz1), "First XYZ file doesn't exist: " + promol_nci_xyz1.string(), std::cout);
-            err_checkf(std::filesystem::exists(promol_nci_xyz2), "Second XYZ file doesn't exist: " + promol_nci_xyz2.string(), std::cout);
-
-            double *optional_values[] = {
-                &properties.promol_nci_rcut1,
-                &properties.promol_nci_rcut2,
-                &properties.promol_nci_rho_abs_max,
-                &properties.promol_nci_rdg_max
-            };
-            int optional_index = 0;
-            while (optional_index < 4 && i + 3 + optional_index < argc)
-            {
-                try
-                {
-                    size_t consumed = 0;
-                    const std::string &candidate = arguments[i + 3 + optional_index];
-                    const double value = std::stod(candidate, &consumed);
-                    if (consumed != candidate.size())
-                        break;
-                    *optional_values[optional_index] = value;
-                    optional_index++;
-                }
-                catch (...)
-                {
-                    break;
-                }
-            }
-
-            i += 2 + optional_index;
-        }
-        else if (temp == "-promol_nci_single_thread")
-            properties.promol_nci_single_threaded = true;
-        else if (temp == "-radius")
-            properties.radius = stod(arguments[i + 1]);
-        else if (temp == "-resolution")
-            properties.resolution = stod(arguments[i + 1]);
-        else if (temp == "-refine")
-            argc > i + 1 ? properties.integral_accuracy = stod(arguments[i + 1]) : properties.integral_accuracy = 0.1;
-        else if (temp == "-rdg")
-            properties.rdg = true;
-        else if (temp == "-rgbi")
-            rgbi = true;
-        else if (temp == "-rgbi_no_sym") {
-            rgbi = true;
-            rgbi_no_sym = true;
-        }
-        else if (temp == "-rgbi_EVs") {
-            rgbi_EVs = true;
-        }
-        else if (temp == "-rgbi_basis") {
-            err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);
-            rgbi = true;
-            std::string basis = arguments[i + 1];
-            std::transform(basis.begin(), basis.end(), basis.begin(),
-                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            if (basis == "nao")
-                rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
-            else if (basis == "ano")
-                rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
-            else
-                err_checkf(false, "Invalid -rgbi_basis value '" + basis + "'. Use 'nao' or 'ano'.", std::cout);
-        }
-        else if (temp == "-rgbi-groups") {
-            int n = 1;
-            ivec2 group_set;
-            while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
-                group_set.push_back(parse_rgbi_group_indices(arguments[i + n]));
-                n++;
-            }
-            if (!group_set.empty()) {
-                validate_rgbi_group_set(group_set);
-                rgbi_group_sets.push_back(group_set);
-            }
-            i += n - 1;
-            rgbi = true;
-        }
-        else if (temp.find("-rkpts") < 1)
-            read_k_pts = true;
-        else if (temp == "-rho_cube")
-        {
-            string wfn_name = arguments[i + 1];
-            std::cout << "Reading wavefunction: " << wfn_name << endl;
-            WFN wavy = WFN(wfn_name);
-            std::cout << "Assigning ECPs" << endl;
-            if (ECP)
-                wavy.set_has_ECPs(true);
-            std::cout << "Starting cube calculation" << endl;
-            wavy.write_rho_cube();
-            exit(0);
-        }
-        else if (temp == "-RI_FIT" || temp == "-ri_fit")
-        {
-            RI_FIT = true;
-            partition_type = PartitionType::RI;
-            int next_basis_set = i + 1;
-            // Check if next argument is a valid basis set name or a new argument starting with "-"
-            while (next_basis_set < argc && arguments[next_basis_set].find("-") != 0) {
-                if (arguments[next_basis_set] == "auto_aux") {
-                    double beta = 2.0;
-                    //Check if the next argument is a valid double
-                    if (next_basis_set + 1 < argc && arguments[next_basis_set + 1].find("-") != 0) {
-                        beta = std::stod(arguments[next_basis_set + 1]);
-                    }
-                    aux_basis.push_back(std::make_shared<BasisSet>());
-                    break;
-                }
-                err_chkf(BasisSetLibrary::check_basis_set_exists(arguments[next_basis_set]),
-                    "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
-                aux_basis.push_back(BasisSetLibrary::get_basis_set(arguments[next_basis_set]));
-                next_basis_set++;
-            }
-            if (aux_basis.size() == 0) {
-                cout << "No basis set specified. Falling back to automatic generation using beta = 2.0!" << endl;
-                aux_basis.push_back(std::make_shared<BasisSet>());
-            }
-        }
-        else if (temp == "-write_ri_coefs") {
-            WFN wavy(wfn);
-            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-            DensityFitting::CONFIG config;
-            config.analyze_quality = debug;
-            //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
-            //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
-            vec ri_coefs = DensityFitting::density_fit(wavy, wavy_aux, config);
-            npy::npy_data<double> np_coeffs;
-            np_coeffs.data = ri_coefs;
-            np_coeffs.fortran_order = false;
-            np_coeffs.shape = { static_cast<unsigned long>(ri_coefs.size()) };
-            npy::write_npy("RI_COEFS.npy", np_coeffs);
-            exit(0);
-        }
-        else if (temp == "-RI_CUBE" || temp == "-ri_cube")
-        {
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
-            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
-            std::string coef_file = arguments[i + 1];
-            std::vector<unsigned long> shape{};
-            bool fortran_order;
-            vec coefs{};
-
-            npy::LoadArrayFromNumpy(coef_file, shape, fortran_order, coefs);
-
-
-            WFN wavy(wfn);
-            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-
-            int nr_coefs = 0;
-            for (const atom &atm : wavy_aux.get_atoms()) {
-                int prim = 0;
-                for (int shell = 0; shell < atm.get_shellcount_size(); shell++) {
-                    const int type = atm.get_basis_set_entry(prim).get_type();
-                    nr_coefs += 2 * type + 1;
-                    prim += atm.get_shellcount(shell);
-                }
-            }
-
-            std::cout << coefs.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
-
-            // First name of coef_file, second name of xyz file
-            cube_from_coef_npy(coefs, wavy_aux);
-
-            // std::string aux_basis = arguments[i + 1];
-            //gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
-            //gen_CUBE_for_RI(wavy, "def2_universal_jkfit", this);
-            //gen_CUBE_for_RI(wavy, "combo-basis-fit", this);
-            //gen_CUBE_for_RI(wavy, "cc-pvqz-jkfit", this);
-
-            exit(0);
-        }
-
-        else if (temp.find("-s_rho") < 1)
-            properties.s_rho = true;
-        else if (temp == "-SALTED" || temp == "-salted")
-        {
-            SALTED = true;
-            salted_model_dir = arguments[i + 1];
-        }
-        else if (temp == "-SALTED_COEFS" || temp == "-salted_coefs")
-        {
-            salted_model_dir = arguments[i + 1];
-
-            //Check that wfn is not empty
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
-
-            WFN wavy(wfn);
-            SALTEDPredictor SP(wavy, *this);
-            filesystem::path salted_model_path = SP.get_salted_filename();
-            log_file << "Using " << salted_model_path << " for the prediction" << endl;
-            if (!SP.basis_set_loaded()) {
-                const string df_basis_name = SP.get_dfbasis_name();
-                std::shared_ptr<BasisSet> _aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
-                load_basis_into_WFN(SP.wavy, _aux_basis);
-            }
-            vec coefs = SP.gen_SALTED_densities();
-            npy::npy_data<double> np_coeffs;
-            np_coeffs.data = coefs;
-            np_coeffs.fortran_order = false;
-            np_coeffs.shape = { static_cast<unsigned long>(coefs.size()) };
-            npy::write_npy("SALTED_COEFS.npy", np_coeffs);
-        }
-        else if (temp == "-SALTED_Training") {
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction.", std::cout);
-            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
-
-            WFN wavy(wfn);
-            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-
-            create_SALTED_training_data(wavy, wavy_aux);
-            exit(0);
-        }
-        else if (temp == "-skpts")
-            save_k_pts = true;
-        else if (temp == "-sfac_diffuse")
-        {
-            sfac_diffuse[0] = fromString<double>(arguments[i + 1]);
-            sfac_diffuse[1] = fromString<double>(arguments[i + 2]);
-            sfac_diffuse[2] = fromString<double>(arguments[i + 3]);
-            cif = arguments[i + 4];
-            wfn = arguments[i + 5];
-            dmin = fromString<double>(arguments[i + 6]);
-            calc_sfac_diffuse(*this, std::cout);
-        }
-        else if (temp == "-atom_dens_diff")
-        {
-            filesystem::path name_wfn_1 = arguments[i + 1];
-            filesystem::path name_wfn_2 = arguments[i + 2];
-
-            subtract_dens_from_gbw(name_wfn_1, name_wfn_2, 2, 0.05);
-            exit(0);
-        }
-        else if (temp == "-spherical_aver_fukui")
-        {
-            filesystem::path wfn1_name = arguments[i + 1];
-            filesystem::path wfn2_name = arguments[i + 2];
-            WFN *wavy1 = new WFN(wfn1_name);
-            WFN *wavy2 = new WFN(wfn2_name);
-            ofstream outputFile("fukui_averaged_density_wfn.dat");
-            for (double r = 0.001; r < 10.0; r += 0.001)
-            {
-                // double dens = calc_grid_averaged_at_r_from_cube(cube_from_file, r, 360, 5800);
-                double dens = calc_fukui_averaged_at_r(*wavy1, *wavy2, r, 5810, 5810);
-                outputFile << r << " " << dens << "\n";
-            }
-            outputFile.close();
-            std::cout << "Data written to output.dat" << endl;
-            delete (wavy1);
-            delete (wavy2);
-            exit(0);
-        }
-        else if (temp == "-spherical_aver_hirsh")
-        {
-            string wfn_name = arguments[i + 1];
-            std::cout << "Reading wavefunction: " << wfn_name << endl;
-            WFN *wavy = new WFN(wfn_name);
-            std::cout << "Assigning ECPs" << endl;
-            if (ECP)
-                wavy->set_has_ECPs(true);
-            std::cout << "Starting spherical averaging" << endl;
-            double dens;
-
-            for (int index_atom = 0; index_atom < wavy->get_ncen(); index_atom += 1)
-            {
-                ofstream outputFile("hirsh_averaged_density_" + std::to_string(index_atom) + ".dat");
-                for (double r = 0.001; r < 5.0; r += 0.002)
-                {
-                    dens = calc_hirsh_grid_averaged_at_r(*wavy, index_atom, r, 360, 5800);
-                    outputFile << r << " " << dens << "\n";
-                }
-                outputFile.close();
-            }
-            std::cout << "Data written to output.dat" << endl;
-            delete (wavy);
-            exit(0);
-        }
-        else if (temp == "-spherical_harmonic")
-        {
-            spherical_harmonic_test();
-            exit(0);
-        }
-        else if (temp == "-spherical_atoms") {
-            write_spherical_atoms();
-            exit(0);
-        }
-        else if (temp == "-test")
-            std::cout << "Running in test mode!" << endl, test = true;
-        else if (temp == "-twin")
-        {
-            twin_law.resize(twin_law.size() + 1);
-            twin_law.back().resize(9);
-            for (int twl = 0; twl < 9; twl++)
-                twin_law.back()[twl] = stod(arguments[i + 1 + twl]);
-            if (debug)
-            {
-                std::cout << "twin_law: ";
-                for (int twl = 0; twl < 9; twl++)
-                    std::cout << setw(7) << setprecision(2) << twin_law.back()[twl];
-                std::cout << endl;
-            }
-            i += 9;
-        }
-        else if (temp == "-old_tsc")
-        {
-            old_tsc = true;
-        }
-        else if (temp == "-tfvc" || temp == "-TFVC")
-        {
-            partition_type = PartitionType::TFVC;
-        }
-        else if (temp == "-tscb")
-        {
-            std::filesystem::path name = arguments[i + 1];
-            string cif_name = "test.cif";
-            if (name.extension() == ".tscb")
-            {
-                tsc_block<int, cdouble> blocky = read_tsc_table(name);
-                blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
-            }
-            else if (name.extension() == ".tsc")
-            {
-                tsc_block<int, cdouble> blocky = read_tsc_table(name);
-                blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
-            }
-            else
-                err_checkf(false, "Wrong file ending!", std::cout);
-            exit(0);
-        }
-        else if (temp == "-tsc_labels")
-        {
-            const bool has_table_and_cif =
-                i + 2 < argc &&
-                arguments[i + 1].find('-') != 0 &&
-                arguments[i + 2].find('-') != 0;
-
-            if (has_table_and_cif)
-            {
-                const std::filesystem::path table = arguments.at(i + 1);
-                const std::filesystem::path cif_file = arguments.at(i + 2);
-                std::filesystem::path output = table;
-                output.replace_extension(".labels.tsc");
-                if (i + 3 < argc && arguments[i + 3].find('-') != 0)
-                    output = arguments[i + 3];
-                if (!convert_tsc_ids_to_labels(table, cif_file, output, std::cout))
-                    exit(1);
-                exit(0);
-            }
-
-            label_tsc_output = true;
-        }
-        else if (temp == "-test_RI")
-        {
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction.", std::cout);
-            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
-
-
-            WFN wavy(wfn);
-            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-            DensityFitting::demonstrate_enhanced_density_fitting(wavy, wavy_aux);
-            exit(0);
-
-        }
-        else if (temp == "-RI_WFN_DIFF") {
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -RI_WFN_DIFF to specify a wavefunction.", std::cout);
-            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -RI_WFN_DIFF to specify an auxiliary basis set.", std::cout);
-            WFN wavy(wfn);
-            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-            DensityFitting::QM_RI_difference_cube(wavy, wavy_aux);
-            exit(0);
-
-            //exit(0);
-        }
-        else if (temp == "-wfn")
-        {
-            wfn = arguments[i + 1];
-            err_checkf(std::filesystem::exists(wfn), "Wavefunction does not exist!", std::cout);
-        }
-        else if (temp == "-cube_density" || temp == "-cube")
-        {
-            cube_density = arguments[i + 1];
-            err_checkf(std::filesystem::exists(cube_density), "Cube density file does not exist!", std::cout);
-        }
-        else if (temp == "-wfn_cif")
-        {
-            write_CIF = true;
-        }
-        else if (temp == "-xyz")
-        {
-            xyz_file = arguments[i + 1];
-        }
-        else if (temp == "-do_XCW") {
-            do_XCW = true;
-            // Optional trailing "stepsize max_value" to limit the lambda scan
-            // range, e.g. for quick tests: -do_XCW 0.01 0.01
-            // CURRENTLY NOT IN USE SINCE THIS IS HANDLED IN THE INPUT FILE
-            //if (i + 2 < argc &&
-            //    string(arguments[i + 1]).find("-") != 0 &&
-            //    string(arguments[i + 2]).find("-") != 0)
-            //{
-            //    xcw_lambda_step = stod(arguments[i + 1]);
-            //    xcw_lambda_max = stod(arguments[i + 2]);
-            //}
-        }
-        else if (temp == "-calc_F") {
-            calc_F_calc = true;
-        }
-        else if (temp == "-xcw_gaussian_halt") {
-            xcw_gaussian_halt = true;
-        }
-        else if (temp == "-xcw_strong_cutoff") {
-            xcw_strong_cutoff = stod(arguments[i + 1]);
-        }
-        else if (temp == "-XCW_settings") {
-			xcw_settings_path = arguments[i + 1];
-        }
-        else if (temp == "-anom_disp")
-        {
-            anom_disp_path = arguments[i + 1];
-        }
-        else if (temp == "-partitioning_test")
-        {
-            calc_partition_densities();
-        }
-        else if (temp == "-occ")
-        {
-            occ = arguments[i + 1];
-            err_checkf(std::filesystem::exists(occ), "OCC input doesn't exist!", std::cout);
-
-        }
-        else if (temp == "-lukas_test")
-        {
-            //Check that wfn is not empty
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
-            err_chkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED option BEFORE -lukas_test to specify a model directory.", std::cout);
-
-            WFN wavy(wfn);
-            SALTEDPredictor SP(wavy, *this);
-            string df_basis_name = SP.get_dfbasis_name();
-            filesystem::path salted_model_path = SP.get_salted_filename();
-            log_file << "Using " << salted_model_path << " for the prediction" << endl;
-            if (!SP.basis_set_loaded()) {
-                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
-                load_basis_into_WFN(SP.wavy, aux_basis);
-            }
-            vec coefs = SP.gen_SALTED_densities();
-
-            cube atom_cube = calc_cube_ML(coefs, SP.wavy);
-            atom_cube.write_file("DBA_total.cube");
-
-            for (int atm_idx = 0; atm_idx < wavy.get_ncen(); atm_idx++) {
-                atom_cube = calc_cube_ML(coefs, SP.wavy, atm_idx);
-                atom_cube.write_file("DBA_atom_" + std::to_string(atm_idx) + ".cube");
-            }
-        }
-        else if (temp == "-calc_dens_1D")
-        {
-            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -calc_dens_1D to specify a wavefunction.", std::cout);
-            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -calc_dens_1D to specify an auxiliary basis set.", std::cout);
-            int atom_idx_1 = 0;
-            int atom_idx_2 = 1;
-            int gridpoints = 1000;
-            double padding = 2.0;
-            if (string(arguments[i + 1]).find("-") != 0) {
-                atom_idx_1 = stoi(arguments[i + 1]);
-            }
-            if (string(arguments[i + 2]).find("-") != 0) {
-                atom_idx_2 = stoi(arguments[i + 2]);
-            }
-            if (string(arguments[i + 3]).find("-") != 0) {
-                gridpoints = stoi(arguments[i + 3]);
-            }
-            if (string(arguments[i + 4]).find("-") != 0) {
-                padding = stod(arguments[i + 4]);
-            }
-
-            WFN wavy(wfn);
-            string out = "Calculating 1D density between atoms " + wavy.get_atom_label(atom_idx_1) + " (" + std::to_string(atom_idx_1) + ") and " + wavy.get_atom_label(atom_idx_2) + " (" + std::to_string(atom_idx_2) + ") with " + std::to_string(gridpoints) + " gridpoints and " + std::to_string(padding) + " Angstrom padding.";
-            std::cout << out << std::endl;
-            get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
-            exit(0);
-        }
+        if (digest_io_options(temp, i))
+            continue;
+        if (digest_run_options(temp, i))
+            continue;
+        if (digest_partition_options(temp, i))
+            continue;
+        if (digest_property_options(temp, i))
+            continue;
+        if (digest_ri_options(temp, i))
+            continue;
+        if (digest_xcw_options(temp, i))
+            continue;
+        if (digest_dev_options(temp, i))
+            continue;
     }
 
     // SALTED predicts a density from atom positions.  Historically its

@@ -891,6 +891,20 @@ struct options
 	 *
 	 * @note Make sure to call this function after looking for debug.
 	 */
+	//file, format and conversion options
+	bool digest_io_options(const std::string &temp, int &i);
+	//resources, accuracy and general run control
+	bool digest_run_options(const std::string &temp, int &i);
+	//partitioning schemes, scattering factors and tsc tables
+	bool digest_partition_options(const std::string &temp, int &i);
+	//cube and property evaluation
+	bool digest_property_options(const std::string &temp, int &i);
+	//RI fitting, featomic descriptors and atom classification
+	bool digest_ri_options(const std::string &temp, int &i);
+	//X-ray constrained wavefunction fitting
+	bool digest_xcw_options(const std::string &temp, int &i);
+	//development and test-only switches
+	bool digest_dev_options(const std::string &temp, int &i);
 	void digest_options();
 
 	options() : log_file(std::cout)
