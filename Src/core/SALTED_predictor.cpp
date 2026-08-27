@@ -35,35 +35,18 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
     file.populate_config(config);
 
-    // Lean by default. This was gated behind -tsc_block on the assumption that
-    // holding fewer blocks cost time; measured paired - both binaries alternating
-    // in one session - it does not: 1.01x on 1EJG, 1.00x on 1EJG -mtc, and 0.90x
-    // on 8,566-atom 21AZ, where peak fell 18.5 -> 7.1 GB. There is no case for
-    // making anyone opt in to that. 0 would hold every block, as before.
+    // Lambda blocks held at once; 0 would hold every block
     lam_group_limit = 1;
 
-    // Two kinds of atom cannot be predicted, and both are handed to the spherical
-    // Thakkar fill instead of guessed at:
-    //
-    //  1. a species the model was never trained on;
-    //  2. an atom with nothing inside the descriptor cutoff.
-    //
-    // The second is the subtler one. An atom with an empty environment has a
-    // descriptor that singles out no direction: the l = 0 part is fine, because
-    // its own density is spherically symmetric, but every equivariant lam >= 1
-    // component is exactly zero. The normalisation 1/sqrt(inner) is then +inf and
-    // the prediction comes out NaN. 3NIR shipped two such atoms - an oxygen 4.07 A
-    // from anything and a hydrogen at 5.05 A, against a 4.0 A cutoff - as NaN
-    // columns running the length of its tsc.
-    //
-    // Removing them disturbs nobody: the test is symmetric, so an atom with
-    // nothing within rcut is also nobody's neighbour within rcut, and every other
-    // atom's environment is exactly what it was.
-    //
-    // The test here is purely geometric, while featomic additionally ignores
-    // neighbours whose species is outside neighspe. An atom with neighbours but no
-    // ALLOWED ones therefore still reaches equicomb - the zero guard there catches
-    // it, leaves it spherical rather than NaN, and says so in the log.
+    // Two kinds of atom go to the spherical Thakkar fill instead: a species the model
+    // was never trained on, and an atom with nothing inside the descriptor cutoff.
+    // The latter has a descriptor whose equivariant lam >= 1 components are all exactly
+    // zero (only l = 0 survives), so the 1/sqrt(inner) normalisation is +inf and the
+    // prediction is NaN. Dropping them changes no other atom's environment, the
+    // neighbour test being symmetric.
+    // The test here is purely geometric while featomic also ignores neighbours outside
+    // neighspe, so an atom with only disallowed neighbours still reaches equicomb,
+    // where the zero guard leaves it spherical rather than NaN.
     const int ncen_in = wavy_in.get_ncen();
     std::vector<char> use_thakkar(ncen_in, 0);
     for (int a = 0; a < ncen_in; a++)
@@ -178,12 +161,8 @@ void SALTEDPredictor::setup_atomic_environment()
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
         std::string label = wavy.get_atom_label(i);
-        /* Deuterium is hydrogen as far as the electron density goes - the
-        models are trained on H and there is nothing for a D to predict from,
-        so without this a joint X-ray/neutron structure is refused outright:
-        "Excluded species: D". Only the nucleus differs, which this does not
-        see. 5MON carries 593 of them.
-        */
+        // Deuterium is hydrogen for the electron density; without this a joint
+        // X-ray/neutron structure is refused with "Excluded species: D"
         if (label == "D" || label == "d")
         {
             label = "H";
@@ -246,18 +225,14 @@ void SALTEDPredictor::setup_atomic_environment()
     }
     else
     {
-        // Same hyperparameters, so the second descriptor set would be an exact
-        // duplicate of the first. Record that instead of copying it: equicomb
-        // then reads conj(v1) where it would have read v2. Conjugation only
-        // flips the sign of the imaginary part, which is exact in IEEE
-        // arithmetic, so the result is bit-identical - and v2 is a copy of an
-        // array that runs to gigabytes on a protein.
+        // Same hyperparameters: v2 would duplicate v1 exactly, so record that instead.
+        // equicomb then reads conj(v1); conjugation only flips the sign of the imaginary
+        // part, exact in IEEE, so the result is bit-identical
         v2_is_conj_of_v1 = true;
         v2.clear();
     }
 
-    // Conjugate v2 once here rather than per use in equicomb. Skipped when v2
-    // is just conj(v1): there is nothing to conjugate, equicomb applies it.
+    // Conjugate v2 once here rather than per use in equicomb; skipped when v2 is conj(v1)
     if (ProgressBar::report_counts)
         std::cout << "[stages] featomic descriptors "
                   << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_desc).count()
@@ -271,13 +246,9 @@ void SALTEDPredictor::setup_atomic_environment()
 
 
 void SALTEDPredictor::read_model_data() {
-    // How long the model costs to get off disk decides whether a lazy loader
-    // needs to be asynchronous or merely lazy: the total bytes are the same
-    // either way, only the moment changes.
     const auto _t_model = std::chrono::steady_clock::now();
     const std::filesystem::path _SALTEDpath = SALTED_DIR / config.salted_filename;
-    // Kept open for the whole prediction: the feature and projector matrices are
-    // fetched lambda by lambda as the loop reaches them, not up front.
+    // Kept open for the whole prediction; the matrices are fetched lambda by lambda
     model_file = std::make_unique<SALTED_BINARY_FILE>(_SALTEDpath);
     SALTED_BINARY_FILE &file = *model_file;
     if (config.field) {
@@ -290,28 +261,21 @@ void SALTEDPredictor::read_model_data() {
     if (config.sparsify) vfps = file.read_fps();
 
 
-    // Only the species this structure actually contains need their model data.
-    // The model knows every species it was trained on; a protein uses five of
-    // them, alanine four. The rest are read for their SHAPE alone, because
-    // `weights` is one flat vector laid out over every species the model knows
-    // and the offset of a present species depends on the sizes of the absent ones
-    // in front of it. Shapes are two integers; the payload is hundreds of MB.
+    // Only present species need their model data; absent ones are needed for their
+    // shape alone, because `weights` is one flat vector laid out over every species
+    // the model knows and the absent widths in front shift a present species' offset
     std::unordered_set<std::string> present;
     for (const std::string &spe : config.species)
         if (atom_idx.find(spe) != atom_idx.end()) present.insert(spe);
 
-    // Nothing large is read here. Both blocks are INDEXED - offset and shape per
-    // (species, lambda) - and the matrices are fetched in load_model_lambda()
-    // when the prediction reaches that lambda, then dropped again. Each block is
-    // used exactly once per run, so the bytes read are the same as before.
+    // Indexing only, no payload: offset and shape per (species, lambda). The matrices
+    // are read in load_model_lambda() and dropped again, each block used once per run
     feat_index = file.index_lambda_based_data("FEATS");
     proj_index = file.index_lambda_based_data("PROJ");
     model_species = present;
 
-    // The two things the rest of the run needs from the shapes alone:
-    //  - Mspe, the number of sparse environments of a present species;
-    //  - the projector width of EVERY species the model knows, present or not,
-    //    because `weights` is one flat vector laid out over all of them.
+    // From the shapes alone: Mspe, the number of sparse environments of a present
+    // species, and the projector width of every species the model knows
     for (const auto &[k, ref] : proj_index)
         proj_dims[k] = { ref.rows, ref.cols };
     for (const std::string &spe : present)
@@ -320,9 +284,6 @@ void SALTEDPredictor::read_model_data() {
         if (it != feat_index.end()) Mspe[spe] = static_cast<int>(it->second.rows);
     }
 
-    // What the model actually costs, and how it splits by lambda. The prediction
-    // walks one lambda at a time, so the per-lambda figure is the floor a lazy
-    // loader could reach - worth knowing before writing one.
     if (ProgressBar::report_counts)
     {
         auto mb = [](const size_t doubles) { return doubles * sizeof(double) / 1048576.0; };
@@ -354,17 +315,9 @@ void SALTEDPredictor::read_model_data() {
 }
 
 
-// Fetch the model matrices for one lambda, use them, drop them.
-//
-// The prediction visits each lambda exactly once, and within a lambda it needs
-// power_env_sparse and Vmat for every species present. Nothing above that
-// lambda is touched again afterwards - the weight accounting downstream works
-// off psi_nm and the projector SHAPES, both of which outlive the matrices - so
-// the blocks can be let go as soon as the kernels for that lambda are built.
-//
-// The bytes read over a run are exactly what they were when everything was
-// loaded up front; only the moment changes. What changes with it is the peak:
-// the largest single lambda instead of all of them at once.
+// Fetch the model matrices for one lambda, use them, drop them. Each lambda is
+// visited once and nothing above it reads them again: the weight accounting
+// downstream works off psi_nm and the projector shapes, which outlive the matrices
 void SALTEDPredictor::load_model_lambda(const int lam)
 {
     if (!model_file) return;
@@ -404,24 +357,16 @@ vec SALTEDPredictor::predict()
     { return std::chrono::duration<double>(std::chrono::steady_clock::now() - from).count(); };
     double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_io = 0.0;
     // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
-    // How many lambda blocks are alive at once.
-    //
-    // A block is natoms * (2*lam+1) * featsize doubles; holding all of them sums
-    // to (nang+1)^2 times a single block - 13.9 GB for 8,566 atoms, most of what
-    // the prediction uses. Holding fewer bounds that, at the cost of revisiting
-    // each species once per group instead of once in total.
-    //
-    // Streaming the tsc is the signal that memory is the binding constraint, so
-    // -tsc_block selects the lean setting; otherwise everything is held, which is
-    // the original loop order exactly.
+    // How many lambda blocks are alive at once. A block is natoms * (2*lam+1) *
+    // featsize doubles and holding all of them sums to (nang+1)^2 times a single
+    // block; fewer bounds that, at the cost of revisiting each species per group
     const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
     const int lam_group = (lam_group_limit > 0) ? lam_group_limit : (lmax_max + 1);
     ivec featsize(lmax_max + 1);
     std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
     for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
         psi_nm[spe_idx].resize(lmax[config.species[spe_idx]] + 1);
-    // The only quantity that crosses lambda: set at lam = 0, reused above it when
-    // zeta != 1. One per species, and small.
+    // The only quantity that crosses lambda: set at lam = 0, reused above it when zeta != 1
     std::vector<dMatrix2> kernell0(config.species.size());
     for (int lam0 = 0; lam0 <= lmax_max; lam0 += lam_group)
     {
@@ -473,15 +418,13 @@ vec SALTEDPredictor::predict()
         }
         }
         _t_equicomb += _elapsed(_t_eq);
-        // Deliberately after the descriptors, not before: the model is only needed
-        // by the kernels, and the descriptor stage is where memory is already
-        // highest. Holding it across equicomb would raise the peak for nothing.
+        // After the descriptors, not before: holding the model across equicomb, where
+        // memory is already highest, would raise the peak for nothing
         const auto _t_ld = std::chrono::steady_clock::now();
         for (int lam = lam0; lam < lam1; lam++) load_model_lambda(lam);
         _t_model_io += _elapsed(_t_ld);
         const auto _t_kn = std::chrono::steady_clock::now();
-        // Species-outer within the group, so a species walks several consecutive
-        // lambdas and keeps its sparse matrices hot.
+        // Species-outer within the group, so a species keeps its sparse matrices hot
         for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
         {
             const string spe = config.species[spe_idx];
@@ -540,7 +483,6 @@ vec SALTEDPredictor::predict()
             }
         }
         _t_kernels += _elapsed(_t_kn);
-        // Nothing above this lambda reads these matrices again.
         for (int lam = lam0; lam < lam1; lam++) free_model_lambda(lam);
     }
 
@@ -554,8 +496,7 @@ vec SALTEDPredictor::predict()
         {
             for (int l = 0; l < lmax[spe] + 1; ++l)
             {
-                // The projector data for an absent species was never loaded; its
-                // shape was, and the shape is all this accounting needs.
+                // Never loaded for an absent species; its shape was, and that is all this needs
                 const auto dim_it = proj_dims.find(spe + to_string(l));
                 if (dim_it == proj_dims.end() || dim_it->second[1] == 0)
                 {
