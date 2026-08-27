@@ -293,7 +293,7 @@ void computeRho(
 
         int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
 
-        vec res(max_block_ij * naok);
+        vec res(static_cast<size_t>(max_block_ij) * naok);
         vec dm_slice(max_block_ij);
         for (int atom_i = 0; atom_i < natoms; atom_i++) {
             shl_slice[0] = bas_orbital_indices[atom_i];
@@ -438,7 +438,7 @@ dMatrix2 cart2sph(const int l, const bool normalized) {
     err_chkf(l <= 15, "cart2sph_matrix: l must be <= 15", std::cout);
 
     int n_sph = 2 * l + 1;
-    vec c_sph(n_sph * n_cart, 0.0);
+    vec c_sph(static_cast<size_t>(n_sph) * n_cart, 0.0);
 
     libcint::CINTc2s_ket_sph(c_sph.data(), n_cart, c_tensor.data(), l);
     //Transform back to row-major order
@@ -555,7 +555,7 @@ vec eval_GTO_sph(Int_Params& params, vec2& grid, ivec& shl_slice) {
 	int nao = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
 
     //non0tab = numpy.ones(((ngrids+BLKSIZE-1)//BLKSIZE,nbas),dtype = numpy.uint8)
-	std::vector<uint8_t> non0table(((ngrid + 56 - 1) / 56) * nbas, 1);
+	std::vector<uint8_t> non0table(static_cast<size_t>((ngrid + 56 - 1) / 56) * nbas, 1);
 
     // Compute integrals
     vec res((size_t)nao * (size_t)ngrid, 0.0);

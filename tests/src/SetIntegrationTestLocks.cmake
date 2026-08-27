@@ -1,9 +1,13 @@
 # Tests using tests/sucrose_fchk_SF
+# Fukui and FukuiPBC both write <stem>_fukui.dat into this directory, so they
+# need the lock both against each other and against the four tests above.
 set_tests_properties(
     TomlIntegrationTests.Fractal
     TomlIntegrationTests.Properties
     TomlIntegrationTests.SucroseSF
     TomlIntegrationTests.SucroseTwin
+    TomlIntegrationTests.Fukui
+    TomlIntegrationTests.FukuiPBC
     PROPERTIES
         RESOURCE_LOCK integration_sucrose_fchk_SF
 )

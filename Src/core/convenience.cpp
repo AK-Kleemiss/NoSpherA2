@@ -627,6 +627,17 @@ std::string help_message =
  "                                    electrostatic-potential properties.\n"
  "  -def  -HDEF                        Request deformation density or HDEF.\n"
  "  -MO <number|all>                   Generate a molecular-orbital property.\n"
+ "  -fukui                             Fukui functions f+/f-/f0 and the dual\n"
+ "                                    descriptor, in the frontier-orbital\n"
+ "                                    approximation. Writes _fukui_plus,\n"
+ "                                    _fukui_minus, _fukui_zero and\n"
+ "                                    _dual_descriptor cubes, plus condensed\n"
+ "                                    per-atom values for all five partitions.\n"
+ "  -fukui_analysis <wfn>              Reactivity analysis of one wavefunction:\n"
+ "                                    frontier orbitals, HOMO-LUMO gap and the\n"
+ "                                    condensed Fukui functions under Hirshfeld,\n"
+ "                                    Becke, TFVC, MBIS and EMBIS. No cubes, so\n"
+ "                                    no grid, radius or CIF is needed.\n"
  "  -radius <angstrom>  -resolution <angstrom>\n"
  "                                    Grid settings for property calculations.\n"
  "  -hirsh <atom-index>                Hirshfeld analysis for one atom.\n"
@@ -3050,6 +3061,32 @@ void options::digest_options()
         }
         else if (temp == "-esp")
             properties.esp = true;
+        else if (temp == "-fukui" || temp == "-Fukui")
+            properties.fukui = true;
+        else if (temp == "-fukui_analysis")
+        {
+            // Only records the request; the analysis itself runs from
+            // run_app_impl.
+            //
+            // Doing the work here instead - the pattern -dipole_moments,
+            // -laplacian_bonds and friends use - would put the whole table in
+            // NoSpherA2.log and nothing on the terminal, because run_app_impl
+            // has already pointed std::cout at that log file by the time
+            // digest_options() runs. (Verified: -dipole_moments prints nothing
+            // to stdout and 2.9 kB to the log.) That is tolerable for a
+            // side-effect command and useless for one whose entire output is
+            // meant to be read, so this one is dispatched later, where the
+            // console buffer can be restored first.
+            fukui_analysis_run = true;
+            // Wavefunction may be given inline (-fukui_analysis mol.gbw) or with
+            // the usual -wfn. The inline form is the point of the flag, so it
+            // wins, but only if the next token is not itself an option.
+            if (i + 1 < argc && arguments[i + 1][0] != '-')
+            {
+                wfn = arguments[i + 1];
+                i++;
+            }
+        }
         else if (temp == "-ewal_sum")
         {
             // bool read, WFN& wave, std::ostream& file,

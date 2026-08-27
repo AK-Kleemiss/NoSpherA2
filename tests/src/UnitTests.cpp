@@ -12,6 +12,8 @@
 #include "core/atoms.h"
 #include "core/tsc_block.h"
 #include "core/cell.h"
+#include "core/wfn_class.h"
+#include "core/properties.h"
 
 static constexpr double PI_VAL = 3.14159265358979323846;
 
@@ -2297,6 +2299,132 @@ namespace NoSpherA2UnitTests
             ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
         EXPECT_EXIT(cell::parse_symop("x+1/0,y,z", "test.cif", result.rot, result.trans, std::cout),
             ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+    }
+
+    // ---------------------------------------------------------------------
+    // find_frontier_orbitals - the HOMO/LUMO detection behind the Fukui
+    // functions. There is no stored frontier index in WFN, so this logic is
+    // the only thing standing between a correct f+/f- and a silently wrong
+    // one, which makes it worth testing directly rather than only through the
+    // integration test.
+    // ---------------------------------------------------------------------
+
+    // A closed-shell case with orbital energies present: the HOMO is the
+    // highest-energy occupied orbital and the LUMO the lowest-energy virtual.
+    TEST(FukuiTests, FrontierOrbitalsRestrictedWithEnergies)
+    {
+        WFN wavy;
+        wavy.push_back_MO(0, 2.0, -10.0);
+        wavy.push_back_MO(1, 2.0, -5.0);
+        wavy.push_back_MO(2, 2.0, -1.0);  // HOMO
+        wavy.push_back_MO(3, 0.0, 0.5);   // LUMO
+        wavy.push_back_MO(4, 0.0, 1.5);
+
+        int homo = -1, lumo = -1;
+        bool unrestricted = true;
+        EXPECT_TRUE(find_frontier_orbitals(wavy, homo, lumo, unrestricted));
+        EXPECT_EQ(homo, 2);
+        EXPECT_EQ(lumo, 3);
+        EXPECT_FALSE(unrestricted);
+    }
+
+    // Energies are not always stored - a plain .wfn carries none, and every
+    // energy then reads back as exactly 0.0. In that case the routine must fall
+    // back to orbital ORDER (last occupied / first virtual) instead of picking
+    // an arbitrary orbital because all the energies compare equal.
+    TEST(FukuiTests, FrontierOrbitalsFallsBackToOrderWithoutEnergies)
+    {
+        WFN wavy;
+        wavy.push_back_MO(0, 2.0, 0.0);
+        wavy.push_back_MO(1, 2.0, 0.0);
+        wavy.push_back_MO(2, 2.0, 0.0);  // HOMO by position
+        wavy.push_back_MO(3, 0.0, 0.0);  // LUMO by position
+        wavy.push_back_MO(4, 0.0, 0.0);
+
+        int homo = -1, lumo = -1;
+        bool unrestricted = false;
+        EXPECT_TRUE(find_frontier_orbitals(wavy, homo, lumo, unrestricted));
+        EXPECT_EQ(homo, 2);
+        EXPECT_EQ(lumo, 3);
+    }
+
+    // Orbitals are not guaranteed to arrive sorted by energy. When energies are
+    // available they must win over index order, otherwise the frontier pair is
+    // silently wrong for any reader that emits an unsorted set.
+    TEST(FukuiTests, FrontierOrbitalsPreferEnergyOverIndexOrder)
+    {
+        WFN wavy;
+        wavy.push_back_MO(0, 2.0, -1.0);  // highest occupied energy -> HOMO
+        wavy.push_back_MO(1, 2.0, -10.0);
+        wavy.push_back_MO(2, 0.0, 2.0);
+        wavy.push_back_MO(3, 0.0, 0.5);   // lowest virtual energy -> LUMO
+
+        int homo = -1, lumo = -1;
+        bool unrestricted = false;
+        EXPECT_TRUE(find_frontier_orbitals(wavy, homo, lumo, unrestricted));
+        EXPECT_EQ(homo, 0);
+        EXPECT_EQ(lumo, 3);
+    }
+
+    // The failure this guards is the one that actually bites: a wavefunction
+    // file storing only the occupied orbitals (the common case for .wfn and for
+    // the sucrose.wfx in tests/) has no LUMO at all, so no Fukui function can be
+    // formed. That must be reported, not silently turned into an all-zero f+.
+    TEST(FukuiTests, FrontierOrbitalsFailWhenNoVirtualsExist)
+    {
+        WFN wavy;
+        wavy.push_back_MO(0, 2.0, -10.0);
+        wavy.push_back_MO(1, 2.0, -5.0);
+        wavy.push_back_MO(2, 2.0, -1.0);
+
+        int homo = -1, lumo = -1;
+        bool unrestricted = false;
+        EXPECT_FALSE(find_frontier_orbitals(wavy, homo, lumo, unrestricted));
+        EXPECT_EQ(homo, 2);
+        EXPECT_EQ(lumo, -1);
+    }
+
+    // The mirror case: no occupied orbitals at all.
+    TEST(FukuiTests, FrontierOrbitalsFailWhenNoOccupiedExist)
+    {
+        WFN wavy;
+        wavy.push_back_MO(0, 0.0, 1.0);
+        wavy.push_back_MO(1, 0.0, 2.0);
+
+        int homo = -1, lumo = -1;
+        bool unrestricted = false;
+        EXPECT_FALSE(find_frontier_orbitals(wavy, homo, lumo, unrestricted));
+        EXPECT_EQ(homo, -1);
+        EXPECT_EQ(lumo, 0);
+    }
+
+    // An empty wavefunction must fail rather than index into nothing.
+    TEST(FukuiTests, FrontierOrbitalsFailOnEmptyWavefunction)
+    {
+        WFN wavy;
+        int homo = -1, lumo = -1;
+        bool unrestricted = false;
+        EXPECT_FALSE(find_frontier_orbitals(wavy, homo, lumo, unrestricted));
+        EXPECT_EQ(homo, -1);
+        EXPECT_EQ(lumo, -1);
+    }
+
+    // Fractional occupations from correlated methods must count as occupied. A
+    // naive "occ == 2.0 means occupied" test would classify a natural orbital
+    // with occupation 1.98 as virtual and put the HOMO in the wrong place.
+    TEST(FukuiTests, FrontierOrbitalsTreatFractionalOccupationAsOccupied)
+    {
+        WFN wavy;
+        wavy.push_back_MO(0, 2.0, -10.0);
+        wavy.push_back_MO(1, 1.98, -2.0);
+        wavy.push_back_MO(2, 0.02, -1.0);  // still occupied, so this is the HOMO
+        wavy.push_back_MO(3, 0.0, 0.5);    // genuinely empty -> LUMO
+
+        int homo = -1, lumo = -1;
+        bool unrestricted = false;
+        EXPECT_TRUE(find_frontier_orbitals(wavy, homo, lumo, unrestricted));
+        EXPECT_EQ(homo, 2);
+        EXPECT_EQ(lumo, 3);
     }
 
 } // namespace NoSpherA2UnitTests

@@ -6530,6 +6530,12 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         return false;
     }
     origin = e_origin::fchk;
+    // Every other reader (read_wfn, read_wfx, read_xyz, read_molden, ...) records
+    // the source path here; read_fchk did not. The path is what the property code
+    // builds cube filenames from, so without it an fchk-driven run wrote
+    // "_rho.cube", "_lap.cube", "_fukui_plus.cube" etc. with an empty stem - which
+    // silently collide when more than one structure is processed in one directory.
+    path = filename;
     std::string line;
     getline(fchk, line);
     std::string title = line;
