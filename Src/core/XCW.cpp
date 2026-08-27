@@ -1541,8 +1541,6 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 #pragma omp parallel reduction(+:skipped_grids)
 	{
 		vec2 single_k_pts(num_syms, vec(3));
-		cvec3 phase(num_syms, cvec2(n_grids));
-		cvec2 grid_factors(num_syms, cvec(n_atom_grids));
 		vec phase_angles;
 		vec phase_sines;
 		vec phase_cosines;
@@ -1555,89 +1553,108 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		// out: the file is reflection-major and the writer seeks to r's offset.
 		cvec blk;
 		if (i_streamed_) blk.assign(packed_size, cdouble{});
+
 #if !defined(__APPLE__)
 		mkl_set_num_threads_local(1);
 #endif
+
+		size_t max_points = 0;
+		for (int g = 0; g < n_grids; g++) {
+			max_points = std::max(max_points, static_cast<size_t>(points[g]));
+		}
+		cvec phase_buffer(max_points);
+		phase_angles.resize(max_points);
+		phase_sines.resize(max_points);
+		phase_cosines.resize(max_points);
+		size_t max_ao_block_size = 0, max_tile_result_size = 0;
+		for (int g = 0; g < n_grids; g++) {
+			for (const GridBlock& block : grid_blocks[g]) {
+				max_ao_block_size = std::max(max_ao_block_size, block.ao_values.size());
+				for (const MatrixTile& tile : block.matrix_tiles) {
+					max_tile_result_size = std::max(max_tile_result_size, static_cast<size_t>(tile.result_offset + tile.row_count * tile.col_count));
+				}
+			}
+		}
+		weighted_values_real.resize(max_ao_block_size);
+		weighted_values_imag.resize(max_ao_block_size);
+		tile_real_values.resize(max_tile_result_size);
+		tile_imag_values.resize(max_tile_result_size);
+
 #pragma omp for schedule(dynamic, 1)
 		for (int r = 0; r < cryst.nr_small; r++) {
+			if (i_streamed_) std::fill(blk.begin(), blk.end(), cdouble{});
+			cdouble* const I_r = i_streamed_ ? blk.data()
+				: I.data() + static_cast<size_t>(r) * packed_size;
+			const size_t base = static_cast<size_t>(r) * packed_size;
 			const int* asym_lookup_r = asym_lookup[r].data();
 			// Precompute weighted phase factors for integration
 			for (int syms = 0; syms < num_syms; syms++) {
 				single_k_pts[syms] = { k_pt[0][asym_lookup_r[syms]], k_pt[1][asym_lookup_r[syms]], k_pt[2][asym_lookup_r[syms]] };
+				const int idx = asym_lookup_r[syms];
 				for (int g = 0; g < n_grids; g++) {
-					phase[syms][g].resize(points[g]);
-					phase_angles.resize(points[g]);
-					phase_sines.resize(points[g]);
-					phase_cosines.resize(points[g]);
+					const int np_g = points[g];
+					double* const angles = phase_angles.data();
+					double* const sines = phase_sines.data();
+					double* const cosines = phase_cosines.data();
 					for (int p = 0; p < points[g]; p++) {
-						phase_angles[p] = single_k_pts[syms][0] * d1[g][p] + single_k_pts[syms][1] * d2[g][p] + single_k_pts[syms][2] * d3[g][p];
+						angles[p] = single_k_pts[syms][0] * d1[g][p] + single_k_pts[syms][1] * d2[g][p] + single_k_pts[syms][2] * d3[g][p];
 					}
 #if defined(__APPLE__)
 					for (int p = 0; p < points[g]; p++) {
-						__sincos(phase_angles[p], &phase_sines[p], &phase_cosines[p]);
+						__sincos(angles[p], &sines[p], &cosines[p]);
 					}
 #else
-					vdSinCos(points[g], phase_angles.data(), phase_sines.data(), phase_cosines.data());
+					vdSinCos(np_g, angles, sines, cosines);
 #endif
-					for (int p = 0; p < points[g]; p++) {
-						phase[syms][g][p] = cdouble(weights[g][p] * phase_cosines[p], weights[g][p] * phase_sines[p]);
+					cdouble* const phase_g = phase_buffer.data();
+					const double* w_g = weights[g].data();
+					for (int p = 0; p < np_g; p++) {
+						phase_g[p] = cdouble(w_g[p] * cosines[p], w_g[p] * sines[p]);
 					}
-				}
-			}
-			// Precompute asym factor, DW factor, phase factor products
-			for (int g = 0; g < n_atom_grids; g++) {
-				const double asym_fact = asym_atoms[g].asym_fact;
-				const cdouble* DW_fact_g = DW_fact[g].data();
-				const cdouble* phase_fact_g = phase_fact[g].data();
-				for (int syms = 0; syms < num_syms; syms++) {
-					const int idx = asym_lookup_r[syms];
+					const double asym_fact = asym_atoms[g].asym_fact;
+					const cdouble* DW_fact_g = DW_fact[g].data();
 					const double DW_im = DW_fact_g[idx].imag();
+					const cdouble* phase_fact_g = phase_fact[g].data();
 					const double phase_im = phase_fact_g[idx].imag();
 					const double DW_re = DW_fact_g[idx].real();
 					const double phase_re = phase_fact_g[idx].real();
-					grid_factors[syms][g] = cdouble(asym_fact * (DW_re * phase_re - DW_im * phase_im),
-													asym_fact * (DW_re * phase_im + DW_im * phase_re));
-				}
-			}
-
-			if (i_streamed_) std::fill(blk.begin(), blk.end(), cdouble{});
-			cdouble *const I_r = i_streamed_ ? blk.data()
-			                                 : I.data() + static_cast<size_t>(r) * packed_size;
-			// Main loop for computation of I
-			const size_t base = static_cast<size_t>(r) * packed_size;
-			for (int syms = 0; syms < num_syms; syms++) {
-				for (int g = 0; g < n_atom_grids; g++) {
-					const cdouble factor = grid_factors[syms][g] * translation_phase[r][syms];
+					// Precompute basis function independent factors
+					const cdouble grid_factor = cdouble(asym_fact * (DW_re * phase_re - DW_im * phase_im),
+						asym_fact * (DW_re * phase_im + DW_im * phase_re));
+					const cdouble factor = grid_factor * translation_phase[r][syms];
+					// This is where the magic happens
 					for (const GridBlock& block : grid_blocks[g]) {
 						const ivec& active_aos = block.active_aos;
 						const int n_active = static_cast<int>(active_aos.size());
 						const int np = block.point_count;
 						const vec& ao_values = block.ao_values;
-						weighted_values_real.resize(ao_values.size());
-						weighted_values_imag.resize(ao_values.size());
-						tile_real_values.resize(block.tile_result_size);
-						tile_imag_values.resize(block.tile_result_size);
-						const cdouble* phase_values = phase[syms][g].data() + block.point_start;
+
+						double* const real_w = weighted_values_real.data();
+						double* const imag_w = weighted_values_imag.data();
+						double* const tile_real = tile_real_values.data();
+						double* const tile_imag = tile_imag_values.data();
+						const cdouble* phase_values = phase_g + block.point_start;
 
 						for (int local_mu = 0; local_mu < n_active; local_mu++) {
 							const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
-							double* real_weighted_row = weighted_values_real.data() + static_cast<size_t>(local_mu) * np;
-							double* imag_weighted_row = weighted_values_imag.data() + static_cast<size_t>(local_mu) * np;
+							double* rw_row = real_w + static_cast<size_t>(local_mu) * np;
+							double* iw_row = imag_w + static_cast<size_t>(local_mu) * np;
 							for (int p = 0; p < np; p++) {
-								real_weighted_row[p] = ao_row[p] * phase_values[p].real();
-								imag_weighted_row[p] = ao_row[p] * phase_values[p].imag();
+								rw_row[p] = ao_row[p] * phase_values[p].real();
+								iw_row[p] = ao_row[p] * phase_values[p].imag();
 							}
 						}
 
 						for (const MatrixTile& tile : block.matrix_tiles) {
+							const double* ao_tile_row = ao_values.data() + static_cast<size_t>(tile.row_start) * np;
 							cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
-								ao_values.data() + static_cast<size_t>(tile.row_start) * np, np,
-								weighted_values_real.data() + static_cast<size_t>(tile.col_start) * np, np,
-								0.0, tile_real_values.data() + tile.result_offset, tile.col_count);
+								ao_tile_row, np,
+								real_w + static_cast<size_t>(tile.col_start) * np, np,
+								0.0, tile_real + tile.result_offset, tile.col_count);
 							cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
-								ao_values.data() + static_cast<size_t>(tile.row_start) * np, np,
-								weighted_values_imag.data() + static_cast<size_t>(tile.col_start) * np, np,
-								0.0, tile_imag_values.data() + tile.result_offset, tile.col_count);
+								ao_tile_row, np,
+								imag_w + static_cast<size_t>(tile.col_start) * np, np,
+								0.0, tile_imag + tile.result_offset, tile.col_count);
 						}
 
 						// Retiling
@@ -1651,7 +1668,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 									const int nu = active_aos[local_nu];
 									if (!skip[mu][nu]) {
 										const size_t matrix_idx = tile.result_offset + static_cast<size_t>(tile_row) * tile.col_count + tile_col;
-										I_r[tri_index(mu, nu)] += cdouble(tile_real_values[matrix_idx], tile_imag_values[matrix_idx]) * factor;
+										I_r[tri_index(mu, nu)] += cdouble(tile_real[matrix_idx], tile_imag[matrix_idx]) * factor;
 									}
 								}
 							}
