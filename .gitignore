@@ -81,3 +81,35 @@ Lib/*
 # reference files are deliberately NOT matched by these patterns.
 *_fukui.dat
 *_fukui.vmd
+
+# MSBuild leftovers. The existing /Windows/Test**/Release* rule does not reach
+# Windows/Tests/x64/Release: ** inside a path segment matches one segment only.
+/Windows/**/x64/
+
+# XCW on-disk tensor cache, written and read back by Src/core/XCW.cpp. Multi-GB.
+I_tensor
+
+# XCW per-lambda dumps. Were tracked until 2b68eb8 "Delete junk files".
+tests/P1_test/NA2_*.wfn
+
+# fchk_conversion leftover, byte-identical to the tracked good.fchk.
+tests/NiP3_fchk/in.fchk
+
+# ORCA and Tonto side products of the RGBI reference runs. Scoped to this
+# directory on purpose: tests/partition carries tracked .bibtex/.densitiesinfo.
+tests/RGBI/*.bibtex
+tests/RGBI/*.densitiesinfo
+tests/RGBI/*.property.txt
+tests/RGBI/*.tonto
+
+# NBO conversion outputs. The fixtures are reference.47 and reference.nbo;
+# these are what Nbo47Tests regenerates into a temp dir on every run.
+tests/epoxide_gbw/NBO/epoxide.47
+tests/epoxide_gbw/NBO/epoxide.nbo
+tests/RGBI_groups/nh3li.47
+tests/RGBI_groups/nh3li.nbo
+
+# NCI outputs written beside the inputs by Src/core/properties.cpp.
+tests/intermolecular_nci/unit_surrounding_values.dat
+tests/intermolecular_nci/unit_surrounding_nci.vmd
+tests/intermolecular_nci/unit_surrounding_plot.py
