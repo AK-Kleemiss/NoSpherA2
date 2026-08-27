@@ -3382,7 +3382,8 @@ void options::digest_options()
             merge_tscs_without_checks("combine", filenames, old_tsc);
             exit(0);
         }
-        else if (temp == "-MO")
+        //Not an else if: MSVC counts each one as a nested block and C1061 trips at 128
+        if (temp == "-MO")
         {
             if (string(arguments[i + 1]) != "all")
                 properties.MO_numbers.push_back(stoi(arguments[i + 1]));
