@@ -301,6 +301,12 @@ private:
 	i_tensor_file i_file_;
 	bool i_streamed_ = false;
 	int i_window_ = 0;
+	// The packed (mu, nu) run of reflection r, from the loaded window or from the resident tensor
+	const cdouble* i_block(const int r) const
+	{
+		return i_streamed_ ? i_file_.block(r)
+			: I.data() + static_cast<size_t>(r) * (static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2);
+	}
 	std::vector<asym_atom> asym_atoms;
 	std::vector<scattering_data> obs;
 	hkl_list hkl;

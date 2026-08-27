@@ -24,13 +24,10 @@ public:
                       const block_type& prototype,
                       const std::size_t reflection_count,
                       const std::size_t queue_depth = 2)
-        : out_(name, std::ios::binary | std::ios::trunc),
-          queue_depth_(queue_depth == 0 ? 1 : queue_depth)
+        : tsc_stream_writer(name, queue_depth)
     {
-        if (!out_)
-            throw std::runtime_error("Failed to open TSCB file for streaming");
         prototype.write_tscb_prologue(out_, reflection_count);
-        worker_ = std::thread([this] { drain(); });
+        start();
     }
 
     tsc_stream_writer(const std::filesystem::path& name,
@@ -38,13 +35,10 @@ public:
                       const std::string& header,
                       const std::size_t reflection_count,
                       const std::size_t queue_depth = 2)
-        : out_(name, std::ios::binary | std::ios::trunc),
-          queue_depth_(queue_depth == 0 ? 1 : queue_depth)
+        : tsc_stream_writer(name, queue_depth)
     {
-        if (!out_)
-            throw std::runtime_error("Failed to open TSCB file for streaming");
         block_type::write_tscb_prologue(out_, scatterers, header, reflection_count);
-        worker_ = std::thread([this] { drain(); });
+        start();
     }
 
     ~tsc_stream_writer() { try { finish(); } catch (...) { } }
@@ -80,6 +74,18 @@ public:
     }
 
 private:
+    // opens and truncates the file; the delegating constructor writes the prologue and only then calls start()
+    tsc_stream_writer(const std::filesystem::path& name, const std::size_t queue_depth)
+        : out_(name, std::ios::binary | std::ios::trunc),
+          queue_depth_(queue_depth == 0 ? 1 : queue_depth)
+    {
+        if (!out_)
+            throw std::runtime_error("Failed to open TSCB file for streaming");
+    }
+
+    // MUST run after the prologue: the worker appends reflection blocks to whatever out_ holds
+    void start() { worker_ = std::thread([this] { drain(); }); }
+
     struct item { index_block idx; cvec2 sf; };
 
     void rethrow_if_failed() const

@@ -316,7 +316,6 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
 	i3 hkl_;
 	double F_, abs_F_, F2_, sigma_, sigma2_;
-	int positive_;
 	err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
 	std::ifstream hkl_input(hkl_filename, std::ios::in);
 	hkl_input.seekg(0, hkl_input.beg);
@@ -340,28 +339,27 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 			hkl_[i] = stoi(temp);
 			// if (debug) file << setw(4) << temp;
 		}
-		for (int i = 0; i < 2; i++) {
-			temp = line;
-			temp.erase(0, 12);
-			int dot = temp.find_first_of('.');
-			std::string temp_F = temp.substr(0, dot + 3);
-			std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
-			temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
-			sigma2_ = stof(temp_sigma);
-			temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
-			F_ = stof(temp_F);
-			if (F_ < 0) {
-				F2_ = -F_;
-				abs_F_ = std::sqrt(F2_);
-				F_ = -abs_F_;
-				sigma_ = sigma2_ * 0.5 / -F_;
-			}
-			else {
-				F2_ = F_;
-				abs_F_ = std::sqrt(F2_);
-				F_ = abs_F_;
-				sigma_ = sigma2_ * 0.5 / F_;
-			}
+		temp = line;
+		temp.erase(0, 12);
+		int dot = temp.find_first_of('.');
+		std::string temp_F = temp.substr(0, dot + 3);
+		std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
+		temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
+		sigma2_ = stof(temp_sigma);
+		temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
+		F_ = stof(temp_F);
+		//the two branches differ only in sign; they are NOT std::abs/copysign, which would turn a -0.00 F2 into +0.0 and flip sigma's infinity
+		if (F_ < 0) {
+			F2_ = -F_;
+			abs_F_ = std::sqrt(F2_);
+			F_ = -abs_F_;
+			sigma_ = sigma2_ * 0.5 / -F_;
+		}
+		else {
+			F2_ = F_;
+			abs_F_ = std::sqrt(F2_);
+			F_ = abs_F_;
+			sigma_ = sigma2_ * 0.5 / F_;
 		}
 		// if (debug) file << endl;
 		hkl.emplace(hkl_);
@@ -2180,6 +2178,20 @@ std::vector<Thakkar> make_spherical_evaluators(const ivec& atom_type_list)
     return spheres;
 }
 
+//the file list a spherical fill runs over, and the index into it; nr also selects opt.groups[nr] and the part's cif,
+//so it must be the whole file list: a one-element vector takes part 0's atoms whatever part is filled, or reads tempy[1] if nr is passed
+int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>& tempy)
+{
+    if (!opt.wfn.empty())
+    {
+        tempy.emplace_back(opt.wfn);
+        return 0;
+    }
+    for (const std::filesystem::path& part_file : opt.combined_tsc_calc_files)
+        tempy.emplace_back(part_file);
+    return nr;
+}
+
 //rows for atoms the SALTED model could not predict (unknown species, or nothing inside the descriptor cutoff)
 //a Thakkar factor depends only on element and reflection, so these chunk like everything else here
 void append_spherical_rows(cvec2& chunk,
@@ -2654,11 +2666,7 @@ tsc_block_type calculate_scattering_factors(
             }
             return tsc_block_type();
         }
-        vector<Thakkar> spherical_atoms;
-        spherical_atoms.reserve(atom_type_list.size());
-        for (int i = 0; i < atom_type_list.size(); i++)
-            spherical_atoms.emplace_back(atom_type_list[i]);
-
+        std::vector<Thakkar> spherical_atoms = make_spherical_evaluators(atom_type_list);
         const int imax = (int)asym_atom_list.size();
         const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
         const int hkl_max = hkl.size();
@@ -2695,16 +2703,6 @@ tsc_block_type calculate_scattering_factors(
                     return chunk;
                 });
         }
-        else if (!opt.electron_diffraction)
-        {
-#pragma omp parallel for shared(hkl_vector)
-            for (int s = 0; s < hkl_max; s++)
-            {
-                const double k = constants::bohr2ang(constants::FOUR_PI * unit_cell.get_stl_of_hkl(hkl_vector[s]));
-                for (int i = 0; i < imax; i++)
-                    sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
-            }
-        }
         else
         {
 #pragma omp parallel for shared(hkl_vector)
@@ -2713,10 +2711,14 @@ tsc_block_type calculate_scattering_factors(
                 const double stl = unit_cell.get_stl_of_hkl(hkl_vector[s]);
                 const double k = constants::bohr2ang(constants::FOUR_PI * stl);
                 const double h2 = pow(stl, 2);
-                double sf_x = 0;
-                for (int i = 0; i < imax; i++) {
-                    sf_x = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
-                    sf[i][s] = cdouble(constants::ED_fact * (atom_type_list[asym_atom_to_type_list[i]] - sf_x) / h2, 0);
+                for (int i = 0; i < imax; i++)
+                {
+                    const int type = asym_atom_to_type_list[i];
+                    const double f = spherical_atoms[type].get_form_factor(k);
+                    //IAM form of Mott-Bethe: tabulated charge, no imaginary part
+                    sf[i][s] = opt.electron_diffraction
+                        ? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
+                        : cdouble(f, 0.0);
                 }
             }
         }
@@ -2781,17 +2783,8 @@ tsc_block_type calculate_scattering_factors(
 			std::vector<Thakkar> spheres;
 			if (opt.needs_Thakkar_fill)
 			{
-				//the whole file list, not just this part's: nr also selects opt.groups[nr], which picks the fill's parts
 				std::vector<WFN> tempy;
-				int fill_nr = 0;
-				if (!opt.wfn.empty())
-					tempy.emplace_back(opt.wfn);
-				else
-				{
-					for (const auto& part_file : opt.combined_tsc_calc_files)
-						tempy.emplace_back(part_file);
-					fill_nr = nr;
-				}
+				const int fill_nr = build_fill_wavefunctions(opt, nr, tempy);
 				{
 					const spherical_fill_scope fill(opt, hkl);
 					calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
@@ -3006,18 +2999,8 @@ tsc_block_type calculate_scattering_factors(
     {
         file << "Performing the remaining calculation of spherical atoms..." << std::endl;
         opt.needs_Thakkar_fill = false;
-        //nr indexes this vector and also picks opt.groups[nr] and the part's cif, so it must be the whole file list:
-        //a one-element vector takes part 0's atoms whatever part is filled, or reads tempy[1] if nr is passed
-        vector<WFN> tempy;
-        int fill_nr = 0;
-        if (!opt.wfn.empty()) {
-            tempy.emplace_back(opt.wfn);
-        }
-        else {
-            for (const auto& part_file : opt.combined_tsc_calc_files)
-                tempy.emplace_back(part_file);
-            fill_nr = nr;
-        }
+        std::vector<WFN> tempy;
+        const int fill_nr = build_fill_wavefunctions(opt, nr, tempy);
         //no_date is not part of spherical_fill_scope: only this caller suppresses the banner
         const bool no_date_was = opt.no_date;
         opt.no_date = true;

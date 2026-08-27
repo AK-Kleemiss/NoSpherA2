@@ -1630,7 +1630,6 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 	// Density matrix from occ is half of what I need, so times 2 and times (2x2)=4
 	//Streamed or resident the walk is the same; the outer loop is one window when
 	//the tensor is resident
-	const size_t packed = static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2;
 	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
 	//The parallel region wraps the window loop: entering one per window would pay
 	//team startup and a barrier for a few reflections of work. omp single does the
@@ -1652,8 +1651,7 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 #pragma omp for schedule(static)
 		for (int r = r0; r < r1; ++r) {
 			if (!io_error.empty()) continue;
-			const cdouble* I_r = i_streamed_ ? i_file_.block(r)
-			                                 : I.data() + static_cast<size_t>(r) * packed;
+			const cdouble* I_r = i_block(r);
 			cdouble sum = F_calc[1][r];
 			size_t k = 0;
 			for (int mu = 0; mu < cryst.nmo; mu++) {
@@ -1673,15 +1671,13 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	ensure_inv_H2_weights();
 	perturb.setZero(cryst.nmo, cryst.nmo);
-	const size_t packed = static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2;
 
 	//The four (XWR_type, refine_against) combinations differ only in the per-reflection
 	//scalar and the prefactor, so one walk over I serves all of them
-	const int key = (static_cast<int>(settings.XWR_type) << 16) | static_cast<int>(settings.refine_against);
-	const bool against_F2 = (static_cast<int>(settings.refine_against) == 2);
-	const bool weighted = (static_cast<int>(settings.XWR_type) == 2);
-	const bool valid = (key == ((1 << 16) | 1) || key == ((1 << 16) | 2) ||
-	                    key == ((2 << 16) | 1) || key == ((2 << 16) | 2));
+	const int xwr = static_cast<int>(settings.XWR_type), ref = static_cast<int>(settings.refine_against);
+	const bool against_F2 = (ref == 2);
+	const bool weighted = (xwr == 2);
+	const bool valid = (xwr == 1 || xwr == 2) && (ref == 1 || ref == 2);
 	if (!valid) XCW_log << "Invalid refinement option" << std::endl;
 	const double scale_sq = cryst.F_scale * cryst.F_scale;
 	const double prefactor = against_F2
@@ -1721,8 +1717,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 				}
 				if (weighted) precompute *= inv_H2_[r];
 
-				const cdouble* I_r = i_streamed_ ? i_file_.block(r)
-				                                 : I.data() + static_cast<size_t>(r) * packed;
+				const cdouble* I_r = i_block(r);
 				size_t offset = 0;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					for (int nu = mu; nu < cryst.nmo; nu++) {

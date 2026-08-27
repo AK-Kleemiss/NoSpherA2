@@ -54,30 +54,13 @@ void equicomb(int natoms, int nrad1, int nrad2,
     const size_t shells = static_cast<size_t>(nrad1) * nrad2 * llmax;
     err_checkf(shells <= static_cast<size_t>(featsize), "equicomb: featsize " + std::to_string(featsize) +
         " is smaller than nrad1*nrad2*llmax " + std::to_string(shells), std::cout);
-    // w3j is consumed once per (n1,n2) shell pair, one entry per surviving m2
-    size_t w3j_needed = 0;
-    for (int chk = 0; chk < llmax; ++chk)
-    {
-        const int cl1 = llvec[0][chk], cl2 = llvec[1][chk];
-        err_checkf(cl1 >= 0 && cl2 >= 0, "equicomb: negative angular momentum in llvec", std::cout);
-        for (int cmu = 0; cmu < l21; ++cmu)
-        {
-            const int cm = cmu - lam + cl1;
-            for (int cm1 = 0; cm1 < 2 * cl1 + 1; ++cm1)
-            {
-                if (abs(cm1 - cm) <= cl2) ++w3j_needed;
-            }
-        }
-    }
-    err_checkf(w3j.size() >= w3j_needed, "equicomb: w3j holds " + std::to_string(w3j.size()) +
-        " entries, the shell loop consumes " + std::to_string(w3j_needed), std::cout);
     for (int chk = 0; chk < nfps; ++chk)
         err_checkf(vfps[chk] >= 0 && static_cast<size_t>(vfps[chk]) < static_cast<size_t>(featsize),
             "equicomb: vfps entry " + std::to_string(chk) + " is outside featsize", std::cout);
 
     std::fill(p.begin(), p.begin() + static_cast<std::ptrdiff_t>(required_p), 0.0);
 
-    int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m2;
+    int iat, n1, n2, il, imu, i, j, ifeat, l2;
     double inner, normfact, preal;
     // Which (im1, im2) pairs contribute is set by |im1 - mu| <= l2, which depends
     // only on (il, imu, lam), never on n1 or n2. That test selects a CONTIGUOUS run
@@ -93,6 +76,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
         for (int til = 0; til < llmax; ++til)
         {
             const int tl1 = llvec[0][til], tl2 = llvec[1][til];
+            err_checkf(tl1 >= 0 && tl2 >= 0, "equicomb: negative angular momentum in llvec", std::cout);
             for (int timu = 0; timu < l21; ++timu)
             {
                 const int tmu = timu - lam + tl1;
@@ -105,6 +89,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
         }
         total_terms = static_cast<size_t>(w_idx);
     }
+    // w3j is consumed once per (n1,n2) shell pair, one entry per surviving m2, which is what the runs add up to
+    err_checkf(w3j.size() >= total_terms, "equicomb: w3j holds " + std::to_string(w3j.size()) +
+        " entries, the shell loop consumes " + std::to_string(total_terms), std::cout);
 
     // The complex-to-real matrix is a mirror-pair transform: row i couples only
     // column i and column l21-1-i, so every row holds exactly two nonzeros (the
@@ -159,7 +146,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
         vec wv1_im(total_terms, 0.0);
         const double *wigner_ptr = NULL;
         int limit_l1 = 0;
-#pragma omp for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m2, inner, normfact, preal) schedule(dynamic, 1)
+#pragma omp for private(iat, n1, n2, il, imu, i, j, ifeat, l2, inner, normfact, preal) schedule(dynamic, 1)
         for (iat = 0; iat < natoms; ++iat)
         {
             inner = 0.0;
@@ -185,7 +172,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
                 {
                     for (il = 0; il < llmax; ++il)
                     {
-                        l1 = llvec[0][il];
                         l2 = llvec[1][il];
 
                         // v2 is conj(v1) when the two descriptor sets are the same

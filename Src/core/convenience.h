@@ -349,9 +349,9 @@ inline size_t items_within_budget(const size_t n_items, const size_t item_bytes,
 {
     if (budget_bytes == 0 || n_items == 0 || item_bytes == 0)
         return 0;
-    if (n_items <= budget_bytes / item_bytes)
-        return 0;
     const size_t n = budget_bytes / item_bytes;
+    if (n_items <= n)
+        return 0;
     //a single item larger than the whole budget still has to be processed, one at a time
     return n ? n : 1;
 }
