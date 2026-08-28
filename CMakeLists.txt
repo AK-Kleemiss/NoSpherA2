@@ -25,6 +25,14 @@ if(NOSPHERA2_USE_CUDA)
             set(CMAKE_CUDA_ARCHITECTURES native)
         endif()
         find_package(CUDAToolkit REQUIRED)
+        #Delay-loading cuBLAS keeps the binary startable where no CUDA runtime exists:
+        #the bind happens on the first call, which only follows a successful device probe.
+        #Without it the loader refuses the process outright and no fallback can run.
+        if(MSVC)
+            set(NOSPHERA2_CUDA_DELAYLOAD
+                "/DELAYLOAD:cublas64_${CUDAToolkit_VERSION_MAJOR}.dll"
+                CACHE INTERNAL "cuBLAS DLL to delay-load")
+        endif()
         message(STATUS "CUDA enabled, arch ${CMAKE_CUDA_ARCHITECTURES}")
     else()
         message(WARNING "NOSPHERA2_USE_CUDA is ON but no CUDA compiler was found; building without it")

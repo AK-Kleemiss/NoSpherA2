@@ -431,3 +431,32 @@ hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings_f2.txt"
 no_date = ""
+
+# GPU variants. These run only when a device is present; the test skips otherwise, so
+# the suite stays green on a CPU-only machine. The grid-weight path is bit-identical to
+# the CPU, so it reuses the CPU reference; the I tensor path is single-precision and
+# carries its own.
+
+[sucrose_SF_gpu_grid]
+directory = "sucrose_fchk_SF"
+good = "sucrose_SF.good"
+
+[sucrose_SF_gpu_grid.args]
+cif = "sucrose.cif"
+hkl = "olex2/Wfn_job/sucrose.hkl"
+wfn = "olex2/Wfn_job/sucrose.wfx"
+acc = 1
+gpu_grid = ""
+
+[P1_test_XCW_gpu_itensor]
+directory = "P1_test"
+good = "P1_test_XCW_gpu_itensor.good"
+
+[P1_test_XCW_gpu_itensor.args]
+do_XCW = ""
+cif = "P1_test_NA2.cif"
+hkl = "P1_test.hkl"
+anom_disp = "anom_disp.txt"
+XCW_settings = "test_settings.txt"
+no_date = ""
+gpu_itensor = ""

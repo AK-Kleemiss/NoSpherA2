@@ -48,3 +48,8 @@ set_target_properties(
 
 
 nosphera2_copy_runtime_libraries(NoSpherA2)
+
+if(NOSPHERA2_CUDA_DELAYLOAD)
+    target_link_options(NoSpherA2 PRIVATE ${NOSPHERA2_CUDA_DELAYLOAD})
+    target_link_libraries(NoSpherA2 PRIVATE delayimp)
+endif()

@@ -25,8 +25,9 @@ if(NOSPHERA2_USE_CUDA OR NOSPHERA2_USE_HIP)
     list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu")
     list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu")
     list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu")
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu")
     if(NOSPHERA2_USE_HIP)
-        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu" PROPERTIES LANGUAGE HIP)
+        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu" PROPERTIES LANGUAGE HIP)
     endif()
 endif()
 
@@ -119,6 +120,10 @@ target_compile_definitions(
 if(NOSPHERA2_USE_CUDA)
     target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_CUDA)
     set_target_properties(NoSpherA2Core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    #cuBLAS is a DLL, so linking it normally makes the executable refuse to start on a
+    #machine that has no CUDA runtime - which defeats the point of choosing the backend at
+    #run time. Delay-loading defers the bind to the first cuBLAS call, which only happens
+    #once a device has been found. cudart is already static and needs no such treatment.
     target_link_libraries(NoSpherA2Core PRIVATE CUDA::cublas)
 endif()
 

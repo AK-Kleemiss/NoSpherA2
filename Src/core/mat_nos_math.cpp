@@ -1,3 +1,6 @@
+#ifdef NOSPHERA2_USE_GPU
+#include "blas_gpu.h"
+#endif
 #include "pch.h"
 #include "nos_math.h"
 
@@ -151,6 +154,15 @@ Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynami
     std::vector<T> result_flat((size_t)m * (size_t)n, 0.0);
     if constexpr (std::is_same_v<T, double>)
     {
+#ifdef NOSPHERA2_USE_GPU
+        //Offered to the device only when the shape earns the transfers; blas_gpu_dgemm
+        //declines otherwise and this falls straight through to MKL
+        if (blas_gpu_dgemm(transp1, transp2, m, n, k1, 1.0,
+                flatMat1.data(), transp1 ? m : k1,
+                flatMat2.data(), transp2 ? k2 : n,
+                0.0, result_flat.data(), n))
+            return reshape<Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>>(result_flat, Shape2D{ (unsigned long long)m, (unsigned long long)n });
+#endif
         // Call cblas_dgemm
         cblas_dgemm(CblasRowMajor,
             transp1 ? CblasTrans : CblasNoTrans,

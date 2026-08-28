@@ -11,6 +11,10 @@
 #define hipblasCreate cublasCreate
 #define hipblasDestroy cublasDestroy
 #define hipblasSgemm cublasSgemm
+#define hipblasDgemm cublasDgemm
+#define hipblasOperation_t cublasOperation_t
+#define hipblasDgemm cublasDgemm
+#define hipblasOperation_t cublasOperation_t
 #define HIPBLAS_OP_T CUBLAS_OP_T
 #define HIPBLAS_OP_N CUBLAS_OP_N
 #define HIPBLAS_STATUS_SUCCESS CUBLAS_STATUS_SUCCESS

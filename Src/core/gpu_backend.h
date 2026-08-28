@@ -35,6 +35,8 @@
 #define gpublasCreate hipblasCreate
 #define gpublasDestroy hipblasDestroy
 #define gpublasSgemm hipblasSgemm
+#define gpublasDgemm hipblasDgemm
+#define gpublasOperation_t hipblasOperation_t
 #define GPUBLAS_OP_T HIPBLAS_OP_T
 #define GPUBLAS_OP_N HIPBLAS_OP_N
 #define GPUBLAS_STATUS_SUCCESS HIPBLAS_STATUS_SUCCESS
@@ -69,6 +71,8 @@
 #define gpublasCreate cublasCreate
 #define gpublasDestroy cublasDestroy
 #define gpublasSgemm cublasSgemm
+#define gpublasDgemm cublasDgemm
+#define gpublasOperation_t cublasOperation_t
 #define GPUBLAS_OP_T CUBLAS_OP_T
 #define GPUBLAS_OP_N CUBLAS_OP_N
 #define GPUBLAS_STATUS_SUCCESS CUBLAS_STATUS_SUCCESS

@@ -1,3 +1,6 @@
+#ifdef NOSPHERA2_USE_GPU
+#include "sf_gpu.h"
+#endif
 #include "pch.h"
 
 #include "core/NoSpherA2.h"
@@ -498,6 +501,40 @@ TEST(TomlIntegrationTests, P1_test_XCW)
 // several minutes (a fresh SCF plus ~10 warm-started XCW steps), so it only
 // runs when RUN_FULL_TEST is set, matching the python harness's convention
 // documented in UNIT_TESTS_STATUS.md.
+// GPU variants. They ask the runtime whether a device is present rather than being gated
+// on an environment variable, so the suite stays green on a CPU-only machine and actually
+// exercises the device on one that has it - a path nothing selects is a path nothing tests.
+static bool gpu_device_present()
+{
+#ifdef NOSPHERA2_USE_GPU
+    return sf_gpu_available();
+#else
+    return false;
+#endif
+}
+
+// The grid-weight kernel is a verbatim transcription and measured bit-identical, so it is
+// held to the CPU reference rather than a reference of its own.
+TEST(TomlIntegrationTests, sucrose_SF_gpu_grid)
+{
+    if (!gpu_device_present()) {
+        GTEST_SKIP() << "No GPU device present; the -gpu_grid path cannot run here";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_grid");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+// The I tensor path contracts in single precision, which moves the total energy in the
+// ninth decimal, so it carries its own reference.
+TEST(TomlIntegrationTests, P1_test_XCW_gpu_itensor)
+{
+    if (!gpu_device_present()) {
+        GTEST_SKIP() << "No GPU device present; the -gpu_itensor path cannot run here";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_gpu_itensor");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, P1_test_XCW_full)
 {
     if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {

@@ -18,6 +18,7 @@
 #ifdef NOSPHERA2_USE_GPU
 #include "SALTED_equicomb.h"
 #include "grid_gpu.h"
+#include "blas_gpu.h"
 #endif
 #include "SALTED_utilities.h"
 #include "GridManager.h"
@@ -2396,6 +2397,7 @@ int make_atomic_grids_wrapper(
 	GridConfiguration config;
 #ifdef NOSPHERA2_USE_GPU
 	grid_gpu_set_enabled(opt.gpu_grid);
+	blas_gpu_set_enabled(opt.gpu_blas);
 #endif
 	config.accuracy = opt.accuracy;
 	config.partition_type = opt.partition_type;
@@ -2511,6 +2513,7 @@ itsc_block calculate_scattering_factors_from_cube(
 	GridConfiguration config;
 #ifdef NOSPHERA2_USE_GPU
 	grid_gpu_set_enabled(opt.gpu_grid);
+	blas_gpu_set_enabled(opt.gpu_blas);
 #endif
 	config.accuracy = opt.accuracy;
 	config.partition_type = opt.partition_type;

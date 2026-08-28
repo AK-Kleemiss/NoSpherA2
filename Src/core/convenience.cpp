@@ -545,6 +545,9 @@ std::string help_message =
  "  -no_gpu                            Keep the scattering-factor Fourier\n"
  "                                    transform on the CPU. It runs on the GPU\n"
  "                                    when one is present and the problem fits.\n"
+ "  -gpu_blas                         Offer large dense matrix products to the GPU.\n"
+ "                                    Small ones stay on the CPU, where they are\n"
+ "                                    faster than the transfers would allow.\n"
  "  -gpu_grid                          Run the atomic integration grid weights\n"
  "                                    (Becke and TFVC) on the GPU.\n"
  "  -gpu_salted                        Run the SALTED descriptor combination\n"
@@ -3351,6 +3354,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_salted = true;
     else if (temp == "-gpu_grid")
         gpu_grid = true;
+    else if (temp == "-gpu_blas")
+        gpu_blas = true;
     else if (temp == "-fukui" || temp == "-Fukui")
         properties.fukui = true;
     else if (temp == "-fukui_analysis")

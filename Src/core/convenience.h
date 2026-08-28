@@ -799,6 +799,8 @@ struct options
     bool gpu_salted = false;
     //-gpu_grid runs the Becke/TFVC integration weights on the device
     bool gpu_grid = false;
+    //-gpu_blas offers large dense GEMMs in nos_math to the device
+    bool gpu_blas = false;
     //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
     bool fukui_analysis_run = false;
     bool profiling = false;
