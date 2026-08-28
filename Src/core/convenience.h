@@ -788,6 +788,8 @@ struct options
     RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
     ivec3 rgbi_group_sets;
     bool fract = false;
+    //GPU scattering factors when a device is present; -no_gpu forces the CPU loop
+    bool use_gpu = true;
     //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
     bool fukui_analysis_run = false;
     bool profiling = false;

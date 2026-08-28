@@ -40,7 +40,7 @@ function(nosphera2_enable_optimizations target_name)
                     /Qpar
                     /Zc:inline
                 >
-                /openmp:experimental
+                $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>
         )
 
         target_link_options(

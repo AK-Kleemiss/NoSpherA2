@@ -18,6 +18,9 @@
 #include "SALTED_utilities.h"
 #include "GridManager.h"
 #include "cube.h"
+#ifdef NOSPHERA2_USE_CUDA
+#include "sf_cuda.h"
+#endif
 
 
 #ifdef PEOJECT_NAME
@@ -1816,7 +1819,8 @@ void calc_SF(const int& points,
 	_time_point& end1,
 	bool debug,
 	bool no_date,
-	bool do_XCW)
+	bool do_XCW,
+	bool use_gpu)
 {
 	const long long int imax = static_cast<long long int>(dens.size());
 	const long long int smax = static_cast<long long int>(k_pt[0].size());
@@ -1839,6 +1843,35 @@ void calc_SF(const int& points,
 		else
 			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
 	}
+#ifdef NOSPHERA2_USE_CUDA
+	if (use_gpu && sf_cuda_available()) {
+		ivec offs(imax + 1, 0);
+		for (int i = 0; i < imax; i++)
+			offs[i + 1] = offs[i] + (int)dens[i].size();
+		const long long tot = offs[imax];
+		vec fd1(tot), fd2(tot), fd3(tot), fde(tot);
+		for (int i = 0; i < imax; i++) {
+			const int lo = offs[i], n = (int)dens[i].size();
+			for (int p = 0; p < n; p++) {
+				fd1[lo + p] = d1[i][p]; fd2[lo + p] = d2[i][p];
+				fd3[lo + p] = d3[i][p]; fde[lo + p] = dens[i][p];
+			}
+		}
+		vec sr((size_t)imax * smax), si((size_t)imax * smax);
+		if (sf_cuda_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
+			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
+			sr.data(), si.data())) {
+			for (int i = 0; i < imax; i++)
+				for (long long s2 = 0; s2 < smax; s2++)
+					sf[i][s2] = cdouble(sr[(size_t)i * smax + s2], si[(size_t)i * smax + s2]);
+			if (!no_date) {
+				_time_point gend = get_time();
+				file << "Fourier transform on GPU: " << get_msec(end1, gend) << " ms" << std::endl;
+			}
+			return;
+		}
+	}
+#endif
 	ProgressBar* progress = nullptr;
 	if (!do_XCW) {
 		progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors", file);
@@ -2492,7 +2525,9 @@ itsc_block calculate_scattering_factors_from_cube(
 		time_points.front(),
 		end1,
 		opt.debug,
-		opt.no_date);
+		opt.no_date,
+		false,
+		opt.use_gpu);
 	time_points.push_back(get_time());
 	time_descriptions.push_back("Fourier transform");
 
@@ -2922,7 +2957,9 @@ tsc_block_type calculate_scattering_factors(
 				time_points.front(),
 				end1,
 				opt.debug,
-				opt.no_date);
+				opt.no_date,
+				false,
+				opt.use_gpu);
 
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Fourier transform");

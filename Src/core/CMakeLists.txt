@@ -19,6 +19,10 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
 )
 
+if(NOSPHERA2_USE_CUDA)
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/sf_cuda.cu")
+endif()
+
 #Basis Set Generator:
 set(
     NOSPHERA2_BASIS_SET_DIRECTORY
@@ -104,6 +108,11 @@ target_compile_definitions(
     PRIVATE
         NOSPHERA2_BASIS_DATA_SEPARATE
 )
+
+if(NOSPHERA2_USE_CUDA)
+    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_CUDA)
+    set_target_properties(NoSpherA2Core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+endif()
 
 target_compile_features(
     NoSpherA2Core

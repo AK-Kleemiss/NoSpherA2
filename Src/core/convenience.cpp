@@ -3325,6 +3325,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         properties.elf = true;
     else if (temp == "-esp")
         properties.esp = true;
+    else if (temp == "-no_gpu")
+        use_gpu = false;
     else if (temp == "-fukui" || temp == "-Fukui")
         properties.fukui = true;
     else if (temp == "-fukui_analysis")

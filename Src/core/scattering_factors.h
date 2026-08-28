@@ -262,7 +262,8 @@ void calc_SF(const int& points,
     _time_point& end1,
     bool debug,
     bool no_date = false,
-    bool do_XCW = false);
+    bool do_XCW = false,
+    bool use_gpu = true);
 
 double fourier_bessel_integral(
     const primitive& p,
