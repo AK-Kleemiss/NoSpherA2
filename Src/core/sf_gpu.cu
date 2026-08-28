@@ -30,10 +30,6 @@ __global__ void sf_kernel(const int imax, const long long smax,
 	const double ky = live ? k2[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
 	const double kz = live ? k3[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
 	double re = 0.0, im = 0.0;
-#ifdef SF_DIAG_ALLFLOAT
-	float fre = 0.0f, fim = 0.0f;
-	const float fkx = (float)kx, fky = (float)ky, fkz = (float)kz;
-#endif
 	const int lo = offs[ia], hi = offs[ia + 1];
 	for (int base = lo; base < hi; base += SF_CHUNK) {
 		const int n = min(SF_CHUNK, hi - base);
@@ -45,29 +41,29 @@ __global__ void sf_kernel(const int imax, const long long smax,
 		}
 		__syncthreads();
 		if (live) {
+			float cre = 0.0f, cim = 0.0f, kre = 0.0f, kim = 0.0f;
 			for (int p = 0; p < n; p++) {
-#ifdef SF_DIAG_ALLFLOAT
-				const float w = fkx * (float)s1[p] + fky * (float)s2[p] + fkz * (float)s3[p];
-#else
 				const double w = kx * s1[p] + ky * s2[p] + kz * s3[p];
-#endif
 				const double r = sd[p];
 				if (F32) {
-#ifdef SF_DIAG_ALLFLOAT
-					//DIAGNOSTIC ONLY - numerically wrong, measures the fp64 ceiling
-					float sif, cof;
-					sincosf((float)w, &sif, &cof);
-					fre += (float)r * cof;
-					fim += (float)r * sif;
-#else
-					//w is in turns here. Reduce in double - sinf of a large argument is
-					//meaningless - then hand sincospif the half-turn count it wants.
+					//w is in turns here. The reduction stays in double - sincospif of an
+					//unreduced argument would be meaningless - and only the transcendental
+					//and the running sum drop to fp32.
 					const double wr = w - rint(w);
 					float sif, cof;
 					sincospif(2.0f * (float)wr, &sif, &cof);
-					re += r * (double)cof;
-					im += r * (double)sif;
-#endif
+					//Compensated, so the error does not grow with the term count. Ten fp32
+					//operations still cost far less than two fp64 fmas on a consumer part.
+					const float pr = (float)r * cof;
+					const float pi = (float)r * sif;
+					float y = pr - kre;
+					float t = cre + y;
+					kre = (t - cre) - y;
+					cre = t;
+					y = pi - kim;
+					t = cim + y;
+					kim = (t - cim) - y;
+					cim = t;
 				}
 				else {
 					double si, co;
@@ -76,15 +72,15 @@ __global__ void sf_kernel(const int imax, const long long smax,
 					im += r * si;
 				}
 			}
+			if (F32) {
+				re += (double)cre;
+				im += (double)cim;
+			}
 		}
 		__syncthreads();
 	}
 	if (live) {
 		double2 v;
-#ifdef SF_DIAG_ALLFLOAT
-		re += fre;
-		im += fim;
-#endif
 		v.x = re;
 		v.y = im;
 		sf_out[(long long)ia * smax + s] = v;

@@ -790,6 +790,8 @@ struct options
     bool fract = false;
     //GPU scattering factors when a device is present; -no_gpu forces the CPU loop
     bool use_gpu = true;
+    //-gpu_fp64 keeps the double sincos on a card that would otherwise pick the fp32 one
+    bool gpu_fp64 = false;
     //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
     bool fukui_analysis_run = false;
     bool profiling = false;

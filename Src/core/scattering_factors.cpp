@@ -1820,7 +1820,8 @@ void calc_SF(const int& points,
 	bool debug,
 	bool no_date,
 	bool do_XCW,
-	bool use_gpu)
+	bool use_gpu,
+	bool gpu_fp64)
 {
 	const long long int imax = static_cast<long long int>(dens.size());
 	const long long int smax = static_cast<long long int>(k_pt[0].size());
@@ -1866,7 +1867,7 @@ void calc_SF(const int& points,
 			rows[i] = reinterpret_cast<double*>(sf[i].data());
 		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
 			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
-			rows.data())) {
+			rows.data(), gpu_fp64)) {
 			//The bar is what the reference logs expect, so draw it even though the work is done
 			if (!do_XCW) {
 				ProgressBar gprogress(imax, 60, "=", " ", "Calculating Scattering Factors", file);
@@ -1877,7 +1878,7 @@ void calc_SF(const int& points,
 				_time_point gend = get_time();
 				const int ratio = sf_gpu_fp64_ratio();
 				file << "Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
-				     << (ratio > 4 ? "reduced-argument f32 sincos" : "f64 sincos")
+				     << (!gpu_fp64 && ratio > 4 ? "reduced-argument f32 sincos" : "f64 sincos")
 				     << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
 			}
 			return;
@@ -2543,7 +2544,8 @@ itsc_block calculate_scattering_factors_from_cube(
 		opt.debug,
 		opt.no_date,
 		false,
-		opt.use_gpu);
+		opt.use_gpu,
+		opt.gpu_fp64);
 	time_points.push_back(get_time());
 	time_descriptions.push_back("Fourier transform");
 
@@ -2979,7 +2981,8 @@ tsc_block_type calculate_scattering_factors(
 				opt.debug,
 				opt.no_date,
 				false,
-				opt.use_gpu);
+				opt.use_gpu,
+				opt.gpu_fp64);
 
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Fourier transform");
