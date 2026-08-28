@@ -29,6 +29,15 @@
 #define gpuMemcpyAsync hipMemcpyAsync
 #define gpuHostAlloc hipHostMalloc
 #define gpuFreeHost hipHostFree
+#include <hipblas/hipblas.h>
+#define gpublasHandle_t hipblasHandle_t
+#define gpublasStatus_t hipblasStatus_t
+#define gpublasCreate hipblasCreate
+#define gpublasDestroy hipblasDestroy
+#define gpublasSgemm hipblasSgemm
+#define GPUBLAS_OP_T HIPBLAS_OP_T
+#define GPUBLAS_OP_N HIPBLAS_OP_N
+#define GPUBLAS_STATUS_SUCCESS HIPBLAS_STATUS_SUCCESS
 #else
 #include <cuda_runtime.h>
 #define gpuError_t cudaError_t
@@ -54,4 +63,13 @@
 #define gpuMemcpyAsync cudaMemcpyAsync
 #define gpuHostAlloc(p, n) cudaHostAlloc((p), (n), cudaHostAllocDefault)
 #define gpuFreeHost cudaFreeHost
+#include <cublas_v2.h>
+#define gpublasHandle_t cublasHandle_t
+#define gpublasStatus_t cublasStatus_t
+#define gpublasCreate cublasCreate
+#define gpublasDestroy cublasDestroy
+#define gpublasSgemm cublasSgemm
+#define GPUBLAS_OP_T CUBLAS_OP_T
+#define GPUBLAS_OP_N CUBLAS_OP_N
+#define GPUBLAS_STATUS_SUCCESS CUBLAS_STATUS_SUCCESS
 #endif

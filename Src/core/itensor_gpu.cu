@@ -1,6 +1,5 @@
 #include "itensor_gpu.h"
 #include "gpu_backend.h"
-#include <cublas_v2.h>
 #include <cstdio>
 #include <vector>
 #include <algorithm>
@@ -12,15 +11,15 @@
 	std::fprintf(stderr, "NoSpherA2 I tensor GPU: %s at %s:%d\n", gpuGetErrorString(e_), __FILE__, __LINE__); \
 	return false; } } while (0)
 
-#define BLAS_TRY(call) do { if ((call) != CUBLAS_STATUS_SUCCESS) { \
-	std::fprintf(stderr, "NoSpherA2 I tensor GPU: cublas failure at %s:%d\n", __FILE__, __LINE__); \
+#define BLAS_TRY(call) do { if ((call) != GPUBLAS_STATUS_SUCCESS) { \
+	std::fprintf(stderr, "NoSpherA2 I tensor GPU: BLAS failure at %s:%d\n", __FILE__, __LINE__); \
 	return false; } } while (0)
 
 namespace {
 
 struct Dev {
 	bool ready = false;
-	cublasHandle_t blas = nullptr;
+	gpublasHandle_t blas = nullptr;
 	int nmo = 0, packed = 0, n_grids = 0, n_blocks = 0;
 	long long n_points = 0;
 	//Uploaded once
@@ -158,7 +157,7 @@ bool itensor_gpu_init(const itensor_gpu_layout& L)
 	GPU_TRY(gpuMemcpy(g.d3, L.d3, sizeof(double) * (size_t)L.n_points, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(g.w, L.weights, sizeof(double) * (size_t)L.n_points, gpuMemcpyHostToDevice));
 
-	if (cublasCreate(&g.blas) != CUBLAS_STATUS_SUCCESS) return false;
+	if (gpublasCreate(&g.blas) != GPUBLAS_STATUS_SUCCESS) return false;
 
 	g.nmo = L.nmo; g.packed = L.packed; g.n_grids = L.n_grids; g.n_blocks = L.n_blocks;
 	g.n_points = L.n_points;
@@ -199,9 +198,9 @@ bool itensor_gpu_reflection(const int num_syms,
 			weight_kernel<<<(unsigned int)((total + 255) / 256), 256>>>(
 				na, np, g.blk_ao_off[b], base, g.ao, g.phase_re, g.phase_im, g.wre, g.wim);
 			//C = A * W^T with both stored row-major n_active x np, i.e. column-major np x n_active
-			BLAS_TRY(cublasSgemm(g.blas, CUBLAS_OP_T, CUBLAS_OP_N, na, na, np,
+			BLAS_TRY(gpublasSgemm(g.blas, GPUBLAS_OP_T, GPUBLAS_OP_N, na, na, np,
 				&one, g.ao + g.blk_ao_off[b], np, g.wre, np, &zero, g.cre, na));
-			BLAS_TRY(cublasSgemm(g.blas, CUBLAS_OP_T, CUBLAS_OP_N, na, na, np,
+			BLAS_TRY(gpublasSgemm(g.blas, GPUBLAS_OP_T, GPUBLAS_OP_N, na, na, np,
 				&one, g.ao + g.blk_ao_off[b], np, g.wim, np, &zero, g.cim, na));
 			const dim3 thr(16, 16);
 			const dim3 blk((na + 15) / 16, (na + 15) / 16);
@@ -222,7 +221,7 @@ bool itensor_gpu_reflection(const int num_syms,
 
 void itensor_gpu_free()
 {
-	if (g.blas) { cublasDestroy(g.blas); g.blas = nullptr; }
+	if (g.blas) { gpublasDestroy(g.blas); g.blas = nullptr; }
 	gpuFree(g.ao); gpuFree(g.aos); gpuFree(g.skip);
 	gpuFree(g.d1); gpuFree(g.d2); gpuFree(g.d3); gpuFree(g.w);
 	gpuFree(g.phase_re); gpuFree(g.phase_im);
