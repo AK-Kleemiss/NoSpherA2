@@ -111,7 +111,7 @@ bool itensor_gpu_available()
 bool itensor_gpu_init(const itensor_gpu_layout& L)
 {
 	itensor_gpu_free();
-	if (!itensor_gpu_available()) return false;
+	if (!itensor_gpu_available() || !gpu_blas_runtime_present()) return false;
 
 	int max_na = 0;
 	long long max_elems = 0;

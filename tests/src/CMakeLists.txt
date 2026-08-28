@@ -86,3 +86,8 @@ if(NOSPHERA2_CUDA_DELAYLOAD)
     target_link_options(NoSpherA2_Tests PRIVATE ${NOSPHERA2_CUDA_DELAYLOAD})
     target_link_libraries(NoSpherA2_Tests PRIVATE delayimp)
 endif()
+
+if(NOSPHERA2_HIP_DELAYLOAD)
+    target_link_options(NoSpherA2_Tests PRIVATE ${NOSPHERA2_HIP_DELAYLOAD})
+    target_link_libraries(NoSpherA2_Tests PRIVATE delayimp)
+endif()

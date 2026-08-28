@@ -77,3 +77,23 @@
 #define GPUBLAS_OP_N CUBLAS_OP_N
 #define GPUBLAS_STATUS_SUCCESS CUBLAS_STATUS_SUCCESS
 #endif
+
+//Delay-loading the BLAS DLL stops the loader rejecting the process where no GPU runtime
+//exists, but on its own it only moves the failure: the first call then raises the
+//delay-load helper exception and kills the process. Measured on the AMD node, exit
+//0xC06D007E. So probe for the module before calling in, and treat absence as "no GPU".
+#ifdef _WIN32
+#include <windows.h>
+inline bool gpu_blas_runtime_present()
+{
+#ifdef NOSPHERA2_USE_HIP
+	static const bool ok = (LoadLibraryA("hipblas.dll") != nullptr);
+#else
+	static const bool ok = (LoadLibraryA("cublas64_13.dll") != nullptr)
+	                   || (LoadLibraryA("cublas64_12.dll") != nullptr);
+#endif
+	return ok;
+}
+#else
+inline bool gpu_blas_runtime_present() { return true; }
+#endif

@@ -25,7 +25,7 @@ bool blas_gpu_dgemm(const bool transA, const bool transB, const int m, const int
 {
 	if (!g_blas_gpu || m <= 0 || n <= 0 || k <= 0) return false;
 	if (2.0 * m * n * k < BLAS_GPU_MIN_FLOP) return false;
-	if (!blas_gpu_available()) return false;
+	if (!blas_gpu_available() || !gpu_blas_runtime_present()) return false;
 
 	static gpublasHandle_t handle = nullptr;
 	if (!handle && gpublasCreate(&handle) != GPUBLAS_STATUS_SUCCESS) return false;

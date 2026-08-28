@@ -50,6 +50,20 @@ if(NOSPHERA2_USE_HIP)
         if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
             set(CMAKE_HIP_ARCHITECTURES gfx90a;gfx942;gfx1100)
         endif()
+        #Same reasoning as the cuBLAS delay-load above, and it bites harder here: ROCm's
+        #bin directory is not on PATH by default, so a HIP build linking hipBLAS fails to
+        #start with STATUS_DLL_NOT_FOUND on a machine that has the GPU but not the SDK.
+        #Measured on the AMD node: without this the process is rejected before main().
+        if(MSVC)
+            string(REGEX MATCH "^[0-9]+" NOSPHERA2_HIP_MAJOR "${CMAKE_HIP_COMPILER_VERSION}")
+            if(NOT NOSPHERA2_HIP_MAJOR)
+                set(NOSPHERA2_HIP_MAJOR 6)
+            endif()
+            set(NOSPHERA2_HIP_DELAYLOAD
+                "/DELAYLOAD:hipblas.dll"
+                "/DELAYLOAD:amdhip64_${NOSPHERA2_HIP_MAJOR}.dll"
+                CACHE INTERNAL "ROCm DLLs to delay-load")
+        endif()
         message(STATUS "HIP enabled, arch ${CMAKE_HIP_ARCHITECTURES}")
     else()
         message(WARNING "NOSPHERA2_USE_HIP is ON but no HIP compiler was found; building without it")
