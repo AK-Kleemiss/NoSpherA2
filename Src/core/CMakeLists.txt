@@ -23,8 +23,9 @@ file(
 if(NOSPHERA2_USE_CUDA OR NOSPHERA2_USE_HIP)
     list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu")
     list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu")
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu")
     if(NOSPHERA2_USE_HIP)
-        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu" PROPERTIES LANGUAGE HIP)
+        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu" PROPERTIES LANGUAGE HIP)
     endif()
 endif()
 

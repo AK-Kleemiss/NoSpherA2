@@ -545,6 +545,8 @@ std::string help_message =
  "  -no_gpu                            Keep the scattering-factor Fourier\n"
  "                                    transform on the CPU. It runs on the GPU\n"
  "                                    when one is present and the problem fits.\n"
+ "  -gpu_salted                        Run the SALTED descriptor combination\n"
+ "                                    (equicomb) on the GPU.\n"
  "  -gpu_itensor                       Run the XCW I tensor contractions on the GPU\n"
  "                                    in single precision. Off by default: it moves\n"
  "                                    the total energy in the ninth decimal.\n"
@@ -3343,6 +3345,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_fp64 = true;
     else if (temp == "-gpu_itensor")
         gpu_itensor = true;
+    else if (temp == "-gpu_salted")
+        gpu_salted = true;
     else if (temp == "-fukui" || temp == "-Fukui")
         properties.fukui = true;
     else if (temp == "-fukui_analysis")

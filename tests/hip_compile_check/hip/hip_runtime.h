@@ -19,6 +19,7 @@
 #define hipMemGetInfo cudaMemGetInfo
 #define hipMalloc cudaMalloc
 #define hipFree cudaFree
+#define hipMemset cudaMemset
 #define hipMemcpy cudaMemcpy
 #define hipMemcpyHostToDevice cudaMemcpyHostToDevice
 #define hipMemcpyDeviceToHost cudaMemcpyDeviceToHost

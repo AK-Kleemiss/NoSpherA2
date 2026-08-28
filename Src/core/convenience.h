@@ -795,6 +795,8 @@ struct options
     //-gpu_itensor runs the XCW I tensor GEMMs on the device in single precision. Off by
     //default: it shifts the total energy in the ninth decimal, which reference logs carry
     bool gpu_itensor = false;
+    //-gpu_salted runs the SALTED descriptor combination on the device
+    bool gpu_salted = false;
     //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
     bool fukui_analysis_run = false;
     bool profiling = false;

@@ -11,6 +11,12 @@
 
 #include "constants.h"
 
+static bool g_equicomb_use_gpu = false;
+void equicomb_set_gpu(bool on) { g_equicomb_use_gpu = on; }
+#ifdef NOSPHERA2_USE_GPU
+#include "salted_gpu.h"
+#endif
+
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
 void equicomb(int natoms, int nrad1, int nrad2,
               const SALTEDDescriptors &v1,
@@ -121,10 +127,65 @@ void equicomb(int natoms, int nrad1, int nrad2,
     {
         std::cout << "[equicomb] lam " << lam << ": c2r "
                   << (c2r_is_sparse ? "sparse (2 per row)" : "dense fallback")
-                  << ", " << total_terms << " wigner terms" << std::endl;
+                  << ", " << total_terms << " wigner terms"
+                  << ", natoms " << natoms << ", nrad1 " << nrad1 << ", nrad2 " << nrad2
+                  << ", llmax " << llmax << ", l21 " << l21
+                  << ", featsize " << featsize << ", nfps " << nfps << std::endl;
     }
 
     int empty_environments = 0;
+
+#ifdef NOSPHERA2_USE_GPU
+    //The device reproduces this walk exactly; it falls through to the CPU loop below if
+    //no device is present, the transform is not the two-per-row form, or it will not fit.
+    if (g_equicomb_use_gpu && c2r_is_sparse)
+    {
+        ivec flat_runs(static_cast<size_t>(llmax) * l21 * 4);
+        for (size_t r = 0; r < runs.size(); ++r) {
+            flat_runs[r * 4 + 0] = runs[r].im1_begin;
+            flat_runs[r * 4 + 1] = runs[r].im2_begin;
+            flat_runs[r * 4 + 2] = runs[r].count;
+            flat_runs[r * 4 + 3] = runs[r].w_off;
+        }
+        ivec cols(static_cast<size_t>(l21) * 2, 0);
+        vec cre(static_cast<size_t>(l21) * 2, 0.0), cim(static_cast<size_t>(l21) * 2, 0.0);
+        for (int i2 = 0; i2 < l21; ++i2)
+            for (int k2 = 0; k2 < 2; ++k2) {
+                cols[i2 * 2 + k2] = c2r_nz[static_cast<size_t>(i2) * 2 + k2].j;
+                cre[i2 * 2 + k2] = c2r_nz[static_cast<size_t>(i2) * 2 + k2].re;
+                cim[i2 * 2 + k2] = c2r_nz[static_cast<size_t>(i2) * 2 + k2].im;
+            }
+        //Reverse of vfps: which output slot, if any, each shell triple feeds
+        ivec sel(static_cast<size_t>(featsize), -1);
+        for (int i2 = 0; i2 < nfps; ++i2) sel[static_cast<size_t>(vfps[i2])] = i2;
+        const SALTEDDescriptors &v2_gpu = v2_is_conj_of_v1 ? v1 : v2;
+        salted_gpu_problem q;
+        q.natoms = natoms; q.nrad1 = nrad1; q.nrad2 = nrad2; q.llmax = llmax;
+        q.lam = lam; q.l21 = l21; q.featsize = featsize; q.nfps = nfps;
+        q.v2_is_conj_of_v1 = v2_is_conj_of_v1;
+        q.v1_values = reinterpret_cast<const double *>(v1.values().data());
+        q.v1_offsets = v1.offsets().data();
+        q.v1_nchannels = v1.nchannels();
+        q.v1_noff = static_cast<int>(v1.offsets().size());
+        q.v1_len_doubles = static_cast<long long>(v1.values().size()) * 2;
+        q.v2_values = reinterpret_cast<const double *>(v2_gpu.values().data());
+        q.v2_offsets = v2_gpu.offsets().data();
+        q.v2_nchannels = v2_gpu.nchannels();
+        q.v2_noff = static_cast<int>(v2_gpu.offsets().size());
+        q.v2_len_doubles = static_cast<long long>(v2_gpu.values().size()) * 2;
+        q.w3j = w3j.data(); q.w3j_len = static_cast<long long>(w3j.size());
+        q.llvec0 = llvec[0].data(); q.llvec1 = llvec[1].data();
+        q.runs = flat_runs.data(); q.c2r_cols = cols.data();
+        q.c2r_re = cre.data(); q.c2r_im = cim.data(); q.c2r_cnt = c2r_cnt.data();
+        q.sel = sel.data(); q.p = p.data();
+        const bool gpu_ok = salted_gpu_equicomb(q, &empty_environments);
+        if (ProgressBar::report_counts)
+            std::cout << "[equicomb] lam " << lam << ": GPU " << (gpu_ok ? "used" : "refused, using the CPU loop") << std::endl;
+        if (gpu_ok)
+            return;
+    }
+#endif
+
 
     // Scoped: the bar rewinds to its own line when it is destroyed, so anything
     // printed after the loop but before that is silently overwritten.

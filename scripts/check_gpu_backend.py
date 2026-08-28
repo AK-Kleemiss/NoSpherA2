@@ -10,12 +10,13 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "Src", "core", "sf_gpu.cu")
+SRCS = [os.path.join(ROOT, "Src", "core", n)
+        for n in ("sf_gpu.cu", "itensor_gpu.cu", "salted_gpu.cu")]
 HDR = os.path.join(ROOT, "Src", "core", "gpu_backend.h")
 
 
 def main():
-    src = io.open(SRC, encoding="utf-8").read()
+    src = "".join(io.open(f, encoding="utf-8").read() for f in SRCS if os.path.exists(f))
     hdr = io.open(HDR, encoding="utf-8").read()
 
     used = {n for n in re.findall(r"\bgpu[A-Za-z_][A-Za-z0-9_]*", src) if n != "gpu_backend"}
@@ -81,15 +82,20 @@ def compile_hip_branch():
         sys.stdout.write("gpu backend check: no nvcc configured, skipping the HIP compile\n")
         return 0
     shim = os.path.join(ROOT, "tests", "hip_compile_check")
-    with tempfile.TemporaryDirectory() as tmp:
+    for src_path in SRCS:
+      if not os.path.exists(src_path):
+        continue
+      with tempfile.TemporaryDirectory() as tmp:
         cmd = [nvcc, "-c", "-O3", "-DNOSPHERA2_USE_HIP",
                "-I", shim, "-I", os.path.join(ROOT, "Src", "core"),
-               "-o", os.path.join(tmp, "sf_gpu_hip.obj"), SRC]
+               "-o", os.path.join(tmp, "hip_probe.obj"), src_path]
         p = subprocess.run(cmd, capture_output=True, text=True)
-    if p.returncode != 0:
-        sys.stderr.write("gpu backend check: HIP branch failed to compile\n%s\n" % p.stderr)
-        return 1
-    sys.stdout.write("gpu backend check: HIP branch compiles (shim, not real hipcc)\n")
+        if p.returncode != 0:
+            sys.stderr.write("gpu backend check: %s fails under HIP\n%s\n"
+                             % (os.path.basename(src_path), p.stderr))
+            return 1
+    sys.stdout.write("gpu backend check: %d kernels compile under HIP (shim, not real hipcc)\n"
+                     % len(SRCS))
     return 0
 
 

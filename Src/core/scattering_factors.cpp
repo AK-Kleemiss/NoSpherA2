@@ -15,6 +15,9 @@
 #include "npy.h"
 #include "integrator.h"
 #include "basis_set.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "SALTED_equicomb.h"
+#endif
 #include "SALTED_utilities.h"
 #include "GridManager.h"
 #include "cube.h"
@@ -2831,6 +2834,9 @@ tsc_block_type calculate_scattering_factors(
     {
         // Generation of SALTED density coefficients
         file << "\nGenerating densities... " << endl;
+#ifdef NOSPHERA2_USE_GPU
+        equicomb_set_gpu(opt.gpu_salted);
+#endif
         vec coefs = calculator.gen_SALTED_densities();
         file << setw(13 * 4) << "... done!" << endl;
         time_points.push_back(get_time());
