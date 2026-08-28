@@ -1567,6 +1567,18 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		skipped_grids += static_cast<long long>(cryst.nr_small) * num_syms * per_r;
 	}
 #endif
+	//Counted here, serially, from the block structure both paths walk - not inside either
+	//of them. That way the CPU and GPU rows are the same work measured two ways, which is
+	//only form of the comparison worth having, and no counter is touched by two threads.
+	double itensor_flops = 0.0;
+	for (int g = 0; g < n_atom_grids; g++)
+		for (const GridBlock& block : grid_blocks[g])
+			for (const MatrixTile& tile : block.matrix_tiles)
+				//real and imaginary passes, hence the factor of two
+				itensor_flops += 2.0 * throughput::flops_gemm(tile.row_count, tile.col_count,
+					block.point_count);
+	itensor_flops *= static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
+
 	if (!itensor_on_gpu)
 	{
 #pragma omp parallel reduction(+:skipped_grids)
@@ -1710,6 +1722,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	auto duration = end - start;
 	skipped_grids_ = skipped_grids;
 	time_taken = std::chrono::duration<double>(duration).count();
+	throughput::record("XCW I tensor", itensor_on_gpu, itensor_flops,
+		1.0e3 * std::chrono::duration<double>(duration).count());
 	if (!(opt->no_date) && pb) {
 		XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
 	}

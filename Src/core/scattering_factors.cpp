@@ -1875,9 +1875,15 @@ void calc_SF(const int& points,
 		//accurate one is the safer default.
 		const sf_precision prec = gpu_fp64 ? sf_precision::FP64
 			: gpu_fp32 ? sf_precision::FP32 : sf_precision::Auto;
+		const _time_point sf_gpu_t0 = get_time();
 		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
 			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
 			rows.data(), prec)) {
+			//Transfers included. What decides where this work belongs is the rate the caller
+			//actually gets, not the one the kernel would post with the copies left out.
+			throughput::record("scattering-factor transform", true,
+				throughput::flops_ndft(static_cast<double>(tot), static_cast<double>(smax)),
+				get_msec(sf_gpu_t0, get_time()));
 			//The bar is what the reference logs expect, so draw it even though the work is done
 			if (!do_XCW) {
 				ProgressBar gprogress(imax, 60, "=", " ", "Calculating Scattering Factors", file);
@@ -1909,9 +1915,16 @@ void calc_SF(const int& points,
 	const double* k2_data = k_pt[1].data();
 	const double* k3_data = k_pt[2].data();
 
+	//Timed around the whole atom loop, not inside it. The inner loop is an omp parallel for,
+	//and a per-thread timer there would sum concurrent time into a total larger than the
+	//wall clock - a profile that cannot be true is worse than none.
+	const _time_point sf_cpu_t0 = get_time();
+	double sf_cpu_points = 0.0;
+
 	for (int i = 0; i < imax; i++)
 	{
 		pmax = static_cast<long long int>(dens[i].size());
+		sf_cpu_points += static_cast<double>(pmax);
 		dens_local = dens[i].data();
 		d1_local = d1[i].data();
 		d2_local = d2[i].data();
@@ -2003,6 +2016,9 @@ void calc_SF(const int& points,
 			progress->update();
 		}
 	}
+	throughput::record("scattering-factor transform", false,
+		throughput::flops_ndft(sf_cpu_points, static_cast<double>(smax)),
+		get_msec(sf_cpu_t0, get_time()));
 	if (!do_XCW) {
 		delete (progress);
 	}

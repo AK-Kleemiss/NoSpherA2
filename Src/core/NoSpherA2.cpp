@@ -71,6 +71,19 @@ static int run_app_impl(int argc, char **argv)
             std::cout.width(saved_width);
         }
     } restore_cout{_coutbuf, std::cout.flags(), std::cout.precision(), std::cout.width()};
+
+    //A destructor because run_app_impl returns from a dozen places, and writing to log_file
+    //rather than cout because most of those places put cout back on the console first - the
+    //report went to stdout and vanished. log_file is declared above this, so it is still open
+    //when this runs. Hanging the report off write_timing_to_file instead was the first
+    //attempt and was worse: an XCW run never calls it, so the pipeline most worth measuring
+    //was the one that reported nothing.
+    struct throughput_reporter
+    {
+        std::ostream& out;
+        ~throughput_reporter() { throughput::report(out); }
+    } report_throughput{log_file};
+
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;

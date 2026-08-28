@@ -565,6 +565,10 @@ std::string help_message =
  "                                    card whose fp64 is fast enough to keep. Mainly\n"
  "                                    for tests, which otherwise cannot pin which of\n"
  "                                    the two kernels a run exercises.\n"
+ "  -gflops                            Report achieved GFLOP/s per stage, for the CPU\n"
+ "                                    and GPU paths, at the end of the run. Use it to\n"
+ "                                    re-derive the offload thresholds on this machine\n"
+ "                                    rather than inheriting another one's.\n"
  "  -mem <MB>                          Memory budget for everything sliceable\n"
  "                                    [unset]. When given, the tsc block size\n"
  "                                    and the XCW I tensor window are chosen\n"
@@ -3354,6 +3358,11 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_fp64 = true;
     else if (temp == "-gpu_fp32")
         gpu_fp32 = true;
+    else if (temp == "-gflops")
+    {
+        track_gflops = true;
+        throughput::set_enabled(true);
+    }
     else if (temp == "-gpu_itensor")
         gpu_itensor = true;
     else if (temp == "-gpu_salted")
