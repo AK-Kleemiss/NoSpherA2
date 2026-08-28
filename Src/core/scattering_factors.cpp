@@ -1645,6 +1645,26 @@ cdouble sfac_bessel(
 	}
 }
 
+//Radial part of the Fourier-Bessel transform, keyed on (exponent, l) so it can be tabulated per k-point
+static inline double fourier_bessel_radial(const double b, const int l, const double exp_l_plus_3_2, const double H)
+{
+	return (pow(H, l) * exp(-H * H / (4.0 * b))) / (constants::pow_2[l] * exp_l_plus_3_2);
+}
+
+//As sfac_bessel(), but with the radial factor already evaluated
+static inline cdouble sfac_bessel_r(const primitive& p, const double* k_point, const double* coefs, const double radial)
+{
+	const int l = p.get_type();
+	const double v = constants::PI3_2 * radial * p.get_normalized_coefficient() * constants::spherical_harmonic(l, k_point, coefs);
+	switch (l % 4) {
+	case 0: return cdouble(v, 0);
+	case 1: return cdouble(0, v);
+	case 2: return cdouble(-v, 0);
+	case 3: return cdouble(0, -v);
+	default: return constants::cnull;
+	}
+}
+
 //TODO�: This breaks if the aux_basis is contracted... Need to fix that!
 //a streaming caller owns one bar for the whole table and passes it in, else every block draws its own
 void calc_SF_SALTED(const vec2& k_pt,
@@ -1692,6 +1712,29 @@ void calc_SF_SALTED(const vec2& k_pt,
 	}
 
 	sf.resize(num_asym_atoms);
+	//The radial factor depends only on (exponent, l) and |k|, so collect the distinct pairs once instead of recomputing per atom
+	vec uniq_b, uniq_elp32;
+	ivec uniq_l;
+	ivec2 bl_index(num_asym_atoms);
+	for (int ia = 0; ia < num_asym_atoms; ia++) {
+		const atom& a = atom_list[asym_atom_list[ia]];
+		const int lim = (int)a.get_basis_set_size();
+		bl_index[ia].resize(lim);
+		for (int ib = 0; ib < lim; ib++) {
+			const primitive& pr = a.get_basis_set_entry(ib).get_primitive();
+			int slot = -1;
+			for (int u = 0; u < (int)uniq_b.size(); u++)
+				if (uniq_b[u] == pr.get_exp() && uniq_l[u] == pr.get_type()) { slot = u; break; }
+			if (slot < 0) {
+				slot = (int)uniq_b.size();
+				uniq_b.push_back(pr.get_exp());
+				uniq_l.push_back(pr.get_type());
+				uniq_elp32.push_back(pr.get_exp_l_plus_3_2());
+			}
+			bl_index[ia][ib] = slot;
+		}
+	}
+	const int n_uniq = (int)uniq_b.size();
 	std::unique_ptr<ProgressBar> local_pb;
 	if (!progress)
 		local_pb = std::make_unique<ProgressBar>(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
@@ -1705,6 +1748,7 @@ void calc_SF_SALTED(const vec2& k_pt,
 			sf[ia].assign(k_pt[0].size(), constants::cnull);
 		}
 
+		vec radial(n_uniq, 0.0);
 #pragma omp for
 		for (int i_kpt = 0; i_kpt < (int)k_pt[0].size(); ++i_kpt)
 		{
@@ -1719,6 +1763,8 @@ void calc_SF_SALTED(const vec2& k_pt,
 
 			for (int i = 0; i < 3; i++)
 				k_pt_local[i] /= k_pt_local[3];
+			for (int u = 0; u < n_uniq; u++)
+				radial[u] = fourier_bessel_radial(uniq_b[u], uniq_l[u], uniq_elp32[u], k_pt_local[3]);
 
 			for (int ia = 0; ia < num_asym_atoms; ++ia)
 			{
@@ -1729,11 +1775,12 @@ void calc_SF_SALTED(const vec2& k_pt,
 
 				const double* coef_slice_ptr = coefs.data() + coef_offsets[ia];
 
+				const int* bl_row = bl_index[ia].data();
 				for (int i_basis = 0; i_basis < lim; ++i_basis, ++basis_ptr)
 				{
 					// IMPORTANT: make basis local, not shared between threads
 					const primitive& basis = basis_ptr->get_primitive();
-					sf[ia][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
+					sf[ia][i_kpt] += sfac_bessel_r(basis, k_pt_local, coef_slice_ptr, radial[bl_row[i_basis]]);
 					coef_slice_ptr += 2 * basis.get_type() + 1;
 				}
 			}
