@@ -83,6 +83,18 @@
 //delay-load helper exception and kills the process. Measured on the AMD node, exit
 //0xC06D007E. So probe for the module before calling in, and treat absence as "no GPU".
 #ifdef _WIN32
+//windows.h defines min and max as macros unless told not to, which turns every std::max in
+//a kernel that includes this header into a syntax error. The core sources escape it because
+//pch.h defines NOMINMAX first, but the .cu files do not use that precompiled header - real
+//hipcc rejected sf_gpu, itensor_gpu and salted_gpu on exactly these lines. The header that
+//drags windows.h in is the one that has to contain it, so it is defined here rather than
+//left to whoever includes it.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 inline bool gpu_blas_runtime_present()
 {

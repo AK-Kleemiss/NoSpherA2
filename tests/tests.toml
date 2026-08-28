@@ -444,7 +444,10 @@ no_date = ""
 # because a silent fallback produces exactly the CPU reference. The reference has to
 # contain the evidence that the GPU did the work.
 #
-# The note names the backend, so a HIP build needs its own copy of this file.
+# The note names the backend, so a HIP build needs its own copy of this file. Regenerate it
+# there rather than editing CUDA out of this one: run the case, confirm the only line that
+# differs from sucrose_SF.good is the note, and save the resulting NoSpherA2.log. Hand-editing
+# the backend name would produce a reference nobody has ever seen a run match.
 [sucrose_SF_gpu_grid]
 directory = "sucrose_fchk_SF"
 good = "sucrose_SF_gpu_grid.good"

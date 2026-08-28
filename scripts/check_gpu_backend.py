@@ -20,17 +20,16 @@ def main():
     hdr = io.open(HDR, encoding="utf-8").read()
 
     used = {n for n in re.findall(r"\bgpu[A-Za-z_][A-Za-z0-9_]*", src) if n != "gpu_backend"}
-    hip = hdr.split("#ifdef NOSPHERA2_USE_HIP")[1].split("#else")[0]
-    cuda = hdr.split("#else")[1].split("#endif")[0]
-    defined = lambda t: set(re.findall(r"#define\s+(gpu[A-Za-z_][A-Za-z0-9_]*)", t))
-    d_hip, d_cuda = defined(hip), defined(cuda)
+    hip, cuda, both = classify_definitions(hdr)
+    #A name provided outside the backend split is provided to both, so it counts for each
+    d_hip, d_cuda = hip | both, cuda | both
 
     bad = []
     for name in sorted(used - d_hip):
         bad.append("%s used but not mapped in the HIP branch" % name)
     for name in sorted(used - d_cuda):
         bad.append("%s used but not mapped in the CUDA branch" % name)
-    for name in sorted(d_hip ^ d_cuda):
+    for name in sorted(hip ^ cuda):
         bad.append("%s is mapped in only one branch" % name)
 
     # The fp32:fp64 ratio is the one thing HIP has no equivalent for, so those three
@@ -49,6 +48,47 @@ def main():
     if "--compile" in sys.argv:
         return compile_hip_branch()
     return 0
+
+
+#Matches "#define gpuFoo ..." and "inline bool gpu_foo(", which is how the header provides
+#names - splitting the file on the first #else and scanning only for #define missed every
+#inline one and reported them as unmapped in both branches at once. A check that is red for
+#a non-reason is a check nobody reads, so it has to track the conditionals properly.
+DEF_RE = re.compile(r"^\s*#\s*define\s+(gpu[A-Za-z_][A-Za-z0-9_]*)"
+                    r"|^\s*(?:static\s+)?inline\s+[\w:*&<>\s]+?\b(gpu[A-Za-z_][A-Za-z0-9_]*)\s*\(",
+                    re.MULTILINE)
+
+
+def classify_definitions(hdr):
+    """Split the names gpu_backend.h provides into HIP-only, CUDA-only and unconditional.
+
+    Walks the preprocessor conditionals rather than splitting on the first #else, because
+    the header now nests (the Windows LoadLibrary probe lives inside its own #ifdef) and
+    has more than one #else. Anything defined while inside the then-branch of an
+    "#ifdef NOSPHERA2_USE_HIP" is HIP's, anything in its else-branch is CUDA's, and
+    everything else is provided to both.
+    """
+    hip, cuda, both = set(), set(), set()
+    stack = []   # one frame per open conditional: "hip", "cuda" or None
+    for line in hdr.splitlines():
+        s = line.strip()
+        if re.match(r"#\s*if", s):
+            stack.append("hip" if re.match(r"#\s*ifdef\s+NOSPHERA2_USE_HIP\b", s) else None)
+            continue
+        if re.match(r"#\s*else", s) and stack:
+            stack[-1] = "cuda" if stack[-1] == "hip" else stack[-1]
+            continue
+        if re.match(r"#\s*endif", s):
+            if stack:
+                stack.pop()
+            continue
+        m = DEF_RE.match(line)
+        if not m:
+            continue
+        name = m.group(1) or m.group(2)
+        where = next((f for f in reversed(stack) if f), None)
+        (hip if where == "hip" else cuda if where == "cuda" else both).add(name)
+    return hip, cuda, both
 
 
 def compile_hip_branch():
