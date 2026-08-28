@@ -3,6 +3,9 @@
 #include <cstdio>
 #include <cstring>
 #include <future>
+#include <vector>
+#include <algorithm>
+#include <cstdlib>
 
 //Each block owns a tile of k-points for one atom and streams that atom's grid points
 //through shared memory. F32 keeps the phase and its reduction in double and drops only
@@ -152,43 +155,81 @@ bool sf_gpu_run(const int imax, const long long smax,
 	const double* dens, const int* offs, const long long total_points,
 	double* const* sf_rows, const bool force_fp64)
 {
-	const size_t pts = sizeof(double) * (size_t)total_points;
+	//offs is int-indexed upstream, so a problem past INT_MAX points is already out of range
+	if (imax <= 0 || (long long)offs[imax] != total_points) return false;
 	const size_t kb = sizeof(double) * (size_t)smax;
 	const size_t row = sizeof(double2) * (size_t)smax;
-	const size_t out = row * (size_t)imax;
 	size_t freeb = 0, totalb = 0;
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
-	//Bail to the CPU rather than thrash if the whole problem will not sit in device memory
-	if (4 * pts + 3 * kb + out + (1u << 26) > freeb) return false;
+	if (kb * 3 + (1u << 26) >= freeb) return false;
+	//Atoms are independent, so oversized problems go in batches rather than to the CPU.
+	//The budget is what is left once the k-points and a margin are accounted for; a batch
+	//costs its own grid points four times over plus one output row per atom.
+	const size_t budget = freeb - kb * 3 - (1u << 26);
+	int batch = imax;
+	{
+		size_t widest = 0;
+		for (int i = 0; i < imax; i++)
+			widest = std::max(widest, (size_t)(offs[i + 1] - offs[i]));
+		//A single atom that will not fit cannot be split without partial sums
+		if (4 * sizeof(double) * widest + row > budget) return false;
+		while (batch > 1) {
+			size_t need = row * (size_t)batch;
+			size_t worst = 0;
+			for (int a = 0; a < imax; a += batch)
+				worst = std::max(worst, (size_t)(offs[std::min(a + batch, imax)] - offs[a]));
+			need += 4 * sizeof(double) * worst;
+			if (need <= budget) break;
+			batch = (batch + 1) / 2;
+		}
+	}
+	//Every card here has room for the whole problem, so the batching would otherwise never
+	//run until it met a protein on someone else's machine.
+	if (const char* cap = std::getenv("NOSPHERA2_GPU_BATCH")) {
+		const int c = std::atoi(cap);
+		if (c > 0 && c < batch) batch = c;
+	}
+	size_t widest_pts = 0;
+	for (int a = 0; a < imax; a += batch)
+		widest_pts = std::max(widest_pts, (size_t)(offs[std::min(a + batch, imax)] - offs[a]));
+	const size_t pts = sizeof(double) * widest_pts;
 	double *dk1 = nullptr, *dk2 = nullptr, *dk3 = nullptr, *dd1 = nullptr, *dd2 = nullptr, *dd3 = nullptr, *dde = nullptr;
 	double2* dout = nullptr;
 	int* dof = nullptr;
 	GPU_TRY(gpuMalloc(&dk1, kb)); GPU_TRY(gpuMalloc(&dk2, kb)); GPU_TRY(gpuMalloc(&dk3, kb));
 	GPU_TRY(gpuMalloc(&dd1, pts)); GPU_TRY(gpuMalloc(&dd2, pts)); GPU_TRY(gpuMalloc(&dd3, pts));
 	GPU_TRY(gpuMalloc(&dde, pts));
-	GPU_TRY(gpuMalloc(&dof, sizeof(int) * (size_t)(imax + 1)));
-	GPU_TRY(gpuMalloc(&dout, out));
+	GPU_TRY(gpuMalloc(&dof, sizeof(int) * (size_t)(batch + 1)));
+	GPU_TRY(gpuMalloc(&dout, row * (size_t)batch));
 	GPU_TRY(gpuMemcpy(dk1, k1, kb, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dk2, k2, kb, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dk3, k3, kb, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMemcpy(dd1, d1, pts, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMemcpy(dd2, d2, pts, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMemcpy(dd3, d3, pts, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMemcpy(dde, dens, pts, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMemcpy(dof, offs, sizeof(int) * (size_t)(imax + 1), gpuMemcpyHostToDevice));
-	const dim3 grid((unsigned int)((smax + SF_TILE_K - 1) / SF_TILE_K), (unsigned int)imax);
 	const int ratio = sf_gpu_fp64_ratio();
 	const bool f32 = !force_fp64 && ratio > 4;
-	if (f32)
-		sf_kernel<true><<<grid, SF_TILE_K>>>(imax, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dout);
-	else
-		sf_kernel<false><<<grid, SF_TILE_K>>>(imax, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dout);
-	GPU_TRY(gpuGetLastError());
-	GPU_TRY(gpuDeviceSynchronize());
-	//Straight into the caller's complex storage, one row per atom: no staging buffer to
-	//allocate, zero and scatter, which cost more than the transfer itself did.
-	for (int i = 0; i < imax; i++)
-		GPU_TRY(gpuMemcpy(sf_rows[i], dout + (size_t)i * (size_t)smax, row, gpuMemcpyDeviceToHost));
+	std::vector<int> rel(batch + 1);
+	for (int a0 = 0; a0 < imax; a0 += batch) {
+		const int na = std::min(batch, imax - a0);
+		const int p0 = offs[a0];
+		const size_t np = (size_t)(offs[a0 + na] - p0);
+		for (int i = 0; i <= na; i++)
+			rel[i] = offs[a0 + i] - p0;
+		GPU_TRY(gpuMemcpy(dd1, d1 + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
+		GPU_TRY(gpuMemcpy(dd2, d2 + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
+		GPU_TRY(gpuMemcpy(dd3, d3 + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
+		GPU_TRY(gpuMemcpy(dde, dens + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
+		GPU_TRY(gpuMemcpy(dof, rel.data(), sizeof(int) * (size_t)(na + 1), gpuMemcpyHostToDevice));
+		const dim3 grid((unsigned int)((smax + SF_TILE_K - 1) / SF_TILE_K), (unsigned int)na);
+		if (f32)
+			sf_kernel<true><<<grid, SF_TILE_K>>>(na, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dout);
+		else
+			sf_kernel<false><<<grid, SF_TILE_K>>>(na, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dout);
+		GPU_TRY(gpuGetLastError());
+		GPU_TRY(gpuDeviceSynchronize());
+		//Straight into the caller's complex storage, one row per atom: no staging buffer to
+		//allocate, zero and scatter, which cost more than the transfer itself did.
+		for (int i = 0; i < na; i++)
+			GPU_TRY(gpuMemcpy(sf_rows[a0 + i], dout + (size_t)i * (size_t)smax, row, gpuMemcpyDeviceToHost));
+	}
 	gpuFree(dk1); gpuFree(dk2); gpuFree(dk3);
 	gpuFree(dd1); gpuFree(dd2); gpuFree(dd3); gpuFree(dde);
 	gpuFree(dof); gpuFree(dout);
