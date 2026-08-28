@@ -5,8 +5,9 @@
 #include <future>
 
 //Each block owns a tile of k-points for one atom and streams that atom's grid points
-//through shared memory. F32 selects the reduced-argument single-precision sincos, which
-//consumer cards run 32-64x faster than the double one; the phase itself stays double.
+//through shared memory. F32 keeps the phase and its reduction in double and drops only
+//the transcendental and the running sum to single, which consumer parts run 32-64x
+//faster. 64, 128 and 256 k-points per tile measure the same, so 128 is not tuned.
 #define SF_TILE_K 128
 #define SF_CHUNK 256
 #define SF_TWO_PI 6.283185307179586476925286766559
