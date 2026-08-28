@@ -17,6 +17,7 @@
 #include "basis_set.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "SALTED_equicomb.h"
+#include "grid_gpu.h"
 #endif
 #include "SALTED_utilities.h"
 #include "GridManager.h"
@@ -2393,6 +2394,9 @@ int make_atomic_grids_wrapper(
 	file << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::endl;
 
 	GridConfiguration config;
+#ifdef NOSPHERA2_USE_GPU
+	grid_gpu_set_enabled(opt.gpu_grid);
+#endif
 	config.accuracy = opt.accuracy;
 	config.partition_type = opt.partition_type;
 	config.pbc = opt.pbc;
@@ -2505,6 +2509,9 @@ itsc_block calculate_scattering_factors_from_cube(
 	time_descriptions.push_back("k-points preparation");
 
 	GridConfiguration config;
+#ifdef NOSPHERA2_USE_GPU
+	grid_gpu_set_enabled(opt.gpu_grid);
+#endif
 	config.accuracy = opt.accuracy;
 	config.partition_type = opt.partition_type;
 	config.pbc = opt.pbc;

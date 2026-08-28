@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "convenience.h"
 #include "AtomGrid.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "grid_gpu.h"
+#endif
 #include "sphere_lebedev_rule.h"
 #include "constants.h"
 #include "wfn_class.h"
@@ -426,6 +429,23 @@ void AtomGrid::get_grid(const int num_centers,
         if (chi.size() == 0)
             chi = make_chi(wfn, 40, true, debug);
         const int np = get_num_grid_points();
+#ifdef NOSPHERA2_USE_GPU
+        //Same walk on the device. Bragg radii are looked up here so the kernel takes
+        //plain doubles and needs no constants table of its own.
+        if (grid_gpu_enabled()) {
+            vec R_v(num_centers);
+            for (int a = 0; a < num_centers; a++)
+                R_v[a] = constants::bragg_angstrom[proton_charges[a]];
+            if (grid_gpu_becke_weights(np, num_centers, center_index,
+                    atom_grid_x_bohr_.data(), atom_grid_y_bohr_.data(),
+                    atom_grid_z_bohr_.data(), atom_grid_w_.data(),
+                    x_coordinates_bohr, y_coordinates_bohr, z_coordinates_bohr,
+                    R_v.data(), chi.data(), constants::far_away, constants::cutoff,
+                    grid_x_bohr, grid_y_bohr, grid_z_bohr,
+                    grid_aw, grid_becke_w, grid_TFVC_w))
+                return;
+        }
+#endif
 #pragma omp parallel
         {
             vec pa_b(num_centers);

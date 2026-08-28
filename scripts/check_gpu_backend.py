@@ -11,7 +11,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRCS = [os.path.join(ROOT, "Src", "core", n)
-        for n in ("sf_gpu.cu", "itensor_gpu.cu", "salted_gpu.cu")]
+        for n in ("sf_gpu.cu", "itensor_gpu.cu", "salted_gpu.cu", "grid_gpu.cu")]
 HDR = os.path.join(ROOT, "Src", "core", "gpu_backend.h")
 
 

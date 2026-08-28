@@ -797,6 +797,8 @@ struct options
     bool gpu_itensor = false;
     //-gpu_salted runs the SALTED descriptor combination on the device
     bool gpu_salted = false;
+    //-gpu_grid runs the Becke/TFVC integration weights on the device
+    bool gpu_grid = false;
     //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
     bool fukui_analysis_run = false;
     bool profiling = false;
