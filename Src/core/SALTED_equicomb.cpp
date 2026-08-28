@@ -13,6 +13,7 @@
 
 static bool g_equicomb_use_gpu = false;
 void equicomb_set_gpu(bool on) { g_equicomb_use_gpu = on; }
+bool equicomb_gpu_enabled() { return g_equicomb_use_gpu; }
 #ifdef NOSPHERA2_USE_GPU
 #include "salted_gpu.h"
 #endif
@@ -179,6 +180,14 @@ void equicomb(int natoms, int nrad1, int nrad2,
         q.c2r_re = cre.data(); q.c2r_im = cim.data(); q.c2r_cnt = c2r_cnt.data();
         q.sel = sel.data(); q.p = p.data();
         const bool gpu_ok = salted_gpu_equicomb(q, &empty_environments);
+        //Once per run, not once per lambda: nine identical lines say nothing extra.
+        //Printed before the progress bar exists, whose carriage returns would eat it.
+        static bool announced = false;
+        if (!announced) {
+            announced = true;
+            std::cout << "GPU in use: SALTED descriptors on "
+                      << (gpu_ok ? "the device (double precision)" : "the CPU - device unavailable") << std::endl;
+        }
         if (ProgressBar::report_counts)
             std::cout << "[equicomb] lam " << lam << ": GPU " << (gpu_ok ? "used" : "refused, using the CPU loop") << std::endl;
         if (gpu_ok)

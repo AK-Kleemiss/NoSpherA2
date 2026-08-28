@@ -1880,7 +1880,7 @@ void calc_SF(const int& points,
 			if (!no_date) {
 				_time_point gend = get_time();
 				const int ratio = sf_gpu_fp64_ratio();
-				file << "Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
+				file << "GPU in use: scattering-factor Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
 				     << (!gpu_fp64 && ratio > 4 ? "reduced-argument f32 sincos" : "f64 sincos")
 				     << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
 			}

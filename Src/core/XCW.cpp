@@ -1528,8 +1528,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
 		L.n_points = static_cast<long long>(fd1.size());
 		itensor_on_gpu = itensor_gpu_init(L);
-		if (!itensor_on_gpu)
-			std::cout << "I tensor GPU path unavailable, using the CPU loop" << std::endl;
+		//Say which processor produced the numbers; gated like the other timing lines so
+		//the golden-file tests, which run with no_date, keep their reference output
+		if (!(opt->no_date))
+			std::cout << "GPU in use: XCW I tensor on " << (itensor_on_gpu ? "the device (single-precision GEMM)"
+			                                                              : "the CPU - device unavailable or problem too large") << std::endl;
 	}
 	if (itensor_on_gpu) {
 		//The GPU holds one reflection at a time, so this loop is sequential by design
