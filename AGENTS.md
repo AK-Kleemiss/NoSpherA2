@@ -188,6 +188,43 @@ Key core modules live in `Src/core`:
 - oneTBB is intentionally deployed dynamically. Expected runtime files beside packaged executables include `tbb12.dll`, `libtbb.so*`, or `libtbb.dylib`.
 - Do not reintroduce `tbbmalloc_proxy` or `tbbmalloc` linking for NoSpherA2.
 
+## GPU and CPU Must Agree Numerically
+
+Every GPU path exists only as a faster way to compute what the CPU path already
+computes. **A GPU path is not finished until its agreement with the CPU has been
+measured on a real workload and written down.** Speed is not a result on its own; a
+kernel that is fast and wrong is worse than no kernel, because it is harder to notice.
+
+Rules:
+
+- **Measure agreement, do not assume it.** Run the same input through the CPU and GPU
+  paths and compare the physics the code exists to produce - scattering factors, the XCW
+  convergence table, predicted coefficients - not an intermediate you happen to have.
+- **Quote the wR2 shape and the maximum absolute difference.** The maximum *relative*
+  difference is not a stable statistic: it is set by whatever the smallest near-zero
+  component in the sample happens to be, and re-parsing the same data moved it three
+  orders of magnitude once already.
+- **Record the number beside the code and in the commit.** A tolerance nobody wrote down
+  cannot be checked later, and the next reader cannot tell a regression from intent.
+- **Check the physics before the clock.** The first I tensor kernel ran 11x faster and
+  was completely wrong (GooF 69.1 against 4.665). Diff the science first, every time.
+- **A path the hardware never selects is a path no test covers.** Give every branch a
+  switch that forces it - `-gpu_fp64`, `NOSPHERA2_GPU_BATCH` - or it rots unnoticed.
+
+Where a kernel deliberately trades precision for speed, the trade must be stated with its
+measured cost, not left implicit. The current paths, all measured on real workloads:
+
+| path | precision | agreement with the CPU |
+|---|---|---|
+| `calc_SF`, `-gpu_fp64` | fp64 throughout | wR2 1.23e-14 |
+| `calc_SF`, default | fp64 phase, fp32 transcendental and sum | wR2 1.84e-8 |
+| I tensor, `-gpu_itensor` | fp32 GEMM | 2.1e-11 worst over the lambda scan |
+| SALTED, `-gpu_salted` | fp64 throughout | wR2 4.95e-13 |
+
+The two fp32 paths are the deliberate trades. Both were measured before being kept, both
+sit orders below the experimental uncertainty of the data being fitted, and the fp64
+alternative is one flag away in each case.
+
 ## Known Pitfalls
 
 - Use `cmake --list-presets=all` or inspect `CMakePresets.json` before assuming preset names. Host-conditional configure presets may hide non-host presets from a plain `cmake --list-presets`.
