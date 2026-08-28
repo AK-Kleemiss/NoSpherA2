@@ -11,6 +11,11 @@
 #include "cif.h"
 #include "bondwise_analysis.h"
 #include "XCW.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "grid_gpu.h"
+#include "blas_gpu.h"
+#include "SALTED_equicomb.h"
+#endif
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 
@@ -69,6 +74,17 @@ static int run_app_impl(int argc, char **argv)
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
+#ifdef NOSPHERA2_USE_GPU
+    //Every GPU toggle, established once per run and from opt alone. These live in globals and
+    //used to be set only inside the two scattering-factor entry points, so a run that took
+    //another path - an XCW, say - inherited whatever the previous run in the same process had
+    //left switched on. In the suite that let -gpu_grid leak out of its own test and into every
+    //case after it; Olex2 calls run_app in-process repeatedly and would see the same thing.
+    //Setting them unconditionally here means a run gets the flags it was actually given.
+    grid_gpu_set_enabled(opt.gpu_grid);
+    blas_gpu_set_enabled(opt.gpu_blas);
+    equicomb_set_gpu(opt.gpu_salted);
+#endif
     vector<WFN> wavy;
 
     if (opt.promol_nci)

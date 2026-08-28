@@ -437,9 +437,17 @@ no_date = ""
 # the CPU, so it reuses the CPU reference; the I tensor path is single-precision and
 # carries its own.
 
+# Its own reference rather than the CPU one, and deliberately so. The weights themselves
+# are bit-identical - the only line that differs is the note saying the device ran them -
+# but that note is the test's real assertion. Held to the shared CPU reference this test
+# passed for a whole session while the kernel was failing its chi copy and falling back,
+# because a silent fallback produces exactly the CPU reference. The reference has to
+# contain the evidence that the GPU did the work.
+#
+# The note names the backend, so a HIP build needs its own copy of this file.
 [sucrose_SF_gpu_grid]
 directory = "sucrose_fchk_SF"
-good = "sucrose_SF.good"
+good = "sucrose_SF_gpu_grid.good"
 
 [sucrose_SF_gpu_grid.args]
 cif = "sucrose.cif"
@@ -460,3 +468,34 @@ anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings.txt"
 no_date = ""
 gpu_itensor = ""
+
+# The two sincos kernels, each pinned rather than left to the card. Without the explicit
+# flags the precision a run gets depends on the reported fp32:fp64 ratio, so on a consumer
+# part both of these would be the f32 kernel and on a V100 both would be the f64 one - the
+# suite would report two passes having tested one path twice.
+#
+# Both are held to the same CPU reference, which is the point: the f64 kernel agrees to
+# ~1e-14 and the reduced-argument f32 one to ~2e-8, and both are inside what the reference
+# comparison accepts. That is the numerical-agreement contract in AGENTS.md, checked.
+
+[sucrose_SF_gpu_fp64]
+directory = "sucrose_fchk_SF"
+good = "sucrose_SF.good"
+
+[sucrose_SF_gpu_fp64.args]
+cif = "sucrose.cif"
+hkl = "olex2/Wfn_job/sucrose.hkl"
+wfn = "olex2/Wfn_job/sucrose.wfx"
+acc = 1
+gpu_fp64 = ""
+
+[sucrose_SF_gpu_fp32]
+directory = "sucrose_fchk_SF"
+good = "sucrose_SF.good"
+
+[sucrose_SF_gpu_fp32.args]
+cif = "sucrose.cif"
+hkl = "olex2/Wfn_job/sucrose.hkl"
+wfn = "olex2/Wfn_job/sucrose.wfx"
+acc = 1
+gpu_fp32 = ""

@@ -535,6 +535,29 @@ TEST(TomlIntegrationTests, P1_test_XCW_gpu_itensor)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+// The two sincos kernels, each pinned by flag. Left on Auto the card decides, so on this
+// machine both of these would run the f32 kernel and on a datacentre part both would run
+// the f64 one - two green tests covering one path between them. Holding both to the same
+// CPU reference is the check that matters: it is the numerical-agreement contract in
+// AGENTS.md, not just a smoke test that the kernel launches.
+TEST(TomlIntegrationTests, sucrose_SF_gpu_fp64)
+{
+    if (!gpu_device_present()) {
+        GTEST_SKIP() << "No GPU device present; the -gpu_fp64 path cannot run here";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_fp64");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, sucrose_SF_gpu_fp32)
+{
+    if (!gpu_device_present()) {
+        GTEST_SKIP() << "No GPU device present; the -gpu_fp32 path cannot run here";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_fp32");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, P1_test_XCW_full)
 {
     if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {

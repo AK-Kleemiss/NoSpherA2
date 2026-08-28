@@ -7,13 +7,23 @@
 //
 //This is partitioning physics, not a contraction: a slip changes every partitioned charge.
 //The device code is a verbatim transcription of the chi-present branch of
-//get_integration_weights, which is the only branch get_grid can reach - it builds chi
-//first whenever num_centers > 1.
+//get_integration_weights.
+//
+//That branch was described here as the only one get_grid could reach, on the grounds that
+//it builds chi first whenever num_centers > 1. That is wrong: make_chi returns an empty
+//vector when the wavefunction carries no MOs, and the CPU has a separate chi-absent branch
+//this kernel does not implement. The caller therefore checks chi is exactly num_centers^2
+//before offering the work. Do not drop that check - make_chi lays its rows out with a
+//stride of wfn.get_ncen() while the kernel assumes num_centers, and a wrongly sized chi
+//copies without complaint and comes back quietly wrong, which is the worst failure this
+//file can have.
 //
 //Returns false if there is no device, if the scratch will not fit, or if num_centers is
 //too large for the per-thread arrays, and the caller keeps the CPU loop.
 
 bool grid_gpu_available();
+//"CUDA" or "HIP", for the log line
+const char* grid_gpu_backend();
 
 //-gpu_grid turns this on; off unless asked, like the other GPU paths
 void grid_gpu_set_enabled(bool on);

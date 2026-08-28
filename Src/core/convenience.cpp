@@ -561,6 +561,10 @@ std::string help_message =
  "                                    transcendental with the phase still in\n"
  "                                    double, which agrees with the CPU to\n"
  "                                    ~2e-8 and is several times faster.\n"
+ "  -gpu_fp32                          Force that single-precision sincos even on a\n"
+ "                                    card whose fp64 is fast enough to keep. Mainly\n"
+ "                                    for tests, which otherwise cannot pin which of\n"
+ "                                    the two kernels a run exercises.\n"
  "  -mem <MB>                          Memory budget for everything sliceable\n"
  "                                    [unset]. When given, the tsc block size\n"
  "                                    and the XCW I tensor window are chosen\n"
@@ -3348,6 +3352,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         use_gpu = false;
     else if (temp == "-gpu_fp64")
         gpu_fp64 = true;
+    else if (temp == "-gpu_fp32")
+        gpu_fp32 = true;
     else if (temp == "-gpu_itensor")
         gpu_itensor = true;
     else if (temp == "-gpu_salted")

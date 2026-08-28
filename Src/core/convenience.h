@@ -792,6 +792,11 @@ struct options
     bool use_gpu = true;
     //-gpu_fp64 keeps the double sincos on a card that would otherwise pick the fp32 one
     bool gpu_fp64 = false;
+    //-gpu_fp32 forces the reduced-argument single-precision sincos on a card that would
+    //otherwise keep the double one. It exists for the test suite: without it the precision
+    //a run uses depends on the card, so neither path can be pinned. -gpu_fp64 wins if both
+    //are given, the accurate path being the safer thing to fall back to.
+    bool gpu_fp32 = false;
     //-gpu_itensor runs the XCW I tensor GEMMs on the device in single precision. Off by
     //default: it shifts the total energy in the ninth decimal, which reference logs carry
     bool gpu_itensor = false;

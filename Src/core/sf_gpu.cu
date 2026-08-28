@@ -145,6 +145,16 @@ int sf_gpu_fp64_ratio()
 #endif
 }
 
+//Resolving Auto lives here rather than at the call site because the log line has to name
+//the kernel that actually ran. Repeating the ratio test where the message is written is how
+//the two drift apart and the log starts claiming a precision the transform did not use.
+bool sf_gpu_uses_fp32(const sf_precision prec)
+{
+	if (prec == sf_precision::FP32) return true;
+	if (prec == sf_precision::FP64) return false;
+	return sf_gpu_fp64_ratio() > 4;
+}
+
 #define GPU_TRY(call) do { const gpuError_t e_ = (call); if (e_ != gpuSuccess) { \
 	std::fprintf(stderr, "NoSpherA2 GPU: %s at %s:%d\n", gpuGetErrorString(e_), __FILE__, __LINE__); \
 	return false; } } while (0)
@@ -153,7 +163,7 @@ bool sf_gpu_run(const int imax, const long long smax,
 	const double* k1, const double* k2, const double* k3,
 	const double* d1, const double* d2, const double* d3,
 	const double* dens, const int* offs, const long long total_points,
-	double* const* sf_rows, const bool force_fp64)
+	double* const* sf_rows, const sf_precision prec)
 {
 	//offs is int-indexed upstream, so a problem past INT_MAX points is already out of range
 	if (imax <= 0 || (long long)offs[imax] != total_points) return false;
@@ -204,8 +214,7 @@ bool sf_gpu_run(const int imax, const long long smax,
 	GPU_TRY(gpuMemcpy(dk1, k1, kb, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dk2, k2, kb, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dk3, k3, kb, gpuMemcpyHostToDevice));
-	const int ratio = sf_gpu_fp64_ratio();
-	const bool f32 = !force_fp64 && ratio > 4;
+	const bool f32 = sf_gpu_uses_fp32(prec);
 	std::vector<int> rel(batch + 1);
 	for (int a0 = 0; a0 < imax; a0 += batch) {
 		const int na = std::min(batch, imax - a0);

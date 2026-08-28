@@ -341,6 +341,15 @@ bool grid_gpu_available()
 	return gpuGetDeviceCount(&n) == gpuSuccess && n > 0;
 }
 
+const char* grid_gpu_backend()
+{
+#ifdef NOSPHERA2_USE_HIP
+	return "HIP";
+#else
+	return "CUDA";
+#endif
+}
+
 bool grid_gpu_becke_weights(const int np, const int nc, const int center_index,
 	const double* proto_x, const double* proto_y, const double* proto_z, const double* proto_w,
 	const double* cx, const double* cy, const double* cz,

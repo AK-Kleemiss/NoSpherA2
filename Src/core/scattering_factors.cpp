@@ -1826,7 +1826,8 @@ void calc_SF(const int& points,
 	bool no_date,
 	bool do_XCW,
 	bool use_gpu,
-	bool gpu_fp64)
+	bool gpu_fp64,
+	bool gpu_fp32)
 {
 	const long long int imax = static_cast<long long int>(dens.size());
 	const long long int smax = static_cast<long long int>(k_pt[0].size());
@@ -1870,9 +1871,13 @@ void calc_SF(const int& points,
 		std::vector<double*> rows(imax);
 		for (int i = 0; i < imax; i++)
 			rows[i] = reinterpret_cast<double*>(sf[i].data());
+		//-gpu_fp64 wins over -gpu_fp32 if both are given: between two explicit requests the
+		//accurate one is the safer default.
+		const sf_precision prec = gpu_fp64 ? sf_precision::FP64
+			: gpu_fp32 ? sf_precision::FP32 : sf_precision::Auto;
 		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
 			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
-			rows.data(), gpu_fp64)) {
+			rows.data(), prec)) {
 			//The bar is what the reference logs expect, so draw it even though the work is done
 			if (!do_XCW) {
 				ProgressBar gprogress(imax, 60, "=", " ", "Calculating Scattering Factors", file);
@@ -1883,7 +1888,7 @@ void calc_SF(const int& points,
 				_time_point gend = get_time();
 				const int ratio = sf_gpu_fp64_ratio();
 				file << "GPU in use: scattering-factor Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
-				     << (!gpu_fp64 && ratio > 4 ? "reduced-argument f32 sincos" : "f64 sincos")
+				     << (sf_gpu_uses_fp32(prec) ? "reduced-argument f32 sincos" : "f64 sincos")
 				     << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
 			}
 			return;
@@ -2558,7 +2563,8 @@ itsc_block calculate_scattering_factors_from_cube(
 		opt.no_date,
 		false,
 		opt.use_gpu,
-		opt.gpu_fp64);
+		opt.gpu_fp64,
+		opt.gpu_fp32);
 	time_points.push_back(get_time());
 	time_descriptions.push_back("Fourier transform");
 
@@ -2998,7 +3004,8 @@ tsc_block_type calculate_scattering_factors(
 				opt.no_date,
 				false,
 				opt.use_gpu,
-				opt.gpu_fp64);
+				opt.gpu_fp64,
+				opt.gpu_fp32);
 
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Fourier transform");
