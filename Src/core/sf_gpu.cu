@@ -23,10 +23,17 @@ __global__ void sf_kernel(const int imax, const long long smax,
 	const int ia = blockIdx.y;
 	const long long s = (long long)blockIdx.x * SF_TILE_K + threadIdx.x;
 	const bool live = (s < smax);
-	const double kx = live ? k1[s] : 0.0;
-	const double ky = live ? k2[s] : 0.0;
-	const double kz = live ? k3[s] : 0.0;
+	//Scaled to turns once per thread, so the phase reduction below is a rint and a
+	//subtract instead of a multiply, an add, a floor and an fma. Costs three fp64
+	//multiplies against the ~2000 grid points each thread then walks.
+	const double kx = live ? k1[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
+	const double ky = live ? k2[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
+	const double kz = live ? k3[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
 	double re = 0.0, im = 0.0;
+#ifdef SF_DIAG_ALLFLOAT
+	float fre = 0.0f, fim = 0.0f;
+	const float fkx = (float)kx, fky = (float)ky, fkz = (float)kz;
+#endif
 	const int lo = offs[ia], hi = offs[ia + 1];
 	for (int base = lo; base < hi; base += SF_CHUNK) {
 		const int n = min(SF_CHUNK, hi - base);
@@ -39,15 +46,28 @@ __global__ void sf_kernel(const int imax, const long long smax,
 		__syncthreads();
 		if (live) {
 			for (int p = 0; p < n; p++) {
+#ifdef SF_DIAG_ALLFLOAT
+				const float w = fkx * (float)s1[p] + fky * (float)s2[p] + fkz * (float)s3[p];
+#else
 				const double w = kx * s1[p] + ky * s2[p] + kz * s3[p];
+#endif
 				const double r = sd[p];
 				if (F32) {
-					//Reduce in double first: sinf/cosf of a large argument is meaningless
-					const double wr = w - SF_TWO_PI * floor(w * SF_INV_TWO_PI + 0.5);
+#ifdef SF_DIAG_ALLFLOAT
+					//DIAGNOSTIC ONLY - numerically wrong, measures the fp64 ceiling
 					float sif, cof;
-					sincosf((float)wr, &sif, &cof);
+					sincosf((float)w, &sif, &cof);
+					fre += (float)r * cof;
+					fim += (float)r * sif;
+#else
+					//w is in turns here. Reduce in double - sinf of a large argument is
+					//meaningless - then hand sincospif the half-turn count it wants.
+					const double wr = w - rint(w);
+					float sif, cof;
+					sincospif(2.0f * (float)wr, &sif, &cof);
 					re += r * (double)cof;
 					im += r * (double)sif;
+#endif
 				}
 				else {
 					double si, co;
@@ -61,6 +81,10 @@ __global__ void sf_kernel(const int imax, const long long smax,
 	}
 	if (live) {
 		double2 v;
+#ifdef SF_DIAG_ALLFLOAT
+		re += fre;
+		im += fim;
+#endif
 		v.x = re;
 		v.y = im;
 		sf_out[(long long)ia * smax + s] = v;
