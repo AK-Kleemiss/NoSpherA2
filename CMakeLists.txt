@@ -7,8 +7,37 @@ message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 option(NOSPHERA2_BUILD_DLL "Build the NoSpherA2 DLL" OFF)
 option(NOSPHERA2_BUILD_TESTS "Build NoSpherA2 tests" OFF)
 option(NOSPHERA2_DEPENDENCIES_ONLY "Build dependencies without building NoSpherA2" OFF)
+#Whether the user picked a backend has to be answered before option() runs, because option()
+#defines the variable either way and afterwards "off by default" and "explicitly turned off"
+#look identical. A -D on the command line is already in the cache at this point.
+if(DEFINED NOSPHERA2_USE_CUDA OR DEFINED NOSPHERA2_USE_HIP)
+    set(_nosphera2_gpu_explicit TRUE)
+else()
+    set(_nosphera2_gpu_explicit FALSE)
+endif()
+
 option(NOSPHERA2_USE_CUDA "Build the CUDA scattering-factor path" OFF)
 option(NOSPHERA2_USE_HIP "Build the HIP (AMD) scattering-factor path" OFF)
+option(NOSPHERA2_GPU_AUTO "Enable a GPU backend by itself when a card and a toolkit are present" ON)
+
+#Nobody should have to know they own a GPU to get the use of it. The bootstrap has already put
+#a toolkit in the environment if it could, so by now this is only asking which one is there.
+#Silent when it finds nothing, and it never overrides a choice the user made.
+if(NOSPHERA2_GPU_AUTO AND NOT _nosphera2_gpu_explicit)
+    include("${CMAKE_CURRENT_LIST_DIR}/scripts/GpuToolkit.cmake")
+    nosphera2_detect_gpu(NOSPHERA2_GPU_VENDOR)
+    if(NOSPHERA2_GPU_VENDOR STREQUAL "NVIDIA")
+        set(NOSPHERA2_USE_CUDA ON)
+        message(STATUS "NVIDIA GPU detected; enabling the CUDA path (-DNOSPHERA2_GPU_AUTO=OFF to stop this)")
+    elseif(NOSPHERA2_GPU_VENDOR STREQUAL "AMD")
+        set(NOSPHERA2_USE_HIP ON)
+        message(STATUS "AMD GPU detected; enabling the HIP path (-DNOSPHERA2_GPU_AUTO=OFF to stop this)")
+    endif()
+    #Auto-enabling must never be able to fail a build that would otherwise have worked, so a
+    #missing compiler downgrades to a status line below rather than the warning a user who
+    #asked for the backend by name deserves.
+    set(_nosphera2_gpu_auto_enabled TRUE)
+endif()
 
 if(NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP)
     message(FATAL_ERROR "NOSPHERA2_USE_CUDA and NOSPHERA2_USE_HIP are mutually exclusive")
@@ -33,7 +62,12 @@ if(NOSPHERA2_USE_CUDA)
                 "/DELAYLOAD:cublas64_${CUDAToolkit_VERSION_MAJOR}.dll"
                 CACHE INTERNAL "cuBLAS DLL to delay-load")
         endif()
+        #cuBLAS always comes with the toolkit, so the two kernels that need it always build
+        set(NOSPHERA2_HAVE_GPUBLAS ON)
         message(STATUS "CUDA enabled, arch ${CMAKE_CUDA_ARCHITECTURES}")
+    elseif(_nosphera2_gpu_auto_enabled)
+        message(STATUS "NVIDIA GPU present but no CUDA compiler found; building for the CPU")
+        set(NOSPHERA2_USE_CUDA OFF)
     else()
         message(WARNING "NOSPHERA2_USE_CUDA is ON but no CUDA compiler was found; building without it")
         set(NOSPHERA2_USE_CUDA OFF)
@@ -64,7 +98,27 @@ if(NOSPHERA2_USE_HIP)
                 "/DELAYLOAD:amdhip64_${NOSPHERA2_HIP_MAJOR}.dll"
                 CACHE INTERNAL "ROCm DLLs to delay-load")
         endif()
+        #Unlike cuBLAS, hipBLAS is not guaranteed to be beside the compiler: conda-forge
+        #packages hipcc without it. Rather than refuse to build, drop the two kernels that
+        #need it - the scattering-factor transform, the grid weights and the SALTED
+        #descriptors do not, and the first of those is the path that runs unasked.
+        find_path(NOSPHERA2_HIPBLAS_INCLUDE
+            NAMES hipblas/hipblas.h hipblas.h
+            HINTS "$ENV{HIP_PATH}/include" "$ENV{ROCM_PATH}/include" "/opt/rocm/include"
+                  "${MICROMAMBA_ENV_PREFIX}/include")
+        mark_as_advanced(NOSPHERA2_HIPBLAS_INCLUDE)
+        if(NOSPHERA2_HIPBLAS_INCLUDE)
+            set(NOSPHERA2_HAVE_GPUBLAS ON)
+        else()
+            set(NOSPHERA2_HAVE_GPUBLAS OFF)
+            message(STATUS
+                "hipBLAS not found: the I tensor and the offloaded GEMM stay on the CPU. "
+                "The transform, grid weights and SALTED descriptors still run on the device.")
+        endif()
         message(STATUS "HIP enabled, arch ${CMAKE_HIP_ARCHITECTURES}")
+    elseif(_nosphera2_gpu_auto_enabled)
+        message(STATUS "AMD GPU present but no HIP compiler found; building for the CPU")
+        set(NOSPHERA2_USE_HIP OFF)
     else()
         message(WARNING "NOSPHERA2_USE_HIP is ON but no HIP compiler was found; building without it")
         set(NOSPHERA2_USE_HIP OFF)

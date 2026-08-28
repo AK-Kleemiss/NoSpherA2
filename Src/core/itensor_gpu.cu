@@ -4,6 +4,20 @@
 #include <vector>
 #include <algorithm>
 
+//The contraction is a GEMM and nothing else, so with no device BLAS there is no path here
+//worth having. conda-forge packages hipcc without hipBLAS, which is how a build gets here.
+//Returning false from init is exactly what this file already does on a machine with no
+//device, and XCW logs "the CPU - device unavailable or problem too large" and carries on.
+#ifndef NOSPHERA2_HAVE_GPUBLAS
+
+bool itensor_gpu_available() { return false; }
+bool itensor_gpu_init(const itensor_gpu_layout&) { return false; }
+bool itensor_gpu_reflection(int, const double*, const double*, const double*,
+	const std::complex<double>*, std::complex<double>*) { return false; }
+void itensor_gpu_free() {}
+
+#else
+
 #define SF_TWO_PI 6.283185307179586476925286766559
 #define SF_INV_TWO_PI 0.15915494309189533576888376337251
 
@@ -229,3 +243,5 @@ void itensor_gpu_free()
 	gpuFree(g.I_re); gpuFree(g.I_im);
 	g = Dev{};
 }
+
+#endif //NOSPHERA2_HAVE_GPUBLAS

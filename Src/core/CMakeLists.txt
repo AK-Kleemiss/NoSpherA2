@@ -133,6 +133,14 @@ if(NOSPHERA2_USE_HIP)
     target_link_libraries(NoSpherA2Core PRIVATE hip::device)
 endif()
 
+#itensor_gpu and blas_gpu compile either way. Without a device BLAS they compile to the same
+#"no, use the CPU" answer their callers already handle for a machine with no device at all,
+#which is why nothing downstream needs to know. Dropping the two files instead would leave
+#their symbols undefined at link time and buy nothing.
+if((NOSPHERA2_USE_CUDA OR NOSPHERA2_USE_HIP) AND NOSPHERA2_HAVE_GPUBLAS)
+    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_HAVE_GPUBLAS)
+endif()
+
 target_compile_features(
     NoSpherA2Core
     PUBLIC

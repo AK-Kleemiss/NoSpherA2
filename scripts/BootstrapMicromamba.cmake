@@ -10,6 +10,15 @@ include(
     "${CMAKE_CURRENT_LIST_DIR}/MicromambaEnvironment.cmake"
 )
 
+include(
+    "${CMAKE_CURRENT_LIST_DIR}/GpuToolkit.cmake"
+)
+
+# ON by default so a machine with a card gets the GPU path without being asked. Set it to OFF
+# to keep the bootstrap to the packages every build needs - worth doing on a metered
+# connection, since the CUDA packages are the largest thing here by a wide margin.
+option(NOSPHERA2_BOOTSTRAP_GPU "Add a CUDA toolkit to the environment when an NVIDIA GPU is present" ON)
+
 set(_mamba_root
     "${NOSPHERA2_SOURCE_DIR}/.mambaenv/root"
 )
@@ -67,6 +76,31 @@ else()
         DOWNLOAD_DIRECTORY
             "${_mamba_bootstrap}"
     )
+
+    # macOS is deliberately excluded above: no CUDA, and no AMD compute stack either.
+    if(NOSPHERA2_BOOTSTRAP_GPU)
+        nosphera2_detect_gpu(_gpu_vendor)
+        if(_gpu_vendor STREQUAL "NVIDIA")
+            nosphera2_bootstrap_cuda_toolkit(
+                PREFIX      "${MICROMAMBA_ENV_PREFIX}"
+                ROOT_PREFIX "${MICROMAMBA_ROOT_PREFIX}"
+                EXECUTABLE  "${MICROMAMBA_EXECUTABLE}"
+            )
+        elseif(_gpu_vendor STREQUAL "AMD")
+            nosphera2_find_rocm(_rocm_hipcc)
+            if(_rocm_hipcc)
+                message(STATUS "ROCm already installed: ${_rocm_hipcc}")
+            else()
+                nosphera2_bootstrap_rocm_toolkit(
+                    PREFIX      "${MICROMAMBA_ENV_PREFIX}"
+                    ROOT_PREFIX "${MICROMAMBA_ROOT_PREFIX}"
+                    EXECUTABLE  "${MICROMAMBA_EXECUTABLE}"
+                )
+            endif()
+        else()
+            message(STATUS "No GPU driver detected; building for the CPU")
+        endif()
+    endif()
 
     message(STATUS "Bootstrap complete")
     message(STATUS "Environment: ${MICROMAMBA_ENV_PREFIX}")

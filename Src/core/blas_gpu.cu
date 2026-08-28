@@ -13,6 +13,23 @@ static bool g_blas_gpu = false;
 void blas_gpu_set_enabled(bool on) { g_blas_gpu = on; }
 bool blas_gpu_enabled() { return g_blas_gpu; }
 
+//conda-forge packages hipcc without hipBLAS, so a device BLAS is not guaranteed to exist
+//just because a device does. Everything below already returns false when there is no device
+//and every caller already falls back to the CPU for that, so the no-BLAS build answers the
+//same way rather than needing a story of its own.
+#ifndef NOSPHERA2_HAVE_GPUBLAS
+
+bool blas_gpu_available() { return false; }
+
+bool blas_gpu_dgemm(const bool, const bool, const int, const int, const int,
+	const double, const double*, const int, const double*, const int,
+	const double, double*, const int)
+{
+	return false;
+}
+
+#else
+
 bool blas_gpu_available()
 {
 	int n = 0;
@@ -63,3 +80,5 @@ bool blas_gpu_dgemm(const bool transA, const bool transB, const int m, const int
 	gpuFree(dA); gpuFree(dB); gpuFree(dC);
 	return ok;
 }
+
+#endif //NOSPHERA2_HAVE_GPUBLAS
