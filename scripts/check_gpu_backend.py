@@ -44,6 +44,52 @@ def main():
             sys.stderr.write("gpu backend check: %s\n" % b)
         return 1
     sys.stdout.write("gpu backend check: %d runtime names map in both backends\n" % len(used))
+
+    if "--compile" in sys.argv:
+        return compile_hip_branch()
+    return 0
+
+
+def compile_hip_branch():
+    """Compile the HIP branch with nvcc against the shim in tests/hip_compile_check.
+
+    HIP on an NVIDIA host is itself a header translation onto CUDA, so this checks the
+    branch's names resolve and its device code is valid. It does not check AMD code
+    generation, the AMD device math library, or that anything runs.
+    """
+    import glob
+    import shutil
+    import subprocess
+    import tempfile
+
+    # Take the compiler CMake configured, not the one on PATH. On this machine both PATH
+    # and CUDA_PATH point at a toolkit too old for the host compiler, so guessing picks
+    # a toolkit that cannot build the project at all.
+    nvcc = None
+    for cache in glob.glob(os.path.join(ROOT, "build", "*", "CMakeCache.txt")):
+        for line in io.open(cache, encoding="utf-8", errors="replace"):
+            if line.startswith("CMAKE_CUDA_COMPILER:"):
+                candidate = line.split("=", 1)[1].strip()
+                if os.path.exists(candidate):
+                    nvcc = candidate
+                break
+        if nvcc:
+            break
+    if not nvcc:
+        nvcc = shutil.which("nvcc")
+    if not nvcc or not os.path.exists(nvcc):
+        sys.stdout.write("gpu backend check: no nvcc configured, skipping the HIP compile\n")
+        return 0
+    shim = os.path.join(ROOT, "tests", "hip_compile_check")
+    with tempfile.TemporaryDirectory() as tmp:
+        cmd = [nvcc, "-c", "-O3", "-DNOSPHERA2_USE_HIP",
+               "-I", shim, "-I", os.path.join(ROOT, "Src", "core"),
+               "-o", os.path.join(tmp, "sf_gpu_hip.obj"), SRC]
+        p = subprocess.run(cmd, capture_output=True, text=True)
+    if p.returncode != 0:
+        sys.stderr.write("gpu backend check: HIP branch failed to compile\n%s\n" % p.stderr)
+        return 1
+    sys.stdout.write("gpu backend check: HIP branch compiles (shim, not real hipcc)\n")
     return 0
 
 
