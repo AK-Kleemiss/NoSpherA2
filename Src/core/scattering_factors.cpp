@@ -18,8 +18,8 @@
 #include "SALTED_utilities.h"
 #include "GridManager.h"
 #include "cube.h"
-#ifdef NOSPHERA2_USE_CUDA
-#include "sf_cuda.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "sf_gpu.h"
 #endif
 
 
@@ -1833,6 +1833,10 @@ void calc_SF(const int& points,
 	if (debug)
 		file << "Initialized FFs" << std::endl
 		<< "asym atom list size: " << imax << " total grid size: " << points << endl;
+#ifdef NOSPHERA2_USE_GPU
+	if (use_gpu)
+		sf_gpu_warmup_wait();
+#endif
 	end1 = get_time();
 
 	if (!no_date)
@@ -1843,8 +1847,8 @@ void calc_SF(const int& points,
 		else
 			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
 	}
-#ifdef NOSPHERA2_USE_CUDA
-	if (use_gpu && sf_cuda_available()) {
+#ifdef NOSPHERA2_USE_GPU
+	if (use_gpu && sf_gpu_available()) {
 		ivec offs(imax + 1, 0);
 		for (int i = 0; i < imax; i++)
 			offs[i + 1] = offs[i] + (int)dens[i].size();
@@ -1857,13 +1861,12 @@ void calc_SF(const int& points,
 				fd3[lo + p] = d3[i][p]; fde[lo + p] = dens[i][p];
 			}
 		}
-		vec sr((size_t)imax * smax), si((size_t)imax * smax);
-		if (sf_cuda_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
+		std::vector<double*> rows(imax);
+		for (int i = 0; i < imax; i++)
+			rows[i] = reinterpret_cast<double*>(sf[i].data());
+		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
 			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
-			sr.data(), si.data())) {
-			for (int i = 0; i < imax; i++)
-				for (long long s2 = 0; s2 < smax; s2++)
-					sf[i][s2] = cdouble(sr[(size_t)i * smax + s2], si[(size_t)i * smax + s2]);
+			rows.data())) {
 			//The bar is what the reference logs expect, so draw it even though the work is done
 			if (!do_XCW) {
 				ProgressBar gprogress(imax, 60, "=", " ", "Calculating Scattering Factors", file);
@@ -1872,8 +1875,8 @@ void calc_SF(const int& points,
 			}
 			if (!no_date) {
 				_time_point gend = get_time();
-				const int ratio = sf_cuda_fp64_ratio();
-				file << "Fourier transform on GPU: " << get_msec(end1, gend) << " ms ("
+				const int ratio = sf_gpu_fp64_ratio();
+				file << "Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
 				     << (ratio > 4 ? "reduced-argument f32 sincos" : "f64 sincos")
 				     << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
 			}
@@ -2430,6 +2433,10 @@ itsc_block calculate_scattering_factors_from_cube(
 	vector<_time_point> time_points;
 	vector<string> time_descriptions;
 	time_points.push_back(get_time());
+#ifdef NOSPHERA2_USE_GPU
+	if (opt.use_gpu)
+		sf_gpu_warmup_start();
+#endif
 
 	cell unit_cell(opt.cif, file, opt.debug);
 	ifstream cif_input(opt.cif.c_str(), ios::in);
@@ -2598,6 +2605,10 @@ tsc_block_type calculate_scattering_factors(
 	salted_part_prep* prep_out
 ) {
 	using namespace std;
+#ifdef NOSPHERA2_USE_GPU
+	if (opt.use_gpu)
+		sf_gpu_warmup_start();
+#endif
 	int nat = 0;
 	WFN* wavy = NULL;
 	if constexpr (std::is_same_v<calculator_type, std::vector<WFN> &>) {

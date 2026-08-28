@@ -19,8 +19,12 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
 )
 
-if(NOSPHERA2_USE_CUDA)
-    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/sf_cuda.cu")
+#One source, two languages: nvcc takes it as CUDA, hipcc as HIP
+if(NOSPHERA2_USE_CUDA OR NOSPHERA2_USE_HIP)
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu")
+    if(NOSPHERA2_USE_HIP)
+        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu" PROPERTIES LANGUAGE HIP)
+    endif()
 endif()
 
 #Basis Set Generator:
@@ -110,8 +114,14 @@ target_compile_definitions(
 )
 
 if(NOSPHERA2_USE_CUDA)
-    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_CUDA)
+    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_CUDA)
     set_target_properties(NoSpherA2Core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+endif()
+
+if(NOSPHERA2_USE_HIP)
+    find_package(hip REQUIRED)
+    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_HIP)
+    target_link_libraries(NoSpherA2Core PRIVATE hip::device)
 endif()
 
 target_compile_features(
