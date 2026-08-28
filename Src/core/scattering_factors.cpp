@@ -1864,6 +1864,12 @@ void calc_SF(const int& points,
 			for (int i = 0; i < imax; i++)
 				for (long long s2 = 0; s2 < smax; s2++)
 					sf[i][s2] = cdouble(sr[(size_t)i * smax + s2], si[(size_t)i * smax + s2]);
+			//The bar is what the reference logs expect, so draw it even though the work is done
+			if (!do_XCW) {
+				ProgressBar gprogress(imax, 60, "=", " ", "Calculating Scattering Factors", file);
+				for (int i = 0; i < imax; i++)
+					gprogress.update();
+			}
 			if (!no_date) {
 				_time_point gend = get_time();
 				const int ratio = sf_cuda_fp64_ratio();
