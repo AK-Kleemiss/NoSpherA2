@@ -545,6 +545,9 @@ std::string help_message =
  "  -no_gpu                            Keep the scattering-factor Fourier\n"
  "                                    transform on the CPU. It runs on the GPU\n"
  "                                    when one is present and the problem fits.\n"
+ "  -gpu_itensor                       Run the XCW I tensor contractions on the GPU\n"
+ "                                    in single precision. Off by default: it moves\n"
+ "                                    the total energy in the ninth decimal.\n"
  "  -gpu_fp64                          Keep the double-precision sincos on the\n"
  "                                    GPU. Cards that report a wide fp32:fp64\n"
  "                                    gap otherwise use a single-precision\n"
@@ -3338,6 +3341,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         use_gpu = false;
     else if (temp == "-gpu_fp64")
         gpu_fp64 = true;
+    else if (temp == "-gpu_itensor")
+        gpu_itensor = true;
     else if (temp == "-fukui" || temp == "-Fukui")
         properties.fukui = true;
     else if (temp == "-fukui_analysis")

@@ -792,6 +792,9 @@ struct options
     bool use_gpu = true;
     //-gpu_fp64 keeps the double sincos on a card that would otherwise pick the fp32 one
     bool gpu_fp64 = false;
+    //-gpu_itensor runs the XCW I tensor GEMMs on the device in single precision. Off by
+    //default: it shifts the total energy in the ninth decimal, which reference logs carry
+    bool gpu_itensor = false;
     //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
     bool fukui_analysis_run = false;
     bool profiling = false;

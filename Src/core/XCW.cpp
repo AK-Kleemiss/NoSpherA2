@@ -1,5 +1,8 @@
 #include "pch.h"
 #include "XCW.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "itensor_gpu.h"
+#endif
 #include "convenience.h"
 #include "scattering_factors.h"
 #include "nos_math.h"
@@ -1481,6 +1484,88 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			screen_counter += skip[mu][nu];
 		}
 	}
+	bool itensor_on_gpu = false;
+#ifdef NOSPHERA2_USE_GPU
+	if (opt->gpu_itensor) {
+		//Flatten what the device needs: the AO values never change with the reflection,
+		//so they are uploaded once and every reflection reuses them.
+		ivec bg, bps, bpc, bna, goff(n_atom_grids + 1, 0);
+		std::vector<long long> bao, baos;
+		std::vector<float> ao_all;
+		ivec aos_all;
+		for (int gg = 0; gg < n_atom_grids; gg++) goff[gg + 1] = goff[gg] + points[gg];
+		for (int gg = 0; gg < n_atom_grids; gg++) {
+			for (const GridBlock& blkk : grid_blocks[gg]) {
+				bg.push_back(gg);
+				bps.push_back(blkk.point_start);
+				bpc.push_back(blkk.point_count);
+				bna.push_back(static_cast<int>(blkk.active_aos.size()));
+				bao.push_back(static_cast<long long>(ao_all.size()));
+				baos.push_back(static_cast<long long>(aos_all.size()));
+				ao_all.insert(ao_all.end(), blkk.ao_values.begin(), blkk.ao_values.end());
+				aos_all.insert(aos_all.end(), blkk.active_aos.begin(), blkk.active_aos.end());
+			}
+		}
+		std::vector<unsigned char> skip_flat(static_cast<size_t>(cryst.nmo) * cryst.nmo, 0);
+		for (int m = 0; m < cryst.nmo; m++)
+			for (int n = 0; n < cryst.nmo; n++)
+				skip_flat[static_cast<size_t>(m) * cryst.nmo + n] = skip[m][n] ? 1 : 0;
+		vec fd1, fd2, fd3, fw;
+		for (int gg = 0; gg < n_atom_grids; gg++) {
+			fd1.insert(fd1.end(), d1[gg].begin(), d1[gg].begin() + points[gg]);
+			fd2.insert(fd2.end(), d2[gg].begin(), d2[gg].begin() + points[gg]);
+			fd3.insert(fd3.end(), d3[gg].begin(), d3[gg].begin() + points[gg]);
+			fw.insert(fw.end(), weights[gg].begin(), weights[gg].begin() + points[gg]);
+		}
+		itensor_gpu_layout L;
+		L.nmo = cryst.nmo; L.packed = packed_size; L.n_grids = n_atom_grids;
+		L.n_blocks = static_cast<int>(bg.size());
+		L.blk_grid = bg.data(); L.blk_point_start = bps.data(); L.blk_point_count = bpc.data();
+		L.blk_n_active = bna.data(); L.blk_ao_off = bao.data(); L.blk_aos_off = baos.data();
+		L.ao_all = ao_all.data(); L.ao_all_len = static_cast<long long>(ao_all.size());
+		L.aos_all = aos_all.data(); L.aos_all_len = static_cast<long long>(aos_all.size());
+		L.skip = skip_flat.data(); L.grid_point_off = goff.data();
+		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
+		L.n_points = static_cast<long long>(fd1.size());
+		itensor_on_gpu = itensor_gpu_init(L);
+		if (!itensor_on_gpu)
+			std::cout << "I tensor GPU path unavailable, using the CPU loop" << std::endl;
+	}
+	if (itensor_on_gpu) {
+		//The GPU holds one reflection at a time, so this loop is sequential by design
+		cvec blk_gpu;
+		if (i_streamed_) blk_gpu.assign(packed_size, cdouble{});
+		vec kxs(num_syms), kys(num_syms), kzs(num_syms);
+		cvec facs(static_cast<size_t>(num_syms) * n_atom_grids);
+		for (int rr = 0; rr < cryst.nr_small; rr++) {
+			for (int sy = 0; sy < static_cast<int>(num_syms); sy++) {
+				kxs[sy] = k_pt[0][asym_lookup[rr][sy]];
+				kys[sy] = k_pt[1][asym_lookup[rr][sy]];
+				kzs[sy] = k_pt[2][asym_lookup[rr][sy]];
+				for (int gg = 0; gg < n_atom_grids; gg++)
+					facs[static_cast<size_t>(sy) * n_atom_grids + gg] =
+						asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
+						* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
+			}
+			cdouble* const I_rr = i_streamed_ ? blk_gpu.data()
+			                                  : I.data() + static_cast<size_t>(rr) * packed_size;
+			if (i_streamed_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
+			if (!itensor_gpu_reflection(static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data(), I_rr))
+				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
+			if (i_streamed_) i_file_.write_block(rr, blk_gpu.data());
+			if (!(opt->no_date) && pb) pb->update();
+		}
+		itensor_gpu_free();
+		//The same count the CPU loop accumulates, without walking the pairs per reflection
+		long long per_r = 0;
+		for (int m = 0; m < cryst.nmo; m++)
+			for (int n = m; n < cryst.nmo; n++)
+				if (!skip[m][n]) per_r += skipped_grids_per_pair[tri_index(m, n)];
+		skipped_grids += static_cast<long long>(cryst.nr_small) * num_syms * per_r;
+	}
+#endif
+	if (!itensor_on_gpu)
+	{
 #pragma omp parallel reduction(+:skipped_grids)
 	{
 		vec2 single_k_pts(num_syms, vec(3));
@@ -1612,6 +1697,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				pb->update();
 			}
 		}
+	}
 	}
 	if (i_streamed_) {
 		i_file_.finish_write();
