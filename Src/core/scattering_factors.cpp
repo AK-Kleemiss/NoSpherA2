@@ -1866,7 +1866,10 @@ void calc_SF(const int& points,
 					sf[i][s2] = cdouble(sr[(size_t)i * smax + s2], si[(size_t)i * smax + s2]);
 			if (!no_date) {
 				_time_point gend = get_time();
-				file << "Fourier transform on GPU: " << get_msec(end1, gend) << " ms" << std::endl;
+				const int ratio = sf_cuda_fp64_ratio();
+				file << "Fourier transform on GPU: " << get_msec(end1, gend) << " ms ("
+				     << (ratio > 4 ? "reduced-argument f32 sincos" : "f64 sincos")
+				     << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
 			}
 			return;
 		}

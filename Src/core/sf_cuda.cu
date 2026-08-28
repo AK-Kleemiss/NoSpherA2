@@ -1,47 +1,65 @@
 #include "sf_cuda.h"
 #include <cuda_runtime.h>
 #include <cstdio>
-#include <vector>
 
-//One block per k-point; threads in the block split that atom's grid points and reduce
+//Each block owns a tile of k-points for one atom and streams that atom's grid points
+//through shared memory. F32 selects the reduced-argument single-precision sincos, which
+//consumer cards run 32-64x faster than the double one; the phase itself stays double.
+#define SF_TILE_K 128
+#define SF_CHUNK 256
+#define SF_TWO_PI 6.283185307179586476925286766559
+#define SF_INV_TWO_PI 0.15915494309189533576888376337251
+
+template <bool F32>
 __global__ void sf_kernel(const int imax, const long long smax,
 	const double* __restrict__ k1, const double* __restrict__ k2, const double* __restrict__ k3,
 	const double* __restrict__ d1, const double* __restrict__ d2, const double* __restrict__ d3,
 	const double* __restrict__ dens, const int* __restrict__ offs,
 	double* __restrict__ sf_re, double* __restrict__ sf_im)
 {
-	const long long s = blockIdx.x;
-	if (s >= smax) return;
-	const double kx = k1[s], ky = k2[s], kz = k3[s];
-	extern __shared__ double sh[];
-	double* sh_re = sh;
-	double* sh_im = sh + blockDim.x;
-	for (int i = 0; i < imax; i++) {
-		const int lo = offs[i], hi = offs[i + 1];
-		double re = 0.0, im = 0.0;
-		for (int p = lo + threadIdx.x; p < hi; p += blockDim.x) {
-			const double w = kx * d1[p] + ky * d2[p] + kz * d3[p];
-			double si, co;
-			sincos(w, &si, &co);
-			const double r = dens[p];
-			re += r * co;
-			im += r * si;
+	__shared__ double s1[SF_CHUNK], s2[SF_CHUNK], s3[SF_CHUNK], sd[SF_CHUNK];
+	const int ia = blockIdx.y;
+	const long long s = (long long)blockIdx.x * SF_TILE_K + threadIdx.x;
+	const bool live = (s < smax);
+	const double kx = live ? k1[s] : 0.0;
+	const double ky = live ? k2[s] : 0.0;
+	const double kz = live ? k3[s] : 0.0;
+	double re = 0.0, im = 0.0;
+	const int lo = offs[ia], hi = offs[ia + 1];
+	for (int base = lo; base < hi; base += SF_CHUNK) {
+		const int n = min(SF_CHUNK, hi - base);
+		for (int t = threadIdx.x; t < n; t += blockDim.x) {
+			s1[t] = d1[base + t];
+			s2[t] = d2[base + t];
+			s3[t] = d3[base + t];
+			sd[t] = dens[base + t];
 		}
-		sh_re[threadIdx.x] = re;
-		sh_im[threadIdx.x] = im;
 		__syncthreads();
-		for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-			if (threadIdx.x < stride) {
-				sh_re[threadIdx.x] += sh_re[threadIdx.x + stride];
-				sh_im[threadIdx.x] += sh_im[threadIdx.x + stride];
+		if (live) {
+			for (int p = 0; p < n; p++) {
+				const double w = kx * s1[p] + ky * s2[p] + kz * s3[p];
+				const double r = sd[p];
+				if (F32) {
+					//Reduce in double first: sinf/cosf of a large argument is meaningless
+					const double wr = w - SF_TWO_PI * floor(w * SF_INV_TWO_PI + 0.5);
+					float sif, cof;
+					sincosf((float)wr, &sif, &cof);
+					re += r * (double)cof;
+					im += r * (double)sif;
+				}
+				else {
+					double si, co;
+					sincos(w, &si, &co);
+					re += r * co;
+					im += r * si;
+				}
 			}
-			__syncthreads();
-		}
-		if (threadIdx.x == 0) {
-			sf_re[(long long)i * smax + s] = sh_re[0];
-			sf_im[(long long)i * smax + s] = sh_im[0];
 		}
 		__syncthreads();
+	}
+	if (live) {
+		sf_re[(long long)ia * smax + s] = re;
+		sf_im[(long long)ia * smax + s] = im;
 	}
 }
 
@@ -49,6 +67,16 @@ bool sf_cuda_available()
 {
 	int n = 0;
 	return cudaGetDeviceCount(&n) == cudaSuccess && n > 0;
+}
+
+//Single-to-double throughput ratio as the driver reports it: 2 on datacentre parts,
+//32 or 64 on consumer ones. Above the threshold the double sincos is not worth paying for.
+int sf_cuda_fp64_ratio()
+{
+	int dev = 0, ratio = 0;
+	if (cudaGetDevice(&dev) != cudaSuccess) return 0;
+	if (cudaDeviceGetAttribute(&ratio, cudaDevAttrSingleToDoublePrecisionPerfRatio, dev) != cudaSuccess) return 0;
+	return ratio;
 }
 
 #define CUDA_TRY(call) do { const cudaError_t e_ = (call); if (e_ != cudaSuccess) { \
@@ -59,7 +87,7 @@ bool sf_cuda_run(const int imax, const long long smax,
 	const double* k1, const double* k2, const double* k3,
 	const double* d1, const double* d2, const double* d3,
 	const double* dens, const int* offs, const long long total_points,
-	double* sf_re, double* sf_im)
+	double* sf_re, double* sf_im, const bool force_fp64)
 {
 	const size_t pts = sizeof(double) * (size_t)total_points;
 	const size_t kb = sizeof(double) * (size_t)smax;
@@ -83,9 +111,13 @@ bool sf_cuda_run(const int imax, const long long smax,
 	CUDA_TRY(cudaMemcpy(dd3, d3, pts, cudaMemcpyHostToDevice));
 	CUDA_TRY(cudaMemcpy(dde, dens, pts, cudaMemcpyHostToDevice));
 	CUDA_TRY(cudaMemcpy(dof, offs, sizeof(int) * (size_t)(imax + 1), cudaMemcpyHostToDevice));
-	const int threads = 256;
-	const size_t shmem = sizeof(double) * 2 * threads;
-	sf_kernel<<<(unsigned int)smax, threads, shmem>>>(imax, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dsr, dsi);
+	const dim3 grid((unsigned int)((smax + SF_TILE_K - 1) / SF_TILE_K), (unsigned int)imax);
+	const int ratio = sf_cuda_fp64_ratio();
+	const bool f32 = !force_fp64 && ratio > 4;
+	if (f32)
+		sf_kernel<true><<<grid, SF_TILE_K>>>(imax, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dsr, dsi);
+	else
+		sf_kernel<false><<<grid, SF_TILE_K>>>(imax, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dsr, dsi);
 	CUDA_TRY(cudaGetLastError());
 	CUDA_TRY(cudaDeviceSynchronize());
 	CUDA_TRY(cudaMemcpy(sf_re, dsr, out, cudaMemcpyDeviceToHost));
