@@ -209,7 +209,33 @@ Rules:
 - **Check the physics before the clock.** The first I tensor kernel ran 11x faster and
   was completely wrong (GooF 69.1 against 4.665). Diff the science first, every time.
 - **A path the hardware never selects is a path no test covers.** Give every branch a
-  switch that forces it - `-gpu_fp64`, `NOSPHERA2_GPU_BATCH` - or it rots unnoticed.
+  switch that forces it - `-gpu_fp64`, `-gpu_fp32`, `NOSPHERA2_GPU_BATCH`,
+  `NOSPHERA2_GRID_LOCAL`, `NOSPHERA2_BLAS_GPU_MIN_FLOP` - or it rots unnoticed. Two paths
+  had already rotted when this rule was written down: `sucrose_SF_gpu_grid` passed for a
+  session while its kernel failed and fell back to the CPU, because a silent fallback
+  reproduces the CPU reference exactly, and `blas_gpu_dgemm` shipped reached by no test at
+  all because its size gate is above anything in the test data.
+
+### Use `-gflops` before optimising anything
+
+`-gflops` reports achieved GFLOP/s per stage for both the CPU and GPU paths, the host
+thread count, and the slowest single call in each row. Each of those three exists because
+something was got wrong without it:
+
+- **The rate** stops a threshold calibrated on one card being trusted on another. A V100
+  runs fp64 at half rate; this laptop's card at a sixty-fourth.
+- **The thread count** because a CPU row that looks like slow hardware is usually a thread
+  count of one. Every Linux build was single-threaded until 29 Aug 2026 and nobody noticed,
+  because an ignored `#pragma omp` is legal and warns about nothing.
+- **The slowest call** because creating the device context costs ~95 ms and lands inside
+  whichever call touches the GPU first. That has twice been mistaken for a slow kernel -
+  once reported as 63 ms of transfers that were really 2.4, and once as SALTED losing to
+  the host 2.5x when per steady-state call it was winning 4.5x.
+
+Measure before and after, in the same sitting, best of three. A speedup is a ratio, and the
+denominator deserves as much suspicion as the numerator: the "20x faster XCW on the
+cluster" that stood for several hours was a correct GPU measurement divided by a CPU
+baseline that was accidentally serial. The honest figure was 1.68x.
 
 Where a kernel deliberately trades precision for speed, the trade must be stated with its
 measured cost, not left implicit. The current paths, all measured on real workloads:
