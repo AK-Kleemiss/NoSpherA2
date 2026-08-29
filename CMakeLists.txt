@@ -12,6 +12,9 @@ option(NOSPHERA2_USE_HIP "Build the HIP (AMD) scattering-factor path" OFF)
 option(NOSPHERA2_GPU_AUTO "Pick the GPU backend from the hardware present" ON)
 #For a binary that will be copied to other machines rather than run where it was built.
 option(NOSPHERA2_CUDA_PORTABLE "Build CUDA code for every major architecture, not just this card" OFF)
+#CUTLASS runs the I tensor GEMM at cuBLAS speed against the built-in kernel's ~57%. Off
+#turns that call site back over to the built-in one, which is also what a HIP build uses.
+option(NOSPHERA2_USE_CUTLASS "Use CUTLASS for the I tensor GEMM (CUDA only)" ON)
 
 #Detection may switch a backend on, never off, and only runs while neither is already on.
 #Both halves are load-bearing. It has to re-decide rather than skip once the variables exist,
@@ -122,6 +125,27 @@ if(NOSPHERA2_USE_CUDA)
         #and the GEMMs that used it are ours now, so the binary imports no DLL that a
         #machine without CUDA could fail to provide.
         message(STATUS "CUDA enabled, arch ${CMAKE_CUDA_ARCHITECTURES}")
+
+        #CUTLASS supplies the I tensor's GEMM, which is the only device GEMM on a hot path.
+        #Headers only: SOURCE_SUBDIR names a directory that does not exist so that
+        #MakeAvailable populates without configuring CUTLASS's own build, which would bring
+        #its tests, examples and profiler with it. Nothing is linked and nothing ships - it
+        #compiles into this binary, so it does not reintroduce a runtime dependency.
+        if(NOSPHERA2_USE_CUTLASS)
+            include(FetchContent)
+            FetchContent_Declare(cutlass
+                URL https://github.com/NVIDIA/cutlass/archive/refs/tags/v4.7.1.tar.gz
+                SOURCE_SUBDIR headers-only-no-build)
+            FetchContent_MakeAvailable(cutlass)
+            if(EXISTS "${cutlass_SOURCE_DIR}/include/cutlass/cutlass.h")
+                set(NOSPHERA2_CUTLASS_INCLUDE "${cutlass_SOURCE_DIR}/include"
+                    CACHE INTERNAL "CUTLASS headers")
+                message(STATUS "CUTLASS enabled from ${cutlass_SOURCE_DIR}")
+            else()
+                message(WARNING "CUTLASS was fetched but its headers are missing; "
+                                "the I tensor falls back to the built-in GEMM")
+            endif()
+        endif()
     elseif(_nosphera2_gpu_auto_enabled)
         message(STATUS "NVIDIA GPU present but no CUDA compiler found; building for the CPU")
         set(NOSPHERA2_USE_CUDA OFF)

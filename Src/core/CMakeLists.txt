@@ -121,6 +121,19 @@ if(NOSPHERA2_USE_CUDA)
     target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_CUDA)
     set_target_properties(NoSpherA2Core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     #No cuBLAS to link, delay-load, probe for or ship: the GEMMs are ours. cudart is static.
+    if(NOSPHERA2_CUTLASS_INCLUDE)
+        target_include_directories(NoSpherA2Core SYSTEM PRIVATE "${NOSPHERA2_CUTLASS_INCLUDE}")
+        target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_HAVE_CUTLASS)
+        #CUTLASS pulls in cuda/std, which refuses to compile under MSVC's traditional
+        #preprocessor, and calls constexpr host functions from host-device ones.
+        target_compile_options(NoSpherA2Core PRIVATE
+            $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
+            $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=20013,20015>)
+        if(MSVC)
+            target_compile_options(NoSpherA2Core PRIVATE
+                $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>)
+        endif()
+    endif()
 endif()
 
 if(NOSPHERA2_USE_HIP)

@@ -1,6 +1,6 @@
 #include "itensor_gpu.h"
 #include "gpu_backend.h"
-#include "gemm_gpu.cuh"
+#include "itensor_gemm.cuh"
 #include "throughput.h"
 #include <cstdio>
 #include <iostream>
@@ -35,7 +35,7 @@ struct Dev {
 	//imaginary half is simply the next na columns of the same column-major matrix.
 	T* wri = nullptr;
 	T* cri = nullptr;
-	T* gemm_ws = nullptr;   //split-k partials for the GEMM
+	void* gemm_ws = nullptr;   //split-k partials, whichever GEMM is compiled in
 	double* I_re = nullptr;
 	double* I_im = nullptr;
 	//Host copies of the small layout arrays, so the loop stays on the host
@@ -162,15 +162,15 @@ bool init_impl(const itensor_gpu_layout& L)
 {
 	Dev<T>& d = g<T>;
 	int max_na = 0;
-	long long max_elems = 0, max_ws = 0;
+	long long max_elems = 0;
+	size_t max_ws = 0;
 	for (int b = 0; b < L.n_blocks; b++) {
 		const int na = L.blk_n_active[b];
 		const int np = L.blk_point_count[b];
 		max_na = std::max(max_na, na);
 		//long long: active AOs times points passes 2^31 on a protein-sized grid
 		max_elems = std::max(max_elems, (long long)na * np);
-		const int splits = gemm_gpu::split_count(na, 2 * na, np);
-		max_ws = std::max(max_ws, (long long)gemm_gpu::workspace_elems(na, 2 * na, splits));
+		max_ws = std::max(max_ws, itensor_gemm::workspace_bytes<T>(na, 2 * na, np));
 	}
 
 	//Block count and shape spread, which is what says whether batching across blocks
@@ -201,7 +201,7 @@ bool init_impl(const itensor_gpu_layout& L)
 		sizeof(T) * 2 * (size_t)L.n_points +
 		sizeof(T) * 2 * (size_t)max_elems +
 		sizeof(T) * 2 * (size_t)max_na * max_na +
-		sizeof(T) * (size_t)max_ws +
+		max_ws +
 		sizeof(double) * 2 * (size_t)L.packed;
 	size_t freeb = 0, totalb = 0;
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
@@ -218,7 +218,7 @@ bool init_impl(const itensor_gpu_layout& L)
 	GPU_TRY(gpuMalloc(&d.phase_im, sizeof(T) * (size_t)L.n_points));
 	GPU_TRY(gpuMalloc(&d.wri, sizeof(T) * (size_t)max_elems * 2));
 	GPU_TRY(gpuMalloc(&d.cri, sizeof(T) * (size_t)max_na * max_na * 2));
-	GPU_TRY(gpuMalloc(&d.gemm_ws, sizeof(T) * (size_t)max_ws));
+	GPU_TRY(gpuMalloc(&d.gemm_ws, max_ws ? max_ws : 1));
 	GPU_TRY(gpuMalloc(&d.I_re, sizeof(double) * (size_t)L.packed));
 	GPU_TRY(gpuMalloc(&d.I_im, sizeof(double) * (size_t)L.packed));
 
@@ -275,8 +275,8 @@ bool reflection_impl(const int num_syms,
 			//C = A * W^T, both row-major n_active x np, i.e. column-major np x n_active.
 			//One GEMM of width 2na, not two of width na: A is shared and the shape is thin
 			//enough to be limited by reading the operands, so widening raises flops per byte.
-			gemm_gpu::launch<T>(true, false, na, 2 * na, np,
-				(T)1, d.ao + d.blk_ao_off[b], np, d.wri, np, (T)0, d.cri, na, d.gemm_ws);
+			itensor_gemm::run<T>(na, 2 * na, np,
+				d.ao + d.blk_ao_off[b], np, d.wri, np, d.cri, na, d.gemm_ws);
 			const dim3 thr(16, 16);
 			const dim3 blk((na + 15) / 16, (na + 15) / 16);
 			accumulate_kernel<T><<<blk, thr>>>(na, d.nmo, d.blk_aos_off[b], d.aos, d.skip,
