@@ -48,8 +48,12 @@ namespace gemm_gpu {
 //of not shipping half a gigabyte, and against the host it is still 11x on the 3090 and
 //2.4x on the 2080 Ti.
 //
-//The untried lead is double-buffering the staged tile: there is a __syncthreads() per depth
-//step with nothing prefetched behind it, so every warp waits on the load it just issued.
+//The depth tile is prefetched (see the kernel), which was the leading candidate for that
+//gap and turned out not to be it: +2.6% on sm_89 and +2.8% on sm_75. Consistent in
+//direction on two architectures so it stays, but latency hiding is plainly not what
+//separates this from cuBLAS. Untried: vectorised shared loads, which would cut the inner
+//loop's load count fourfold and is the remaining structural difference. A wider tile is
+//not the answer here - m is about 100, so a 128-wide tile would waste half its work.
 struct tile_config { int BM, BN, BK, TM, TN; };
 constexpr tile_config TILE{64, 64, 32, 4, 4};
 
@@ -92,22 +96,44 @@ __global__ void gemm_partial_kernel(const int m, const int n, const int k, const
 	for (int a = 0; a < TM; a++)
 		for (int b = 0; b < TN; b++) acc[a][b] = T(0);
 
-	for (int kt = k0; kt < k1; kt += BK) {
-		for (int idx = tid; idx < BK * BM; idx += NTHREADS) {
-			const int l = idx / BM;
-			const int i = idx % BM;
-			const int gi = blockIdx.y * BM + i;
-			const int gl = kt + l;
-			As[l][i] = (gi < m && gl < k1) ? a_at<T, TA>(A, lda, gi, gl) : T(0);
+	//The next depth tile is fetched into registers before the current one is multiplied, so
+	//the global load is in flight across the arithmetic instead of being waited on straight
+	//after it is issued. Registers rather than a second shared buffer because at this tile
+	//size two fp64 buffers come to 64 KB, over the 48 KB a block may declare statically.
+	constexpr int AREG = (BK * BM) / NTHREADS;
+	constexpr int BREG = (BK * BN) / NTHREADS;
+	T ra[AREG], rb[BREG];
+
+	const auto fetch = [&](const int kt) {
+		for (int r = 0; r < AREG; r++) {
+			const int idx = tid + r * NTHREADS;
+			const int gi = blockIdx.y * BM + idx % BM;
+			const int gl = kt + idx / BM;
+			ra[r] = (gi < m && gl < k1) ? a_at<T, TA>(A, lda, gi, gl) : T(0);
 		}
-		for (int idx = tid; idx < BK * BN; idx += NTHREADS) {
-			const int l = idx / BN;
-			const int j = idx % BN;
-			const int gj = blockIdx.x * BN + j;
-			const int gl = kt + l;
-			Bs[l][j] = (gj < n && gl < k1) ? b_at<T, TB>(B, ldb, gl, gj) : T(0);
+		for (int r = 0; r < BREG; r++) {
+			const int idx = tid + r * NTHREADS;
+			const int gj = blockIdx.x * BN + idx % BN;
+			const int gl = kt + idx / BN;
+			rb[r] = (gj < n && gl < k1) ? b_at<T, TB>(B, ldb, gl, gj) : T(0);
+		}
+	};
+
+	fetch(k0);
+	for (int kt = k0; kt < k1; kt += BK) {
+		//Everyone must be done reading the tile before it is overwritten
+		__syncthreads();
+		for (int r = 0; r < AREG; r++) {
+			const int idx = tid + r * NTHREADS;
+			As[idx / BM][idx % BM] = ra[r];
+		}
+		for (int r = 0; r < BREG; r++) {
+			const int idx = tid + r * NTHREADS;
+			Bs[idx / BN][idx % BN] = rb[r];
 		}
 		__syncthreads();
+
+		if (kt + BK < k1) fetch(kt + BK);
 
 		for (int l = 0; l < BK; l++) {
 			T av[TM], bv[TN];
@@ -116,7 +142,6 @@ __global__ void gemm_partial_kernel(const int m, const int n, const int k, const
 			for (int a = 0; a < TM; a++)
 				for (int b = 0; b < TN; b++) acc[a][b] += av[a] * bv[b];
 		}
-		__syncthreads();
 	}
 
 	T* Pz = P + (long long)z * m * n;
