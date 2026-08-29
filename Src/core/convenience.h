@@ -802,9 +802,10 @@ struct options
     //a run uses depends on the card, so neither path can be pinned. -gpu_fp64 wins if both
     //are given, the accurate path being the safer thing to fall back to.
     bool gpu_fp32 = false;
-    //-gpu_itensor runs the XCW I tensor GEMMs on the device in single precision. Off by
-    //default: it shifts the total energy in the ninth decimal, which reference logs carry
-    bool gpu_itensor = false;
+    //-no_gpu_itensor keeps the XCW I tensor GEMMs on the CPU. On by default: it is much the
+    //largest of the device paths, and it moves the total energy only in the tenth
+    //significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
+    bool gpu_itensor = true;
     //-gpu_salted runs the SALTED descriptor combination on the device
     bool gpu_salted = false;
     //-gpu_grid runs the Becke/TFVC integration weights on the device

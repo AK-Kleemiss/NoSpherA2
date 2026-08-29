@@ -308,6 +308,13 @@ rgbi_basis = "ano"
 # far fewer basis functions, cutting both memory and runtime substantially;
 # this also exercises the STO-3G L-shell fix (see UNIT_TESTS_STATUS.md) as a
 # real regression test, not just a manual smoke test.
+#
+# Every XCW test below pins no_gpu, for the reference output rather than for speed. The I
+# tensor runs on the device by default now, and the device answer differs from the CPU one
+# in the tenth significant figure - enough to change these logs. Left unpinned, each would
+# pass on a machine with no usable GPU and fail on one with a card, which is the same trap
+# the fp32/fp64 tests further down already document. P1_test_XCW_gpu_itensor is the
+# deliberate exception and carries its own reference.
 
 [P1_test_XCW]
 directory = "P1_test"
@@ -315,6 +322,7 @@ good = "P1_test_XCW.good"
 
 [P1_test_XCW.args]
 do_XCW = ""
+no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
@@ -332,6 +340,7 @@ full = true
 
 [P1_test_XCW_full.args]
 do_XCW = ""
+no_gpu = ""
 xcw_gaussian_halt = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
@@ -348,6 +357,7 @@ good = "P1_test_XCW_h2.good"
 
 [P1_test_XCW_h2.args]
 do_XCW = ""
+no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
@@ -369,6 +379,7 @@ full = true
 
 [P1_test_XCW_h2_full.args]
 do_XCW = ""
+no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
@@ -383,6 +394,7 @@ good = "P1_F2_test_XCW.good"
 
 [P1_F2_test_XCW.args]
 do_XCW = ""
+no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
@@ -396,6 +408,7 @@ full = true
 
 [P1_F2_test_XCW_full.args]
 do_XCW = ""
+no_gpu = ""
 xcw_gaussian_halt = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
@@ -412,6 +425,7 @@ good = "P1_F2_test_XCW_h2.good"
 [P1_F2_test_XCW_h2.args]
 
 do_XCW = ""
+no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
@@ -425,6 +439,7 @@ full = true
 
 [P1_F2_test_XCW_h2_full.args]
 do_XCW = ""
+no_gpu = ""
 xcw_gaussian_halt = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
