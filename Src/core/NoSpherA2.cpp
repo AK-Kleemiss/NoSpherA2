@@ -15,6 +15,7 @@
 #include "grid_gpu.h"
 #include "sf_gpu.h"
 #include "blas_gpu.h"
+#include "cublas_dynamic.h"
 #include "SALTED_equicomb.h"
 #endif
 
@@ -91,6 +92,7 @@ static int run_app_impl(int argc, char **argv)
     grid_gpu_set_enabled(opt.gpu_grid);
     blas_gpu_set_enabled(opt.gpu_blas);
     equicomb_set_gpu(opt.gpu_salted);
+    cublas_dynamic_set_enabled(opt.gpu_cublas);
     //Started here so context creation overlaps the file reading rather than landing inside
     //whichever kernel runs first.
     if (opt.use_gpu || opt.gpu_grid || opt.gpu_salted || opt.gpu_itensor || opt.gpu_blas)

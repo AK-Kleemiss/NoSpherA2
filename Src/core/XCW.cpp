@@ -1541,13 +1541,23 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		//asked for rather than detected.
 		const sf_precision iprec = opt->gpu_fp64 ? sf_precision::FP64 : sf_precision::FP32;
 		itensor_on_gpu = itensor_gpu_init(L, iprec);
-		//Say which processor produced the numbers; gated like the other timing lines so
-		//the golden-file tests, which run with no_date, keep their reference output
-		if (!(opt->no_date))
-			std::cout << "GPU in use: XCW I tensor on "
-			          << (itensor_on_gpu ? (opt->gpu_fp64 ? "the device (double-precision GEMM)"
-			                                              : "the device (single-precision GEMM)")
-			                             : "the CPU - device unavailable or problem too large") << std::endl;
+		//Say which processor produced the numbers, and which GEMM: the three do not agree
+		//in the last digits, so a log that does not name one cannot be compared with
+		//another. Gated like the other timing lines so the golden-file tests, which run
+		//with no_date, keep their reference output.
+		//
+		//stderr, not cout, for the reason the shape diagnostic in itensor_gpu.cu gives:
+		//cout is redirected into the log and moved again later in the run, so anything
+		//written here never reached either the terminal or the file.
+		if (!(opt->no_date)) {
+			std::cerr << "GPU in use: XCW I tensor on ";
+			if (itensor_on_gpu)
+				std::cerr << "the device (" << (opt->gpu_fp64 ? "double" : "single")
+				          << "-precision " << itensor_gpu_gemm_name() << " GEMM)";
+			else
+				std::cerr << "the CPU - device unavailable or problem too large";
+			std::cerr << std::endl;
+		}
 	}
 	if (itensor_on_gpu) {
 		//The GPU holds one reflection at a time, so this loop is sequential by design

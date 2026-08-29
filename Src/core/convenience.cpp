@@ -576,6 +576,14 @@ std::string help_message =
  "  -gpu_blas                          Offer large dense matrix products to the\n"
  "                                    device. Small ones stay on the CPU, where\n"
  "                                    they beat what the transfers would allow.\n"
+ "  -gpu_cublas                        Run the I tensor GEMM through cuBLAS when\n"
+ "                                    the machine has it, instead of the built-in\n"
+ "                                    CUTLASS path. Nothing is shipped or linked:\n"
+ "                                    the library is opened by name and ignored if\n"
+ "                                    absent. Worth trying on a datacentre card,\n"
+ "                                    where cuBLAS is still well ahead; on Ada and\n"
+ "                                    Turing the default is level or faster. It is\n"
+ "                                    a different kernel, so the last digits move.\n"
  "\n"
  "  Precision:\n"
  "  -gpu_fp64                          Keep the device in double throughout: the\n"
@@ -3393,6 +3401,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_itensor = true;
     else if (temp == "-no_gpu_itensor")
         gpu_itensor = false;
+    else if (temp == "-gpu_cublas")
+        gpu_cublas = true;
     else if (temp == "-gpu_salted")
         gpu_salted = true;
     else if (temp == "-gpu_grid")

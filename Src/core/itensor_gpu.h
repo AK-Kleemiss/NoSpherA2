@@ -14,6 +14,10 @@
 
 bool itensor_gpu_available();
 
+//Which GEMM the device path will actually use, for the log: the three do not agree in the
+//last digits, so a run says which one produced its numbers.
+const char* itensor_gpu_gemm_name();
+
 struct itensor_gpu_layout {
 	int nmo = 0;
 	int packed = 0;

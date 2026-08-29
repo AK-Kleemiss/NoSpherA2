@@ -120,7 +120,11 @@ target_compile_definitions(
 if(NOSPHERA2_USE_CUDA)
     target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_CUDA)
     set_target_properties(NoSpherA2Core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-    #No cuBLAS to link, delay-load, probe for or ship: the GEMMs are ours. cudart is static.
+    #No cuBLAS to link, delay-load or ship: the GEMMs are ours. cudart is static. cuBLAS can
+    #still be opened by name at run time under -gpu_cublas, which needs no more from the
+    #build than the major version to look for.
+    target_compile_definitions(NoSpherA2Core PRIVATE
+        NOSPHERA2_CUDART_MAJOR=${CUDAToolkit_VERSION_MAJOR})
     if(NOSPHERA2_CUTLASS_INCLUDE)
         target_include_directories(NoSpherA2Core SYSTEM PRIVATE "${NOSPHERA2_CUTLASS_INCLUDE}")
         target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_HAVE_CUTLASS)

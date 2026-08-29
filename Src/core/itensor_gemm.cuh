@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gemm_gpu.cuh"
+#include "cublas_dynamic.h"
 
 //The one GEMM the I tensor performs, behind a name so the implementation can change under
 //it: C = A^T B, column-major, alpha 1, beta 0, with m and n around a hundred and k in the
@@ -29,6 +30,13 @@
 #include "cutlass/cutlass.h"
 #include "cutlass/gemm/device/gemm_splitk_parallel.h"
 #include "cutlass/layout/matrix.h"
+#endif
+
+//Named so a log says which GEMM produced its numbers; they differ in the last digits.
+#if defined(NOSPHERA2_HAVE_CUTLASS)
+#define NOSPHERA2_ITENSOR_GEMM_NAME "CUTLASS"
+#else
+#define NOSPHERA2_ITENSOR_GEMM_NAME "built-in"
 #endif
 
 namespace itensor_gemm {
@@ -67,6 +75,11 @@ template <typename T>
 inline bool run(const int m, const int n, const int k,
 	const T* A, const int lda, const T* B, const int ldb, T* C, const int ldc, void* ws)
 {
+	//-gpu_cublas, and only then. cuBLAS is still ahead on Volta by a wide margin, so it is
+	//worth being able to reach; taking it whenever it happened to be installed would make
+	//the last digits depend on the machine rather than on the input.
+	if (cublas_dynamic_gemm(true, false, m, n, k, T(1), A, lda, B, ldb, T(0), C, ldc))
+		return true;
 	Gemm<T> op;
 	typename Gemm<T>::Arguments args({m, n, k}, {A, lda}, {B, ldb},
 		{C, ldc}, {C, ldc}, {T(1), T(0)}, split_count(k));
@@ -88,6 +101,10 @@ template <typename T>
 inline bool run(const int m, const int n, const int k,
 	const T* A, const int lda, const T* B, const int ldb, T* C, const int ldc, void* ws)
 {
+	//Same order as the CUTLASS build: cuBLAS when asked for and loadable, ours otherwise.
+	//On a HIP build the first call is always false, there being no cuBLAS to open.
+	if (cublas_dynamic_gemm(true, false, m, n, k, T(1), A, lda, B, ldb, T(0), C, ldc))
+		return true;
 	return gemm_gpu::launch<T>(true, false, m, n, k,
 		T(1), A, lda, B, ldb, T(0), C, ldc, static_cast<T*>(ws));
 }

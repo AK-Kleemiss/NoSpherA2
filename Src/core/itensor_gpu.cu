@@ -299,6 +299,11 @@ bool reflection_impl(const int num_syms,
 //Shared with the transform so the "no code for this card" case is diagnosed in one place.
 bool itensor_gpu_available() { return sf_gpu_available(); }
 
+const char* itensor_gpu_gemm_name()
+{
+	return cublas_dynamic_available() ? "cuBLAS" : NOSPHERA2_ITENSOR_GEMM_NAME;
+}
+
 bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec)
 {
 	itensor_gpu_free();
