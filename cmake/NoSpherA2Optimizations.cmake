@@ -75,6 +75,21 @@ function(nosphera2_enable_optimizations target_name)
                 >
         )
 
+        # -fopenmp has to be a compile option on every target, static library included.
+        # It used to sit inside the "not a static library" branch below, next to the link
+        # options where it does not belong: NoSpherA2Core is a static library and holds
+        # every omp pragma in the project, so on Linux they were all compiled away. The
+        # executables got the flag and contain almost no parallel code, which is why this
+        # was invisible. Measured on the cluster before the fix: the scattering-factor
+        # transform ran at 0.5 GFLOP/s against 22.1 on a laptop, and OMP_NUM_THREADS=48 and
+        # =1 gave the same runtime to within a second. MSVC was never affected because
+        # /openmp:experimental above is applied unconditionally.
+        target_compile_options(
+            "${target_name}"
+            PRIVATE
+                $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
+        )
+
         get_target_property(target_type "${target_name}" TYPE)
 
         if(NOT target_type STREQUAL "STATIC_LIBRARY")
@@ -98,13 +113,10 @@ function(nosphera2_enable_optimizations target_name)
                         $<$<CONFIG:Release>:
                             LINKER:--gc-sections
                         >
+                        # Linking the runtime is the half that genuinely only applies to
+                        # things that get linked; the compile flag moved out of here.
+                        -fopenmp
                 )
-                target_compile_options(
-                    "${target_name}"
-                    PRIVATE
-                        $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
-                )
-                
             endif()
         endif()
     endif()

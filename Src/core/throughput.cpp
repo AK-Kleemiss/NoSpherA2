@@ -82,6 +82,24 @@ void report(std::ostream& out)
     }
 
     out << "\n\n------------------------- Arithmetic throughput -------------------------\n";
+    //The thread count belongs beside the rates, because a CPU row that looks like bad
+    //hardware is usually a thread count of one. On the AKL cluster this stage measured the
+    //same to a second at OMP_NUM_THREADS=48 and =1, which is only possible if neither was
+    //believed - two configurations that should differ by a factor of forty-eight did not
+    //differ at all. Asking the runtime what it actually got turns that from a puzzle into a
+    //line of output.
+#ifdef _OPENMP
+    int actual = 1;
+#pragma omp parallel
+    {
+#pragma omp single
+        actual = omp_get_num_threads();
+    }
+    out << "host threads: " << actual << " in a parallel region, omp_get_max_threads() = "
+        << omp_get_max_threads() << "\n";
+#else
+    out << "host threads: built without OpenMP\n";
+#endif
     out << std::left << std::setw(34) << "stage" << std::setw(6) << "where"
         << std::right << std::setw(8) << "calls" << std::setw(12) << "time/ms"
         << std::setw(12) << "GFLOP" << std::setw(12) << "GFLOP/s" << "\n";
