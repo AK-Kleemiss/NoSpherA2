@@ -14,20 +14,24 @@
 //what settled it - the heuristic was already within 2% of the best count available to it,
 //so the ceiling was the kernel and no further tuning of the split rule could have moved it.
 //
-//Whole I tensor stage, which is what the run actually pays, in GFLOP/s. The first two
-//columns are same-sitting triples; the 2080 Ti cuBLAS figure predates -gpu_cublas and comes
-//from the build that linked it:
+//Whole I tensor stage, which is what the run actually pays, in GFLOP/s:
 //
 //                          ours   CUTLASS   cuBLAS
-//  RTX 4090 mobile         1759      2061     2193
+//  RTX 4090 mobile         1759      1950     2224
 //  RTX 2080 Ti             1181      1663     1794
 //  Tesla V100              1507      1542     2552
 //
-//CUTLASS closes most of the gap on Ada and Turing and almost none of it on Volta, where
-//cuBLAS remains 1.65x ahead in single and 1.79x in double. That is why -gpu_cublas exists:
-//nothing is linked or shipped either way, and on the machine where the difference is worth
-//having it is available for the asking. Nothing is linked and nothing ships for CUTLASS
-//either - it is headers, compiled in - so the half-gigabyte problem does not come back.
+//Read the first row with care. Three interleaved pairs on that laptop gave CUTLASS
+//1725-1950 and cuBLAS 1535-2224 - a 45% spread - so the two are indistinguishable there
+//and only the best of each is tabulated. Earlier versions of this comment claimed first
+//that CUTLASS beat cuBLAS on Ada and then the reverse; both were reading that noise across
+//sittings. The V100 row is the one that is safe to reason from: 1.65x in single and 1.79x
+//in double, far outside anything the variance explains.
+//
+//Hence the default: cuBLAS when the machine has it, CUTLASS when it does not. Preferring
+//cuBLAS costs nothing measurable where it does not help and is worth a great deal on a
+//datacentre part. Neither is linked or shipped - CUTLASS is headers compiled in, cuBLAS is
+//opened by name at run time - so the half-gigabyte problem does not come back either way.
 //
 //HIP keeps the hand-written kernel: CUTLASS is CUDA-only.
 
@@ -80,9 +84,7 @@ template <typename T>
 inline bool run(const int m, const int n, const int k,
 	const T* A, const int lda, const T* B, const int ldb, T* C, const int ldc, void* ws)
 {
-	//-gpu_cublas, and only then. cuBLAS is still ahead on Volta by a wide margin, so it is
-	//worth being able to reach; taking it whenever it happened to be installed would make
-	//the last digits depend on the machine rather than on the input.
+	//cuBLAS first when it loaded, CUTLASS behind it. -no_gpu_cublas pins the second.
 	if (cublas_dynamic_gemm(true, false, m, n, k, T(1), A, lda, B, ldb, T(0), C, ldc))
 		return true;
 	Gemm<T> op;

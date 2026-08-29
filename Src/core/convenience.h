@@ -812,11 +812,13 @@ struct options
     bool gpu_grid = false;
     //-gpu_blas offers large dense GEMMs in nos_math to the device
     bool gpu_blas = false;
-    //-gpu_cublas runs the I tensor GEMM through cuBLAS when the machine has it, instead of
-    //the built-in CUTLASS path. Asked for rather than detected: it is a different kernel and
-    //moves the last digits, so taking it automatically would make results depend on whether
-    //a toolkit happened to be installed.
-    bool gpu_cublas = false;
+    //The I tensor GEMM goes through cuBLAS when the machine has it, and through the
+    //built-in CUTLASS path otherwise. cuBLAS is 1.65x faster on a V100 and level with
+    //CUTLASS within measurement noise on consumer cards, so preferring it costs nothing
+    //where it does not help. -no_gpu_cublas pins CUTLASS, which is what the reference tests
+    //do: the two differ in the last digits, so a test left to pick would pass or fail on
+    //whether a CUDA toolkit happened to be installed.
+    bool gpu_cublas = true;
     //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
     bool fukui_analysis_run = false;
     bool profiling = false;

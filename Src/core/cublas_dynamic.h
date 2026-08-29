@@ -8,10 +8,15 @@
 //for doing it this way rather than linking and delay-loading - the previous arrangement
 //needed the import library at build time and shipped half a gigabyte to be useful.
 //
-//It is off unless asked for. Selecting it automatically would make the same input produce
-//different last digits on two machines depending on whether a CUDA toolkit happened to be
-//installed, which is the trap the reference logs and the fp32/fp64 tests already document.
-//CUTLASS is the default and is always there.
+//Preferred whenever it loads, with CUTLASS behind it: cuBLAS is 1.65x faster on a V100 and
+//level with CUTLASS within measurement noise on consumer cards, so choosing it costs
+//nothing where it does not help.
+//
+//The consequence has to be lived with rather than wished away. The two disagree in the last
+//digits, so the same input gives slightly different output on a machine that has a CUDA
+//toolkit and one that does not. That is why a run states which GEMM produced its numbers,
+//and why -no_gpu_cublas exists and the reference tests use it: a test left to choose would
+//pass or fail on whether a toolkit happened to be installed.
 
 void cublas_dynamic_set_enabled(bool on);
 bool cublas_dynamic_enabled();

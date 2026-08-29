@@ -486,6 +486,10 @@ anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings.txt"
 no_date = ""
 gpu_itensor = ""
+# The device GEMM is cuBLAS when the machine has it and CUTLASS otherwise, and the two
+# disagree in the last digits. Pinned to CUTLASS because that is the one always present:
+# left to choose, this test would pass or fail on whether a CUDA toolkit was installed.
+no_gpu_cublas = ""
 
 # The two sincos kernels, each pinned rather than left to the card. Without the explicit
 # flags the precision a run gets depends on the reported fp32:fp64 ratio, so on a consumer

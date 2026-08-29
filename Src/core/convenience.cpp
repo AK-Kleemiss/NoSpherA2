@@ -576,14 +576,16 @@ std::string help_message =
  "  -gpu_blas                          Offer large dense matrix products to the\n"
  "                                    device. Small ones stay on the CPU, where\n"
  "                                    they beat what the transfers would allow.\n"
- "  -gpu_cublas                        Run the I tensor GEMM through cuBLAS when\n"
- "                                    the machine has it, instead of the built-in\n"
- "                                    CUTLASS path. Nothing is shipped or linked:\n"
- "                                    the library is opened by name and ignored if\n"
- "                                    absent. Worth trying on a datacentre card,\n"
- "                                    where cuBLAS is still well ahead; on Ada and\n"
- "                                    Turing the default is level or faster. It is\n"
- "                                    a different kernel, so the last digits move.\n"
+ "  -no_gpu_cublas                     Pin the built-in CUTLASS GEMM for the I\n"
+ "                                    tensor. By default cuBLAS is used when the\n"
+ "                                    machine has it and CUTLASS otherwise: cuBLAS\n"
+ "                                    is 1.65x faster on a V100 and level with\n"
+ "                                    CUTLASS within noise on consumer cards.\n"
+ "                                    Nothing is shipped or linked either way -\n"
+ "                                    cuBLAS is opened by name and ignored when\n"
+ "                                    absent. The two differ in the last digits,\n"
+ "                                    so a run says which one it used, and pin\n"
+ "                                    this when comparing logs across machines.\n"
  "\n"
  "  Precision:\n"
  "  -gpu_fp64                          Keep the device in double throughout: the\n"
@@ -3403,6 +3405,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_itensor = false;
     else if (temp == "-gpu_cublas")
         gpu_cublas = true;
+    else if (temp == "-no_gpu_cublas")
+        gpu_cublas = false;
     else if (temp == "-gpu_salted")
         gpu_salted = true;
     else if (temp == "-gpu_grid")
