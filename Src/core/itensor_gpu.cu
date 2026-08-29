@@ -6,10 +6,8 @@
 #include <vector>
 #include <algorithm>
 
-//The contraction is a GEMM and nothing else, so with no device BLAS there is no path here
-//worth having. conda-forge packages hipcc without hipBLAS, which is how a build gets here.
-//Returning false from init is exactly what this file already does on a machine with no
-//device, and XCW logs "the CPU - device unavailable or problem too large" and carries on.
+//No device BLAS, no path worth having: conda-forge ships hipcc without hipBLAS.
+//Returning false is what XCW already handles for a machine with no device.
 #ifndef NOSPHERA2_HAVE_GPUBLAS
 
 bool itensor_gpu_available() { return false; }
@@ -140,10 +138,8 @@ bool itensor_gpu_init(const itensor_gpu_layout& L)
 		max_elems = std::max(max_elems, (long long)L.blk_n_active[b] * L.blk_point_count[b]);
 	}
 
-	//What the remaining launch bound is made of. Each block costs three launches per
-	//symmetry mate and its GEMM is only na*na*np, so the block count is the launch count
-	//and the shape spread says whether batching across blocks could ever be one call or
-	//would have to be one per distinct shape. Printed only under -gflops.
+	//Block count and shape spread, which is what says whether batching across blocks
+	//could ever be one call. Printed only under -gflops.
 	if (throughput::enabled()) {
 		std::vector<long long> shapes;
 		shapes.reserve(L.n_blocks);
@@ -157,9 +153,7 @@ bool itensor_gpu_init(const itensor_gpu_layout& L)
 		}
 		std::sort(shapes.begin(), shapes.end());
 		const size_t distinct = std::unique(shapes.begin(), shapes.end()) - shapes.begin();
-		//stderr, not cout: the app points cout at NoSpherA2.log and XCW points it somewhere
-		//else again mid-run, so a diagnostic written there lands in whichever file happened
-		//to be current. stderr is the one stream nothing reassigns.
+		//stderr because cout is redirected to the log and moved again mid-run
 		std::fprintf(stderr, "I tensor GPU: %d blocks, %zu distinct (n_active, points) shapes,"
 		             " n_active %d-%d, points %d-%d\n",
 		             L.n_blocks, distinct, min_na, max_na, min_np, max_np);
@@ -242,25 +236,10 @@ bool itensor_gpu_reflection(const int num_syms,
 			weight_kernel<<<(unsigned int)((total + 255) / 256), 256>>>(
 				na, np, g.blk_ao_off[b], base, g.ao, g.phase_re, g.phase_im,
 				g.wri, g.wri + total);
-			//C = A * W^T with both stored row-major n_active x np, i.e. column-major np x n_active.
-			//One GEMM of width 2na rather than two of width na. The operand A is the same for
-			//both, and the shape is thin enough - n_active ~85 against ~4200 points - that it
-			//is limited by reading the operands rather than by the multiplies, so widening it
-			//raises the flops per byte from about 21 to 28. Measured 1.42x here, 1.24x on a
-			//V100.
-			//
-			//syrkx was tried and is much worse, which is worth recording because the argument
-			//for it is a good one: C is symmetric and accumulate_kernel below reads a single
-			//triangle, so a GEMM computes twice what is kept and syrkx computes exactly the
-			//half that is used. At this shape on a V100, per reflection's worth of blocks:
-			//
-			//  two Sgemm (before the merge)    1.939 ms   2880 GFLOP/s
-			//  one Sgemm of width 2na          1.548 ms   3606 GFLOP/s
-			//  two syrkx, half the arithmetic 35.811 ms    156 GFLOP/s
-			//
-			//Twenty-three times slower for half the work: cuBLAS has no good syrkx for a small
-			//n with a huge k. Halving the arithmetic is not worth anything when the arithmetic
-			//was never the constraint.
+			//C = A * W^T, both row-major n_active x np, i.e. column-major np x n_active.
+			//One GEMM of width 2na, not two of width na: A is shared and the shape is thin
+			//enough to be limited by reading the operands, so widening raises flops per byte.
+			//syrkx computes only the kept triangle and is far slower here.
 			BLAS_TRY(gpublasSgemm(g.blas, GPUBLAS_OP_T, GPUBLAS_OP_N, na, 2 * na, np,
 				&one, g.ao + g.blk_ao_off[b], np, g.wri, np, &zero, g.cri, na));
 			const dim3 thr(16, 16);

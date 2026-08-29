@@ -407,7 +407,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
 
     if (std::getenv("NOSPHERA2_CHI_DEBUG")) {
         double s = 0.0;
-        for (double v : chi) s += v * v;
+        for (int i = 0; i < chi.size(); i++) s += chi[i] * chi[i];
         std::fprintf(stderr, "chi checksum %.17g size %zu\n", s, chi.size());
     }
     return chi;
@@ -437,12 +437,9 @@ void AtomGrid::get_grid(const int num_centers,
 #ifdef NOSPHERA2_USE_GPU
         //Same walk on the device. Bragg radii are looked up here so the kernel takes
         //plain doubles and needs no constants table of its own.
-        //The kernel is a transcription of the chi-present branch only, and it indexes chi
-        //with a stride of num_centers. make_chi returns an empty vector when the
-        //wavefunction carries no MOs, and builds its rows with a stride of wfn.get_ncen(),
-        //so neither is guaranteed to be what the kernel expects. Empty chi showed up as an
-        //"invalid argument" on the copy - loud, at least - but a chi sized to a different
-        //centre count would have copied happily and returned quietly wrong weights.
+        //The kernel transcribes the chi-present branch and indexes chi with a stride of
+        //num_centers. make_chi returns empty without MOs and uses a stride of ncen, so
+        //neither is guaranteed; a wrongly sized chi would copy and come back wrong.
         const bool chi_fits = chi.size() == (size_t)num_centers * (size_t)num_centers;
         if (grid_gpu_enabled() && chi_fits) {
             vec R_v(num_centers);
@@ -455,9 +452,8 @@ void AtomGrid::get_grid(const int num_centers,
                     R_v.data(), chi.data(), constants::far_away, constants::cutoff,
                     grid_x_bohr, grid_y_bohr, grid_z_bohr,
                     grid_aw, grid_becke_w, grid_TFVC_w)) {
-                //Once, not once per atomic grid. Every other GPU path announces itself and
-                //this one did not, which is exactly how it spent a session falling back to
-                //the CPU on every call while its test went on passing.
+                //Once per run. Every other GPU path announces itself; this one did not, which
+                //is how it fell back to the CPU for a session with its test still passing.
                 static std::atomic<bool> announced{false};
                 if (!announced.exchange(true))
                     std::cout << "GPU in use: atomic grid weights (Becke and TFVC) on "

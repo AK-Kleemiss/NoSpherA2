@@ -449,9 +449,9 @@ vec SALTEDPredictor::predict()
                 std::copy(_temp.data_handle(), _temp.data_handle() + row_size, pvec_ptr);
                 pvec_ptr += row_size;
             }
-            //The regression GEMM stays on the CPU: on the device it measured 0.515 s
-            //against 0.626 s, because fp64 runs at 1/64 rate here and each call has to
-            //ship its own operands. It would pay on a datacentre part; it does not here.
+            //The regression GEMM stays on the CPU: the device barely wins, because fp64 runs
+            //at a sixty-fourth rate on a consumer part and each call ships its own operands.
+            //It would pay on a datacentre part.
             dMatrix2 kernel_nm = dot(pvec_lam, power_env_sparse[spe + to_string(lam)], false, true);
 
             if (config.zeta == 1)

@@ -73,12 +73,8 @@ static int run_app_impl(int argc, char **argv)
         }
     } restore_cout{_coutbuf, std::cout.flags(), std::cout.precision(), std::cout.width()};
 
-    //A destructor because run_app_impl returns from a dozen places, and writing to log_file
-    //rather than cout because most of those places put cout back on the console first - the
-    //report went to stdout and vanished. log_file is declared above this, so it is still open
-    //when this runs. Hanging the report off write_timing_to_file instead was the first
-    //attempt and was worse: an XCW run never calls it, so the pipeline most worth measuring
-    //was the one that reported nothing.
+    //A destructor because run_app_impl returns from a dozen places, and log_file rather than
+    //cout because most of those places put cout back on the console first.
     struct throughput_reporter
     {
         std::ostream& out;
@@ -89,22 +85,14 @@ static int run_app_impl(int argc, char **argv)
     opt.digest_options();
     opt.cwd = cwd;
 #ifdef NOSPHERA2_USE_GPU
-    //Every GPU toggle, established once per run and from opt alone. These live in globals and
-    //used to be set only inside the two scattering-factor entry points, so a run that took
-    //another path - an XCW, say - inherited whatever the previous run in the same process had
-    //left switched on. In the suite that let -gpu_grid leak out of its own test and into every
-    //case after it; Olex2 calls run_app in-process repeatedly and would see the same thing.
-    //Setting them unconditionally here means a run gets the flags it was actually given.
+    //Every GPU toggle, from opt alone, once per run. These are globals and used to be set
+    //only inside the scattering-factor entry points, so a run reaching XCW instead inherited
+    //whatever the previous run in the process had left on. Olex2 calls run_app repeatedly.
     grid_gpu_set_enabled(opt.gpu_grid);
     blas_gpu_set_enabled(opt.gpu_blas);
     equicomb_set_gpu(opt.gpu_salted);
-    //Creating the device context costs about 95 ms and lands inside whichever call touches
-    //the GPU first. The scattering-factor path already started it early for that reason;
-    //every other path did not, so the cost sat inside the first kernel and made it look
-    //slow. Measured on the SALTED descriptors: six calls, 90 ms in total, of which the
-    //first was 77 - which read as the device losing to the host 2.5x when in fact the
-    //other five ran at 2.6 ms against the host's 4.5. Started here it overlaps the file
-    //reading that has to happen anyway, and no path has to remember to do it.
+    //Started here so context creation overlaps the file reading rather than landing inside
+    //whichever kernel runs first.
     if (opt.use_gpu || opt.gpu_grid || opt.gpu_salted || opt.gpu_itensor || opt.gpu_blas)
         sf_gpu_warmup_start();
 #endif

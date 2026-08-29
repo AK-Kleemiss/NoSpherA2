@@ -80,15 +80,12 @@
 
 //Delay-loading the BLAS DLL stops the loader rejecting the process where no GPU runtime
 //exists, but on its own it only moves the failure: the first call then raises the
-//delay-load helper exception and kills the process. Measured on the AMD node, exit
-//0xC06D007E. So probe for the module before calling in, and treat absence as "no GPU".
+//delay-load helper exception and kills the process with 0xC06D007E. So probe for the
+//module before calling in, and treat absence as "no GPU".
 #ifdef _WIN32
 //windows.h defines min and max as macros unless told not to, which turns every std::max in
-//a kernel that includes this header into a syntax error. The core sources escape it because
-//pch.h defines NOMINMAX first, but the .cu files do not use that precompiled header - real
-//hipcc rejected sf_gpu, itensor_gpu and salted_gpu on exactly these lines. The header that
-//drags windows.h in is the one that has to contain it, so it is defined here rather than
-//left to whoever includes it.
+//a kernel including this header into a syntax error. The core sources escape it through
+//pch.h; the .cu files do not use that precompiled header.
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -96,13 +93,20 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <cstdio>
 inline bool gpu_blas_runtime_present()
 {
 #ifdef NOSPHERA2_USE_HIP
 	static const bool ok = (LoadLibraryA("hipblas.dll") != nullptr);
 #else
-	static const bool ok = (LoadLibraryA("cublas64_13.dll") != nullptr)
-	                   || (LoadLibraryA("cublas64_12.dll") != nullptr);
+	//The name must be the major version this binary imports, which is what CMake delay-loads.
+	//Accepting any cuBLAS is worse than not probing: on a machine with 12 but not 13 the
+	//probe passes and the delay-load then dies binding 13 at the first call.
+	static const bool ok = []() {
+		char name[32];
+		std::snprintf(name, sizeof(name), "cublas64_%d.dll", CUDART_VERSION / 1000);
+		return LoadLibraryA(name) != nullptr;
+	}();
 #endif
 	return ok;
 }

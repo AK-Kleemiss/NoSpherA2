@@ -4,10 +4,10 @@
 //dot_BLAS can hand off without the callers knowing. Works against cuBLAS or hipBLAS.
 //
 //It is size-gated, and that gate is the whole point. With the operands living on the host
-//every call pays to ship them, and a small GEMM loses: the SALTED regression GEMM, which
-//is m ~ 3400, n ~ 1000, k = 2500, measured 0.515 s on the device against 0.626 s on 16
-//CPU threads - 1.22x, not worth a code path. Only shapes well past that are offered to
-//the device, and the threshold below was calibrated by measurement, not chosen.
+//every call pays to ship them, and a small GEMM loses: the SALTED regression GEMM is
+//barely faster on the device than on the host and not worth a code path. Only shapes
+//well past that are offered to the device, and the threshold below was calibrated by
+//measurement, not chosen.
 //
 //Returns false whenever the caller should just call BLAS, which includes every case where
 //no device is present.

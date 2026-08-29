@@ -55,7 +55,8 @@ void record(const char* stage, const bool on_device, const double flops, const d
     if (!stage || flops < 0.0)
         return;
     std::lock_guard<std::mutex> lock(g_mutex);
-    for (Row& r : g_rows) {
+    for (int i = 0; i < g_rows.size(); i++) {
+        Row& r = g_rows[i];
         if (r.on_device == on_device && r.stage == stage) {
             r.flops += flops;
             r.ms += ms;
@@ -89,12 +90,8 @@ void report(std::ostream& out)
     }
 
     out << "\n\n------------------------- Arithmetic throughput -------------------------\n";
-    //The thread count belongs beside the rates, because a CPU row that looks like bad
-    //hardware is usually a thread count of one. On the AKL cluster this stage measured the
-    //same to a second at OMP_NUM_THREADS=48 and =1, which is only possible if neither was
-    //believed - two configurations that should differ by a factor of forty-eight did not
-    //differ at all. Asking the runtime what it actually got turns that from a puzzle into a
-    //line of output.
+    //A CPU row that looks like slow hardware is usually a thread count of one, and that is
+    //easier to read than to deduce.
 #ifdef _OPENMP
     int actual = 1;
 #pragma omp parallel
@@ -107,18 +104,16 @@ void report(std::ostream& out)
 #else
     out << "host threads: built without OpenMP\n";
 #endif
-    //"slowest" is the longest single call in the row, and it is there to separate a stage
-    //that is genuinely slow from one paying a one-off. Creating the device context costs
-    //about 95 ms and lands in whichever call touches the GPU first, which is enough to make
-    //a small kernel look like a loss against the CPU when every later call is a win.
+    //slowest separates a slow stage from one paying a one-off: context creation lands in
+    //whichever call touches the GPU first.
     out << std::left << std::setw(34) << "stage" << std::setw(6) << "where"
         << std::right << std::setw(8) << "calls" << std::setw(12) << "time/ms"
         << std::setw(12) << "GFLOP" << std::setw(12) << "GFLOP/s"
         << std::setw(12) << "slowest" << "\n";
 
-    for (const Row& r : rows) {
-        //A row recorded by record_time has no flop count, and printing 0.000 GFLOP for it
-        //would read as "this stage does no arithmetic" rather than "nobody counted it"
+    for (int i = 0; i < rows.size(); i++) {
+        const Row& r = rows[i];
+        //0.000 GFLOP would read as "does no arithmetic" rather than "nobody counted it"
         const bool counted = r.flops > 0.0;
         std::ostringstream gflop;
         if (counted) gflop << std::fixed << std::setprecision(3) << (r.flops / 1.0e9);

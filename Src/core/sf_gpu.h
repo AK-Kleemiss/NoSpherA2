@@ -3,8 +3,8 @@
 //GPU path for calc_SF's non-uniform DFT, built against CUDA or HIP. All return false
 //if no device is present or the problem will not fit, and the caller falls back to the CPU loop.
 bool sf_gpu_available();
-//Device context creation costs ~95 ms. Start it when grid work begins and wait for it
-//just before the transform, so it overlaps instead of landing inside the measurement.
+//Start context creation when grid work begins and wait just before the transform, so it
+//overlaps instead of landing inside the measurement.
 void sf_gpu_warmup_start();
 void sf_gpu_warmup_wait();
 //"CUDA" or "HIP", for the log line

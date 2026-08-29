@@ -97,9 +97,8 @@ bool sf_gpu_available()
 	return gpuGetDeviceCount(&n) == gpuSuccess && n > 0;
 }
 
-//Creating the device context costs ~95 ms and would otherwise happen on the first
-//allocation, inside the transform. Started when the grids begin and waited for just
-//before the transform, it overlaps CPU work that has to happen anyway.
+//Context creation would otherwise happen on the first allocation, inside the transform.
+//Started when the grids begin, it overlaps CPU work that has to happen anyway.
 static std::future<void> g_warmup;
 
 void sf_gpu_warmup_start()
@@ -135,8 +134,8 @@ int sf_gpu_fp64_ratio()
 	gpuDeviceProp_t prop;
 	if (gpuGetDeviceProperties(&prop, dev) != gpuSuccess) return 0;
 	static const char* const cdna[] = { "gfx906", "gfx908", "gfx90a", "gfx940", "gfx941", "gfx942", "gfx950" };
-	for (const char* a : cdna)
-		if (std::strncmp(prop.gcnArchName, a, std::strlen(a)) == 0) return 2;
+	for (int i = 0; i < 7; i++)
+		if (std::strncmp(prop.gcnArchName, cdna[i], std::strlen(cdna[i])) == 0) return 2;
 	return 32;
 #else
 	int ratio = 0;
@@ -145,9 +144,8 @@ int sf_gpu_fp64_ratio()
 #endif
 }
 
-//Resolving Auto lives here rather than at the call site because the log line has to name
-//the kernel that actually ran. Repeating the ratio test where the message is written is how
-//the two drift apart and the log starts claiming a precision the transform did not use.
+//Resolved here, not at the call site, so the log line cannot name a precision the
+//transform did not use.
 bool sf_gpu_uses_fp32(const sf_precision prec)
 {
 	if (prec == sf_precision::FP32) return true;

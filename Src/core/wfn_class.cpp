@@ -7068,9 +7068,8 @@ const double WFN::compute_dens_cartesian(
     const MO *MOs_data = MOs.data();
     double *phi_data = phi.data();
     const double exp_cutoff = constants::exp_cutoff;
-    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
-    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
-    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    //Primitive-major: every MO for one primitive is contiguous, where MOs keeps them nex
+    //apart. Same arithmetic in the same order, and no per-point allocation.
     const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
@@ -7790,22 +7789,11 @@ void WFN::pop_back_MO()
     nmo--;
 }
 
-//Built once and reused for every grid point. nmo*nex doubles - 531 KB on sucrose - against
-//the millions of points that then read it, so the build cost is noise.
-//
-//Locked, because the first caller is very often several threads at once. make_chi runs an
-//omp parallel for over atom pairs; each pair calls find_line_density_extrema, which runs
-//another over its sample points; each sample calls compute_dens, and compute_dens is what
-//asks for this. Unlocked, two threads both found the cache cold and both called assign(),
-//one reallocating the vector under the other's read. The damage was not a crash but a wrong
-//chi: on sucrose its checksum came out 2192.46 instead of 2139.92 - about twenty-six atom
-//pairs classified differently - and the TFVC charges moved by whole electrons, in roughly
-//one run in six.
-//
-//The lock is taken on every call, not only on the cold path. Double-checking would need the
-//valid flag to be atomic, and an atomic member would make WFN non-copyable, which it cannot
-//be. Uncontended that is tens of nanoseconds against the ~140 000 flops each grid point does
-//with the result.
+//Transposed MO coefficients, [primitive * nmo + mo], built once and reused by every point.
+//Locked because the first caller is usually several threads at once: make_chi parallelises
+//over atom pairs, and compute_dens underneath it is what asks for this. Unlocked, two
+//threads both find it cold and one reallocates under the other. A plain bool cannot be
+//double-checked and an atomic member would make WFN non-copyable.
 const double* WFN::get_coef_primitive_major() const
 {
 	const int _nmo = get_nmo(false);

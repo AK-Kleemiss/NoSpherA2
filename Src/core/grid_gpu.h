@@ -9,14 +9,11 @@
 //The device code is a verbatim transcription of the chi-present branch of
 //get_integration_weights.
 //
-//That branch was described here as the only one get_grid could reach, on the grounds that
-//it builds chi first whenever num_centers > 1. That is wrong: make_chi returns an empty
-//vector when the wavefunction carries no MOs, and the CPU has a separate chi-absent branch
-//this kernel does not implement. The caller therefore checks chi is exactly num_centers^2
-//before offering the work. Do not drop that check - make_chi lays its rows out with a
-//stride of wfn.get_ncen() while the kernel assumes num_centers, and a wrongly sized chi
-//copies without complaint and comes back quietly wrong, which is the worst failure this
-//file can have.
+//That branch is not the only one get_grid can reach: make_chi returns empty when the
+//wavefunction carries no MOs, and the CPU has a chi-absent branch this kernel does not
+//implement. The caller checks chi is exactly num_centers^2 first - make_chi lays its rows
+//out with a stride of wfn.get_ncen(), which is not num_centers in general, and a wrongly
+//sized chi copies without complaint and comes back wrong.
 //
 //Returns false if there is no device, if the scratch will not fit, or if num_centers is
 //too large for the per-thread arrays, and the caller keeps the CPU loop.

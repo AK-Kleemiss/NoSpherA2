@@ -20,7 +20,7 @@ GridManager: Generated total of 102932 grid points.
 Total number of grid points after pruning: 102920
 AO values calculated for all grids.
 Screened out 1473 unique pairs of mu, nu (27.50%) 
-Skipped evaluation of 60229810 grids (15.21%) 
+Skipped evaluation of 74067170 grids (18.70%) 
 More detailed output in XCW.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
 ____________________________________________________________________________________

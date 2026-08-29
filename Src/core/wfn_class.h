@@ -77,17 +77,10 @@ private:
     std::string method;
     // Vector of molecular orbitals
     std::vector<MO> MOs;
-    // The same MO coefficients, transposed: primitive-major, [primitive * nmo + mo].
-    //
-    // MOs stores one coefficient array per orbital, so the grid evaluators - which walk
-    // primitives outermost and every MO inside - read C[mo][j] with a stride of nex between
-    // consecutive MOs. That is 91 scattered cache lines per primitive on sucrose, and it is
-    // why a property run measured 41.7 GFLOP/s on 16 threads where the arithmetic alone
-    // should go several times faster. Primitive-major makes that read contiguous.
-    //
-    // Mutable and filled on demand, because it is a cache of what MOs already holds and
-    // building it does not change the object's value. Anything that edits MOs or the
-    // primitive count has to call invalidate_coef_cache().
+    // The same coefficients transposed, [primitive * nmo + mo]. The grid evaluators walk
+    // primitives outermost and read every MO inside, which in MOs is a stride of nex.
+    // Mutable because it caches what MOs already holds; anything editing MOs or nex must
+    // call invalidate_coef_cache().
     mutable vec coef_primitive_major;
     mutable bool coef_primitive_major_valid = false;
     // Vector of centeres that primitives are base on

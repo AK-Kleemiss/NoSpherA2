@@ -1566,17 +1566,12 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			if (!(opt->no_date) && pb) pb->update();
 		}
 		itensor_gpu_free();
-		//The same count the CPU loop accumulates, without walking the pairs per reflection
-		long long per_r = 0;
-		for (int m = 0; m < cryst.nmo; m++)
-			for (int n = m; n < cryst.nmo; n++)
-				if (!skip[m][n]) per_r += skipped_grids_per_pair[tri_index(m, n)];
-		skipped_grids += static_cast<long long>(cryst.nr_small) * num_syms * per_r;
+		//No bookkeeping here: the loop above runs for both paths and eval_I multiplies the
+		//total by nr_small on the way out, so anything added here counts twice.
 	}
 #endif
-	//Counted here, serially, from the block structure both paths walk - not inside either
-	//of them. That way the CPU and GPU rows are the same work measured two ways, which is
-	//only form of the comparison worth having, and no counter is touched by two threads.
+	//Counted serially from the block structure both paths walk, so the CPU and GPU rows are
+	//the same work measured two ways and no counter is touched by two threads.
 	double itensor_flops = 0.0;
 	for (int g = 0; g < n_atom_grids; g++)
 		for (const GridBlock& block : grid_blocks[g])
@@ -2079,9 +2074,8 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	const double ehf_last = scf.ctx.energy["electronic"];
 	const occ::Mat dm_old = scf.ctx.mo.D;
 	dMatrix2 dm_eff(cryst.nmo, cryst.nmo);
-	//The lambda loop is serial, so per-iteration timing here is safe and is the only way
-	//to say how much of an XCW run is ours to speed up: this block is NoSpherA2 code, the
-	//Fock build below is OCC. Without the split the whole remainder looks equally ours.
+	//This block is NoSpherA2 code, the Fock build below is OCC. Without the split the whole
+	//remainder looks equally ours.
 	const _time_point it_t0 = get_time();
 	build_effective_dm(scf, dm_eff, dm_old);
 	calc_F_calc(dm_eff);
@@ -2331,13 +2325,8 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor, bool save_tensor
 //}
 
 void XCW::run_XCW_fitting() {
-	//OCC parallelises through TBB, which has its own thread count and does not read
-	//OMP_NUM_THREADS. Without a tbb::global_control TBB helps itself to every core, so the
-	//Fock build was already parallel and this is not a speedup - measured 45.9 s against
-	//46.1 s. What it fixes is -cpus, which is documented as capping worker threads and was
-	//silently ignored by the 82% of an XCW run that OCC owns: -cpus 2 now costs 174.7 s
-	//against 45.7 s at 16, where before it changed nothing. That matters on a shared node,
-	//where asking for two cores and taking all of them is somebody else's problem.
+	//OCC parallelises through TBB, which does not read OMP_NUM_THREADS. Not a speedup - it
+	//already used every core - but it makes -cpus bind the 82% of a run that OCC owns.
 	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
 	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor, settings.safe_tensor);
 	occ::qm::SCF scf(hf, settings.hf_type);

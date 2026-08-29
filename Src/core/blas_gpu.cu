@@ -4,10 +4,9 @@
 #include <cstdio>
 #include <cstdlib>
 
-//Calibrated on this machine (RTX 4090 Laptop, fp64 at 1/64 rate, 16 CPU threads with MKL):
-//the SALTED regression shape, 2*m*n*k = 17 GFLOP, measured 1.22x and was not worth taking.
-//The crossover therefore sits above that, and the constant is set an order beyond it so a
-//marginal shape stays on the CPU.
+//Calibrated on a consumer part with fp64 at a sixty-fourth rate: the SALTED regression
+//shape was barely faster on the device and not worth a code path. The constant sits an
+//order beyond the crossover so a marginal shape stays on the CPU.
 #define BLAS_GPU_MIN_FLOP_AT_RATIO_64 2.0e11
 
 static bool g_blas_gpu = false;
@@ -31,26 +30,13 @@ bool blas_gpu_dgemm(const bool, const bool, const int, const int, const int,
 
 #else
 
-//The comment above used to end by saying this would be far too conservative on a datacentre
-//part and should be re-measured. It has been: a V100 runs the double-precision GEMM at 6657
-//GFLOP/s against 13988 in single, half rate rather than a sixty-fourth. At that speed the
-//17 GFLOP shape costs about 2.6 ms of arithmetic against roughly 12 ms of transfers, and
-//still beats the host - so the threshold that was right on a consumer card refuses work a
-//datacentre card should be taking.
-//
-//What made the constant right on one machine is the device's double-precision rate, and the
-//fp32:fp64 ratio is the one proxy for that available without stopping to run a benchmark.
-//Scaling by it keeps this machine's measured value exactly (ratio 64 gives 2.0e11 back) and
-//lowers the bar in proportion where doubles are cheap. It is a proxy, not a measurement of
-//the crossover on the card in hand: the honest form of that is a calibration GEMM at
-//startup, which is worth doing only if this proves too coarse.
+//The device rate is what made the constant right, and the fp32:fp64 ratio is the only proxy
+//for it available without benchmarking. Scaling by it keeps the measured value where it was
+//measured and lowers the bar where doubles are cheap.
 static double blas_gpu_min_flop()
 {
-	//The threshold is high enough that no problem in the test data comes near it, so without
-	//a way to lower it this function and the GEMM below ship untested - which is how the
-	//row-major transpose swap would come to be wrong on someone else's machine rather than
-	//here. Same escape hatch, for the same reason, as NOSPHERA2_GPU_BATCH and
-	//NOSPHERA2_GRID_LOCAL: a path nothing selects is a path nothing tests.
+	//No test problem reaches the threshold, so without an override this and the GEMM below
+	//ship untested. Same escape hatch as NOSPHERA2_GPU_BATCH and NOSPHERA2_GRID_LOCAL.
 	if (const char* env = std::getenv("NOSPHERA2_BLAS_GPU_MIN_FLOP")) {
 		const double v = std::atof(env);
 		if (v > 0.0) return v;
