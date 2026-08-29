@@ -243,9 +243,24 @@ bool itensor_gpu_reflection(const int num_syms,
 				na, np, g.blk_ao_off[b], base, g.ao, g.phase_re, g.phase_im,
 				g.wri, g.wri + total);
 			//C = A * W^T with both stored row-major n_active x np, i.e. column-major np x n_active.
-			//One GEMM of width 2na rather than two of width na: the operand A is the same for
-			//both and these shapes are far too small to fill the device, so what was being paid
-			//was the launch, not the arithmetic. Measured, not assumed - see the commit.
+			//One GEMM of width 2na rather than two of width na. The operand A is the same for
+			//both, and the shape is thin enough - n_active ~85 against ~4200 points - that it
+			//is limited by reading the operands rather than by the multiplies, so widening it
+			//raises the flops per byte from about 21 to 28. Measured 1.42x here, 1.24x on a
+			//V100.
+			//
+			//syrkx was tried and is much worse, which is worth recording because the argument
+			//for it is a good one: C is symmetric and accumulate_kernel below reads a single
+			//triangle, so a GEMM computes twice what is kept and syrkx computes exactly the
+			//half that is used. At this shape on a V100, per reflection's worth of blocks:
+			//
+			//  two Sgemm (before the merge)    1.939 ms   2880 GFLOP/s
+			//  one Sgemm of width 2na          1.548 ms   3606 GFLOP/s
+			//  two syrkx, half the arithmetic 35.811 ms    156 GFLOP/s
+			//
+			//Twenty-three times slower for half the work: cuBLAS has no good syrkx for a small
+			//n with a huge k. Halving the arithmetic is not worth anything when the arithmetic
+			//was never the constraint.
 			BLAS_TRY(gpublasSgemm(g.blas, GPUBLAS_OP_T, GPUBLAS_OP_N, na, 2 * na, np,
 				&one, g.ao + g.blk_ao_off[b], np, g.wri, np, &zero, g.cri, na));
 			const dim3 thr(16, 16);
