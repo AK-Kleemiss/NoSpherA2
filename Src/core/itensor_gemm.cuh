@@ -14,15 +14,20 @@
 //what settled it - the heuristic was already within 2% of the best count available to it,
 //so the ceiling was the kernel and no further tuning of the split rule could have moved it.
 //
-//Whole I tensor stage, which is what the run actually pays, in GFLOP/s:
+//Whole I tensor stage, which is what the run actually pays, in GFLOP/s. The first two
+//columns are same-sitting triples; the 2080 Ti cuBLAS figure predates -gpu_cublas and comes
+//from the build that linked it:
 //
 //                          ours   CUTLASS   cuBLAS
-//  RTX 4090 mobile         1759      2061     1764
+//  RTX 4090 mobile         1759      2061     2193
 //  RTX 2080 Ti             1181      1663     1794
+//  Tesla V100              1507      1542     2552
 //
-//So CUTLASS is ahead of the cuBLAS build this replaced on Ada and within 7% of it on
-//Turing, for a dependency that is headers only. Nothing is linked and nothing ships: it
-//compiles into this binary, so the half-gigabyte problem does not come back.
+//CUTLASS closes most of the gap on Ada and Turing and almost none of it on Volta, where
+//cuBLAS remains 1.65x ahead in single and 1.79x in double. That is why -gpu_cublas exists:
+//nothing is linked or shipped either way, and on the machine where the difference is worth
+//having it is available for the asking. Nothing is linked and nothing ships for CUTLASS
+//either - it is headers, compiled in - so the half-gigabyte problem does not come back.
 //
 //HIP keeps the hand-written kernel: CUTLASS is CUDA-only.
 
