@@ -1,6 +1,8 @@
 #include "itensor_gpu.h"
 #include "gpu_backend.h"
+#include "throughput.h"
 #include <cstdio>
+#include <iostream>
 #include <vector>
 #include <algorithm>
 
@@ -136,6 +138,31 @@ bool itensor_gpu_init(const itensor_gpu_layout& L)
 		max_na = std::max(max_na, L.blk_n_active[b]);
 		//long long: active AOs times points passes 2^31 on a protein-sized grid
 		max_elems = std::max(max_elems, (long long)L.blk_n_active[b] * L.blk_point_count[b]);
+	}
+
+	//What the remaining launch bound is made of. Each block costs three launches per
+	//symmetry mate and its GEMM is only na*na*np, so the block count is the launch count
+	//and the shape spread says whether batching across blocks could ever be one call or
+	//would have to be one per distinct shape. Printed only under -gflops.
+	if (throughput::enabled()) {
+		std::vector<long long> shapes;
+		shapes.reserve(L.n_blocks);
+		int min_na = L.n_blocks ? L.blk_n_active[0] : 0;
+		int min_np = L.n_blocks ? L.blk_point_count[0] : 0, max_np = 0;
+		for (int b = 0; b < L.n_blocks; b++) {
+			shapes.push_back((long long)L.blk_n_active[b] * 100000 + L.blk_point_count[b]);
+			min_na = std::min(min_na, L.blk_n_active[b]);
+			min_np = std::min(min_np, L.blk_point_count[b]);
+			max_np = std::max(max_np, L.blk_point_count[b]);
+		}
+		std::sort(shapes.begin(), shapes.end());
+		const size_t distinct = std::unique(shapes.begin(), shapes.end()) - shapes.begin();
+		//stderr, not cout: the app points cout at NoSpherA2.log and XCW points it somewhere
+		//else again mid-run, so a diagnostic written there lands in whichever file happened
+		//to be current. stderr is the one stream nothing reassigns.
+		std::fprintf(stderr, "I tensor GPU: %d blocks, %zu distinct (n_active, points) shapes,"
+		             " n_active %d-%d, points %d-%d\n",
+		             L.n_blocks, distinct, min_na, max_na, min_np, max_np);
 	}
 	const size_t need =
 		sizeof(float) * (size_t)L.ao_all_len +
