@@ -16,6 +16,7 @@ struct Row {
     bool on_device = false;
     double flops = 0.0;
     double ms = 0.0;
+    double slowest = 0.0;
     long long calls = 0;
 };
 
@@ -58,11 +59,12 @@ void record(const char* stage, const bool on_device, const double flops, const d
         if (r.on_device == on_device && r.stage == stage) {
             r.flops += flops;
             r.ms += ms;
+            if (ms > r.slowest) r.slowest = ms;
             r.calls++;
             return;
         }
     }
-    g_rows.push_back(Row{stage, on_device, flops, ms, 1});
+    g_rows.push_back(Row{stage, on_device, flops, ms, ms, 1});
 }
 
 void reset()
@@ -100,9 +102,14 @@ void report(std::ostream& out)
 #else
     out << "host threads: built without OpenMP\n";
 #endif
+    //"slowest" is the longest single call in the row, and it is there to separate a stage
+    //that is genuinely slow from one paying a one-off. Creating the device context costs
+    //about 95 ms and lands in whichever call touches the GPU first, which is enough to make
+    //a small kernel look like a loss against the CPU when every later call is a win.
     out << std::left << std::setw(34) << "stage" << std::setw(6) << "where"
         << std::right << std::setw(8) << "calls" << std::setw(12) << "time/ms"
-        << std::setw(12) << "GFLOP" << std::setw(12) << "GFLOP/s" << "\n";
+        << std::setw(12) << "GFLOP" << std::setw(12) << "GFLOP/s"
+        << std::setw(12) << "slowest" << "\n";
 
     for (const Row& r : rows) {
         out << std::left << std::setw(34) << r.stage.substr(0, 33)
@@ -110,7 +117,8 @@ void report(std::ostream& out)
             << std::right << std::setw(8) << r.calls
             << std::setw(12) << std::fixed << std::setprecision(1) << r.ms
             << std::setw(12) << std::fixed << std::setprecision(3) << (r.flops / 1.0e9)
-            << std::setw(12) << rate(r.flops, r.ms) << "\n";
+            << std::setw(12) << rate(r.flops, r.ms)
+            << std::setw(12) << std::fixed << std::setprecision(1) << r.slowest << "\n";
     }
 
     //Where a stage ran in both places the ratio is the whole answer, so do the division here

@@ -179,7 +179,12 @@ void equicomb(int natoms, int nrad1, int nrad2,
         q.runs = flat_runs.data(); q.c2r_cols = cols.data();
         q.c2r_re = cre.data(); q.c2r_im = cim.data(); q.c2r_cnt = c2r_cnt.data();
         q.sel = sel.data(); q.p = p.data();
+        const _time_point eq_gpu_t0 = get_time();
         const bool gpu_ok = salted_gpu_equicomb(q, &empty_environments);
+        if (gpu_ok)
+            throughput::record("SALTED equicomb", true,
+                throughput::flops_equicomb(natoms, nrad1, nrad2, llmax, l21),
+                get_msec(eq_gpu_t0, get_time()));
         //Once per run, not once per lambda: nine identical lines say nothing extra.
         //Printed before the progress bar exists, whose carriage returns would eat it.
         static bool announced = false;
@@ -195,6 +200,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
     }
 #endif
 
+    //Timed around the whole CPU contraction, outside any parallel region, and counted
+    //with the same convention the GPU branch above uses so the two rows compare.
+    const _time_point eq_cpu_t0 = get_time();
 
     // Scoped: the bar rewinds to its own line when it is destroyed, so anything
     // printed after the loop but before that is silently overwritten.
@@ -358,6 +366,10 @@ void equicomb(int natoms, int nrad1, int nrad2,
     // An atom with no neighbours still has an l = 0 descriptor, its own density being
     // spherically symmetric; only the equivariant lam >= 1 parts vanish, so zeroing
     // them leaves the atom spherical, which is the right answer for it.
+    throughput::record("SALTED equicomb", false,
+        throughput::flops_equicomb(natoms, nrad1, nrad2, llmax, l21),
+        get_msec(eq_cpu_t0, get_time()));
+
     static bool warned_empty_environment = false;
     if (empty_environments > 0 && !warned_empty_environment)
     {

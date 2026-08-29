@@ -54,4 +54,15 @@ inline double flops_gemm(double m, double n, double k)
     return 2.0 * m * n * k;
 }
 
+//SALTED's equicomb: a Wigner-3j weighted contraction over
+//(atom, nrad1, nrad2, ll, mu) with a complex multiply-accumulate at the centre, counted
+//at 8 flops. This is the *dense* extent - the real loop is sparse, skipping runs of zero
+//w3j and screened environments - so the absolute number overstates the work, by a factor
+//that depends on the model. Both paths walk the same sparsity and are counted the same
+//way, so the CPU/GPU ratio is unaffected; treat the absolute rate as a lower bound.
+inline double flops_equicomb(double natoms, double nrad1, double nrad2, double llmax, double l21)
+{
+    return 8.0 * natoms * nrad1 * nrad2 * llmax * l21;
+}
+
 } //namespace throughput
