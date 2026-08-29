@@ -7,36 +7,45 @@ message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 option(NOSPHERA2_BUILD_DLL "Build the NoSpherA2 DLL" OFF)
 option(NOSPHERA2_BUILD_TESTS "Build NoSpherA2 tests" OFF)
 option(NOSPHERA2_DEPENDENCIES_ONLY "Build dependencies without building NoSpherA2" OFF)
-#Whether the user picked a backend has to be answered before option() runs, because option()
-#defines the variable either way and afterwards "off by default" and "explicitly turned off"
-#look identical. A -D on the command line is already in the cache at this point.
-if(DEFINED NOSPHERA2_USE_CUDA OR DEFINED NOSPHERA2_USE_HIP)
-    set(_nosphera2_gpu_explicit TRUE)
-else()
-    set(_nosphera2_gpu_explicit FALSE)
-endif()
-
 option(NOSPHERA2_USE_CUDA "Build the CUDA scattering-factor path" OFF)
 option(NOSPHERA2_USE_HIP "Build the HIP (AMD) scattering-factor path" OFF)
-option(NOSPHERA2_GPU_AUTO "Enable a GPU backend by itself when a card and a toolkit are present" ON)
+option(NOSPHERA2_GPU_AUTO "Pick the GPU backend from the hardware present" ON)
 
-#Nobody should have to know they own a GPU to get the use of it. The bootstrap has already put
-#a toolkit in the environment if it could, so by now this is only asking which one is there.
-#Silent when it finds nothing, and it never overrides a choice the user made.
-if(NOSPHERA2_GPU_AUTO AND NOT _nosphera2_gpu_explicit)
+#While AUTO is on, detection decides on every configure and overwrites the cache. It cannot
+#instead skip when the variables are already set: option() caches them on the first configure,
+#so from the second onwards "the user asked for this" and "nobody has ever asked" are the same
+#state. A build directory created before the toolkit existed would then stay CPU-only however
+#often it was reconfigured. Set NOSPHERA2_GPU_AUTO=OFF to pin the two flags by hand.
+if(NOSPHERA2_GPU_AUTO)
     include("${CMAKE_CURRENT_LIST_DIR}/scripts/GpuToolkit.cmake")
     nosphera2_detect_gpu(NOSPHERA2_GPU_VENDOR)
     if(NOSPHERA2_GPU_VENDOR STREQUAL "NVIDIA")
-        set(NOSPHERA2_USE_CUDA ON)
-        message(STATUS "NVIDIA GPU detected; enabling the CUDA path (-DNOSPHERA2_GPU_AUTO=OFF to stop this)")
+        set(NOSPHERA2_USE_CUDA ON CACHE BOOL "" FORCE)
+        set(NOSPHERA2_USE_HIP OFF CACHE BOOL "" FORCE)
     elseif(NOSPHERA2_GPU_VENDOR STREQUAL "AMD")
-        set(NOSPHERA2_USE_HIP ON)
-        message(STATUS "AMD GPU detected; enabling the HIP path (-DNOSPHERA2_GPU_AUTO=OFF to stop this)")
+        set(NOSPHERA2_USE_HIP ON CACHE BOOL "" FORCE)
+        set(NOSPHERA2_USE_CUDA OFF CACHE BOOL "" FORCE)
+    else()
+        set(NOSPHERA2_USE_CUDA OFF CACHE BOOL "" FORCE)
+        set(NOSPHERA2_USE_HIP OFF CACHE BOOL "" FORCE)
     endif()
-    #Auto-enabling must never be able to fail a build that would otherwise have worked, so a
-    #missing compiler downgrades to a status line below rather than the warning a user who
-    #asked for the backend by name deserves.
+    message(STATUS "GPU auto-detect: ${NOSPHERA2_GPU_VENDOR} (-DNOSPHERA2_GPU_AUTO=OFF to choose by hand)")
+    #A missing compiler after auto-enabling is a status line below, not the warning someone
+    #who named the backend deserves.
     set(_nosphera2_gpu_auto_enabled TRUE)
+endif()
+
+#The toolkit the bootstrap fetched, in preference to whatever is first on PATH. Without this
+#the build silently follows PATH: on a machine carrying both, the binary can end up importing
+#a cuBLAS that the machine it runs on does not have.
+if(NOSPHERA2_USE_CUDA AND NOT DEFINED CMAKE_CUDA_COMPILER AND MICROMAMBA_ENV_PREFIX)
+    foreach(_c "${MICROMAMBA_ENV_PREFIX}/Library/bin/nvcc.exe" "${MICROMAMBA_ENV_PREFIX}/bin/nvcc")
+        if(EXISTS "${_c}")
+            set(CMAKE_CUDA_COMPILER "${_c}" CACHE FILEPATH "CUDA compiler from the micromamba environment")
+            message(STATUS "Using the bootstrapped CUDA compiler: ${_c}")
+            break()
+        endif()
+    endforeach()
 endif()
 
 if(NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP)
