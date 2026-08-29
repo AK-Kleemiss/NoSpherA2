@@ -2056,6 +2056,10 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	const double ehf_last = scf.ctx.energy["electronic"];
 	const occ::Mat dm_old = scf.ctx.mo.D;
 	dMatrix2 dm_eff(cryst.nmo, cryst.nmo);
+	//The lambda loop is serial, so per-iteration timing here is safe and is the only way
+	//to say how much of an XCW run is ours to speed up: this block is NoSpherA2 code, the
+	//Fock build below is OCC. Without the split the whole remainder looks equally ours.
+	const _time_point it_t0 = get_time();
 	build_effective_dm(scf, dm_eff, dm_old);
 	calc_F_calc(dm_eff);
 	eval_scale();
@@ -2064,6 +2068,8 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	// Generates the perturbation matrix
 	occ::Mat perturbation;
 	calc_perturb(perturbation, scf);
+	const _time_point it_t1 = get_time();
+	throughput::record_time("XCW structure factors + perturbation", false, get_msec(it_t0, it_t1));
 
 	// Build perturbed Fock matrix
 	// Maybe necessary to update the Hamiltoian if a potential changes depending on the density, but that does not happen in normal HF
@@ -2072,6 +2078,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.ctx.F = scf.ctx.H;
 	scf.ctx.F += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
 	scf.update_scf_energy(false);
+	throughput::record_time("OCC Fock build (not ours)", false, get_msec(it_t1, get_time()));
 	const double ehf = scf.ctx.energy["electronic"];
 	const double e_diff = std::abs(ehf - ehf_last);
 
@@ -2301,6 +2308,14 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor, bool save_tensor
 //}
 
 void XCW::run_XCW_fitting() {
+	//OCC parallelises through TBB, which has its own thread count and does not read
+	//OMP_NUM_THREADS. Without a tbb::global_control TBB helps itself to every core, so the
+	//Fock build was already parallel and this is not a speedup - measured 45.9 s against
+	//46.1 s. What it fixes is -cpus, which is documented as capping worker threads and was
+	//silently ignored by the 82% of an XCW run that OCC owns: -cpus 2 now costs 174.7 s
+	//against 45.7 s at 16, where before it changed nothing. That matters on a shared node,
+	//where asking for two cores and taking all of them is somebody else's problem.
+	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
 	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor, settings.safe_tensor);
 	occ::qm::SCF scf(hf, settings.hf_type);
 	occ::qm::Wavefunction last_wfn;

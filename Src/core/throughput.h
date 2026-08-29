@@ -32,6 +32,11 @@ bool enabled();
 //whole stage.
 void record(const char* stage, bool on_device, double flops, double ms);
 
+//For stages worth apportioning but with no honest flop count - a Fock build inside a
+//library, a criterion evaluation. The rate columns read "-" rather than being invented.
+//Where the question is "which part of the run is this", time is the whole answer.
+void record_time(const char* stage, bool on_device, double ms);
+
 //Rows in first-seen order, with a CPU/GPU speed ratio wherever a stage has both.
 void report(std::ostream& out);
 

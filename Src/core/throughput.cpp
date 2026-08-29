@@ -52,7 +52,7 @@ bool enabled()
 
 void record(const char* stage, const bool on_device, const double flops, const double ms)
 {
-    if (!stage || flops <= 0.0)
+    if (!stage || flops < 0.0)
         return;
     std::lock_guard<std::mutex> lock(g_mutex);
     for (Row& r : g_rows) {
@@ -65,6 +65,11 @@ void record(const char* stage, const bool on_device, const double flops, const d
         }
     }
     g_rows.push_back(Row{stage, on_device, flops, ms, ms, 1});
+}
+
+void record_time(const char* stage, const bool on_device, const double ms)
+{
+    record(stage, on_device, 0.0, ms);
 }
 
 void reset()
@@ -112,12 +117,18 @@ void report(std::ostream& out)
         << std::setw(12) << "slowest" << "\n";
 
     for (const Row& r : rows) {
+        //A row recorded by record_time has no flop count, and printing 0.000 GFLOP for it
+        //would read as "this stage does no arithmetic" rather than "nobody counted it"
+        const bool counted = r.flops > 0.0;
+        std::ostringstream gflop;
+        if (counted) gflop << std::fixed << std::setprecision(3) << (r.flops / 1.0e9);
+        else gflop << "-";
         out << std::left << std::setw(34) << r.stage.substr(0, 33)
             << std::setw(6) << (r.on_device ? "GPU" : "CPU")
             << std::right << std::setw(8) << r.calls
             << std::setw(12) << std::fixed << std::setprecision(1) << r.ms
-            << std::setw(12) << std::fixed << std::setprecision(3) << (r.flops / 1.0e9)
-            << std::setw(12) << rate(r.flops, r.ms)
+            << std::setw(12) << gflop.str()
+            << std::setw(12) << (counted ? rate(r.flops, r.ms) : std::string("-"))
             << std::setw(12) << std::fixed << std::setprecision(1) << r.slowest << "\n";
     }
 
