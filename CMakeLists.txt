@@ -11,23 +11,23 @@ option(NOSPHERA2_USE_CUDA "Build the CUDA scattering-factor path" OFF)
 option(NOSPHERA2_USE_HIP "Build the HIP (AMD) scattering-factor path" OFF)
 option(NOSPHERA2_GPU_AUTO "Pick the GPU backend from the hardware present" ON)
 
-#While AUTO is on, detection decides on every configure and overwrites the cache. It cannot
-#instead skip when the variables are already set: option() caches them on the first configure,
-#so from the second onwards "the user asked for this" and "nobody has ever asked" are the same
-#state. A build directory created before the toolkit existed would then stay CPU-only however
-#often it was reconfigured. Set NOSPHERA2_GPU_AUTO=OFF to pin the two flags by hand.
-if(NOSPHERA2_GPU_AUTO)
+#Detection may switch a backend on, never off, and only runs while neither is already on.
+#Both halves are load-bearing. It has to re-decide rather than skip once the variables exist,
+#because option() caches them on the first configure and from the second onwards "the user
+#asked for this" and "nobody has ever asked" are the same state - a build directory created
+#before the toolkit existed would otherwise stay CPU-only however often it was reconfigured.
+#But overwriting unconditionally is worse: it overrides an explicit -DNOSPHERA2_USE_CUDA=ON
+#and so breaks building for a GPU on a machine that has none, which is the ordinary cluster
+#arrangement of a GPU-less head node compiling for the compute nodes. Deferring to a backend
+#that is already on covers both, since wanting to build for an absent GPU is exactly what
+#detection cannot observe. Set NOSPHERA2_GPU_AUTO=OFF to pin the two flags by hand.
+if(NOSPHERA2_GPU_AUTO AND NOT NOSPHERA2_USE_CUDA AND NOT NOSPHERA2_USE_HIP)
     include("${CMAKE_CURRENT_LIST_DIR}/scripts/GpuToolkit.cmake")
     nosphera2_detect_gpu(NOSPHERA2_GPU_VENDOR)
     if(NOSPHERA2_GPU_VENDOR STREQUAL "NVIDIA")
         set(NOSPHERA2_USE_CUDA ON CACHE BOOL "" FORCE)
-        set(NOSPHERA2_USE_HIP OFF CACHE BOOL "" FORCE)
     elseif(NOSPHERA2_GPU_VENDOR STREQUAL "AMD")
         set(NOSPHERA2_USE_HIP ON CACHE BOOL "" FORCE)
-        set(NOSPHERA2_USE_CUDA OFF CACHE BOOL "" FORCE)
-    else()
-        set(NOSPHERA2_USE_CUDA OFF CACHE BOOL "" FORCE)
-        set(NOSPHERA2_USE_HIP OFF CACHE BOOL "" FORCE)
     endif()
     message(STATUS "GPU auto-detect: ${NOSPHERA2_GPU_VENDOR} (-DNOSPHERA2_GPU_AUTO=OFF to choose by hand)")
     #A missing compiler after auto-enabling is a status line below, not the warning someone
