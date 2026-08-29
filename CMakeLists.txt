@@ -75,13 +75,28 @@ if(NOSPHERA2_USE_CUDA)
         set(CMAKE_CUDA_STANDARD 17)
         set(CMAKE_CUDA_STANDARD_REQUIRED ON)
         #native builds for the card doing the build and nothing else, which is right for a
-        #local build and wrong for one that gets copied. all-major covers every major
-        #architecture the toolkit still supports and carries PTX for the newest, so a binary
-        #built this way runs on any card from that era onwards. Note CUDA 13 dropped Volta,
-        #so a V100 needs a 12.x toolkit whatever this is set to.
+        #local build and wrong for one that gets copied.
+        #
+        #The portable list names minor architectures, not major ones. all-major would be the
+        #obvious choice and is a trap: a cubin runs on any later minor of the same major, so
+        #sm_80 does execute on an sm_86 or sm_89 card - but as sm_80 code. Measured on the I
+        #tensor, an sm_80 cubin on an sm_89 card gives up 17% against one built for sm_89.
+        #The consumer parts are exactly the ones that would inherit that, so they are named.
+        #
+        #Chosen from the compiler version rather than by filtering
+        #CMAKE_CUDA_ARCHITECTURES_ALL. That list suffixes its entries with -real, so a plain
+        #IN_LIST against bare numbers silently matches almost nothing, and in a directory
+        #that has seen more than one toolkit it goes stale as well. The version is neither.
+        #
+        #CUDA 13 dropped Volta, so 70 appears only on a 12.x toolkit - which is what a V100
+        #needs anyway - and Blackwell only on 13.
         if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
             if(NOSPHERA2_CUDA_PORTABLE)
-                set(CMAKE_CUDA_ARCHITECTURES all-major)
+                if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13)
+                    set(CMAKE_CUDA_ARCHITECTURES 75 80 86 89 90 100 120)
+                else()
+                    set(CMAKE_CUDA_ARCHITECTURES 70 75 80 86 89 90)
+                endif()
             else()
                 set(CMAKE_CUDA_ARCHITECTURES native)
             endif()
