@@ -7068,11 +7068,10 @@ const double WFN::compute_dens_cartesian(
     const MO *MOs_data = MOs.data();
     double *phi_data = phi.data();
     const double exp_cutoff = constants::exp_cutoff;
-    const double **MO_coefs_data = new const double *[nmo];
-    for (j = 0; j < nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -7146,19 +7145,13 @@ const double WFN::compute_dens_cartesian(
 
         // use pointer arithmetic and cache coefficient pointer
         // This avoids repeated virtual function calls to get_coefficient_f
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi_data;
-        const double *phi_end = phi_ptr + nmo;
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; phi_ptr != phi_end; ++phi_ptr, ++mo_coef_ptr)
+        for (int mo = 0; mo < nmo; ++mo, ++phi_ptr)
         {
-            *phi_ptr += (*mo_coef_ptr)[j] * ex;
+            *phi_ptr += c_row[mo] * ex;
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     // use pointer arithmetic and minimize overhead
     const double *phi_ptr = phi_data;
@@ -7373,11 +7366,10 @@ const double WFN::compute_spin_dens_cartesian(
     const double *exponents_data = exponents.data();
     const MO *MOs_data = MOs.data();
     double *phi_data = phi.data();
-    const double **MO_coefs_data = new const double *[nmo];
-    for (j = 0; j < nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -7450,19 +7442,13 @@ const double WFN::compute_spin_dens_cartesian(
         }
         // use pointer arithmetic and cache coefficient pointer
         // This avoids repeated virtual function calls to get_coefficient_f
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi_data;
-        const double *phi_end = phi_ptr + nmo;
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; phi_ptr != phi_end; ++phi_ptr, ++mo_coef_ptr)
+        for (int mo = 0; mo < nmo; ++mo, ++phi_ptr)
         {
-            *phi_ptr += (*mo_coef_ptr)[j] * ex;
+            *phi_ptr += c_row[mo] * ex;
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     // use pointer arithmetic and minimize overhead
     const double *phi_ptr = phi_data;
@@ -7804,6 +7790,26 @@ void WFN::pop_back_MO()
     nmo--;
 }
 
+//Built once and reused for every grid point. nmo*nex doubles - 531 KB on sucrose - 
+//against the millions of points that then read it, so the build cost is noise.
+const double* WFN::get_coef_primitive_major() const
+{
+	const int _nmo = get_nmo(false);
+	if (_nmo <= 0 || nex <= 0) return nullptr;
+	if (coef_primitive_major_valid
+	    && coef_primitive_major.size() == (size_t)nex * (size_t)_nmo)
+		return coef_primitive_major.data();
+	coef_primitive_major.assign((size_t)nex * (size_t)_nmo, 0.0);
+	for (int mo = 0; mo < _nmo; mo++) {
+		const double* src = MOs[mo].get_coefficient_ptr();
+		if (!src) continue;
+		for (int j = 0; j < nex; j++)
+			coef_primitive_major[(size_t)j * _nmo + mo] = src[j];
+	}
+	coef_primitive_major_valid = true;
+	return coef_primitive_major.data();
+}
+
 const void WFN::computeValues(
     const d3 &PosGrid, // [3] vector with current position on te grid
     double &Rho,           // Value of Electron Density
@@ -7836,11 +7842,10 @@ const void WFN::computeValues(
     Hess[5] = 0;
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -7907,23 +7912,15 @@ const void WFN::computeValues(
         chi[8] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[1][0] * ex;
         chi[9] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 10)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 10)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 10; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
-
     for (int mo = 0; mo < _nmo; mo++)
     {
         const double occ = get_MO_occ(mo);
@@ -7974,11 +7971,10 @@ const void WFN::computeELIELF(
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8037,23 +8033,15 @@ const void WFN::computeELIELF(
         chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
         chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 4)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 4; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
     double tau = 0;
@@ -8095,11 +8083,10 @@ const double WFN::computeELI(
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8158,23 +8145,15 @@ const double WFN::computeELI(
         chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
         chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 4)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 4; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
     double tau = 0;
@@ -8242,11 +8221,10 @@ void WFN::computeRhoELI(
     const double exp_cutoff = constants::exp_cutoff;
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8308,23 +8286,15 @@ void WFN::computeRhoELI(
         chi[2] = (y1 - ex2 * ynext) * x0 * z0 * ex;
         chi[3] = (z1 - ex2 * znext) * x0 * y0 * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + _nmo;
+        const double *c_row = coefs + (size_t)j * _nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
+        for (int mo = 0; mo < _nmo; ++mo, phi_ptr += 4)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 4; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
     double tau = 0;
@@ -8392,11 +8362,10 @@ void WFN::computeGrad(
     const double exp_cutoff = constants::exp_cutoff;
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8458,23 +8427,15 @@ void WFN::computeGrad(
         chi[2] = (y1 - ex2 * ynext) * x0 * z0 * ex;
         chi[3] = (z1 - ex2 * znext) * x0 * y0 * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + _nmo;
+        const double *c_row = coefs + (size_t)j * _nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
+        for (int mo = 0; mo < _nmo; ++mo, phi_ptr += 4)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 4; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
 
@@ -8614,11 +8575,10 @@ const void WFN::computeLapELIELF(
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8681,23 +8641,15 @@ const void WFN::computeLapELIELF(
         chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
         chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 7)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 7; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
     double Hess[3]{ 0, 0, 0 };
@@ -8746,11 +8698,10 @@ const void WFN::computeLapELI(
 
     const MO *MOs_data = MOs.data();
     double *phi_data = phi.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8821,16 +8772,11 @@ const void WFN::computeLapELI(
         chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
         chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 7)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             phi_ptr[0] += c * chi[0];
             phi_ptr[1] += c * chi[1];
             phi_ptr[2] += c * chi[2];
@@ -8840,9 +8786,6 @@ const void WFN::computeLapELI(
             phi_ptr[6] += c * chi[6];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
     double Hess[3]{ 0, 0, 0 };
@@ -8889,11 +8832,10 @@ const double WFN::computeLap(
     double xl[9]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8964,16 +8906,11 @@ const double WFN::computeLap(
         chi[4] = (xl[2] - ex2 * (2 * l[0] + 1) * xl[0] + ex4 * pow(d[0], l[0] + 2)) * xl[3] * xl[6] * ex;
         chi[5] = (xl[5] - ex2 * (2 * l[1] + 1) * xl[3] + ex4 * pow(d[1], l[1] + 2)) * xl[6] * xl[0] * ex;
         chi[6] = (xl[8] - ex2 * (2 * l[2] + 1) * xl[6] + ex4 * pow(d[2], l[2] + 2)) * xl[0] * xl[3] * ex;
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 7)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             phi_ptr[0] += c * chi[0];
             phi_ptr[1] += c * chi[1];
             phi_ptr[2] += c * chi[2];
@@ -8984,9 +8921,6 @@ const double WFN::computeLap(
         }
 
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Hess[3]{ 0, 0, 0 };
 

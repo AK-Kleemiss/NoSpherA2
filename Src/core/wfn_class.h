@@ -77,6 +77,19 @@ private:
     std::string method;
     // Vector of molecular orbitals
     std::vector<MO> MOs;
+    // The same MO coefficients, transposed: primitive-major, [primitive * nmo + mo].
+    //
+    // MOs stores one coefficient array per orbital, so the grid evaluators - which walk
+    // primitives outermost and every MO inside - read C[mo][j] with a stride of nex between
+    // consecutive MOs. That is 91 scattered cache lines per primitive on sucrose, and it is
+    // why a property run measured 41.7 GFLOP/s on 16 threads where the arithmetic alone
+    // should go several times faster. Primitive-major makes that read contiguous.
+    //
+    // Mutable and filled on demand, because it is a cache of what MOs already holds and
+    // building it does not change the object's value. Anything that edits MOs or the
+    // primitive count has to call invalidate_coef_cache().
+    mutable vec coef_primitive_major;
+    mutable bool coef_primitive_major_valid = false;
     // Vector of centeres that primitives are base on
     ivec centers;
     // Vector of types of primitives
@@ -154,6 +167,13 @@ private:
     const double compute_dens_spherical(const d3& Pos, vec2& d, vec& phi) const;
 
 public:
+    /** Primitive-major MO coefficients, [primitive * nmo + mo], built on first use.
+     *  The grid evaluators want all MOs for one primitive contiguous; MOs stores the
+     *  transpose of that. Returns an empty span if there is nothing to build from. */
+    const double* get_coef_primitive_major() const;
+    /** Drop the cache above. Call after anything that changes MO coefficients or nex. */
+    void invalidate_coef_cache() const { coef_primitive_major_valid = false; }
+
     /** @name Constructors */
     ///@{
     /** Default constructor creates an empty wavefunction object. */
