@@ -1493,12 +1493,14 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 	bool itensor_on_gpu = false;
 #ifdef NOSPHERA2_USE_GPU
-	if (opt->gpu_itensor) {
+	//Read with use_gpu rather than on its own, so -no_gpu means what it says. Checking the
+	//pair here rather than clearing the flag at parse time keeps it order-independent.
+	if (opt->gpu_itensor && opt->use_gpu) {
 		//Flatten what the device needs: the AO values never change with the reflection,
 		//so they are uploaded once and every reflection reuses them.
 		ivec bg, bps, bpc, bna, goff(n_atom_grids + 1, 0);
 		std::vector<long long> bao, baos;
-		std::vector<float> ao_all;
+		vec ao_all;
 		ivec aos_all;
 		for (int gg = 0; gg < n_atom_grids; gg++) goff[gg + 1] = goff[gg] + points[gg];
 		for (int gg = 0; gg < n_atom_grids; gg++) {
@@ -1534,12 +1536,18 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		L.skip = skip_flat.data(); L.grid_point_off = goff.data();
 		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
 		L.n_points = static_cast<long long>(fd1.size());
-		itensor_on_gpu = itensor_gpu_init(L);
+		//-gpu_fp64 raises the whole device path to double. It is worth asking for on a card
+		//with real double-precision units and expensive on one without, which is why it is
+		//asked for rather than detected.
+		const sf_precision iprec = opt->gpu_fp64 ? sf_precision::FP64 : sf_precision::FP32;
+		itensor_on_gpu = itensor_gpu_init(L, iprec);
 		//Say which processor produced the numbers; gated like the other timing lines so
 		//the golden-file tests, which run with no_date, keep their reference output
 		if (!(opt->no_date))
-			std::cout << "GPU in use: XCW I tensor on " << (itensor_on_gpu ? "the device (single-precision GEMM)"
-			                                                              : "the CPU - device unavailable or problem too large") << std::endl;
+			std::cout << "GPU in use: XCW I tensor on "
+			          << (itensor_on_gpu ? (opt->gpu_fp64 ? "the device (double-precision GEMM)"
+			                                              : "the device (single-precision GEMM)")
+			                             : "the CPU - device unavailable or problem too large") << std::endl;
 	}
 	if (itensor_on_gpu) {
 		//The GPU holds one reflection at a time, so this loop is sequential by design

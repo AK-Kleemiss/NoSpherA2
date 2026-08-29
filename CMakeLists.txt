@@ -10,6 +10,8 @@ option(NOSPHERA2_DEPENDENCIES_ONLY "Build dependencies without building NoSpherA
 option(NOSPHERA2_USE_CUDA "Build the CUDA scattering-factor path" OFF)
 option(NOSPHERA2_USE_HIP "Build the HIP (AMD) scattering-factor path" OFF)
 option(NOSPHERA2_GPU_AUTO "Pick the GPU backend from the hardware present" ON)
+#For a binary that will be copied to other machines rather than run where it was built.
+option(NOSPHERA2_CUDA_PORTABLE "Build CUDA code for every major architecture, not just this card" OFF)
 
 #Detection may switch a backend on, never off, and only runs while neither is already on.
 #Both halves are load-bearing. It has to re-decide rather than skip once the variables exist,
@@ -72,20 +74,38 @@ if(NOSPHERA2_USE_CUDA)
         enable_language(CUDA)
         set(CMAKE_CUDA_STANDARD 17)
         set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+        #native builds for the card doing the build and nothing else, which is right for a
+        #local build and wrong for one that gets copied. all-major covers every major
+        #architecture the toolkit still supports and carries PTX for the newest, so a binary
+        #built this way runs on any card from that era onwards. Note CUDA 13 dropped Volta,
+        #so a V100 needs a 12.x toolkit whatever this is set to.
         if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-            set(CMAKE_CUDA_ARCHITECTURES native)
+            if(NOSPHERA2_CUDA_PORTABLE)
+                set(CMAKE_CUDA_ARCHITECTURES all-major)
+            else()
+                set(CMAKE_CUDA_ARCHITECTURES native)
+            endif()
+        endif()
+        #A pinned list compiles to those architectures and nothing else, so the binary has
+        #no code at all for a card outside it and every GPU path quietly declines - which
+        #looks exactly like having no GPU. Carrying PTX for the newest entry lets the driver
+        #compile for anything newer on first run. It cannot help an older card: PTX is
+        #compiled forward, never back, so this is a backstop and not a substitute for
+        #NOSPHERA2_CUDA_PORTABLE. "native" is left alone, being the one case that cannot
+        #arise.
+        if(NOT CMAKE_CUDA_ARCHITECTURES MATCHES "native|all|all-major")
+            set(_arch_sorted ${CMAKE_CUDA_ARCHITECTURES})
+            list(SORT _arch_sorted COMPARE NATURAL)
+            list(GET _arch_sorted -1 _arch_newest)
+            string(REGEX MATCH "^[0-9]+" _arch_newest "${_arch_newest}")
+            if(_arch_newest AND NOT "${_arch_newest}-virtual" IN_LIST CMAKE_CUDA_ARCHITECTURES)
+                list(APPEND CMAKE_CUDA_ARCHITECTURES "${_arch_newest}-virtual")
+            endif()
         endif()
         find_package(CUDAToolkit REQUIRED)
-        #Delay-loading cuBLAS keeps the binary startable where no CUDA runtime exists:
-        #the bind happens on the first call, which only follows a successful device probe.
-        #Without it the loader refuses the process outright and no fallback can run.
-        if(MSVC)
-            set(NOSPHERA2_CUDA_DELAYLOAD
-                "/DELAYLOAD:cublas64_${CUDAToolkit_VERSION_MAJOR}.dll"
-                CACHE INTERNAL "cuBLAS DLL to delay-load")
-        endif()
-        #cuBLAS always comes with the toolkit, so the two kernels that need it always build
-        set(NOSPHERA2_HAVE_GPUBLAS ON)
+        #Nothing to delay-load any more. cuBLAS was the only dynamic CUDA library linked,
+        #and the GEMMs that used it are ours now, so the binary imports no DLL that a
+        #machine without CUDA could fail to provide.
         message(STATUS "CUDA enabled, arch ${CMAKE_CUDA_ARCHITECTURES}")
     elseif(_nosphera2_gpu_auto_enabled)
         message(STATUS "NVIDIA GPU present but no CUDA compiler found; building for the CPU")
@@ -106,36 +126,19 @@ if(NOSPHERA2_USE_HIP)
         if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
             set(CMAKE_HIP_ARCHITECTURES gfx90a;gfx942;gfx1100)
         endif()
-        #Same reasoning as the cuBLAS delay-load above, and it bites harder here: ROCm's
-        #bin directory is not on PATH by default, so a HIP build linking hipBLAS fails to
-        #start with STATUS_DLL_NOT_FOUND on a machine that has the GPU but not the SDK.
-        #Measured on the AMD node: without this the process is rejected before main().
+        #ROCm's bin directory is not on PATH by default, so a HIP build fails to start with
+        #STATUS_DLL_NOT_FOUND on a machine that has the GPU but not the SDK. Measured on the
+        #AMD node: without this the process is rejected before main(). hipBLAS is no longer
+        #among these, which is what lets every kernel build on a conda-forge ROCm - it
+        #packages hipcc without hipBLAS, and that used to strand the I tensor on the CPU.
         if(MSVC)
             string(REGEX MATCH "^[0-9]+" NOSPHERA2_HIP_MAJOR "${CMAKE_HIP_COMPILER_VERSION}")
             if(NOT NOSPHERA2_HIP_MAJOR)
                 set(NOSPHERA2_HIP_MAJOR 6)
             endif()
             set(NOSPHERA2_HIP_DELAYLOAD
-                "/DELAYLOAD:hipblas.dll"
                 "/DELAYLOAD:amdhip64_${NOSPHERA2_HIP_MAJOR}.dll"
                 CACHE INTERNAL "ROCm DLLs to delay-load")
-        endif()
-        #Unlike cuBLAS, hipBLAS is not guaranteed to be beside the compiler: conda-forge
-        #packages hipcc without it. Rather than refuse to build, drop the two kernels that
-        #need it - the scattering-factor transform, the grid weights and the SALTED
-        #descriptors do not, and the first of those is the path that runs unasked.
-        find_path(NOSPHERA2_HIPBLAS_INCLUDE
-            NAMES hipblas/hipblas.h hipblas.h
-            HINTS "$ENV{HIP_PATH}/include" "$ENV{ROCM_PATH}/include" "/opt/rocm/include"
-                  "${MICROMAMBA_ENV_PREFIX}/include")
-        mark_as_advanced(NOSPHERA2_HIPBLAS_INCLUDE)
-        if(NOSPHERA2_HIPBLAS_INCLUDE)
-            set(NOSPHERA2_HAVE_GPUBLAS ON)
-        else()
-            set(NOSPHERA2_HAVE_GPUBLAS OFF)
-            message(STATUS
-                "hipBLAS not found: the I tensor and the offloaded GEMM stay on the CPU. "
-                "The transform, grid weights and SALTED descriptors still run on the device.")
         endif()
         message(STATUS "HIP enabled, arch ${CMAKE_HIP_ARCHITECTURES}")
     elseif(_nosphera2_gpu_auto_enabled)

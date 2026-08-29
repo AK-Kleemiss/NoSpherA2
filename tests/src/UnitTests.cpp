@@ -2494,6 +2494,50 @@ namespace NoSpherA2UnitTests
         blas_gpu_set_enabled(false);
     }
 
+    // Every shape above uses a single k-slice, so none of them reaches the split-k path - and
+    // that path is where a GEMM of our own differs from a library one. A deep, narrow
+    // reduction is what the I tensor actually asks for, and it is the shape that forces the
+    // depth to be cut across blocks and summed afterwards.
+    //
+    // Determinism is asserted as well as accuracy, deliberately: accumulating the slices with
+    // an atomic would be shorter, would pass an accuracy check, and would make the result
+    // depend on the order the device happened to finish them. Bit-identical repeats are the
+    // only thing that tells those two implementations apart.
+    TEST(BlasGpuTests, ADeepReductionIsSplitAcrossBlocksAndStillSumsInAFixedOrder)
+    {
+        if (!blas_gpu_available()) {
+            GTEST_SKIP() << "No GPU device present; blas_gpu_dgemm cannot run here";
+        }
+
+        const int m = 9, n = 7, k = 4096;   // one tile of output, many slices of depth
+        std::vector<double> A((size_t)m * k), B((size_t)k * n);
+        for (size_t i = 0; i < A.size(); i++) A[i] = 0.5 - std::sin(0.37 * (double)i);
+        for (size_t i = 0; i < B.size(); i++) B[i] = 0.25 + std::cos(0.21 * (double)i);
+
+        blas_gpu_set_enabled(true);
+        set_min_flop_env("1");
+
+        std::vector<double> C1((size_t)m * n, 0.0), C2((size_t)m * n, 0.0);
+        ASSERT_TRUE(blas_gpu_dgemm(false, false, m, n, k, 1.0,
+            A.data(), k, B.data(), n, 0.0, C1.data(), n));
+        ASSERT_TRUE(blas_gpu_dgemm(false, false, m, n, k, 1.0,
+            A.data(), k, B.data(), n, 0.0, C2.data(), n));
+
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                double want = 0.0;
+                for (int p = 0; p < k; p++)
+                    want += A[(size_t)i * k + p] * B[(size_t)p * n + j];
+                const size_t at = (size_t)i * n + j;
+                ASSERT_NEAR(C1[at], want, 1e-9) << "at (" << i << "," << j << ")";
+                ASSERT_EQ(C1[at], C2[at]) << "not reproducible at (" << i << "," << j << ")";
+            }
+        }
+
+        set_min_flop_env(nullptr);
+        blas_gpu_set_enabled(false);
+    }
+
     // The gate is the reason the offload is worth having, so it gets its own check: a shape
     // below the threshold has to be declined rather than quietly run at a loss.
     TEST(BlasGpuTests, SmallShapesAreDeclinedSoTheyStayOnTheHost)

@@ -29,17 +29,6 @@
 #define gpuMemcpyAsync hipMemcpyAsync
 #define gpuHostAlloc hipHostMalloc
 #define gpuFreeHost hipHostFree
-#include <hipblas/hipblas.h>
-#define gpublasHandle_t hipblasHandle_t
-#define gpublasStatus_t hipblasStatus_t
-#define gpublasCreate hipblasCreate
-#define gpublasDestroy hipblasDestroy
-#define gpublasSgemm hipblasSgemm
-#define gpublasDgemm hipblasDgemm
-#define gpublasOperation_t hipblasOperation_t
-#define GPUBLAS_OP_T HIPBLAS_OP_T
-#define GPUBLAS_OP_N HIPBLAS_OP_N
-#define GPUBLAS_STATUS_SUCCESS HIPBLAS_STATUS_SUCCESS
 #else
 #include <cuda_runtime.h>
 #define gpuError_t cudaError_t
@@ -65,51 +54,8 @@
 #define gpuMemcpyAsync cudaMemcpyAsync
 #define gpuHostAlloc(p, n) cudaHostAlloc((p), (n), cudaHostAllocDefault)
 #define gpuFreeHost cudaFreeHost
-#include <cublas_v2.h>
-#define gpublasHandle_t cublasHandle_t
-#define gpublasStatus_t cublasStatus_t
-#define gpublasCreate cublasCreate
-#define gpublasDestroy cublasDestroy
-#define gpublasSgemm cublasSgemm
-#define gpublasDgemm cublasDgemm
-#define gpublasOperation_t cublasOperation_t
-#define GPUBLAS_OP_T CUBLAS_OP_T
-#define GPUBLAS_OP_N CUBLAS_OP_N
-#define GPUBLAS_STATUS_SUCCESS CUBLAS_STATUS_SUCCESS
 #endif
 
-//Delay-loading the BLAS DLL stops the loader rejecting the process where no GPU runtime
-//exists, but on its own it only moves the failure: the first call then raises the
-//delay-load helper exception and kills the process with 0xC06D007E. So probe for the
-//module before calling in, and treat absence as "no GPU".
-#ifdef _WIN32
-//windows.h defines min and max as macros unless told not to, which turns every std::max in
-//a kernel including this header into a syntax error. The core sources escape it through
-//pch.h; the .cu files do not use that precompiled header.
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#include <cstdio>
-inline bool gpu_blas_runtime_present()
-{
-#ifdef NOSPHERA2_USE_HIP
-	static const bool ok = (LoadLibraryA("hipblas.dll") != nullptr);
-#else
-	//The name must be the major version this binary imports, which is what CMake delay-loads.
-	//Accepting any cuBLAS is worse than not probing: on a machine with 12 but not 13 the
-	//probe passes and the delay-load then dies binding 13 at the first call.
-	static const bool ok = []() {
-		char name[32];
-		std::snprintf(name, sizeof(name), "cublas64_%d.dll", CUDART_VERSION / 1000);
-		return LoadLibraryA(name) != nullptr;
-	}();
-#endif
-	return ok;
-}
-#else
-inline bool gpu_blas_runtime_present() { return true; }
-#endif
+//No BLAS library is mapped here on purpose. The GEMMs are in gemm_gpu.cuh, which removed
+//half a gigabyte of cuBLAS from the package and, on the AMD side, removed a dependency
+//conda-forge does not ship at all.

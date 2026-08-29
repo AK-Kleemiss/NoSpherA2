@@ -1,5 +1,6 @@
 #pragma once
 
+#include "sf_gpu.h"
 #include <complex>
 #include <cstddef>
 
@@ -24,7 +25,9 @@ struct itensor_gpu_layout {
 	const int* blk_n_active = nullptr;    //[n_blocks]
 	const long long* blk_ao_off = nullptr;  //[n_blocks] into ao_all
 	const long long* blk_aos_off = nullptr; //[n_blocks] into aos_all
-	const float* ao_all = nullptr;        //row-major n_active x point_count per block
+	//Double whichever precision the device runs in: narrowing, when it happens, is the
+	//upload's business, so the caller does not have to know what was chosen.
+	const double* ao_all = nullptr;       //row-major n_active x point_count per block
 	long long ao_all_len = 0;
 	const int* aos_all = nullptr;         //AO index per active row, ascending
 	long long aos_all_len = 0;
@@ -37,7 +40,9 @@ struct itensor_gpu_layout {
 	long long n_points = 0;
 };
 
-bool itensor_gpu_init(const itensor_gpu_layout& L);
+//FP64 runs the whole device path in double, phase and GEMM alike; anything else runs it in
+//single. sf_precision::Auto is deliberately not honoured - see the definition.
+bool itensor_gpu_init(const itensor_gpu_layout& L, sf_precision prec = sf_precision::FP32);
 
 //One reflection: phases for each symmetry mate, then every block, accumulated into I_r.
 //factors is [num_syms * n_grids], the same product the CPU path applies per (sym, grid).

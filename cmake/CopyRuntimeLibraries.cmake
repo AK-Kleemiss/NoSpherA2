@@ -111,32 +111,6 @@ function(nosphera2_copy_runtime_libraries target)
         VERBATIM
     )
 
-    # cuBLAS. The binary delay-loads cublas64_<major>.dll and probes before calling in, so a
-    # missing one is not a crash: every path needing a device BLAS declines and runs on the
-    # CPU, which looks like -gpu_itensor doing nothing. Three layouts hold it - CUDA 12 in
-    # bin, CUDA 13 in bin/x64, a conda-forge toolkit in Library/bin.
-    if(WIN32 AND NOSPHERA2_USE_CUDA)
-        file(GLOB _cuda_runtime
-            "${CUDAToolkit_BIN_DIR}/cublas64_*.dll"
-            "${CUDAToolkit_BIN_DIR}/cublasLt64_*.dll"
-            "${CUDAToolkit_BIN_DIR}/x64/cublas64_*.dll"
-            "${CUDAToolkit_BIN_DIR}/x64/cublasLt64_*.dll"
-            "${MICROMAMBA_ENV_PREFIX}/Library/bin/cublas64_*.dll"
-            "${MICROMAMBA_ENV_PREFIX}/Library/bin/cublasLt64_*.dll")
-        if(NOT _cuda_runtime)
-            message(WARNING
-                "cuBLAS runtime not found beside the CUDA toolkit. Paths needing a device "
-                "BLAS will decline at run time unless one is on PATH.")
-        endif()
-        foreach(_dll ${_cuda_runtime})
-            add_custom_command(
-                TARGET "${target}"
-                POST_BUILD
-                COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-                        "${_dll}" "$<TARGET_FILE_DIR:${target}>"
-                COMMENT "Copying ${_dll} for ${target}"
-                VERBATIM
-            )
-        endforeach()
-    endif()
+    # No CUDA or ROCm runtime is copied. cuBLAS was the only one that ever needed to be, and
+    # shipping it cost half a gigabyte for two GEMM calls; gemm_gpu.cuh replaced it.
 endfunction()

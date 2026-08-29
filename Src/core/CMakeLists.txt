@@ -120,25 +120,13 @@ target_compile_definitions(
 if(NOSPHERA2_USE_CUDA)
     target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_CUDA)
     set_target_properties(NoSpherA2Core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-    #cuBLAS is a DLL, so linking it normally makes the executable refuse to start on a
-    #machine that has no CUDA runtime - which defeats the point of choosing the backend at
-    #run time. Delay-loading defers the bind to the first cuBLAS call, which only happens
-    #once a device has been found. cudart is already static and needs no such treatment.
-    target_link_libraries(NoSpherA2Core PRIVATE CUDA::cublas)
+    #No cuBLAS to link, delay-load, probe for or ship: the GEMMs are ours. cudart is static.
 endif()
 
 if(NOSPHERA2_USE_HIP)
     find_package(hip REQUIRED)
     target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_HIP)
     target_link_libraries(NoSpherA2Core PRIVATE hip::device)
-endif()
-
-#itensor_gpu and blas_gpu compile either way. Without a device BLAS they compile to the same
-#"no, use the CPU" answer their callers already handle for a machine with no device at all,
-#which is why nothing downstream needs to know. Dropping the two files instead would leave
-#their symbols undefined at link time and buy nothing.
-if((NOSPHERA2_USE_CUDA OR NOSPHERA2_USE_HIP) AND NOSPHERA2_HAVE_GPUBLAS)
-    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_HAVE_GPUBLAS)
 endif()
 
 target_compile_features(

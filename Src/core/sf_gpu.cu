@@ -91,10 +91,38 @@ __global__ void sf_kernel(const int imax, const long long smax,
 	}
 }
 
+namespace {
+__global__ void probe_kernel(int* p) { if (p) *p = 1; }
+}
+
+//A device being present is not the same as this binary having code for it. A build pinned
+//to particular architectures carries nothing for a card outside them, and every launch then
+//fails with cudaErrorNoKernelImageForDevice - which, once the caller falls back, is
+//indistinguishable from having no GPU at all. Launching an empty kernel is the only way to
+//find out, so do it once and say so plainly.
 bool sf_gpu_available()
 {
 	int n = 0;
-	return gpuGetDeviceCount(&n) == gpuSuccess && n > 0;
+	if (gpuGetDeviceCount(&n) != gpuSuccess || n <= 0) return false;
+
+	static const bool usable = []() {
+		probe_kernel<<<1, 1>>>(nullptr);
+		const gpuError_t e = gpuDeviceSynchronize();
+		//Clear the sticky error either way, so a later launch is judged on its own merits
+		(void)gpuGetLastError();
+		if (e == gpuSuccess) return true;
+		gpuDeviceProp_t prop{};
+		int dev = 0;
+		if (gpuGetDevice(&dev) == gpuSuccess && gpuGetDeviceProperties(&prop, dev) == gpuSuccess)
+			std::fprintf(stderr, "NoSpherA2: a GPU is present (compute %d.%d) but this build "
+			             "contains no code for it, so every GPU path will use the CPU. "
+			             "Rebuild with -DNOSPHERA2_CUDA_PORTABLE=ON.\n", prop.major, prop.minor);
+		else
+			std::fprintf(stderr, "NoSpherA2: a GPU is present but unusable (%s); "
+			             "every GPU path will use the CPU.\n", gpuGetErrorString(e));
+		return false;
+	}();
+	return usable;
 }
 
 //Context creation would otherwise happen on the first allocation, inside the transform.
