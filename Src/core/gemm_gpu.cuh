@@ -18,22 +18,35 @@
 
 namespace gemm_gpu {
 
-//Measured on the I tensor shape (m~100, n~200, k~4500), RTX 4090 mobile, best of three:
+//Tile shape, measured on the I tensor shape (m~100, n~200, k~4500), best of three:
 //
-//  BM/BN 32, TM/TN 2, BK 32   1530 GFLOP/s
-//  BM/BN 64, TM/TN 4, BK 32   1713          <- this
-//  BM/BN 64, TM/TN 4, BK 16   1542
+//                            RTX 4090 mobile (sm_89)   RTX 2080 Ti (sm_75)
+//  32/32 tile, 2x2 thread          1500 GFLOP/s              985
+//  64/64 tile, 4x4 thread          1714                     1149   <- this
+//  64/64 tile, 4x4, BK 16          1542                        -
 //
-//The first row spends four shared-memory loads on four FMAs; widening the per-thread tile
-//to 4x4 makes that eight loads on sixteen, and that ratio is what the inner loop is limited
-//by. Halving the staged depth undoes most of it, so the win is arithmetic intensity rather
-//than occupancy - fewer, fatter blocks beat more, thinner ones here.
-constexpr int BM = 64;   //rows of C per block
-constexpr int BN = 64;   //columns of C per block
-constexpr int BK = 32;   //depth staged per iteration
-constexpr int TM = 4;    //rows of C per thread
-constexpr int TN = 4;    //columns of C per thread
-constexpr int NTHREADS = (BM / TM) * (BN / TN);
+//The narrow tile spends four shared-memory loads on four FMAs where the wide one spends
+//eight on sixteen, and that ratio is what the inner loop is limited by. Halving the staged
+//depth gives most of it back, which says the same thing: the constraint is arithmetic
+//intensity, not occupancy - fewer, fatter blocks beat more, thinner ones.
+//
+//The obvious objection is that Turing has 64 KB of shared memory per SM against Ada's 100,
+//so the 16 KB block should run out of room there and want the narrow tile. It was built
+//that way, selected at run time from the compute capability, and measured: the narrow tile
+//is slower on Turing too, by 14%. One shape, no dispatch.
+//
+//Where this kernel stands against cuBLAS on the same shape and inputs:
+//
+//  sm_89, RTX 4090 mobile   1714 vs 1764   97%
+//  sm_75, RTX 2080 Ti       1149 vs 1794   64%
+//  sm_70, Tesla V100        1507 vs 2595   58%
+//
+//So it is competitive on Ada and behind on the two older parts, and that is the price of
+//not shipping half a gigabyte. The untried lead is double-buffering the staged tile:
+//there is a __syncthreads() per depth step with no prefetch, and the newer part has the
+//warps in flight to hide it where the older ones do not, which fits the shape of the gap.
+struct tile_config { int BM, BN, BK, TM, TN; };
+constexpr tile_config TILE{64, 64, 32, 4, 4};
 
 //The transpose flags are template parameters rather than arguments so the indexing folds
 //away instead of branching once per element of the innermost loop.
@@ -52,11 +65,12 @@ __device__ inline T b_at(const T* __restrict__ B, const int ldb, const int l, co
 //One k-slice of C into its own slot of P. Splitting k is what makes the I tensor shape fill
 //a device at all: m and n are around a hundred there while k runs to several thousand, so
 //the un-split grid is a few dozen blocks whatever the tile size.
-template <typename T, bool TA, bool TB>
+template <typename T, bool TA, bool TB, int BM, int BN, int BK, int TM, int TN>
 __global__ void gemm_partial_kernel(const int m, const int n, const int k, const int splits,
 	const T* __restrict__ A, const int lda, const T* __restrict__ B, const int ldb,
 	T* __restrict__ P)
 {
+	constexpr int NTHREADS = (BM / TM) * (BN / TN);
 	__shared__ T As[BK][BM];
 	__shared__ T Bs[BK][BN];
 
@@ -132,9 +146,10 @@ __global__ void gemm_reduce_kernel(const int m, const int n, const int splits,
 //and comes back with one slice.
 inline int split_count(const int m, const int n, const int k)
 {
-	const long long tiles = (long long)((m + BM - 1) / BM) * ((n + BN - 1) / BN);
+	constexpr tile_config t = TILE;
+	const long long tiles = (long long)((m + t.BM - 1) / t.BM) * ((n + t.BN - 1) / t.BN);
 	long long s = 512 / (tiles > 0 ? tiles : 1);
-	const long long by_depth = k / (4 * BK);   //keep each slice worth staging
+	const long long by_depth = k / (4 * t.BK);   //keep each slice worth staging
 	if (s > by_depth) s = by_depth;
 	if (s < 1) s = 1;
 	if (s > 64) s = 64;
@@ -146,6 +161,23 @@ inline size_t workspace_elems(const int m, const int n, const int splits)
 	return (size_t)m * n * splits;
 }
 
+template <typename T, int BM, int BN, int BK, int TM, int TN>
+inline void launch_tiled(const bool transA, const bool transB,
+	const int m, const int n, const int k, const int splits,
+	const T* A, const int lda, const T* B, const int ldb, T* P)
+{
+	const dim3 thr(BN / TN, BM / TM);
+	const dim3 blk((n + BN - 1) / BN, (m + BM - 1) / BM, splits);
+	if (!transA && !transB)
+		gemm_partial_kernel<T, false, false, BM, BN, BK, TM, TN><<<blk, thr>>>(m, n, k, splits, A, lda, B, ldb, P);
+	else if (transA && !transB)
+		gemm_partial_kernel<T, true, false, BM, BN, BK, TM, TN><<<blk, thr>>>(m, n, k, splits, A, lda, B, ldb, P);
+	else if (!transA && transB)
+		gemm_partial_kernel<T, false, true, BM, BN, BK, TM, TN><<<blk, thr>>>(m, n, k, splits, A, lda, B, ldb, P);
+	else
+		gemm_partial_kernel<T, true, true, BM, BN, BK, TM, TN><<<blk, thr>>>(m, n, k, splits, A, lda, B, ldb, P);
+}
+
 //P must hold workspace_elems(m, n, split_count(m, n, k)) elements.
 template <typename T>
 inline bool launch(const bool transA, const bool transB,
@@ -155,17 +187,8 @@ inline bool launch(const bool transA, const bool transB,
 {
 	if (m <= 0 || n <= 0 || k <= 0) return false;
 	const int splits = split_count(m, n, k);
-	const dim3 thr(BN / TN, BM / TM);
-	const dim3 blk((n + BN - 1) / BN, (m + BM - 1) / BM, splits);
-
-	if (!transA && !transB)
-		gemm_partial_kernel<T, false, false><<<blk, thr>>>(m, n, k, splits, A, lda, B, ldb, P);
-	else if (transA && !transB)
-		gemm_partial_kernel<T, true, false><<<blk, thr>>>(m, n, k, splits, A, lda, B, ldb, P);
-	else if (!transA && transB)
-		gemm_partial_kernel<T, false, true><<<blk, thr>>>(m, n, k, splits, A, lda, B, ldb, P);
-	else
-		gemm_partial_kernel<T, true, true><<<blk, thr>>>(m, n, k, splits, A, lda, B, ldb, P);
+	launch_tiled<T, TILE.BM, TILE.BN, TILE.BK, TILE.TM, TILE.TN>(
+		transA, transB, m, n, k, splits, A, lda, B, ldb, P);
 
 	const dim3 rthr(16, 16);
 	const dim3 rblk((n + 15) / 16, (m + 15) / 16);
