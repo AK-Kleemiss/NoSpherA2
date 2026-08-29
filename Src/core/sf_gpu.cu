@@ -97,9 +97,10 @@ __global__ void probe_kernel(int* p) { if (p) *p = 1; }
 
 //A device being present is not the same as this binary having code for it. A build pinned
 //to particular architectures carries nothing for a card outside them, and every launch then
-//fails with cudaErrorNoKernelImageForDevice - which, once the caller falls back, is
-//indistinguishable from having no GPU at all. Launching an empty kernel is the only way to
-//find out, so do it once and say so plainly.
+//fails with "no kernel image is available for execution on the device" - which, once the
+//caller falls back, is indistinguishable from having no GPU at all. Launching an empty
+//kernel is the only way to find out, so do it once and say so plainly. Both backends raise
+//this, under different names, which is why neither is named here.
 bool sf_gpu_available()
 {
 	int n = 0;
@@ -111,6 +112,14 @@ bool sf_gpu_available()
 		//Clear the sticky error either way, so a later launch is judged on its own merits
 		(void)gpuGetLastError();
 		if (e == gpuSuccess) return true;
+		//Which architecture to name, and what to advise, is the one part of this that is
+		//not common to the two backends: compute capability has no HIP equivalent, and
+		//NOSPHERA2_CUDA_PORTABLE would be the wrong advice on an AMD card.
+#ifdef NOSPHERA2_USE_HIP
+		std::fprintf(stderr, "NoSpherA2: a GPU is present but this build contains no code "
+		             "for it (%s), so every GPU path will use the CPU. Rebuild with this "
+		             "card's architecture in CMAKE_HIP_ARCHITECTURES.\n", gpuGetErrorString(e));
+#else
 		gpuDeviceProp_t prop{};
 		int dev = 0;
 		if (gpuGetDevice(&dev) == gpuSuccess && gpuGetDeviceProperties(&prop, dev) == gpuSuccess)
@@ -120,6 +129,7 @@ bool sf_gpu_available()
 		else
 			std::fprintf(stderr, "NoSpherA2: a GPU is present but unusable (%s); "
 			             "every GPU path will use the CPU.\n", gpuGetErrorString(e));
+#endif
 		return false;
 	}();
 	return usable;
