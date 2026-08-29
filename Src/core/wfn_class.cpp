@@ -7790,12 +7790,28 @@ void WFN::pop_back_MO()
     nmo--;
 }
 
-//Built once and reused for every grid point. nmo*nex doubles - 531 KB on sucrose - 
-//against the millions of points that then read it, so the build cost is noise.
+//Built once and reused for every grid point. nmo*nex doubles - 531 KB on sucrose - against
+//the millions of points that then read it, so the build cost is noise.
+//
+//Locked, because the first caller is very often several threads at once. make_chi runs an
+//omp parallel for over atom pairs; each pair calls find_line_density_extrema, which runs
+//another over its sample points; each sample calls compute_dens, and compute_dens is what
+//asks for this. Unlocked, two threads both found the cache cold and both called assign(),
+//one reallocating the vector under the other's read. The damage was not a crash but a wrong
+//chi: on sucrose its checksum came out 2192.46 instead of 2139.92 - about twenty-six atom
+//pairs classified differently - and the TFVC charges moved by whole electrons, in roughly
+//one run in six.
+//
+//The lock is taken on every call, not only on the cold path. Double-checking would need the
+//valid flag to be atomic, and an atomic member would make WFN non-copyable, which it cannot
+//be. Uncontended that is tens of nanoseconds against the ~140 000 flops each grid point does
+//with the result.
 const double* WFN::get_coef_primitive_major() const
 {
 	const int _nmo = get_nmo(false);
 	if (_nmo <= 0 || nex <= 0) return nullptr;
+	static std::mutex coef_cache_mutex;
+	std::lock_guard<std::mutex> lock(coef_cache_mutex);
 	if (coef_primitive_major_valid
 	    && coef_primitive_major.size() == (size_t)nex * (size_t)_nmo)
 		return coef_primitive_major.data();

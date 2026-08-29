@@ -405,6 +405,11 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
         }
     }
 
+    if (std::getenv("NOSPHERA2_CHI_DEBUG")) {
+        double s = 0.0;
+        for (double v : chi) s += v * v;
+        std::fprintf(stderr, "chi checksum %.17g size %zu\n", s, chi.size());
+    }
     return chi;
 }
 
