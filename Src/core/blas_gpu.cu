@@ -2,6 +2,7 @@
 #include "gpu_backend.h"
 #include "sf_gpu.h"   //sf_gpu_fp64_ratio: the device property the threshold below scales on
 #include <cstdio>
+#include <cstdlib>
 
 //Calibrated on this machine (RTX 4090 Laptop, fp64 at 1/64 rate, 16 CPU threads with MKL):
 //the SALTED regression shape, 2*m*n*k = 17 GFLOP, measured 1.22x and was not worth taking.
@@ -45,6 +46,15 @@ bool blas_gpu_dgemm(const bool, const bool, const int, const int, const int,
 //startup, which is worth doing only if this proves too coarse.
 static double blas_gpu_min_flop()
 {
+	//The threshold is high enough that no problem in the test data comes near it, so without
+	//a way to lower it this function and the GEMM below ship untested - which is how the
+	//row-major transpose swap would come to be wrong on someone else's machine rather than
+	//here. Same escape hatch, for the same reason, as NOSPHERA2_GPU_BATCH and
+	//NOSPHERA2_GRID_LOCAL: a path nothing selects is a path nothing tests.
+	if (const char* env = std::getenv("NOSPHERA2_BLAS_GPU_MIN_FLOP")) {
+		const double v = std::atof(env);
+		if (v > 0.0) return v;
+	}
 	const int ratio = sf_gpu_fp64_ratio();
 	if (ratio <= 0) return BLAS_GPU_MIN_FLOP_AT_RATIO_64;   //unknown device: stay conservative
 	return BLAS_GPU_MIN_FLOP_AT_RATIO_64 * (double)ratio / 64.0;
