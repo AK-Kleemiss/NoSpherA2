@@ -38,14 +38,27 @@ endif()
 #The toolkit the bootstrap fetched, in preference to whatever is first on PATH. Without this
 #the build silently follows PATH: on a machine carrying both, the binary can end up importing
 #a cuBLAS that the machine it runs on does not have.
-if(NOSPHERA2_USE_CUDA AND NOT DEFINED CMAKE_CUDA_COMPILER AND MICROMAMBA_ENV_PREFIX)
-    foreach(_c "${MICROMAMBA_ENV_PREFIX}/Library/bin/nvcc.exe" "${MICROMAMBA_ENV_PREFIX}/bin/nvcc")
-        if(EXISTS "${_c}")
-            set(CMAKE_CUDA_COMPILER "${_c}" CACHE FILEPATH "CUDA compiler from the micromamba environment")
-            message(STATUS "Using the bootstrapped CUDA compiler: ${_c}")
-            break()
-        endif()
-    endforeach()
+#
+#Tested for usability rather than for being set. check_language caches CMAKE_CUDA_COMPILER as
+#NOTFOUND when it fails, so a directory configured before the toolkit arrived holds a defined
+#but useless value, and check_language will not look again. Gating on DEFINED here reproduced
+#exactly the freeze this file already has one fix for: bootstrap reports a toolkit, configure
+#reports no compiler, and no amount of reconfiguring changes its mind.
+if(NOSPHERA2_USE_CUDA)
+    #Drop a cached compiler that no longer resolves, so check_language searches again. This
+    #covers a toolkit installed system-wide after the failed configure as well as a fetched one.
+    if(DEFINED CMAKE_CUDA_COMPILER AND (NOT CMAKE_CUDA_COMPILER OR NOT EXISTS "${CMAKE_CUDA_COMPILER}"))
+        unset(CMAKE_CUDA_COMPILER CACHE)
+    endif()
+    if(MICROMAMBA_ENV_PREFIX AND NOT CMAKE_CUDA_COMPILER)
+        foreach(_c "${MICROMAMBA_ENV_PREFIX}/Library/bin/nvcc.exe" "${MICROMAMBA_ENV_PREFIX}/bin/nvcc")
+            if(EXISTS "${_c}")
+                set(CMAKE_CUDA_COMPILER "${_c}" CACHE FILEPATH "CUDA compiler from the micromamba environment" FORCE)
+                message(STATUS "Using the bootstrapped CUDA compiler: ${_c}")
+                break()
+            endif()
+        endforeach()
+    endif()
 endif()
 
 if(NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP)
