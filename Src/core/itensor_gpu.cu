@@ -43,8 +43,11 @@ struct Dev {
 	double *d1 = nullptr, *d2 = nullptr, *d3 = nullptr, *w = nullptr;
 	//Per reflection scratch
 	float *phase_re = nullptr, *phase_im = nullptr;
-	float *wre = nullptr, *wim = nullptr;
-	float *cre = nullptr, *cim = nullptr;
+	//The real and imaginary weighted copies live in one allocation, back to back, and so do
+	//the two results. That is what lets the pair of GEMMs below be a single wider one: the
+	//imaginary half is simply the next na columns of the same column-major matrix.
+	float* wri = nullptr;
+	float* cri = nullptr;
 	double* I_re = nullptr;
 	double* I_im = nullptr;
 	//Host copies of the small layout arrays, so the loop stays on the host
@@ -156,10 +159,8 @@ bool itensor_gpu_init(const itensor_gpu_layout& L)
 	GPU_TRY(gpuMalloc(&g.w, sizeof(double) * (size_t)L.n_points));
 	GPU_TRY(gpuMalloc(&g.phase_re, sizeof(float) * (size_t)L.n_points));
 	GPU_TRY(gpuMalloc(&g.phase_im, sizeof(float) * (size_t)L.n_points));
-	GPU_TRY(gpuMalloc(&g.wre, sizeof(float) * (size_t)max_elems));
-	GPU_TRY(gpuMalloc(&g.wim, sizeof(float) * (size_t)max_elems));
-	GPU_TRY(gpuMalloc(&g.cre, sizeof(float) * (size_t)max_na * max_na));
-	GPU_TRY(gpuMalloc(&g.cim, sizeof(float) * (size_t)max_na * max_na));
+	GPU_TRY(gpuMalloc(&g.wri, sizeof(float) * (size_t)max_elems * 2));
+	GPU_TRY(gpuMalloc(&g.cri, sizeof(float) * (size_t)max_na * max_na * 2));
 	GPU_TRY(gpuMalloc(&g.I_re, sizeof(double) * (size_t)L.packed));
 	GPU_TRY(gpuMalloc(&g.I_im, sizeof(double) * (size_t)L.packed));
 
@@ -209,17 +210,21 @@ bool itensor_gpu_reflection(const int num_syms,
 			const int np = g.blk_pc[b];
 			const int base = g.grid_off[gi] + g.blk_ps[b];
 			const long long total = (long long)na * np;
+			//The imaginary half starts exactly where the real one ends, so the two together
+			//are one column-major np x 2na matrix and the kernel needs no change
 			weight_kernel<<<(unsigned int)((total + 255) / 256), 256>>>(
-				na, np, g.blk_ao_off[b], base, g.ao, g.phase_re, g.phase_im, g.wre, g.wim);
-			//C = A * W^T with both stored row-major n_active x np, i.e. column-major np x n_active
-			BLAS_TRY(gpublasSgemm(g.blas, GPUBLAS_OP_T, GPUBLAS_OP_N, na, na, np,
-				&one, g.ao + g.blk_ao_off[b], np, g.wre, np, &zero, g.cre, na));
-			BLAS_TRY(gpublasSgemm(g.blas, GPUBLAS_OP_T, GPUBLAS_OP_N, na, na, np,
-				&one, g.ao + g.blk_ao_off[b], np, g.wim, np, &zero, g.cim, na));
+				na, np, g.blk_ao_off[b], base, g.ao, g.phase_re, g.phase_im,
+				g.wri, g.wri + total);
+			//C = A * W^T with both stored row-major n_active x np, i.e. column-major np x n_active.
+			//One GEMM of width 2na rather than two of width na: the operand A is the same for
+			//both and these shapes are far too small to fill the device, so what was being paid
+			//was the launch, not the arithmetic. Measured, not assumed - see the commit.
+			BLAS_TRY(gpublasSgemm(g.blas, GPUBLAS_OP_T, GPUBLAS_OP_N, na, 2 * na, np,
+				&one, g.ao + g.blk_ao_off[b], np, g.wri, np, &zero, g.cri, na));
 			const dim3 thr(16, 16);
 			const dim3 blk((na + 15) / 16, (na + 15) / 16);
 			accumulate_kernel<<<blk, thr>>>(na, g.nmo, g.blk_aos_off[b], g.aos, g.skip,
-				g.cre, g.cim, f.real(), f.imag(), g.I_re, g.I_im);
+				g.cri, g.cri + (long long)na * na, f.real(), f.imag(), g.I_re, g.I_im);
 		}
 	}
 	GPU_TRY(gpuGetLastError());
@@ -239,7 +244,7 @@ void itensor_gpu_free()
 	gpuFree(g.ao); gpuFree(g.aos); gpuFree(g.skip);
 	gpuFree(g.d1); gpuFree(g.d2); gpuFree(g.d3); gpuFree(g.w);
 	gpuFree(g.phase_re); gpuFree(g.phase_im);
-	gpuFree(g.wre); gpuFree(g.wim); gpuFree(g.cre); gpuFree(g.cim);
+	gpuFree(g.wri); gpuFree(g.cri);
 	gpuFree(g.I_re); gpuFree(g.I_im);
 	g = Dev{};
 }
