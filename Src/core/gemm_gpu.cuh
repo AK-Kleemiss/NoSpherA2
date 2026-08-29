@@ -38,13 +38,18 @@ namespace gemm_gpu {
 //Where this kernel stands against cuBLAS on the same shape and inputs:
 //
 //  sm_89, RTX 4090 mobile   1714 vs 1764   97%
+//  sm_86, RTX 3090          1364 vs 2370   58%
 //  sm_75, RTX 2080 Ti       1149 vs 1794   64%
 //  sm_70, Tesla V100        1507 vs 2595   58%
 //
-//So it is competitive on Ada and behind on the two older parts, and that is the price of
-//not shipping half a gigabyte. The untried lead is double-buffering the staged tile:
-//there is a __syncthreads() per depth step with no prefetch, and the newer part has the
-//warps in flight to hide it where the older ones do not, which fits the shape of the gap.
+//Read the first row as the outlier rather than the trend. It is a mobile part and
+//power-limited, so cuBLAS cannot stretch its advantage there; on every desktop and
+//datacentre card measured this kernel runs at around 60% of it. That is the standing price
+//of not shipping half a gigabyte, and against the host it is still 11x on the 3090 and
+//2.4x on the 2080 Ti.
+//
+//The untried lead is double-buffering the staged tile: there is a __syncthreads() per depth
+//step with nothing prefetched behind it, so every warp waits on the load it just issued.
 struct tile_config { int BM, BN, BK, TM, TN; };
 constexpr tile_config TILE{64, 64, 32, 4, 4};
 
