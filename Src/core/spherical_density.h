@@ -334,12 +334,16 @@ class Thakkar_Anion : public Thakkar
 {
 public:
     Thakkar_Anion(const int g_atom_number);
+    // Ask before constructing: 43 anions are tabulated, the rest are not.
+    static bool available(const int g_atom_number);
 };
 
 class Thakkar_Cation : public Thakkar
 {
 public:
     Thakkar_Cation(const int g_atom_number);
+    // Ask before constructing: 53 cations are tabulated, the rest are not.
+    static bool available(const int g_atom_number);
 };
 
 class Gaussian_Atom : public Spherical_Atom

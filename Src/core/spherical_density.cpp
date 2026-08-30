@@ -2,6 +2,7 @@
 #include "spherical_density.h"
 #include "convenience.h"
 #include "Thakkar_coefs.h"
+#include "Slater_ion_coefs.h"
 #include "def2-ECPs_GA.h"
 #include "ECPs_corrections.h"
 #include "constants.h"
@@ -704,20 +705,30 @@ const double EMBIS_Atom::get_density(const d3 &pos) const
     return Rho;
 };
 
+bool Thakkar_Anion::available(const int g_atom_number)
+{
+    return g_atom_number >= 1 && g_atom_number <= 103 &&
+           SlaterAn_available[g_atom_number - 1] != 0;
+}
+
 Thakkar_Anion::Thakkar_Anion(int g_atom_number) : Thakkar(g_atom_number)
 {
-    if (g_atom_number != 1 && g_atom_number != 6 && g_atom_number != 8 && g_atom_number != 15 && g_atom_number != 17)
-        err_not_impl_f("Only selected anions are currently defined!", std::cout);
-    nex = &(Anion_nex[0]);
+    // Was: only H, C, O, P and Cl, everything else aborted. The compiled-in
+    // Slater set covers 43 anions. Ask available() first; this still refuses
+    // rather than returning a silently neutral density.
+    err_checkf(available(g_atom_number),
+        "No anion density for Z = " + std::to_string(g_atom_number) +
+        "; call Thakkar_Anion::available() and fall back to the neutral.", std::cout);
+    nex = &(SlaterAn_nex[0]);
     _first_ex = first_ex();
-    ns = &(Anion_ns[0]);
-    np = &(Anion_np[0]);
-    nd = &(Anion_nd[0]);
-    nf = &(Thakkar_nf[0]);
-    occ = &(Anion_occ[0]);
-    n = &(Anion_n[0]);
-    z = &(Anion_z[0]);
-    c = &(Anion_c[0]);
+    ns = &(SlaterAn_ns[0]);
+    np = &(SlaterAn_np[0]);
+    nd = &(SlaterAn_nd[0]);
+    nf = &(SlaterAn_nf[0]);
+    occ = &(SlaterAn_occ[0]);
+    n = &(SlaterAn_n[0]);
+    z = &(SlaterAn_z[0]);
+    c = &(SlaterAn_c[0]);
     charge = -1;
     if (atomic_number == 1)
         _prev_coef = 0;
@@ -725,20 +736,29 @@ Thakkar_Anion::Thakkar_Anion(int g_atom_number) : Thakkar(g_atom_number)
         _prev_coef = previous_element_coef();
 };
 
+bool Thakkar_Cation::available(const int g_atom_number)
+{
+    return g_atom_number >= 1 && g_atom_number <= 103 &&
+           SlaterCat_available[g_atom_number - 1] != 0;
+}
+
 Thakkar_Cation::Thakkar_Cation(int g_atom_number) : Thakkar(g_atom_number)
 {
-    if (g_atom_number < 3 || g_atom_number > 29)
-        err_not_impl_f("Atoms with Z < 3 or bigger than 29 are not yet done!", std::cout);
-    nex = &(Cation_nex[0]);
+    // Was: 3 <= Z <= 29 only, so Pd, Ag, Zn, Cd, I, Br ... all aborted. The
+    // compiled-in Slater set covers 53 cations.
+    err_checkf(available(g_atom_number),
+        "No cation density for Z = " + std::to_string(g_atom_number) +
+        "; call Thakkar_Cation::available() and fall back to the neutral.", std::cout);
+    nex = &(SlaterCat_nex[0]);
     _first_ex = first_ex();
-    ns = &(Cation_ns[0]);
-    np = &(Cation_np[0]);
-    nd = &(Cation_nd[0]);
-    nf = &(Thakkar_nf[0]);
-    occ = &(Cation_occ[0]);
-    n = &(Cation_n[0]);
-    z = &(Cation_z[0]);
-    c = &(Cation_c[0]);
+    ns = &(SlaterCat_ns[0]);
+    np = &(SlaterCat_np[0]);
+    nd = &(SlaterCat_nd[0]);
+    nf = &(SlaterCat_nf[0]);
+    occ = &(SlaterCat_occ[0]);
+    n = &(SlaterCat_n[0]);
+    z = &(SlaterCat_z[0]);
+    c = &(SlaterCat_c[0]);
     charge = +1;
     if (atomic_number == 1)
         _prev_coef = 0;
