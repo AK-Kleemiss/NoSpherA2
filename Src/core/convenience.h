@@ -760,6 +760,13 @@ struct options
     bool allow_empty_asym = false;
     //Set while a spherical fill runs for somebody else: it must RETURN a block, not stream experimental.tscb out from under the table being built
     bool spherical_fill = false;
+    // Per-atom EEQ charges for atoms handed to the spherical fill, as
+    // {x, y, z, q} in the wavefunction's own coordinate units. Keyed by
+    // POSITION rather than index because the fill rebuilds its wavefunction
+    // from the original file, and that is how CIF and WFN atoms are matched
+    // everywhere else here. Empty means "no charges known" -> neutral fill,
+    // which is the previous behaviour.
+    std::vector<std::array<double, 4>> spherical_fill_charges{};
     //Reflections per block when streaming the tsc; 0 restores the single allocation of the whole scatterers x reflections x 16 byte table
     //The exact block size is not performance-critical
     size_t tsc_block_size = 1000;

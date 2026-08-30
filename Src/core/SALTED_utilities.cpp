@@ -493,7 +493,7 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs)
 double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs,
                                int net_charge, bool spherical_fill_used,
                                int n_filled, double filled_eeq_charge,
-                               std::ostream& file)
+                               double applied_fill_charge, std::ostream& file)
 {
     // The auxiliary fit does not conserve the integral: measured over this
     // training set the REFERENCE coefficients are already -0.208 % short and
@@ -529,6 +529,22 @@ double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs,
     // Ignoring this would silently pull an anion back to neutral: -1 on a
     // 300-electron system is 0.33 %, well inside the sanity guard below, so it
     // would be applied without complaint and be wrong.
+    // The spherically filled atoms are no longer assumed neutral: each carries
+    // Z - q. Those q electrons have to come from somewhere, and the only place
+    // they can come from is the predicted region - so the target moves by
+    // exactly the charge the fill took on. Without this the two halves disagree
+    // and the SYSTEM total stops being exact, which is the one guarantee this
+    // whole mechanism exists to provide.
+    if (std::abs(applied_fill_charge) > 1e-12)
+    {
+        target_from_coefs += applied_fill_charge;
+        file << "Charge constraint: " << std::showpos << std::fixed << std::setprecision(3)
+             << applied_fill_charge << std::noshowpos
+             << " e moved to the spherically filled atom(s), so the predicted"
+             << " region is targeted accordingly and the system total stays exact."
+             << std::endl;
+    }
+
     if (net_charge != 0)
     {
         if (spherical_fill_used)
@@ -568,20 +584,21 @@ double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs,
         // exact total hides that. Quantify it instead.
         if (std::isnan(filled_eeq_charge))
         {
-            file << "NOTE: " << n_filled << " atom(s) are spherically filled and assumed"
-                 << " neutral; their true charge could not be estimated." << std::endl;
+            file << "NOTE: " << n_filled << " atom(s) are spherically filled and their"
+                 << " charge could not be estimated, so they are left neutral." << std::endl;
         }
         else
         {
-            file << "NOTE: " << n_filled << " atom(s) are spherically filled and therefore"
-                 << " treated as NEUTRAL. EEQ estimates " << std::showpos << std::fixed
-                 << std::setprecision(2) << filled_eeq_charge << std::noshowpos
-                 << " e on them, so roughly that many electrons are placed on the filled"
-                 << " region instead of the predicted one. The total is still exact;"
-                 << " the local density near those atoms is not." << std::endl;
-            if (std::abs(filled_eeq_charge) > 0.5)
-                file << "      That is large enough to matter for properties read off"
-                     << " the density near those atoms." << std::endl;
+            const double missed = filled_eeq_charge - applied_fill_charge;
+            file << "NOTE: " << n_filled << " atom(s) are spherically filled. EEQ puts "
+                 << std::showpos << std::fixed << std::setprecision(2) << filled_eeq_charge
+                 << std::noshowpos << " e on them, of which " << std::showpos
+                 << applied_fill_charge << std::noshowpos << " e is applied." << std::endl;
+            if (std::abs(missed) > 0.05)
+                file << "      " << std::showpos << std::setprecision(2) << missed
+                     << std::noshowpos << " e could not be applied because no ion is"
+                     << " tabulated for that element; those atoms stay neutral and that"
+                     << " charge remains on the predicted region." << std::endl;
         }
     }
 

@@ -31,6 +31,10 @@ private:
     // EEQ estimate of the charge sitting on the spherically filled atoms, and
     // how many there are. Used to say how wrong the neutral-fill assumption is.
     double filled_eeq_charge = 0.0;
+    // The part of that charge the spherical fill can actually carry (an ion
+    // must be tabulated for the element). The ML target is shifted by exactly
+    // this, so predicted + filled still sums to the right number of electrons.
+    double applied_fill_charge = 0.0;
     int n_filled = 0;
     Config config;
     int natoms;

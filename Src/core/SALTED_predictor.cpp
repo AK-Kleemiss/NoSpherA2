@@ -2,6 +2,7 @@
 #include "SALTED_predictor.h"
 #include "SALTED_utilities.h"
 #include <occ/core/eeq.h>
+#include "spherical_density.h"
 #include "SALTED_equicomb.h"
 #include "nos_math.h"
 #include "constants.h"
@@ -147,8 +148,29 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
             const occ::Vec q = occ::core::charges::eeq_partial_charges(
                 nums, pos, static_cast<double>(wavy_in.get_charge()));
             filled_eeq_charge = 0.0;
+            applied_fill_charge = 0.0;
+            opt_in.spherical_fill_charges.clear();
             for (int a = 0; a < ncen_in; a++)
-                if (use_thakkar[a]) filled_eeq_charge += q(a);
+            {
+                if (!use_thakkar[a]) continue;
+                filled_eeq_charge += q(a);
+                // Only charge the fill can actually carry may be moved out of
+                // the predicted region. If no ion is tabulated for this element
+                // the fill stays neutral, so the target must stay neutral too -
+                // otherwise the two disagree and the system total is wrong.
+                const int Zf = wavy_in.get_atom_charge(a);
+                const bool ion_ok = (q(a) > 0.0) ? Thakkar_Cation::available(Zf)
+                                                 : Thakkar_Anion::available(Zf);
+                if (ion_ok) applied_fill_charge += q(a);
+                // Position-keyed, in the wavefunction's own units: the fill
+                // rebuilds its wavefunction from the original file, so indices
+                // there are not ours to assume.
+                opt_in.spherical_fill_charges.push_back({
+                    wavy_in.get_atom_coordinate(a, 0),
+                    wavy_in.get_atom_coordinate(a, 1),
+                    wavy_in.get_atom_coordinate(a, 2),
+                    ion_ok ? q(a) : 0.0});
+            }
         }
         catch (const std::exception &e)
         {
@@ -684,7 +706,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
         if (mode == 1)
             apply_charge_constraint(wavy.get_atoms(), coefs, wavy.get_charge(),
                                     spherical_fill_used, n_filled,
-                                    filled_eeq_charge, std::cout);
+                                    filled_eeq_charge, applied_fill_charge, std::cout);
         else if (mode != 0)
             std::cout << "Unknown charge-constraint mode " << mode
                       << " in the model file; leaving the density alone." << std::endl;

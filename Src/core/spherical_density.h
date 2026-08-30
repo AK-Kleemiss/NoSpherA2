@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 
 #include <vector>
 #include <iostream>
@@ -344,6 +345,49 @@ public:
     Thakkar_Cation(const int g_atom_number);
     // Ask before constructing: 53 cations are tabulated, the rest are not.
     static bool available(const int g_atom_number);
+};
+
+// Fractionally charged spherical atom, built from the tabulated integer states.
+//
+// rho_q(r) = (1 - f) * rho_0(r) + f * rho_ion(r),   f = |q|
+//
+// which is the Hirshfeld-E build-up written as a two-point interpolation: the
+// partial density of one electron is delta = rho_0 - rho_cation, and removing a
+// fraction f of it is the same as weighting the two tabulated states. Because
+// rho_0 integrates to Z and the +1 state to Z-1, this integrates to Z - q for
+// ANY real q, which is the property the whole construction exists for.
+//
+// Cations are used for q > 0 and anions for q < 0. Note the asymmetry: cationic
+// reference states are bound and well defined, whereas atomic anions beyond -1
+// are not bound at all, so |q| > 1 on the anion side is extrapolation into
+// territory that has no reference state. See is_extrapolating().
+class HE_Spherical_Atom
+{
+public:
+    // Falls back to the neutral density if no ion is tabulated for this element.
+    HE_Spherical_Atom(const int atomic_number, const double charge);
+
+    double get_radial_density(const double &r) const;
+    double get_form_factor(const double &k) const;
+
+    // f(0), i.e. how many electrons this density actually carries. Equals
+    // Z - charge when an ion was available, Z when it fell back.
+    double electrons() const { return _electrons; }
+    bool used_ion() const { return _has_ion; }
+    // |q| > 1: beyond the tabulated ion, so the shape is extrapolated even
+    // though the electron count stays exact.
+    bool is_extrapolating() const { return _weight > 1.0; }
+    // The interpolation gives a negative weight to the neutral once |q| > 1 and
+    // the density can in principle dip below zero. Reports the most negative
+    // value found on a scan, 0.0 when the density stayed non-negative.
+    double most_negative_density() const { return _most_negative; }
+
+private:
+    int _Z;
+    double _charge, _weight, _electrons, _most_negative;
+    bool _has_ion;
+    Thakkar _neutral;
+    std::unique_ptr<Thakkar> _ion;
 };
 
 class Gaussian_Atom : public Spherical_Atom

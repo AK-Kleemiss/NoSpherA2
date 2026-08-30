@@ -766,6 +766,61 @@ Thakkar_Cation::Thakkar_Cation(int g_atom_number) : Thakkar(g_atom_number)
         _prev_coef = previous_element_coef();
 };
 
+HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charge)
+    : _Z(atomic_number), _charge(charge), _weight(std::abs(charge)),
+      _electrons(static_cast<double>(atomic_number)), _most_negative(0.0),
+      _has_ion(false), _neutral(atomic_number)
+{
+    if (std::abs(charge) < 1e-12)
+        return;   // neutral: nothing to blend
+
+    const bool want_cation = charge > 0.0;
+    const bool have = want_cation ? Thakkar_Cation::available(atomic_number)
+                                  : Thakkar_Anion::available(atomic_number);
+    if (!have)
+    {
+        // No reference state for this element. Returning the neutral is the
+        // honest fallback - it is what the caller would otherwise have used -
+        // but used_ion() reports false so the caller can say the charge was
+        // not applied instead of silently believing it was.
+        _weight = 0.0;
+        return;
+    }
+
+    if (want_cation)
+        _ion = std::make_unique<Thakkar_Cation>(atomic_number);
+    else
+        _ion = std::make_unique<Thakkar_Anion>(atomic_number);
+    _has_ion = true;
+    _electrons = static_cast<double>(atomic_number) - charge;
+
+    // Scan for a negative excursion. Only possible when |q| > 1, where the
+    // neutral carries a negative weight; the caller decides whether that is
+    // acceptable rather than having it silently clipped here.
+    if (_weight > 1.0)
+    {
+        for (double r = 1e-4; r < 30.0; r *= 1.05)
+        {
+            const double d = get_radial_density(r);
+            if (d < _most_negative) _most_negative = d;
+        }
+    }
+}
+
+double HE_Spherical_Atom::get_radial_density(const double &r) const
+{
+    const double n = _neutral.get_radial_density(r);
+    if (!_has_ion) return n;
+    return (1.0 - _weight) * n + _weight * _ion->get_radial_density(r);
+}
+
+double HE_Spherical_Atom::get_form_factor(const double &k) const
+{
+    const double n = _neutral.get_form_factor(k);
+    if (!_has_ion) return n;
+    return (1.0 - _weight) * n + _weight * _ion->get_form_factor(k);
+}
+
 const double gauss_cos_integral(const int &N, const double &exp, const double &k_vector);
 
 // This function calcualtes the integral of Int_0^Inf r^N exp(-zr^2) sin(kr) dr using a recursion of sinus and cosinus integrals with lower exponents of r

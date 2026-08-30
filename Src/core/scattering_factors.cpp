@@ -2249,11 +2249,64 @@ int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>&
     return nr;
 }
 
+//One evaluator per ATOM, not per element type. Two atoms of the same element in
+//different environments carry different EEQ charges, and the tsc gives each atom
+//its own row anyway, so there is nothing to be gained by sharing.
+//
+//Charges are matched by position because the fill rebuilds its wavefunction from
+//the original file; that is also how CIF atoms are matched to WFN atoms here.
+//An atom with no recorded charge, or an element with no tabulated ion, falls
+//back to the neutral density.
+std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
+    const WFN& fill_wavy, const options& opt, std::ostream& file)
+{
+    std::vector<HE_Spherical_Atom> out;
+    out.reserve(sph.asym_atom_list.size());
+    int n_charged = 0, n_extrap = 0, n_nofit = 0;
+    double worst_neg = 0.0;
+    for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
+    {
+        const int idx = sph.asym_atom_list[a];
+        const int Z = fill_wavy.get_atom_charge(idx);
+        double q = 0.0;
+        double best = 1e-3;   // squared tolerance in the wavefunction's units
+        for (const auto& e : opt.spherical_fill_charges)
+        {
+            double d = 0.0;
+            for (int ax = 0; ax < 3; ax++)
+            {
+                const double dx = fill_wavy.get_atom_coordinate(idx, ax) - e[ax];
+                d += dx * dx;
+            }
+            if (d < best) { best = d; q = e[3]; }
+        }
+        if (std::abs(q) > 1e-6) n_charged++;
+        else if (!opt.spherical_fill_charges.empty()) n_nofit++;
+        out.emplace_back(Z, q);
+        if (out.back().is_extrapolating()) n_extrap++;
+        worst_neg = std::min(worst_neg, out.back().most_negative_density());
+    }
+    if (n_charged)
+    {
+        file << "Spherical fill: " << n_charged << " of " << out.size()
+             << " atom(s) given a fractional charge";
+        if (n_extrap)
+            file << ", " << n_extrap << " beyond the tabulated +/-1 ion (shape extrapolated)";
+        file << "." << std::endl;
+        if (worst_neg < -1e-8)
+            file << "      most negative density from the blend: " << worst_neg
+                 << " e/bohr^3 - an extrapolation artefact, not clipped." << std::endl;
+        if (n_nofit)
+            file << "      " << n_nofit << " atom(s) had no charge recorded and stay neutral." << std::endl;
+    }
+    return out;
+}
+
 //rows for atoms the SALTED model could not predict (unknown species, or nothing inside the descriptor cutoff)
 //a Thakkar factor depends only on element and reflection, so these chunk like everything else here
 void append_spherical_rows(cvec2& chunk,
     const salted_part_prep& sph,
-    const std::vector<Thakkar>& spheres,
+    const std::vector<HE_Spherical_Atom>& spheres,
     const bool electron_diffraction,
     const size_t lo, const size_t hi)
 {
@@ -2263,7 +2316,7 @@ void append_spherical_rows(cvec2& chunk,
         cvec row(hi - lo);
         for (size_t r = lo; r < hi; r++)
         {
-            const double f = spheres[t].get_form_factor(sph.k_of_reflection[r]);
+            const double f = spheres[a].get_form_factor(sph.k_of_reflection[r]);
             //IAM form of Mott-Bethe: tabulated charge, no imaginary part
             row[r - lo] = electron_diffraction
                 ? cdouble(constants::ED_fact * (sph.atom_type_list[t] - f) /
@@ -2837,7 +2890,7 @@ tsc_block_type calculate_scattering_factors(
 
 			//atoms the model cannot predict were erased before the prediction; append_spherical_rows() emits them per block
 			salted_part_prep spherical;
-			std::vector<Thakkar> spheres;
+			std::vector<HE_Spherical_Atom> spheres;
 			if (opt.needs_Thakkar_fill)
 			{
 				std::vector<WFN> tempy;
@@ -2854,7 +2907,7 @@ tsc_block_type calculate_scattering_factors(
 						" reflections, the table covers " + std::to_string(n_refl), file);
 					append_scatterer_ids(stream_ids, opt, spherical.labels,
 						tempy[fill_nr], spherical.asym_atom_list);
-					spheres = make_spherical_evaluators(spherical.atom_type_list);
+					spheres = make_he_evaluators(spherical, tempy[fill_nr], opt, file);
 					file << "Spherical remainder: " << spherical.asym_atom_list.size()
 						 << " atom(s) the model cannot predict" << endl;
 				}
@@ -3131,6 +3184,9 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	//a table must hold either all atomIDs or all labels; salted_part_prep::labels holds hex strings while the
 	//predicted parts contribute atomID objects, so the spherical rows are converted here rather than passed through
 	std::vector<ScattererLabels> spherical_ids(n_parts);
+	//built inside the block below: the per-atom charges are matched against the
+	//fill wavefunctions, which only exist there
+	std::vector<std::vector<HE_Spherical_Atom>> spheres(n_parts);
 	if (opt.needs_Thakkar_fill)
 	{
 		hkl_list fill_reflections;
@@ -3160,6 +3216,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 				known.push_back(spherical[i].labels[a]);
 			append_scatterer_ids(spherical_ids[i], opt, spherical[i].labels,
 				tempy[i], spherical[i].asym_atom_list);
+			spheres[i] = make_he_evaluators(spherical[i], tempy[i], opt, file);
 		}
 		file << "Spherical remainder: " << n_filled
 			 << " atom(s) the model cannot predict" << std::endl;
@@ -3174,12 +3231,6 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		for (const auto& sid : spherical_ids[p])
 			ids.emplace_back(sid);
 	}
-
-	//one Thakkar evaluator set per part; they depend only on each part's element list, so build outside the block loop
-	std::vector<std::vector<Thakkar>> spheres(n_parts);
-	for (size_t p = 0; p < n_parts; p++)
-		if (have_spherical[p])
-			spheres[p] = make_spherical_evaluators(spherical[p].atom_type_list);
 
 	const size_t n_refl = preps[0].hkl_v.size();
 	file << "Combined tsc: " << ids.size() << " scatterers from "
