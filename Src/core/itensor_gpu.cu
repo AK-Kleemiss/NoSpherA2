@@ -41,6 +41,10 @@ struct Dev {
 	//Host copies of the small layout arrays, so the loop stays on the host
 	std::vector<int> blk_grid, blk_ps, blk_pc, blk_na, grid_off;
 	std::vector<long long> blk_ao_off, blk_aos_off;
+	//Landing buffers for the read-back, held rather than made per reflection: they are
+	//overwritten wholesale by the copy, so allocating and zeroing them once per reflection
+	//was two costs for no purpose, several thousand times a run.
+	std::vector<double> host_re, host_im;
 };
 
 template <typename T> Dev<T> g;
@@ -239,6 +243,8 @@ bool init_impl(const itensor_gpu_layout& L)
 	d.blk_ao_off.assign(L.blk_ao_off, L.blk_ao_off + L.n_blocks);
 	d.blk_aos_off.assign(L.blk_aos_off, L.blk_aos_off + L.n_blocks);
 	d.grid_off.assign(L.grid_point_off, L.grid_point_off + L.n_grids + 1);
+	d.host_re.resize((size_t)L.packed);
+	d.host_im.resize((size_t)L.packed);
 	d.ready = true;
 	return true;
 }
@@ -286,11 +292,10 @@ bool reflection_impl(const int num_syms,
 	GPU_TRY(gpuGetLastError());
 	GPU_TRY(gpuDeviceSynchronize());
 
-	std::vector<double> hr((size_t)d.packed), hi((size_t)d.packed);
-	GPU_TRY(gpuMemcpy(hr.data(), d.I_re, sizeof(double) * (size_t)d.packed, gpuMemcpyDeviceToHost));
-	GPU_TRY(gpuMemcpy(hi.data(), d.I_im, sizeof(double) * (size_t)d.packed, gpuMemcpyDeviceToHost));
+	GPU_TRY(gpuMemcpy(d.host_re.data(), d.I_re, sizeof(double) * (size_t)d.packed, gpuMemcpyDeviceToHost));
+	GPU_TRY(gpuMemcpy(d.host_im.data(), d.I_im, sizeof(double) * (size_t)d.packed, gpuMemcpyDeviceToHost));
 	for (int i = 0; i < d.packed; i++)
-		I_r[i] += std::complex<double>(hr[i], hi[i]);
+		I_r[i] += std::complex<double>(d.host_re[i], d.host_im[i]);
 	return true;
 }
 
