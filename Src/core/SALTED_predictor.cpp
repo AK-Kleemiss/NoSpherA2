@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "SALTED_predictor.h"
 #include "SALTED_utilities.h"
+#include <occ/core/eeq.h>
 #include "SALTED_equicomb.h"
 #include "nos_math.h"
 #include "constants.h"
@@ -121,6 +122,40 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
         wavy.set_path(new_fn);
         opt_in.needs_Thakkar_fill = true;
         spherical_fill_used = true;
+
+        // The filled atoms get a NEUTRAL Thakkar density, which fixes how many
+        // electrons they carry. Estimate what they should really carry, so the
+        // size of that assumption can be reported rather than hidden. EEQ gives
+        // smooth non-integer charges from geometry and honours the net charge,
+        // which suits coordination chemistry far better than assigning a formal
+        // oxidation state.
+        n_filled = n_unknown + n_isolated;
+        try
+        {
+            occ::IVec nums(ncen_in);
+            occ::Mat3N pos(3, ncen_in);
+            const bool bohr = wavy_in.get_isBohr();
+            for (int a = 0; a < ncen_in; a++)
+            {
+                nums(a) = wavy_in.get_atom_charge(a);
+                for (int ax = 0; ax < 3; ax++)
+                {
+                    const double c = wavy_in.get_atom_coordinate(a, ax);
+                    pos(ax, a) = bohr ? constants::bohr2ang(c) : c;   // EEQ wants Angstrom
+                }
+            }
+            const occ::Vec q = occ::core::charges::eeq_partial_charges(
+                nums, pos, static_cast<double>(wavy_in.get_charge()));
+            filled_eeq_charge = 0.0;
+            for (int a = 0; a < ncen_in; a++)
+                if (use_thakkar[a]) filled_eeq_charge += q(a);
+        }
+        catch (const std::exception &e)
+        {
+            std::cout << "Could not estimate the filled-region charge (" << e.what()
+                      << "); reporting it as unknown." << std::endl;
+            filled_eeq_charge = std::numeric_limits<double>::quiet_NaN();
+        }
     }
     else
     {
@@ -648,7 +683,8 @@ vec SALTEDPredictor::gen_SALTED_densities()
                              : 0;
         if (mode == 1)
             apply_charge_constraint(wavy.get_atoms(), coefs, wavy.get_charge(),
-                                    spherical_fill_used, std::cout);
+                                    spherical_fill_used, n_filled,
+                                    filled_eeq_charge, std::cout);
         else if (mode != 0)
             std::cout << "Unknown charge-constraint mode " << mode
                       << " in the model file; leaving the density alone." << std::endl;

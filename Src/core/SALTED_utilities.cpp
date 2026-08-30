@@ -492,6 +492,7 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs)
 
 double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs,
                                int net_charge, bool spherical_fill_used,
+                               int n_filled, double filled_eeq_charge,
                                std::ostream& file)
 {
     // The auxiliary fit does not conserve the integral: measured over this
@@ -561,9 +562,27 @@ double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs,
     // no charge check can catch this - say so and let the user judge.
     if (spherical_fill_used)
     {
-        file << "NOTE: the target assumes the spherically filled atom(s) are neutral."
-             << " If any of them is a formal ion, the split between the predicted"
-             << " and filled regions is wrong and so is this correction." << std::endl;
+        // The TOTAL stays exact either way - the filled atoms carry a fixed
+        // neutral count and the rest is imposed here - so F(000) is safe. What
+        // the neutral assumption gets wrong is WHERE the electrons sit, and an
+        // exact total hides that. Quantify it instead.
+        if (std::isnan(filled_eeq_charge))
+        {
+            file << "NOTE: " << n_filled << " atom(s) are spherically filled and assumed"
+                 << " neutral; their true charge could not be estimated." << std::endl;
+        }
+        else
+        {
+            file << "NOTE: " << n_filled << " atom(s) are spherically filled and therefore"
+                 << " treated as NEUTRAL. EEQ estimates " << std::showpos << std::fixed
+                 << std::setprecision(2) << filled_eeq_charge << std::noshowpos
+                 << " e on them, so roughly that many electrons are placed on the filled"
+                 << " region instead of the predicted one. The total is still exact;"
+                 << " the local density near those atoms is not." << std::endl;
+            if (std::abs(filled_eeq_charge) > 0.5)
+                file << "      That is large enough to matter for properties read off"
+                     << " the density near those atoms." << std::endl;
+        }
     }
 
     const double factor = target_from_coefs / from_coefs;

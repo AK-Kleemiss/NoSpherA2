@@ -28,6 +28,10 @@ private:
     // constraint needs it: with a mixed ML/Thakkar system the split of a net
     // charge between the two regions is undefined.
     bool spherical_fill_used = false;
+    // EEQ estimate of the charge sitting on the spherically filled atoms, and
+    // how many there are. Used to say how wrong the neutral-fill assumption is.
+    double filled_eeq_charge = 0.0;
+    int n_filled = 0;
     Config config;
     int natoms;
     std::filesystem::path SALTED_DIR;

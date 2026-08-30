@@ -126,6 +126,7 @@ vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs);
 // electron count. Returns the applied factor (1.0 if nothing was done).
 double apply_charge_constraint(const std::vector<atom> &atoms, vec &coefs,
                                int net_charge, bool spherical_fill_used,
+                               int n_filled, double filled_eeq_charge,
                                std::ostream &file);
 
 cube calc_cube_ML(const vec& data, WFN &dummy, const int& atom_nr = -1);
