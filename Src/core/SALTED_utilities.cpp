@@ -490,6 +490,72 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs)
     return atom_elecs;
 }
 
+double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs, std::ostream& file)
+{
+    // The auxiliary fit does not conserve the integral: measured over this
+    // training set the REFERENCE coefficients are already -0.208 % short and
+    // the ML prediction -0.235 %, so most of the deficit is inherited from the
+    // density fitting rather than learned. The exact target is fixed by the
+    // composition, so it can be imposed here.
+    //
+    // Only l=0 functions have a non-zero integral, so only they are scaled.
+    // The scaling is GLOBAL on purpose: the atom-centred auxiliary basis is not
+    // an atomic-charge partition (measured per-element ratios span 0.899 for Al
+    // to 1.150 for B, with ~10 % scatter, which is bonding rather than error),
+    // so a per-element correction would distort the chemistry to fix a total.
+    vec atom_elecs = calc_atomic_density(atoms, coefs);
+
+    double predicted = 0.0, target = 0.0, ecp = 0.0;
+    for (int a = 0; a < static_cast<int>(atoms.size()); a++)
+    {
+        predicted += atom_elecs[a];
+        target += static_cast<double>(atoms[a].get_charge());
+        ecp += static_cast<double>(atoms[a].get_ECP_electrons());
+    }
+    // calc_atomic_density folds the ECP electrons in, but those do not come
+    // from the coefficients and must not be rescaled.
+    const double from_coefs = predicted - ecp;
+    const double target_from_coefs = target - ecp;
+
+    if (from_coefs <= 0.0 || target_from_coefs <= 0.0)
+    {
+        file << "Charge constraint skipped: non-positive electron count." << std::endl;
+        return 1.0;
+    }
+    const double factor = target_from_coefs / from_coefs;
+    if (std::abs(factor - 1.0) > 0.05)
+    {
+        file << "Charge constraint SKIPPED: factor " << factor
+             << " is further than 5 % from unity, which means something else is"
+             << " wrong - refusing to paper over it." << std::endl;
+        return 1.0;
+    }
+
+    int coef_counter = 0;
+    for (int a = 0; a < static_cast<int>(atoms.size()); a++)
+    {
+        int prim = 0;
+        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++)
+        {
+            const int type = atoms[a].get_basis_set_entry(prim).get_type();
+            if (type != 0)
+            {
+                coef_counter += (2 * type + 1);
+                prim += atoms[a].get_shellcount()[shell];
+                continue;
+            }
+            prim += atoms[a].get_shellcount()[shell];
+            coefs[coef_counter] *= factor;
+            coef_counter++;
+        }
+    }
+
+    file << "Charge constraint applied: " << std::fixed << std::setprecision(4)
+         << from_coefs << " -> " << target_from_coefs << " electrons (factor "
+         << std::setprecision(8) << factor << ")" << std::endl;
+    return factor;
+}
+
 void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr)
 {
     _time_point start = get_time();

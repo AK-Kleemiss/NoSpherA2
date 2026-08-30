@@ -521,6 +521,21 @@ std::unordered_map<std::string, vec> SALTED_BINARY_FILE::read_averages() {
     );
 }
 
+std::unordered_map<std::string, vec> SALTED_BINARY_FILE::read_charge_constraint() {
+    // Same layout as AVERG: a 5-byte key then a float64 dataset. Keys are
+    // MODE (0 = off, 1 = global scale), DEFCT (the reference fit's measured
+    // relative deficit, for reporting) and NCAL (structures it was measured on).
+    return read_generic_blocks<std::unordered_map<std::string, vec>>("NORMC",
+        [this](std::unordered_map<std::string, vec>& entries, int i) {
+            std::string key = read_string_remove_NULL(5);
+            std::vector<size_t> dims;
+            vec data;
+            read_dataset(data, dims);
+            entries[key] = data;
+        }
+    );
+}
+
 std::unordered_map<int, vec> SALTED_BINARY_FILE::read_wigners() {
     return read_generic_blocks<std::unordered_map<int, vec>>("WIG",
         [this](std::unordered_map<int, vec>& wigners, int i) {

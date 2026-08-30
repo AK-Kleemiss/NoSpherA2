@@ -633,6 +633,25 @@ vec SALTEDPredictor::gen_SALTED_densities()
 
 
     vec coefs = predict();
+
+    // File VERSION 3 models carry an optional NORMC block asking for the
+    // electron count to be constrained. Applied here rather than at each call
+    // site so the tsc, the charge table and the cubes all see the same density.
+    // V2 models have no such block, so they are untouched.
+    if (model_file && model_file->charge_constraint_defined())
+    {
+        const auto entries = model_file->read_charge_constraint();
+        const auto mode_it = entries.find("MODE");
+        const int mode = (mode_it != entries.end() && !mode_it->second.empty())
+                             ? static_cast<int>(std::lround(mode_it->second[0]))
+                             : 0;
+        if (mode == 1)
+            apply_charge_constraint(wavy.get_atoms(), coefs, std::cout);
+        else if (mode != 0)
+            std::cout << "Unknown charge-constraint mode " << mode
+                      << " in the model file; leaving the density alone." << std::endl;
+    }
+
     shrink_intermediate_vectors();
     return coefs;
 }
