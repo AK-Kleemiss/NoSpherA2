@@ -24,6 +24,10 @@ public:
 
 private:
     bool bbasis_set_loaded = false;
+    // Set when atoms were moved to the spherical Thakkar fill. The charge
+    // constraint needs it: with a mixed ML/Thakkar system the split of a net
+    // charge between the two regions is undefined.
+    bool spherical_fill_used = false;
     Config config;
     int natoms;
     std::filesystem::path SALTED_DIR;

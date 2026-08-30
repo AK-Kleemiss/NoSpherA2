@@ -120,6 +120,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
         wavy.write_xyz(new_fn);
         wavy.set_path(new_fn);
         opt_in.needs_Thakkar_fill = true;
+        spherical_fill_used = true;
     }
     else
     {
@@ -646,7 +647,8 @@ vec SALTEDPredictor::gen_SALTED_densities()
                              ? static_cast<int>(std::lround(mode_it->second[0]))
                              : 0;
         if (mode == 1)
-            apply_charge_constraint(wavy.get_atoms(), coefs, std::cout);
+            apply_charge_constraint(wavy.get_atoms(), coefs, wavy.get_charge(),
+                                    spherical_fill_used, std::cout);
         else if (mode != 0)
             std::cout << "Unknown charge-constraint mode " << mode
                       << " in the model file; leaving the density alone." << std::endl;

@@ -490,13 +490,20 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs)
     return atom_elecs;
 }
 
-double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs, std::ostream& file)
+double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs,
+                               int net_charge, bool spherical_fill_used,
+                               std::ostream& file)
 {
     // The auxiliary fit does not conserve the integral: measured over this
     // training set the REFERENCE coefficients are already -0.208 % short and
     // the ML prediction -0.235 %, so most of the deficit is inherited from the
     // density fitting rather than learned. The exact target is fixed by the
     // composition, so it can be imposed here.
+    //
+    // With the spherical Thakkar fill active, `atoms` is already only the
+    // ML-predicted subset (the predictor erases the filled atoms from its
+    // copy of the wavefunction), and Thakkar densities are exactly neutral,
+    // so the sum of nuclear charges over THESE atoms is the right target.
     //
     // Only l=0 functions have a non-zero integral, so only they are scaled.
     // The scaling is GLOBAL on purpose: the atom-centred auxiliary basis is not
@@ -515,13 +522,50 @@ double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs, std::
     // calc_atomic_density folds the ECP electrons in, but those do not come
     // from the coefficients and must not be rescaled.
     const double from_coefs = predicted - ecp;
-    const double target_from_coefs = target - ecp;
+    double target_from_coefs = target - ecp;
+
+    // A charged system does not integrate to the sum of the nuclear charges.
+    // Ignoring this would silently pull an anion back to neutral: -1 on a
+    // 300-electron system is 0.33 %, well inside the sanity guard below, so it
+    // would be applied without complaint and be wrong.
+    if (net_charge != 0)
+    {
+        if (spherical_fill_used)
+        {
+            // Some atoms are Thakkar-filled, so `atoms` is only the ML subset.
+            // Thakkar densities are strictly neutral, but how a NET charge
+            // divides between the ML region and the filled region is not
+            // defined here. Refusing beats guessing.
+            file << "Charge constraint SKIPPED: net charge " << net_charge
+                 << " on a structure that also uses the spherical fill. The split"
+                 << " of that charge between the predicted and filled regions is"
+                 << " undefined, so the density is left alone." << std::endl;
+            return 1.0;
+        }
+        target_from_coefs -= static_cast<double>(net_charge);
+        file << "Charge constraint: net charge " << net_charge
+             << " taken into account." << std::endl;
+    }
 
     if (from_coefs <= 0.0 || target_from_coefs <= 0.0)
     {
         file << "Charge constraint skipped: non-positive electron count." << std::endl;
         return 1.0;
     }
+    // With the spherical fill in play the target assumes every filled atom is
+    // NEUTRAL. That is exactly right for a Thakkar density of a neutral atom
+    // and wrong whenever the filled atom is a formal ion. Seen in practice on a
+    // calcium salt: Ca filled as neutral (20 e) puts the ML target at 116, the
+    // model predicted 116.48 because the organic part is really a dianion, and
+    // the constraint then pulled it the WRONG way. The net charge is zero, so
+    // no charge check can catch this - say so and let the user judge.
+    if (spherical_fill_used)
+    {
+        file << "NOTE: the target assumes the spherically filled atom(s) are neutral."
+             << " If any of them is a formal ion, the split between the predicted"
+             << " and filled regions is wrong and so is this correction." << std::endl;
+    }
+
     const double factor = target_from_coefs / from_coefs;
     if (std::abs(factor - 1.0) > 0.05)
     {
@@ -550,9 +594,21 @@ double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs, std::
         }
     }
 
+    // On the training chemistry this factor sits at 1.00235 +/- 0.0008. A much
+    // larger one means the density shape is being extrapolated, and a fixed
+    // integral would otherwise hide that.
+    if (std::abs(factor - 1.0) > 0.005)
+    {
+        file << "NOTE: correction of " << std::fixed << std::setprecision(3)
+             << 100.0 * (factor - 1.0) << " % is well outside the ~0.24 % seen on"
+             << " training-like systems - treat this prediction with caution."
+             << std::endl;
+    }
+
     file << "Charge constraint applied: " << std::fixed << std::setprecision(4)
-         << from_coefs << " -> " << target_from_coefs << " electrons (factor "
-         << std::setprecision(8) << factor << ")" << std::endl;
+         << from_coefs << " -> " << target_from_coefs << " electrons over "
+         << atoms.size() << (spherical_fill_used ? " ML-predicted" : "")
+         << " atoms (factor " << std::setprecision(8) << factor << ")" << std::endl;
     return factor;
 }
 
