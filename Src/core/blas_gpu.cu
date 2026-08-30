@@ -9,11 +9,9 @@
 //so every call ships them across and back, and a shape too small to hide that loses. Stated
 //in flops so it does not depend on how the caller shaped the matrices.
 //
-//Measured on square host-resident dgemm, RTX 4090 mobile against 16 Zen4 threads: the
-//device draws level near 2e9 flops and is clearly ahead by 8e9. The value sits between the
-//two. The predecessor was 2e11 - two orders above the crossover, chosen when there was no
-//measurement - which put the whole path out of reach of anything the program actually does.
-//Re-derive it elsewhere with -gflops; NOSPHERA2_BLAS_GPU_MIN_FLOP overrides it.
+//Calibrated on square host-resident dgemm, RTX 4090 mobile against 16 Zen4 threads: the
+//device draws level near 2e9 flops and is clearly ahead by 8e9, so the gate sits between
+//them. Re-derive it elsewhere with -gflops; NOSPHERA2_BLAS_GPU_MIN_FLOP overrides it.
 #define BLAS_GPU_MIN_FLOP_AT_RATIO_64 4.0e9
 
 static bool g_blas_gpu = false;

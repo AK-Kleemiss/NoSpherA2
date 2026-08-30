@@ -18,42 +18,21 @@
 
 namespace gemm_gpu {
 
-//Tile shape, measured on the I tensor shape (m~100, n~200, k~4500), best of three:
+//Tile shape. The narrow alternative spends four shared-memory loads on four FMAs where
+//this one spends eight on sixteen, and that ratio is what the inner loop is limited by;
+//halving the staged depth gives most of the difference back, which says the same thing.
+//The constraint is arithmetic intensity, not occupancy - fewer, fatter blocks win.
 //
-//                            RTX 4090 mobile (sm_89)   RTX 2080 Ti (sm_75)
-//  32/32 tile, 2x2 thread          1500 GFLOP/s              985
-//  64/64 tile, 4x4 thread          1714                     1149   <- this
-//  64/64 tile, 4x4, BK 16          1542                        -
+//Selecting the tile per architecture was tried and removed. Turing has less shared memory
+//per SM than Ada, so the narrow tile ought to suit it, and measurement says otherwise: the
+//narrow tile is slower there too. One shape, no dispatch.
 //
-//The narrow tile spends four shared-memory loads on four FMAs where the wide one spends
-//eight on sixteen, and that ratio is what the inner loop is limited by. Halving the staged
-//depth gives most of it back, which says the same thing: the constraint is arithmetic
-//intensity, not occupancy - fewer, fatter blocks beat more, thinner ones.
+//The depth tile is prefetched, which was the leading explanation for the remaining gap to
+//cuBLAS and turned out not to be it - a small consistent gain, not the difference. Untried:
+//vectorised shared loads, the one structural difference left. A wider tile is not the
+//answer, m being about a hundred here, so a 128-wide tile would discard half its work.
 //
-//The obvious objection is that Turing has 64 KB of shared memory per SM against Ada's 100,
-//so the 16 KB block should run out of room there and want the narrow tile. It was built
-//that way, selected at run time from the compute capability, and measured: the narrow tile
-//is slower on Turing too, by 14%. One shape, no dispatch.
-//
-//Where this kernel stands against cuBLAS on the same shape and inputs:
-//
-//  sm_89, RTX 4090 mobile   1714 vs 1764   97%
-//  sm_86, RTX 3090          1364 vs 2370   58%
-//  sm_75, RTX 2080 Ti       1149 vs 1794   64%
-//  sm_70, Tesla V100        1507 vs 2595   58%
-//
-//Read the first row as the outlier rather than the trend. It is a mobile part and
-//power-limited, so cuBLAS cannot stretch its advantage there; on every desktop and
-//datacentre card measured this kernel runs at around 60% of it. That is the standing price
-//of not shipping half a gigabyte, and against the host it is still 11x on the 3090 and
-//2.4x on the 2080 Ti.
-//
-//The depth tile is prefetched (see the kernel), which was the leading candidate for that
-//gap and turned out not to be it: +2.6% on sm_89 and +2.8% on sm_75. Consistent in
-//direction on two architectures so it stays, but latency hiding is plainly not what
-//separates this from cuBLAS. Untried: vectorised shared loads, which would cut the inner
-//loop's load count fourfold and is the remaining structural difference. A wider tile is
-//not the answer here - m is about 100, so a 128-wide tile would waste half its work.
+//Rates per card are in the vault note rather than here; they age and this file should not.
 struct tile_config { int BM, BN, BK, TM, TN; };
 constexpr tile_config TILE{64, 64, 32, 4, 4};
 

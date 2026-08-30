@@ -301,7 +301,9 @@ bool itensor_gpu_available() { return sf_gpu_available(); }
 
 const char* itensor_gpu_gemm_name()
 {
-	return cublas_dynamic_available() ? "cuBLAS" : NOSPHERA2_ITENSOR_GEMM_NAME;
+	if (cublas_dynamic_available()) return "cuBLAS";
+	//CUTLASS covers single precision only, so the double path names a different kernel.
+	return g_fp64 ? "built-in" : NOSPHERA2_ITENSOR_GEMM_NAME;
 }
 
 bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec)

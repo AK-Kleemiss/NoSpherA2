@@ -8,9 +8,9 @@
 //for doing it this way rather than linking and delay-loading - the previous arrangement
 //needed the import library at build time and shipped half a gigabyte to be useful.
 //
-//Preferred whenever it loads, with CUTLASS behind it: cuBLAS is 1.65x faster on a V100 and
-//level with CUTLASS within measurement noise on consumer cards, so choosing it costs
-//nothing where it does not help.
+//Preferred whenever it loads: it is clearly ahead on a datacentre card and within
+//measurement noise of the fallbacks on consumer ones, so choosing it costs nothing where it
+//does not help.
 //
 //The consequence has to be lived with rather than wished away. The two disagree in the last
 //digits, so the same input gives slightly different output on a machine that has a CUDA

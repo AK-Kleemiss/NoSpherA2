@@ -2,36 +2,23 @@
 
 #include "gemm_gpu.cuh"
 #include "cublas_dynamic.h"
+#include <type_traits>
 
 //The one GEMM the I tensor performs, behind a name so the implementation can change under
 //it: C = A^T B, column-major, alpha 1, beta 0, with m and n around a hundred and k in the
 //thousands. Nothing else in the program has this shape, and it is the only device GEMM that
 //is on a hot path.
 //
-//CUTLASS where it is available, our own kernel otherwise. Isolated on this shape alone,
-//one process so the clocks are common, best split count each, as a fraction of cuBLAS:
-//ours 0.55-0.61 and flat in the split count, CUTLASS 0.85-1.12. Our kernel being flat is
-//what settled it - the heuristic was already within 2% of the best count available to it,
-//so the ceiling was the kernel and no further tuning of the split rule could have moved it.
+//Three implementations, chosen at run time and per precision because the fastest differs
+//by both. cuBLAS leads in single and double alike and is used whenever it loads; CUTLASS
+//takes single precision behind it and is beaten by the built-in kernel in double, so
+//double falls to the built-in one. -no_gpu_cublas pins whichever of the latter two applies.
 //
-//Whole I tensor stage, which is what the run actually pays, in GFLOP/s:
+//Neither fallback is a runtime dependency: CUTLASS is headers compiled into this binary
+//and the built-in kernel is ours, so a machine with no CUDA toolkit still runs the device
+//path. cuBLAS is opened by name and ignored when absent - nothing links it.
 //
-//                          ours   CUTLASS   cuBLAS
-//  RTX 4090 mobile         1759      1950     2224
-//  RTX 2080 Ti             1181      1663     1794
-//  Tesla V100              1507      1542     2552
-//
-//Read the first row with care. Three interleaved pairs on that laptop gave CUTLASS
-//1725-1950 and cuBLAS 1535-2224 - a 45% spread - so the two are indistinguishable there
-//and only the best of each is tabulated. Earlier versions of this comment claimed first
-//that CUTLASS beat cuBLAS on Ada and then the reverse; both were reading that noise across
-//sittings. The V100 row is the one that is safe to reason from: 1.65x in single and 1.79x
-//in double, far outside anything the variance explains.
-//
-//Hence the default: cuBLAS when the machine has it, CUTLASS when it does not. Preferring
-//cuBLAS costs nothing measurable where it does not help and is worth a great deal on a
-//datacentre part. Neither is linked or shipped - CUTLASS is headers compiled in, cuBLAS is
-//opened by name at run time - so the half-gigabyte problem does not come back either way.
+//Rates per card and per backend are in the vault note, not here.
 //
 //HIP keeps the hand-written kernel: CUTLASS is CUDA-only.
 
@@ -60,10 +47,11 @@ using Gemm = cutlass::gemm::device::GemmSplitKParallel<
 	T, cutlass::layout::ColumnMajor,
 	T, cutlass::layout::ColumnMajor>;
 
-//Slices sized so each carries a few hundred elements of depth. Measured on an RTX 4090
-//mobile at k = 4500: 8 slices reaches 0.44 of cuBLAS, 20-32 stays between 0.85 and 1.12,
-//and 48 falls back to 0.47. Splitting by depth rather than by SM count keeps that shape
-//without asking the device anything.
+//Slices sized so each carries a couple of hundred elements of depth. The count matters a
+//great deal - too few starves the device and too many drowns it in reduction - and the
+//useful band was found by sweeping it on an RTX 4090 mobile at k = 4500. Splitting by depth
+//rather than by SM count reproduces that band without asking the device anything, though it
+//has not been re-swept on a datacentre part.
 inline int split_count(const int k)
 {
 	int s = k / 192;
@@ -72,28 +60,44 @@ inline int split_count(const int k)
 	return s;
 }
 
+//CUTLASS was adopted on a single-precision measurement and allowed to take double with it,
+//which halved that path until someone ran it. The choice is per precision because the
+//answer is per precision.
+template <typename T>
+constexpr bool cutlass_handles() { return std::is_same<T, float>::value; }
+
 template <typename T>
 inline size_t workspace_bytes(const int m, const int n, const int k)
 {
-	typename Gemm<T>::Arguments args({m, n, k}, {nullptr, k}, {nullptr, k},
-		{nullptr, m}, {nullptr, m}, {T(1), T(0)}, split_count(k));
-	return Gemm<T>::get_workspace_size(args);
+	if constexpr (cutlass_handles<T>()) {
+		typename Gemm<T>::Arguments args({m, n, k}, {nullptr, k}, {nullptr, k},
+			{nullptr, m}, {nullptr, m}, {T(1), T(0)}, split_count(k));
+		return Gemm<T>::get_workspace_size(args);
+	} else {
+		return sizeof(T) * gemm_gpu::workspace_elems(m, n, gemm_gpu::split_count(m, n, k));
+	}
 }
 
 template <typename T>
 inline bool run(const int m, const int n, const int k,
 	const T* A, const int lda, const T* B, const int ldb, T* C, const int ldc, void* ws)
 {
-	//cuBLAS first when it loaded, CUTLASS behind it. -no_gpu_cublas pins the second.
+	//cuBLAS first when it loaded - it is the fastest of the three in both precisions.
+	//-no_gpu_cublas pins whichever of the other two handles this one.
 	if (cublas_dynamic_gemm(true, false, m, n, k, T(1), A, lda, B, ldb, T(0), C, ldc))
 		return true;
-	Gemm<T> op;
-	typename Gemm<T>::Arguments args({m, n, k}, {A, lda}, {B, ldb},
-		{C, ldc}, {C, ldc}, {T(1), T(0)}, split_count(k));
-	//initialize + run rather than operator()(args, workspace): in 4.7.1 that overload hands
-	//a stream to an initialize() declared with two parameters, and does not compile.
-	if (op.initialize(args, ws) != cutlass::Status::kSuccess) return false;
-	return op.run() == cutlass::Status::kSuccess;
+	if constexpr (cutlass_handles<T>()) {
+		Gemm<T> op;
+		typename Gemm<T>::Arguments args({m, n, k}, {A, lda}, {B, ldb},
+			{C, ldc}, {C, ldc}, {T(1), T(0)}, split_count(k));
+		//initialize + run rather than operator()(args, workspace): in 4.7.1 that overload
+		//hands a stream to an initialize() declared with two parameters, and will not compile.
+		if (op.initialize(args, ws) != cutlass::Status::kSuccess) return false;
+		return op.run() == cutlass::Status::kSuccess;
+	} else {
+		return gemm_gpu::launch<T>(true, false, m, n, k,
+			T(1), A, lda, B, ldb, T(0), C, ldc, static_cast<T*>(ws));
+	}
 }
 
 #else
