@@ -841,6 +841,54 @@ void generate_fractional_hkl(const double& dmin,
  * @param file The output stream for the file.
  * @param debug A boolean indicating whether to enable debug mode.
  */
+// Read exactly n whitespace-separated values of one CIF loop row.
+//
+// Two things a real CIF does that "one stringstream per line" does not survive:
+//
+//   * a row may be WRAPPED over several lines. CIF has an 80-column heritage and
+//     writers still break long rows. Seen on a disordered structure whose carbon
+//     rows carry 14 of 15 values with the last on the following line - the empty
+//     field then reached std::stoi and aborted the whole run.
+//   * a value may be QUOTED and contain spaces, e.g. 'x, y, z'. Splitting on
+//     whitespace turns one value into three.
+//
+// Returns false if the file ends with the row incomplete. `line` is left holding
+// the last line consumed, which is what the surrounding loops expect.
+static bool read_cif_loop_row(std::istream &input, std::string &line, int n, svec &fields)
+{
+    fields.assign(n, "");
+    int got = 0;
+    std::string rest = line;
+    while (true)
+    {
+        size_t i = 0;
+        while (got < n && i < rest.size())
+        {
+            while (i < rest.size() && std::isspace(static_cast<unsigned char>(rest[i]))) i++;
+            if (i >= rest.size()) break;
+            std::string value;
+            const char c = rest[i];
+            if (c == 0x27 || c == '"')
+            {
+                const char quote = c;
+                i++;
+                while (i < rest.size() && rest[i] != quote) value.push_back(rest[i++]);
+                if (i < rest.size()) i++;              // closing quote
+            }
+            else
+            {
+                while (i < rest.size() && !std::isspace(static_cast<unsigned char>(rest[i])))
+                    value.push_back(rest[i++]);
+            }
+            fields[got++] = value;
+        }
+        if (got >= n) return true;
+        if (!std::getline(input, rest)) return false;
+        line = rest;
+    }
+}
+
+
 svec read_atoms_from_CIF(std::ifstream& cif_input,
 	const ivec& input_groups,
 	const cell& unit_cell,
@@ -914,12 +962,13 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 			while (trim(line).find("_") > 0 && line.length() > 3)
 			{
 				atoms_read = true;
-				stringstream s(line);
 				svec fields;
-				fields.resize(count_fields);
 				int nr = -1;
-				for (int i = 0; i < count_fields; i++)
-					s >> fields[i];
+				if (!read_cif_loop_row(cif_input, line, count_fields, fields))
+				{
+					file << "CIF atom loop ended mid-row; ignoring the incomplete entry." << std::endl;
+					break;
+				}
 				fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
 				fields[type_field].erase(remove_if(fields[type_field].begin(), fields[type_field].end(), ::isspace), fields[type_field].end());
 				if (debug)
@@ -943,8 +992,16 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
 				int group_nr = 0;
-				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?") {
-					group_nr = std::stoi(fields[group_field]);
+				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?"
+					&& !fields[group_field].empty()) {
+					// Belt and braces: an unreadable disorder group should not abort a
+					// run that is otherwise perfectly fine.
+					try { group_nr = std::stoi(fields[group_field]); }
+					catch (const std::exception &) {
+						file << "Could not read disorder group for atom " << fields[label_field]
+							 << "; treating it as 0." << std::endl;
+						group_nr = 0;
+					}
 				}
 				// Filter PART before matching this CIF row to a WFN atom.  Disorder
 				// positions can be close enough to match an atom in another PART;
