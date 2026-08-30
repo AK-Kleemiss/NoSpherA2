@@ -70,6 +70,12 @@ if(NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP)
     message(FATAL_ERROR "NOSPHERA2_USE_CUDA and NOSPHERA2_USE_HIP are mutually exclusive")
 endif()
 
+#Nothing delay-loads a CUDA library any more, cuBLAS having been the only one. Deleting the
+#code that set this was not enough to stop it being used: it was cached, so a build directory
+#configured before that change kept handing the flag and delayimp to every link. Cleared
+#rather than left to rot, the same way an unusable cached compiler is above.
+unset(NOSPHERA2_CUDA_DELAYLOAD CACHE)
+
 if(NOSPHERA2_USE_CUDA)
     include(CheckLanguage)
     check_language(CUDA)

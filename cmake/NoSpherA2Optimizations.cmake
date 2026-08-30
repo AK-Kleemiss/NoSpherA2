@@ -43,11 +43,16 @@ function(nosphera2_enable_optimizations target_name)
                 $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>
         )
 
+        #HOST_LINK, because a CUDA target links twice. Link options otherwise reach the
+        #device link as well, where nvcc hands what it does not recognise to cl - and cl
+        #reads /OPT:REF as its own /O flag followed by rubbish, warning once per character.
+        #They were ignored there rather than misapplied, so this was noise rather than a
+        #defect, but it buried real warnings and made every build look unclean.
         target_link_options(
             "${target_name}"
             PRIVATE
-                /NODEFAULTLIB:vcomp
-                /NODEFAULTLIB:vcompd
+                "$<HOST_LINK:/NODEFAULTLIB:vcomp>"
+                "$<HOST_LINK:/NODEFAULTLIB:vcompd>"
         )
 
         get_target_property(target_type "${target_name}" TYPE)
@@ -56,11 +61,9 @@ function(nosphera2_enable_optimizations target_name)
             target_link_options(
                 "${target_name}"
                 PRIVATE
-                    $<$<CONFIG:Release>:
-                        /OPT:REF
-                        /OPT:ICF
-                        /INCREMENTAL:NO
-                    >
+                    "$<HOST_LINK:$<$<CONFIG:Release>:/OPT:REF>>"
+                    "$<HOST_LINK:$<$<CONFIG:Release>:/OPT:ICF>>"
+                    "$<HOST_LINK:$<$<CONFIG:Release>:/INCREMENTAL:NO>>"
             )
         endif()
 
