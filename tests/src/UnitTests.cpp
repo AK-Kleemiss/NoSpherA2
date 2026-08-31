@@ -14,6 +14,9 @@
 #include "core/cell.h"
 #include "core/wfn_class.h"
 #include "core/properties.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "core/blas_gpu.h"
+#endif
 
 static constexpr double PI_VAL = 3.14159265358979323846;
 
@@ -2426,5 +2429,125 @@ namespace NoSpherA2UnitTests
         EXPECT_EQ(homo, 2);
         EXPECT_EQ(lumo, 3);
     }
+
+#ifdef NOSPHERA2_USE_GPU
+    static void set_min_flop_env(const char* value)
+    {
+#ifdef _WIN32
+        _putenv_s("NOSPHERA2_BLAS_GPU_MIN_FLOP", value ? value : "");
+#else
+        if (value) setenv("NOSPHERA2_BLAS_GPU_MIN_FLOP", value, 1);
+        else unsetenv("NOSPHERA2_BLAS_GPU_MIN_FLOP");
+#endif
+    }
+
+    // blas_gpu_dgemm ships and, until this test, was reached by nothing at all: its size
+    // gate sits far above anything in the test data, so neither the gate nor the GEMM behind
+    // it was ever exercised. The interesting part is not that the device can multiply but
+    // that the arguments survive the trip - the routine presents a row-major interface over a
+    // column-major library by swapping the operands and the transposes, and that swap is
+    // exactly the sort of thing that is right in three of the four transpose combinations and
+    // wrong in the fourth. So all four are checked, against a reference computed from the
+    // definition rather than from another BLAS, which would share any convention mistake.
+    TEST(BlasGpuTests, RowMajorDgemmMatchesTheDefinitionInEveryTransposeCombination)
+    {
+        if (!blas_gpu_available()) {
+            GTEST_SKIP() << "No GPU device present; blas_gpu_dgemm cannot run here";
+        }
+
+        const int m = 17, n = 11, k = 23;   // deliberately unequal, so a swapped extent shows
+        std::vector<double> A((size_t)m * k), B((size_t)k * n);
+        for (size_t i = 0; i < A.size(); i++) A[i] = 0.5 - std::sin(0.37 * (double)i);
+        for (size_t i = 0; i < B.size(); i++) B[i] = 0.25 + std::cos(0.21 * (double)i);
+
+        blas_gpu_set_enabled(true);
+        set_min_flop_env("1");   // without this the gate refuses a problem this small
+
+        for (int tA = 0; tA < 2; tA++) {
+            for (int tB = 0; tB < 2; tB++) {
+                // op(A) is m x k and op(B) is k x n either way, so the leading dimensions
+                // follow how the operand is stored rather than how it is used
+                const int lda = tA ? m : k;
+                const int ldb = tB ? k : n;
+                std::vector<double> C((size_t)m * n, 0.0);
+                const bool ran = blas_gpu_dgemm(tA != 0, tB != 0, m, n, k, 1.0,
+                    A.data(), lda, B.data(), ldb, 0.0, C.data(), n);
+                ASSERT_TRUE(ran) << "device declined transA=" << tA << " transB=" << tB;
+
+                for (int i = 0; i < m; i++) {
+                    for (int j = 0; j < n; j++) {
+                        double want = 0.0;
+                        for (int p = 0; p < k; p++) {
+                            const double a = tA ? A[(size_t)p * m + i] : A[(size_t)i * k + p];
+                            const double b = tB ? B[(size_t)j * k + p] : B[(size_t)p * n + j];
+                            want += a * b;
+                        }
+                        ASSERT_NEAR(C[(size_t)i * n + j], want, 1e-10)
+                            << "transA=" << tA << " transB=" << tB
+                            << " at (" << i << "," << j << ")";
+                    }
+                }
+            }
+        }
+
+        set_min_flop_env(nullptr);
+        blas_gpu_set_enabled(false);
+    }
+
+    // Every shape above uses a single k-slice, so none of them reaches the split-k path - and
+    // that path is where a GEMM of our own differs from a library one. A deep, narrow
+    // reduction is what the I tensor actually asks for, and it is the shape that forces the
+    // depth to be cut across blocks and summed afterwards.
+    //
+    // Determinism is asserted as well as accuracy, deliberately: accumulating the slices with
+    // an atomic would be shorter, would pass an accuracy check, and would make the result
+    // depend on the order the device happened to finish them. Bit-identical repeats are the
+    // only thing that tells those two implementations apart.
+    TEST(BlasGpuTests, ADeepReductionIsSplitAcrossBlocksAndStillSumsInAFixedOrder)
+    {
+        if (!blas_gpu_available()) {
+            GTEST_SKIP() << "No GPU device present; blas_gpu_dgemm cannot run here";
+        }
+
+        const int m = 9, n = 7, k = 4096;   // one tile of output, many slices of depth
+        std::vector<double> A((size_t)m * k), B((size_t)k * n);
+        for (size_t i = 0; i < A.size(); i++) A[i] = 0.5 - std::sin(0.37 * (double)i);
+        for (size_t i = 0; i < B.size(); i++) B[i] = 0.25 + std::cos(0.21 * (double)i);
+
+        blas_gpu_set_enabled(true);
+        set_min_flop_env("1");
+
+        std::vector<double> C1((size_t)m * n, 0.0), C2((size_t)m * n, 0.0);
+        ASSERT_TRUE(blas_gpu_dgemm(false, false, m, n, k, 1.0,
+            A.data(), k, B.data(), n, 0.0, C1.data(), n));
+        ASSERT_TRUE(blas_gpu_dgemm(false, false, m, n, k, 1.0,
+            A.data(), k, B.data(), n, 0.0, C2.data(), n));
+
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                double want = 0.0;
+                for (int p = 0; p < k; p++)
+                    want += A[(size_t)i * k + p] * B[(size_t)p * n + j];
+                const size_t at = (size_t)i * n + j;
+                ASSERT_NEAR(C1[at], want, 1e-9) << "at (" << i << "," << j << ")";
+                ASSERT_EQ(C1[at], C2[at]) << "not reproducible at (" << i << "," << j << ")";
+            }
+        }
+
+        set_min_flop_env(nullptr);
+        blas_gpu_set_enabled(false);
+    }
+
+    // The gate is the reason the offload is worth having, so it gets its own check: a shape
+    // below the threshold has to be declined rather than quietly run at a loss.
+    TEST(BlasGpuTests, SmallShapesAreDeclinedSoTheyStayOnTheHost)
+    {
+        blas_gpu_set_enabled(true);
+        std::vector<double> A(16, 1.0), B(16, 1.0), C(16, 0.0);
+        EXPECT_FALSE(blas_gpu_dgemm(false, false, 4, 4, 4, 1.0,
+            A.data(), 4, B.data(), 4, 0.0, C.data(), 4));
+        blas_gpu_set_enabled(false);
+    }
+#endif
 
 } // namespace NoSpherA2UnitTests

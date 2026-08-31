@@ -35,6 +35,12 @@ public:
 
     std::vector<cdouble>& values() noexcept { return _values; }
 
+    //Flat view for the GPU path: block(atom, channel, l) is offsets[l] +
+    //(atom * nchannels + channel) * (2l+1), which the device reproduces
+    const std::vector<cdouble>& values() const noexcept { return _values; }
+    const std::vector<size_t>& offsets() const noexcept { return _offsets; }
+    int nchannels() const noexcept { return _nchannels; }
+
     void clear() noexcept {
         _nchannels = 0;
         _offsets.clear();

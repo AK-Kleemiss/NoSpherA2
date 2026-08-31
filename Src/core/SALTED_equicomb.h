@@ -26,3 +26,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     cvec2& c2r, int featsize,
     vec& p,
     bool v2_is_conj_of_v1 = false);
+
+//Opt-in GPU path for the descriptor combination; off unless -gpu_salted is given
+void equicomb_set_gpu(bool on);
+bool equicomb_gpu_enabled();

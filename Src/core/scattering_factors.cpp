@@ -15,9 +15,17 @@
 #include "npy.h"
 #include "integrator.h"
 #include "basis_set.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "SALTED_equicomb.h"
+#include "grid_gpu.h"
+#include "blas_gpu.h"
+#endif
 #include "SALTED_utilities.h"
 #include "GridManager.h"
 #include "cube.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "sf_gpu.h"
+#endif
 
 
 #ifdef PEOJECT_NAME
@@ -1702,6 +1710,26 @@ cdouble sfac_bessel(
 	}
 }
 
+//Radial part of the Fourier-Bessel transform, keyed on (exponent, l) so it can be tabulated per k-point
+static inline double fourier_bessel_radial(const double b, const int l, const double exp_l_plus_3_2, const double H)
+{
+	return (pow(H, l) * exp(-H * H / (4.0 * b))) / (constants::pow_2[l] * exp_l_plus_3_2);
+}
+
+//As sfac_bessel(), but with the radial factor already evaluated
+static inline cdouble sfac_bessel_r(const primitive& p, const double* k_point, const double* coefs, const double radial)
+{
+	const int l = p.get_type();
+	const double v = constants::PI3_2 * radial * p.get_normalized_coefficient() * constants::spherical_harmonic(l, k_point, coefs);
+	switch (l % 4) {
+	case 0: return cdouble(v, 0);
+	case 1: return cdouble(0, v);
+	case 2: return cdouble(-v, 0);
+	case 3: return cdouble(0, -v);
+	default: return constants::cnull;
+	}
+}
+
 //TODO�: This breaks if the aux_basis is contracted... Need to fix that!
 //a streaming caller owns one bar for the whole table and passes it in, else every block draws its own
 void calc_SF_SALTED(const vec2& k_pt,
@@ -1749,6 +1777,29 @@ void calc_SF_SALTED(const vec2& k_pt,
 	}
 
 	sf.resize(num_asym_atoms);
+	//The radial factor depends only on (exponent, l) and |k|, so collect the distinct pairs once instead of recomputing per atom
+	vec uniq_b, uniq_elp32;
+	ivec uniq_l;
+	ivec2 bl_index(num_asym_atoms);
+	for (int ia = 0; ia < num_asym_atoms; ia++) {
+		const atom& a = atom_list[asym_atom_list[ia]];
+		const int lim = (int)a.get_basis_set_size();
+		bl_index[ia].resize(lim);
+		for (int ib = 0; ib < lim; ib++) {
+			const primitive& pr = a.get_basis_set_entry(ib).get_primitive();
+			int slot = -1;
+			for (int u = 0; u < (int)uniq_b.size(); u++)
+				if (uniq_b[u] == pr.get_exp() && uniq_l[u] == pr.get_type()) { slot = u; break; }
+			if (slot < 0) {
+				slot = (int)uniq_b.size();
+				uniq_b.push_back(pr.get_exp());
+				uniq_l.push_back(pr.get_type());
+				uniq_elp32.push_back(pr.get_exp_l_plus_3_2());
+			}
+			bl_index[ia][ib] = slot;
+		}
+	}
+	const int n_uniq = (int)uniq_b.size();
 	std::unique_ptr<ProgressBar> local_pb;
 	if (!progress)
 		local_pb = std::make_unique<ProgressBar>(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
@@ -1762,6 +1813,7 @@ void calc_SF_SALTED(const vec2& k_pt,
 			sf[ia].assign(k_pt[0].size(), constants::cnull);
 		}
 
+		vec radial(n_uniq, 0.0);
 #pragma omp for
 		for (int i_kpt = 0; i_kpt < (int)k_pt[0].size(); ++i_kpt)
 		{
@@ -1776,6 +1828,8 @@ void calc_SF_SALTED(const vec2& k_pt,
 
 			for (int i = 0; i < 3; i++)
 				k_pt_local[i] /= k_pt_local[3];
+			for (int u = 0; u < n_uniq; u++)
+				radial[u] = fourier_bessel_radial(uniq_b[u], uniq_l[u], uniq_elp32[u], k_pt_local[3]);
 
 			for (int ia = 0; ia < num_asym_atoms; ++ia)
 			{
@@ -1786,11 +1840,12 @@ void calc_SF_SALTED(const vec2& k_pt,
 
 				const double* coef_slice_ptr = coefs.data() + coef_offsets[ia];
 
+				const int* bl_row = bl_index[ia].data();
 				for (int i_basis = 0; i_basis < lim; ++i_basis, ++basis_ptr)
 				{
 					// IMPORTANT: make basis local, not shared between threads
 					const primitive& basis = basis_ptr->get_primitive();
-					sf[ia][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
+					sf[ia][i_kpt] += sfac_bessel_r(basis, k_pt_local, coef_slice_ptr, radial[bl_row[i_basis]]);
 					coef_slice_ptr += 2 * basis.get_type() + 1;
 				}
 			}
@@ -1826,7 +1881,10 @@ void calc_SF(const int& points,
 	_time_point& end1,
 	bool debug,
 	bool no_date,
-	bool do_XCW)
+	bool do_XCW,
+	bool use_gpu,
+	bool gpu_fp64,
+	bool gpu_fp32)
 {
 	const long long int imax = static_cast<long long int>(dens.size());
 	const long long int smax = static_cast<long long int>(k_pt[0].size());
@@ -1839,6 +1897,10 @@ void calc_SF(const int& points,
 	if (debug)
 		file << "Initialized FFs" << std::endl
 		<< "asym atom list size: " << imax << " total grid size: " << points << endl;
+#ifdef NOSPHERA2_USE_GPU
+	if (use_gpu)
+		sf_gpu_warmup_wait();
+#endif
 	end1 = get_time();
 
 	if (!no_date)
@@ -1849,6 +1911,53 @@ void calc_SF(const int& points,
 		else
 			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
 	}
+#ifdef NOSPHERA2_USE_GPU
+	if (use_gpu && sf_gpu_available()) {
+		ivec offs(imax + 1, 0);
+		for (int i = 0; i < imax; i++)
+			offs[i + 1] = offs[i] + (int)dens[i].size();
+		const long long tot = offs[imax];
+		vec fd1(tot), fd2(tot), fd3(tot), fde(tot);
+		for (int i = 0; i < imax; i++) {
+			const int lo = offs[i], n = (int)dens[i].size();
+			for (int p = 0; p < n; p++) {
+				fd1[lo + p] = d1[i][p]; fd2[lo + p] = d2[i][p];
+				fd3[lo + p] = d3[i][p]; fde[lo + p] = dens[i][p];
+			}
+		}
+		std::vector<double*> rows(imax);
+		for (int i = 0; i < imax; i++)
+			rows[i] = reinterpret_cast<double*>(sf[i].data());
+		//-gpu_fp64 wins over -gpu_fp32 if both are given: between two explicit requests the
+		//accurate one is the safer default.
+		const sf_precision prec = gpu_fp64 ? sf_precision::FP64
+			: gpu_fp32 ? sf_precision::FP32 : sf_precision::Auto;
+		const _time_point sf_gpu_t0 = get_time();
+		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
+			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
+			rows.data(), prec)) {
+			//Transfers included. What decides where this work belongs is the rate the caller
+			//actually gets, not the one the kernel would post with the copies left out.
+			throughput::record("scattering-factor transform", true,
+				throughput::flops_ndft(static_cast<double>(tot), static_cast<double>(smax)),
+				get_msec(sf_gpu_t0, get_time()));
+			//The bar is what the reference logs expect, so draw it even though the work is done
+			if (!do_XCW) {
+				ProgressBar gprogress(imax, 60, "=", " ", "Calculating Scattering Factors", file);
+				for (int i = 0; i < imax; i++)
+					gprogress.update();
+			}
+			if (!no_date) {
+				_time_point gend = get_time();
+				const int ratio = sf_gpu_fp64_ratio();
+				file << "GPU in use: scattering-factor Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
+				     << (sf_gpu_uses_fp32(prec) ? "reduced-argument f32 sincos" : "f64 sincos")
+				     << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
+			}
+			return;
+		}
+	}
+#endif
 	ProgressBar* progress = nullptr;
 	if (!do_XCW) {
 		progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors", file);
@@ -1863,9 +1972,16 @@ void calc_SF(const int& points,
 	const double* k2_data = k_pt[1].data();
 	const double* k3_data = k_pt[2].data();
 
+	//Timed around the whole atom loop, not inside it. The inner loop is an omp parallel for,
+	//and a per-thread timer there would sum concurrent time into a total larger than the
+	//wall clock - a profile that cannot be true is worse than none.
+	const _time_point sf_cpu_t0 = get_time();
+	double sf_cpu_points = 0.0;
+
 	for (int i = 0; i < imax; i++)
 	{
 		pmax = static_cast<long long int>(dens[i].size());
+		sf_cpu_points += static_cast<double>(pmax);
 		dens_local = dens[i].data();
 		d1_local = d1[i].data();
 		d2_local = d2[i].data();
@@ -1957,6 +2073,9 @@ void calc_SF(const int& points,
 			progress->update();
 		}
 	}
+	throughput::record("scattering-factor transform", false,
+		throughput::flops_ndft(sf_cpu_points, static_cast<double>(smax)),
+		get_msec(sf_cpu_t0, get_time()));
 	if (!do_XCW) {
 		delete (progress);
 	}
@@ -2410,6 +2529,10 @@ int make_atomic_grids_wrapper(
 	file << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::endl;
 
 	GridConfiguration config;
+#ifdef NOSPHERA2_USE_GPU
+	grid_gpu_set_enabled(opt.gpu_grid);
+	blas_gpu_set_enabled(opt.gpu_blas);
+#endif
 	config.accuracy = opt.accuracy;
 	config.partition_type = opt.partition_type;
 	config.pbc = opt.pbc;
@@ -2454,6 +2577,10 @@ itsc_block calculate_scattering_factors_from_cube(
 	vector<_time_point> time_points;
 	vector<string> time_descriptions;
 	time_points.push_back(get_time());
+#ifdef NOSPHERA2_USE_GPU
+	if (opt.use_gpu)
+		sf_gpu_warmup_start();
+#endif
 
 	cell unit_cell(opt.cif, file, opt.debug);
 	ifstream cif_input(opt.cif.c_str(), ios::in);
@@ -2518,6 +2645,10 @@ itsc_block calculate_scattering_factors_from_cube(
 	time_descriptions.push_back("k-points preparation");
 
 	GridConfiguration config;
+#ifdef NOSPHERA2_USE_GPU
+	grid_gpu_set_enabled(opt.gpu_grid);
+	blas_gpu_set_enabled(opt.gpu_blas);
+#endif
 	config.accuracy = opt.accuracy;
 	config.partition_type = opt.partition_type;
 	config.pbc = opt.pbc;
@@ -2558,7 +2689,11 @@ itsc_block calculate_scattering_factors_from_cube(
 		time_points.front(),
 		end1,
 		opt.debug,
-		opt.no_date);
+		opt.no_date,
+		false,
+		opt.use_gpu,
+		opt.gpu_fp64,
+		opt.gpu_fp32);
 	time_points.push_back(get_time());
 	time_descriptions.push_back("Fourier transform");
 
@@ -2620,6 +2755,10 @@ tsc_block_type calculate_scattering_factors(
 	salted_part_prep* prep_out
 ) {
 	using namespace std;
+#ifdef NOSPHERA2_USE_GPU
+	if (opt.use_gpu)
+		sf_gpu_warmup_start();
+#endif
 	int nat = 0;
 	WFN* wavy = NULL;
 	if constexpr (std::is_same_v<calculator_type, std::vector<WFN> &>) {
@@ -2840,6 +2979,9 @@ tsc_block_type calculate_scattering_factors(
     {
         // Generation of SALTED density coefficients
         file << "\nGenerating densities... " << endl;
+#ifdef NOSPHERA2_USE_GPU
+        equicomb_set_gpu(opt.gpu_salted);
+#endif
         vec coefs = calculator.gen_SALTED_densities();
         file << setw(13 * 4) << "... done!" << endl;
         time_points.push_back(get_time());
@@ -2988,7 +3130,11 @@ tsc_block_type calculate_scattering_factors(
 				time_points.front(),
 				end1,
 				opt.debug,
-				opt.no_date);
+				opt.no_date,
+				false,
+				opt.use_gpu,
+				opt.gpu_fp64,
+				opt.gpu_fp32);
 
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Fourier transform");

@@ -1,3 +1,6 @@
+#ifdef NOSPHERA2_USE_GPU
+#include "blas_gpu.h"
+#endif
 #include "pch.h"
 #include "nos_math.h"
 
@@ -151,6 +154,23 @@ Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynami
     std::vector<T> result_flat((size_t)m * (size_t)n, 0.0);
     if constexpr (std::is_same_v<T, double>)
     {
+#ifdef NOSPHERA2_USE_GPU
+        //Offered to the device only when the shape earns the transfers; blas_gpu_dgemm
+        //declines otherwise and this falls straight through to MKL
+        const _time_point gemm_t0 = get_time();
+        if (blas_gpu_dgemm(transp1, transp2, m, n, k1, 1.0,
+                flatMat1.data(), transp1 ? m : k1,
+                flatMat2.data(), transp2 ? k2 : n,
+                0.0, result_flat.data(), n))
+        {
+            throughput::record("dense GEMM (dot_BLAS)", true,
+                throughput::flops_gemm(m, n, k1), get_msec(gemm_t0, get_time()));
+            return reshape<Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>>(result_flat, Shape2D{ (unsigned long long)m, (unsigned long long)n });
+        }
+#endif
+        //The host GEMM is timed with the same 2mnk count, which is what makes the two
+        //rows comparable and the offload threshold re-derivable on this machine.
+        const _time_point cpu_gemm_t0 = get_time();
         // Call cblas_dgemm
         cblas_dgemm(CblasRowMajor,
             transp1 ? CblasTrans : CblasNoTrans,
@@ -161,6 +181,8 @@ Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynami
             flatMat2.data(), transp2 ? k2 : n,
             0.0,
             result_flat.data(), n);
+        throughput::record("dense GEMM (dot_BLAS)", false,
+            throughput::flops_gemm(m, n, k1), get_msec(cpu_gemm_t0, get_time()));
     }
     else if constexpr (std::is_same_v<T, cdouble>)
     {

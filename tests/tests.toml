@@ -308,6 +308,13 @@ rgbi_basis = "ano"
 # far fewer basis functions, cutting both memory and runtime substantially;
 # this also exercises the STO-3G L-shell fix (see UNIT_TESTS_STATUS.md) as a
 # real regression test, not just a manual smoke test.
+#
+# Every XCW test below pins no_gpu, for the reference output rather than for speed. The I
+# tensor runs on the device by default now, and the device answer differs from the CPU one
+# in the tenth significant figure - enough to change these logs. Left unpinned, each would
+# pass on a machine with no usable GPU and fail on one with a card, which is the same trap
+# the fp32/fp64 tests further down already document. P1_test_XCW_gpu_itensor is the
+# deliberate exception and carries its own reference.
 
 [P1_test_XCW]
 directory = "P1_test"
@@ -315,6 +322,7 @@ good = "P1_test_XCW.good"
 
 [P1_test_XCW.args]
 do_XCW = ""
+no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
@@ -332,6 +340,7 @@ full = true
 
 [P1_test_XCW_full.args]
 do_XCW = ""
+no_gpu = ""
 xcw_gaussian_halt = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
@@ -348,6 +357,7 @@ good = "P1_test_XCW_h2.good"
 
 [P1_test_XCW_h2.args]
 do_XCW = ""
+no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
@@ -369,6 +379,7 @@ full = true
 
 [P1_test_XCW_h2_full.args]
 do_XCW = ""
+no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
@@ -383,6 +394,7 @@ good = "P1_F2_test_XCW.good"
 
 [P1_F2_test_XCW.args]
 do_XCW = ""
+no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
@@ -396,6 +408,7 @@ full = true
 
 [P1_F2_test_XCW_full.args]
 do_XCW = ""
+no_gpu = ""
 xcw_gaussian_halt = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
@@ -412,6 +425,7 @@ good = "P1_F2_test_XCW_h2.good"
 [P1_F2_test_XCW_h2.args]
 
 do_XCW = ""
+no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
@@ -425,9 +439,85 @@ full = true
 
 [P1_F2_test_XCW_h2_full.args]
 do_XCW = ""
+no_gpu = ""
 xcw_gaussian_halt = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings_f2.txt"
 no_date = ""
+
+# GPU variants. These run only when a device is present; the test skips otherwise, so
+# the suite stays green on a CPU-only machine. The grid-weight path is bit-identical to
+# the CPU, so it reuses the CPU reference; the I tensor path is single-precision and
+# carries its own.
+
+# Its own reference rather than the CPU one, and deliberately so. The weights themselves
+# are bit-identical - the only line that differs is the note saying the device ran them -
+# but that note is the test's real assertion. Held to the shared CPU reference this test
+# passed for a whole session while the kernel was failing its chi copy and falling back,
+# because a silent fallback produces exactly the CPU reference. The reference has to
+# contain the evidence that the GPU did the work.
+#
+# The note names the backend, so a HIP build needs its own copy of this file. Regenerate it
+# there rather than editing CUDA out of this one: run the case, confirm the only line that
+# differs from sucrose_SF.good is the note, and save the resulting NoSpherA2.log. Hand-editing
+# the backend name would produce a reference nobody has ever seen a run match.
+[sucrose_SF_gpu_grid]
+directory = "sucrose_fchk_SF"
+good = "sucrose_SF_gpu_grid.good"
+
+[sucrose_SF_gpu_grid.args]
+cif = "sucrose.cif"
+hkl = "olex2/Wfn_job/sucrose.hkl"
+wfn = "olex2/Wfn_job/sucrose.wfx"
+acc = 1
+gpu_grid = ""
+
+[P1_test_XCW_gpu_itensor]
+directory = "P1_test"
+good = "P1_test_XCW_gpu_itensor.good"
+
+[P1_test_XCW_gpu_itensor.args]
+do_XCW = ""
+cif = "P1_test_NA2.cif"
+hkl = "P1_test.hkl"
+anom_disp = "anom_disp.txt"
+XCW_settings = "test_settings.txt"
+no_date = ""
+gpu_itensor = ""
+# The device GEMM is cuBLAS when the machine has it and CUTLASS otherwise, and the two
+# disagree in the last digits. Pinned to CUTLASS because that is the one always present:
+# left to choose, this test would pass or fail on whether a CUDA toolkit was installed.
+no_gpu_cublas = ""
+
+# The two sincos kernels, each pinned rather than left to the card. Without the explicit
+# flags the precision a run gets depends on the reported fp32:fp64 ratio, so on a consumer
+# part both of these would be the f32 kernel and on a V100 both would be the f64 one - the
+# suite would report two passes having tested one path twice.
+#
+# Both are held to the same CPU reference, which is the point: the f64 kernel agrees to
+# ~1e-14 and the reduced-argument f32 one to ~2e-8, and both are inside what the reference
+# comparison accepts. That is the numerical-agreement contract in AGENTS.md, checked.
+
+[sucrose_SF_gpu_fp64]
+directory = "sucrose_fchk_SF"
+good = "sucrose_SF.good"
+
+[sucrose_SF_gpu_fp64.args]
+cif = "sucrose.cif"
+hkl = "olex2/Wfn_job/sucrose.hkl"
+wfn = "olex2/Wfn_job/sucrose.wfx"
+acc = 1
+gpu_fp64 = ""
+
+[sucrose_SF_gpu_fp32]
+directory = "sucrose_fchk_SF"
+good = "sucrose_SF.good"
+
+[sucrose_SF_gpu_fp32.args]
+cif = "sucrose.cif"
+hkl = "olex2/Wfn_job/sucrose.hkl"
+wfn = "olex2/Wfn_job/sucrose.wfx"
+acc = 1
+gpu_fp32 = ""

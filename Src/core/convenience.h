@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "pch.h"
+#include "throughput.h"
 
 
 
@@ -795,6 +796,36 @@ struct options
     RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
     ivec3 rgbi_group_sets;
     bool fract = false;
+    //GPU scattering factors when a device is present; -no_gpu forces the CPU loop
+    bool use_gpu = true;
+    //-gpu_fp64 keeps the double sincos on a card that would otherwise pick the fp32 one
+    bool gpu_fp64 = false;
+    //-gflops reports achieved GFLOP/s per stage for the CPU and GPU paths at the end of a
+    //run. The thresholds deciding what goes to the device were calibrated on one machine;
+    //this is how they get re-derived on another.
+    bool track_gflops = false;
+    //-gpu_fp32 forces the reduced-argument single-precision sincos on a card that would
+    //otherwise keep the double one. It exists for the test suite: without it the precision
+    //a run uses depends on the card, so neither path can be pinned. -gpu_fp64 wins if both
+    //are given, the accurate path being the safer thing to fall back to.
+    bool gpu_fp32 = false;
+    //-no_gpu_itensor keeps the XCW I tensor GEMMs on the CPU. On by default: it is much the
+    //largest of the device paths, and it moves the total energy only in the tenth
+    //significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
+    bool gpu_itensor = true;
+    //-gpu_salted runs the SALTED descriptor combination on the device
+    bool gpu_salted = false;
+    //-gpu_grid runs the Becke/TFVC integration weights on the device
+    bool gpu_grid = false;
+    //-gpu_blas offers large dense GEMMs in nos_math to the device
+    bool gpu_blas = false;
+    //The I tensor GEMM goes through cuBLAS when the machine has it, and through the
+    //built-in CUTLASS path otherwise. cuBLAS is 1.65x faster on a V100 and level with
+    //CUTLASS within measurement noise on consumer cards, so preferring it costs nothing
+    //where it does not help. -no_gpu_cublas pins CUTLASS, which is what the reference tests
+    //do: the two differ in the last digits, so a test left to pick would pass or fail on
+    //whether a CUDA toolkit happened to be installed.
+    bool gpu_cublas = true;
     //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
     bool fukui_analysis_run = false;
     bool profiling = false;

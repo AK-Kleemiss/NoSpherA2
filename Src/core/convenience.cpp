@@ -550,6 +550,69 @@ std::string help_message =
  "                                    arrangement. An explicit -tsc_block or\n"
  "                                    XCW i_tensor_mb overrides it.\n"
  "  -pbc <n>                           Periodic-boundary setting.\n\n"
+ "GPU ACCELERATION\n"
+ "  A CUDA or ROCm device is found and used on its own; nothing needs to be\n"
+ "  installed alongside this binary and no BLAS library is required. Every path\n"
+ "  falls back to the CPU when no usable device is present, so these flags are\n"
+ "  safe to leave on a machine that has none. If a GPU is present but this build\n"
+ "  carries no code for it, that is reported rather than silently ignored.\n"
+ "\n"
+ "  On by default:\n"
+ "  (scattering factors)               The Fourier transform runs on the device\n"
+ "                                    whenever one is present and the problem\n"
+ "                                    fits. Roughly 5-30x the CPU loop.\n"
+ "  -gpu_itensor / -no_gpu_itensor     The XCW I tensor contractions, much the\n"
+ "                                    largest of these paths: roughly 4-18x, set\n"
+ "                                    mostly by how fast the host CPU is. Single\n"
+ "                                    precision by default, which moves the total\n"
+ "                                    energy in the tenth significant figure.\n"
+ "\n"
+ "  Off unless asked:\n"
+ "  -gpu_grid                          Atomic integration grid weights (Becke\n"
+ "                                    and TFVC).\n"
+ "  -gpu_salted                        SALTED descriptor combination (equicomb).\n"
+ "                                    Wins per call, but creating the device\n"
+ "                                    context costs more than a small model saves.\n"
+ "  -gpu_blas                          Offer large dense matrix products to the\n"
+ "                                    device. Small ones stay on the CPU, where\n"
+ "                                    they beat what the transfers would allow.\n"
+ "  -no_gpu_cublas                     Keep the I tensor GEMM off cuBLAS. By\n"
+ "                                    default cuBLAS is used when the machine has\n"
+ "                                    it, being the fastest of the three, and the\n"
+ "                                    built-in kernels otherwise - CUTLASS in\n"
+ "                                    single precision, our own in double.\n"
+ "                                    Nothing is shipped or linked either way:\n"
+ "                                    cuBLAS is opened by name and ignored when\n"
+ "                                    absent. They differ in the last digits, so\n"
+ "                                    a run says which one it used; pin this when\n"
+ "                                    comparing logs across machines.\n"
+ "\n"
+ "  Precision:\n"
+ "  -gpu_fp64                          Keep the device in double throughout: the\n"
+ "                                    sincos in the transform and the I tensor\n"
+ "                                    alike. Costs almost nothing on a card with\n"
+ "                                    real double-precision units and a great deal\n"
+ "                                    on one without, which is why it is asked for\n"
+ "                                    rather than detected.\n"
+ "  -gpu_fp32                          Force single precision even on a card whose\n"
+ "                                    fp64 is fast enough to keep. Mainly for the\n"
+ "                                    tests, which otherwise cannot pin which\n"
+ "                                    kernel a run exercises.\n"
+ "                                    Left alone, the transform picks from the\n"
+ "                                    card's reported fp32:fp64 ratio: double where\n"
+ "                                    that is 2, single where it is 32 or 64. The\n"
+ "                                    single-precision path keeps the phase in\n"
+ "                                    double and agrees with the CPU to ~2e-8.\n"
+ "\n"
+ "  Turning it off and measuring it:\n"
+ "  -no_gpu                            Keep everything on the CPU, including the\n"
+ "                                    paths that are on by default. This is what\n"
+ "                                    to use for a CPU baseline.\n"
+ "  -gflops                            Report achieved GFLOP/s per stage, CPU and\n"
+ "                                    GPU, at the end of the run, with the slowest\n"
+ "                                    single call per stage. Use it to re-derive\n"
+ "                                    the offload thresholds on this machine rather\n"
+ "                                    than inheriting another one's.\n\n"
  "TSC/TSCB TABLE UTILITIES\n"
  "  -tscb <table.tsc|table.tscb>        Convert between text .tsc and binary\n"
  "                                    .tscb, preserving the basename.\n"
@@ -3325,6 +3388,31 @@ bool options::digest_property_options(const std::string &temp, int &i)
         properties.elf = true;
     else if (temp == "-esp")
         properties.esp = true;
+    else if (temp == "-no_gpu")
+        use_gpu = false;
+    else if (temp == "-gpu_fp64")
+        gpu_fp64 = true;
+    else if (temp == "-gpu_fp32")
+        gpu_fp32 = true;
+    else if (temp == "-gflops")
+    {
+        track_gflops = true;
+        throughput::set_enabled(true);
+    }
+    else if (temp == "-gpu_itensor")
+        gpu_itensor = true;
+    else if (temp == "-no_gpu_itensor")
+        gpu_itensor = false;
+    else if (temp == "-gpu_cublas")
+        gpu_cublas = true;
+    else if (temp == "-no_gpu_cublas")
+        gpu_cublas = false;
+    else if (temp == "-gpu_salted")
+        gpu_salted = true;
+    else if (temp == "-gpu_grid")
+        gpu_grid = true;
+    else if (temp == "-gpu_blas")
+        gpu_blas = true;
     else if (temp == "-fukui" || temp == "-Fukui")
         properties.fukui = true;
     else if (temp == "-fukui_analysis")

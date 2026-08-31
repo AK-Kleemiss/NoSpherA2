@@ -11,6 +11,13 @@
 #include "cif.h"
 #include "bondwise_analysis.h"
 #include "XCW.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "grid_gpu.h"
+#include "sf_gpu.h"
+#include "blas_gpu.h"
+#include "cublas_dynamic.h"
+#include "SALTED_equicomb.h"
+#endif
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 
@@ -66,9 +73,31 @@ static int run_app_impl(int argc, char **argv)
             std::cout.width(saved_width);
         }
     } restore_cout{_coutbuf, std::cout.flags(), std::cout.precision(), std::cout.width()};
+
+    //A destructor because run_app_impl returns from a dozen places, and log_file rather than
+    //cout because most of those places put cout back on the console first.
+    struct throughput_reporter
+    {
+        std::ostream& out;
+        ~throughput_reporter() { throughput::report(out); }
+    } report_throughput{log_file};
+
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
+#ifdef NOSPHERA2_USE_GPU
+    //Every GPU toggle, from opt alone, once per run. These are globals and used to be set
+    //only inside the scattering-factor entry points, so a run reaching XCW instead inherited
+    //whatever the previous run in the process had left on. Olex2 calls run_app repeatedly.
+    grid_gpu_set_enabled(opt.gpu_grid);
+    blas_gpu_set_enabled(opt.gpu_blas);
+    equicomb_set_gpu(opt.gpu_salted);
+    cublas_dynamic_set_enabled(opt.gpu_cublas);
+    //Started here so context creation overlaps the file reading rather than landing inside
+    //whichever kernel runs first.
+    if (opt.use_gpu || opt.gpu_grid || opt.gpu_salted || opt.gpu_itensor || opt.gpu_blas)
+        sf_gpu_warmup_start();
+#endif
     vector<WFN> wavy;
 
     if (opt.promol_nci)
