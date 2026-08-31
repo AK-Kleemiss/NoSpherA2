@@ -60,6 +60,15 @@ private:
     bool debug = false;
     const std::string MAGIC_NUMBER = "SALTD";
     static const int HEADER_SIZE = 5;
+    // Highest file version this build understands. Blocks are looked up by name
+    // through the table of contents, so a newer file still READS fine -- the
+    // unknown blocks are simply never requested. That is exactly the danger: a
+    // VERSION 3 model opened by a pre-VERSION-3 build skips the NORMC
+    // electron-count constraint and returns an uncorrected density with no
+    // diagnostic whatsoever. Builds already shipped cannot be fixed, but from
+    // here on a file from the future says so instead of quietly dropping a
+    // correction.
+    static const int SUPPORTED_VERSION = 3;
     enum DataType { INT32 = 0, FLOAT64 = 1, STRING = 2 };
 
     std::filesystem::path filepath;

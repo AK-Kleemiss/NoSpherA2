@@ -323,6 +323,19 @@ bool SALTED_BINARY_FILE::read_header() {
     // Read version
     file.read((char*)&version, sizeof(int));
     if (debug) std::cout << "File Version: " << version << std::endl;
+    // Not fatal: the format is additive and read through the table of contents,
+    // so the parts this build knows are still correct. But anything introduced
+    // after SUPPORTED_VERSION is silently absent, and for the VERSION 3 charge
+    // constraint "silently absent" means an uncorrected electron count. Say so.
+    if (version > SUPPORTED_VERSION) {
+        std::cout << "WARNING: this .salted file is VERSION " << version
+                  << " but this build of NoSpherA2 only understands VERSION "
+                  << SUPPORTED_VERSION << ".\n"
+                  << "         Any correction introduced after VERSION "
+                  << SUPPORTED_VERSION << " will be IGNORED, and the resulting\n"
+                  << "         densities may be wrong. Please update NoSpherA2."
+                  << std::endl;
+    }
 
     //Read number of blocks
     file.read((char*)&numBlocks, sizeof(int));
