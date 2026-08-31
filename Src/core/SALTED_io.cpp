@@ -123,7 +123,7 @@ template std::vector<int> readVectorFromFile(const std::filesystem::path &filena
 // ----------------- Functions to populate the Config struct -----------------
 
 // From txt file
-void Config::populateFromFile(const std::filesystem::path &filename)
+void SALTEDConfig::populateFromFile(const std::filesystem::path &filename)
 {
     err_checkf(std::filesystem::exists(filename), "Couldn't open or find " + filename.string() + ", leaving", std::cout);
     std::ifstream file(filename);
@@ -187,7 +187,7 @@ void Config::populateFromFile(const std::filesystem::path &filename)
     this->nspe2 = static_cast<int>(this->neighspe2.size());
     this->from_binary = false;
 }
-std::vector<std::string> Config::parseVector(const std::string &value)
+std::vector<std::string> SALTEDConfig::parseVector(const std::string &value)
 {
     std::vector<std::string> result;
 
@@ -367,7 +367,7 @@ bool SALTED_BINARY_FILE::read_header() {
     return true;
 }
 
-void SALTED_BINARY_FILE::populate_config(Config &config) {
+void SALTED_BINARY_FILE::populate_config(SALTEDConfig& config) {
     err_checkf(header_end != -1, "Header not read yet! Aborting", std::cout);
     err_checkf(table_of_contents.find("CONFG") != table_of_contents.end(),
         "SALTED binary file does not contain required CONFG block: " + filepath.string(), std::cout);

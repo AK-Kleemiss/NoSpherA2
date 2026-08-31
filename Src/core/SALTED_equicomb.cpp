@@ -161,16 +161,13 @@ void equicomb(int natoms, int nrad1, int nrad2,
     struct c2r_entry { int j; double re, im; };
     std::vector<c2r_entry> c2r_nz(static_cast<size_t>(l21) * 2, c2r_entry{0, 0.0, 0.0});
     std::vector<int> c2r_cnt(l21, 0);
-    bool c2r_is_sparse = (c2r.size() >= static_cast<size_t>(l21));
-    for (int i2 = 0; i2 < l21 && c2r_is_sparse; ++i2)
+    for (int i2 = 0; i2 < l21; ++i2)
     {
-        if (c2r[i2].size() < static_cast<size_t>(l21)) { c2r_is_sparse = false; break; }
         int cnt = 0;
         for (int j2 = 0; j2 < l21; ++j2)
         {
             const cdouble &e = c2r[i2][j2];
             if (e.real() == 0.0 && e.imag() == 0.0) continue;
-            if (cnt == 2) { c2r_is_sparse = false; break; }
             c2r_nz[static_cast<size_t>(i2) * 2 + cnt] = { j2, e.real(), e.imag() };
             ++cnt;
         }
@@ -178,12 +175,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
     }
     if (ProgressBar::report_counts)
     {
-        std::cout << "[equicomb] lam " << lam << ": c2r "
-                  << (c2r_is_sparse ? "sparse (2 per row)" : "dense fallback")
-                  << ", " << total_terms << " wigner terms" << std::endl;
+        std::cout << "[equicomb] lam " << lam << ", " << total_terms << " wigner terms" << std::endl;
     }
-
-    int empty_environments = 0;
 
     // Scoped: the bar rewinds to its own line when it is destroyed, so anything
     // printed after the loop but before that is silently overwritten. The empty
@@ -195,6 +188,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
         vec ptemp(static_cast<size_t>(l21) * featsize, 0.0);
         vec pcmplx_real(l21);
         vec pcmplx_imag(l21);
+        double* __restrict pvec_real_ptr = pcmplx_real.data();
+        double* __restrict pvec_imag_ptr = pcmplx_imag.data();
         // w * v1 depends on n1 but not on n2, and the n2 loop below runs nrad2
         // times, so that product was being formed nrad2 times over. Build it once
         // per (atom, n1) instead. Real and imaginary parts live in separate arrays
@@ -243,24 +238,22 @@ void equicomb(int natoms, int nrad1, int nrad2,
 
                         // v2 is conj(v1) when the two descriptor sets are the same
                         const cdouble *v2_ptr = v2_src.block(iat, n2, l2);
-
                         for (imu = 0; imu < l21; imu++)
                         {
-                            double acc_real = 0.0;
-                            double acc_imag = 0.0;
-
+                            pvec_real_ptr[imu] = 0.0;
+                            pvec_imag_ptr[imu] = 0.0;
                             const w3j_run &run = runs[static_cast<size_t>(il) * l21 + imu];
                             const double *__restrict ar = wv1_re.data() + run.w_off;
                             const double *__restrict ai = wv1_im.data() + run.w_off;
                             const cdouble *__restrict b = v2_ptr + run.im2_begin;
-                            if (v2_is_conj_of_v1)
+                            if (v2_is_conj_of_v1) [[likely]]
                             {
                                 for (int k = 0; k < run.count; ++k)
                                 {
                                     const double v2_r = b[k].real();
                                     const double v2_i = b[k].imag();
-                                    acc_real += ar[k] * v2_r + ai[k] * v2_i;
-                                    acc_imag += ai[k] * v2_r - ar[k] * v2_i;
+                                    pvec_real_ptr[imu] += ar[k] * v2_r + ai[k] * v2_i;
+                                    pvec_imag_ptr[imu] += ai[k] * v2_r - ar[k] * v2_i;
                                 }
                             }
                             else
@@ -269,72 +262,38 @@ void equicomb(int natoms, int nrad1, int nrad2,
                                 {
                                     const double v2_r = b[k].real();
                                     const double v2_i = b[k].imag();
-                                    acc_real += ar[k] * v2_r - ai[k] * v2_i;
-                                    acc_imag += ar[k] * v2_i + ai[k] * v2_r;
+                                    pvec_real_ptr[imu] += ar[k] * v2_r - ai[k] * v2_i;
+                                    pvec_imag_ptr[imu] += ar[k] * v2_i + ai[k] * v2_r;
                                 }
                             }
-                            pcmplx_real[imu] = acc_real;
-                            pcmplx_imag[imu] = acc_imag;
                         }
                         //recycling this variable
                         limit_l1 = l21 * ifeat;
-                        const double *__restrict pvec_real_ptr = pcmplx_real.data();
-                        const double *__restrict pvec_imag_ptr = pcmplx_imag.data();
-                        if (c2r_is_sparse)
+
+                        for (i = 0; i < l21; ++i)
                         {
-                            for (i = 0; i < l21; ++i)
+                            preal = 0.0;
+                            const c2r_entry *__restrict row = &c2r_nz[static_cast<size_t>(i) * 2];
+                            const int nz = c2r_cnt[i];
+                            for (int k = 0; k < nz; ++k)
                             {
-                                preal = 0.0;
-                                const c2r_entry *__restrict row = &c2r_nz[static_cast<size_t>(i) * 2];
-                                const int nz = c2r_cnt[i];
-                                for (int k = 0; k < nz; ++k)
-                                {
-                                    preal += row[k].re * pvec_real_ptr[row[k].j] - row[k].im * pvec_imag_ptr[row[k].j];
-                                }
-                                inner += preal * preal;
-                                ptemp[i + limit_l1] = preal;
+                                preal += row[k].re * pvec_real_ptr[row[k].j] - row[k].im * pvec_imag_ptr[row[k].j];
                             }
-                        }
-                        else
-                        {
-                            for (i = 0; i < l21; ++i)
-                            {
-                                preal = 0.0;
-                                const cdouble *__restrict cvec_ptr = c2r[i].data();
-#if defined(_MSC_VER)
-#pragma loop(ivdep)
-#elif defined(__GNUC__) || defined(__clang__)
-#pragma GCC ivdep
-#endif
-                                for (j = 0; j < l21; ++j)
-                                {
-                                    const cdouble &c2r_ih = cvec_ptr[j];
-                                    preal += c2r_ih.real() * pvec_real_ptr[j] - c2r_ih.imag() * pvec_imag_ptr[j];
-                                }
-                                inner += preal * preal;
-                                ptemp[i + limit_l1] = preal;
-                            }
+                            inner += preal * preal;
+                            ptemp[i + limit_l1] = preal;
                         }
                         ifeat++;
                     }
                 }
             }
 
-            // An empty environment gives a descriptor of all zeros, so inner is 0
-            // and 1/sqrt(inner) is +inf. Multiplying the zero descriptor by it
-            // yields NaN for every feature, which reaches the form factors. Zero is
-            // the meaningful answer instead: no environment information, so the
-            // kernel contributes nothing and the atom keeps the species average the
-            // model adds separately. For any inner > 0 this is the old expression.
-            if (inner > 0.0)
+            if (inner > 0.0) [[likely]]
             {
                 normfact = 1.0 / sqrt(inner);
             }
             else
             {
                 normfact = 0.0;
-#pragma omp atomic
-                ++empty_environments;
             }
             const int offset = iat * l21 * nfps;
             for (i = 0; i < nfps; ++i)
@@ -348,26 +307,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
                     p[out_idx] = ptemp[feat_idx] * normfact;
                 }
             }
-            //pb.update(std::cout);
         }
     }
-    }
-
-    // Said once per run, on the first lambda that sees it - NOT gated on lam == 0.
-    // An atom with no neighbours still has an l = 0 descriptor, because its own
-    // density is spherically symmetric; it is only the equivariant lam >= 1 parts
-    // that vanish, which is exactly what an empty environment means. Zeroing those
-    // leaves the atom spherical, which is the right answer for it. +inf left it NaN.
-    static bool warned_empty_environment = false;
-    if (empty_environments > 0 && !warned_empty_environment)
-    {
-        warned_empty_environment = true;
-        std::cout << "WARNING: " << empty_environments << " atom(s) have no neighbour"
-                  << " inside the descriptor cutoff.\n"
-                  << "         Their environment singles out no direction, so their"
-                  << " predicted density stays spherical.\n"
-                  << "         Isolated solvent is the usual cause."
-                  << std::endl;
     }
 }
 

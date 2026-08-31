@@ -17,7 +17,7 @@ template <typename Scalar>
 void read_npy(std::filesystem::path &filename, std::vector<Scalar> &data);
 
 
-struct Config
+struct SALTEDConfig
 {
 public:
     bool from_binary;
@@ -131,7 +131,7 @@ public:
     SALTED_BINARY_FILE(const SALTED_BINARY_FILE&) = delete;            // owns a file handle
     SALTED_BINARY_FILE& operator=(const SALTED_BINARY_FILE&) = delete;
 
-    void populate_config(Config& config_in);
+    void populate_config(SALTEDConfig& config_in);
 
 
     std::unordered_map<int, std::vector<int64_t>> read_fps();

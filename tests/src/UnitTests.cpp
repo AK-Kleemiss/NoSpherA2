@@ -352,7 +352,7 @@ namespace {
             path = std::filesystem::path("../SALTED/Model/model.salted");
         }
         SALTED_BINARY_FILE file = SALTED_BINARY_FILE(path, true);
-        Config config;
+        SALTEDConfig config;
         file.populate_config(config);
         std::unordered_map<int, std::vector<int64_t>> fps = file.read_fps();
         std::unordered_map<std::string, vec> averages = file.read_averages();

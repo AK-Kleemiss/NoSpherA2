@@ -6,6 +6,9 @@
 #include "constants.h"
 #include "metatensor.h"
 
+//Predefine the SALTEDConfig struct, since it is used in the SALTED_Utils namespace
+struct SALTEDConfig;
+
 // Stores one contiguous slab per angular momentum. equicomb fixes l1/l2 for
 // substantial stretches of work, so this avoids the thousands of tiny vectors
 // in the former atom/channel/l/m representation.
@@ -55,14 +58,13 @@ private:
 namespace SALTED_Utils
 {
     std::vector<cvec2> complex_to_real_transformation(std::vector<int> sizes);
-    std::vector<std::string> filter_species(const std::vector<std::string> &atomic_symbols, const std::vector<std::string> &species);
+    void filter_input(WFN& wavy, options& opt, const SALTEDConfig& config);
     void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const std::array<std::vector<primitive>, 118> &basis_set, std::vector<std::string> species);
     int get_lmax_max(std::unordered_map<std::string, int> &lmax);
 
-    inline featomic::SimpleSystem gen_featomic_system(const std::filesystem::path& filepath)
+    inline featomic::SimpleSystem gen_featomic_system(const WFN& wfn)
     {
         featomic::SimpleSystem featomic_system;
-        WFN wfn = WFN(filepath);
         for (const atom& a : *wfn.get_atoms_ptr())
         {
             d3 xyz = { constants::bohr2ang(a.get_coordinate(0)),

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "SALTED_utilities.h"
+#include "SALTED_io.h"
 #include "constants.h"
 #include "atoms.h"
 #include "cube.h"
@@ -76,46 +77,96 @@ void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int>& lmax, std
     }
 }
 
-// Function to filter out atoms that belong to species not available for the model selected
-std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::string>& atomic_symbols, const std::vector<std::string>& species)
-{
-    std::vector<std::string> filtered_symbols;
-    std::set<std::string> excluded_species;
 
-    // Convert species vector to a set for efficient lookup
-    std::set<std::string> species_set(species.begin(), species.end());
+void SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALTEDConfig& config) {
+    // Two kinds of atom cannot be predicted, and both are handed to the spherical
+    // Thakkar fill instead of guessed at:
+    //
+    //  1. a species the model was never trained on;
+    //  2. an atom with nothing inside the descriptor cutoff.
+    //
+    // Removing them disturbs nobody: the test is symmetric, so an atom with
+    // nothing within rcut is also nobody's neighbour within rcut, and every other
+    // atom's environment is exactly what it was.
+    //
+    // The test here is purely geometric, while featomic additionally ignores
+    // neighbours whose species is outside neighspe. An atom with neighbours but no
+    // ALLOWED ones therefore still reaches equicomb - the zero guard there catches
+    // it, leaves it spherical rather than NaN, and says so in the log.
+    const int ncen_in = wavy.get_ncen();
+    std::vector<char> use_thakkar(ncen_in, 0);
+    for (int a = 0; a < ncen_in; a++)
+        if (std::find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy.get_atom_charge(a)))) == config.species.end())
+            use_thakkar[a] = 1;
+    const int n_unknown = static_cast<int>(std::count(use_thakkar.begin(), use_thakkar.end(), (char)1));
 
-    // Find all species that are not in the input species set
-    for (const auto& symbol : atomic_symbols)
+    const double rcut = std::min(config.rcut1, config.rcut2);
+    // rcut is in Angstrom, the coordinates may not be
+    const double rcut_internal = wavy.get_isBohr() ? constants::ang2bohr(rcut) : rcut;
+    const double cut_sq = rcut_internal * rcut_internal;
+    int n_isolated = 0;
+#pragma omp parallel for reduction(+ : n_isolated)
+    for (int a = 0; a < ncen_in; a++)
     {
-        if (species_set.find(symbol) == species_set.end())
+        if (use_thakkar[a]) continue;
+        bool lonely = true;
+        for (int b = 0; b < ncen_in && lonely; b++)
         {
-            excluded_species.insert(symbol);
+            if (b == a) continue;
+            double d_sq = 0.0;
+            for (unsigned int ax = 0; ax < 3; ax++)
+            {
+                const double dx = wavy.get_atom_coordinate(a, ax) - wavy.get_atom_coordinate(b, ax);
+                d_sq += dx * dx;
+            }
+            if (d_sq < cut_sq) lonely = false;
+        }
+        if (lonely)
+        {
+            use_thakkar[a] = 1;   // distinct indices, and char so there is no bitfield to race on
+            ++n_isolated;
         }
     }
 
-    // Print out the excluded species
-    if (!excluded_species.empty())
+    if (n_unknown + n_isolated > 0)
     {
-        std::cout << "Excluded species: ";
-        for (const auto& _species : excluded_species)
+        if (n_unknown > 0)
         {
-            std::cout << _species << " ";
+            std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
+            for (int a = 0; a < ncen_in; a++)
+            {
+                if (std::find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy.get_atom_charge(a)))) == config.species.end())
+                {
+                    std::cout << constants::atnr2letter(wavy.get_atom_charge(a)) << " ";
+                }
+            }
+            std::cout << std::endl;
         }
-        std::cout << std::endl;
-        err_not_impl_f("This Model does not contain all neccecary molecules to predict this structure\n", std::cout);
-    }
-
-    // Filter out excluded species from atomic_symbols
-    for (const auto& symbol : atomic_symbols)
-    {
-        if (excluded_species.find(symbol) == excluded_species.end())
+        if (n_isolated > 0)
         {
-            filtered_symbols.push_back(symbol);
+            std::cout << "WARNING: " << n_isolated << " atom(s) have no neighbour within the "
+                << rcut << " A descriptor cutoff, so there is no environment to predict from."
+                << " Isolated solvent is the usual cause." << std::endl;
         }
+        std::cout << "I will fill out these atoms using spherical Thakkar densities!\n";
+        // make a copy of initial wavefunction, to leave the initial one untouched!
+        for (int a = ncen_in - 1; a >= 0; a--)
+        {
+            if (use_thakkar[a])
+            {
+                wavy.erase_atom(a);
+            }
+        }
+        // remove all known basis sets, to not get problems with newly loaded ones
+        for (int a = 0; a < wavy.get_ncen(); a++)
+        {
+            wavy.clear_atom_basis_set(a);
+        }
+        //std::filesystem::path new_fn = wavy.get_path().parent_path() / "SALTED_temp.xyz"; //I think this is not actually neccecary....
+        //wavy.write_xyz(new_fn);
+        //wavy.set_path(new_fn);
+        opt.needs_Thakkar_fill = true;
     }
-
-    return filtered_symbols;
 }
 
 std::string SALTED_Utils::FeatomicHyperParameters::to_json() const

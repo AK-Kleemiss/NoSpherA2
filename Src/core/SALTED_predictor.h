@@ -9,7 +9,7 @@
 class SALTEDPredictor
 {
 public:
-    SALTEDPredictor(const WFN &wavy, options &opt_in);
+    SALTEDPredictor(WFN wavy, options &opt_in);
     SALTEDPredictor() = default;
 
     const std::string get_dfbasis_name() const;
@@ -24,7 +24,7 @@ public:
 
 private:
     bool bbasis_set_loaded = false;
-    Config config;
+    SALTEDConfig config;
     int natoms;
     std::filesystem::path SALTED_DIR;
     std::filesystem::path coef_file;
@@ -40,7 +40,6 @@ private:
     bool v2_is_conj_of_v1 = false;
     // Lambda blocks held at once; 0 means all. Set in the constructor, where the
     // options are in scope: streaming the tsc implies memory is the constraint.
-    int lam_group_limit = 0;
     void setup_atomic_environment();
 
     vec weights{};

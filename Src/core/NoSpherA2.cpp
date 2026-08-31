@@ -665,7 +665,7 @@ static int run_app_impl(int argc, char **argv)
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
 
-                SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[0], opt);
+                std::unique_ptr<SALTEDPredictor> temp_pred = std::make_unique<SALTEDPredictor>(wavy[0], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
@@ -683,8 +683,6 @@ static int run_app_impl(int argc, char **argv)
                     log_file,
                     empty,
                     0);
-
-                delete temp_pred;
             }
             // as above: the streamed path already wrote the file itself
             if (opt.tsc_written_by_stream)
