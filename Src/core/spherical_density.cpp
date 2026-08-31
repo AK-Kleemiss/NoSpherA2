@@ -3,6 +3,7 @@
 #include "convenience.h"
 #include "Thakkar_coefs.h"
 #include "Slater_ion_coefs.h"
+#include "Slater_delta_coefs.h"
 #include "def2-ECPs_GA.h"
 #include "ECPs_corrections.h"
 #include "constants.h"
@@ -766,10 +767,61 @@ Thakkar_Cation::Thakkar_Cation(int g_atom_number) : Thakkar(g_atom_number)
         _prev_coef = previous_element_coef();
 };
 
+namespace
+{
+    // The delta_k tables live on two fixed grids, both indexable in O(1): r is
+    // LOG-uniform, s is LINEAR-uniform. get_form_factor runs per reflection per
+    // atom type, so a search here would be felt.
+    double delta_rho_at(const int table, const double r)
+    {
+        static const double log_rmin = std::log(SlaterDelta_r_min);
+        static const double dlog =
+            (std::log(SlaterDelta_r_max) - log_rmin) / (SlaterDelta_n_r - 1);
+        const double *t = SlaterDelta_rho + static_cast<size_t>(table) * SlaterDelta_n_r;
+        // Outside the grid the difference is clamped rather than run on: below
+        // r_min it is flat on this scale, above r_max it has decayed to ~0
+        // because delta_k is a valence effect.
+        if (r <= SlaterDelta_r_min) return t[0];
+        if (r >= SlaterDelta_r_max) return t[SlaterDelta_n_r - 1];
+        const double x = (std::log(r) - log_rmin) / dlog;
+        const int i = static_cast<int>(x);
+        const double f = x - i;
+        return (1.0 - f) * t[i] + f * t[i + 1];
+    }
+
+    double delta_f_at(const int table, const double s)
+    {
+        static const double ds =
+            (SlaterDelta_s_max - SlaterDelta_s_min) / (SlaterDelta_n_s - 1);
+        const double *t = SlaterDelta_f + static_cast<size_t>(table) * SlaterDelta_n_s;
+        if (s <= SlaterDelta_s_min) return t[0];
+        if (s >= SlaterDelta_s_max) return t[SlaterDelta_n_s - 1];
+        const double x = (s - SlaterDelta_s_min) / ds;
+        const int i = static_cast<int>(x);
+        const double f = x - i;
+        return (1.0 - f) * t[i] + f * t[i + 1];
+    }
+
+    int delta_table(const int Z, const int k)
+    {
+        if (Z < 1 || Z > 103) return -1;
+        if (k < SlaterDelta_k_min || k > SlaterDelta_k_max) return -1;
+        const int span = SlaterDelta_k_max - SlaterDelta_k_min + 1;
+        return SlaterDelta_offset[(Z - 1) * span + (k - SlaterDelta_k_min)];
+    }
+
+    // The caller's k is 4 pi s a0 (see k_of_reflection); the tables are in s.
+    double s_of_k(const double k)
+    {
+        return constants::ang2bohr(k) / constants::FOUR_PI;
+    }
+}
+
 HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charge)
     : _Z(atomic_number), _charge(charge), _weight(std::abs(charge)),
       _electrons(static_cast<double>(atomic_number)), _most_negative(0.0),
-      _has_ion(false), _neutral(atomic_number)
+      _has_ion(false), _use_delta(false), _delta_n(0), _delta_frac(0.0),
+      _neutral(atomic_number)
 {
     if (std::abs(charge) < 1e-12)
         return;   // neutral: nothing to blend
@@ -794,9 +846,39 @@ HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charg
     _has_ion = true;
     _electrons = static_cast<double>(atomic_number) - charge;
 
-    // Scan for a negative excursion. Only possible when |q| > 1, where the
-    // neutral carries a negative weight; the caller decides whether that is
-    // acceptable rather than having it silently clipped here.
+    // Past +1 the plain blend would give the neutral a negative weight. If the
+    // delta series reaches this charge state we can instead walk DOWN through
+    // bound states, which keeps every weight in [0, 1]:
+    //
+    //     rho_q = rho_n - f * delta_{n+1},   rho_n = rho_1 - sum_{k=2..n} delta_k
+    //
+    // for q = n + f. Cations only: atomic anions past -1 are unbound, so no
+    // such reference states exist and those keep the old extrapolation.
+    if (want_cation && _weight > 1.0)
+    {
+        const int n = static_cast<int>(std::floor(charge));
+        const double frac = charge - n;
+        // An exact integer charge stops at rho_n; a fractional one needs the
+        // next difference as well to interpolate towards rho_{n+1}.
+        const int need = (frac > 1e-12) ? n + 1 : n;
+        bool ok = (need >= SlaterDelta_k_min) &&
+                  (need <= SlaterDelta_kmax[atomic_number - 1]);
+        // rho_m is a running sum, so every step from k_min up to need must be
+        // present - a gap anywhere strands the whole chain.
+        for (int k = SlaterDelta_k_min; ok && k <= need; k++)
+            ok = delta_table(atomic_number, k) >= 0;
+        if (ok)
+        {
+            _use_delta = true;
+            _delta_n = n;
+            _delta_frac = frac;
+        }
+    }
+
+    // Scan for a negative excursion. Only possible when |q| > 1; with the delta
+    // route it should come back clean, and that is worth measuring rather than
+    // assuming. The caller decides whether a dip is acceptable rather than
+    // having it silently clipped here.
     if (_weight > 1.0)
     {
         for (double r = 1e-4; r < 30.0; r *= 1.05)
@@ -809,6 +891,17 @@ HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charg
 
 double HE_Spherical_Atom::get_radial_density(const double &r) const
 {
+    if (_use_delta)
+    {
+        // rho_1 stays the tabulated Slater cation; only the steps down from it
+        // come from the delta tables.
+        double d = _ion->get_radial_density(r);
+        for (int k = SlaterDelta_k_min; k <= _delta_n; k++)
+            d -= delta_rho_at(delta_table(_Z, k), r);
+        if (_delta_frac > 0.0)
+            d -= _delta_frac * delta_rho_at(delta_table(_Z, _delta_n + 1), r);
+        return d;
+    }
     const double n = _neutral.get_radial_density(r);
     if (!_has_ion) return n;
     return (1.0 - _weight) * n + _weight * _ion->get_radial_density(r);
@@ -816,6 +909,18 @@ double HE_Spherical_Atom::get_radial_density(const double &r) const
 
 double HE_Spherical_Atom::get_form_factor(const double &k) const
 {
+    if (_use_delta)
+    {
+        // Same walk in reciprocal space - the transform is linear, so the
+        // electron count comes out as f(0) = (Z-1) - (n-1) - frac = Z - q.
+        const double s = s_of_k(k);
+        double d = _ion->get_form_factor(k);
+        for (int kk = SlaterDelta_k_min; kk <= _delta_n; kk++)
+            d -= delta_f_at(delta_table(_Z, kk), s);
+        if (_delta_frac > 0.0)
+            d -= _delta_frac * delta_f_at(delta_table(_Z, _delta_n + 1), s);
+        return d;
+    }
     const double n = _neutral.get_form_factor(k);
     if (!_has_ion) return n;
     return (1.0 - _weight) * n + _weight * _ion->get_form_factor(k);

@@ -374,18 +374,29 @@ public:
     // Z - charge when an ion was available, Z when it fell back.
     double electrons() const { return _electrons; }
     bool used_ion() const { return _has_ion; }
-    // |q| > 1: beyond the tabulated ion, so the shape is extrapolated even
-    // though the electron count stays exact.
-    bool is_extrapolating() const { return _weight > 1.0; }
-    // The interpolation gives a negative weight to the neutral once |q| > 1 and
-    // the density can in principle dip below zero. Reports the most negative
-    // value found on a scan, 0.0 when the density stayed non-negative.
+    // |q| > 1 that could NOT be reached from tabulated data, so the shape is
+    // extrapolated even though the electron count stays exact. False once the
+    // delta series covers the charge: that blend is between two adjacent BOUND
+    // states, with every weight in [0, 1].
+    bool is_extrapolating() const { return _weight > 1.0 && !_use_delta; }
+    // |q| > 1 reached by walking down the delta_k series rather than
+    // extrapolating. Cations only - atomic anions past -1 are unbound, so there
+    // is no honest reference state to walk towards.
+    bool uses_delta_series() const { return _use_delta; }
+    // Extrapolation gives a negative weight to the neutral once |q| > 1 and the
+    // density can then dip below zero. Reports the most negative value found on
+    // a scan, 0.0 when the density stayed non-negative.
     double most_negative_density() const { return _most_negative; }
 
 private:
     int _Z;
     double _charge, _weight, _electrons, _most_negative;
     bool _has_ion;
+    // Delta-series route for |q| > 1: rho_q = rho_{_delta_n} - _delta_frac *
+    // delta_{_delta_n+1}, itself built as rho_1 - sum_{k=2.._delta_n} delta_k.
+    bool _use_delta;
+    int _delta_n;
+    double _delta_frac;
     Thakkar _neutral;
     std::unique_ptr<Thakkar> _ion;
 };
