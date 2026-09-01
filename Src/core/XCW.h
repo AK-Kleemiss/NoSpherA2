@@ -75,14 +75,19 @@ private:
 	   Also keeps track of the current state of convergence */
 	struct SCF_settings {
 		double quant_diff;
+		double current_quant_diff;
 		bool conv_quant_diff = false;
 		double max_diis_error;
+		double current_max_diis_error;
 		bool conv_max_diis_error = false;
 		double gradient;
+		double current_gradient;
 		bool conv_gradient = false;
 		double RMSP_diff;
+		double current_RMSP_diff;
 		bool conv_RMSP_diff = false;
 		double MaxP_diff;
+		double current_MaxP_diff;
 		bool conv_MaxP_diff = false;
 		double diis_stop_damping;
 		bool apply_shift = true;
@@ -104,6 +109,7 @@ private:
 		int multiplicity;
 		bool safe_tensor;
 		bool read_tensor;
+		bool read_first_guess;
 		// Largest I tensor held resident, in MB. Above it the tensor goes to disk
 		// and is read back a window of reflections at a time; 0 means no limit,
 		// which is the original behaviour. Set with `i_tensor_mb <n>` in the XCW
@@ -269,7 +275,7 @@ private:
 	bool SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& e_diff_mem, double& quant, double& last_quant, occ::Mat& dm_last);
 
 	// Checks convergence for SCF cycle
-	bool SCF_convergence_check(const double& e_diff, const double& gradient, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last);
+	bool SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last);
 
 	// Computes the orbital gradient for usage as a convergence criterion
 	double compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf);

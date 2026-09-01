@@ -109,7 +109,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768;
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
-	bool grown = false, safe_tensor = false, read_tensor = false;
+	bool grown = false, safe_tensor = false, read_tensor = false, read_first_guess = false;
 	// 0 = hold the whole tensor, which is what every run did before this existed.
 	size_t i_tensor_max_mb = 0;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
@@ -265,7 +265,9 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		handlers["read"] = [&](std::istream&) {
 			read_tensor = true;
 			};
-
+		handlers["load_wfn"] = [&](std::istream&) {
+			read_first_guess = true;
+			};
 		// The tensor is nr_small blocks of nmo(nmo+1)/2 complex doubles and grows
 		// quadratically with the basis, so on anything past a minimal basis it is
 		// the largest thing in the process. `stream` puts it on disk with a
@@ -296,60 +298,56 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		}
 	}
 
-	if (!(conv_preset == "default")) {
-		if (conv_preset == "sloppy") {
-			settings.quant_diff = 1e-6;
-			settings.max_diis_error = 1e-5;
-			settings.gradient = 1e-5;
-			settings.MaxP_diff = 1e-7;
-			settings.RMSP_diff = 5e-9;
-			settings.max_scf_iterations = 100;
-		}
-		else if (conv_preset == "normal") {
-			settings.quant_diff = 1e-6;
-			settings.max_diis_error = 1e-5;
-			settings.gradient = 1e-5;
-			settings.MaxP_diff = 1e-7;
-			settings.RMSP_diff = 5e-9;
-			settings.max_scf_iterations = 100;
-		}
-		else if (conv_preset == "tight") {
-			settings.quant_diff = 1e-6;
-			settings.max_diis_error = 1e-5;
-			settings.gradient = 1e-5;
-			settings.MaxP_diff = 1e-7;
-			settings.RMSP_diff = 5e-9;
-			settings.max_scf_iterations = 100;
-		}
-		else if (conv_preset == "very_tight") {
-			settings.quant_diff = 1e-6;
-			settings.max_diis_error = 1e-5;
-			settings.gradient = 1e-5;
-			settings.MaxP_diff = 1e-7;
-			settings.RMSP_diff = 5e-9;
-			settings.max_scf_iterations = 100;
-		}
+	if (conv_preset == "sloppy") {
+		settings.quant_diff = 3e-5;
+		settings.max_diis_error = 1e-4;
+		settings.gradient = 1e-4;
+		settings.MaxP_diff = 1e-4;
+		settings.RMSP_diff = 1e-5;
+		settings.max_scf_iterations = 100;
+	}
+	else if (conv_preset == "normal") {
+		settings.quant_diff = 1e-6;
+		settings.max_diis_error = 1e-5;
+		settings.gradient = 1e-5;
+		settings.MaxP_diff = 1e-5;
+		settings.RMSP_diff = 1e-6;
+		settings.max_scf_iterations = 100;
+	}
+	else if (conv_preset == "tight") {
+		settings.quant_diff = 5e-7;
+		settings.max_diis_error = 5e-6;
+		settings.gradient = 5e-6;
+		settings.MaxP_diff = 1e-6;
+		settings.RMSP_diff = 1e-7;
+		settings.max_scf_iterations = 100;
+	}
+	else if (conv_preset == "very_tight") {
+		settings.quant_diff = 1e-7;
+		settings.max_diis_error = 1e-6;
+		settings.gradient = 1e-6;
+		settings.MaxP_diff = 1e-7;
+		settings.RMSP_diff = 1e-8;
+		settings.max_scf_iterations = 100;
 	}
 
-	if (!(speed_preset == "default")) {
-		if (speed_preset == "slow_conv") {
-			settings.alpha = 0.5;
-			settings.level_shift = 0.5;
-			settings.diis_stop_damping = 1e-3;
-			settings.diis_stop_shift = 1e-2;
-		}
-		else if (speed_preset == "normal_conv") {
-			settings.alpha = 0.5;
-			settings.level_shift = 0.5;
-			settings.diis_stop_damping = 1e-3;
-			settings.diis_stop_shift = 1e-2;
-		}
-		else if (speed_preset == "fast_conv") {
-			settings.alpha = 0.5;
-			settings.level_shift = 0.5;
-			settings.diis_stop_damping = 1e-3;
-			settings.diis_stop_shift = 1e-2;
-		}
+	if (speed_preset == "slow_conv") {
+		settings.alpha = 0.8;
+		settings.level_shift = 1;
+		settings.diis_stop_damping = 1e-3;
+		settings.diis_stop_shift = 1e-3;
+	}
+	else if (speed_preset == "normal_conv") {
+		settings.alpha = 0.5;
+		settings.level_shift = 0.5;
+		settings.diis_stop_damping = 1e-3;
+		settings.diis_stop_shift = 1e-2;
+	}
+	else if (speed_preset == "fast_conv") {
+		settings.alpha = 0;
+		settings.level_shift = 0;
+		settings.diis_stop_damping = 1e50;
+		settings.diis_stop_shift = 1e50;
 	}
 
 	if (basis_set_name == "Undefined") {
@@ -382,6 +380,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.hf_type = hf_type;
 	settings.safe_tensor = safe_tensor;
 	settings.read_tensor = read_tensor;
+	settings.read_first_guess = read_first_guess;
 	settings.i_tensor_max_mb = i_tensor_max_mb;
 
 	return settings;
@@ -1159,7 +1158,7 @@ void XCW::decide_i_storage() {
 	// was given. Neither is the same as "no budget": without either, the tensor is
 	// held, which is what every run did before this existed.
 	size_t budget = settings.i_tensor_max_mb * 1024ULL * 1024ULL;
-	const char *source = "i_tensor_mb";
+	const char* source = "i_tensor_mb";
 	if (budget == 0 && opt->mem_given && opt->mem > 0.0) {
 		budget = static_cast<size_t>(opt->mem * 1024.0 * 1024.0);
 		source = "-mem";
@@ -1177,7 +1176,7 @@ void XCW::decide_i_storage() {
 		// carries no news, and it shifts every reference output by one line.
 		if (budget > 0 || ProgressBar::report_counts) {
 			std::cout << std::fixed << std::setprecision(2)
-			          << "I tensor held in memory: " << (total / 1048576.0) << " MB";
+				<< "I tensor held in memory: " << (total / 1048576.0) << " MB";
 			if (budget > 0)
 				std::cout << " (fits the " << (budget / 1048576.0) << " MB " << source << " budget)";
 			std::cout << std::endl;
@@ -1189,13 +1188,13 @@ void XCW::decide_i_storage() {
 	i_window_ = static_cast<int>(std::min(w, static_cast<size_t>(cryst.nr_small)));
 	i_file_.create(i_tensor_path(), cryst.nr_small, cryst.nmo);
 	std::cout << std::fixed << std::setprecision(2)
-	          << "I tensor streamed to disk: " << (total / 1048576.0) << " MB total, "
-	          << i_window_ << " of " << cryst.nr_small << " reflections resident ("
-	          << (i_window_ * per_block / 1048576.0) << " MB) to fit the "
-	          << (budget / 1048576.0) << " MB " << source << " budget" << std::endl;
+		<< "I tensor streamed to disk: " << (total / 1048576.0) << " MB total, "
+		<< i_window_ << " of " << cryst.nr_small << " reflections resident ("
+		<< (i_window_ * per_block / 1048576.0) << " MB) to fit the "
+		<< (budget / 1048576.0) << " MB " << source << " budget" << std::endl;
 	if (i_window_ == 1 && per_block > budget)
 		std::cout << "  NOTE: one reflection alone is " << (per_block / 1048576.0)
-		          << " MB, over the budget. Running one at a time." << std::endl;
+		<< " MB, over the budget. Running one at a time." << std::endl;
 }
 
 std::filesystem::path XCW::i_tensor_path() const {
@@ -1259,54 +1258,75 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 
 	// Precompute screening
-	double cutoff = 0;
 	ivec2 skip(cryst.nmo, ivec(cryst.nmo, 0));
-	for (mu = 0; mu < cryst.nmo; mu++) {
-		const ao_data& mu_prims = ao_data_shells[mu];
-		const std::vector<primitive>& mu_primitives = mu_prims.prims;
-		const double& mp0 = mu_prims.pos[0];
-		const double& mp1 = mu_prims.pos[1];
-		const double& mp2 = mu_prims.pos[2];
-		for (nu = mu + 1; nu < cryst.nmo; nu++) {
-			const ao_data& nu_prims = ao_data_shells[nu];
-			const std::vector<primitive>& nu_primitives = nu_prims.prims;
-			const double& np0 = nu_prims.pos[0];
-			const double& np1 = nu_prims.pos[1];
-			const double& np2 = nu_prims.pos[2];
-			const double dist0 = mp0 - np0;
-			const double dist1 = mp1 - np1;
-			const double dist2 = mp2 - np2;
-			const double dist = dist0 * dist0 + dist1 * dist1 + dist2 * dist2;
-			if (dist < 1e-5) {
-				continue;
-			}
-			double e_tol = 0.0005;
-			vec mu_eff;
-			double c = 0;
-			double mu_min = std::numeric_limits<double>::max();
-			for (int k = 0; k < mu_primitives.size(); k++) {
-				const double alpha = mu_primitives[k].get_exp();
-				const double l_k = mu_primitives[k].get_type() + 1;
-				const double l_half_k = l_k * 0.5;
-				double N_k = std::sqrt(0.25 * constants::INV_PI * (2 * l_k + 1)) * std::pow(l_k / alpha, l_half_k) * std::exp(-l_half_k);
-				for (int j = 0; j < nu_primitives.size(); j++) {
-					const double beta = nu_primitives[j].get_exp();
-					const double l_j = nu_primitives[j].get_type() + 1;
-					const double alpha_beta = alpha + beta;
-					const double mu_k_l = alpha * beta / (2 * (alpha_beta));
-					mu_eff.push_back(mu_k_l);
-					const double l_half_j = 0.5 * l_j;
-					double N_j = std::sqrt(0.25 * constants::INV_PI * (2 * l_j + 1)) * std::pow(l_j / beta, l_half_j) * std::exp(-l_half_j);
-					const double A_kj = std::pow(constants::TWO_PI / alpha_beta, 1.5) * N_k * N_j;
-					c += std::abs(mu_primitives[k].get_coef() * nu_primitives[j].get_coef()) * A_kj;
+	{
+		double e_tol = 0.0005;
+		const double root_inv_four_pi = std::sqrt(constants::INV_FOUR_PI);
+		for (mu = 0; mu < cryst.nmo; mu++) {
+			const ao_data& mu_prims = ao_data_shells[mu];
+			const std::vector<primitive>& mu_primitives = mu_prims.prims;
+			const double& mp0 = mu_prims.pos[0];
+			const double& mp1 = mu_prims.pos[1];
+			const double& mp2 = mu_prims.pos[2];
+			for (nu = mu + 1; nu < cryst.nmo; nu++) {
+				const ao_data& nu_prims = ao_data_shells[nu];
+				const std::vector<primitive>& nu_primitives = nu_prims.prims;
+				const double& np0 = nu_prims.pos[0];
+				const double& np1 = nu_prims.pos[1];
+				const double& np2 = nu_prims.pos[2];
+				const double dist0 = mp0 - np0;
+				const double dist1 = mp1 - np1;
+				const double dist2 = mp2 - np2;
+				const double dist = dist0 * dist0 + dist1 * dist1 + dist2 * dist2;
+				if (dist < 1e-5) {
+					continue;
 				}
-			}
-			for (int temp_ = 0; temp_ < mu_eff.size(); temp_++) {
-				mu_min = std::min(mu_min, mu_eff[temp_]);
-			}
-			cutoff = std::log(c / e_tol) / mu_min;
-			if (dist > cutoff) {
-				skip[mu][nu] = 1;
+
+				double c = 0;
+				double mu_min = std::numeric_limits<double>::max();
+				double nu_min = std::numeric_limits<double>::max();
+				const int mu_l = mu_prims.prims[0].get_type();
+				const double mu_l_half = 0.5 * mu_l;
+				const double temp_mu = std::sqrt((2 * mu_l + 1) * constants::INV_FOUR_PI) * std::exp(-mu_l_half);
+				const int nu_l = nu_prims.prims[0].get_type();
+				const double nu_l_half = 0.5 * nu_l;
+				const double temp_nu = std::sqrt((2 * nu_l + 1) * constants::INV_FOUR_PI) * std::exp(-nu_l_half);
+				std::vector<std::pair<double, double>> pairs;
+				pairs.reserve(mu_primitives.size() * nu_primitives.size());
+				for (int k = 0; k < mu_primitives.size(); k++) {
+					mu_min = std::min(mu_min, mu_primitives[k].get_exp());
+					const double c_k = std::abs(mu_primitives[k].get_coef());
+					const double alpha_k = mu_primitives[k].get_exp();
+					const double N_k = mu_l == 0 ? root_inv_four_pi : temp_mu * std::pow(mu_l / alpha_k, mu_l_half);
+					for (int l = 0; l < nu_primitives.size(); l++) {
+						nu_min = std::min(nu_min, nu_primitives[l].get_exp());
+						const double c_l = std::abs(nu_primitives[l].get_coef());
+						const double alpha_l = nu_primitives[l].get_exp();
+						const double N_l = nu_l == 0 ? root_inv_four_pi : temp_nu * std::pow(nu_l / alpha_l, nu_l_half);
+						const double N_kl = N_k * N_l * std::pow(constants::TWO_PI / (alpha_k + alpha_l), 1.5);
+						const double temp1 = c_k * c_l * N_kl;
+						c += temp1;
+						pairs.emplace_back(temp1, alpha_k * alpha_l / (2.0 * (alpha_k + alpha_l)));
+					}
+				}
+				const double gamma = 2 * (mu_min + nu_min) / (mu_min * nu_min);
+				const double cutoff = std::log(c / e_tol) * gamma;
+				//Newton method for finding correct cutoff
+				double newton_cutoff = cutoff;
+				for (int iter = 0; iter < 50; iter++) {
+					double upper_bound = 0.0, bound_derivative = 0.0;
+					for (const auto& [weight, gamma_kl] : pairs) {
+						const double upper_bound_temp = weight * std::exp(-gamma_kl * newton_cutoff);
+						upper_bound += upper_bound_temp;
+						bound_derivative -= gamma_kl * upper_bound_temp;
+					}
+					const double delta = (upper_bound - e_tol) / bound_derivative;
+					newton_cutoff -= delta;
+					if (std::abs(delta) < 1e-12 * newton_cutoff) break;
+				}
+				if (dist > newton_cutoff) {
+					skip[mu][nu] = 1;
+				}
 			}
 		}
 	}
@@ -1721,32 +1741,32 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 	std::string io_error;
 #pragma omp parallel
 	{
-	for (int r0 = 0; r0 < cryst.nr_small; r0 += step) {
-		const int r1 = std::min(r0 + step, cryst.nr_small);
-		if (i_streamed_) {
+		for (int r0 = 0; r0 < cryst.nr_small; r0 += step) {
+			const int r1 = std::min(r0 + step, cryst.nr_small);
+			if (i_streamed_) {
 #pragma omp single
-			{
-				try { i_file_.load(r0, r1); }
-				catch (const std::exception &e) { io_error = e.what(); }
-			}
-		}
-#pragma omp for schedule(static)
-		for (int r = r0; r < r1; ++r) {
-			if (!io_error.empty()) continue;
-			const cdouble* I_r = i_streamed_ ? i_file_.block(r)
-			                                 : I.data() + static_cast<size_t>(r) * packed;
-			cdouble sum = F_calc[1][r];
-			size_t k = 0;
-			for (int mu = 0; mu < cryst.nmo; mu++) {
-				sum += 2.0 * I_r[k] * D(mu, mu);
-				k++;
-				for (int nu = mu + 1; nu < cryst.nmo; nu++, k++) {
-					sum += 4.0 * I_r[k] * D(mu, nu);
+				{
+					try { i_file_.load(r0, r1); }
+					catch (const std::exception& e) { io_error = e.what(); }
 				}
 			}
-			F_calc[0][r] = sum;
+#pragma omp for schedule(static)
+			for (int r = r0; r < r1; ++r) {
+				if (!io_error.empty()) continue;
+				const cdouble* I_r = i_streamed_ ? i_file_.block(r)
+					: I.data() + static_cast<size_t>(r) * packed;
+				cdouble sum = F_calc[1][r];
+				size_t k = 0;
+				for (int mu = 0; mu < cryst.nmo; mu++) {
+					sum += 2.0 * I_r[k] * D(mu, mu);
+					k++;
+					for (int nu = mu + 1; nu < cryst.nmo; nu++, k++) {
+						sum += 4.0 * I_r[k] * D(mu, nu);
+					}
+				}
+				F_calc[0][r] = sum;
+			}
 		}
-	}
 	}
 	if (!io_error.empty()) throw std::runtime_error(io_error);
 }
@@ -1764,7 +1784,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	const bool against_F2 = (static_cast<int>(settings.refine_against) == 2);
 	const bool weighted = (static_cast<int>(settings.XWR_type) == 2);
 	const bool valid = (key == ((1 << 16) | 1) || key == ((1 << 16) | 2) ||
-	                    key == ((2 << 16) | 1) || key == ((2 << 16) | 2));
+		key == ((2 << 16) | 1) || key == ((2 << 16) | 2));
 	if (!valid) XCW_log << "Invalid refinement option" << std::endl;
 	const double scale_sq = cryst.F_scale * cryst.F_scale;
 	const double prefactor = against_F2
@@ -1787,7 +1807,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 #pragma omp single
 				{
 					try { i_file_.load(r0, r1); }
-					catch (const std::exception &e) { io_error = e.what(); }
+					catch (const std::exception& e) { io_error = e.what(); }
 				}
 			}
 			// No nowait: the next window's read must not start until every
@@ -1807,7 +1827,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 				if (weighted) precompute *= inv_H2_[r];
 
 				const cdouble* I_r = i_streamed_ ? i_file_.block(r)
-				                                 : I.data() + static_cast<size_t>(r) * packed;
+					: I.data() + static_cast<size_t>(r) * packed;
 				size_t offset = 0;
 				for (int mu = 0; mu < cryst.nmo; mu++) {
 					for (int nu = mu; nu < cryst.nmo; nu++) {
@@ -1865,12 +1885,12 @@ void XCW::setup_basis(occ::core::Molecule& mol, std::string& basis_set_name, occ
 	occ_basis_set = basis_set->to_AOBasis(mol.atoms());
 }
 
-double XCW::dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& current_alpha, const double& e_diff, double& e_diff_mem) {
+double XCW::dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& current_alpha, const double& quant_diff, double& quant_diff_mem) {
 	double new_alpha = current_alpha;
-	if (e_diff < e_diff_mem / 10) {
+	if (quant_diff < quant_diff_mem / 10) {
 		new_alpha *= 0.75;
-		e_diff_mem = e_diff;
-		if (e_diff < 10 * scf.convergence_settings.energy_threshold) {
+		quant_diff_mem = quant_diff;
+		if (quant_diff < 10 * scf.convergence_settings.energy_threshold) {
 			print_centered_message("***Turned off damping***", 84, XCW_log);
 			new_alpha = 0;
 			settings.apply_damping = false;
@@ -1953,11 +1973,11 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	bool converged;
 	double quant;
 	double last_quant = 0;
-	double e_diff_mem = 0;
+	double quant_diff_mem = 0;
 	occ::Mat dm_last = scf.ctx.mo.D;
 
 	do {
-		converged = SCF_iteration(scf, lambda, alpha, e_diff_mem, quant, last_quant, dm_last);
+		converged = SCF_iteration(scf, lambda, alpha, quant_diff_mem, quant, last_quant, dm_last);
 
 	} while (!converged && scf.iter < scf.maxiter);
 
@@ -2005,6 +2025,51 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	else {
 		XCW_log << "____________________________________________________________________________________\n";
 		print_centered_message("***SCF did not converge***", 84, XCW_log);
+		std::ostringstream perturbed_energy;
+		perturbed_energy << "Threshold for perturbed energy: " << std::to_string(settings.quant_diff) << " (current: " << std::to_string(settings.current_quant_diff) << ")";
+		std::ostringstream diis_error;
+		diis_error << "Threshold for DIIS error: " << std::to_string(settings.max_diis_error) << " (current: " << std::to_string(settings.current_max_diis_error) << ")";
+		std::ostringstream orbital_gradient;
+		orbital_gradient << "Threshold for orbital gradient: " << std::to_string(settings.gradient) << " (current: " << std::to_string(settings.current_gradient) << ")";
+		std::ostringstream max_density_diff;
+		max_density_diff << "Threshold for maximum difference in density matrix: " << std::to_string(settings.MaxP_diff) << " (current: " << std::to_string(settings.current_MaxP_diff) << ")";
+		std::ostringstream rmsd_density;
+		rmsd_density << "Threshold for RMSD of density matrix: " << std::to_string(settings.RMSP_diff) << " (current: " << std::to_string(settings.current_RMSP_diff) << ")";
+		XCW_log << perturbed_energy.str();
+		if (settings.conv_quant_diff) {
+			XCW_log << " -> Converged \n";
+		}
+		else {
+			XCW_log << " -> Not converged \n";
+		}
+		XCW_log << diis_error.str();
+		if (settings.conv_max_diis_error) {
+			XCW_log << " -> Converged \n";
+		}
+		else {
+			XCW_log << " -> Not converged \n";
+		}
+		XCW_log << orbital_gradient.str();
+		if (settings.conv_gradient) {
+			XCW_log << " -> Converged \n";
+		}
+		else {
+			XCW_log << " -> Not converged \n";
+		}
+		XCW_log << max_density_diff.str();
+		if (settings.conv_MaxP_diff) {
+			XCW_log << " -> Converged \n";
+		}
+		else {
+			XCW_log << " -> Not converged \n";
+		}
+		XCW_log << rmsd_density.str();
+		if (settings.conv_RMSP_diff) {
+			XCW_log << " -> Converged \n";
+		}
+		else {
+			XCW_log << " -> Not converged \n";
+		}
 	}
 	// closing function
 }
@@ -2039,10 +2104,9 @@ void XCW::get_density_criteria(double& RMSP_diff, double& maxP_diff, const occ::
 	// closing function
 }
 
-bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& e_diff_mem, double& quant, double& last_quant, occ::Mat& dm_last) {
+bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& quant_diff_mem, double& quant, double& last_quant, occ::Mat& dm_last) {
 	// Set up energy values & crystallographic information
 	scf.iter++;
-	const double ehf_last = scf.ctx.energy["electronic"];
 	const occ::Mat dm_old = scf.ctx.mo.D;
 	dMatrix2 dm_eff(cryst.nmo, cryst.nmo);
 	build_effective_dm(scf, dm_eff, dm_old);
@@ -2061,8 +2125,6 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.ctx.F = scf.ctx.H;
 	scf.ctx.F += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
 	scf.update_scf_energy(false);
-	const double ehf = scf.ctx.energy["electronic"];
-	const double e_diff = std::abs(ehf - ehf_last);
 
 	double current_criterion = 0;
 	switch ((static_cast<int>(settings.XWR_type) << 16) | static_cast<int>(settings.refine_against)) {
@@ -2094,12 +2156,13 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	// DIIS extrapolation
 	occ::Mat F_diis = scf.convergence_accelerator.update(scf.ctx.mo.kind, scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
 	scf.diis_error = scf.convergence_accelerator.max_error();
+	settings.current_max_diis_error = scf.diis_error;
 	settings.update(scf.diis_error, XCW_log, alpha);
 
 	// Convergence check
-	const double gradient = compute_orbital_gradient(scf);
-	const double quant_diff = std::abs(quant - last_quant);
-	if (SCF_convergence_check(quant_diff, gradient, scf, dm_last)) {
+	settings.current_gradient = compute_orbital_gradient(scf);
+	settings.current_quant_diff = std::abs(quant - last_quant);
+	if (SCF_convergence_check(scf, dm_last)) {
 		return true;
 	}
 	last_quant = quant;
@@ -2116,10 +2179,10 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	// Apply damping
 	if (settings.apply_damping) {
 		if (scf.iter == 2) {
-			e_diff_mem = e_diff;
+			quant_diff_mem = settings.current_quant_diff;
 		}
 		if (scf.iter > 2) {
-			alpha = dynamic_damping(scf, alpha, e_diff, e_diff_mem);
+			alpha = dynamic_damping(scf, alpha, settings.current_quant_diff, quant_diff_mem);
 		}
 	}
 
@@ -2137,22 +2200,21 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	//closing function
 }
 
-bool XCW::SCF_convergence_check(const double& quant_diff, const double& gradient, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last) {
-	double RMSP_diff, maxP_diff;
-	get_density_criteria(RMSP_diff, maxP_diff, scf.ctx.mo.D, dm_last);
-	if (quant_diff < settings.quant_diff) {
+bool XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last) {
+	get_density_criteria(settings.current_RMSP_diff, settings.current_MaxP_diff, scf.ctx.mo.D, dm_last);
+	if (settings.current_quant_diff < settings.quant_diff) {
 		settings.conv_quant_diff = true;
 	}
-	if (scf.diis_error < settings.max_diis_error) {
+	if (settings.current_max_diis_error < settings.max_diis_error) {
 		settings.conv_max_diis_error = true;
 	}
-	if (gradient < settings.gradient) {
+	if (settings.current_gradient < settings.gradient) {
 		settings.conv_gradient = true;
 	}
-	if (RMSP_diff < settings.RMSP_diff) {
+	if (settings.current_RMSP_diff < settings.RMSP_diff) {
 		settings.conv_RMSP_diff = true;
 	}
-	if (maxP_diff < settings.MaxP_diff) {
+	if (settings.current_MaxP_diff < settings.MaxP_diff) {
 		settings.conv_MaxP_diff = true;
 	}
 	return settings.convergence_check();
@@ -2182,6 +2244,9 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	std::ostringstream oss2;
 	oss2 << "NA2_" << std::setw(3) << std::setfill('0') << value << ".wfn";
 	sf_wave_vec[0].write_wfn(oss2.str(), false, true);
+	std::ostringstream oss3;
+	oss3 << "NA2_" << std::setw(3) << std::setfill('0') << value << ".fchk";
+	scf.wavefunction().save(oss3.str());
 	//Roby_information Roby(sf_wave_vec[0]);
 }
 
@@ -2203,8 +2268,8 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor, bool save_tensor
 		int num_elements_safe = (cryst.nmo * (cryst.nmo + 1)) / 2;
 		if (i_streamed_) {
 			std::cout << "I tensor is streamed; it is already on disk as "
-			          << i_tensor_path().string() << ", not rewriting it as I_tensor."
-			          << std::endl;
+				<< i_tensor_path().string() << ", not rewriting it as I_tensor."
+				<< std::endl;
 			return hf;
 		}
 		if (I.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
@@ -2292,8 +2357,25 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor, bool save_tensor
 void XCW::run_XCW_fitting() {
 	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor, settings.safe_tensor);
 	occ::qm::SCF scf(hf, settings.hf_type);
-	occ::qm::Wavefunction last_wfn;
 	bool has_guess = false;
+	occ::qm::Wavefunction last_wfn;
+	if (settings.read_first_guess) {
+		std::ostringstream oss2;
+		std::string start_value_str = std::to_string(settings.xcw_start_value);
+		start_value_str.erase(std::remove(start_value_str.begin(), start_value_str.end(), '.'), start_value_str.end());
+		if (start_value_str.length() > 3) {
+			start_value_str = start_value_str.substr(0, 3);
+		}
+		else if (start_value_str.length() < 3) {
+			start_value_str.append(3 - start_value_str.length(), '0');
+		}
+		oss2 << "NA2_" << std::setw(3) << std::setfill('0') << start_value_str << ".fchk";
+		last_wfn = occ::qm::Wavefunction::load(oss2.str());
+		//WFN loaded_wfn;
+		//loaded_wfn.read_wfn(oss2.str(), opt->debug, XCW_log);
+		//loaded_wfn.wfn_to_occ_wavefunction(last_wfn);
+		has_guess = true;
+	}
 
 	std::cout << "More detailed output in XCW.log file..." << std::endl;
 	if (settings.XWR_type == 2) {
@@ -2315,7 +2397,7 @@ void XCW::run_XCW_fitting() {
 	for (int step = 0; step < settings.num_xcw_steps; step++) {
 		occ::qm::SCF scf(hf, settings.hf_type);
 		double alpha = settings.alpha;
-		const double lambda = step * settings.xcw_step_size;
+		const double lambda = step * settings.xcw_step_size + settings.xcw_start_value;
 		scf.set_charge_multiplicity(settings.charge, settings.multiplicity);
 		scf.maxiter = settings.max_scf_iterations;
 		scf.convergence_settings.level_shift = settings.level_shift;

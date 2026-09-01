@@ -310,6 +310,147 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 	}
 }
 
+//Hokus pokus freestyle modus, hopefully converts a WFN object to the occ wavefunction
+// Does not work yet
+void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
+{
+    using occ::gto::num_subshells;
+    using AOBasisT = std::remove_cvref_t<decltype(occ_wf.basis)>;
+    using AtomListT = AOBasisT::AtomList;
+    using ShellListT = AOBasisT::ShellList;
+    const int n_atoms = get_ncen();
+    AtomListT occ_atoms(n_atoms);
+    for (int i = 0; i < n_atoms; i++) {
+        const atom& at = get_atom(i);
+        occ_atoms[i].atomic_number = at.get_charge();
+        occ_atoms[i].x = at.get_pos()[0];  
+        occ_atoms[i].y = at.get_pos()[1];
+        occ_atoms[i].z = at.get_pos()[2];
+    }
+    struct RebuiltShell {
+        int atom, l, n_cart, n_prim, nex_start;
+        occ::Vec exponents;
+    };
+    std::vector<RebuiltShell> rebuilt_shells;
+    {
+        int pos = 0;
+        const int nex_total = get_nex();
+        while (pos < nex_total) {
+            const int type0 = get_type(pos);
+            const int atom0 = get_center(pos);
+            int l = 0;
+            while (type0 > static_cast<int>(sum_subshells(l)) + static_cast<int>(num_subshells(true, l)))
+                l++;
+            const int n_cart = num_subshells(true, l);
+            std::vector<double> exp_v;
+            int scan = pos;
+            while (scan < nex_total &&
+                get_center(scan) == atom0 &&
+                ((get_type(scan) - 1) % n_cart) == 0 &&
+                get_type(scan) >= type0 && get_type(scan) < type0 + n_cart) {
+                exp_v.push_back(get_exponent(scan));
+                scan += n_cart;
+            }
+            RebuiltShell rs;
+            rs.atom = atom0 - 1;
+            rs.l = l;
+            rs.n_cart = n_cart;
+            rs.n_prim = static_cast<int>(exp_v.size());
+            rs.nex_start = pos;
+            rs.exponents = Eigen::Map<occ::Vec>(exp_v.data(), exp_v.size());
+            rebuilt_shells.push_back(rs);
+            pos += rs.n_prim * n_cart;
+        }
+    }
+
+    const auto& mo0 = get_MO(0);
+    const double* mo0_coeffs = mo0.get_coefficient_ptr();
+    ShellListT occ_shells;
+    occ_shells.reserve(rebuilt_shells.size());
+    std::vector<occ::Vec> actual_contraction_coeffs(rebuilt_shells.size()); 
+
+    for (size_t k = 0; k < rebuilt_shells.size(); k++) {
+        const auto& rs = rebuilt_shells[k];
+        const int l = rs.l, n_prim = rs.n_prim, n_cart = rs.n_cart;
+        int write_cursor = 0;
+        for (size_t k2 = 0; k2 < k; k2++)
+            write_cursor += rebuilt_shells[k2].n_prim * rebuilt_shells[k2].n_cart;
+        Eigen::Map<const Eigen::MatrixXd> dest_block0(mo0_coeffs + write_cursor, n_prim, n_cart);
+        int j_ref = 0; double best = 0;
+        for (int j = 0; j < n_cart; j++) {
+            double m = dest_block0.col(j).cwiseAbs().maxCoeff();
+            if (m > best) { best = m; j_ref = j; }
+        }
+        occ::Vec ratio = dest_block0.col(j_ref);
+        const double scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25);
+        const double p = (2.0 * l + 3.0) / 4.0;
+        std::vector<double> cc_input(n_prim), expo(n_prim);
+        for (int i = 0; i < n_prim; i++) {
+            expo[i] = rs.exponents(i);
+            cc_input[i] = ratio(i) / (scalar * std::pow(2.0 * expo[i], p));
+        }
+        std::array<double, 3> pos{ occ_atoms[rs.atom].x,
+                                    occ_atoms[rs.atom].y,
+                                    occ_atoms[rs.atom].z };
+        occ::gto::Shell sh(l, expo, { cc_input }, pos);
+        sh.kind = occ::gto::Shell::Kind::Spherical;
+        occ::Vec true_cc(n_prim);
+        for (int i = 0; i < n_prim; i++)
+            true_cc(i) = scalar * std::pow(2.0 * expo[i], p) * sh.coeff_normalized(0, i);
+
+        actual_contraction_coeffs[k] = true_cc;
+        occ_shells.push_back(std::move(sh));
+    }
+    occ_wf.basis = AOBasisT(occ_atoms, occ_shells);
+    occ_wf.basis.set_pure(true);
+    const int nbf_sph = static_cast<int>(occ_wf.basis.nbf());
+    const int n_mo_total = get_nmo();
+    const bool unrestricted = get_is_unrestricted();
+    const int n_spin = unrestricted ? 2 : 1;
+    occ::Mat C_gaussian_order(nbf_sph * n_spin, n_mo_total / n_spin);
+    occ::Vec energies(n_mo_total);
+    int n_alpha = 0, n_beta = 0;
+    for (int spin = 0; spin < n_spin; spin++) {
+        for (int n = 0; n < n_mo_total / n_spin; n++) {
+            const int mo_index = unrestricted ? spin * (n_mo_total / n_spin) + n : n;
+            const auto& mo = get_MO(mo_index);
+            energies(mo_index) = mo.get_energy();
+            if (unrestricted) {
+                if (spin == 0 && mo.get_occ() > 0.5) n_alpha++;
+                if (spin == 1 && mo.get_occ() > 0.5) n_beta++;
+            }
+            else {
+                if (mo.get_occ() > 1.5) { n_alpha++; n_beta++; }
+                else if (mo.get_occ() > 0.5) n_alpha++;
+            }
+            const double* coeffs_ptr = mo.get_coefficient_ptr();
+            int write_cursor = 0, sph_offset = spin * nbf_sph;
+            for (size_t k = 0; k < rebuilt_shells.size(); k++) {
+                const auto& rs = rebuilt_shells[k];
+                Eigen::Map<const Eigen::MatrixXd> dest_block(coeffs_ptr + write_cursor, rs.n_prim, rs.n_cart);
+                const occ::Vec& cc = actual_contraction_coeffs[k];
+                occ::Vec cart_mo_coeffs =
+                    (dest_block.transpose() * cc) / cc.squaredNorm();
+                const auto& A = MappedMatrices[rs.l];
+                occ::Vec MOc = A.completeOrthogonalDecomposition().pseudoInverse() * cart_mo_coeffs;
+                C_gaussian_order.block(sph_offset, n, MOc.size(), 1) = MOc;
+                sph_offset += A.cols();
+                write_cursor += rs.n_prim * rs.n_cart;
+            }
+        }
+    }
+    occ::qm::MolecularOrbitals mo_go;
+    mo_go.kind = unrestricted ? occ::qm::Unrestricted : occ::qm::Restricted;
+    mo_go.n_alpha = n_alpha;
+    mo_go.n_beta = n_beta;
+    mo_go.n_ao = nbf_sph;
+    mo_go.C = C_gaussian_order;
+    mo_go.energies = energies;
+    occ_wf.mo = occ::io::conversion::orb::from_gaussian_order(occ_wf.basis, mo_go);
+    occ_wf.mo.update_density_matrix();
+    occ_wf.nbf = occ_wf.basis.nbf();
+}
+
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const atomID &ID)
 {
     ncen++;
@@ -4848,6 +4989,24 @@ double WFN::count_nr_electrons(void) const
         count += MOs[i].get_occ();
     return count;
 };
+
+double WFN::count_alpha_electrons(void) const
+{
+	double count = 0;
+	for (int i = 0; i < nmo; i++)
+		if (MOs[i].get_spin() == 0)
+			count += MOs[i].get_occ();
+	return count;
+}
+
+double WFN::count_beta_electrons(void) const
+{
+	double count = 0;
+	for (int i = 0; i < nmo; i++)
+		if (MOs[i].get_spin() == 1)
+			count += MOs[i].get_occ();
+	return count;
+}
 
 const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim) const
 {

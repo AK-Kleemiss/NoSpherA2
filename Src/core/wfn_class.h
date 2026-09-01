@@ -301,6 +301,10 @@ public:
     const unsigned int get_nr_ECP_electrons() const;
     /** Sum of MO occupations (for consistency checks). */
     double count_nr_electrons(void) const;
+    /** Count alpha electrons. */
+	double count_alpha_electrons(void) const;
+	/** Count beta electrons. */
+	double count_beta_electrons(void) const;
     /** Human-readable string listing centers and positions. */
     const std::string get_centers(const bool& bohr) const;
     /** Basis set name accessor. */
@@ -601,6 +605,8 @@ public:
     void set_types(const ivec& in) { types = in; };
 	const vec& get_exponents() { return exponents; };
 	const ivec& get_centers() { return centers; };
+    // Converting to other formats
+    void wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf);
 };
 
 #include "mo_class.h"
