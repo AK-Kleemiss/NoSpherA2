@@ -77,35 +77,33 @@ function(nosphera2_enable_optimizations target_name)
 
         get_target_property(target_type "${target_name}" TYPE)
 
-        if(NOT target_type STREQUAL "STATIC_LIBRARY")
-            if(APPLE)
-                target_link_options(
-                    "${target_name}"
-                    PRIVATE
-                        $<$<CONFIG:Release>:
-                            LINKER:-dead_strip
-                        >
-                )
-                target_link_libraries(
-                    "${target_name}"
-                    PRIVATE
-                        OpenMP::OpenMP_CXX
-                )
-            else()
-                target_link_options(
-                    "${target_name}"
-                    PRIVATE
-                        $<$<CONFIG:Release>:
-                            LINKER:--gc-sections
-                        >
-                )
-                target_compile_options(
-                    "${target_name}"
-                    PRIVATE
-                        $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
-                )
+		if(APPLE)
+			target_link_options(
+				"${target_name}"
+				PRIVATE
+					$<$<CONFIG:Release>:
+						LINKER:-dead_strip
+					>
+			)
+			target_link_libraries(
+				"${target_name}"
+				PRIVATE
+					OpenMP::OpenMP_CXX
+			)
+		else()
+			target_link_options(
+				"${target_name}"
+				PRIVATE
+					$<$<CONFIG:Release>:
+						LINKER:--gc-sections
+					>
+			)
+			target_compile_options(
+				"${target_name}"
+				PRIVATE
+					$<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
+			)
                 
-            endif()
         endif()
     endif()
 endfunction()
