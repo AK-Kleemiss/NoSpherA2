@@ -569,10 +569,12 @@ std::string help_message =
  "  -gpu_salted / -no_gpu_salted       The SALTED descriptor combination\n"
  "                                    (equicomb). It falls back to the CPU when\n"
  "                                    no usable device is present.\n"
+ "  -gpu_grid / -no_gpu_grid            Atomic integration grid weights (Becke\n"
+ "                                    and TFVC). It falls back to the CPU when\n"
+ "                                    the grid is incompatible or does not fit\n"
+ "                                    on the device.\n"
  "\n"
  "  Off unless asked:\n"
- "  -gpu_grid                          Atomic integration grid weights (Becke\n"
- "                                    and TFVC).\n"
  "  -gpu_blas                          Offer large dense matrix products to the\n"
  "                                    device. Small ones stay on the CPU, where\n"
  "                                    they beat what the transfers would allow.\n"
@@ -3413,6 +3415,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_salted = false;
     else if (temp == "-gpu_grid")
         gpu_grid = true;
+    else if (temp == "-no_gpu_grid")
+        gpu_grid = false;
     else if (temp == "-gpu_blas")
         gpu_blas = true;
     else if (temp == "-fukui" || temp == "-Fukui")

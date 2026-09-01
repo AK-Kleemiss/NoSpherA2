@@ -2530,7 +2530,7 @@ int make_atomic_grids_wrapper(
 
 	GridConfiguration config;
 #ifdef NOSPHERA2_USE_GPU
-	grid_gpu_set_enabled(opt.gpu_grid);
+	grid_gpu_set_enabled(opt.use_gpu && opt.gpu_grid);
 	blas_gpu_set_enabled(opt.gpu_blas);
 #endif
 	config.accuracy = opt.accuracy;
@@ -2646,7 +2646,7 @@ itsc_block calculate_scattering_factors_from_cube(
 
 	GridConfiguration config;
 #ifdef NOSPHERA2_USE_GPU
-	grid_gpu_set_enabled(opt.gpu_grid);
+	grid_gpu_set_enabled(opt.use_gpu && opt.gpu_grid);
 	blas_gpu_set_enabled(opt.gpu_blas);
 #endif
 	config.accuracy = opt.accuracy;

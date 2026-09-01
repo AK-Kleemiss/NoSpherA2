@@ -815,8 +815,8 @@ struct options
     bool gpu_itensor = true;
     //SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
     bool gpu_salted = true;
-    //-gpu_grid runs the Becke/TFVC integration weights on the device
-    bool gpu_grid = false;
+    //-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
+    bool gpu_grid = true;
     //-gpu_blas offers large dense GEMMs in nos_math to the device
     bool gpu_blas = false;
     //The I tensor GEMM goes through cuBLAS when the machine has it, and through the

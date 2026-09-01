@@ -22,7 +22,7 @@ bool grid_gpu_available();
 //"CUDA" or "HIP", for the log line
 const char* grid_gpu_backend();
 
-//-gpu_grid turns this on; off unless asked, like the other GPU paths
+//On by default; -no_gpu_grid turns this off
 void grid_gpu_set_enabled(bool on);
 bool grid_gpu_enabled();
 

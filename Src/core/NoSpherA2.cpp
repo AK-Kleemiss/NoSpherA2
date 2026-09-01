@@ -89,13 +89,13 @@ static int run_app_impl(int argc, char **argv)
     //Every GPU toggle, from opt alone, once per run. These are globals and used to be set
     //only inside the scattering-factor entry points, so a run reaching XCW instead inherited
     //whatever the previous run in the process had left on. Olex2 calls run_app repeatedly.
-    grid_gpu_set_enabled(opt.gpu_grid);
+    grid_gpu_set_enabled(opt.use_gpu && opt.gpu_grid);
     blas_gpu_set_enabled(opt.gpu_blas);
     equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
     cublas_dynamic_set_enabled(opt.gpu_cublas);
     //Started here so context creation overlaps the file reading rather than landing inside
     //whichever kernel runs first.
-    if (opt.use_gpu || opt.gpu_grid || opt.gpu_salted || opt.gpu_itensor || opt.gpu_blas)
+    if (opt.use_gpu && (opt.gpu_grid || opt.gpu_salted || opt.gpu_itensor || opt.gpu_blas))
         sf_gpu_warmup_start();
 #endif
     vector<WFN> wavy;
