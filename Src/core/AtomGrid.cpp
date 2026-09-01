@@ -1017,7 +1017,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         atom_coords[j * 3 + 2] = atoms[j].get_coordinate(2);
         const int c = atoms[j].get_charge();
         nshell_cache[j] = constants::MBIS_function[c];
-        ECP_electron_helper.emplace_back(c);
+        ECP_electron_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_els[j] = atoms[j].get_ECP_electrons();
     }
@@ -1196,7 +1196,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         atom_coords[j * 3 + 2] = atoms[j].get_coordinate(2);
         const int c = atoms[j].get_charge();
         nshell_cache[j] = constants::MBIS_function[c];
-        ECP_electron_helper.emplace_back(c);
+        ECP_electron_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_els[j] = atoms[j].get_ECP_electrons();
         has_ECP[j] = (atoms[j].get_ECP_electrons() > 0);

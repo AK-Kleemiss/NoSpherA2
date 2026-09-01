@@ -64,6 +64,18 @@ if(NOSPHERA2_USE_CUDA)
             endif()
         endforeach()
     endif()
+    #A Visual Studio developer prompt can retain an older toolkit first on PATH after a
+    #new CUDA Toolkit is installed. Prefer the newest system nvcc in that case: otherwise
+    #check_language() rejects an old toolkit before it ever considers the new one.
+    if(WIN32 AND NOT CMAKE_CUDA_COMPILER)
+        file(GLOB _system_nvcc "$ENV{ProgramFiles}/NVIDIA GPU Computing Toolkit/CUDA/v*/bin/nvcc.exe")
+        if(_system_nvcc)
+            list(SORT _system_nvcc COMPARE NATURAL)
+            list(GET _system_nvcc -1 _system_nvcc)
+            set(CMAKE_CUDA_COMPILER "${_system_nvcc}" CACHE FILEPATH "Newest system CUDA compiler" FORCE)
+            message(STATUS "Using the newest system CUDA compiler: ${_system_nvcc}")
+        endif()
+    endif()
 endif()
 
 if(NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP)
@@ -83,6 +95,10 @@ if(NOSPHERA2_USE_CUDA)
         enable_language(CUDA)
         set(CMAKE_CUDA_STANDARD 17)
         set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+        #A distributed executable must not import cudart64_*.dll. The static CUDA runtime
+        #opens the display-driver API only when a GPU path is used, so the ordinary CPU
+        #fallback still starts on a machine with no NVIDIA software installed.
+        set(CMAKE_CUDA_RUNTIME_LIBRARY Static)
         #native builds for the card doing the build and nothing else, which is right for a
         #local build and wrong for one that gets copied.
         #
