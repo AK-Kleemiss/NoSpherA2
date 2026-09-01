@@ -22,17 +22,25 @@ AO values calculated for all grids.
 Screened out 1798 unique pairs of mu, nu (33.57%) 
 Skipped evaluation of 64013865 grids (16.16%) 
 More detailed output in XCW.log file...
-XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
 ____________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	Total Energy	Perturbation	Target quantity 	A^2 (halt)
 										(Eh)		   (a. u.)			(a. u.)
 ____________________________________________________________________________________
-0.00000		9.729		4.695		-1961.923538504		0.000		-1961.923538504		188.1284
-0.01000		6.282		3.708		-1961.790218970		0.063		-1961.727397195		121.7459
-0.02000		5.807		3.520		-1961.706939814		0.116		-1961.590805445		111.2727
+0.00000		4.695		4.695		-1961.923538504		0.000		-1961.923538504		188.1284
+0.01000		4.230		4.230		-1961.905545196		0.042		-1961.863246723		156.5878
+0.02000		3.972		3.972		-1961.874624912		0.079		-1961.795178324		140.0187
+0.03000		3.801		3.801		-1961.841553764		0.114		-1961.727527269		129.8529
+0.04000		3.675		3.675		-1961.808748503		0.147		-1961.661736371		123.0183
 ____________________________________________________________________________
-Recommended halting lambda* = 0.02000 (A^2=111.2727) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
-  candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
+Gaussian halting criterion: progress update after 5 lambda steps
+Recommended halting lambda* = 0.04000 (A^2=123.0183) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+  candidate fit: degree=2 RSS=13.9810 R^2=0.9948 AIC=13.1413 [chosen]
   candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
-WARNING: A^2 is still falling at the last evaluated lambda (0.02000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. Not enough points yet to extrapolate an estimate (need >= 5 evaluated lambda steps).
+WARNING: A^2 is still falling at the last evaluated lambda (0.04000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum.
+0.05000		3.578		3.578		-1961.776849976		0.179		-1961.597967544		117.9665
+____________________________________________________________________________
+Recommended halting lambda* = 0.05000 (A^2=117.9665) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+  candidate fit: degree=2 RSS=33.2054 R^2=0.9903 AIC=18.2657 [chosen]
+  candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
+WARNING: A^2 is still falling at the last evaluated lambda (0.05000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum.
 Finished XCW fitting procedure.

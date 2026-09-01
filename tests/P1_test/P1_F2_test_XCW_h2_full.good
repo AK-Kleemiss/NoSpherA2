@@ -24,10 +24,15 @@ Skipped evaluation of 64013865 grids (16.16%)
 More detailed output in XCW.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
 ____________________________________________________________________________________
- Lambda		Criterion	GooF(F2)	Total Energy	Perturbation	Target quantity 
+ Lambda		Criterion	GooF(F2)	Total Energy	Perturbation	Target quantity 	A^2 (halt)
 										(Eh)		   (a. u.)			(a. u.)
 ____________________________________________________________________________________
-0.00000		9.792		4.695		-1961.923538504		0.000		-1961.923538504
-0.01000		6.284		3.703		-1961.787956788		0.063		-1961.725113607
-0.02000		5.810		3.519		-1961.704294466		0.116		-1961.588093676
+0.00000		9.792		4.695		-1961.923538504		0.000		-1961.923538504		188.1284
+0.01000		6.284		3.703		-1961.787956788		0.063		-1961.725113607		121.0901
+0.02000		5.810		3.519		-1961.704294466		0.116		-1961.588093676		110.8812
+____________________________________________________________________________
+Recommended halting lambda* = 0.02000 (A^2=110.8812) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+  candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
+  candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
+WARNING: A^2 is still falling at the last evaluated lambda (0.02000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. Not enough points yet to extrapolate an estimate (need >= 5 evaluated lambda steps).
 Finished XCW fitting procedure.

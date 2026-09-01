@@ -381,6 +381,7 @@ full = true
 [P1_test_XCW_h2_full.args]
 do_XCW = ""
 no_gpu = ""
+xcw_gaussian_halt = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_test.hkl"
 anom_disp = "anom_disp.txt"
