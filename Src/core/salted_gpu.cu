@@ -17,6 +17,58 @@
 
 namespace {
 
+struct descriptor_cache {
+	const double *v1_values = nullptr, *v2_values = nullptr;
+	const size_t *v1_offsets = nullptr, *v2_offsets = nullptr;
+	long long v1_len = 0, v2_len = 0;
+	int v1_noff = 0, v2_noff = 0;
+	bool conj = false, ready = false;
+	double *d_v1 = nullptr, *d_v2 = nullptr;
+	size_t *d_v1off = nullptr, *d_v2off = nullptr;
+	void clear()
+	{
+		if (d_v1) gpuFree(d_v1);
+		if (d_v2 && d_v2 != d_v1) gpuFree(d_v2);
+		if (d_v1off) gpuFree(d_v1off);
+		if (d_v2off && d_v2off != d_v1off) gpuFree(d_v2off);
+		v1_values = nullptr; v2_values = nullptr; v1_offsets = nullptr; v2_offsets = nullptr;
+		v1_len = 0; v2_len = 0; v1_noff = 0; v2_noff = 0; conj = false; ready = false;
+		d_v1 = nullptr; d_v2 = nullptr; d_v1off = nullptr; d_v2off = nullptr;
+	}
+	bool matches(const salted_gpu_problem& q) const
+	{
+		return ready && v1_values == q.v1_values && v2_values == q.v2_values
+			&& v1_offsets == q.v1_offsets && v2_offsets == q.v2_offsets
+			&& v1_len == q.v1_len_doubles && v2_len == q.v2_len_doubles
+			&& v1_noff == q.v1_noff && v2_noff == q.v2_noff && conj == q.v2_is_conj_of_v1;
+	}
+	bool upload(const salted_gpu_problem& q)
+	{
+		if (matches(q)) return true;
+		clear();
+		GPU_TRY(gpuMalloc(&d_v1, sizeof(double) * q.v1_len_doubles));
+		GPU_TRY(gpuMemcpy(d_v1, q.v1_values, sizeof(double) * q.v1_len_doubles, gpuMemcpyHostToDevice));
+		GPU_TRY(gpuMalloc(&d_v1off, sizeof(size_t) * q.v1_noff));
+		GPU_TRY(gpuMemcpy(d_v1off, q.v1_offsets, sizeof(size_t) * q.v1_noff, gpuMemcpyHostToDevice));
+		if (q.v2_is_conj_of_v1) {
+			d_v2 = d_v1;
+			d_v2off = d_v1off;
+		}
+		else {
+			GPU_TRY(gpuMalloc(&d_v2, sizeof(double) * q.v2_len_doubles));
+			GPU_TRY(gpuMemcpy(d_v2, q.v2_values, sizeof(double) * q.v2_len_doubles, gpuMemcpyHostToDevice));
+			GPU_TRY(gpuMalloc(&d_v2off, sizeof(size_t) * q.v2_noff));
+			GPU_TRY(gpuMemcpy(d_v2off, q.v2_offsets, sizeof(size_t) * q.v2_noff, gpuMemcpyHostToDevice));
+		}
+		v1_values = q.v1_values; v2_values = q.v2_values; v1_offsets = q.v1_offsets; v2_offsets = q.v2_offsets;
+		v1_len = q.v1_len_doubles; v2_len = q.v2_len_doubles; v1_noff = q.v1_noff; v2_noff = q.v2_noff;
+		conj = q.v2_is_conj_of_v1; ready = true;
+		return true;
+	}
+};
+
+descriptor_cache g_descriptor_cache;
+
 //block(atom, channel, l) as SALTEDDescriptors lays it out, in interleaved doubles
 __device__ __forceinline__ const double* desc_block(const double* v, const size_t* off,
 	const int nchannels, const int atom, const int channel, const int l)
@@ -145,6 +197,11 @@ bool salted_gpu_available()
 	return gpuGetDeviceCount(&n) == gpuSuccess && n > 0;
 }
 
+void salted_gpu_clear_cache()
+{
+	g_descriptor_cache.clear();
+}
+
 bool salted_gpu_equicomb(const salted_gpu_problem& q, int* empty_environments)
 {
 	if (q.natoms <= 0 || q.featsize <= 0 || q.nfps <= 0 || q.l21 <= 0) return false;
@@ -157,26 +214,11 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q, int* empty_environments)
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
 	if (out_bytes + inner_bytes + (1u << 27) > freeb) return false;
 
-	double *d_v1 = nullptr, *d_v2 = nullptr, *d_w3j = nullptr, *d_c2r_re = nullptr, *d_c2r_im = nullptr;
+	double *d_w3j = nullptr, *d_c2r_re = nullptr, *d_c2r_im = nullptr;
 	double *d_out = nullptr, *d_inner = nullptr, *d_p = nullptr;
-	size_t *d_v1off = nullptr, *d_v2off = nullptr;
 	int *d_ll0 = nullptr, *d_ll1 = nullptr, *d_runs = nullptr, *d_cols = nullptr, *d_cnt = nullptr, *d_sel = nullptr, *d_empty = nullptr;
 
-	const size_t v1_vals = q.v1_len_doubles, v2_vals = q.v2_len_doubles;
-	GPU_TRY(gpuMalloc(&d_v1, sizeof(double) * v1_vals));
-	GPU_TRY(gpuMemcpy(d_v1, q.v1_values, sizeof(double) * v1_vals, gpuMemcpyHostToDevice));
-	if (q.v2_is_conj_of_v1) { d_v2 = d_v1; }
-	else {
-		GPU_TRY(gpuMalloc(&d_v2, sizeof(double) * v2_vals));
-		GPU_TRY(gpuMemcpy(d_v2, q.v2_values, sizeof(double) * v2_vals, gpuMemcpyHostToDevice));
-	}
-	GPU_TRY(gpuMalloc(&d_v1off, sizeof(size_t) * q.v1_noff));
-	GPU_TRY(gpuMemcpy(d_v1off, q.v1_offsets, sizeof(size_t) * q.v1_noff, gpuMemcpyHostToDevice));
-	if (q.v2_is_conj_of_v1) { d_v2off = d_v1off; }
-	else {
-		GPU_TRY(gpuMalloc(&d_v2off, sizeof(size_t) * q.v2_noff));
-		GPU_TRY(gpuMemcpy(d_v2off, q.v2_offsets, sizeof(size_t) * q.v2_noff, gpuMemcpyHostToDevice));
-	}
+	if (!g_descriptor_cache.upload(q)) return false;
 	GPU_TRY(gpuMalloc(&d_w3j, sizeof(double) * (size_t)q.w3j_len));
 	GPU_TRY(gpuMemcpy(d_w3j, q.w3j, sizeof(double) * (size_t)q.w3j_len, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMalloc(&d_ll0, sizeof(int) * q.llmax));
@@ -212,7 +254,8 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q, int* empty_environments)
 	const dim3 thr(256), grid(q.nrad1, q.natoms);
 	equicomb_kernel<<<grid, thr, shmem>>>(q.natoms, q.nrad2, q.llmax, q.l21,
 		q.featsize, q.nfps, q.v2_is_conj_of_v1, total_terms,
-		d_v1, d_v1off, q.v1_nchannels, d_v2, d_v2off, q.v2_nchannels,
+		g_descriptor_cache.d_v1, g_descriptor_cache.d_v1off, q.v1_nchannels,
+		g_descriptor_cache.d_v2, g_descriptor_cache.d_v2off, q.v2_nchannels,
 		d_w3j, d_ll0, d_ll1, d_runs, d_cols, d_c2r_re, d_c2r_im, d_cnt, d_sel,
 		d_out, d_inner);
 	GPU_TRY(gpuGetLastError());
@@ -228,8 +271,6 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q, int* empty_environments)
 	GPU_TRY(gpuMemcpy(&host_empty, d_empty, sizeof(int), gpuMemcpyDeviceToHost));
 	if (empty_environments) *empty_environments += host_empty;
 
-	gpuFree(d_v1); if (!q.v2_is_conj_of_v1) gpuFree(d_v2);
-	gpuFree(d_v1off); if (!q.v2_is_conj_of_v1) gpuFree(d_v2off);
 	gpuFree(d_w3j); gpuFree(d_ll0); gpuFree(d_ll1); gpuFree(d_runs);
 	gpuFree(d_cols); gpuFree(d_c2r_re); gpuFree(d_c2r_im); gpuFree(d_cnt);
 	gpuFree(d_sel); gpuFree(d_out); gpuFree(d_inner); gpuFree(d_p); gpuFree(d_empty);

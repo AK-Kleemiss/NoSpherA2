@@ -205,7 +205,7 @@ Added: 2026-06-14.
 | RGBI_NH3Li | RGBI | nh3li_nao.good | no | ✅ passing (macOS arm64, regenerated with `-rgbi` 2026-07-03) |
 | RGBI_NH3Li_ANO | RGBI | nh3li_ano.good | no | ✅ passing (macOS arm64, regenerated with `-rgbi` 2026-07-03) |
 | rubredoxin_cmtc | rubredoxin_cmtc | rubredoxin_cmtc.good | no | ✅ passing |
-| SALTED | SALTED | SALTED.good | no | ✅ passing |
+| SALTED | SALTED | SALTED.good | no | ✅ passing (CPU-pinned with `-no_gpu_salted` for hardware-independent golden output) |
 | sucrose_IAM | sucrose_IAM_SF | sucrose_IAM.good | no | ✅ passing |
 | sucrose_ptb | sucrose_IAM_SF | sucrose_ptb.good | no | ✅ passing |
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |

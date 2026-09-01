@@ -16,6 +16,7 @@
 //the CPU loop.
 
 bool salted_gpu_available();
+void salted_gpu_clear_cache();
 
 struct salted_gpu_problem {
 	int natoms = 0;

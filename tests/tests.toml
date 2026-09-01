@@ -181,6 +181,7 @@ SALTED = "Model"
 cif = "test_cysteine.cif"
 wfn = "test_cysteine.xyz"
 dmin = 0.73
+no_gpu_salted = ""
 
 [sucrose_IAM]
 directory = "sucrose_IAM_SF"

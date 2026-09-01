@@ -414,6 +414,12 @@ void SALTEDPredictor::free_model_lambda(const int lam)
 vec SALTEDPredictor::predict()
 {
     using namespace std;
+#ifdef NOSPHERA2_USE_GPU
+    struct salted_gpu_cache_scope {
+        salted_gpu_cache_scope() { salted_gpu_clear_cache(); }
+        ~salted_gpu_cache_scope() { salted_gpu_clear_cache(); }
+    } gpu_cache_scope;
+#endif
     const auto _t_predict_start = std::chrono::steady_clock::now();
     auto _elapsed = [](const std::chrono::steady_clock::time_point &from)
     { return std::chrono::duration<double>(std::chrono::steady_clock::now() - from).count(); };
