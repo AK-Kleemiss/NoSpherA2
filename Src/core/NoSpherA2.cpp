@@ -11,17 +11,22 @@
 #include "cif.h"
 #include "bondwise_analysis.h"
 #include "XCW.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "grid_gpu.h"
+#include "sf_gpu.h"
+#include "blas_gpu.h"
+#include "cublas_dynamic.h"
+#include "SALTED_equicomb.h"
+#endif
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 
 static int run_app_impl(int argc, char **argv);
 
-// Wrapper around the actual application, so that an exception thrown deep inside a file
-// parser reports what went wrong instead of terminating the process with a fail-fast.
+//Wrapper so an exception from deep inside a file parser reports instead of fail-fast
 int run_app(int argc, char **argv)
 {
-    // Remember the console before run_app_impl() redirects std::cout into NoSpherA2.log;
-    // by the time we get here in a catch block the log file has already been destroyed.
+    //Remember the console before run_app_impl() redirects cout into NoSpherA2.log; in the catch block the log file is already destroyed
     std::streambuf *const console = std::cout.rdbuf();
     try
     {
@@ -52,31 +57,8 @@ static int run_app_impl(int argc, char **argv)
     ofstream log_file("NoSpherA2.log", ios::out);
     std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
 
-    // Put std::cout back the way it was found - buffer AND format state - however
-    // this function is left.
-    //
-    // EVERY exit path has to do this, and four of them did not, the ordinary end of
-    // the function among them. Leaving it redirected points std::cout at a
-    // streambuf that dies with log_file a few lines later: harmless for a process
-    // about to end, poison for one that is not. The in-process test runner calls
-    // this in the same process as everything else, so afterwards nothing reached
-    // the real stdout and every later test that captured it saw an empty string.
-    //
-    // The FORMAT STATE is the half that actually bit. This code sets
-    // fixed/setprecision on std::cout freely and those flags are sticky on the
-    // stream object, so afterwards a bare `0.1` prints as `0.10000000`. Restoring
-    // only the buffer left that behind: a later test looking for "frac_x: 0.1" in a
-    // warning found "frac_x: 0.10000000" instead, which is why the two
-    // duplicate-scatterer tests passed alone and failed in a full run.
-    //
-    // A guard rather than a fifth manual restore, so a newly added return cannot
-    // reintroduce the bug and an exception unwinding through here is covered too.
-    // Declared AFTER log_file and therefore destroyed BEFORE it, so std::cout comes
-    // off the file buffer while that buffer is still alive.
-    //
-    // The explicit restores further down stay: they are needed where the code goes
-    // on to write to the console before returning, and restoring twice to the same
-    // buffer is a no-op.
+    //Restores cout's buffer AND its sticky fixed/setprecision state on every exit path, including an unwinding exception
+    //Declared after log_file so it detaches cout while that buffer is still alive
     struct cout_restorer
     {
         std::streambuf *saved_buf;
@@ -91,9 +73,31 @@ static int run_app_impl(int argc, char **argv)
             std::cout.width(saved_width);
         }
     } restore_cout{_coutbuf, std::cout.flags(), std::cout.precision(), std::cout.width()};
+
+    //A destructor because run_app_impl returns from a dozen places, and log_file rather than
+    //cout because most of those places put cout back on the console first.
+    struct throughput_reporter
+    {
+        std::ostream& out;
+        ~throughput_reporter() { throughput::report(out); }
+    } report_throughput{log_file};
+
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
+#ifdef NOSPHERA2_USE_GPU
+    //Every GPU toggle, from opt alone, once per run. These are globals and used to be set
+    //only inside the scattering-factor entry points, so a run reaching XCW instead inherited
+    //whatever the previous run in the process had left on. Olex2 calls run_app repeatedly.
+    grid_gpu_set_enabled(opt.gpu_grid);
+    blas_gpu_set_enabled(opt.gpu_blas);
+    equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
+    cublas_dynamic_set_enabled(opt.gpu_cublas);
+    //Started here so context creation overlaps the file reading rather than landing inside
+    //whichever kernel runs first.
+    if (opt.use_gpu || opt.gpu_grid || opt.gpu_salted || opt.gpu_itensor || opt.gpu_blas)
+        sf_gpu_warmup_start();
+#endif
     vector<WFN> wavy;
 
     if (opt.promol_nci)
@@ -122,6 +126,14 @@ static int run_app_impl(int argc, char **argv)
         cls();
         std::cout << "Starting QCT menu..." << endl;
         return QCT(opt, wavy);
+    }
+    //Conceptual-DFT reactivity analysis and quit; its table goes to stdout, not the log
+    if (opt.fukui_analysis_run)
+    {
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
+        fukui_analysis(opt, std::cout);
+        return 0;
     }
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
@@ -365,14 +377,10 @@ static int run_app_impl(int argc, char **argv)
         svec known_scatterer;
         vec2 known_kpts;
         tsc_block<int, cdouble> result;
-        // Streamed combined table, when eligible: parts prepared first, then one
-        // pass over reflection blocks. Falls through to the loop below otherwise.
+        //Streamed combined table when eligible: parts first, then one pass over reflection blocks; falls through to the loop otherwise
         if (stream_mtc_salted(opt, wavy, log_file, &known_kpts))
         {
-            // Olex2 reads this literal line out of the log to decide whether the
-            // calculation succeeded, so it has to be here too. This early return is
-            // the path a multi-part protein actually takes, and it was the one site
-            // of four that never said it.
+            //Olex2 greps the log for this exact string; changing it reads as a failed run
             log_file << "Writing tsc file...  ... done!" << endl;
             log_file << "  (written block by block while the factors were computed)" << endl;
             log_file.flush();
@@ -424,14 +432,7 @@ static int run_app_impl(int argc, char **argv)
 
         if (opt.tsc_written_by_stream)
         {
-            // the streamed path already wrote the file block by block; writing
-            // the (empty) in-memory block now would truncate it
-            // Olex2 decides whether NoSpherA2 succeeded by looking for this exact
-            // line in its log: the nsa2 utilities test the log lines against the
-            // literal "Writing tsc file...  ... done!". A streamed run writes a
-            // perfectly good table and used to say so in different words, which
-            // every shipping Olex2 read as a failed calculation. The wording is a
-            // contract with the caller, not a message to a human.
+            //the streamed path already wrote the file block by block; writing the (empty) in-memory block now would truncate it
             log_file << "Writing tsc file...  ... done!" << endl;
             log_file << "  (written block by block while the factors were computed)" << endl;
             log_file.flush();
@@ -487,16 +488,9 @@ static int run_app_impl(int argc, char **argv)
         //use atoms of group 0
         opt.groups[0].push_back(0);
         itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, wavy, log_file, empty, 0);
-        // The streamed path wrote the file block by block as it went; `res` is the
-        // empty placeholder it returned, and writing that now would truncate it.
+        //the streamed path already wrote the file; res is the empty placeholder and writing it would truncate
         if (opt.tsc_written_by_stream)
         {
-            // Olex2 decides whether NoSpherA2 succeeded by looking for this exact
-            // line in its log: the nsa2 utilities test the log lines against the
-            // literal "Writing tsc file...  ... done!". A streamed run writes a
-            // perfectly good table and used to say so in different words, which
-            // every shipping Olex2 read as a failed calculation. The wording is a
-            // contract with the caller, not a message to a human.
             log_file << "Writing tsc file...  ... done!" << endl;
             log_file << "  (written block by block while the factors were computed)" << endl;
         }
@@ -613,7 +607,6 @@ static int run_app_impl(int argc, char **argv)
         // this one is for generation of an fchk file
         if (opt.fchk != "")
         {
-            // Make a fchk out of the wfn/wfx file
             filesystem::path tmp = opt.basis_set_path / opt.basis_set;
             if (opt.debug)
                 log_file << "Checking for " << opt.basis_set_path << " " << exists(opt.basis_set_path) << endl;
@@ -686,15 +679,9 @@ static int run_app_impl(int argc, char **argv)
 
                 delete temp_pred;
             }
-            // as above: the streamed path already wrote the file itself
+            //as above: the streamed path already wrote the file itself
             if (opt.tsc_written_by_stream)
             {
-                // Olex2 decides whether NoSpherA2 succeeded by looking for this
-                // exact line in its log: the nsa2 utilities test the log lines
-                // against the literal "Writing tsc file...  ... done!". A streamed
-                // run writes a perfectly good table and used to say so in different
-                // words, which every shipping Olex2 read as a failed calculation.
-                // The wording is a contract with the caller, not a message.
                 log_file << "Writing tsc file...  ... done!" << endl;
                 log_file << "  (written block by block while the factors were computed)" << endl;
             }

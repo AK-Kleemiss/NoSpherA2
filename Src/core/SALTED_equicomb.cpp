@@ -11,17 +11,12 @@
 
 #include "constants.h"
 
-// Guard failures have to survive: the program log is buffered and the progress
-// bar seeks back over it, and an uncaught throw leaves no message at all.
-static void equicomb_bail(const std::string &msg)
-{
-    std::ofstream f("equicomb_error.txt", std::ios::app);
-    f << msg << std::endl;
-    f.close();
-    std::cerr << msg << std::endl;
-    std::cerr.flush();
-    throw std::out_of_range(msg);
-}
+static bool g_equicomb_use_gpu = false;
+void equicomb_set_gpu(bool on) { g_equicomb_use_gpu = on; }
+bool equicomb_gpu_enabled() { return g_equicomb_use_gpu; }
+#ifdef NOSPHERA2_USE_GPU
+#include "salted_gpu.h"
+#endif
 
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
 void equicomb(int natoms, int nrad1, int nrad2,
@@ -57,75 +52,29 @@ void equicomb(int natoms, int nrad1, int nrad2,
         throw std::out_of_range("equicomb: output buffer p is smaller than required size");
     }
 
-    // The walks below trust sizes taken from the model file, not from the
-    // structure: ifeat advances nrad1*nrad2*llmax times into a buffer sized by
-    // featsize, wigner_ptr runs through w3j with no bound, and vfps indexes
-    // ptemp. A structure missing a species the model knows makes those
+    // Sizes below come from the model file, not the structure: ifeat advances
+    // nrad1*nrad2*llmax into a featsize buffer, w3j is walked unbounded and vfps
+    // indexes ptemp. A structure missing a species the model knows makes those
     // disagree, so check here rather than run off the end inside the threads.
-    // The descriptors themselves are not checked: SALTEDDescriptors is one slab
-    // whose extent is fixed by (natoms, nchannels, lmax) at construction, so
-    // there are no per-atom sizes left that could disagree with each other.
-    // When the two descriptor sets are identical v2 is not filled at all and
-    // conj(v1) is read instead, so the loop must read v2_src, never v2.
+    // v2 is not filled when the two descriptor sets match, so read v2_src, never v2.
     const SALTEDDescriptors &v2_src = v2_is_conj_of_v1 ? v1 : v2;
     const size_t shells = static_cast<size_t>(nrad1) * nrad2 * llmax;
-    if (shells > static_cast<size_t>(featsize))
-    {
-        equicomb_bail("equicomb: featsize " + std::to_string(featsize) +
-            " is smaller than nrad1*nrad2*llmax " + std::to_string(shells));
-    }
-    // w3j is consumed once per (n1,n2) shell pair, one entry per surviving m2
-    size_t w3j_needed = 0;
-    for (int chk = 0; chk < llmax; ++chk)
-    {
-        const int cl1 = llvec[0][chk], cl2 = llvec[1][chk];
-        if (cl1 < 0 || cl2 < 0)
-        {
-            equicomb_bail("equicomb: negative angular momentum in llvec");
-        }
-        for (int cmu = 0; cmu < l21; ++cmu)
-        {
-            const int cm = cmu - lam + cl1;
-            for (int cm1 = 0; cm1 < 2 * cl1 + 1; ++cm1)
-            {
-                if (abs(cm1 - cm) <= cl2) ++w3j_needed;
-            }
-        }
-    }
-    if (w3j.size() < w3j_needed)
-    {
-        equicomb_bail("equicomb: w3j holds " + std::to_string(w3j.size()) +
-            " entries, the shell loop consumes " + std::to_string(w3j_needed));
-    }
+    err_checkf(shells <= static_cast<size_t>(featsize), "equicomb: featsize " + std::to_string(featsize) +
+        " is smaller than nrad1*nrad2*llmax " + std::to_string(shells), std::cout);
     for (int chk = 0; chk < nfps; ++chk)
-    {
-        if (vfps[chk] < 0 || static_cast<size_t>(vfps[chk]) >= static_cast<size_t>(featsize))
-        {
-            equicomb_bail("equicomb: vfps entry " + std::to_string(chk) + " is outside featsize");
-        }
-    }
+        err_checkf(vfps[chk] >= 0 && static_cast<size_t>(vfps[chk]) < static_cast<size_t>(featsize),
+            "equicomb: vfps entry " + std::to_string(chk) + " is outside featsize", std::cout);
 
-    // Initialize p with zeros
     std::fill(p.begin(), p.begin() + static_cast<std::ptrdiff_t>(required_p), 0.0);
 
-    // Declare variables at the beginning
-    int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m2;
+    int iat, n1, n2, il, imu, i, j, ifeat, l2;
     double inner, normfact, preal;
-    // Which (im1, im2) pairs contribute is decided by |im1 - mu| <= l2, and that
-    // depends only on (il, imu, lam) - never on n1 or n2. The test was being
-    // re-evaluated inside the n1 x n2 loop, which runs nrad1*nrad2 times per atom
-    // per lambda, and the iterations that fail it do no work.
-    //
-    // The survivors are more than a subset. |im1 - mu| <= l2 selects a CONTIGUOUS
-    // run of im1, and im2 = im1 - mu + l2 advances in lockstep with it, so a group
-    // needs no index list at all: a first index, a length and an offset into w3j
-    // describe it completely. The inner loop then reads three unit-stride streams
-    // instead of gathering two indices out of a term list for every term.
-    //
-    // w3j is consumed in exactly (il, imu, im1) order, which is why the weights of
-    // one group are a contiguous slice of it and no copy of them is needed here.
-    //
-    // Same values, same operations, same summation order: the result is unchanged.
+    // Which (im1, im2) pairs contribute is set by |im1 - mu| <= l2, which depends
+    // only on (il, imu, lam), never on n1 or n2. That test selects a CONTIGUOUS run
+    // of im1, and im2 = im1 - mu + l2 advances in lockstep with it, so a first
+    // index, a length and an offset into w3j describe a group completely. w3j is
+    // consumed in exactly (il, imu, im1) order, so a group's weights are a
+    // contiguous slice of it and need no copy here.
     struct w3j_run { int im1_begin, im2_begin, count, w_off; };
     std::vector<w3j_run> runs(static_cast<size_t>(llmax) * l21, w3j_run{0, 0, 0, 0});
     size_t total_terms = 0;
@@ -134,6 +83,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
         for (int til = 0; til < llmax; ++til)
         {
             const int tl1 = llvec[0][til], tl2 = llvec[1][til];
+            err_checkf(tl1 >= 0 && tl2 >= 0, "equicomb: negative angular momentum in llvec", std::cout);
             for (int timu = 0; timu < l21; ++timu)
             {
                 const int tmu = timu - lam + tl1;
@@ -146,18 +96,16 @@ void equicomb(int natoms, int nrad1, int nrad2,
         }
         total_terms = static_cast<size_t>(w_idx);
     }
+    // w3j is consumed once per (n1,n2) shell pair, one entry per surviving m2, which is what the runs add up to
+    err_checkf(w3j.size() >= total_terms, "equicomb: w3j holds " + std::to_string(w3j.size()) +
+        " entries, the shell loop consumes " + std::to_string(total_terms), std::cout);
 
     // The complex-to-real matrix is a mirror-pair transform: row i couples only
     // column i and column l21-1-i, so every row holds exactly two nonzeros (the
-    // middle row holds one). The transform below was walking all l21 columns of
-    // every row, which for lam = 5 multiplies by 119 exact zeros out of 121.
-    //
-    // Adding a term that is exactly zero does not change a finite sum, so dropping
-    // those terms - while keeping the survivors in ascending column order, which is
-    // the order the dense loop added them in - leaves the result bit for bit the
-    // same. The structure is read off c2r rather than assumed, and anything that
-    // does not fit two-per-row falls back to the dense walk, so a future transform
-    // cannot silently lose terms here.
+    // middle row holds one). Dropping the exact zeros leaves a finite sum bit for
+    // bit the same as long as the survivors stay in ascending column order, which
+    // is the order the dense loop added them in. The structure is read off c2r
+    // rather than assumed; anything not two-per-row falls back to the dense walk.
     struct c2r_entry { int j; double re, im; };
     std::vector<c2r_entry> c2r_nz(static_cast<size_t>(l21) * 2, c2r_entry{0, 0.0, 0.0});
     std::vector<int> c2r_cnt(l21, 0);
@@ -180,14 +128,84 @@ void equicomb(int natoms, int nrad1, int nrad2,
     {
         std::cout << "[equicomb] lam " << lam << ": c2r "
                   << (c2r_is_sparse ? "sparse (2 per row)" : "dense fallback")
-                  << ", " << total_terms << " wigner terms" << std::endl;
+                  << ", " << total_terms << " wigner terms"
+                  << ", natoms " << natoms << ", nrad1 " << nrad1 << ", nrad2 " << nrad2
+                  << ", llmax " << llmax << ", l21 " << l21
+                  << ", featsize " << featsize << ", nfps " << nfps << std::endl;
     }
 
     int empty_environments = 0;
 
+#ifdef NOSPHERA2_USE_GPU
+    //The device reproduces this walk exactly; it falls through to the CPU loop below if
+    //no device is present, the transform is not the two-per-row form, or it will not fit.
+    if (g_equicomb_use_gpu && c2r_is_sparse)
+    {
+        ivec flat_runs(static_cast<size_t>(llmax) * l21 * 4);
+        for (size_t r = 0; r < runs.size(); ++r) {
+            flat_runs[r * 4 + 0] = runs[r].im1_begin;
+            flat_runs[r * 4 + 1] = runs[r].im2_begin;
+            flat_runs[r * 4 + 2] = runs[r].count;
+            flat_runs[r * 4 + 3] = runs[r].w_off;
+        }
+        ivec cols(static_cast<size_t>(l21) * 2, 0);
+        vec cre(static_cast<size_t>(l21) * 2, 0.0), cim(static_cast<size_t>(l21) * 2, 0.0);
+        for (int i2 = 0; i2 < l21; ++i2)
+            for (int k2 = 0; k2 < 2; ++k2) {
+                cols[i2 * 2 + k2] = c2r_nz[static_cast<size_t>(i2) * 2 + k2].j;
+                cre[i2 * 2 + k2] = c2r_nz[static_cast<size_t>(i2) * 2 + k2].re;
+                cim[i2 * 2 + k2] = c2r_nz[static_cast<size_t>(i2) * 2 + k2].im;
+            }
+        //Reverse of vfps: which output slot, if any, each shell triple feeds
+        ivec sel(static_cast<size_t>(featsize), -1);
+        for (int i2 = 0; i2 < nfps; ++i2) sel[static_cast<size_t>(vfps[i2])] = i2;
+        const SALTEDDescriptors &v2_gpu = v2_is_conj_of_v1 ? v1 : v2;
+        salted_gpu_problem q;
+        q.natoms = natoms; q.nrad1 = nrad1; q.nrad2 = nrad2; q.llmax = llmax;
+        q.lam = lam; q.l21 = l21; q.featsize = featsize; q.nfps = nfps;
+        q.v2_is_conj_of_v1 = v2_is_conj_of_v1;
+        q.v1_values = reinterpret_cast<const double *>(v1.values().data());
+        q.v1_offsets = v1.offsets().data();
+        q.v1_nchannels = v1.nchannels();
+        q.v1_noff = static_cast<int>(v1.offsets().size());
+        q.v1_len_doubles = static_cast<long long>(v1.values().size()) * 2;
+        q.v2_values = reinterpret_cast<const double *>(v2_gpu.values().data());
+        q.v2_offsets = v2_gpu.offsets().data();
+        q.v2_nchannels = v2_gpu.nchannels();
+        q.v2_noff = static_cast<int>(v2_gpu.offsets().size());
+        q.v2_len_doubles = static_cast<long long>(v2_gpu.values().size()) * 2;
+        q.w3j = w3j.data(); q.w3j_len = static_cast<long long>(w3j.size());
+        q.llvec0 = llvec[0].data(); q.llvec1 = llvec[1].data();
+        q.runs = flat_runs.data(); q.c2r_cols = cols.data();
+        q.c2r_re = cre.data(); q.c2r_im = cim.data(); q.c2r_cnt = c2r_cnt.data();
+        q.sel = sel.data(); q.p = p.data();
+        const _time_point eq_gpu_t0 = get_time();
+        const bool gpu_ok = salted_gpu_equicomb(q, &empty_environments);
+        if (gpu_ok)
+            throughput::record("SALTED equicomb", true,
+                throughput::flops_equicomb(natoms, nrad1, nrad2, llmax, l21),
+                get_msec(eq_gpu_t0, get_time()));
+        //Once per run, not once per lambda: nine identical lines say nothing extra.
+        //Printed before the progress bar exists, whose carriage returns would eat it.
+        static bool announced = false;
+        if (!announced) {
+            announced = true;
+            std::cout << "GPU in use: SALTED descriptors on "
+                      << (gpu_ok ? "the device (double precision)" : "the CPU - device unavailable") << std::endl;
+        }
+        if (ProgressBar::report_counts)
+            std::cout << "[equicomb] lam " << lam << ": GPU " << (gpu_ok ? "used" : "refused, using the CPU loop") << std::endl;
+        if (gpu_ok)
+            return;
+    }
+#endif
+
+    //Timed around the whole CPU contraction, outside any parallel region, and counted
+    //with the same convention the GPU branch above uses so the two rows compare.
+    const _time_point eq_cpu_t0 = get_time();
+
     // Scoped: the bar rewinds to its own line when it is destroyed, so anything
-    // printed after the loop but before that is silently overwritten. The empty
-    // environment warning below was lost exactly that way.
+    // printed after the loop but before that is silently overwritten.
     {
     ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
 #pragma omp parallel 
@@ -195,24 +213,18 @@ void equicomb(int natoms, int nrad1, int nrad2,
         vec ptemp(static_cast<size_t>(l21) * featsize, 0.0);
         vec pcmplx_real(l21);
         vec pcmplx_imag(l21);
-        // w * v1 depends on n1 but not on n2, and the n2 loop below runs nrad2
-        // times, so that product was being formed nrad2 times over. Build it once
-        // per (atom, n1) instead. Real and imaginary parts live in separate arrays
-        // so the inner loop reads plain double streams rather than picking fields
-        // out of a complex.
-        //
-        // The conjugation sign is deliberately NOT folded in here. It looks like it
-        // could be, since multiplying by -1 is exact, but conj(v2) puts that sign on
-        // v1_i*v2_i in the real accumulator and on v1_r*v2_i in the imaginary one,
-        // so one signed copy of w*v1 cannot serve both. Folding it anyway moved the
-        // form factors by 5% of the largest one - not a rounding effect, a wrong
-        // answer. It is applied by choosing between two forms of the inner loop,
-        // which costs one branch per (il, imu) rather than a multiply per term.
+        // w * v1 depends on n1 but not on n2, so build it once per (atom, n1); real
+        // and imaginary parts live in separate arrays so the inner loop reads plain
+        // double streams rather than picking fields out of a complex.
+        // The conjugation sign is deliberately NOT folded in here: conj(v2) puts that
+        // sign on v1_i*v2_i in the real accumulator and on v1_r*v2_i in the imaginary
+        // one, so one signed copy of w*v1 cannot serve both. It is applied by choosing
+        // between two forms of the inner loop instead.
         vec wv1_re(total_terms, 0.0);
         vec wv1_im(total_terms, 0.0);
         const double *wigner_ptr = NULL;
         int limit_l1 = 0;
-#pragma omp for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m2, inner, normfact, preal) schedule(dynamic, 1)
+#pragma omp for private(iat, n1, n2, il, imu, i, j, ifeat, l2, inner, normfact, preal) schedule(dynamic, 1)
         for (iat = 0; iat < natoms; ++iat)
         {
             inner = 0.0;
@@ -238,7 +250,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
                 {
                     for (il = 0; il < llmax; ++il)
                     {
-                        l1 = llvec[0][il];
                         l2 = llvec[1][il];
 
                         // v2 is conj(v1) when the two descriptor sets are the same
@@ -320,12 +331,10 @@ void equicomb(int natoms, int nrad1, int nrad2,
                 }
             }
 
-            // An empty environment gives a descriptor of all zeros, so inner is 0
-            // and 1/sqrt(inner) is +inf. Multiplying the zero descriptor by it
-            // yields NaN for every feature, which reaches the form factors. Zero is
-            // the meaningful answer instead: no environment information, so the
-            // kernel contributes nothing and the atom keeps the species average the
-            // model adds separately. For any inner > 0 this is the old expression.
+            // An empty environment gives an all-zero descriptor, so inner is 0 and
+            // 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
+            // answer: the kernel contributes nothing and the atom keeps the species
+            // average the model adds separately.
             if (inner > 0.0)
             {
                 normfact = 1.0 / sqrt(inner);
@@ -354,10 +363,13 @@ void equicomb(int natoms, int nrad1, int nrad2,
     }
 
     // Said once per run, on the first lambda that sees it - NOT gated on lam == 0.
-    // An atom with no neighbours still has an l = 0 descriptor, because its own
-    // density is spherically symmetric; it is only the equivariant lam >= 1 parts
-    // that vanish, which is exactly what an empty environment means. Zeroing those
-    // leaves the atom spherical, which is the right answer for it. +inf left it NaN.
+    // An atom with no neighbours still has an l = 0 descriptor, its own density being
+    // spherically symmetric; only the equivariant lam >= 1 parts vanish, so zeroing
+    // them leaves the atom spherical, which is the right answer for it.
+    throughput::record("SALTED equicomb", false,
+        throughput::flops_equicomb(natoms, nrad1, nrad2, llmax, l21),
+        get_msec(eq_cpu_t0, get_time()));
+
     static bool warned_empty_environment = false;
     if (empty_environments > 0 && !warned_empty_environment)
     {
@@ -402,15 +414,12 @@ void equicomb(int natoms, int nrad1, int nrad2,
         throw std::out_of_range("equicomb: output buffer p is smaller than required size");
     }
 
-    // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
     double inner, normfact;
 
-    // default(none) below means every name the region touches must be listed,
-    // including read-only function parameters like v2_is_conj_of_v1. clang
-    // enforces that and fails to compile; MSVC's OpenMP 2.0 does not, so a
+    // default(none) means every name the region touches must be listed, read-only
+    // parameters included. clang enforces that; MSVC's OpenMP 2.0 does not, so a
     // missing name builds clean on Windows and breaks the macOS and Linux jobs.
-    // Anything added to this loop body has to be added to the clause as well.
 
 #pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, w3j, llmax, llvec, lam, l21, c2r, p, featsize, constants::cnull)
     for (iat = 0; iat < natoms; ++iat)
@@ -442,9 +451,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
                             if (abs(m2) <= l2)
                             {
                                 im2 = m2 + l2;
-                                // v2 is conj(v1) elementwise when the two descriptor
-                                // sets match, so the same value is available from v1
-                                // whatever the index order happens to be here
+                                // v2 is conj(v1) elementwise when the two descriptor sets match
                                 pcmplx[imu] += w3j[iwig] * v1.block(iat, n1, l1)[im1] *
                                     (v2_is_conj_of_v1 ? std::conj(v1.block(iat, n2, l2)[im2])
                                                       : v2.block(iat, n2, l2)[im2]);
@@ -467,8 +474,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
                 }
             }
         }
-        // See the note in the sparsified overload: an empty environment would make
-        // this zero and every feature NaN.
+        // See the sparsified overload: an empty environment makes this zero and every feature NaN
         normfact = sqrt(inner);
         const double inv_normfact = (normfact > 0.0) ? (1.0 / normfact) : 0.0;
         for (ifeat = 0; ifeat < featsize; ++ifeat)

@@ -1,7 +1,125 @@
 # Unit Test Status
-**Last updated: 2026-08-15** (added `AtomTest.ID_IsRebuiltWhenCIFPartChanges`, made the
+**Last updated: 2026-08-25** (added the Fukui-function feature and its tests: 7 new
+`FukuiTests` unit cases covering `find_frontier_orbitals`, plus one new
+`TomlIntegrationTests.Fukui` golden-file case. Net +8 cases.)
+
+## 2026-08-25 — Fukui functions (`-fukui`)
+
+New `-fukui` flag computes f+, f-, f0 and the dual descriptor in the frontier-orbital
+approximation and writes four cubes plus a `<stem>_fukui.dat` summary.
+
+It also computes the **condensed (atom-summed) Fukui functions under all five atomic
+partitions** — Hirshfeld, Becke, TFVC, MBIS, EMBIS — in one pass. This required **no
+change to GridManager at all**: `calculatePartitionedCharges` integrates whatever is in
+the `WFN_DENSITY` column against all five weight columns and does not recompute it, so
+substituting a frontier-orbital density for the total density turns the existing
+five-way charge accumulation into a five-way condensed-Fukui accumulation.
+`getGridData()` already returns a mutable reference.
+
+There is also a **standalone `-fukui_analysis <wfn>`** that does the reactivity analysis
+with no cube machinery at all — no grid, radius or CIF. It is dispatched from
+`run_app_impl`, **not** from `options::digest_options()`, and that placement is load
+bearing: `run_app_impl` redirects `std::cout` into `NoSpherA2.log` before
+`digest_options()` runs, so a flag handled at parse time prints into the log and nothing
+onto the terminal. Verified on the existing `-dipole_moments`, which uses the parse-time
+pattern: 0 bytes to stdout, 2.9 kB to `NoSpherA2.log`. Fine for a side-effect command,
+useless for one whose whole output is meant to be read, so this one restores the console
+buffer first.
+
+Two correctness points that are easy to get wrong here:
+
+- The grid and the weights are built from a copy with `delete_unoccupied_MOs()` applied,
+  but the frontier orbitals are evaluated from the **original** wavefunction. Both parts
+  matter: `compute_dens` sizes its scratch by `get_nmo(true)`, so leaving several hundred
+  virtuals in place overruns it — and the partition weights must come from the
+  ground-state density anyway, since MBIS and EMBIS are refined self-consistently
+  against it. Only the integrand changes.
+- `calculatePartitionedCharges` adds ECP core electrons to the populations. Correct for a
+  charge, wrong for a Fukui function, so it is subtracted back out.
+
+The sum over atoms of each column is exactly 1 for f+ and f-, and 0 for the dual
+descriptor, which makes every run self-checking. Measured on ethylene oxide:
+0.99991–1.00000 across the five partitions. Verified byte-identical across
+`OMP_NUM_THREADS` of 4, 8 and 16, including the iterative MBIS/EMBIS refinement, which
+is what makes it safe as golden-file output. Costs ~0.9 s for 7 atoms and ~2.9 s for
+sucrose's 45.
+
+| Test | Kind | Covers |
+|------|------|--------|
+| `FukuiTests.FrontierOrbitalsRestrictedWithEnergies` | unit | HOMO/LUMO by orbital energy |
+| `FukuiTests.FrontierOrbitalsFallsBackToOrderWithoutEnergies` | unit | `.wfn`-style files with no stored energies |
+| `FukuiTests.FrontierOrbitalsPreferEnergyOverIndexOrder` | unit | energy-unsorted MO sets |
+| `FukuiTests.FrontierOrbitalsFailWhenNoVirtualsExist` | unit | occupied-only files must fail loudly |
+| `FukuiTests.FrontierOrbitalsFailWhenNoOccupiedExist` | unit | mirror case |
+| `FukuiTests.FrontierOrbitalsFailOnEmptyWavefunction` | unit | empty WFN |
+| `FukuiTests.FrontierOrbitalsTreatFractionalOccupationAsOccupied` | unit | natural-orbital occupations |
+| `TomlIntegrationTests.Fukui` | integration | end-to-end run, pins frontier pair and integrated norms |
+| `TomlIntegrationTests.FukuiPBC` | integration | the same through the periodic (`-cif`) path |
+
+Both integration tests were added to the `integration_sucrose_fchk_SF` `RESOURCE_LOCK`
+group in `tests/src/SetIntegrationTestLocks.cmake`. They share that directory with
+`Fractal`, `Properties`, `SucroseSF` and `SucroseTwin`, and both write
+`sucrose_fukui.dat`, so without the lock a parallel `ctest` run would have them
+clobbering each other.
+
+`FukuiPBC` exists because `-cif` is a genuinely different code path in
+`cube::evaluate_on_grid` — it sweeps each index over `[-size, 2*size)` and wraps,
+costing ~27x — and it is the path Olex2 actually drives, since
+`cubes_maps.calculate_cubes` always passes `-cif`. The non-periodic test never touches
+it. It runs in ~0.2 s at resolution 1.5.
+
+Four things worth recording, because each is a trap rather than a preference:
+
+1. **The integration test uses `sucrose.fchk`, NOT the `sucrose.wfx`** that the
+   neighbouring `[properties]` test uses. That wfx stores only the 91 occupied
+   orbitals, so it has no LUMO and cannot produce a Fukui function at all. The fchk
+   carries all 432 orbitals (91 occupied, 341 virtual).
+2. **The golden file is `sucrose_fukui.dat`, not a log.** Property runs write to
+   `NoSpherA2_cube.log`, which contains wall-clock timings; at the harness's 1%
+   tolerance a `0 s` → `1 s` drift would fail the comparison. The `.dat` summary is
+   deterministic and carries the numbers actually worth asserting.
+3. **`Calc_Fukui` must run before `delete_unoccupied_MOs()`** in
+   `properties_calculation` (`properties.cpp`). The LUMO is an unoccupied orbital;
+   calling it after would yield an all-zero f+ cube with no error.
+4. **`Calc_Fukui` uses two grid passes on purpose, not one.** Filling all four cubes
+   from a single functor means a non-atomic read-modify-write on three of them from
+   inside a parallel region; in the wrapped path several raw indices map onto the same
+   voxel, so that is a data race. Only the functor's *return* value is protected, by
+   the `#pragma omp atomic` inside `evaluate_on_grid`. Two passes cost the same (one
+   `computeMO` per point either way) and leave every voxel with a single writer.
+   Verified empirically as well: the periodic run is byte-identical across 5 repeats at
+   `OMP_NUM_THREADS=16`. Note the same single-functor pattern still exists in
+   `Calc_Prop`/`accumulate_prop_values` for ELF/ELI/Lap/RDG and was left alone here.
+
+**Validation on 2026-08-25 (`release-windows`): `ctest --preset release-windows` reports
+258/258 passing, 0 failed, in 569 s** (5 skipped, all pre-existing: the four
+`full = true` XCW cases and the optional `Nbo47.EpoxideGennboMatchesReferenceWhenAvailable`
+fixture). That includes the 9 new cases here, and confirms the `read_fchk` path fix
+below regressed nothing — it was the one change with reach outside this feature.
+
+Correctness was additionally checked by grid convergence rather than by a golden file
+alone — the integrated norms approach the exact value of 1.0 as the grid is refined:
+
+| resolution (A) | integral f+ | integral f- |
+|---|---|---|
+| 0.8 | 1.0045 | 0.9327 |
+| 0.4 | 1.0004 | 1.0088 |
+| 0.2 | 0.9966 | 0.9994 |
+
+and the cube contents satisfy f+ >= 0, f- >= 0, f0 == (f+ + f-)/2 and
+df == f+ - f- to within cube-file write precision (~1e-7).
+
+**Also fixed here:** `WFN::read_fchk` never recorded `path`, unlike every other reader.
+Cube filenames are built from that path, so any fchk-driven property run wrote
+`_rho.cube`, `_lap.cube` etc. with an empty stem, which silently collide when more than
+one structure is processed in one directory. Pre-existing, unrelated to Fukui, and no
+test or `.good` file depended on the stem-less names.
+
+## Earlier history
+
+The previous 2026-08-15 update added `AtomTest.ID_IsRebuiltWhenCIFPartChanges`, made the
 CIF reader store and immediately rebuild its PART-aware `SCATTERER_ID`, and moved PART filtering ahead of WFN matching
-to prevent another PART from overwriting atom IDs during `-mtc`; validation pending.)
+to prevent another PART from overwriting atom IDs during `-mtc`; validation pending.
 
 The previous 2026-08-02 update
 `TscBlockTests.BinaryFileRoundTripsWith32BitSizes` so `SCATTERER_IDS` is inferred from
@@ -87,7 +205,7 @@ Added: 2026-06-14.
 | RGBI_NH3Li | RGBI | nh3li_nao.good | no | ✅ passing (macOS arm64, regenerated with `-rgbi` 2026-07-03) |
 | RGBI_NH3Li_ANO | RGBI | nh3li_ano.good | no | ✅ passing (macOS arm64, regenerated with `-rgbi` 2026-07-03) |
 | rubredoxin_cmtc | rubredoxin_cmtc | rubredoxin_cmtc.good | no | ✅ passing |
-| SALTED | SALTED | SALTED.good | no | ✅ passing |
+| SALTED | SALTED | SALTED.good | no | ✅ passing (CPU-pinned with `-no_gpu_salted` for hardware-independent golden output) |
 | sucrose_IAM | sucrose_IAM_SF | sucrose_IAM.good | no | ✅ passing |
 | sucrose_ptb | sucrose_IAM_SF | sucrose_ptb.good | no | ✅ passing |
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |

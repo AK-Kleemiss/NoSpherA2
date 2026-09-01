@@ -22,6 +22,12 @@ add_executable(
 
 nosphera2_enable_optimizations(NoSpherA2_Tests)
 
+#So the GPU tests can ask whether a device is present rather than being gated on an
+#environment variable the runner has to remember to set
+if(NOSPHERA2_USE_CUDA OR NOSPHERA2_USE_HIP)
+    target_compile_definitions(NoSpherA2_Tests PRIVATE NOSPHERA2_USE_GPU)
+endif()
+
 target_compile_features(
     NoSpherA2_Tests
     PRIVATE
@@ -75,3 +81,13 @@ set_target_properties(
 )
 
 nosphera2_copy_runtime_libraries(NoSpherA2_Tests)
+
+if(NOSPHERA2_CUDA_DELAYLOAD)
+    target_link_options(NoSpherA2_Tests PRIVATE ${NOSPHERA2_CUDA_DELAYLOAD})
+    target_link_libraries(NoSpherA2_Tests PRIVATE delayimp)
+endif()
+
+if(NOSPHERA2_HIP_DELAYLOAD)
+    target_link_options(NoSpherA2_Tests PRIVATE ${NOSPHERA2_HIP_DELAYLOAD})
+    target_link_libraries(NoSpherA2_Tests PRIVATE delayimp)
+endif()

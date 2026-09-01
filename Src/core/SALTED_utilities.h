@@ -35,6 +35,12 @@ public:
 
     std::vector<cdouble>& values() noexcept { return _values; }
 
+    //Flat view for the GPU path: block(atom, channel, l) is offsets[l] +
+    //(atom * nchannels + channel) * (2l+1), which the device reproduces
+    const std::vector<cdouble>& values() const noexcept { return _values; }
+    const std::vector<size_t>& offsets() const noexcept { return _offsets; }
+    int nchannels() const noexcept { return _nchannels; }
+
     void clear() noexcept {
         _nchannels = 0;
         _offsets.clear();
@@ -121,6 +127,13 @@ const double calc_density_ML(const double &x,
                              const int &atom_nr);
 
 vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs);
+
+// Scale the l=0 coefficients so the predicted density integrates to the exact
+// electron count. Returns the applied factor (1.0 if nothing was done).
+double apply_charge_constraint(const std::vector<atom> &atoms, vec &coefs,
+                               int net_charge, bool spherical_fill_used,
+                               int n_filled, double filled_eeq_charge,
+                               double applied_fill_charge, std::ostream &file);
 
 cube calc_cube_ML(const vec& data, WFN &dummy, const int& atom_nr = -1);
 void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr = -1);

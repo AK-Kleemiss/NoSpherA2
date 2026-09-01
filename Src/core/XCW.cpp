@@ -1,5 +1,8 @@
 #include "pch.h"
 #include "XCW.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "itensor_gpu.h"
+#endif
 #include "convenience.h"
 #include "scattering_factors.h"
 #include "nos_math.h"
@@ -792,12 +795,9 @@ void XCW::ensure_hkl_ordered() {
 	}
 }
 
-// Builds the per-reflection 1/|H|^2 cache used to weight the residual
-// self-energy criterion (XCW_plan.md sec. 6.2: U_res ~ Sum_h |dF_h|^2/|H_h|^2).
-// |H| = 1/d = 2*sin(theta)/lambda; the (0,0,0) reflection is already
-// excluded from `hkl` at read time (see read_hkl_full), so no H=0 guard is
-// needed beyond the defensive check below. Computed once and reused across
-// all SCF iterations and lambda steps, since it depends only on geometry.
+//Per-reflection 1/|H|^2 weights for the residual self-energy criterion,
+//U_res ~ Sum_h |dF_h|^2/|H_h|^2, with |H| = 1/d = 2*sin(theta)/lambda.
+//(0,0,0) is already excluded from hkl at read time; depends only on geometry.
 void XCW::ensure_inv_H2_weights() {
 	if (settings.XWR_type == 1 || !inv_H2_.empty()) {
 		return;
@@ -812,14 +812,11 @@ void XCW::ensure_inv_H2_weights() {
 	}
 }
 
-// See tests/P1_test/XCW_plan.md and Src/core/xcw_halting.h for the
-// statistical background. Computes z_h = (|F_obs,h| - |F_calc,h|) / sigma_h
-// for the current (converged) F_calc/F_scale, restricted to "strong"
-// reflections (|F_obs|/sigma >= opt->xcw_strong_cutoff, XCW_plan.md 4.2),
-// then tests {z_h} against N(0,1) after a global shape/scale decoupling
-// rescale (XCW_plan.md 4.1). This is the full-reflection-set version of the
-// criterion (XCW_plan.md sec. 2); the free/working-set cross-validation
-// variant (sec. 5) is not yet implemented.
+//z_h = (|F_obs,h| - |F_calc,h|) / sigma_h for the converged F_calc/F_scale over
+//strong reflections (|F_obs|/sigma >= opt->xcw_strong_cutoff), tested against
+//N(0,1) after a global shape/scale rescale. Full reflection set only; the
+//free/working-set cross-validation variant is not implemented.
+//Background: tests/P1_test/XCW_plan.md, Src/core/xcw_halting.h.
 void XCW::evaluate_gaussian_halting(const double lambda) {
 	ensure_hkl_ordered();
 
@@ -859,10 +856,8 @@ void XCW::evaluate_gaussian_halting(const double lambda) {
 		return;
 	}
 
-	// Decouple shape from scale (XCW_plan.md 4.1): rescale z so <z^2> ~ 1
-	// globally before testing the *shape* of the distribution against
-	// N(0,1). This is a single global scale factor, not the full
-	// resolution-uniform weighting scheme referenced in the plan.
+	//Decouple shape from scale: one global factor rescaling z so <z^2> ~ 1, not the
+	//resolution-uniform weighting of XCW_plan.md 4.1
 	double mean_z2 = 0.0;
 	for (const double v : z_raw) {
 		mean_z2 += v * v;
@@ -912,9 +907,7 @@ void XCW::evaluate_gaussian_halting(const double lambda) {
 	gaussian_halt_history_.push_back(entry);
 }
 
-// Prints the full per-lambda table to XCW_log (the detailed-output file,
-// same convention as the rest of the XCW-specific diagnostics), then calls
-// report_halting_progress_estimate(true) for the final recommendation.
+//Full per-lambda table to XCW_log, then the final recommendation
 void XCW::report_gaussian_halting_summary() {
 	if (gaussian_halt_history_.empty()) {
 		return;
@@ -936,11 +929,9 @@ void XCW::report_gaussian_halting_summary() {
 	report_halting_progress_estimate(true);
 }
 
-// See the declaration in XCW.h for the full behavior description. lambda*
-// is the argmin of A^2 among lambda steps with enough strong reflections to
-// be meaningful; a WARNING is appended if the binned-trend test
-// (XCW_plan.md 3.3) flags that lambda, since that indicates spatially
-// correlated residuals that a marginal normality test alone would miss.
+//lambda* is the argmin of A^2 over steps with enough strong reflections. A flagged
+//binned-trend test means spatially correlated residuals that a marginal normality
+//test would miss, so it is warned about. See XCW.h for the full behaviour.
 void XCW::report_halting_progress_estimate(bool is_final) {
 	const GaussianHaltEntry* best = nullptr;
 	double max_valid_lambda = 0.0;
@@ -960,19 +951,13 @@ void XCW::report_halting_progress_estimate(bool is_final) {
 		return;
 	}
 
-	// A minimum found only at the last evaluated lambda is a scan-boundary
-	// artifact (A^2 was still falling when the data ran out), not evidence
-	// that lambda* has actually been reached -- flag it explicitly instead
-	// of silently reporting the boundary value.
+	//A minimum at the last evaluated lambda is a scan-boundary artifact, not a
+	//reached lambda*, so it is flagged rather than reported as the answer
 	const bool at_boundary = (best->lambda >= max_valid_lambda - 1e-12) && (fit_lambda.size() > 1);
 	const bool trend_ok = !best->resolution_trend_flagged && !best->intensity_trend_flagged;
 
-	// Try a small family of candidate functional forms for the A^2(lambda)
-	// trend and let AIC pick the best fit-quality/parsimony trade-off,
-	// rather than committing to a single functional form. Quartic needs
-	// noticeably more points than quadratic to be stable (see
-	// fit_polynomial's `degree + 3` minimum), so it naturally only enters
-	// consideration once the scan has enough steps.
+	//AIC picks between candidate forms of the A^2(lambda) trend; quartic only enters
+	//once the scan has enough steps, via fit_polynomial's degree + 3 minimum
 	std::vector<PolynomialFit> candidates;
 	const PolynomialFit fit = choose_best_polynomial_fit(fit_lambda, fit_A2, { 2, 4 }, &candidates);
 
@@ -1101,9 +1086,8 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 		in.read(reinterpret_cast<char*>(&total_size_safe), sizeof(total_size_safe));
 		if (total_size_safe < 0 ||
 			static_cast<size_t>(nr_safe) * num_elements_safe != static_cast<size_t>(total_size_safe)) {
-			// The count is stored as an int and wraps past 2^31 elements, so a
-			// large tensor reads back a plausible-looking negative or truncated
-			// size and the file is silently short. Say so rather than proceed.
+			//The count is stored as an int and wraps past 2^31 elements, so a large
+			//tensor reads back a truncated size and the file is silently short
 			throw std::runtime_error("XCW: I_tensor element count does not match nr * packed - "
 				"the file was written by a build that stored the count as a 32-bit int "
 				"and this tensor is too large for that. Recompute it.");
@@ -1128,33 +1112,12 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 	// closing function
 }
 
-// Whether the tensor is held or streamed, and how large a window to read back.
-//
-// The choice is a budget, not a structure-size test: the same molecule at a
-// bigger basis crosses the line while nothing about the crystallography changes,
-// because the tensor is quadratic in nmo and only linear in the reflection count.
-//
-// SPEND THE BUDGET, DO NOT MINIMISE IT. Measured on P1_test (3215 reflections,
-// nmo 103, 263 MB tensor), three window sizes interleaved, medians of 3, all
-// producing identical lambda tables:
-//
-//     window            median    peak      vs resident
-//     all 3215 refl      88.1 s   493 MB    -
-//     391 refl (12%)     95.4 s   212 MB    1.08x time, 2.3x less memory
-//     12 refl (0.4%)    104.1 s   197 MB    1.18x time, 2.5x less memory
-//
-// The memory saving saturates almost at once - a window only has to be small
-// against the whole - while the time cost keeps growing as the window narrows.
-// Dropping from 12% to 0.4% resident buys 15 MB and costs another 9%. So the
-// useful setting is the largest window that fits, which is what
-// items_within_budget returns, and holding everything whenever it fits at all.
+//Whether the I tensor is held or streamed, and the largest window that fits the budget
 void XCW::decide_i_storage() {
 	const size_t per_block = i_tensor_file::block_bytes(cryst.nmo);
 	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo);
 
-	// The XCW settings file wins if it named a budget; otherwise -mem does, if it
-	// was given. Neither is the same as "no budget": without either, the tensor is
-	// held, which is what every run did before this existed.
+	//The settings file budget wins, then -mem; with neither the tensor is held
 	size_t budget = settings.i_tensor_max_mb * 1024ULL * 1024ULL;
 	const char* source = "i_tensor_mb";
 	if (budget == 0 && opt->mem_given && opt->mem > 0.0) {
@@ -1162,16 +1125,12 @@ void XCW::decide_i_storage() {
 		source = "-mem";
 	}
 
-	// items_within_budget returns 0 for "hold everything", which is both the
-	// fastest arrangement and the right answer whenever the tensor fits: no file,
-	// no re-reading it twice per SCF iteration.
+	//items_within_budget returns 0 for "hold everything": no file, no re-read twice per SCF iteration
 	const size_t w = items_within_budget(static_cast<size_t>(cryst.nr_small), per_block, budget);
 	i_streamed_ = (w != 0);
 	if (!i_streamed_) {
-		// Announced only when someone asked about memory - a budget was set, or
-		// -debug. Holding the whole tensor is what every XCW run did before this
-		// existed, so saying so unconditionally is a new line on every run that
-		// carries no news, and it shifts every reference output by one line.
+		//Announced only when someone asked about memory: saying it unconditionally
+		//shifts every reference output by a line
 		if (budget > 0 || ProgressBar::report_counts) {
 			std::cout << std::fixed << std::setprecision(2)
 				<< "I tensor held in memory: " << (total / 1048576.0) << " MB";
@@ -1181,8 +1140,6 @@ void XCW::decide_i_storage() {
 		}
 		return;
 	}
-	// Streaming, by contrast, always says so: it is a change in how the run
-	// behaves, not a report on the status quo.
 	i_window_ = static_cast<int>(std::min(w, static_cast<size_t>(cryst.nr_small)));
 	i_file_.create(i_tensor_path(), cryst.nr_small, cryst.nmo);
 	std::cout << std::fixed << std::setprecision(2)
@@ -1206,9 +1163,8 @@ void XCW::open_i_stream_for_reading() {
 void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids_) {
 	long long skipped_grids = 0;
 	const int packed_size = (cryst.nmo * (cryst.nmo + 1)) / 2;
-	// nr_small * packed_size deliberately in size_t: both are int and their
-	// product passes 2^31 at nmo = 500 with 20k reflections, which is a size this
-	// code is meant to reach.
+	//nr_small * packed_size deliberately in size_t: both are int and their product
+	//passes 2^31 at nmo = 500 with 20k reflections
 	decide_i_storage();
 	if (!i_streamed_)
 		I.assign(static_cast<size_t>(cryst.nr_small) * packed_size, cdouble{});
@@ -1556,6 +1512,116 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			}
 		}
 	}
+	bool itensor_on_gpu = false;
+#ifdef NOSPHERA2_USE_GPU
+	//Read with use_gpu rather than on its own, so -no_gpu means what it says. Checking the
+	//pair here rather than clearing the flag at parse time keeps it order-independent.
+	if (opt->gpu_itensor && opt->use_gpu) {
+		//Flatten what the device needs: the AO values never change with the reflection,
+		//so they are uploaded once and every reflection reuses them.
+		ivec bg, bps, bpc, bna, goff(n_atom_grids + 1, 0);
+		std::vector<long long> bao, baos;
+		vec ao_all;
+		ivec aos_all;
+		for (int gg = 0; gg < n_atom_grids; gg++) goff[gg + 1] = goff[gg] + points[gg];
+		for (int gg = 0; gg < n_atom_grids; gg++) {
+			for (const GridBlock& blkk : grid_blocks[gg]) {
+				bg.push_back(gg);
+				bps.push_back(blkk.point_start);
+				bpc.push_back(blkk.point_count);
+				bna.push_back(static_cast<int>(blkk.active_aos.size()));
+				bao.push_back(static_cast<long long>(ao_all.size()));
+				baos.push_back(static_cast<long long>(aos_all.size()));
+				ao_all.insert(ao_all.end(), blkk.ao_values.begin(), blkk.ao_values.end());
+				aos_all.insert(aos_all.end(), blkk.active_aos.begin(), blkk.active_aos.end());
+			}
+		}
+		std::vector<unsigned char> skip_flat(static_cast<size_t>(cryst.nmo) * cryst.nmo, 0);
+		for (int m = 0; m < cryst.nmo; m++)
+			for (int n = 0; n < cryst.nmo; n++)
+				skip_flat[static_cast<size_t>(m) * cryst.nmo + n] = skip[m][n] ? 1 : 0;
+		vec fd1, fd2, fd3, fw;
+		for (int gg = 0; gg < n_atom_grids; gg++) {
+			fd1.insert(fd1.end(), d1[gg].begin(), d1[gg].begin() + points[gg]);
+			fd2.insert(fd2.end(), d2[gg].begin(), d2[gg].begin() + points[gg]);
+			fd3.insert(fd3.end(), d3[gg].begin(), d3[gg].begin() + points[gg]);
+			fw.insert(fw.end(), weights[gg].begin(), weights[gg].begin() + points[gg]);
+		}
+		itensor_gpu_layout L;
+		L.nmo = cryst.nmo; L.packed = packed_size; L.n_grids = n_atom_grids;
+		L.n_blocks = static_cast<int>(bg.size());
+		L.blk_grid = bg.data(); L.blk_point_start = bps.data(); L.blk_point_count = bpc.data();
+		L.blk_n_active = bna.data(); L.blk_ao_off = bao.data(); L.blk_aos_off = baos.data();
+		L.ao_all = ao_all.data(); L.ao_all_len = static_cast<long long>(ao_all.size());
+		L.aos_all = aos_all.data(); L.aos_all_len = static_cast<long long>(aos_all.size());
+		L.skip = skip_flat.data(); L.grid_point_off = goff.data();
+		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
+		L.n_points = static_cast<long long>(fd1.size());
+		//-gpu_fp64 raises the whole device path to double. It is worth asking for on a card
+		//with real double-precision units and expensive on one without, which is why it is
+		//asked for rather than detected.
+		const sf_precision iprec = opt->gpu_fp64 ? sf_precision::FP64 : sf_precision::FP32;
+		itensor_on_gpu = itensor_gpu_init(L, iprec);
+		//Say which processor produced the numbers, and which GEMM: the three do not agree
+		//in the last digits, so a log that does not name one cannot be compared with
+		//another. Gated like the other timing lines so the golden-file tests, which run
+		//with no_date, keep their reference output.
+		//
+		//stderr, not cout, for the reason the shape diagnostic in itensor_gpu.cu gives:
+		//cout is redirected into the log and moved again later in the run, so anything
+		//written here never reached either the terminal or the file.
+		if (!(opt->no_date)) {
+			std::cerr << "GPU in use: XCW I tensor on ";
+			if (itensor_on_gpu)
+				std::cerr << "the device (" << (opt->gpu_fp64 ? "double" : "single")
+				          << "-precision " << itensor_gpu_gemm_name() << " GEMM)";
+			else
+				std::cerr << "the CPU - device unavailable or problem too large";
+			std::cerr << std::endl;
+		}
+	}
+	if (itensor_on_gpu) {
+		//The GPU holds one reflection at a time, so this loop is sequential by design
+		cvec blk_gpu;
+		if (i_streamed_) blk_gpu.assign(packed_size, cdouble{});
+		vec kxs(num_syms), kys(num_syms), kzs(num_syms);
+		cvec facs(static_cast<size_t>(num_syms) * n_atom_grids);
+		for (int rr = 0; rr < cryst.nr_small; rr++) {
+			for (int sy = 0; sy < static_cast<int>(num_syms); sy++) {
+				kxs[sy] = k_pt[0][asym_lookup[rr][sy]];
+				kys[sy] = k_pt[1][asym_lookup[rr][sy]];
+				kzs[sy] = k_pt[2][asym_lookup[rr][sy]];
+				for (int gg = 0; gg < n_atom_grids; gg++)
+					facs[static_cast<size_t>(sy) * n_atom_grids + gg] =
+						asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
+						* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
+			}
+			cdouble* const I_rr = i_streamed_ ? blk_gpu.data()
+			                                  : I.data() + static_cast<size_t>(rr) * packed_size;
+			if (i_streamed_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
+			if (!itensor_gpu_reflection(static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data(), I_rr))
+				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
+			if (i_streamed_) i_file_.write_block(rr, blk_gpu.data());
+			if (!(opt->no_date) && pb) pb->update();
+		}
+		itensor_gpu_free();
+		//No bookkeeping here: the loop above runs for both paths and eval_I multiplies the
+		//total by nr_small on the way out, so anything added here counts twice.
+	}
+#endif
+	//Counted serially from the block structure both paths walk, so the CPU and GPU rows are
+	//the same work measured two ways and no counter is touched by two threads.
+	double itensor_flops = 0.0;
+	for (int g = 0; g < n_atom_grids; g++)
+		for (const GridBlock& block : grid_blocks[g])
+			for (const MatrixTile& tile : block.matrix_tiles)
+				//real and imaginary passes, hence the factor of two
+				itensor_flops += 2.0 * throughput::flops_gemm(tile.row_count, tile.col_count,
+					block.point_count);
+	itensor_flops *= static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
+
+	if (!itensor_on_gpu)
+	{
 #pragma omp parallel reduction(+:skipped_grids)
 	{
 		vec2 single_k_pts(num_syms, vec(3));
@@ -1566,9 +1632,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		vec weighted_values_imag;
 		vec tile_real_values;
 		vec tile_imag_values;
-		// One reflection's worth of tensor, used only while streaming. Each r
-		// touches nothing but its own block, so no ordering is needed on the way
-		// out: the file is reflection-major and the writer seeks to r's offset.
+		//One reflection's block, used only while streaming. No ordering is needed on
+		//the way out: the file is reflection-major and the writer seeks to r's offset
 		cvec blk;
 		if (i_streamed_) blk.assign(packed_size, cdouble{});
 
@@ -1695,9 +1760,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				}
 			}
 			if (i_streamed_) {
-				// A write is packed_size * 16 bytes against a whole reflection's
-				// worth of integration, so the lock is not on the hot path - but
-				// it is measured rather than assumed, see the [i_tensor] line.
+				//A write is packed_size * 16 bytes against a whole reflection's worth
+				//of integration, so the lock is not on the hot path
 #pragma omp critical(i_tensor_write)
 				i_file_.write_block(r, blk.data());
 			}
@@ -1705,6 +1769,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				pb->update();
 			}
 		}
+	}
 	}
 	if (i_streamed_) {
 		i_file_.finish_write();
@@ -1714,6 +1779,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	auto duration = end - start;
 	skipped_grids_ = skipped_grids * cryst.nr_small;
 	time_taken = std::chrono::duration<double>(duration).count();
+	throughput::record("XCW I tensor", itensor_on_gpu, itensor_flops,
+		1.0e3 * std::chrono::duration<double>(duration).count());
 	if (!(opt->no_date) && pb) {
 		XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
 	}
@@ -1721,21 +1788,14 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 
 void XCW::calc_F_calc(const dMatrix2& D) {
 	// Density matrix from occ is half of what I need, so times 2 and times (2x2)=4
-	//
-	// Streamed or resident, the walk is the same: reflection r reads its own block
-	// and nothing else, so the only difference is where the block comes from. The
-	// outer loop is one window when the tensor is resident, which is the original
-	// single pass exactly.
-	const size_t packed = static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2;
+	//Streamed or resident the walk is the same; the outer loop is one window when
+	//the tensor is resident
 	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
-	// The parallel region wraps the window loop rather than sitting inside it.
-	// A narrow window means many windows, and entering a region per window pays
-	// team startup and a barrier every time for a few reflections of work.
-	// omp single does the read; its implicit barrier is what stops a thread
-	// running ahead into a window that has not been loaded yet.
-	// load() reads a file and can throw, but it runs inside omp single and an
-	// exception must not leave an OpenMP structured block. Record it and rethrow
-	// after the region; the compute loop skips its work once one is pending.
+	//The parallel region wraps the window loop: entering one per window would pay
+	//team startup and a barrier for a few reflections of work. omp single does the
+	//read, and its implicit barrier stops a thread entering a window not yet loaded.
+	//load() can throw and an exception must not leave an OpenMP structured block,
+	//so it is recorded and rethrown after the region.
 	std::string io_error;
 #pragma omp parallel
 	{
@@ -1743,9 +1803,22 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 			const int r1 = std::min(r0 + step, cryst.nr_small);
 			if (i_streamed_) {
 #pragma omp single
-				{
-					try { i_file_.load(r0, r1); }
-					catch (const std::exception& e) { io_error = e.what(); }
+			{
+				try { i_file_.load(r0, r1); }
+				catch (const std::exception &e) { io_error = e.what(); }
+			}
+		}
+#pragma omp for schedule(static)
+		for (int r = r0; r < r1; ++r) {
+			if (!io_error.empty()) continue;
+			const cdouble* I_r = i_block(r);
+			cdouble sum = F_calc[1][r];
+			size_t k = 0;
+			for (int mu = 0; mu < cryst.nmo; mu++) {
+				sum += 2.0 * I_r[k] * D(mu, mu);
+				k++;
+				for (int nu = mu + 1; nu < cryst.nmo; nu++, k++) {
+					sum += 4.0 * I_r[k] * D(mu, nu);
 				}
 			}
 #pragma omp for schedule(static)
@@ -1772,7 +1845,6 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	ensure_inv_H2_weights();
 	perturb.setZero(cryst.nmo, cryst.nmo);
-	const size_t packed = static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2;
 
 	// The four (XWR_type, refine_against) combinations differed only in the scalar
 	// formed per reflection and in the prefactor; the loop over the tensor was
@@ -1792,9 +1864,8 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
 	// See calc_F_calc: an exception must not leave an OpenMP structured block.
 	std::string io_error;
-	// One region, one accumulator per thread, one reduction - however many windows
-	// the budget implies. Allocating and reducing an nmo x nmo matrix per window
-	// is what made a narrow window expensive out of proportion to its I/O.
+	//One region, one accumulator per thread, one reduction, however many windows the
+	//budget implies: an nmo x nmo matrix per window is what made narrow windows dear
 #pragma omp parallel
 	{
 		occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
@@ -1808,8 +1879,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 					catch (const std::exception& e) { io_error = e.what(); }
 				}
 			}
-			// No nowait: the next window's read must not start until every
-			// thread has finished reading this one out of the buffer.
+			//No nowait: the next window's read must not start until every thread has read this one
 #pragma omp for
 			for (int r = r0; r < r1; r++) {
 				if (!io_error.empty()) continue;
@@ -1981,9 +2051,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		print_ << "***SCF converged in " << scf.iter << " iterations***";
 		print_centered_message(print_.str(), 84, XCW_log);
 
-		// Computed before the summary line below so its A^2 can be appended
-		// as an extra column (see run_XCW_fitting's header, which only adds
-		// that column when opt->xcw_gaussian_halt is set).
+		//Before the summary line below so its A^2 can be appended as an extra column
 		if (opt->xcw_gaussian_halt) {
 			evaluate_gaussian_halting(lambda);
 		}
@@ -2103,6 +2171,9 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.iter++;
 	const occ::Mat dm_old = scf.ctx.mo.D;
 	dMatrix2 dm_eff(cryst.nmo, cryst.nmo);
+	//This block is NoSpherA2 code, the Fock build below is OCC. Without the split the whole
+	//remainder looks equally ours.
+	const _time_point it_t0 = get_time();
 	build_effective_dm(scf, dm_eff, dm_old);
 	calc_F_calc(dm_eff);
 	eval_scale();
@@ -2111,6 +2182,8 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	// Generates the perturbation matrix
 	occ::Mat perturbation;
 	calc_perturb(perturbation, scf);
+	const _time_point it_t1 = get_time();
+	throughput::record_time("XCW structure factors + perturbation", false, get_msec(it_t0, it_t1));
 
 	// Build perturbed Fock matrix
 	// Maybe necessary to update the Hamiltoian if a potential changes depending on the density, but that does not happen in normal HF
@@ -2353,6 +2426,9 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor, bool save_tensor
 //}
 
 void XCW::run_XCW_fitting() {
+	//OCC parallelises through TBB, which does not read OMP_NUM_THREADS. Not a speedup - it
+	//already used every core - but it makes -cpus bind the 82% of a run that OCC owns.
+	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
 	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor, settings.safe_tensor);
 	occ::qm::SCF scf(hf, settings.hf_type);
 	bool has_guess = false;
@@ -2403,10 +2479,8 @@ void XCW::run_XCW_fitting() {
 		do_SCF(lambda, alpha, scf, last_wfn, has_guess);
 		last_wfn = scf.wavefunction();
 
-		// Periodic progress estimate: every 5 completed lambda steps, using
-		// whatever the scan has accumulated so far (not just at the end).
-		// Skipped on the very last step since report_gaussian_halting_summary()
-		// below always prints a final one right after the loop.
+		//Progress estimate every 5 lambda steps; the last step is skipped because the
+		//summary below always prints a final one
 		if (opt->xcw_gaussian_halt && (step + 1) % 5 == 0 && step + 1 < settings.num_xcw_steps) {
 			report_halting_progress_estimate(false);
 		}

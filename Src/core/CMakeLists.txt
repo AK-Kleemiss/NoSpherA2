@@ -19,6 +19,18 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
 )
 
+#One source, two languages: nvcc takes it as CUDA, hipcc as HIP
+if(NOSPHERA2_USE_CUDA OR NOSPHERA2_USE_HIP)
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu")
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu")
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu")
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu")
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu")
+    if(NOSPHERA2_USE_HIP)
+        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu" PROPERTIES LANGUAGE HIP)
+    endif()
+endif()
+
 #Basis Set Generator:
 set(
     NOSPHERA2_BASIS_SET_DIRECTORY
@@ -104,6 +116,35 @@ target_compile_definitions(
     PRIVATE
         NOSPHERA2_BASIS_DATA_SEPARATE
 )
+
+if(NOSPHERA2_USE_CUDA)
+    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_CUDA)
+    set_target_properties(NoSpherA2Core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    #No cuBLAS to link, delay-load or ship: the GEMMs are ours. cudart is static. cuBLAS can
+    #still be opened by name at run time under -gpu_cublas, which needs no more from the
+    #build than the major version to look for.
+    target_compile_definitions(NoSpherA2Core PRIVATE
+        NOSPHERA2_CUDART_MAJOR=${CUDAToolkit_VERSION_MAJOR})
+    if(NOSPHERA2_CUTLASS_INCLUDE)
+        target_include_directories(NoSpherA2Core SYSTEM PRIVATE "${NOSPHERA2_CUTLASS_INCLUDE}")
+        target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_HAVE_CUTLASS)
+        #CUTLASS pulls in cuda/std, which refuses to compile under MSVC's traditional
+        #preprocessor, and calls constexpr host functions from host-device ones.
+        target_compile_options(NoSpherA2Core PRIVATE
+            $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
+            $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=20013,20015>)
+        if(MSVC)
+            target_compile_options(NoSpherA2Core PRIVATE
+                $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>)
+        endif()
+    endif()
+endif()
+
+if(NOSPHERA2_USE_HIP)
+    find_package(hip REQUIRED)
+    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_HIP)
+    target_link_libraries(NoSpherA2Core PRIVATE hip::device)
+endif()
 
 target_compile_features(
     NoSpherA2Core

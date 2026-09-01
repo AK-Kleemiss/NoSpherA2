@@ -114,6 +114,44 @@ For coverage, keep `coverage.runsettings` aligned with the current DLL/test outp
 
 ## Agent Rules
 
+### Match the house code style
+
+This codebase is terse, dense and comment-sparse. There is no formatter, so style
+is enforced by imitation: **match the file you are editing**, not a global rule.
+Code that is correct but laid out differently has been rejected by reviewers here.
+
+Before committing any C++ change, re-read the staged diff for layout alone:
+
+- **No blank lines inserted inside a function body to group statements.** Core
+  files run 0-9% blank lines; `fchk.cpp` is 0%.
+- **Comment lines should be 0-13% of added lines**, the baseline band for this
+  repo. Rationale belongs in the commit message, not the source. Comments here
+  explain mathematics, not decisions.
+- **No markdown inside C++ comments** (`**bold**`, bullets, ASCII tables) and no
+  benchmark results parked above a default value or function.
+- **No defensive validation that has never fired.** The house guard style is one
+  or two compact `err_checkf` statements at the top of the function.
+- **Index-`for` with `int` and a short name** (`i`, `j`, `a`, `s`, `x`/`y`/`z`).
+  2155 of 2620 loops. Do not introduce range-`for` or `std::accumulate` into
+  index-`for` code.
+- **Do not brace single-statement bodies** in files that leave them off; 40% of
+  `if` and 24% of `for` bodies are braceless.
+- **Use the `convenience.h` typedefs** (`vec`, `vec2`, `ivec`, `cvec`,
+  `hkl_list`, `dMatrix*`), never `std::vector<double>`.
+- **`#pragma omp` at column 0**, always, regardless of loop nesting depth.
+- **Preserve whitespace convention per file.** `scattering_factors.cpp`,
+  `XCW.cpp`, `basis_set.cpp`, `convenience.h`, `XCW.h` and `cell.cpp` are
+  tab-indented; most others use 4 spaces.
+- **Do not reformat untouched code**, delete commented-out code, or "fix" the
+  repo-wide splits in brace style, `&` placement, `NULL` vs `nullptr` or function
+  naming. Those are genuinely mixed and no migration is in progress.
+
+Keep commit-message bodies short and prose-shaped; a one-line subject naming the
+change is the norm here.
+
+See the `nosphera2-house-style` skill in `.claude/skills/` for the full checklist
+and the measured evidence behind each item.
+
 ### Unit-test documentation is mandatory
 
 Whenever an agent adds, removes, modifies, or investigates a test in `tests/tests.toml`, `tests/src`, `Windows/Tests`, `tests/run_test.py`, `TestRunner.h`, or any `.good` reference file, it must:
@@ -178,6 +216,15 @@ Key core modules live in `Src/core`:
 - New libcint parallel call sites should pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use the existing `three_center_max_cache_size<kind>` and `tbb::enumerable_thread_specific` pattern in OCC.
 
 ## Current Validation Notes
+
+As of 2026-08-25, `ctest --preset release-windows` reports **258/258 passing, 0 failed**
+(569 s; 5 skipped, all pre-existing: the four `full = true` XCW cases and the optional
+`Nbo47.EpoxideGennboMatchesReferenceWhenAvailable` fixture). This baseline includes the
+new `-fukui` feature: 7 `FukuiTests` unit cases and the `TomlIntegrationTests.Fukui` /
+`TomlIntegrationTests.FukuiPBC` golden-file cases. It also confirms that fixing
+`WFN::read_fchk` to record `path` — which changes fchk-driven cube filenames from a
+stem-less `_rho.cube` to `<stem>_rho.cube` — regressed nothing. See
+`UNIT_TESTS_STATUS.md` for the Fukui traps and the grid-convergence validation.
 
 As of 2026-07-18, `TomlIntegrationTests.P1_test_XCW` (in-process, `release-windows`,
 `OMP_NUM_THREADS=20`) passes after fixing a real access violation: `GridManager::calculateMBISWeights`/

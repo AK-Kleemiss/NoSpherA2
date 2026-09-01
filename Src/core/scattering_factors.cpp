@@ -15,9 +15,17 @@
 #include "npy.h"
 #include "integrator.h"
 #include "basis_set.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "SALTED_equicomb.h"
+#include "grid_gpu.h"
+#include "blas_gpu.h"
+#endif
 #include "SALTED_utilities.h"
 #include "GridManager.h"
 #include "cube.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "sf_gpu.h"
+#endif
 
 
 #ifdef PEOJECT_NAME
@@ -316,7 +324,6 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
 	i3 hkl_;
 	double F_, abs_F_, F2_, sigma_, sigma2_;
-	int positive_;
 	err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
 	std::ifstream hkl_input(hkl_filename, std::ios::in);
 	hkl_input.seekg(0, hkl_input.beg);
@@ -340,28 +347,27 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 			hkl_[i] = stoi(temp);
 			// if (debug) file << setw(4) << temp;
 		}
-		for (int i = 0; i < 2; i++) {
-			temp = line;
-			temp.erase(0, 12);
-			int dot = temp.find_first_of('.');
-			std::string temp_F = temp.substr(0, dot + 3);
-			std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
-			temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
-			sigma2_ = stof(temp_sigma);
-			temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
-			F_ = stof(temp_F);
-			if (F_ < 0) {
-				F2_ = -F_;
-				abs_F_ = std::sqrt(F2_);
-				F_ = -abs_F_;
-				sigma_ = sigma2_ * 0.5 / -F_;
-			}
-			else {
-				F2_ = F_;
-				abs_F_ = std::sqrt(F2_);
-				F_ = abs_F_;
-				sigma_ = sigma2_ * 0.5 / F_;
-			}
+		temp = line;
+		temp.erase(0, 12);
+		int dot = temp.find_first_of('.');
+		std::string temp_F = temp.substr(0, dot + 3);
+		std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
+		temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
+		sigma2_ = stof(temp_sigma);
+		temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
+		F_ = stof(temp_F);
+		//the two branches differ only in sign; they are NOT std::abs/copysign, which would turn a -0.00 F2 into +0.0 and flip sigma's infinity
+		if (F_ < 0) {
+			F2_ = -F_;
+			abs_F_ = std::sqrt(F2_);
+			F_ = -abs_F_;
+			sigma_ = sigma2_ * 0.5 / -F_;
+		}
+		else {
+			F2_ = F_;
+			abs_F_ = std::sqrt(F2_);
+			F_ = abs_F_;
+			sigma_ = sigma2_ * 0.5 / F_;
 		}
 		// if (debug) file << endl;
 		hkl.emplace(hkl_);
@@ -843,6 +849,54 @@ void generate_fractional_hkl(const double& dmin,
  * @param file The output stream for the file.
  * @param debug A boolean indicating whether to enable debug mode.
  */
+// Read exactly n whitespace-separated values of one CIF loop row.
+//
+// Two things a real CIF does that "one stringstream per line" does not survive:
+//
+//   * a row may be WRAPPED over several lines. CIF has an 80-column heritage and
+//     writers still break long rows. Seen on a disordered structure whose carbon
+//     rows carry 14 of 15 values with the last on the following line - the empty
+//     field then reached std::stoi and aborted the whole run.
+//   * a value may be QUOTED and contain spaces, e.g. 'x, y, z'. Splitting on
+//     whitespace turns one value into three.
+//
+// Returns false if the file ends with the row incomplete. `line` is left holding
+// the last line consumed, which is what the surrounding loops expect.
+static bool read_cif_loop_row(std::istream &input, std::string &line, int n, svec &fields)
+{
+    fields.assign(n, "");
+    int got = 0;
+    std::string rest = line;
+    while (true)
+    {
+        size_t i = 0;
+        while (got < n && i < rest.size())
+        {
+            while (i < rest.size() && std::isspace(static_cast<unsigned char>(rest[i]))) i++;
+            if (i >= rest.size()) break;
+            std::string value;
+            const char c = rest[i];
+            if (c == 0x27 || c == '"')
+            {
+                const char quote = c;
+                i++;
+                while (i < rest.size() && rest[i] != quote) value.push_back(rest[i++]);
+                if (i < rest.size()) i++;              // closing quote
+            }
+            else
+            {
+                while (i < rest.size() && !std::isspace(static_cast<unsigned char>(rest[i])))
+                    value.push_back(rest[i++]);
+            }
+            fields[got++] = value;
+        }
+        if (got >= n) return true;
+        if (!std::getline(input, rest)) return false;
+        line = rest;
+    }
+}
+
+
 svec read_atoms_from_CIF(std::ifstream& cif_input,
 	const ivec& input_groups,
 	const cell& unit_cell,
@@ -916,12 +970,13 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 			while (trim(line).find("_") > 0 && line.length() > 3)
 			{
 				atoms_read = true;
-				stringstream s(line);
 				svec fields;
-				fields.resize(count_fields);
 				int nr = -1;
-				for (int i = 0; i < count_fields; i++)
-					s >> fields[i];
+				if (!read_cif_loop_row(cif_input, line, count_fields, fields))
+				{
+					file << "CIF atom loop ended mid-row; ignoring the incomplete entry." << std::endl;
+					break;
+				}
 				fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
 				fields[type_field].erase(remove_if(fields[type_field].begin(), fields[type_field].end(), ::isspace), fields[type_field].end());
 				if (debug)
@@ -945,8 +1000,16 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
 				int group_nr = 0;
-				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?") {
-					group_nr = std::stoi(fields[group_field]);
+				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?"
+					&& !fields[group_field].empty()) {
+					// Belt and braces: an unreadable disorder group should not abort a
+					// run that is otherwise perfectly fine.
+					try { group_nr = std::stoi(fields[group_field]); }
+					catch (const std::exception &) {
+						file << "Could not read disorder group for atom " << fields[label_field]
+							 << "; treating it as 0." << std::endl;
+						group_nr = 0;
+					}
 				}
 				// Filter PART before matching this CIF row to a WFN atom.  Disorder
 				// positions can be close enough to match an atom in another PART;
@@ -1647,10 +1710,28 @@ cdouble sfac_bessel(
 	}
 }
 
+//Radial part of the Fourier-Bessel transform, keyed on (exponent, l) so it can be tabulated per k-point
+static inline double fourier_bessel_radial(const double b, const int l, const double exp_l_plus_3_2, const double H)
+{
+	return (pow(H, l) * exp(-H * H / (4.0 * b))) / (constants::pow_2[l] * exp_l_plus_3_2);
+}
+
+//As sfac_bessel(), but with the radial factor already evaluated
+static inline cdouble sfac_bessel_r(const primitive& p, const double* k_point, const double* coefs, const double radial)
+{
+	const int l = p.get_type();
+	const double v = constants::PI3_2 * radial * p.get_normalized_coefficient() * constants::spherical_harmonic(l, k_point, coefs);
+	switch (l % 4) {
+	case 0: return cdouble(v, 0);
+	case 1: return cdouble(0, v);
+	case 2: return cdouble(-v, 0);
+	case 3: return cdouble(0, -v);
+	default: return constants::cnull;
+	}
+}
+
 //TODO�: This breaks if the aux_basis is contracted... Need to fix that!
-// progress: when the caller is streaming, it owns ONE bar spanning the whole
-// table and passes it in. Without this every block drew its own bar - 33 of them
-// for the epoxide test, and about 160 for an 8,566-atom protein.
+//a streaming caller owns one bar for the whole table and passes it in, else every block draws its own
 void calc_SF_SALTED(const vec2& k_pt,
 	const vec& coefs,
 	const std::vector<atom>& atom_list,
@@ -1696,6 +1777,29 @@ void calc_SF_SALTED(const vec2& k_pt,
 	}
 
 	sf.resize(num_asym_atoms);
+	//The radial factor depends only on (exponent, l) and |k|, so collect the distinct pairs once instead of recomputing per atom
+	vec uniq_b, uniq_elp32;
+	ivec uniq_l;
+	ivec2 bl_index(num_asym_atoms);
+	for (int ia = 0; ia < num_asym_atoms; ia++) {
+		const atom& a = atom_list[asym_atom_list[ia]];
+		const int lim = (int)a.get_basis_set_size();
+		bl_index[ia].resize(lim);
+		for (int ib = 0; ib < lim; ib++) {
+			const primitive& pr = a.get_basis_set_entry(ib).get_primitive();
+			int slot = -1;
+			for (int u = 0; u < (int)uniq_b.size(); u++)
+				if (uniq_b[u] == pr.get_exp() && uniq_l[u] == pr.get_type()) { slot = u; break; }
+			if (slot < 0) {
+				slot = (int)uniq_b.size();
+				uniq_b.push_back(pr.get_exp());
+				uniq_l.push_back(pr.get_type());
+				uniq_elp32.push_back(pr.get_exp_l_plus_3_2());
+			}
+			bl_index[ia][ib] = slot;
+		}
+	}
+	const int n_uniq = (int)uniq_b.size();
 	std::unique_ptr<ProgressBar> local_pb;
 	if (!progress)
 		local_pb = std::make_unique<ProgressBar>(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
@@ -1709,6 +1813,7 @@ void calc_SF_SALTED(const vec2& k_pt,
 			sf[ia].assign(k_pt[0].size(), constants::cnull);
 		}
 
+		vec radial(n_uniq, 0.0);
 #pragma omp for
 		for (int i_kpt = 0; i_kpt < (int)k_pt[0].size(); ++i_kpt)
 		{
@@ -1723,6 +1828,8 @@ void calc_SF_SALTED(const vec2& k_pt,
 
 			for (int i = 0; i < 3; i++)
 				k_pt_local[i] /= k_pt_local[3];
+			for (int u = 0; u < n_uniq; u++)
+				radial[u] = fourier_bessel_radial(uniq_b[u], uniq_l[u], uniq_elp32[u], k_pt_local[3]);
 
 			for (int ia = 0; ia < num_asym_atoms; ++ia)
 			{
@@ -1733,11 +1840,12 @@ void calc_SF_SALTED(const vec2& k_pt,
 
 				const double* coef_slice_ptr = coefs.data() + coef_offsets[ia];
 
+				const int* bl_row = bl_index[ia].data();
 				for (int i_basis = 0; i_basis < lim; ++i_basis, ++basis_ptr)
 				{
 					// IMPORTANT: make basis local, not shared between threads
 					const primitive& basis = basis_ptr->get_primitive();
-					sf[ia][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
+					sf[ia][i_kpt] += sfac_bessel_r(basis, k_pt_local, coef_slice_ptr, radial[bl_row[i_basis]]);
 					coef_slice_ptr += 2 * basis.get_type() + 1;
 				}
 			}
@@ -1773,7 +1881,10 @@ void calc_SF(const int& points,
 	_time_point& end1,
 	bool debug,
 	bool no_date,
-	bool do_XCW)
+	bool do_XCW,
+	bool use_gpu,
+	bool gpu_fp64,
+	bool gpu_fp32)
 {
 	const long long int imax = static_cast<long long int>(dens.size());
 	const long long int smax = static_cast<long long int>(k_pt[0].size());
@@ -1786,6 +1897,10 @@ void calc_SF(const int& points,
 	if (debug)
 		file << "Initialized FFs" << std::endl
 		<< "asym atom list size: " << imax << " total grid size: " << points << endl;
+#ifdef NOSPHERA2_USE_GPU
+	if (use_gpu)
+		sf_gpu_warmup_wait();
+#endif
 	end1 = get_time();
 
 	if (!no_date)
@@ -1796,6 +1911,53 @@ void calc_SF(const int& points,
 		else
 			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
 	}
+#ifdef NOSPHERA2_USE_GPU
+	if (use_gpu && sf_gpu_available()) {
+		ivec offs(imax + 1, 0);
+		for (int i = 0; i < imax; i++)
+			offs[i + 1] = offs[i] + (int)dens[i].size();
+		const long long tot = offs[imax];
+		vec fd1(tot), fd2(tot), fd3(tot), fde(tot);
+		for (int i = 0; i < imax; i++) {
+			const int lo = offs[i], n = (int)dens[i].size();
+			for (int p = 0; p < n; p++) {
+				fd1[lo + p] = d1[i][p]; fd2[lo + p] = d2[i][p];
+				fd3[lo + p] = d3[i][p]; fde[lo + p] = dens[i][p];
+			}
+		}
+		std::vector<double*> rows(imax);
+		for (int i = 0; i < imax; i++)
+			rows[i] = reinterpret_cast<double*>(sf[i].data());
+		//-gpu_fp64 wins over -gpu_fp32 if both are given: between two explicit requests the
+		//accurate one is the safer default.
+		const sf_precision prec = gpu_fp64 ? sf_precision::FP64
+			: gpu_fp32 ? sf_precision::FP32 : sf_precision::Auto;
+		const _time_point sf_gpu_t0 = get_time();
+		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
+			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
+			rows.data(), prec)) {
+			//Transfers included. What decides where this work belongs is the rate the caller
+			//actually gets, not the one the kernel would post with the copies left out.
+			throughput::record("scattering-factor transform", true,
+				throughput::flops_ndft(static_cast<double>(tot), static_cast<double>(smax)),
+				get_msec(sf_gpu_t0, get_time()));
+			//The bar is what the reference logs expect, so draw it even though the work is done
+			if (!do_XCW) {
+				ProgressBar gprogress(imax, 60, "=", " ", "Calculating Scattering Factors", file);
+				for (int i = 0; i < imax; i++)
+					gprogress.update();
+			}
+			if (!no_date) {
+				_time_point gend = get_time();
+				const int ratio = sf_gpu_fp64_ratio();
+				file << "GPU in use: scattering-factor Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
+				     << (sf_gpu_uses_fp32(prec) ? "reduced-argument f32 sincos" : "f64 sincos")
+				     << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
+			}
+			return;
+		}
+	}
+#endif
 	ProgressBar* progress = nullptr;
 	if (!do_XCW) {
 		progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors", file);
@@ -1810,9 +1972,16 @@ void calc_SF(const int& points,
 	const double* k2_data = k_pt[1].data();
 	const double* k3_data = k_pt[2].data();
 
+	//Timed around the whole atom loop, not inside it. The inner loop is an omp parallel for,
+	//and a per-thread timer there would sum concurrent time into a total larger than the
+	//wall clock - a profile that cannot be true is worse than none.
+	const _time_point sf_cpu_t0 = get_time();
+	double sf_cpu_points = 0.0;
+
 	for (int i = 0; i < imax; i++)
 	{
 		pmax = static_cast<long long int>(dens[i].size());
+		sf_cpu_points += static_cast<double>(pmax);
 		dens_local = dens[i].data();
 		d1_local = d1[i].data();
 		d2_local = d2[i].data();
@@ -1904,6 +2073,9 @@ void calc_SF(const int& points,
 			progress->update();
 		}
 	}
+	throughput::record("scattering-factor transform", false,
+		throughput::flops_ndft(sf_cpu_points, static_cast<double>(smax)),
+		get_msec(sf_cpu_t0, get_time()));
 	if (!do_XCW) {
 		delete (progress);
 	}
@@ -2094,13 +2266,7 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
  * @param unit_cell The unit cell.
  * @param hkl The hkl list.
  */
-// Three overloads of one conversion, narrowing to this innermost form: all it
-// needs is each reflection's stl and each atom's charge. No cell, no reflection
-// indices, and no coupling between reflections - sf[i][s] depends on reflection s
-// and atom i alone. That is why the conversion applies to a block of a table as
-// readily as to the whole of one, and so why an electron-diffraction run can be
-// streamed. A caller that already holds the stl values (a salted_part_prep does)
-// needs no unit cell at all; the two overloads below derive them and delegate.
+//sf[i][s] depends on stl[s] and atom i alone, so this applies to a block as readily as to a whole table
 void convert_to_ED(const ivec& asym_atom_list,
 	const WFN& wave,
 	cvec2& sf,
@@ -2138,24 +2304,10 @@ void convert_to_ED(const ivec& asym_atom_list,
         std::vector<i3>(hkl.begin(), hkl.end()));
 }
 
-// ---------------------------------------------------------------------------
-// The pieces every streamed write shares
-// ---------------------------------------------------------------------------
-//
-// Four places in this file stream a tsc: -IAM, SALTED, SALTED with an auxiliary
-// wavefunction, and the combined -mtc walk at the bottom. They differ only in how
-// one block of reflections is filled. Everything wrapped around that fill - the
-// writer, the block numbering, the single progress bar, the slicing of the hkl and
-// k-point tables - is identical, so it lives here once rather than four times.
-//
-// Read stream_blocks() first; the small functions above it are what its callers
-// use to build a block.
-//
+//shared machinery of the streamed tsc writes; the fill of one reflection block is all that differs
 namespace {
 
-// The scatterer list has to be all labels or all atomIDs - a table holding both is
-// rejected on write - and the choice must match what the non-streamed path would
-// have produced, or the two files cannot be compared byte for byte.
+//a table must hold either all labels or all atomIDs, mixed ones are rejected on write
 void append_scatterer_ids(ScattererLabels& ids,
     const options& opt,
     const svec& labels,
@@ -2171,8 +2323,7 @@ void append_scatterer_ids(ScattererLabels& ids,
     }
 }
 
-// hkl indices of reflections [lo, hi), transposed to [dimension][reflection] -
-// the layout write_tscb_reflection_block expects.
+//reflections [lo, hi) transposed to [dimension][reflection], the layout write_tscb_reflection_block expects
 std::vector<std::vector<int>> slice_hkl(const std::vector<i3>& hkl_v,
     const size_t lo, const size_t hi)
 {
@@ -2183,9 +2334,7 @@ std::vector<std::vector<int>> slice_hkl(const std::vector<i3>& hkl_v,
     return idx;
 }
 
-// The same slice of the k-point table. calc_SF_SALTED sizes its output from the
-// k-points it is handed, so a sliced table needs no change on its side: blocking
-// is a loop around an unmodified kernel, not a modified one.
+//calc_SF_SALTED sizes its output from the k-points it is handed, so a slice needs no change on its side
 vec2 slice_k_points(const vec2& k_pt, const size_t lo, const size_t hi)
 {
     vec2 k_slice(3, vec(hi - lo));
@@ -2195,9 +2344,7 @@ vec2 slice_k_points(const vec2& k_pt, const size_t lo, const size_t hi)
     return k_slice;
 }
 
-// One Thakkar evaluator per element present. Depends on the element list alone, so
-// it is built once and reused for every block - building it inside the block loop
-// would rebuild the same objects on every pass.
+//one Thakkar evaluator per element; depends on the element list alone, so it is built outside the block loop
 std::vector<Thakkar> make_spherical_evaluators(const ivec& atom_type_list)
 {
     std::vector<Thakkar> spheres;
@@ -2207,18 +2354,81 @@ std::vector<Thakkar> make_spherical_evaluators(const ivec& atom_type_list)
     return spheres;
 }
 
-// Rows for the atoms the SALTED model could not predict - an unknown species, or
-// nothing inside the descriptor cutoff - appended to a block that already holds
-// the predicted ones.
+//the file list a spherical fill runs over, and the index into it; nr also selects opt.groups[nr] and the part's cif,
+//so it must be the whole file list: a one-element vector takes part 0's atoms whatever part is filled, or reads tempy[1] if nr is passed
+int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>& tempy)
+{
+    if (!opt.wfn.empty())
+    {
+        tempy.emplace_back(opt.wfn);
+        return 0;
+    }
+    for (const std::filesystem::path& part_file : opt.combined_tsc_calc_files)
+        tempy.emplace_back(part_file);
+    return nr;
+}
+
+//One evaluator per ATOM, not per element type. Two atoms of the same element in
+//different environments carry different EEQ charges, and the tsc gives each atom
+//its own row anyway, so there is nothing to be gained by sharing.
 //
-// The whole-table path computes a second Thakkar table for these afterwards and
-// appends it, which is why a spherical remainder used to switch streaming off. But
-// a Thakkar form factor depends on nothing except the element and the reflection,
-// so it chunks as freely as everything else here: prepare it once, emit its rows
-// with every block.
+//Charges are matched by position because the fill rebuilds its wavefunction from
+//the original file; that is also how CIF atoms are matched to WFN atoms here.
+//An atom with no recorded charge, or an element with no tabulated ion, falls
+//back to the neutral density.
+std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
+    const WFN& fill_wavy, const options& opt, std::ostream& file)
+{
+    std::vector<HE_Spherical_Atom> out;
+    out.reserve(sph.asym_atom_list.size());
+    int n_charged = 0, n_extrap = 0, n_nofit = 0, n_delta = 0;
+    double worst_neg = 0.0;
+    for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
+    {
+        const int idx = sph.asym_atom_list[a];
+        const int Z = fill_wavy.get_atom_charge(idx);
+        double q = 0.0;
+        double best = 1e-3;   // squared tolerance in the wavefunction's units
+        for (const auto& e : opt.spherical_fill_charges)
+        {
+            double d = 0.0;
+            for (int ax = 0; ax < 3; ax++)
+            {
+                const double dx = fill_wavy.get_atom_coordinate(idx, ax) - e[ax];
+                d += dx * dx;
+            }
+            if (d < best) { best = d; q = e[3]; }
+        }
+        if (std::abs(q) > 1e-6) n_charged++;
+        else if (!opt.spherical_fill_charges.empty()) n_nofit++;
+        out.emplace_back(Z, q);
+        if (out.back().is_extrapolating()) n_extrap++;
+        if (out.back().uses_delta_series()) n_delta++;
+        worst_neg = std::min(worst_neg, out.back().most_negative_density());
+    }
+    if (n_charged)
+    {
+        file << "Spherical fill: " << n_charged << " of " << out.size()
+             << " atom(s) given a fractional charge";
+        if (n_delta)
+            file << ", " << n_delta << " past +1 via the delta_k series (interpolated between bound states)";
+        if (n_extrap)
+            file << ", " << n_extrap << " beyond the tabulated +/-1 ion (shape extrapolated)";
+        file << "." << std::endl;
+        if (worst_neg < -1e-8)
+            file << "      most negative density from the blend: " << worst_neg
+                 << " e/bohr^3 - an extrapolation artefact, not clipped." << std::endl;
+        if (n_nofit)
+            file << "      " << n_nofit << " atom(s) had no charge recorded and stay neutral." << std::endl;
+    }
+    return out;
+}
+
+//rows for atoms the SALTED model could not predict (unknown species, or nothing inside the descriptor cutoff)
+//a Thakkar factor depends only on element and reflection, so these chunk like everything else here
 void append_spherical_rows(cvec2& chunk,
     const salted_part_prep& sph,
-    const std::vector<Thakkar>& spheres,
+    const std::vector<HE_Spherical_Atom>& spheres,
     const bool electron_diffraction,
     const size_t lo, const size_t hi)
 {
@@ -2228,9 +2438,8 @@ void append_spherical_rows(cvec2& chunk,
         cvec row(hi - lo);
         for (size_t r = lo; r < hi; r++)
         {
-            const double f = spheres[t].get_form_factor(sph.k_of_reflection[r]);
-            // these rows take the IAM form of the Mott-Bethe conversion: the
-            // tabulated charge, and no imaginary part
+            const double f = spheres[a].get_form_factor(sph.k_of_reflection[r]);
+            //IAM form of Mott-Bethe: tabulated charge, no imaginary part
             row[r - lo] = electron_diffraction
                 ? cdouble(constants::ED_fact * (sph.atom_type_list[t] - f) /
                     pow(sph.stl_of_reflection[r], 2), 0.0)
@@ -2240,16 +2449,9 @@ void append_spherical_rows(cvec2& chunk,
     }
 }
 
-// Write a whole tsc as a sequence of reflection blocks.
-//
-// fill_block(lo, hi, progress) returns the rows for reflections [lo, hi), in the
-// order `ids` declares them; the caller reports its own work against `progress`.
-// progress_items is what that bar counts to - the reflection count normally, or
-// reflections x parts when a block is filled part by part.
-//
-// Nothing here holds more than one block, which is the whole point: peak memory
-// becomes queue depth x scatterers x block size x 16 bytes instead of the size of
-// the finished table.
+//writes a tsc as a sequence of reflection blocks; peak memory is queue depth * scatterers * block size * 16 bytes
+//fill_block(lo, hi, progress) returns the rows for reflections [lo, hi) in the order `ids` declares them
+//progress_items is the bar total: reflections, or reflections * parts when a block is filled part by part
 template <typename FillBlock>
 void stream_blocks(options& opt,
     std::ostream& file,
@@ -2265,9 +2467,7 @@ void stream_blocks(options& opt,
     file << "Streaming tsc in blocks of " << bs << " reflections" << std::endl;
 
     tsc_stream_writer<int, cdouble> writer(name, ids, std::string(), n_refl, 2);
-    // One bar for the whole table rather than one per block. Declared after the
-    // writer so it is destroyed first - the bar rewinds to its own line, and must
-    // finish before anything else is written.
+    //declared after the writer so it is destroyed first: the bar rewinds to its own line and must finish first
     ProgressBar progress(progress_items, 60, "#", " ", "Generating scattering factors...");
     size_t block_id = 0;
     for (size_t lo = 0; lo < n_refl; lo += bs)
@@ -2279,13 +2479,8 @@ void stream_blocks(options& opt,
     opt.tsc_written_by_stream = true;
 }
 
-// Runs a nested calculate_scattering_factors() as a spherical (Thakkar) fill:
-// independent-atom factors, over exactly the reflections being written, and
-// permitted to come back with no atoms at all.
-//
-// Every flag is restored on the way out, including when an exception leaves
-// through here, so a fill can never leave `opt` altered behind it - these flags
-// are read all over this file and a stray one is invisible until it is not.
+//runs a nested calculate_scattering_factors() as a spherical (Thakkar) fill over exactly the reflections written
+//restores every flag on the way out, exceptions included: these flags are read all over this file
 struct spherical_fill_scope
 {
     options& opt;
@@ -2295,8 +2490,7 @@ struct spherical_fill_scope
     spherical_fill_scope(options& o, const hkl_list& reflections)
         : opt(o), saved_iam(o.iam_switch), saved_hkl(o.m_hkl_list)
     {
-        // Pin the fill to our reflections. Without this it builds its own list and
-        // comes back a different length, which is then read off the end.
+        //pin the fill to our reflections, else it builds its own list of a different length and is read off the end
         opt.m_hkl_list = reflections;
         opt.iam_switch = true;
         opt.allow_empty_asym = true;
@@ -2335,6 +2529,10 @@ int make_atomic_grids_wrapper(
 	file << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::endl;
 
 	GridConfiguration config;
+#ifdef NOSPHERA2_USE_GPU
+	grid_gpu_set_enabled(opt.gpu_grid);
+	blas_gpu_set_enabled(opt.gpu_blas);
+#endif
 	config.accuracy = opt.accuracy;
 	config.partition_type = opt.partition_type;
 	config.pbc = opt.pbc;
@@ -2379,6 +2577,10 @@ itsc_block calculate_scattering_factors_from_cube(
 	vector<_time_point> time_points;
 	vector<string> time_descriptions;
 	time_points.push_back(get_time());
+#ifdef NOSPHERA2_USE_GPU
+	if (opt.use_gpu)
+		sf_gpu_warmup_start();
+#endif
 
 	cell unit_cell(opt.cif, file, opt.debug);
 	ifstream cif_input(opt.cif.c_str(), ios::in);
@@ -2443,6 +2645,10 @@ itsc_block calculate_scattering_factors_from_cube(
 	time_descriptions.push_back("k-points preparation");
 
 	GridConfiguration config;
+#ifdef NOSPHERA2_USE_GPU
+	grid_gpu_set_enabled(opt.gpu_grid);
+	blas_gpu_set_enabled(opt.gpu_blas);
+#endif
 	config.accuracy = opt.accuracy;
 	config.partition_type = opt.partition_type;
 	config.pbc = opt.pbc;
@@ -2483,7 +2689,11 @@ itsc_block calculate_scattering_factors_from_cube(
 		time_points.front(),
 		end1,
 		opt.debug,
-		opt.no_date);
+		opt.no_date,
+		false,
+		opt.use_gpu,
+		opt.gpu_fp64,
+		opt.gpu_fp32);
 	time_points.push_back(get_time());
 	time_descriptions.push_back("Fourier transform");
 
@@ -2545,6 +2755,10 @@ tsc_block_type calculate_scattering_factors(
 	salted_part_prep* prep_out
 ) {
 	using namespace std;
+#ifdef NOSPHERA2_USE_GPU
+	if (opt.use_gpu)
+		sf_gpu_warmup_start();
+#endif
 	int nat = 0;
 	WFN* wavy = NULL;
 	if constexpr (std::is_same_v<calculator_type, std::vector<WFN> &>) {
@@ -2612,10 +2826,7 @@ tsc_block_type calculate_scattering_factors(
 
 	cif_input.close();
 
-	// A spherical fill walks every disorder part, and a part whose missing atoms
-	// were already covered by an earlier part has nothing to contribute. That is
-	// not an error, it is the normal end of the walk - but only when the caller
-	// said so, because everywhere else no asymmetric atoms means a broken CIF.
+	//empty only means a broken CIF unless the caller allowed it: a spherical fill of an already covered part finds nothing
 	if (asym_atom_list.empty())
 	{
 		if (prep_out) *prep_out = salted_part_prep();
@@ -2669,29 +2880,10 @@ tsc_block_type calculate_scattering_factors(
 
 	time_points.push_back(get_time());
 	time_descriptions.push_back("k-points preparation");
-	// Streaming emits the table in reflection blocks instead of holding
-	// scatterers x reflections x 16 bytes at once.
-	//
-	// Almost everything is eligible, because almost everything in this file is
-	// per-reflection: an -IAM Thakkar factor, a SALTED prediction, the Mott-Bethe
-	// conversion for electron diffraction, and the spherical remainder rows all
-	// depend on one reflection and one atom and nothing else. The exclusions are
-	// the three cases where that is not true:
-	//
-	//   prep_out           this call must RETURN what it computed for a caller
-	//   opt.spherical_fill   ... likewise: a fill hands back rows, it does not
-	//                        write a file, or it would overwrite the very table
-	//                        being assembled
-	//   more than one part   parts are combined by scatterer, so a combined table
-	//                        needs every part present. stream_mtc_salted() at the
-	//                        bottom of this file turns those loops inside out and
-	//                        streams it anyway; this is the single-part path.
-	//
-	// The block size itself comes from opt.tsc_block_for, which holds the table
-	// whole when -mem says it fits: a resident table needs no queue and no writer
-	// thread, so where memory allows it, it is the faster of the two.
-	// Not named tsc_block: that is the class template this function instantiates
-	// further down, and a local of the same name hides it.
+	//streaming emits the table in reflection blocks instead of holding scatterers * reflections * 16 bytes at once
+	//excluded: prep_out and spherical_fill must hand their rows back rather than write a file, and a combined
+	//table needs every part present - stream_mtc_salted() at the bottom inverts those loops instead
+	//tsc_block_for returns 0 when -mem says the table fits whole; not named tsc_block, that is the class template below
 	const size_t block_reflections = opt.tsc_block_for(hkl.size(), asym_atom_list.size());
 	const bool stream_tsc = block_reflections > 0
 		&& prep_out == NULL
@@ -2726,20 +2918,14 @@ tsc_block_type calculate_scattering_factors(
             }
             return tsc_block_type();
         }
-        vector<Thakkar> spherical_atoms;
-        spherical_atoms.reserve(atom_type_list.size());
-        for (int i = 0; i < atom_type_list.size(); i++)
-            spherical_atoms.emplace_back(atom_type_list[i]);
-
+        std::vector<Thakkar> spherical_atoms = make_spherical_evaluators(atom_type_list);
         const int imax = (int)asym_atom_list.size();
         const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
         const int hkl_max = hkl.size();
 
         if (stream_tsc)
         {
-            // The simplest case of the four. A Thakkar factor is a function of the
-            // element and the reflection alone, so a block needs nothing that a
-            // whole table would have given it: no state crosses a block boundary.
+            //a Thakkar factor depends on element and reflection alone, so no state crosses a block boundary
             ScattererLabels stream_ids;
             append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
 
@@ -2759,8 +2945,7 @@ tsc_block_type calculate_scattering_factors(
                         {
                             const int type = asym_atom_to_type_list[i];
                             const double f = spherical_atoms[type].get_form_factor(k);
-                            // the IAM form of the Mott-Bethe conversion: the
-                            // tabulated charge, and no imaginary part
+                            //IAM form of Mott-Bethe: tabulated charge, no imaginary part
                             chunk[i][s] = opt.electron_diffraction
                                 ? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
                                 : cdouble(f, 0.0);
@@ -2770,16 +2955,6 @@ tsc_block_type calculate_scattering_factors(
                     return chunk;
                 });
         }
-        else if (!opt.electron_diffraction)
-        {
-#pragma omp parallel for shared(hkl_vector)
-            for (int s = 0; s < hkl_max; s++)
-            {
-                const double k = constants::bohr2ang(constants::FOUR_PI * unit_cell.get_stl_of_hkl(hkl_vector[s]));
-                for (int i = 0; i < imax; i++)
-                    sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
-            }
-        }
         else
         {
 #pragma omp parallel for shared(hkl_vector)
@@ -2788,10 +2963,14 @@ tsc_block_type calculate_scattering_factors(
                 const double stl = unit_cell.get_stl_of_hkl(hkl_vector[s]);
                 const double k = constants::bohr2ang(constants::FOUR_PI * stl);
                 const double h2 = pow(stl, 2);
-                double sf_x = 0;
-                for (int i = 0; i < imax; i++) {
-                    sf_x = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
-                    sf[i][s] = cdouble(constants::ED_fact * (atom_type_list[asym_atom_to_type_list[i]] - sf_x) / h2, 0);
+                for (int i = 0; i < imax; i++)
+                {
+                    const int type = asym_atom_to_type_list[i];
+                    const double f = spherical_atoms[type].get_form_factor(k);
+                    //IAM form of Mott-Bethe: tabulated charge, no imaginary part
+                    sf[i][s] = opt.electron_diffraction
+                        ? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
+                        : cdouble(f, 0.0);
                 }
             }
         }
@@ -2800,6 +2979,9 @@ tsc_block_type calculate_scattering_factors(
     {
         // Generation of SALTED density coefficients
         file << "\nGenerating densities... " << endl;
+#ifdef NOSPHERA2_USE_GPU
+        equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
+#endif
         vec coefs = calculator.gen_SALTED_densities();
         file << setw(13 * 4) << "... done!" << endl;
         time_points.push_back(get_time());
@@ -2829,16 +3011,14 @@ tsc_block_type calculate_scattering_factors(
 
 		if (prep_out != NULL)
 		{
-			// -mtc streaming: the reflection loop lives outside this call, so hand
-			// back everything that does not depend on reflections and stop here.
+			//-mtc streaming: the reflection loop lives outside, so hand back the reflection-independent part and stop
 			prep_out->coefs = std::move(coefs);
 			prep_out->asym_atom_list = asym_atom_list;
 			prep_out->labels = labels;
 			prep_out->atoms = calculator.wavy.get_atoms_ptr();
 			prep_out->k_pt = k_pt;
 			prep_out->hkl_v.assign(hkl.begin(), hkl.end());
-			// carried so the -mtc streaming loop can do the electron-diffraction
-			// conversion per block without a unit cell of its own
+			//carried so the -mtc loop can convert to ED per block without a unit cell of its own
 			prep_out->stl_of_reflection.resize(prep_out->hkl_v.size());
 			for (size_t s = 0; s < prep_out->hkl_v.size(); s++)
 				prep_out->stl_of_reflection[s] = unit_cell.get_stl_of_hkl(prep_out->hkl_v[s]);
@@ -2853,26 +3033,13 @@ tsc_block_type calculate_scattering_factors(
 			const std::vector<i3> hkl_v(hkl.begin(), hkl.end());
 			const size_t n_refl = hkl_v.size();
 
-			// Atoms the model cannot predict were erased before the prediction, so
-			// they are missing from the rows above. Prepare their spherical factors
-			// once here; append_spherical_rows() emits them with every block.
+			//atoms the model cannot predict were erased before the prediction; append_spherical_rows() emits them per block
 			salted_part_prep spherical;
-			std::vector<Thakkar> spheres;
+			std::vector<HE_Spherical_Atom> spheres;
 			if (opt.needs_Thakkar_fill)
 			{
-				// The whole file list, not just this part's: nr indexes it, but it
-				// also selects opt.groups[nr], which is what decides WHICH disorder
-				// parts the fill draws atoms from. See the sequential fill below.
 				std::vector<WFN> tempy;
-				int fill_nr = 0;
-				if (!opt.wfn.empty())
-					tempy.emplace_back(opt.wfn);
-				else
-				{
-					for (const auto& part_file : opt.combined_tsc_calc_files)
-						tempy.emplace_back(part_file);
-					fill_nr = nr;
-				}
+				const int fill_nr = build_fill_wavefunctions(opt, nr, tempy);
 				{
 					const spherical_fill_scope fill(opt, hkl);
 					calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
@@ -2885,7 +3052,7 @@ tsc_block_type calculate_scattering_factors(
 						" reflections, the table covers " + std::to_string(n_refl), file);
 					append_scatterer_ids(stream_ids, opt, spherical.labels,
 						tempy[fill_nr], spherical.asym_atom_list);
-					spheres = make_spherical_evaluators(spherical.atom_type_list);
+					spheres = make_he_evaluators(spherical, tempy[fill_nr], opt, file);
 					file << "Spherical remainder: " << spherical.asym_atom_list.size()
 						 << " atom(s) the model cannot predict" << endl;
 				}
@@ -2898,9 +3065,7 @@ tsc_block_type calculate_scattering_factors(
 					cvec2 chunk;
 					calc_SF_SALTED(slice_k_points(k_pt, lo, hi), coefs,
 						calculator.wavy.get_atoms(), asym_atom_list, chunk, &progress);
-					// Mott-Bethe on this block, exactly as the whole-table path does
-					// it on all of them - the conversion never looks outside one
-					// reflection, so a block is as valid a unit as a table.
+					//Mott-Bethe never looks outside one reflection, so a block is as valid a unit as a table
 					if (opt.electron_diffraction)
 						convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
 							std::vector<i3>(hkl_v.begin() + lo, hkl_v.begin() + hi));
@@ -2965,7 +3130,11 @@ tsc_block_type calculate_scattering_factors(
 				time_points.front(),
 				end1,
 				opt.debug,
-				opt.no_date);
+				opt.no_date,
+				false,
+				opt.use_gpu,
+				opt.gpu_fp64,
+				opt.gpu_fp32);
 
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Fourier transform");
@@ -3011,8 +3180,7 @@ tsc_block_type calculate_scattering_factors(
 
             if (stream_tsc)
             {
-                // Same as the SALTED case above, but the atoms come from the
-                // auxiliary wavefunction and there is never a spherical remainder.
+                //as the SALTED case above, but the atoms come from the auxiliary wavefunction, so no spherical remainder
                 ScattererLabels stream_ids;
                 append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
 
@@ -3061,8 +3229,7 @@ tsc_block_type calculate_scattering_factors(
         }
     }
 
-    // Not when streaming: sf is empty there and each block was converted as it
-    // was produced.
+    //not when streaming: sf is empty there and each block was converted as it was produced
     if (opt.electron_diffraction && !opt.iam_switch && !stream_tsc)
     {
         convert_to_ED(asym_atom_list,
@@ -3091,26 +3258,9 @@ tsc_block_type calculate_scattering_factors(
     {
         file << "Performing the remaining calculation of spherical atoms..." << std::endl;
         opt.needs_Thakkar_fill = false;
-        // nr is not only an index into this vector: it also picks opt.groups[nr],
-        // which is what decides WHICH disorder parts the fill takes atoms from, and
-        // the part's cif. Handing over a one-element vector and nr = 0 therefore
-        // asked for part 0's atoms no matter which part was being filled, so an
-        // atom belonging only to a later part was never restored - 3NIR came out
-        // with 1025 scatterers where it has 1026. Build the whole list instead, so
-        // the index means the same thing in all three places. (Passing nr with a
-        // one-element vector is the variant that reads tempy[1] and crashes.)
-        vector<WFN> tempy;
-        int fill_nr = 0;
-        if (!opt.wfn.empty()) {
-            tempy.emplace_back(opt.wfn);
-        }
-        else {
-            for (const auto& part_file : opt.combined_tsc_calc_files)
-                tempy.emplace_back(part_file);
-            fill_nr = nr;
-        }
-        // no_date is not part of spherical_fill_scope: only this caller suppresses
-        // the banner, and the streamed fills must not change their output.
+        std::vector<WFN> tempy;
+        const int fill_nr = build_fill_wavefunctions(opt, nr, tempy);
+        //no_date is not part of spherical_fill_scope: only this caller suppresses the banner
         const bool no_date_was = opt.no_date;
         opt.no_date = true;
         tsc_block<int, cdouble> blocky_thakkar;
@@ -3134,68 +3284,21 @@ tsc_block_type calculate_scattering_factors(
 	}
 	return blocky;
 }
-// ---------------------------------------------------------------------------
-// Streaming a combined (-mtc) table, one block of reflections at a time
-// ---------------------------------------------------------------------------
-//
-// A disordered structure is calculated as several "parts". The ordinary path
-// runs one part to completion, then the next, and merges the finished tables:
-//
-//     for each part:  compute EVERY reflection  ->  append to the table
-//
-// That needs the whole table in memory, because a part contributes rows and
-// every row spans every reflection.
-//
-// This turns the loops inside out:
-//
-//     prepare every part once            (no reflections involved yet)
-//     for each block of reflections:
-//         for each part: compute just this block
-//         hand the assembled block to the writer
-//
-// The inversion is only possible because everything expensive in a part - the
-// CIF reading and the SALTED density prediction - does not depend on which
-// reflections we ask for. Prepared once and kept, it costs nothing to reuse
-// for every block. That is what salted_part_prep holds.
-//
-// THE SUBTLE PART: ROW ORDER.
-//
-// The rows of the finished file must appear in exactly the order the merging
-// path would have produced, or every value is attributed to the wrong atom -
-// a file of the right size, full of plausible, misassigned numbers, which no
-// error message would ever reveal.
-//
-// It works out to a plain concatenation, for a reason worth stating: each part
-// is prepared with the identifiers of the parts before it (the growing "known"
-// list), exactly as the sequential code does. read_atoms_from_CIF skips any
-// atom already in that list, so a part never claims an atom an earlier one
-// covered and no duplicates arise. Prepare the parts against an empty list
-// instead and they would overlap - silently, and wrongly.
-//
-// WHAT GOES IN THAT LIST MATTERS, and it is not obvious. The sequential path
-// passes result.get_scatterers_string(), which is the atomID hex string unless
-// labels were explicitly requested. Atom LABELS are not unique across disorder
-// parts - the same label legitimately appears in several - so filling the list
-// with labels makes a later part skip atoms it should have kept.
-//
-// That mistake was made here and cost a table that was 760 KB short on a
-// four-part structure: the right size to look plausible, silently missing rows.
-// Three-part 1EJG did not reveal it; four-part 3NIR did. If this is ever
-// changed, check it against a structure with several parts and compare the
-// bytes, not the size.
-//
-// Atoms of species the SALTED model does not know are erased from every part,
-// so they are missing at this stage. The old path computed a whole second
-// table of spherical (Thakkar) form factors for them and appended it; here
-// they are simply extra rows of each block. A Thakkar factor depends only on
-// the element and the reflection, so it needs no prediction and chunks freely.
-// ---------------------------------------------------------------------------
+//streams a combined (-mtc) table one block of reflections at a time, inverting the sequential loops:
+//prepare every disorder part once, then per block compute every part and hand the assembled block to the writer
+//the inversion works because the expensive parts (CIF read, SALTED prediction) do not depend on reflections,
+//which is what salted_part_prep holds
+//row order must equal the merged path's exactly, or values are attributed to the wrong atom without any error
+//it is a plain concatenation because each part is prepared with the identifiers of the parts before it (the
+//growing `known` list) and read_atoms_from_CIF skips atoms already in it
+//that list must hold atomID hex strings, as result.get_scatterers_string() gives: labels are not unique across
+//parts, so a later part skips atoms it should keep and the table silently loses rows - check any change against
+//a multi-part structure byte for byte, not by size
+//species the model does not know are erased from every part and return as extra Thakkar rows of each block
 bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file, vec2* known_kpts)
 {
 	const size_t n_parts = opt.combined_tsc_calc_files.size();
-	// Electron diffraction is no longer excluded: the conversion needs each
-	// reflection's stl and each atom's charge, and the prep carries the stl, so no
-	// unit cell is needed down here.
+	//electron diffraction is not excluded: the prep carries the stl, so no unit cell is needed down here
 	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2 || opt.iam_switch)
 		return false;
 
@@ -3210,11 +3313,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		salted_part_prep prep;
 		calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
 			opt, *pred, file, known, static_cast<int>(i), known_kpts, &prep);
-		// Feed the NEXT part exactly what the sequential path feeds it:
-		// result.get_scatterers_string(), which is the atomID hex string unless
-		// labels were requested. Labels are NOT unique across disorder parts - the
-		// same label appears in several - so passing those makes a later part skip
-		// atoms it should keep, and the table silently loses rows.
+		//feed the next part what the sequential path feeds it: get_scatterers_string(), the atomID hex string
 		for (size_t a = 0; a < prep.asym_atom_list.size(); a++)
 		{
 			if (opt.label_tsc_output)
@@ -3226,25 +3325,17 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		preps.push_back(std::move(prep));
 	}
 
-	// Atoms the model cannot predict - an unknown species, or nothing inside the
-	// descriptor cutoff - were erased from every part, so they are still missing.
-	// The old path recomputed a whole second table for them and appended it; here
-	// they become extra rows of each block.
-	//
-	// ONE PASS OVER PART 0 IS NOT ENOUGH. A part file only yields the atoms that
-	// belong to the parts it covers, so a missing atom that belongs to part 3 can
-	// only come out of part 3's file. Filling from part 0 alone silently dropped
-	// it: 3NIR came out with 1025 scatterers where it has 1026, which is exactly
-	// the kind of shortfall that looks plausible in a file listing. Walk every
-	// part, feeding `known` as we go so no atom is produced twice.
+	//atoms the model cannot predict (unknown species, or nothing inside the descriptor cutoff) become extra rows here
+	//every part must be walked: a part file only yields atoms of the parts it covers, so part 0 alone drops the rest
+	//feed `known` as we go so no atom is produced twice
 	std::vector<salted_part_prep> spherical(n_parts);
 	std::vector<char> have_spherical(n_parts, 0);
-	// The scatterer list must be all atomIDs or all labels - a table with both
-	// is rejected on write. salted_part_prep::labels holds hex STRINGS, while the
-	// predicted parts contribute atomID objects, so the spherical rows have to be
-	// converted here rather than passed through. This never showed up until a
-	// streamed -mtc run first had a spherical remainder to append.
+	//a table must hold either all atomIDs or all labels; salted_part_prep::labels holds hex strings while the
+	//predicted parts contribute atomID objects, so the spherical rows are converted here rather than passed through
 	std::vector<ScattererLabels> spherical_ids(n_parts);
+	//built inside the block below: the per-atom charges are matched against the
+	//fill wavefunctions, which only exist there
+	std::vector<std::vector<HE_Spherical_Atom>> spheres(n_parts);
 	if (opt.needs_Thakkar_fill)
 	{
 		hkl_list fill_reflections;
@@ -3252,9 +3343,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			fill_reflections.emplace(h);
 		const spherical_fill_scope fill(opt, fill_reflections);
 
-		// The whole file list, not one file: the index also selects opt.groups[nr],
-		// so a one-element vector with nr = i either reads past the end or asks the
-		// wrong part for its atoms. See the note in the sequential path above.
+		//the whole file list, not one file: the index also selects opt.groups[nr], see the sequential path above
 		std::vector<WFN> tempy;
 		for (const auto& part_file : opt.combined_tsc_calc_files)
 			tempy.emplace_back(part_file);
@@ -3276,16 +3365,14 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 				known.push_back(spherical[i].labels[a]);
 			append_scatterer_ids(spherical_ids[i], opt, spherical[i].labels,
 				tempy[i], spherical[i].asym_atom_list);
+			spheres[i] = make_he_evaluators(spherical[i], tempy[i], opt, file);
 		}
 		file << "Spherical remainder: " << n_filled
 			 << " atom(s) the model cannot predict" << std::endl;
 	}
 
-	// Part by part, each spherical remainder straight after its own predicted
-	// atoms. The sequential path appends the fill to each part as it goes, so
-	// collecting all the spherical rows at the end instead gives the same
-	// scatterers in a different order - and then the two paths cannot be compared
-	// byte for byte, which is the only check that keeps them honest.
+	//each spherical remainder straight after its own predicted atoms, as the sequential path appends it per part;
+	//collecting them at the end gives the same scatterers in a different order and breaks a byte-for-byte comparison
 	ScattererLabels ids;
 	for (size_t p = 0; p < preps.size(); p++)
 	{
@@ -3294,19 +3381,11 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			ids.emplace_back(sid);
 	}
 
-	// One Thakkar evaluator set per part, built before the block loop rather than
-	// inside it - they depend only on each part's element list.
-	std::vector<std::vector<Thakkar>> spheres(n_parts);
-	for (size_t p = 0; p < n_parts; p++)
-		if (have_spherical[p])
-			spheres[p] = make_spherical_evaluators(spherical[p].atom_type_list);
-
 	const size_t n_refl = preps[0].hkl_v.size();
 	file << "Combined tsc: " << ids.size() << " scatterers from "
 		<< n_parts << " parts" << std::endl;
 
-	// The bar counts reflections x parts, because every part is evaluated for
-	// every block - unlike the single-part cases, where one block is one unit.
+	//the bar counts reflections * parts, since every part is evaluated for every block
 	stream_blocks(opt, file, "experimental.tscb", ids, preps[0].hkl_v,
 		n_refl * preps.size(),
 		[&](const size_t lo, const size_t hi, ProgressBar& progress)

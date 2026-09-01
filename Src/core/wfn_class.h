@@ -77,6 +77,12 @@ private:
     std::string method;
     // Vector of molecular orbitals
     std::vector<MO> MOs;
+    // The same coefficients transposed, [primitive * nmo + mo]. The grid evaluators walk
+    // primitives outermost and read every MO inside, which in MOs is a stride of nex.
+    // Mutable because it caches what MOs already holds; anything editing MOs or nex must
+    // call invalidate_coef_cache().
+    mutable vec coef_primitive_major;
+    mutable bool coef_primitive_major_valid = false;
     // Vector of centeres that primitives are base on
     ivec centers;
     // Vector of types of primitives
@@ -154,6 +160,13 @@ private:
     const double compute_dens_spherical(const d3& Pos, vec2& d, vec& phi) const;
 
 public:
+    /** Primitive-major MO coefficients, [primitive * nmo + mo], built on first use.
+     *  The grid evaluators want all MOs for one primitive contiguous; MOs stores the
+     *  transpose of that. Returns an empty span if there is nothing to build from. */
+    const double* get_coef_primitive_major() const;
+    /** Drop the cache above. Call after anything that changes MO coefficients or nex. */
+    void invalidate_coef_cache() const { coef_primitive_major_valid = false; }
+
     /** @name Constructors */
     ///@{
     /** Default constructor creates an empty wavefunction object. */

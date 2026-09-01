@@ -736,13 +736,9 @@ public:
     }
 
     // --- streaming write -------------------------------------------------
-    // The payload is reflection-major, so a table can be emitted in blocks of
-    // reflections without ever holding all of it. These two entry points are
-    // what tsc_stream_writer drives; they reuse the serialisation above so the
-    // streamed file and the one-shot file cannot drift apart.
-    // Static so a streamed table needs only the scatterer list, never a fully
-    // populated block - constructing one just to emit a prologue would
-    // allocate the very array the streaming exists to avoid.
+    // The payload is reflection-major, so a table can be emitted a block of reflections
+    // at a time; reuses the serialisation above so streamed and one-shot files match.
+    // Static because a streamed table has only the scatterer list, never a populated block.
     static void write_tscb_prologue(std::ostream& out,
                                     const ScattererLabels& scatterers,
                                     const std::string& header,

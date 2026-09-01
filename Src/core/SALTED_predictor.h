@@ -24,6 +24,18 @@ public:
 
 private:
     bool bbasis_set_loaded = false;
+    // Set when atoms were moved to the spherical Thakkar fill. The charge
+    // constraint needs it: with a mixed ML/Thakkar system the split of a net
+    // charge between the two regions is undefined.
+    bool spherical_fill_used = false;
+    // EEQ estimate of the charge sitting on the spherically filled atoms, and
+    // how many there are. Used to say how wrong the neutral-fill assumption is.
+    double filled_eeq_charge = 0.0;
+    // The part of that charge the spherical fill can actually carry (an ion
+    // must be tabulated for the element). The ML target is shifted by exactly
+    // this, so predicted + filled still sums to the right number of electrons.
+    double applied_fill_charge = 0.0;
+    int n_filled = 0;
     Config config;
     int natoms;
     std::filesystem::path SALTED_DIR;
@@ -34,23 +46,18 @@ private:
     
     std::unordered_map<std::string, int> natom_dict{}, lmax{}, nmax{};
     SALTEDDescriptors v1, v2;
-    // Set when the two descriptor hyperparameter sets are identical: v2 is then
-    // exactly conj(v1), so it is not filled at all and equicomb conjugates on
-    // read. Saves a full duplicate of a slab that is gigabytes on a protein.
+    // Both hyperparameter sets identical: v2 is conj(v1), never filled, equicomb conjugates on read
     bool v2_is_conj_of_v1 = false;
-    // Lambda blocks held at once; 0 means all. Set in the constructor, where the
-    // options are in scope: streaming the tsc implies memory is the constraint.
+    // Lambda blocks held at once; 0 means all
     int lam_group_limit = 0;
     void setup_atomic_environment();
 
     vec weights{};
     std::unordered_map<std::string, dMatrix2> Vmat{};
-    // Projector SHAPES for every species the model knows, present or not. The
-    // flat weight vector is laid out over all of them, so an absent species
-    // still has to contribute its width to the offset arithmetic.
+    // Projector shapes for every species the model knows, present or not: the flat
+    // weight vector is laid out over all of them, so absent widths shift the offsets
     std::unordered_map<std::string, std::array<size_t, 2>> proj_dims{};
-    // Held open for the whole prediction, with an offset+shape index per
-    // (species, lambda) instead of the matrices themselves.
+    // Held open for the whole prediction, indexed by (species, lambda)
     std::unique_ptr<SALTED_BINARY_FILE> model_file{};
     std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> feat_index{};
     std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> proj_index{};
@@ -62,8 +69,7 @@ private:
     std::unordered_map<std::string, vec> av_coefs{};
     std::unordered_map<int, int> featsize{};
     void read_model_data();
-    // Fetch / drop the model matrices of one lambda. read_model_data() only
-    // indexes the file; these do the reading, as the prediction reaches them.
+    // Fetch / drop the model matrices of one lambda; read_model_data() only indexes
     void load_model_lambda(const int lam);
     void free_model_lambda(const int lam);
 

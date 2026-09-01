@@ -555,7 +555,10 @@ public:
                     getline(cif_input, line);
                     if (debug)
                         file << "line in loop field definition: " << line << std::endl;
-                    if (line.find("space_group_symop_operation_xyz") != std::string::npos)
+                    // Both spellings occur: the current tag and the deprecated one,
+                    // which PDB-derived and older CIFs still use.
+                    if (line.find("space_group_symop_operation_xyz") != std::string::npos ||
+                        line.find("symmetry_equiv_pos_as_xyz") != std::string::npos)
                         operation_field = count_fields;
                     else if (count_fields > 2 || (operation_field == 200 && count_fields != 0))
                     {
@@ -571,12 +574,31 @@ public:
                     if (debug)
                         file << "Reading operation!" << line << std::endl;
                     symm_found = true;
-                    std::stringstream s(line);
+                    // Operations are commonly quoted AND spaced - 'x, y, z' - which a
+                    // plain whitespace split turns into three separate fields, so the
+                    // parser then sees "'x," and rejects the file. Honour the quotes.
                     svec fields;
                     fields.resize(count_fields);
                     int rot_from_cif[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-                    for (int i = 0; i < count_fields; i++)
-                        s >> fields[i];
+                    {
+                        size_t p = 0;
+                        for (int i = 0; i < count_fields && p < line.size(); i++)
+                        {
+                            while (p < line.size() && std::isspace(static_cast<unsigned char>(line[p]))) p++;
+                            if (p >= line.size()) break;
+                            if (line[p] == 0x27 || line[p] == '"')
+                            {
+                                const char quote = line[p++];
+                                while (p < line.size() && line[p] != quote) fields[i].push_back(line[p++]);
+                                if (p < line.size()) p++;
+                            }
+                            else
+                            {
+                                while (p < line.size() && !std::isspace(static_cast<unsigned char>(line[p])))
+                                    fields[i].push_back(line[p++]);
+                            }
+                        }
+                    }
                     err_checkf(operation_field < count_fields,
                         "Could not find the _space_group_symop_operation_xyz column in the symmetry loop of " + filename.string() + "!", file);
                     double trans_from_cif[3]{ 0.0, 0.0, 0.0 };
