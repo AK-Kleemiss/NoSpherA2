@@ -13,6 +13,7 @@
 #include "wfn_class.h"
 #include "basis_set.h"
 #include <filesystem>
+#include <future>
 
 
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
@@ -423,7 +424,11 @@ vec SALTEDPredictor::predict()
     const auto _t_predict_start = std::chrono::steady_clock::now();
     auto _elapsed = [](const std::chrono::steady_clock::time_point &from)
     { return std::chrono::duration<double>(std::chrono::steady_clock::now() - from).count(); };
-    double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_io = 0.0;
+    double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_wait = 0.0, _t_model_work = 0.0;
+    bool overlap_model_loading = false;
+#ifdef NOSPHERA2_USE_GPU
+    overlap_model_loading = equicomb_gpu_enabled() && salted_gpu_available();
+#endif
     // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     // How many lambda blocks are alive at once. A block is natoms * (2*lam+1) *
     // featsize doubles and holding all of them sums to (nang+1)^2 times a single
@@ -440,6 +445,13 @@ vec SALTEDPredictor::predict()
     {
         const int lam1 = std::min(lam0 + lam_group, lmax_max + 1);
         vec2 pg(lam1 - lam0);
+        std::future<double> model_loader;
+        if (overlap_model_loading)
+            model_loader = std::async(std::launch::async, [this, lam0, lam1]() {
+                const auto start = std::chrono::steady_clock::now();
+                for (int lam = lam0; lam < lam1; lam++) load_model_lambda(lam);
+                return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+            });
         const auto _t_eq = std::chrono::steady_clock::now();
         for (int lam = lam0; lam < lam1; lam++)
         {
@@ -486,11 +498,14 @@ vec SALTEDPredictor::predict()
         }
         }
         _t_equicomb += _elapsed(_t_eq);
-        // After the descriptors, not before: holding the model across equicomb, where
-        // memory is already highest, would raise the peak for nothing
-        const auto _t_ld = std::chrono::steady_clock::now();
-        for (int lam = lam0; lam < lam1; lam++) load_model_lambda(lam);
-        _t_model_io += _elapsed(_t_ld);
+        const auto _t_wait = std::chrono::steady_clock::now();
+        if (overlap_model_loading)
+            _t_model_work += model_loader.get();
+        else
+            for (int lam = lam0; lam < lam1; lam++) load_model_lambda(lam);
+        const double model_wait = _elapsed(_t_wait);
+        _t_model_wait += model_wait;
+        if (!overlap_model_loading) _t_model_work += model_wait;
         const auto _t_kn = std::chrono::steady_clock::now();
         // Species-outer within the group, so a species keeps its sparse matrices hot
         for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
@@ -669,9 +684,10 @@ vec SALTEDPredictor::predict()
         std::cout << "[stages] predict " << total << " s = equicomb " << _t_equicomb
                   << " s (" << (100.0 * _t_equicomb / total) << "%) + kernels "
                   << _t_kernels << " s (" << (100.0 * _t_kernels / total)
-                  << "%) + model I/O " << _t_model_io << " s ("
-                  << (100.0 * _t_model_io / total) << "%) + rest "
-                  << (total - _t_equicomb - _t_kernels - _t_model_io) << " s" << std::endl;
+                  << "%) + model wait " << _t_model_wait << " s ("
+                  << (100.0 * _t_model_wait / total) << "%) + rest "
+                  << (total - _t_equicomb - _t_kernels - _t_model_wait) << " s; model preparation "
+                  << _t_model_work << " s" << std::endl;
     }
     return pred_coefs;
 }
