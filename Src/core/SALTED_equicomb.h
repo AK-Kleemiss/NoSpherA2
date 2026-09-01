@@ -27,6 +27,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
     vec& p,
     bool v2_is_conj_of_v1 = false);
 
-//Opt-in GPU path for the descriptor combination; off unless -gpu_salted is given
+//GPU path for the descriptor combination; -no_gpu_salted keeps it on the CPU
 void equicomb_set_gpu(bool on);
 bool equicomb_gpu_enabled();

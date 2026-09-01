@@ -566,13 +566,13 @@ std::string help_message =
  "                                    mostly by how fast the host CPU is. Single\n"
  "                                    precision by default, which moves the total\n"
  "                                    energy in the tenth significant figure.\n"
+ "  -gpu_salted / -no_gpu_salted       The SALTED descriptor combination\n"
+ "                                    (equicomb). It falls back to the CPU when\n"
+ "                                    no usable device is present.\n"
  "\n"
  "  Off unless asked:\n"
  "  -gpu_grid                          Atomic integration grid weights (Becke\n"
  "                                    and TFVC).\n"
- "  -gpu_salted                        SALTED descriptor combination (equicomb).\n"
- "                                    Wins per call, but creating the device\n"
- "                                    context costs more than a small model saves.\n"
  "  -gpu_blas                          Offer large dense matrix products to the\n"
  "                                    device. Small ones stay on the CPU, where\n"
  "                                    they beat what the transfers would allow.\n"
@@ -3409,6 +3409,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_cublas = false;
     else if (temp == "-gpu_salted")
         gpu_salted = true;
+    else if (temp == "-no_gpu_salted")
+        gpu_salted = false;
     else if (temp == "-gpu_grid")
         gpu_grid = true;
     else if (temp == "-gpu_blas")

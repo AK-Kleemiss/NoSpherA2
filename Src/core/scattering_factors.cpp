@@ -2980,7 +2980,7 @@ tsc_block_type calculate_scattering_factors(
         // Generation of SALTED density coefficients
         file << "\nGenerating densities... " << endl;
 #ifdef NOSPHERA2_USE_GPU
-        equicomb_set_gpu(opt.gpu_salted);
+        equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
 #endif
         vec coefs = calculator.gen_SALTED_densities();
         file << setw(13 * 4) << "... done!" << endl;

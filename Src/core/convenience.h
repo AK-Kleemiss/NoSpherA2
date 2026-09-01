@@ -813,8 +813,8 @@ struct options
     //largest of the device paths, and it moves the total energy only in the tenth
     //significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
     bool gpu_itensor = true;
-    //-gpu_salted runs the SALTED descriptor combination on the device
-    bool gpu_salted = false;
+    //SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
+    bool gpu_salted = true;
     //-gpu_grid runs the Becke/TFVC integration weights on the device
     bool gpu_grid = false;
     //-gpu_blas offers large dense GEMMs in nos_math to the device
