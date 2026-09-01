@@ -253,6 +253,13 @@ files generated before they can be registered.
 
 ## Known Issues
 
+- **Focused P1 XCW validation pending after the 2026-09-01 `XCW_Test` merge**: both the CPU-pinned
+  `TomlIntegrationTests.P1_test_XCW` and GPU `TomlIntegrationTests.P1_test_XCW_gpu_itensor` complete
+  their XCW calculations locally, but the golden comparator stops at the shared screening lines:
+  expected 1798 pairs / 64,013,865 grids and actual 1473 / 74,067,170. The CPU failure proves this
+  is not caused by the asynchronous GPU read-back path. The current P1 numerical outputs need a clean
+  merged-baseline review before this focused pair can be reported passing again.
+
 - **XCW test output race condition (RESOURCE_LOCK), found and fixed 2026-07-20**: after the
   `-b sto-3g` fix below was pushed, CI failed again on **all three platforms** (Linux, Windows,
   macOS) with `P1_test_XCW` and `P1_test_XCW_h2` both producing visibly *interleaved, byte-level
