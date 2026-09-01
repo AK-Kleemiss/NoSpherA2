@@ -90,8 +90,10 @@ private:
 		double current_MaxP_diff;
 		bool conv_MaxP_diff = false;
 		double diis_stop_damping;
+		bool method_apply_shift = true;
 		bool apply_shift = true;
 		double diis_stop_shift;
+		bool method_apply_damping = true;
 		bool apply_damping = true;
 		std::string basis_set_name;
 		bool grown;
@@ -138,13 +140,12 @@ private:
 		}
 
 		// Updates the SCF routine in regards to damping and level shift
-		void update(const double& diis_error, std::ostream& file, double& alpha) {
-			if (diis_error < diis_stop_damping && apply_damping == true) {
+		void update(std::ostream& file, double& alpha) {
+			if (current_max_diis_error < diis_stop_damping && apply_damping == true) {
 				apply_damping = false;
 				print_centered_message("***Turned off damping***", 84, file);
-				alpha = 0;
 			}
-			if (diis_error < diis_stop_shift && apply_shift == true) {
+			if (current_max_diis_error < diis_stop_shift && apply_shift == true) {
 				apply_shift = false;
 				print_centered_message("***Turned off level shift***", 84, file);
 			}

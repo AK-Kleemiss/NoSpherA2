@@ -310,8 +310,8 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 	}
 }
 
-//Hokus pokus freestyle modus, hopefully converts a WFN object to the occ wavefunction
-// Does not work yet
+// Hokus pokus freestyle modus, hopefully converts a WFN object to the occ wavefunction
+// Fully vibe coded without application because WFNs don't include virtual orbitals
 void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
 {
     using occ::gto::num_subshells;
@@ -342,24 +342,28 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
             while (type0 > static_cast<int>(sum_subshells(l)) + static_cast<int>(num_subshells(true, l)))
                 l++;
             const int n_cart = num_subshells(true, l);
-            std::vector<double> exp_v;
+            int n_prim = 0;
             int scan = pos;
             while (scan < nex_total &&
-                get_center(scan) == atom0 &&
-                ((get_type(scan) - 1) % n_cart) == 0 &&
-                get_type(scan) >= type0 && get_type(scan) < type0 + n_cart) {
-                exp_v.push_back(get_exponent(scan));
-                scan += n_cart;
+                get_type(scan) == type0 &&
+                get_center(scan) == atom0) {
+                n_prim++;
+                scan++;
             }
+
+            std::vector<double> exp_v(n_prim);
+            for (int i = 0; i < n_prim; i++)
+                exp_v[i] = get_exponent(pos + i);
+
             RebuiltShell rs;
             rs.atom = atom0 - 1;
             rs.l = l;
             rs.n_cart = n_cart;
-            rs.n_prim = static_cast<int>(exp_v.size());
+            rs.n_prim = n_prim;
             rs.nex_start = pos;
-            rs.exponents = Eigen::Map<occ::Vec>(exp_v.data(), exp_v.size());
+            rs.exponents = Eigen::Map<occ::Vec>(exp_v.data(), n_prim);
             rebuilt_shells.push_back(rs);
-            pos += rs.n_prim * n_cart;
+            pos += n_prim * n_cart; 
         }
     }
 
@@ -402,6 +406,7 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
         occ_shells.push_back(std::move(sh));
     }
     occ_wf.basis = AOBasisT(occ_atoms, occ_shells);
+    occ_wf.atoms = occ_atoms;
     occ_wf.basis.set_pure(true);
     const int nbf_sph = static_cast<int>(occ_wf.basis.nbf());
     const int n_mo_total = get_nmo();
@@ -409,12 +414,14 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
     const int n_spin = unrestricted ? 2 : 1;
     occ::Mat C_gaussian_order(nbf_sph * n_spin, n_mo_total / n_spin);
     occ::Vec energies(n_mo_total);
+	occ::Vec occupations(n_mo_total);
     int n_alpha = 0, n_beta = 0;
     for (int spin = 0; spin < n_spin; spin++) {
         for (int n = 0; n < n_mo_total / n_spin; n++) {
             const int mo_index = unrestricted ? spin * (n_mo_total / n_spin) + n : n;
             const auto& mo = get_MO(mo_index);
             energies(mo_index) = mo.get_energy();
+            occupations(mo_index) = mo.get_occ();
             if (unrestricted) {
                 if (spin == 0 && mo.get_occ() > 0.5) n_alpha++;
                 if (spin == 1 && mo.get_occ() > 0.5) n_beta++;
@@ -446,7 +453,10 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
     mo_go.n_ao = nbf_sph;
     mo_go.C = C_gaussian_order;
     mo_go.energies = energies;
+    mo_go.occupation = occupations;
+    occ_wf.num_electrons = n_alpha + n_beta;
     occ_wf.mo = occ::io::conversion::orb::from_gaussian_order(occ_wf.basis, mo_go);
+    occ_wf.mo.update_occupied_orbitals();
     occ_wf.mo.update_density_matrix();
     occ_wf.nbf = occ_wf.basis.nbf();
 }

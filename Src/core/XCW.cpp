@@ -334,8 +334,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	if (speed_preset == "slow_conv") {
 		settings.alpha = 0.8;
 		settings.level_shift = 1;
-		settings.diis_stop_damping = 1e-3;
-		settings.diis_stop_shift = 1e-3;
+		settings.diis_stop_damping = 1e-5;
+		settings.diis_stop_shift = 1e-5;
 	}
 	else if (speed_preset == "normal_conv") {
 		settings.alpha = 0.5;
@@ -344,10 +344,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		settings.diis_stop_shift = 1e-2;
 	}
 	else if (speed_preset == "fast_conv") {
-		settings.alpha = 0;
-		settings.level_shift = 0;
-		settings.diis_stop_damping = 1e50;
-		settings.diis_stop_shift = 1e50;
+		settings.method_apply_damping = false;
+		settings.method_apply_shift = false;
 	}
 
 	if (basis_set_name == "Undefined") {
@@ -1906,22 +1904,18 @@ double XCW::dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& scf, const
 }
 
 void XCW::apply_level_shift(const occ::Mat& C_old, const occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& F_diis) {
-	const double temp_shift = scf.convergence_settings.effective_level_shift(scf.diis_error);
-	if (temp_shift < 1e-5) {
-		return;
-	}
 	const int nocc = scf.ctx.mo.Cocc.cols();
 	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Restricted) {
 		const occ::Mat SC_virt = scf.ctx.S * C_old.rightCols(cryst.nmo - nocc);
-		F_diis.noalias() += temp_shift * SC_virt * SC_virt.transpose();
+		F_diis.noalias() += settings.level_shift * SC_virt * SC_virt.transpose();
 	}
 	else {
 		const int nao = C_old.rows() / 2;
 		const auto S_ao = scf.ctx.S.topRows(nao);
 		const occ::Mat SC_virt_a = S_ao * C_old.topRows(nao).rightCols(cryst.nmo - nocc);
 		const occ::Mat SC_virt_b = S_ao * C_old.bottomRows(nao).rightCols(cryst.nmo - nocc);
-		F_diis.topRows(nao).noalias() += temp_shift * SC_virt_a * SC_virt_a.transpose();
-		F_diis.bottomRows(nao).noalias() += temp_shift * SC_virt_b * SC_virt_b.transpose();
+		F_diis.topRows(nao).noalias() += settings.level_shift * SC_virt_a * SC_virt_a.transpose();
+		F_diis.bottomRows(nao).noalias() += settings.level_shift * SC_virt_b * SC_virt_b.transpose();
 	}
 }
 
@@ -2014,7 +2008,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 			break;
 		}
 		}
-		std::cout << std::fixed << std::setprecision(3) << lambda << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * current_criterion << "\t\t" << std::fixed << std::setprecision(9) << quant;
+		std::cout << std::fixed << std::setprecision(5) << lambda << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * current_criterion << "\t\t" << std::fixed << std::setprecision(9) << quant;
 		if (opt->xcw_gaussian_halt && !gaussian_halt_history_.empty()) {
 			std::cout << "\t\t" << std::setprecision(4) << gaussian_halt_history_.back().A2;
 		}
@@ -2026,50 +2020,50 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		XCW_log << "____________________________________________________________________________________\n";
 		print_centered_message("***SCF did not converge***", 84, XCW_log);
 		std::ostringstream perturbed_energy;
-		perturbed_energy << "Threshold for perturbed energy: " << std::to_string(settings.quant_diff) << " (current: " << std::to_string(settings.current_quant_diff) << ")";
+		perturbed_energy << " for perturbed energy: " << std::scientific << settings.quant_diff << " (current: " << settings.current_quant_diff << ") \n";
 		std::ostringstream diis_error;
-		diis_error << "Threshold for DIIS error: " << std::to_string(settings.max_diis_error) << " (current: " << std::to_string(settings.current_max_diis_error) << ")";
+		diis_error << " for DIIS error: " << std::scientific << settings.max_diis_error << " (current: " << settings.current_max_diis_error << ") \n";
 		std::ostringstream orbital_gradient;
-		orbital_gradient << "Threshold for orbital gradient: " << std::to_string(settings.gradient) << " (current: " << std::to_string(settings.current_gradient) << ")";
+		orbital_gradient << " for orbital gradient: " << std::scientific << settings.gradient << " (current: " << settings.current_gradient << ") \n";
 		std::ostringstream max_density_diff;
-		max_density_diff << "Threshold for maximum difference in density matrix: " << std::to_string(settings.MaxP_diff) << " (current: " << std::to_string(settings.current_MaxP_diff) << ")";
+		max_density_diff << " for maximum difference in density matrix: " << std::scientific << settings.MaxP_diff << " (current: " << settings.current_MaxP_diff << ") \n";
 		std::ostringstream rmsd_density;
-		rmsd_density << "Threshold for RMSD of density matrix: " << std::to_string(settings.RMSP_diff) << " (current: " << std::to_string(settings.current_RMSP_diff) << ")";
-		XCW_log << perturbed_energy.str();
+		rmsd_density << " for RMSD of density matrix: " << std::scientific << settings.RMSP_diff << " (current: " << settings.current_RMSP_diff << ") \n";
 		if (settings.conv_quant_diff) {
-			XCW_log << " -> Converged \n";
+			XCW_log << "CONVERGED";
 		}
 		else {
-			XCW_log << " -> Not converged \n";
+			XCW_log << "NOT CONVERGED";
+		}
+		XCW_log << perturbed_energy.str();
+		if (settings.conv_max_diis_error) {
+			XCW_log << "CONVERGED";
+		}
+		else {
+			XCW_log << "NOT CONVERGED";
 		}
 		XCW_log << diis_error.str();
-		if (settings.conv_max_diis_error) {
-			XCW_log << " -> Converged \n";
+		if (settings.conv_gradient) {
+			XCW_log << "CONVERGED";
 		}
 		else {
-			XCW_log << " -> Not converged \n";
+			XCW_log << "NOT CONVERGED";
 		}
 		XCW_log << orbital_gradient.str();
-		if (settings.conv_gradient) {
-			XCW_log << " -> Converged \n";
+		if (settings.conv_MaxP_diff) {
+			XCW_log << "CONVERGED";
 		}
 		else {
-			XCW_log << " -> Not converged \n";
+			XCW_log << "NOT CONVERGED";
 		}
 		XCW_log << max_density_diff.str();
-		if (settings.conv_MaxP_diff) {
-			XCW_log << " -> Converged \n";
+		if (settings.conv_RMSP_diff) {
+			XCW_log << "CONVERGED";
 		}
 		else {
-			XCW_log << " -> Not converged \n";
+			XCW_log << "NOT CONVERGED";
 		}
 		XCW_log << rmsd_density.str();
-		if (settings.conv_RMSP_diff) {
-			XCW_log << " -> Converged \n";
-		}
-		else {
-			XCW_log << " -> Not converged \n";
-		}
 	}
 	// closing function
 }
@@ -2157,7 +2151,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	occ::Mat F_diis = scf.convergence_accelerator.update(scf.ctx.mo.kind, scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
 	scf.diis_error = scf.convergence_accelerator.max_error();
 	settings.current_max_diis_error = scf.diis_error;
-	settings.update(scf.diis_error, XCW_log, alpha);
+	settings.update(XCW_log, alpha);
 
 	// Convergence check
 	settings.current_gradient = compute_orbital_gradient(scf);
@@ -2237,15 +2231,19 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 		0,
 		&k_pt),
 		XCW_log);
-	int value = static_cast<int>(std::round(lambda * 100));
+	std::string value = std::to_string(lambda);
+	value.erase(std::remove(value.begin(), value.end(), '.'), value.end());
+	while (value.length() < 7) {
+		value += '0';
+	}
 	std::ostringstream oss;
-	oss << "NA2_" << std::setw(3) << std::setfill('0') << value << ".tscb";
+	oss << "NA2_" << value << ".tscb";
 	result.write_tscb_file("test.cif", oss.str());
 	std::ostringstream oss2;
-	oss2 << "NA2_" << std::setw(3) << std::setfill('0') << value << ".wfn";
+	oss2 << "NA2_" << value << ".wfn";
 	sf_wave_vec[0].write_wfn(oss2.str(), false, true);
 	std::ostringstream oss3;
-	oss3 << "NA2_" << std::setw(3) << std::setfill('0') << value << ".fchk";
+	oss3 << "NA2_" << value << ".fchk";
 	scf.wavefunction().save(oss3.str());
 	//Roby_information Roby(sf_wave_vec[0]);
 }
@@ -2363,17 +2361,14 @@ void XCW::run_XCW_fitting() {
 		std::ostringstream oss2;
 		std::string start_value_str = std::to_string(settings.xcw_start_value);
 		start_value_str.erase(std::remove(start_value_str.begin(), start_value_str.end(), '.'), start_value_str.end());
-		if (start_value_str.length() > 3) {
-			start_value_str = start_value_str.substr(0, 3);
+		if (start_value_str.length() > 7) {
+			start_value_str = start_value_str.substr(0, 7);
 		}
-		else if (start_value_str.length() < 3) {
-			start_value_str.append(3 - start_value_str.length(), '0');
+		else if (start_value_str.length() < 7) {
+			start_value_str.append(7 - start_value_str.length(), '0');
 		}
-		oss2 << "NA2_" << std::setw(3) << std::setfill('0') << start_value_str << ".fchk";
+		oss2 << "NA2_" << start_value_str << ".fchk";
 		last_wfn = occ::qm::Wavefunction::load(oss2.str());
-		//WFN loaded_wfn;
-		//loaded_wfn.read_wfn(oss2.str(), opt->debug, XCW_log);
-		//loaded_wfn.wfn_to_occ_wavefunction(last_wfn);
 		has_guess = true;
 	}
 
