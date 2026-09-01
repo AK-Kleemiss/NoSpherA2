@@ -72,6 +72,8 @@ cmake --preset release-windows -DNOSPHERA2_BUILD_TESTS=ON
 
 The CUDA runtime is linked statically and cuBLAS is loaded only when `-gpu_cublas` is requested and a matching library is installed. A CUDA-enabled executable therefore has no required CUDA DLL import and starts normally on a machine without an NVIDIA GPU; GPU requests fall back to the CPU when no usable device is present. HIP builds use Windows delay loading for their HIP runtime for the same startup behaviour. No CUDA, HIP, or cuBLAS runtime is copied into the executable directory.
 
+At runtime, supported GPU paths are enabled by default: Fourier transforms, XCW I-tensor contractions, SALTED descriptor combinations, and Becke/TFVC atomic-grid weights. Each automatically falls back to the CPU if the device, memory budget, or input layout is unsuitable. Use `-no_gpu` to disable every GPU path, or `-no_gpu_grid`, `-no_gpu_itensor`, and `-no_gpu_salted` to pin an individual calculation to the CPU. `-gpu_blas` remains opt-in because its transfers only pay off for sufficiently large dense matrix products.
+
 On Windows, configure from the x64 Visual Studio developer environment and use a CUDA/toolset combination supported by NVIDIA. If CMake cannot validate the selected CUDA compiler, configuration continues as a CPU-only build and reports the fallback; choose a compatible MSVC toolset or CUDA release before relying on GPU support.
 
 #### Step 3: Build the project
