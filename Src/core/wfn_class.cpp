@@ -198,7 +198,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     {
         const auto &shell = shells[i];
         l = shell.l;
-        shellType(i) = l;
+        shellType(i) = l + 1;
         nprim = shell.num_primitives();
         n_cart = num_subshells(true, l);
         sum_ncart = sum_subshells(l);
@@ -213,7 +213,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
         }
         // insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
         for (int j = 0; j < shell.exponents.size(); j++) {
-            push_back_atom_basis_set(atom, shell.exponents(j), shell.contraction_coefficients(j), shell.l, k);
+            push_back_atom_basis_set(atom, shell.exponents(j), shell.contraction_coefficients(j), shell.l + 1, k);
         }
         k++;
         auto repeated = std::views::iota(0u, n_cart * nprim) | std::views::transform([&](auto) { return atom + 1; });

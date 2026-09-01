@@ -112,7 +112,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768;
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
-	bool grown = false, safe_tensor = false, read_tensor = false, read_first_guess = false;
+	bool grown = false, safe_tensor = false, read_tensor = false, read_first_guess = false, nbo_output = false;
 	// 0 = hold the whole tensor, which is what every run did before this existed.
 	size_t i_tensor_max_mb = 0;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
@@ -271,6 +271,9 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		handlers["load_wfn"] = [&](std::istream&) {
 			read_first_guess = true;
 			};
+		handlers["nbo"] = [&](std::istream&) {
+			nbo_output = true;
+			};
 		// The tensor is nr_small blocks of nmo(nmo+1)/2 complex doubles and grows
 		// quadratically with the basis, so on anything past a minimal basis it is
 		// the largest thing in the process. `stream` puts it on disk with a
@@ -383,6 +386,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.read_tensor = read_tensor;
 	settings.read_first_guess = read_first_guess;
 	settings.i_tensor_max_mb = i_tensor_max_mb;
+	settings.nbo_output = nbo_output;
 
 	return settings;
 }
@@ -1574,7 +1578,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			std::cerr << "GPU in use: XCW I tensor on ";
 			if (itensor_on_gpu)
 				std::cerr << "the device (" << (opt->gpu_fp64 ? "double" : "single")
-				          << "-precision " << itensor_gpu_gemm_name() << " GEMM)";
+				<< "-precision " << itensor_gpu_gemm_name() << " GEMM)";
 			else
 				std::cerr << "the CPU - device unavailable or problem too large";
 			std::cerr << std::endl;
@@ -1593,11 +1597,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				kzs[sy] = k_pt[2][asym_lookup[rr][sy]];
 				for (int gg = 0; gg < n_atom_grids; gg++)
 					facs[static_cast<size_t>(sy) * n_atom_grids + gg] =
-						asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
-						* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
+					asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
+					* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
 			}
 			cdouble* const I_rr = i_streamed_ ? blk_gpu.data()
-			                                  : I.data() + static_cast<size_t>(rr) * packed_size;
+				: I.data() + static_cast<size_t>(rr) * packed_size;
 			if (i_streamed_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
 			if (!itensor_gpu_reflection(static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data(), I_rr))
 				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
@@ -1623,153 +1627,153 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	if (!itensor_on_gpu)
 	{
 #pragma omp parallel reduction(+:skipped_grids)
-	{
-		vec2 single_k_pts(num_syms, vec(3));
-		vec phase_angles;
-		vec phase_sines;
-		vec phase_cosines;
-		vec weighted_values_real;
-		vec weighted_values_imag;
-		vec tile_real_values;
-		vec tile_imag_values;
-		//One reflection's block, used only while streaming. No ordering is needed on
-		//the way out: the file is reflection-major and the writer seeks to r's offset
-		cvec blk;
-		if (i_streamed_) blk.assign(packed_size, cdouble{});
+		{
+			vec2 single_k_pts(num_syms, vec(3));
+			vec phase_angles;
+			vec phase_sines;
+			vec phase_cosines;
+			vec weighted_values_real;
+			vec weighted_values_imag;
+			vec tile_real_values;
+			vec tile_imag_values;
+			//One reflection's block, used only while streaming. No ordering is needed on
+			//the way out: the file is reflection-major and the writer seeks to r's offset
+			cvec blk;
+			if (i_streamed_) blk.assign(packed_size, cdouble{});
 
 #if !defined(__APPLE__)
-		mkl_set_num_threads_local(1);
+			mkl_set_num_threads_local(1);
 #endif
 
-		size_t max_points = 0;
-		for (int g = 0; g < n_grids; g++) {
-			max_points = std::max(max_points, static_cast<size_t>(points[g]));
-		}
-		cvec phase_buffer(max_points);
-		phase_angles.resize(max_points);
-		phase_sines.resize(max_points);
-		phase_cosines.resize(max_points);
-		size_t max_ao_block_size = 0, max_tile_result_size = 0;
-		for (int g = 0; g < n_grids; g++) {
-			for (const GridBlock& block : grid_blocks[g]) {
-				max_ao_block_size = std::max(max_ao_block_size, block.ao_values.size());
-				for (const MatrixTile& tile : block.matrix_tiles) {
-					max_tile_result_size = std::max(max_tile_result_size, static_cast<size_t>(tile.result_offset + tile.row_count * tile.col_count));
+			size_t max_points = 0;
+			for (int g = 0; g < n_grids; g++) {
+				max_points = std::max(max_points, static_cast<size_t>(points[g]));
+			}
+			cvec phase_buffer(max_points);
+			phase_angles.resize(max_points);
+			phase_sines.resize(max_points);
+			phase_cosines.resize(max_points);
+			size_t max_ao_block_size = 0, max_tile_result_size = 0;
+			for (int g = 0; g < n_grids; g++) {
+				for (const GridBlock& block : grid_blocks[g]) {
+					max_ao_block_size = std::max(max_ao_block_size, block.ao_values.size());
+					for (const MatrixTile& tile : block.matrix_tiles) {
+						max_tile_result_size = std::max(max_tile_result_size, static_cast<size_t>(tile.result_offset + tile.row_count * tile.col_count));
+					}
 				}
 			}
-		}
-		weighted_values_real.resize(max_ao_block_size);
-		weighted_values_imag.resize(max_ao_block_size);
-		tile_real_values.resize(max_tile_result_size);
-		tile_imag_values.resize(max_tile_result_size);
+			weighted_values_real.resize(max_ao_block_size);
+			weighted_values_imag.resize(max_ao_block_size);
+			tile_real_values.resize(max_tile_result_size);
+			tile_imag_values.resize(max_tile_result_size);
 
 #pragma omp for schedule(dynamic, 1)
-		for (int r = 0; r < cryst.nr_small; r++) {
-			if (i_streamed_) std::fill(blk.begin(), blk.end(), cdouble{});
-			cdouble* const I_r = i_streamed_ ? blk.data()
-				: I.data() + static_cast<size_t>(r) * packed_size;
-			const size_t base = static_cast<size_t>(r) * packed_size;
-			const int* asym_lookup_r = asym_lookup[r].data();
-			// Precompute weighted phase factors for integration
-			for (int syms = 0; syms < num_syms; syms++) {
-				single_k_pts[syms] = { k_pt[0][asym_lookup_r[syms]], k_pt[1][asym_lookup_r[syms]], k_pt[2][asym_lookup_r[syms]] };
-				const int idx = asym_lookup_r[syms];
-				for (int g = 0; g < n_grids; g++) {
-					const int np_g = points[g];
-					double* const angles = phase_angles.data();
-					double* const sines = phase_sines.data();
-					double* const cosines = phase_cosines.data();
-					for (int p = 0; p < points[g]; p++) {
-						angles[p] = single_k_pts[syms][0] * d1[g][p] + single_k_pts[syms][1] * d2[g][p] + single_k_pts[syms][2] * d3[g][p];
-					}
+			for (int r = 0; r < cryst.nr_small; r++) {
+				if (i_streamed_) std::fill(blk.begin(), blk.end(), cdouble{});
+				cdouble* const I_r = i_streamed_ ? blk.data()
+					: I.data() + static_cast<size_t>(r) * packed_size;
+				const size_t base = static_cast<size_t>(r) * packed_size;
+				const int* asym_lookup_r = asym_lookup[r].data();
+				// Precompute weighted phase factors for integration
+				for (int syms = 0; syms < num_syms; syms++) {
+					single_k_pts[syms] = { k_pt[0][asym_lookup_r[syms]], k_pt[1][asym_lookup_r[syms]], k_pt[2][asym_lookup_r[syms]] };
+					const int idx = asym_lookup_r[syms];
+					for (int g = 0; g < n_grids; g++) {
+						const int np_g = points[g];
+						double* const angles = phase_angles.data();
+						double* const sines = phase_sines.data();
+						double* const cosines = phase_cosines.data();
+						for (int p = 0; p < points[g]; p++) {
+							angles[p] = single_k_pts[syms][0] * d1[g][p] + single_k_pts[syms][1] * d2[g][p] + single_k_pts[syms][2] * d3[g][p];
+						}
 #if defined(__APPLE__)
-					for (int p = 0; p < points[g]; p++) {
-						__sincos(angles[p], &sines[p], &cosines[p]);
-					}
+						for (int p = 0; p < points[g]; p++) {
+							__sincos(angles[p], &sines[p], &cosines[p]);
+						}
 #else
-					vdSinCos(np_g, angles, sines, cosines);
+						vdSinCos(np_g, angles, sines, cosines);
 #endif
-					cdouble* const phase_g = phase_buffer.data();
-					const double* w_g = weights[g].data();
-					for (int p = 0; p < np_g; p++) {
-						phase_g[p] = cdouble(w_g[p] * cosines[p], w_g[p] * sines[p]);
-					}
-					const double asym_fact = asym_atoms[g].asym_fact;
-					const cdouble* DW_fact_g = DW_fact[g].data();
-					const double DW_im = DW_fact_g[idx].imag();
-					const cdouble* phase_fact_g = phase_fact[g].data();
-					const double phase_im = phase_fact_g[idx].imag();
-					const double DW_re = DW_fact_g[idx].real();
-					const double phase_re = phase_fact_g[idx].real();
-					// Precompute basis function independent factors
-					const cdouble grid_factor = cdouble(asym_fact * (DW_re * phase_re - DW_im * phase_im),
-						asym_fact * (DW_re * phase_im + DW_im * phase_re));
-					const cdouble factor = grid_factor * translation_phase[r][syms];
-					// This is where the magic happens
-					for (const GridBlock& block : grid_blocks[g]) {
-						const ivec& active_aos = block.active_aos;
-						const int n_active = static_cast<int>(active_aos.size());
-						const int np = block.point_count;
-						const vec& ao_values = block.ao_values;
+						cdouble* const phase_g = phase_buffer.data();
+						const double* w_g = weights[g].data();
+						for (int p = 0; p < np_g; p++) {
+							phase_g[p] = cdouble(w_g[p] * cosines[p], w_g[p] * sines[p]);
+						}
+						const double asym_fact = asym_atoms[g].asym_fact;
+						const cdouble* DW_fact_g = DW_fact[g].data();
+						const double DW_im = DW_fact_g[idx].imag();
+						const cdouble* phase_fact_g = phase_fact[g].data();
+						const double phase_im = phase_fact_g[idx].imag();
+						const double DW_re = DW_fact_g[idx].real();
+						const double phase_re = phase_fact_g[idx].real();
+						// Precompute basis function independent factors
+						const cdouble grid_factor = cdouble(asym_fact * (DW_re * phase_re - DW_im * phase_im),
+							asym_fact * (DW_re * phase_im + DW_im * phase_re));
+						const cdouble factor = grid_factor * translation_phase[r][syms];
+						// This is where the magic happens
+						for (const GridBlock& block : grid_blocks[g]) {
+							const ivec& active_aos = block.active_aos;
+							const int n_active = static_cast<int>(active_aos.size());
+							const int np = block.point_count;
+							const vec& ao_values = block.ao_values;
 
-						double* const real_w = weighted_values_real.data();
-						double* const imag_w = weighted_values_imag.data();
-						double* const tile_real = tile_real_values.data();
-						double* const tile_imag = tile_imag_values.data();
-						const cdouble* phase_values = phase_g + block.point_start;
+							double* const real_w = weighted_values_real.data();
+							double* const imag_w = weighted_values_imag.data();
+							double* const tile_real = tile_real_values.data();
+							double* const tile_imag = tile_imag_values.data();
+							const cdouble* phase_values = phase_g + block.point_start;
 
-						for (int local_mu = 0; local_mu < n_active; local_mu++) {
-							const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
-							double* rw_row = real_w + static_cast<size_t>(local_mu) * np;
-							double* iw_row = imag_w + static_cast<size_t>(local_mu) * np;
-							for (int p = 0; p < np; p++) {
-								rw_row[p] = ao_row[p] * phase_values[p].real();
-								iw_row[p] = ao_row[p] * phase_values[p].imag();
+							for (int local_mu = 0; local_mu < n_active; local_mu++) {
+								const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
+								double* rw_row = real_w + static_cast<size_t>(local_mu) * np;
+								double* iw_row = imag_w + static_cast<size_t>(local_mu) * np;
+								for (int p = 0; p < np; p++) {
+									rw_row[p] = ao_row[p] * phase_values[p].real();
+									iw_row[p] = ao_row[p] * phase_values[p].imag();
+								}
 							}
-						}
 
-						for (const MatrixTile& tile : block.matrix_tiles) {
-							const double* ao_tile_row = ao_values.data() + static_cast<size_t>(tile.row_start) * np;
-							cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
-								ao_tile_row, np,
-								real_w + static_cast<size_t>(tile.col_start) * np, np,
-								0.0, tile_real + tile.result_offset, tile.col_count);
-							cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
-								ao_tile_row, np,
-								imag_w + static_cast<size_t>(tile.col_start) * np, np,
-								0.0, tile_imag + tile.result_offset, tile.col_count);
-						}
+							for (const MatrixTile& tile : block.matrix_tiles) {
+								const double* ao_tile_row = ao_values.data() + static_cast<size_t>(tile.row_start) * np;
+								cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
+									ao_tile_row, np,
+									real_w + static_cast<size_t>(tile.col_start) * np, np,
+									0.0, tile_real + tile.result_offset, tile.col_count);
+								cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
+									ao_tile_row, np,
+									imag_w + static_cast<size_t>(tile.col_start) * np, np,
+									0.0, tile_imag + tile.result_offset, tile.col_count);
+							}
 
-						// Retiling
-						for (const MatrixTile& tile : block.matrix_tiles) {
-							for (int tile_row = 0; tile_row < tile.row_count; tile_row++) {
-								const int local_mu = tile.row_start + tile_row;
-								const int mu = active_aos[local_mu];
-								const int first_tile_col = (tile.row_start == tile.col_start) ? tile_row : 0;
-								for (int tile_col = first_tile_col; tile_col < tile.col_count; tile_col++) {
-									const int local_nu = tile.col_start + tile_col;
-									const int nu = active_aos[local_nu];
-									if (!skip[mu][nu]) {
-										const size_t matrix_idx = tile.result_offset + static_cast<size_t>(tile_row) * tile.col_count + tile_col;
-										I_r[tri_index(mu, nu)] += cdouble(tile_real[matrix_idx], tile_imag[matrix_idx]) * factor;
+							// Retiling
+							for (const MatrixTile& tile : block.matrix_tiles) {
+								for (int tile_row = 0; tile_row < tile.row_count; tile_row++) {
+									const int local_mu = tile.row_start + tile_row;
+									const int mu = active_aos[local_mu];
+									const int first_tile_col = (tile.row_start == tile.col_start) ? tile_row : 0;
+									for (int tile_col = first_tile_col; tile_col < tile.col_count; tile_col++) {
+										const int local_nu = tile.col_start + tile_col;
+										const int nu = active_aos[local_nu];
+										if (!skip[mu][nu]) {
+											const size_t matrix_idx = tile.result_offset + static_cast<size_t>(tile_row) * tile.col_count + tile_col;
+											I_r[tri_index(mu, nu)] += cdouble(tile_real[matrix_idx], tile_imag[matrix_idx]) * factor;
+										}
 									}
 								}
 							}
 						}
 					}
 				}
-			}
-			if (i_streamed_) {
-				//A write is packed_size * 16 bytes against a whole reflection's worth
-				//of integration, so the lock is not on the hot path
+				if (i_streamed_) {
+					//A write is packed_size * 16 bytes against a whole reflection's worth
+					//of integration, so the lock is not on the hot path
 #pragma omp critical(i_tensor_write)
-				i_file_.write_block(r, blk.data());
-			}
-			if (!(opt->no_date) && pb) {
-				pb->update();
+					i_file_.write_block(r, blk.data());
+				}
+				if (!(opt->no_date) && pb) {
+					pb->update();
+				}
 			}
 		}
-	}
 	}
 	if (i_streamed_) {
 		i_file_.finish_write();
@@ -2300,6 +2304,11 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	std::ostringstream oss3;
 	oss3 << "NA2_" << value << ".fchk";
 	scf.wavefunction().save(oss3.str());
+	if (settings.nbo_output) {
+		std::ostringstream oss4;
+		oss4 << "NA2_" << value << ".47";
+		sf_wave_vec[0].write_nbo(oss4.str(), opt->debug, &XCW_log);
+	}
 	//Roby_information Roby(sf_wave_vec[0]);
 }
 

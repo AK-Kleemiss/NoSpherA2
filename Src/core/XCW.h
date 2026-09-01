@@ -112,6 +112,7 @@ private:
 		bool safe_tensor;
 		bool read_tensor;
 		bool read_first_guess;
+		bool nbo_output = false;
 		// Largest I tensor held resident, in MB. Above it the tensor goes to disk
 		// and is read back a window of reflections at a time; 0 means no limit,
 		// which is the original behaviour. Set with `i_tensor_mb <n>` in the XCW
