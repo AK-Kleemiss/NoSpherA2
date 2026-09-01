@@ -36,15 +36,15 @@ struct Dev {
 	T* wri = nullptr;
 	T* cri = nullptr;
 	void* gemm_ws = nullptr;   //split-k partials, whichever GEMM is compiled in
-	double* I_re = nullptr;
-	double* I_im = nullptr;
+	double* I_re[2] = { nullptr, nullptr };
+	double* I_im[2] = { nullptr, nullptr };
+	double* host_re[2] = { nullptr, nullptr };
+	double* host_im[2] = { nullptr, nullptr };
+	gpuEvent_t done[2] = {};
+	gpuStream_t copy_stream = nullptr;
 	//Host copies of the small layout arrays, so the loop stays on the host
 	std::vector<int> blk_grid, blk_ps, blk_pc, blk_na, grid_off;
 	std::vector<long long> blk_ao_off, blk_aos_off;
-	//Landing buffers for the read-back, held rather than made per reflection: they are
-	//overwritten wholesale by the copy, so allocating and zeroing them once per reflection
-	//was two costs for no purpose, several thousand times a run.
-	std::vector<double> host_re, host_im;
 };
 
 template <typename T> Dev<T> g;
@@ -157,7 +157,13 @@ void free_impl()
 	gpuFree(d.d1); gpuFree(d.d2); gpuFree(d.d3); gpuFree(d.w);
 	gpuFree(d.phase_re); gpuFree(d.phase_im);
 	gpuFree(d.wri); gpuFree(d.cri); gpuFree(d.gemm_ws);
-	gpuFree(d.I_re); gpuFree(d.I_im);
+	for (int i = 0; i < 2; i++) {
+		gpuFree(d.I_re[i]); gpuFree(d.I_im[i]);
+		if (d.host_re[i]) gpuFreeHost(d.host_re[i]);
+		if (d.host_im[i]) gpuFreeHost(d.host_im[i]);
+		if (d.done[i]) gpuEventDestroy(d.done[i]);
+	}
+	if (d.copy_stream) gpuStreamDestroy(d.copy_stream);
 	d = Dev<T>{};
 }
 
@@ -206,7 +212,7 @@ bool init_impl(const itensor_gpu_layout& L)
 		sizeof(T) * 2 * (size_t)max_elems +
 		sizeof(T) * 2 * (size_t)max_na * max_na +
 		max_ws +
-		sizeof(double) * 2 * (size_t)L.packed;
+		sizeof(double) * 4 * (size_t)L.packed;
 	size_t freeb = 0, totalb = 0;
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
 	if (need + (1u << 26) > freeb) return false;
@@ -223,8 +229,14 @@ bool init_impl(const itensor_gpu_layout& L)
 	GPU_TRY(gpuMalloc(&d.wri, sizeof(T) * (size_t)max_elems * 2));
 	GPU_TRY(gpuMalloc(&d.cri, sizeof(T) * (size_t)max_na * max_na * 2));
 	GPU_TRY(gpuMalloc(&d.gemm_ws, max_ws ? max_ws : 1));
-	GPU_TRY(gpuMalloc(&d.I_re, sizeof(double) * (size_t)L.packed));
-	GPU_TRY(gpuMalloc(&d.I_im, sizeof(double) * (size_t)L.packed));
+	for (int i = 0; i < 2; i++) {
+		GPU_TRY(gpuMalloc(&d.I_re[i], sizeof(double) * (size_t)L.packed));
+		GPU_TRY(gpuMalloc(&d.I_im[i], sizeof(double) * (size_t)L.packed));
+		GPU_TRY(gpuHostAlloc((void**)&d.host_re[i], sizeof(double) * (size_t)L.packed));
+		GPU_TRY(gpuHostAlloc((void**)&d.host_im[i], sizeof(double) * (size_t)L.packed));
+		GPU_TRY(gpuEventCreate(&d.done[i]));
+	}
+	GPU_TRY(gpuStreamCreateNonBlocking(&d.copy_stream));
 
 	if (!upload_ao<T>(d.ao, L.ao_all, L.ao_all_len)) return false;
 	GPU_TRY(gpuMemcpy(d.aos, L.aos_all, sizeof(int) * (size_t)L.aos_all_len, gpuMemcpyHostToDevice));
@@ -243,21 +255,18 @@ bool init_impl(const itensor_gpu_layout& L)
 	d.blk_ao_off.assign(L.blk_ao_off, L.blk_ao_off + L.n_blocks);
 	d.blk_aos_off.assign(L.blk_aos_off, L.blk_aos_off + L.n_blocks);
 	d.grid_off.assign(L.grid_point_off, L.grid_point_off + L.n_grids + 1);
-	d.host_re.resize((size_t)L.packed);
-	d.host_im.resize((size_t)L.packed);
 	d.ready = true;
 	return true;
 }
 
 template <typename T>
-bool reflection_impl(const int num_syms,
+bool submit_impl(const int slot, const int num_syms,
 	const double* kx, const double* ky, const double* kz,
-	const std::complex<double>* factors,
-	std::complex<double>* I_r)
+	const std::complex<double>* factors)
 {
 	Dev<T>& d = g<T>;
-	if (!d.ready) return false;
-	zero_kernel<<<(d.packed + 255) / 256, 256>>>(d.packed, d.I_re, d.I_im);
+	if (!d.ready || slot < 0 || slot > 1) return false;
+	zero_kernel<<<(d.packed + 255) / 256, 256>>>(d.packed, d.I_re[slot], d.I_im[slot]);
 
 	for (int s = 0; s < num_syms; s++) {
 		//The CPU path takes sin/cos of k.d directly; scaling k to turns here is what lets
@@ -286,16 +295,27 @@ bool reflection_impl(const int num_syms,
 			const dim3 thr(16, 16);
 			const dim3 blk((na + 15) / 16, (na + 15) / 16);
 			accumulate_kernel<T><<<blk, thr>>>(na, d.nmo, d.blk_aos_off[b], d.aos, d.skip,
-				d.cri, d.cri + (long long)na * na, f.real(), f.imag(), d.I_re, d.I_im);
+				d.cri, d.cri + (long long)na * na, f.real(), f.imag(), d.I_re[slot], d.I_im[slot]);
 		}
 	}
 	GPU_TRY(gpuGetLastError());
-	GPU_TRY(gpuDeviceSynchronize());
+	GPU_TRY(gpuEventRecord(d.done[slot], 0));
+	return true;
+}
 
-	GPU_TRY(gpuMemcpy(d.host_re.data(), d.I_re, sizeof(double) * (size_t)d.packed, gpuMemcpyDeviceToHost));
-	GPU_TRY(gpuMemcpy(d.host_im.data(), d.I_im, sizeof(double) * (size_t)d.packed, gpuMemcpyDeviceToHost));
+template <typename T>
+bool collect_impl(const int slot, std::complex<double>* I_r)
+{
+	Dev<T>& d = g<T>;
+	if (!d.ready || slot < 0 || slot > 1) return false;
+	GPU_TRY(gpuStreamWaitEvent(d.copy_stream, d.done[slot], 0));
+	GPU_TRY(gpuMemcpyAsync(d.host_re[slot], d.I_re[slot], sizeof(double) * (size_t)d.packed,
+		gpuMemcpyDeviceToHost, d.copy_stream));
+	GPU_TRY(gpuMemcpyAsync(d.host_im[slot], d.I_im[slot], sizeof(double) * (size_t)d.packed,
+		gpuMemcpyDeviceToHost, d.copy_stream));
+	GPU_TRY(gpuStreamSynchronize(d.copy_stream));
 	for (int i = 0; i < d.packed; i++)
-		I_r[i] += std::complex<double>(d.host_re[i], d.host_im[i]);
+		I_r[i] += std::complex<double>(d.host_re[slot][i], d.host_im[slot][i]);
 	return true;
 }
 
@@ -319,16 +339,22 @@ bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec)
 	//visible in the reference output, so the same input would produce different logs on
 	//different machines. Single precision unless the caller asks for double.
 	g_fp64 = (prec == sf_precision::FP64);
-	return g_fp64 ? init_impl<double>(L) : init_impl<float>(L);
+	const bool ok = g_fp64 ? init_impl<double>(L) : init_impl<float>(L);
+	if (!ok) itensor_gpu_free();
+	return ok;
 }
 
-bool itensor_gpu_reflection(const int num_syms,
+bool itensor_gpu_submit(const int slot, const int num_syms,
 	const double* kx, const double* ky, const double* kz,
-	const std::complex<double>* factors,
-	std::complex<double>* I_r)
+	const std::complex<double>* factors)
 {
-	return g_fp64 ? reflection_impl<double>(num_syms, kx, ky, kz, factors, I_r)
-	              : reflection_impl<float>(num_syms, kx, ky, kz, factors, I_r);
+	return g_fp64 ? submit_impl<double>(slot, num_syms, kx, ky, kz, factors)
+	              : submit_impl<float>(slot, num_syms, kx, ky, kz, factors);
+}
+
+bool itensor_gpu_collect(const int slot, std::complex<double>* I_r)
+{
+	return g_fp64 ? collect_impl<double>(slot, I_r) : collect_impl<float>(slot, I_r);
 }
 
 void itensor_gpu_free()

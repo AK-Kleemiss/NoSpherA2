@@ -26,6 +26,12 @@
 #define gpuStreamCreate hipStreamCreate
 #define gpuStreamDestroy hipStreamDestroy
 #define gpuStreamSynchronize hipStreamSynchronize
+#define gpuStreamCreateNonBlocking(s) hipStreamCreateWithFlags(s, hipStreamNonBlocking)
+#define gpuStreamWaitEvent hipStreamWaitEvent
+#define gpuEvent_t hipEvent_t
+#define gpuEventCreate(e) hipEventCreateWithFlags(e, hipEventDisableTiming)
+#define gpuEventDestroy hipEventDestroy
+#define gpuEventRecord hipEventRecord
 #define gpuMemcpyAsync hipMemcpyAsync
 #define gpuHostAlloc hipHostMalloc
 #define gpuFreeHost hipHostFree
@@ -51,6 +57,12 @@
 #define gpuStreamCreate cudaStreamCreate
 #define gpuStreamDestroy cudaStreamDestroy
 #define gpuStreamSynchronize cudaStreamSynchronize
+#define gpuStreamCreateNonBlocking(s) cudaStreamCreateWithFlags(s, cudaStreamNonBlocking)
+#define gpuStreamWaitEvent cudaStreamWaitEvent
+#define gpuEvent_t cudaEvent_t
+#define gpuEventCreate(e) cudaEventCreateWithFlags(e, cudaEventDisableTiming)
+#define gpuEventDestroy cudaEventDestroy
+#define gpuEventRecord cudaEventRecord
 #define gpuMemcpyAsync cudaMemcpyAsync
 #define gpuHostAlloc(p, n) cudaHostAlloc((p), (n), cudaHostAllocDefault)
 #define gpuFreeHost cudaFreeHost

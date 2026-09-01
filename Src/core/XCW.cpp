@@ -1585,11 +1585,19 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 	}
 	if (itensor_on_gpu) {
-		//The GPU holds one reflection at a time, so this loop is sequential by design
 		cvec blk_gpu;
 		if (i_streamed_) blk_gpu.assign(packed_size, cdouble{});
 		vec kxs(num_syms), kys(num_syms), kzs(num_syms);
 		cvec facs(static_cast<size_t>(num_syms) * n_atom_grids);
+		auto collect_gpu = [&](const int rr) {
+			if (i_streamed_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
+			cdouble* const I_rr = i_streamed_ ? blk_gpu.data()
+									  : I.data() + static_cast<size_t>(rr) * packed_size;
+			if (!itensor_gpu_collect(rr & 1, I_rr))
+				err_checkf(false, "I tensor GPU read-back failed", std::cout);
+			if (i_streamed_) i_file_.write_block(rr, blk_gpu.data());
+			if (!(opt->no_date) && pb) pb->update();
+		};
 		for (int rr = 0; rr < cryst.nr_small; rr++) {
 			for (int sy = 0; sy < static_cast<int>(num_syms); sy++) {
 				kxs[sy] = k_pt[0][asym_lookup[rr][sy]];
@@ -1600,14 +1608,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
 					* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
 			}
-			cdouble* const I_rr = i_streamed_ ? blk_gpu.data()
-				: I.data() + static_cast<size_t>(rr) * packed_size;
-			if (i_streamed_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
-			if (!itensor_gpu_reflection(static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data(), I_rr))
+			if (!itensor_gpu_submit(rr & 1, static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data()))
 				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
-			if (i_streamed_) i_file_.write_block(rr, blk_gpu.data());
-			if (!(opt->no_date) && pb) pb->update();
+			if (rr > 0) collect_gpu(rr - 1);
 		}
+		if (cryst.nr_small > 0) collect_gpu(cryst.nr_small - 1);
 		itensor_gpu_free();
 		//No bookkeeping here: the loop above runs for both paths and eval_I multiplies the
 		//total by nr_small on the way out, so anything added here counts twice.

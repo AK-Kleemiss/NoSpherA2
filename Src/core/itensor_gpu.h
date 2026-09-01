@@ -48,11 +48,11 @@ struct itensor_gpu_layout {
 //single. sf_precision::Auto is deliberately not honoured - see the definition.
 bool itensor_gpu_init(const itensor_gpu_layout& L, sf_precision prec = sf_precision::FP32);
 
-//One reflection: phases for each symmetry mate, then every block, accumulated into I_r.
-//factors is [num_syms * n_grids], the same product the CPU path applies per (sym, grid).
-bool itensor_gpu_reflection(int num_syms,
+//Submit one reflection to one of two result slots. collect() returns it after a later
+//reflection has started, so the device-to-host copy overlaps that calculation.
+bool itensor_gpu_submit(int slot, int num_syms,
 	const double* kx, const double* ky, const double* kz,
-	const std::complex<double>* factors,
-	std::complex<double>* I_r);
+	const std::complex<double>* factors);
+bool itensor_gpu_collect(int slot, std::complex<double>* I_r);
 
 void itensor_gpu_free();
