@@ -317,6 +317,17 @@ bool unsaved_files(std::vector<WFN>& wavy);
 std::string trim(const std::string& s);
 
 /**
+ * @brief Physical memory this process can actually get, in bytes, or 0 when it cannot be told.
+ *
+ * Not what the machine has: a scheduler or container ceiling counts, and on a cluster it is
+ * usually well below the node's total. Windows reads the available physical memory and any
+ * job object limit, macOS counts free, inactive and purgeable pages, Linux takes
+ * MemAvailable against the cgroup v2 or v1 limit. Zero means no answer was available and
+ * the caller should keep whatever it would have done without asking.
+ */
+size_t available_memory_bytes();
+
+/**
  * @brief std::getline that also accepts CRLF line endings.
  *
  * Files here move between Windows and the Linux servers constantly, and a text

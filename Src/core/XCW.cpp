@@ -1122,12 +1122,32 @@ void XCW::decide_i_storage() {
 	const size_t per_block = i_tensor_file::block_bytes(cryst.nmo);
 	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo);
 
-	//The settings file budget wins, then -mem; with neither the tensor is held
+	//The settings file budget wins, then -mem, then what the process can actually have.
+	//Left to a keyword this is the most expensive decision in an XCW run and the wrong
+	//answer is silent: calc_F_calc and calc_perturb each walk the whole tensor every SCF
+	//iteration, so streaming one that would have fit costs the difference between reading
+	//it from disk and reading it from memory. Measured on a V100 node with the planar
+	//ethylene at def2-TZVP, 16862 reflections and a 155.8 GB tensor: 184.7 s per iteration
+	//streamed against 6.8 s held, 27x, on the stage a 200-step lambda scan spends its life
+	//in. Nobody should have to know that to get it right, and the machine can be asked.
 	size_t budget = settings.i_tensor_max_mb * 1024ULL * 1024ULL;
 	const char* source = "i_tensor_mb";
+	bool automatic = false;
 	if (budget == 0 && opt->mem_given && opt->mem > 0.0) {
 		budget = static_cast<size_t>(opt->mem * 1024.0 * 1024.0);
 		source = "-mem";
+	}
+	if (budget == 0) {
+		const size_t avail = available_memory_bytes();
+		if (avail > 0) {
+			//Four fifths: the SCF matrices, the grids and OCC's own allocations live in the
+			//rest, and a tensor that only just fits would page rather than run. What the
+			//process can have is a platform question - a cgroup here, a job object on
+			//Windows, page classes on a Mac - and lives in convenience.cpp.
+			budget = avail / 5 * 4;
+			source = "four fifths of the memory this job can have";
+			automatic = true;
+		}
 	}
 
 	//items_within_budget returns 0 for "hold everything": no file, no re-read twice per SCF iteration
@@ -1135,8 +1155,9 @@ void XCW::decide_i_storage() {
 	i_streamed_ = (w != 0);
 	if (!i_streamed_) {
 		//Announced only when someone asked about memory: saying it unconditionally
-		//shifts every reference output by a line
-		if (budget > 0 || ProgressBar::report_counts) {
+		//shifts every reference output by a line, and the automatic budget would say it on
+		//every run - including the reference tests, which is why it stays quiet there.
+		if ((budget > 0 && !automatic) || ProgressBar::report_counts) {
 			std::cout << std::fixed << std::setprecision(2)
 				<< "I tensor held in memory: " << (total / 1048576.0) << " MB";
 			if (budget > 0)
@@ -1150,8 +1171,8 @@ void XCW::decide_i_storage() {
 	std::cout << std::fixed << std::setprecision(2)
 		<< "I tensor streamed to disk: " << (total / 1048576.0) << " MB total, "
 		<< i_window_ << " of " << cryst.nr_small << " reflections resident ("
-		<< (i_window_ * per_block / 1048576.0) << " MB) to fit the "
-		<< (budget / 1048576.0) << " MB " << source << " budget" << std::endl;
+		<< (i_window_ * per_block / 1048576.0) << " MB) to fit " << source
+		<< " (" << (budget / 1048576.0) << " MB)" << std::endl;
 	if (i_window_ == 1 && per_block > budget)
 		std::cout << "  NOTE: one reflection alone is " << (per_block / 1048576.0)
 		<< " MB, over the budget. Running one at a time." << std::endl;

@@ -16,6 +16,9 @@
 #include <windows.h>
 #include <commdlg.h>
 #include <cderr.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <sys/sysctl.h>
 #endif
 
 namespace {
@@ -4204,6 +4207,90 @@ double double_from_string_with_esd(std::string in)
         return stod(in);
     else
         return stod(in.substr(0, in.find('(')));
+}
+
+size_t available_memory_bytes()
+{
+	size_t avail = 0;
+#ifdef _WIN32
+	MEMORYSTATUSEX status{};
+	status.dwLength = sizeof(status);
+	if (GlobalMemoryStatusEx(&status))
+		avail = static_cast<size_t>(status.ullAvailPhys);
+	//A job object limit is what a scheduler or a container puts on a Windows process, the
+	//counterpart of the cgroup ceiling below. Passing nullptr asks about this process's own
+	//job, and a process outside one simply reports no limit flags.
+	JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+	DWORD returned = 0;
+	if (QueryInformationJobObject(nullptr, JobObjectExtendedLimitInformation,
+		&limits, sizeof(limits), &returned)) {
+		const DWORD flags = limits.BasicLimitInformation.LimitFlags;
+		if (flags & JOB_OBJECT_LIMIT_PROCESS_MEMORY) {
+			const size_t l = static_cast<size_t>(limits.ProcessMemoryLimit);
+			if (l > 0 && (avail == 0 || l < avail)) avail = l;
+		}
+		if (flags & JOB_OBJECT_LIMIT_JOB_MEMORY) {
+			const size_t l = static_cast<size_t>(limits.JobMemoryLimit);
+			if (l > 0 && (avail == 0 || l < avail)) avail = l;
+		}
+	}
+#elif defined(__APPLE__)
+	//Free alone understates it badly on a Mac, where the kernel keeps most of memory
+	//speculatively occupied: inactive and purgeable pages are handed back on demand and
+	//count as available, which is the same thing Activity Monitor calls memory pressure.
+	vm_size_t page_size = 0;
+	mach_port_t host = mach_host_self();
+	if (host_page_size(host, &page_size) == KERN_SUCCESS) {
+		vm_statistics64_data_t vm{};
+		mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+		if (host_statistics64(host, HOST_VM_INFO64,
+			reinterpret_cast<host_info64_t>(&vm), &count) == KERN_SUCCESS) {
+			const uint64_t pages = static_cast<uint64_t>(vm.free_count)
+				+ vm.inactive_count + vm.purgeable_count;
+			avail = static_cast<size_t>(pages * static_cast<uint64_t>(page_size));
+		}
+	}
+	if (avail == 0) {
+		//Nothing else answered: the physical size, which is at least an upper bound the
+		//caller's fraction keeps it under.
+		uint64_t total = 0;
+		size_t len = sizeof(total);
+		if (sysctlbyname("hw.memsize", &total, &len, nullptr, 0) == 0)
+			avail = static_cast<size_t>(total);
+	}
+#else
+	if (std::FILE *f = std::fopen("/proc/meminfo", "r")) {
+		char line[256];
+		while (std::fgets(line, sizeof(line), f)) {
+			unsigned long long kb = 0;
+			if (std::sscanf(line, "MemAvailable: %llu kB", &kb) == 1) {
+				avail = static_cast<size_t>(kb) * 1024ULL;
+				break;
+			}
+		}
+		std::fclose(f);
+	}
+	//Under a batch system or a container the cgroup limit is the real ceiling and
+	///proc/meminfo reports the whole machine: a job given 180 GB of a 376 GB node would
+	//otherwise decide it can have 300 and be killed for it. v2 first, then v1.
+	for (const char *path : { "/sys/fs/cgroup/memory.max",
+							  "/sys/fs/cgroup/memory/memory.limit_in_bytes" }) {
+		std::FILE *f = std::fopen(path, "r");
+		if (!f) continue;
+		char buf[64] = {};
+		if (std::fgets(buf, sizeof(buf), f)) {
+			unsigned long long lim = 0;
+			//v2 writes "max" when there is none; v1 writes a sentinel near SIZE_MAX
+			if (std::sscanf(buf, "%llu", &lim) == 1 && lim > 0) {
+				const size_t l = static_cast<size_t>(lim);
+				if (l < (static_cast<size_t>(1) << 62) && (avail == 0 || l < avail)) avail = l;
+			}
+		}
+		std::fclose(f);
+		break;
+	}
+#endif
+	return avail;
 }
 
 std::string trim(const std::string &s)
