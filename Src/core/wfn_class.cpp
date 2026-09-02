@@ -9237,6 +9237,7 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
 bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
     origin = e_origin::ptb;
+    path = filename;
     if (debug)
         file << "Reading pTB file: " << filename << std::endl;
     std::ifstream inFile(filename, std::ios::binary | std::ios::in);
@@ -9425,6 +9426,8 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     err_checkf(nmo == nmomax, "Error adding MOs to WFN!", file);
 
     // we need to generate the primitive coefficients from the contr and exp from the momat, then we cann add them MO-wise
+    // pTB orders cartesian f as xxx,yyy,zzz,xxy,xxz,xyy,yyz,xzz,yzz,xyz, so its 16 and 17
+    // are xyy and yyz where type_vector has them the other way round
     for (int i = 0; i < nprims; i++)
     {
         vec values;
@@ -9432,7 +9435,10 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         {
             values.push_back(momat(j, ipao[i] - 1) * contr[i]);
         }
-        add_primitive(aoatcart[i], lao[i], exps[i], values.data());
+        int type = lao[i];
+        if (type == 16) type = 17;
+        else if (type == 17) type = 16;
+        add_primitive(aoatcart[i], type, exps[i], values.data());
     }
 
     //Now turn Pmat into a full matrix

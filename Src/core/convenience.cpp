@@ -642,7 +642,10 @@ std::string help_message =
  "  -Cation <label ...>  -Anion <label ...>\n"
  "                                    Explicit ionic fragment labels.\n\n"
  "DENSITY, PROPERTIES, AND ANALYSIS\n"
- "  -rho_cube <wfn>                    Write an electron-density cube.\n"
+ "  -rho_cube <wfn>                    Write an electron-density cube.  Uses\n"
+ "                                    -radius/-resolution when they precede it\n"
+ "                                    on the command line, and reports the\n"
+ "                                    integrated electron count.\n"
  "  -elf  -eli  -lap  -rdg  -esp       Request ELF, ELI, Laplacian, RDG, or\n"
  "                                    electrostatic-potential properties.\n"
  "  -def  -HDEF                        Request deformation density or HDEF.\n"
@@ -693,7 +696,12 @@ std::string help_message =
  "  -v | -v2 | -debug                  Verbose diagnostic output.\n"
  "  -profiling [tests-root]            Run the internal profiling suite\n"
  "                                    [./tests]. Alias: -profile.\n"
- "  -no-date                           Suppress date information in output.\n"
+ "  -no-date                           Suppress date information and the GPU notes, so\n"
+ "                                    output does not depend on the machine it ran on.\n"
+ "  -no_date_but_gpu                   As -no-date, but keeps the GPU notes. For the\n"
+ "                                    tests whose reference has to show that the device\n"
+ "                                    did the work, a silent fallback being otherwise\n"
+ "                                    indistinguishable from the CPU result.\n"
  "  -draw_orbits l,m[,resolution,radius]\n"
  "                                    Draw a spherical-harmonic orbital.\n"
  "  -eli_analysis <wfn> <resolution> <radius>\n"
@@ -2885,7 +2893,12 @@ bool options::digest_run_options(const std::string &temp, int &i)
     else if (temp == "-mult")
         mult = stoi(arguments[i + 1]);
     else if (temp == "-no-date" || temp == "-no_date")
+        no_date = constants::hide_gpu_notes = true;
+    else if (temp == "-no_date_but_gpu" || temp == "-no-date-but-gpu")
+    {
         no_date = true;
+        constants::hide_gpu_notes = false;
+    }
     else if (temp == "-pbc")
         pbc = stoi(arguments[i + 1]);
     else if (temp == "-profiling" || temp == "-profile")
@@ -3552,7 +3565,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
         if (ECP)
             wavy.set_has_ECPs(true);
         std::cout << "Starting cube calculation" << endl;
-        wavy.write_rho_cube();
+        wavy.write_rho_cube(properties.radius, properties.resolution);
         exit(0);
     }
     else if (temp.find("-s_rho") < 1)
