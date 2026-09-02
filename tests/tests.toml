@@ -1,7 +1,12 @@
 [defaults]
-# Parameters that are added to every test by default
+# Parameters that are added to every test by default. The list lives in
+# tests/src/IntegrationTests.cpp; this section mirrors it.
 all_charges = ""
 no_date = ""
+# Integration grid weights on the CPU, so a reference log does not depend on
+# whether the machine running the test has a GPU. Tests that want the device
+# pass -gpu_grid, which comes after this and wins.
+no_gpu_grid = ""
 
 [alanine_occ]
 directory = "alanine_occ"

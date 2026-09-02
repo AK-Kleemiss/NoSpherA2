@@ -315,9 +315,15 @@ static std::optional<TomlTestDef> load_test_def_from_toml(const std::filesystem:
     Mode mode = Mode::None;
 
     TomlTestDef def;
-    // Defaults from [defaults] in tests/tests.toml are currently two flags.
+    // Defaults from [defaults] in tests/tests.toml, mirrored here.
     def.args.emplace_back("all_charges", std::vector<std::string>{"true"});
     def.args.emplace_back("no_date", std::vector<std::string>{"true"});
+    // The integration grid weights went to the GPU by default, which adds a line to
+    // the log on a machine with a card and none on a machine without, so every
+    // reference log here matched on one kind of machine and failed on the other.
+    // Pin the CPU path the way the fp32/fp64 tests pin theirs; the tests that want
+    // the device pass -gpu_grid themselves and, coming after this one, win.
+    def.args.emplace_back("no_gpu_grid", std::vector<std::string>{"true"});
     std::string line;
     while (std::getline(in, line)) {
         line = strip_comment(line);

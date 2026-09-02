@@ -1,6 +1,9 @@
 # Tests using tests/sucrose_fchk_SF
 # Fukui and FukuiPBC both write <stem>_fukui.dat into this directory, so they
-# need the lock both against each other and against the four tests above.
+# need the lock both against each other and against the four tests above. The
+# three GPU variants run in the same directory and belong in the group as well:
+# without them, -j runs interleaved their output into the shared NoSpherA2.log
+# and all three failed with garbage - including NUL padding - in the log.
 set_tests_properties(
     TomlIntegrationTests.Fractal
     TomlIntegrationTests.Properties
@@ -8,6 +11,9 @@ set_tests_properties(
     TomlIntegrationTests.SucroseTwin
     TomlIntegrationTests.Fukui
     TomlIntegrationTests.FukuiPBC
+    TomlIntegrationTests.sucrose_SF_gpu_grid
+    TomlIntegrationTests.sucrose_SF_gpu_fp64
+    TomlIntegrationTests.sucrose_SF_gpu_fp32
     PROPERTIES
         RESOURCE_LOCK integration_sucrose_fchk_SF
 )
@@ -47,7 +53,7 @@ set_tests_properties(
         RESOURCE_LOCK integration_SALTED
 )
 
-# Tests using tests/P1_test (all four write to the same tests/P1_test/NoSpherA2.log,
+# Tests using tests/P1_test (all of them write to the same tests/P1_test/NoSpherA2.log,
 # NoSpherA2's log filename is not currently configurable via CLI -- without this lock,
 # CTEST_PARALLEL_LEVEL > 1 races these against each other and corrupts the shared log
 # with interleaved output from concurrent runs, on every platform)
@@ -58,6 +64,11 @@ set_tests_properties(
     TomlIntegrationTests.P1_test_XCW_h2_full
     TomlIntegrationTests.P1_F2_test_XCW
     TomlIntegrationTests.P1_F2_test_XCW_h2
+    TomlIntegrationTests.P1_test_XCW_full
+    TomlIntegrationTests.P1_test_XCW_h2_full
+    TomlIntegrationTests.P1_F2_test_XCW_full
+    TomlIntegrationTests.P1_F2_test_XCW_h2_full
+    TomlIntegrationTests.P1_test_XCW_gpu_itensor
     PROPERTIES
         RESOURCE_LOCK integration_P1_test
 )
