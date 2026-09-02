@@ -87,11 +87,26 @@ function(nosphera2_enable_optimizations target_name)
         # transform ran at 0.5 GFLOP/s against 22.1 on a laptop, and OMP_NUM_THREADS=48 and
         # =1 gave the same runtime to within a second. MSVC was never affected because
         # /openmp:experimental above is applied unconditionally.
-        target_compile_options(
-            "${target_name}"
-            PRIVATE
-                $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
-        )
+        # AppleClang rejects a bare -fopenmp ("unsupported option '-fopenmp'"), and
+        # even a clang that accepts it would not find omp.h or libomp, both of which
+        # live in the Micromamba environment. The imported target carries what that
+        # compiler needs - -Xpreprocessor -fopenmp, the include directory and the
+        # libomp path, all set by the macOS presets - so use it there. Linking it to
+        # a static library adds no library but does hand the target its compile
+        # options and include directories, which is the half that matters here.
+        if(APPLE)
+            target_link_libraries(
+                "${target_name}"
+                PRIVATE
+                    OpenMP::OpenMP_CXX
+            )
+        else()
+            target_compile_options(
+                "${target_name}"
+                PRIVATE
+                    $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
+            )
+        endif()
 
         get_target_property(target_type "${target_name}" TYPE)
 
@@ -103,11 +118,6 @@ function(nosphera2_enable_optimizations target_name)
                         $<$<CONFIG:Release>:
                             LINKER:-dead_strip
                         >
-                )
-                target_link_libraries(
-                    "${target_name}"
-                    PRIVATE
-                        OpenMP::OpenMP_CXX
                 )
             else()
                 target_link_options(
