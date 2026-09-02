@@ -395,7 +395,7 @@ public:
             file << "\nStarting while !.eof()" << std::endl;
         while (!cif_input.eof())
         {
-            getline(cif_input, line);
+            getline_universal(cif_input, line);
             for (int k = 0; k < cell_keywords.size(); k++)
             {
                 if (line.find(cell_keywords[k]) != std::string::npos)
@@ -546,13 +546,13 @@ public:
         int count_fields = 0;
         while (!cif_input.eof() && !symm_found)
         {
-            getline(cif_input, line);
+            getline_universal(cif_input, line);
             if (line.find("loop_") != std::string::npos)
             {
                 // if(debug) file << "found loop!" << endl;
                 while (line.find("_") != std::string::npos)
                 {
-                    getline(cif_input, line);
+                    getline_universal(cif_input, line);
                     if (debug)
                         file << "line in loop field definition: " << line << std::endl;
                     // Both spellings occur: the current tag and the deprecated one,
@@ -644,7 +644,7 @@ public:
                             for (int y = 0; y < 3; y++)
                                 sym[y][x].push_back(rot_from_cif[x][y]);
                     }
-                    getline(cif_input, line);
+                    getline_universal(cif_input, line);
                 }
             }
         }

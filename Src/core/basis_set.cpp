@@ -732,11 +732,11 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 		}
 		// scan the tonto style basis set file for the entries we are looking or:
 		string line;
-		getline(ifile, line);
+		getline_universal(ifile, line);
 		int file_type = 0;
 		// check if we support that type of basis set
 		while (line.find("keys=") == -1 && !ifile.eof())
-			getline(ifile, line);
+			getline_universal(ifile, line);
 		if (debug)
 		{
 			std::cout << "Line after looking for keys=: " << line << endl;
@@ -780,7 +780,7 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 			return false;
 		}
 		while (!(line.find(elements_list[i]) < line.size()) && !ifile.eof())
-			getline(ifile, line);
+			getline_universal(ifile, line);
 		if (debug)
 			std::cout << "line while search for " << elements_list[i] << " :" << line << endl;
 		if (debug && line.find(elements_list[i]) != -1)
@@ -796,7 +796,7 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 		unsigned int shell = 0;
 		if (line.find("{") == -1)
 		{
-			getline(ifile, line);
+			getline_universal(ifile, line);
 			if (debug)
 			{
 				std::cout << "I read an additional line!" << endl;
@@ -804,7 +804,7 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 		}
 		while (line.find("}") == string::npos && !ifile.eof())
 		{
-			getline(ifile, line);
+			getline_universal(ifile, line);
 			stringstream stream;
 			stream << line;
 			if (line.find("}") != string::npos)
@@ -828,7 +828,7 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 			}
 			for (int j = 0; j < count; j++)
 			{
-				getline(ifile, line);
+				getline_universal(ifile, line);
 				if (debug)
 				{
 					std::cout << "read the " << j << ". line: " << line << endl;
@@ -985,7 +985,7 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 		}
 		// scan the tonto style basis set file for the entries we are looking or:
 		string line;
-		getline(ifile, line);
+		getline_universal(ifile, line);
 		int file_type = 0;
 		// check if we support that type of basis set
 		while (line.find("keys=") == -1 && !ifile.eof())
@@ -994,7 +994,7 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 			{
 				std::cout << "line.size of first line: " << line.size() << "line.find(\"keys=\"): " << line.find("keys=") << endl;
 			}
-			getline(ifile, line);
+			getline_universal(ifile, line);
 		}
 		if (debug)
 		{
@@ -1033,7 +1033,7 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 		}
 		while (!(line.find(elements_list[i]) < line.size()) && !ifile.eof())
 		{
-			getline(ifile, line);
+			getline_universal(ifile, line);
 			if (debug)
 				std::cout << "line while search for " << elements_list[i] << " :" << line << endl;
 		}
@@ -1050,13 +1050,13 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 		unsigned int shell = 0;
 		if (line.find("{") == -1)
 		{
-			getline(ifile, line);
+			getline_universal(ifile, line);
 			if (debug)
 				std::cout << "I read an additional line!" << endl;
 		}
 		while (line.find("}") == -1 && !ifile.eof())
 		{
-			getline(ifile, line);
+			getline_universal(ifile, line);
 			stringstream stream;
 			stream << line;
 			int count = 0;
@@ -1084,7 +1084,7 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 			}
 			for (int j = 0; j < count; j++)
 			{
-				getline(ifile, line);
+				getline_universal(ifile, line);
 				if (debug)
 				{
 					std::cout << "read the " << j << ". line: " << line << endl;

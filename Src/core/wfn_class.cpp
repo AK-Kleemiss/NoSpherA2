@@ -859,9 +859,9 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         path = fileName;
     string line;
     rf.seekg(0);
-    getline(rf, line);
+    getline_universal(rf, line);
     comment = line;
-    getline(rf, line);
+    getline_universal(rf, line);
     stringstream stream(line);
     string header_tmp;
     int e_nmo, e_nex, e_nuc = 0; // number of expected MOs, Exponents and nuclei
@@ -884,7 +884,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     for (int i = 0; i < e_nuc; i++)
     {
         // int dump = 0;
-        getline(rf, line);
+        getline_universal(rf, line);
         if (debug)
             file << i << ".run, line:" << line << endl;
         length = line.copy(tempchar, 4, 0);
@@ -917,7 +917,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     // int run = 0;
     int exnum = 0;
     // int dump = 0;
-    getline(rf, line);
+    getline_universal(rf, line);
     while (line.compare(0, 6, "CENTRE") == 0 && !rf.eof())
     {
         if (exnum + 20 <= e_nex)
@@ -954,11 +954,11 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
             }
             else
             {
-                getline(rf, line);
+                getline_universal(rf, line);
                 continue;
             }
         }
-        getline(rf, line);
+        getline_universal(rf, line);
         if (exnum > e_nex)
         {
             file << "run went higher than expected values in center reading, thats suspicius, lets stop here...\n";
@@ -1006,10 +1006,10 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         }
         else
         {
-            getline(rf, line);
+            getline_universal(rf, line);
             continue;
         }
-        getline(rf, line);
+        getline_universal(rf, line);
         if (exnum > e_nex)
         {
             file << "exnum went higher than expected values in type reading, thats suspicius, lets stop here...\n";
@@ -1088,10 +1088,10 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         }
         else
         {
-            getline(rf, line);
+            getline_universal(rf, line);
             continue;
         }
-        getline(rf, line);
+        getline_universal(rf, line);
         if (exnum > e_nex)
         {
             file << "exnum went higher than expected values in exponent reading, thats suspicius, lets stop here...\n";
@@ -1165,7 +1165,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         }
         push_back_MO(temp_nr, temp_occ, temp_ener, oper);
         //---------------------------Start reading MO coefficients-----------------------
-        getline(rf, line);
+        getline_universal(rf, line);
         linecount = 0;
         exnum = 0;
         while (!(line.compare(0, 2, "MO") == 0) && !rf.eof())
@@ -1207,10 +1207,10 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
             }
             else
             {
-                getline(rf, line);
+                getline_universal(rf, line);
                 continue;
             }
-            getline(rf, line);
+            getline_universal(rf, line);
             if (linecount * 5 > e_nex + 1)
             {
                 file << "linecount went higher than expected values in exponent reading, thats suspicius, lets stop here...\n";
@@ -1243,13 +1243,13 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
     string line;
     rf.seekg(0);
 
-    getline(rf, line);
+    getline_universal(rf, line);
     stringstream stream(line);
     int e_nuc = 0; // number of expected MOs, Exponents and nuclei
     stream >> e_nuc;
     if (debug)
         file << "e_nuc: " << e_nuc << endl;
-    getline(rf, line);
+    getline_universal(rf, line);
     comment = line;
     //----------------------------- Read Atoms ------------------------------------------------------------
     ivec dum_nr, dum_ch;
@@ -1264,7 +1264,7 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
     for (int i = 0; i < e_nuc; i++)
     {
         svec temp;
-        getline(rf, line);
+        getline_universal(rf, line);
         stream.str(line);
         if (debug)
             file << i << ".run, line:" << line << endl;
@@ -1327,41 +1327,41 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     path = fileName;
     string line;
     rf.seekg(0);
-    getline(rf, line);
+    getline_universal(rf, line);
     while (line.find("<Title>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     if (debug)
         file << "comment line " << line << endl;
     comment = line;
     rf.seekg(0);
     while (line.find("<Number of Nuclei>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     if (debug)
         file << line << endl;
     int temp_ncen = stoi(line);
     rf.seekg(0);
     while (line.find("<Number of Primitives>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     if (debug)
         file << "nex line: " << line << endl;
     int temp_nex = stoi(line);
     rf.seekg(0);
     while (line.find("<Number of Occupied Molecular Orbitals>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     if (debug)
         file << "nmo line: " << line << endl;
     int temp_nmo = stoi(line);
     rf.seekg(0);
     while (line.find("<Atomic Numbers>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     ivec nrs;
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         // if (debug) file << "atom number line: " << line << endl;
         if (line.find("</Atomic Numbers>") != string::npos)
             break;
@@ -1370,13 +1370,13 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     err_checkf(nrs.size() == temp_ncen, "Mismatch in atom number size", file);
     rf.seekg(0);
     while (line.find("<Nuclear Cartesian Coordinates>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     vec2 pos;
     pos.resize(3);
     double temp[3]{ 0, 0, 0 };
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         if (line.find("</Nuclear Cartesian Coordinates>") != string::npos)
             break;
         istringstream is(line);
@@ -1394,20 +1394,20 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     pos.resize(0);
     rf.seekg(0);
     while (line.find("<Net Charge>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     charge = stoi(line);
     rf.seekg(0);
     while (line.find("<Electronic Spin Multiplicity>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     multi = stoi(line);
     rf.seekg(0);
     while (line.find("<Primitive Centers>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         if (line.find("</Primitive Centers>") != string::npos)
             break;
         int number = CountWords(line.c_str());
@@ -1421,10 +1421,10 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     }
     rf.seekg(0);
     while (line.find("<Primitive Types>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         if (line.find("</Primitive Types>") != string::npos)
             break;
         int number = CountWords(line.c_str());
@@ -1438,10 +1438,10 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     }
     rf.seekg(0);
     while (line.find("<Primitive Exponents>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         bool please_break = false;
         if (line.find("</Primitive Exponents>") != string::npos)
         {
@@ -1467,11 +1467,11 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     nex = temp_nex;
     rf.seekg(0);
     while (line.find("<Molecular Orbital Occupation Numbers>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     vec occ;
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         bool please_break = false;
         if (line.find("</Molecular Orbital Occupation Numbers>") != string::npos)
         {
@@ -1493,11 +1493,11 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     }
     rf.seekg(0);
     while (line.find("<Molecular Orbital Energies>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     vec ener;
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         bool please_break = false;
         if (line.find("</Molecular Orbital Energies>") != string::npos)
         {
@@ -1537,21 +1537,21 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     ener.resize(0);
     rf.seekg(0);
     while (line.find("<Molecular Orbital Primitive Coefficients>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     vec coef;
     while (line.find("</Molecular Orbital Primitive Coefficients>") == string::npos)
     {
         while (line.find("<MO Number>") == string::npos)
-            getline(rf, line);
-        getline(rf, line);
+            getline_universal(rf, line);
+        getline_universal(rf, line);
         // if (debug) file << "mo Nr line: " << line << endl;
         int nr = stoi(line);
         nr--;
         while (line.find("</MO Number>") == string::npos)
-            getline(rf, line);
+            getline_universal(rf, line);
         while (coef.size() != nex)
         {
-            getline(rf, line);
+            getline_universal(rf, line);
             // if (nr == 1 && debug) file << "first MO Coef lines: " << line << endl;
             int number = CountWords(line.c_str());
             istringstream is(line);
@@ -1566,7 +1566,7 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
         for (int i = 0; i < nex; i++)
             MOs[nr].push_back_coef(coef[i]);
         coef.resize(0);
-        getline(rf, line);
+        getline_universal(rf, line);
     }
 
     //Trying to actually read in all the information where it belongs
@@ -1634,12 +1634,12 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
 
 
     while (line.find("<Energy =") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     total_energy = stod(line);
     while (line.find("<Virial Ratio") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     virial_ratio = stod(line);
     rf.close();
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
@@ -1675,20 +1675,20 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     rf.seekg(0);
     // d_f_switch = true;
 
-    getline(rf, line);
+    getline_universal(rf, line);
     err_checkf(line.find("Molden Format") != string::npos, "Does not look like proper molden format file!", file);
-    getline(rf, line);
+    getline_universal(rf, line);
     comment = split_string<string>(line, "]")[1];
     bool au_bohr = false; // au = false, angs = true;
     while (line.find("[Atoms]") == string::npos)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     if (split_string<string>(line, "]")[1].find("angs") != string::npos)
         au_bohr = true;
     else if (split_string<string>(line, "]")[1].find("Angs") != string::npos)
         au_bohr = true;
-    getline(rf, line);
+    getline_universal(rf, line);
     svec temp;
     while (line.find("]") == string::npos)
     {
@@ -1708,17 +1708,17 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 stod(temp[5]),
                 stoi(temp[2])),
                 "Error pushing back atom", file);
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     err_checkf(line.find("[STO]") == string::npos, "ERROR: STOs are not yet suupported!", file);
-    getline(rf, line);
+    getline_universal(rf, line);
     int atoms_with_basis = 0;
     while (atoms_with_basis < ncen && line.find("[") == string::npos)
     {
         svec line_digest = split_string<string>(line, " ");
         remove_empty_elements(line_digest);
         const int atom_based = stoi(line_digest[0]) - 1;
-        getline(rf, line);
+        getline_universal(rf, line);
         int shell = 0;
         while (line.size() > 2)
         {
@@ -1737,19 +1737,19 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 shell_type = 5;
             else if (line_digest[0] == "h" || line_digest[0] == "H" || line_digest[0] == "i" || line_digest[0] == "I")
                 err_not_impl_f("Higher angular momentum basis functions than G", file);
-            getline(rf, line);
+            getline_universal(rf, line);
             const int number_of_functions = stoi(line_digest[1]);
             for (int i = 0; i < number_of_functions; i++)
             {
                 line_digest = split_string<string>(line, " ");
                 remove_empty_elements(line_digest);
                 err_checkf(atoms[atom_based].push_back_basis_set(stod(line_digest[0]), stod(line_digest[1]), shell_type, shell), "Error pushing back basis", file);
-                getline(rf, line);
+                getline_universal(rf, line);
             }
             shell++;
         }
         atoms_with_basis++;
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     bool d5 = false;
     bool f7 = false;
@@ -1779,7 +1779,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             d5 = true;
             g9 = true;
         }
-        getline(rf, line); // Read more lines until we reach MO block
+        getline_universal(rf, line); // Read more lines until we reach MO block
     }
     vec3 coefficients(2);
     vec occ;
@@ -1829,7 +1829,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     atoms[a].get_basis_set_coefficient(s)));
             }
         }
-        getline(rf, line);
+        getline_universal(rf, line);
         int MO_run = 0;
         vec2 p_pure_2_cart;
         vec2 d_pure_2_cart;
@@ -1842,11 +1842,11 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             sym = temp[1];
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             ene = stod(temp[1]);
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             if (temp[1] == "Alpha" || temp[1] == "alpha")
@@ -1855,7 +1855,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 spin = true;
                 is_unrestricted = true;
             }
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             occup = stod(temp[1]);
@@ -1874,7 +1874,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             int basis_run = 0;
             for (int i = 0; i < expected_coefs; i++)
             {
-                getline(rf, line);
+                getline_universal(rf, line);
                 temp = split_string<string>(line, " ");
                 remove_empty_elements(temp);
                 coefficients[spin][MO_run].push_back(stod(temp[1]));
@@ -2077,7 +2077,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             }
             err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
             MO_run++;
-            getline(rf, line);
+            getline_universal(rf, line);
         }
     }
     else if (!d5 && !f7 && !g9)
@@ -2127,7 +2127,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     atoms[a].get_basis_set_coefficient(s)));
             }
         }
-        getline(rf, line);
+        getline_universal(rf, line);
         int MO_run = 0;
         while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos)
         {
@@ -2135,18 +2135,18 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             sym = temp[1];
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             ene = stod(temp[1]);
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             if (temp[1] == "Alpha" || temp[1] == "alpha")
                 spin = false;
             else
                 spin = true;
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             occup = stod(temp[1]);
@@ -2165,7 +2165,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             int basis_run = 0;
             for (int i = 0; i < expected_coefs; i++)
             {
-                getline(rf, line);
+                getline_universal(rf, line);
                 temp = split_string<string>(line, " ");
                 remove_empty_elements(temp);
                 coefficients[spin][MO_run].push_back(stod(temp[1]));
@@ -2358,7 +2358,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             }
             err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
             MO_run++;
-            getline(rf, line);
+            getline_universal(rf, line);
         }
     }
     else
@@ -2401,13 +2401,13 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
             rf.open(stdout_file.string().c_str(), ios::in);
             rf.seekg(0);
             while (rf.good() && line.find("Name ...") == string::npos) {
-                getline(rf, line);
+                getline_universal(rf, line);
             }
             jobname = split_string<string>(line, " ")[2];
 
             rf.seekg(0);
             while (rf.good() && line.find("SCF kind ....") == string::npos) {
-                getline(rf, line);
+                getline_universal(rf, line);
             }
             scf_kind = split_string<string>(line, " ")[3];
             if (scf_kind == "rhf" || scf_kind == "rks" || scf_kind == "xray_rhf" || scf_kind == "xray_rks")
@@ -2561,32 +2561,32 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
     err_checkf(rf.good(), "couldn't open " + stdout_file.string() + ", leaving", file);
     //fast forward to the atom section
     while (rf.good() && line.find("Molecule information") == string::npos) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     err_checkf(rf.good(), "Couldn't find molecule information in " + stdout_file.string(), file);
     //skip 8 lines to get to the charge
     for (int i = 0; i < 8; i++) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     svec line_digest = split_string<string>(line, " ");
     //get the charge form the last element in the line
     charge = stoi(line_digest[line_digest.size() - 1]);
-    getline(rf, line);
+    getline_universal(rf, line);
     line_digest = split_string<string>(line, " ");
     multi = stoi(line_digest[line_digest.size() - 1]);
-    getline(rf, line);
-    getline(rf, line);
+    getline_universal(rf, line);
+    getline_universal(rf, line);
     line_digest = split_string<string>(line, " ");
     const int expected_atoms = stoi(line_digest[line_digest.size() - 1]);
-    getline(rf, line);
+    getline_universal(rf, line);
     line_digest = split_string<string>(line, " ");
     const int expected_electrons = stoi(line_digest[line_digest.size() - 1]);
     while (rf.good() && line.find("Atom coordinates") == string::npos) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     //skip 11 lines to get to the atom list
     for (int i = 0; i < 11; i++) {
-        getline(rf, line);
+        getline_universal(rf, line);
         if (line.find("This molecule has non trivial group") != string::npos)
             i -= 3;
     }
@@ -2613,7 +2613,7 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
             z = constants::ang2bohr(stod(line_digest[6]));
         }
         err_checkf(push_back_atom(label, x, y, z, atomic_number), "Error pushing back an atom!", std::cout);
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     err_checkf(ncen == expected_atoms, "Did not read expected number of atoms!", std::cout);
 
@@ -2646,35 +2646,35 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
     }
 
     while (rf.good() && line.find("Gaussian basis sets") == string::npos) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     //get 3 lines down to the basis set name
     for (int i = 0; i < 3; i++) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     //read basis set
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
     basis_set_name = line_digest[line_digest.size() - 1];
-    getline(rf, line);//emtpy line
-    getline(rf, line);//number of basis sets that will be printed below
+    getline_universal(rf, line);//emtpy line
+    getline_universal(rf, line);//number of basis sets that will be printed below
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
     const int no_basis_sets = stoi(line_digest[line_digest.size() - 1]);
-    getline(rf, line);//number of shells
+    getline_universal(rf, line);//number of shells
 
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
     const int no_shells = stoi(line_digest[line_digest.size() - 1]);
 
-    getline(rf, line);//number of shell pair (we do not consider this)
-    getline(rf, line);//No of basis functions
+    getline_universal(rf, line);//number of shell pair (we do not consider this)
+    getline_universal(rf, line);//No of basis functions
 
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
     const int no_bf = stoi(line_digest[line_digest.size() - 1]);
 
-    getline(rf, line);//No of primitives
+    getline_universal(rf, line);//No of primitives
 
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
@@ -2684,19 +2684,19 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
     for (int nbs = 0; nbs < no_basis_sets; nbs++)
     {
         //two empty lines
-        getline(rf, line);
-        getline(rf, line);
-        getline(rf, line);//looks like "Basis set H:3-21G"
+        getline_universal(rf, line);
+        getline_universal(rf, line);
+        getline_universal(rf, line);//looks like "Basis set H:3-21G"
         line_digest = split_string<string>(line, " ");
         const string atom_type = split_string<string>(line_digest[2], ":")[0];
-        getline(rf, line); // empty line
-        getline(rf, line);//looks like "No. of shells .... N"
+        getline_universal(rf, line); // empty line
+        getline_universal(rf, line);//looks like "No. of shells .... N"
         line_digest = split_string<string>(line, " ");
         const int shells_local = stoi(line_digest[4]);
-        getline(rf, line);//looks like "No. of basis functions .... N"
+        getline_universal(rf, line);//looks like "No. of basis functions .... N"
         line_digest = split_string<string>(line, " ");
         const int bfs_local = stoi(line_digest[5]);
-        getline(rf, line);//looks like "No. of primitives .... N"
+        getline_universal(rf, line);//looks like "No. of primitives .... N"
         line_digest = split_string<string>(line, " ");
         const int prims_local = stoi(line_digest[4]);
         /*
@@ -2707,11 +2707,11 @@ __________________________________
 __________________________________
 
 */
-        for (int i = 0; i < 7; i++) getline(rf, line); //skip 6 lines to get to the shells
+        for (int i = 0; i < 7; i++) getline_universal(rf, line); //skip 6 lines to get to the shells
         atom temp_at(atom_type, {}, 0, 0, 0, 0, constants::get_Z_from_label(atom_type.c_str()));
         for (int s = 0; s < shells_local; s++)
         {
-            //getline(rf, line); //get shell line
+            //getline_universal(rf, line); //get shell line
             line_digest = split_string<string>(line, " ");
             remove_empty_elements(line_digest);
             err_checkf(l_map.contains(line_digest[0][0]), "Angular momentum not found: " + line_digest[0], std::cout);
@@ -2722,7 +2722,7 @@ __________________________________
                 const double coefficient = stod(line_digest[line_digest.size() == 2 ? 1 : 3]);
                 const double norm_fac = pow(pow(2, 3 + 4 * angul) * pow(exponent, 2 * angul + 3) / constants::PI3 / pow(constants::double_ft[angul], 2), 0.25);
                 temp_at.push_back_basis_set(exponent, coefficient * norm_fac, angul + 1, s);
-                getline(rf, line);
+                getline_universal(rf, line);
                 line_digest = split_string<string>(line, " ");
                 remove_empty_elements(line_digest);
             } while (line_digest.size() == 2);
@@ -6706,9 +6706,9 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     // silently collide when more than one structure is processed in one directory.
     path = filename;
     std::string line;
-    getline(fchk, line);
+    getline_universal(fchk, line);
     std::string title = line;
-    getline(fchk, line);
+    getline_universal(fchk, line);
     std::string calculation_level = line;
     if (line[10] == 'R')
     {
@@ -6723,9 +6723,9 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     else if (line[10] == 'U') // Unrestricted
         r_u_ro_switch = 1;
     const int el = read_fchk_integer(fchk, "Number of electrons", false);
-    getline(fchk, line);
+    getline_universal(fchk, line);
     const int ael = read_fchk_integer(line);
-    getline(fchk, line);
+    getline_universal(fchk, line);
     const int bel = read_fchk_integer(line);
     err_checkf(el == ael + bel, "Error in number of electrons!", log);
     if (ael != bel && r_u_ro_switch == 0)

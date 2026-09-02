@@ -883,9 +883,9 @@ int autobonds(bool debug, WFN &wavy, const std::filesystem::path &inputfile, con
     }
     input.seekg(0);
     std::string line("");
-    getline(input, line);
+    getline_universal(input, line);
     std::string comment("!");
-    while (line.compare(0, 1, comment) == 0) getline(input, line);
+    while (line.compare(0, 1, comment) == 0) getline_universal(input, line);
     int rho, rdg, eli, lap;
     if (line.length() < 10) return 0;
     else
@@ -898,7 +898,7 @@ int autobonds(bool debug, WFN &wavy, const std::filesystem::path &inputfile, con
     }
     int errorcount = 0, runnumber = 0;
     do {
-        getline(input, line);
+        getline_universal(input, line);
         if (line.length() < 10) continue;
         runnumber++;
         int sel = 0, leng = 0, cube = 0, mres = 0, a1 = 0, a2 = 0, a3 = 0;

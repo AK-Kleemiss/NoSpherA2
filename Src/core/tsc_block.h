@@ -307,7 +307,7 @@ private:
         // The scatterer encoding is a property of the data, rather than a
         // caller-supplied header detail. Remove any stale marker; the
         // matching marker, when needed, was written as the first line above.
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             if (line == "SCATTERER_IDS")
                 continue;
@@ -918,7 +918,7 @@ namespace tsc_merge_detail
         std::string line;
         bool found_data = false;
 
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             const bool is_ids = line.find("SCATTERER_IDS:") != std::string::npos;
             const bool is_names = line.find("SCATTERERS:") != std::string::npos;
@@ -1055,7 +1055,7 @@ namespace tsc_merge_detail
         ReflectionKey key;
         std::vector<std::complex<double>> values;
 
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             if (!parse_data_row(line, key, values) || is_zero(key))
                 continue;
@@ -1098,7 +1098,7 @@ namespace tsc_merge_detail
         std::vector<std::complex<double>> values;
         std::size_t reflection = 0;
 
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             if (!parse_data_row(line, key, values))
                 continue;

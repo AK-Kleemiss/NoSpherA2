@@ -700,7 +700,7 @@ void XCW::parse_anom_atoms(std::vector<anom_atom>& anom_atoms) {
 		std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
 	}
 	std::string line;
-	while (std::getline(file, line)) {
+	while (getline_universal(file, line)) {
 		if (line.empty())
 			continue;
 		std::istringstream iss(line);

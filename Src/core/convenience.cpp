@@ -1080,7 +1080,7 @@ std::string go_get_string(std::ifstream &file, std::string search, bool rewind)
         file.seekg(0, file.beg);
     }
     std::string line;
-    while (line.find(search) == std::string::npos && !file.eof() && getline(file, line))
+    while (line.find(search) == std::string::npos && !file.eof() && getline_universal(file, line))
         continue;
     if (file.eof())
         return "";
@@ -1784,12 +1784,12 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
     bool atoms_read = false;
     while (!asym_cif_input.eof() && !atoms_read)
     {
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("loop_") != string::npos)
         {
             while (line.find("_") != string::npos)
             {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (debug)
                     log3 << "line in loop field definition: " << line << endl;
                 if (line.find("label") != string::npos)
@@ -1842,7 +1842,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                 if (!found_this_one && debug)
                     log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
                 labels.push_back(fields[label_field]);
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
     }
@@ -1856,12 +1856,12 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
     Uij.resize(wavy.get_ncen());
     while (!asym_cif_input.eof() && !atoms_read)
     {
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("loop_") != string::npos)
         {
             while (line.find("_") != string::npos)
             {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (debug)
                     log3 << "line in loop field definition: " << line << endl;
                 if (line.find("aniso_label") != string::npos)
@@ -1910,7 +1910,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                 }
                 if (!found_this_one && debug)
                     log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
     }
@@ -1923,12 +1923,12 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
     Cijk.resize(wavy.get_ncen());
     while (!asym_cif_input.eof() && !atoms_read)
     {
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("loop_") != string::npos)
         {
             while (line.find("_") != string::npos)
             {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (debug)
                     log3 << "line in loop field definition: " << line << endl;
                 if (line.find("C_label") != string::npos)
@@ -1985,7 +1985,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                 }
                 if (!found_this_one && debug)
                     log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
     }
@@ -1998,12 +1998,12 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
     Dijkl.resize(wavy.get_ncen());
     while (!asym_cif_input.eof() && !atoms_read)
     {
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("loop_") != string::npos)
         {
             while (line.find("_") != string::npos)
             {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (debug)
                     log3 << "line in loop field definition: " << line << endl;
                 if (line.find("D_label") != string::npos)
@@ -2070,7 +2070,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                 }
                 if (!found_this_one && debug)
                     log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
     }
@@ -2101,7 +2101,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
         labels[i] = wavy.get_atoms()[i].get_label();
     }
 
-    while (getline(asym_cif_input, line)) {
+    while (getline_universal(asym_cif_input, line)) {
         if (!line.starts_with("loop_")) {
             if (debug)
                 log3 << "This is not part of a loop. Moving on.";
@@ -2109,14 +2109,14 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
         }
         if (debug)
             log3 << "Found a loop!";
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("_atom_site_aniso_label") != string::npos) {
             if (debug) {
                 log3 << "This loop contains anisotropic displacement parameters.";
             }
             ivec fields;
             while (line.find("_atom_site_aniso") != string::npos && line.length() > 3) {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (line.find("U_11") != string::npos)
 					fields.push_back(0);
 				else if (line.find("U_22") != string::npos)
@@ -2136,7 +2136,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                 std::string token;
                 while (entries.size() < 7 && iss >> token)
                     entries.push_back(token);
-                while (entries.size() < 7 && std::getline(asym_cif_input, line)) {
+                while (entries.size() < 7 && getline_universal(asym_cif_input, line)) {
                     std::istringstream nextLine(line);
                     while (entries.size() < 7 && nextLine >> token)
                         entries.push_back(token);
@@ -2162,7 +2162,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                     }
                 }
                 if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
         else if (line.find("_atom_site_anharm_GC_C_label") != string::npos) {
@@ -2170,7 +2170,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
 				log3 << "This loop contains anharmonic Gram-Charlier coefficients C.";
             ivec fields;
             while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (line.find("C_111") != string::npos)
                     fields.push_back(0);
                 else if (line.find("C_112") != string::npos)
@@ -2200,7 +2200,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                     const int pos = token.find('(');
                     entries.push_back(token);
                 }
-                while (entries.size() < 11 && std::getline(asym_cif_input, line)) {
+                while (entries.size() < 11 && getline_universal(asym_cif_input, line)) {
                     std::istringstream nextLine(line);
                     while (entries.size() < 11 && nextLine >> token) {
                         entries.push_back(token);
@@ -2227,7 +2227,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                     }
                 }
                 if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
         else if (line.find("_atom_site_anharm_GC_D_label") != string::npos) {
@@ -2235,7 +2235,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
 				log3 << "This loop contains anharmonic Gram-Charlier coefficients D.";
             ivec fields;
             while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (line.find("D_1111") != string::npos)
                     fields.push_back(0);
                 else if (line.find("D_1112") != string::npos)
@@ -2273,7 +2273,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                 std::string token;
                 while (entries.size() < 16 && iss >> token)
                     entries.push_back(token);
-                while (entries.size() < 16 && std::getline(asym_cif_input, line)) {
+                while (entries.size() < 16 && getline_universal(asym_cif_input, line)) {
                     std::istringstream nextLine(line);
                     while (entries.size() < 16 && nextLine >> token)
                         entries.push_back(token);
@@ -2299,7 +2299,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                     }
                 }
                 if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
         else {
@@ -2337,12 +2337,12 @@ vec read_U_iso_from_CIF(const std::filesystem::path &cif, WFN &wavy, cell &unit_
     bool atoms_read = false;
     while (!asym_cif_input.eof() && !atoms_read)
     {
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("loop_") != string::npos)
         {
             while (line.find("_") != string::npos)
             {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (debug)
                     log3 << "line in loop field definition: " << line << endl;
                 if (line.find("_atom_site_label") != string::npos          // be specific to avoid
@@ -2421,7 +2421,7 @@ vec read_U_iso_from_CIF(const std::filesystem::path &cif, WFN &wavy, cell &unit_
                 if (!found_this_one && debug)
                     log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
                 labels.push_back(fields[label_field]);
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
     }
@@ -3717,7 +3717,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         {
             std::ifstream list(list_file);
             std::string line;
-            while (std::getline(list, line))
+            while (getline_universal(list, line))
             {
                 const std::string entry = trim(line);
                 if (entry.empty() || entry[0] == '#') continue;
@@ -3777,7 +3777,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         {
             std::ifstream list(list_file);
             std::string line;
-            while (std::getline(list, line))
+            while (getline_universal(list, line))
             {
                 const std::string entry = trim(line);
                 if (entry.empty() || entry[0] == '#')
@@ -4462,7 +4462,7 @@ bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std:
             std::cout << "No suitable file dialog tool found (zenity/kdialog)." << std::endl;
             std::cout << "Please enter the full path to the file: " << std::flush;
             std::string input_path;
-            std::getline(std::cin, input_path);
+            getline_universal(std::cin, input_path);
 
             // Trim leading/trailing whitespace
             input_path.erase(0, input_path.find_first_not_of(" \t\n\r"));
@@ -4616,7 +4616,7 @@ bool save_file_dialog(std::filesystem::path &path, bool debug, const std::vector
         path = file;
         std::stringstream ss(path);
         std::string name = path.string();
-        getline(ss, name);
+        getline_universal(ss, name);
         if (debug) std::cout << "Path: " << path << std::endl;
         if (pclose(f) != 0) std::cout << "Zenity returned non zero, whatever that means..." << std::endl;
         bool found = false;
@@ -4977,7 +4977,7 @@ void convert_tonto_XCW_lambda_steps(const std::string &str, const std::string &l
     std::ifstream rf(stdout_file.string().c_str(), std::ios::in);
     rf.seekg(0);
     while (rf.good() && line.find("Name ...") == std::string::npos) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     jobname = split_string<std::string>(line, " ")[2];
     std::cout << "Conervting XCW wavefunctions with lambda step " + std::to_string(ls) + " and jobname: " + jobname << std::endl;
