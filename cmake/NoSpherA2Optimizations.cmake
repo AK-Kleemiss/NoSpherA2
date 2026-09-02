@@ -87,6 +87,13 @@ function(nosphera2_enable_optimizations target_name)
         # transform ran at 0.5 GFLOP/s against 22.1 on a laptop, and OMP_NUM_THREADS=48 and
         # =1 gave the same runtime to within a second. MSVC was never affected because
         # /openmp:experimental above is applied unconditionally.
+        #
+        # The compile flag is deliberately not matched by -fopenmp at link time: that
+        # makes gcc pull in libgomp, and the process then holds two OpenMP runtimes,
+        # since MKL brings libiomp5. libiomp5 implements the GOMP_* entry points that
+        # -fopenmp generates, so linking MKL is enough to resolve them and the build
+        # keeps a single runtime, which is how it worked before the link flag was
+        # added alongside the compile one.
         # AppleClang rejects a bare -fopenmp ("unsupported option '-fopenmp'"), and
         # even a clang that accepts it would not find omp.h or libomp, both of which
         # live in the Micromamba environment. The imported target carries what that
@@ -126,9 +133,6 @@ function(nosphera2_enable_optimizations target_name)
                         $<$<CONFIG:Release>:
                             LINKER:--gc-sections
                         >
-                        # Linking the runtime is the half that genuinely only applies to
-                        # things that get linked; the compile flag moved out of here.
-                        -fopenmp
                 )
             endif()
         endif()
