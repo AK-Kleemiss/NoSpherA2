@@ -23,6 +23,7 @@ bool cublas_dynamic_enabled();
 
 //True only if it is both asked for and actually loadable.
 bool cublas_dynamic_available();
+bool cublas_dynamic_fast_16f_available();
 
 //Column-major, BLAS conventions, matching the GEMM the I tensor performs.
 bool cublas_dynamic_gemm(bool transA, bool transB, int m, int n, int k,
@@ -32,3 +33,9 @@ bool cublas_dynamic_gemm(bool transA, bool transB, int m, int n, int k,
 bool cublas_dynamic_gemm(bool transA, bool transB, int m, int n, int k,
 	double alpha, const double* A, int lda, const double* B, int ldb,
 	double beta, double* C, int ldc);
+
+//FP32 inputs and outputs, with cuBLAS allowed to use FP16 Tensor Core operands and FP32
+//accumulation. False means the caller must use the ordinary SGEMM path.
+bool cublas_dynamic_gemm_fast_16f(bool transA, bool transB, int m, int n, int k,
+	float alpha, const float* A, int lda, const float* B, int ldb,
+	float beta, float* C, int ldc);

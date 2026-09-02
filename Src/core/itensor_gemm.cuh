@@ -37,6 +37,14 @@
 
 namespace itensor_gemm {
 
+inline bool& tensor_mode()
+{
+	static bool on = false;
+	return on;
+}
+
+inline void set_tensor_mode(const bool on) { tensor_mode() = on; }
+
 #if defined(NOSPHERA2_HAVE_CUTLASS)
 
 //op(A) is m x k with element (i,l) at i*lda + l, which is row-major over the column-major
@@ -84,6 +92,9 @@ inline bool run(const int m, const int n, const int k,
 {
 	//cuBLAS first when it loaded - it is the fastest of the three in both precisions.
 	//-no_gpu_cublas pins whichever of the other two handles this one.
+	if constexpr (std::is_same<T, float>::value)
+		if (tensor_mode() && cublas_dynamic_gemm_fast_16f(true, false, m, n, k,
+			T(1), A, lda, B, ldb, T(0), C, ldc)) return true;
 	if (cublas_dynamic_gemm(true, false, m, n, k, T(1), A, lda, B, ldb, T(0), C, ldc))
 		return true;
 	if constexpr (cutlass_handles<T>()) {
@@ -114,6 +125,9 @@ inline bool run(const int m, const int n, const int k,
 {
 	//Same order as the CUTLASS build: cuBLAS when asked for and loadable, ours otherwise.
 	//On a HIP build the first call is always false, there being no cuBLAS to open.
+	if constexpr (std::is_same<T, float>::value)
+		if (tensor_mode() && cublas_dynamic_gemm_fast_16f(true, false, m, n, k,
+			T(1), A, lda, B, ldb, T(0), C, ldc)) return true;
 	if (cublas_dynamic_gemm(true, false, m, n, k, T(1), A, lda, B, ldb, T(0), C, ldc))
 		return true;
 	return gemm_gpu::launch<T>(true, false, m, n, k,

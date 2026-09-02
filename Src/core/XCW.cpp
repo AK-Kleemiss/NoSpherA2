@@ -1513,6 +1513,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 	}
 	bool itensor_on_gpu = false;
+	double itensor_gpu_dense_flops = 0.0;
 #ifdef NOSPHERA2_USE_GPU
 	//Read with use_gpu rather than on its own, so -no_gpu means what it says. Checking the
 	//pair here rather than clearing the flag at parse time keeps it order-independent.
@@ -1557,11 +1558,15 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		L.skip = skip_flat.data(); L.grid_point_off = goff.data();
 		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
 		L.n_points = static_cast<long long>(fd1.size());
+		for (int b = 0; b < L.n_blocks; b++)
+			itensor_gpu_dense_flops += throughput::flops_gemm(L.blk_n_active[b],
+				2.0 * L.blk_n_active[b], L.blk_point_count[b]);
+		itensor_gpu_dense_flops *= static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
 		//-gpu_fp64 raises the whole device path to double. It is worth asking for on a card
 		//with real double-precision units and expensive on one without, which is why it is
 		//asked for rather than detected.
 		const sf_precision iprec = opt->gpu_fp64 ? sf_precision::FP64 : sf_precision::FP32;
-		itensor_on_gpu = itensor_gpu_init(L, iprec);
+		itensor_on_gpu = itensor_gpu_init(L, iprec, opt->gpu_itensor_tensor);
 		//Say which processor produced the numbers, and which GEMM: the three do not agree
 		//in the last digits, so a log that does not name one cannot be compared with
 		//another. Gated like the other timing lines so the golden-file tests, which run
@@ -1581,6 +1586,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 	}
 	if (itensor_on_gpu) {
+		const auto gpu_start = std::chrono::high_resolution_clock::now();
 		cvec blk_gpu;
 		if (i_streamed_) blk_gpu.assign(packed_size, cdouble{});
 		vec kxs(num_syms), kys(num_syms), kzs(num_syms);
@@ -1610,6 +1616,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 		if (cryst.nr_small > 0) collect_gpu(cryst.nr_small - 1);
 		itensor_gpu_free();
+		if (throughput::enabled())
+			std::fprintf(stderr, "I tensor GPU: %.3f s wall time\n",
+				std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - gpu_start).count());
 		//No bookkeeping here: the loop above runs for both paths and eval_I multiplies the
 		//total by nr_small on the way out, so anything added here counts twice.
 	}
@@ -1617,13 +1626,30 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//Counted serially from the block structure both paths walk, so the CPU and GPU rows are
 	//the same work measured two ways and no counter is touched by two threads.
 	double itensor_flops = 0.0;
+	double itensor_unscreened_tile_flops = 0.0;
 	for (int g = 0; g < n_atom_grids; g++)
-		for (const GridBlock& block : grid_blocks[g])
+		for (const GridBlock& block : grid_blocks[g]) {
 			for (const MatrixTile& tile : block.matrix_tiles)
 				//real and imaginary passes, hence the factor of two
 				itensor_flops += 2.0 * throughput::flops_gemm(tile.row_count, tile.col_count,
 					block.point_count);
+			const int n_active = static_cast<int>(block.active_aos.size());
+			for (int row = 0; row < n_active; row += screened_tile_size) {
+				const int row_count = std::min(screened_tile_size, n_active - row);
+				for (int col = row; col < n_active; col += screened_tile_size)
+					itensor_unscreened_tile_flops += 2.0 * throughput::flops_gemm(row_count,
+						std::min(screened_tile_size, n_active - col), block.point_count);
+			}
+		}
 	itensor_flops *= static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
+	itensor_unscreened_tile_flops *= static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
+	if (itensor_on_gpu && throughput::enabled()) {
+		const double screened = itensor_unscreened_tile_flops > 0.0
+			? 100.0 * (1.0 - itensor_flops / itensor_unscreened_tile_flops) : 0.0;
+		std::fprintf(stderr, "I tensor GPU: %.3f dense GEMM GFLOP; CPU tiles %.3f unscreened, %.3f after overlap screening (%.1f%% pruned)\n",
+			itensor_gpu_dense_flops / 1.0e9, itensor_unscreened_tile_flops / 1.0e9,
+			itensor_flops / 1.0e9, screened);
+	}
 
 	if (!itensor_on_gpu)
 	{

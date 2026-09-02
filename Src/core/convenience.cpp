@@ -566,6 +566,10 @@ std::string help_message =
  "                                    mostly by how fast the host CPU is. Single\n"
  "                                    precision by default, which moves the total\n"
  "                                    energy in the tenth significant figure.\n"
+ "  -gpu_itensor_tensor                FP16 Tensor Core operands with FP32\n"
+ "                                    accumulation for the I tensor (default\n"
+ "                                    when cuBLAS provides it); use\n"
+ "                                    -no_gpu_itensor_tensor for FP32 GEMM.\n"
  "  -gpu_salted / -no_gpu_salted       The SALTED descriptor combination\n"
  "                                    (equicomb). It falls back to the CPU when\n"
  "                                    no usable device is present.\n"
@@ -3405,6 +3409,10 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_itensor = true;
     else if (temp == "-no_gpu_itensor")
         gpu_itensor = false;
+    else if (temp == "-gpu_itensor_tensor")
+        gpu_itensor_tensor = true;
+    else if (temp == "-no_gpu_itensor_tensor")
+        gpu_itensor_tensor = false;
     else if (temp == "-gpu_cublas")
         gpu_cublas = true;
     else if (temp == "-no_gpu_cublas")

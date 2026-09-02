@@ -813,6 +813,10 @@ struct options
     //largest of the device paths, and it moves the total energy only in the tenth
     //significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
     bool gpu_itensor = true;
+    //Use FP16 Tensor Core operands with FP32 accumulation when cuBLAS provides them. The
+    //I tensor falls back to ordinary FP32 GEMM when it does not, and the no-flag is for
+    //reproducibility with older output.
+    bool gpu_itensor_tensor = true;
     //SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
     bool gpu_salted = true;
     //-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
