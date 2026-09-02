@@ -97,6 +97,23 @@ static int run_app_impl(int argc, char **argv)
     //whichever kernel runs first.
     if (opt.use_gpu && (opt.gpu_grid || opt.gpu_salted || opt.gpu_itensor || opt.gpu_blas))
         sf_gpu_warmup_start();
+    //A destructor for the same reason as the two above, and because only calc_SF waits for
+    //this thread: a run that never reaches the transform - IAM, properties, RGBI, RI fit -
+    //used to leave it running. What then joined it was the destructor of the static future
+    //in sf_gpu.cu, which runs after the CUDA runtime's own atexit teardown, so the thread
+    //was still inside cuDevicePrimaryCtxRetain with the driver already torn down under it.
+    //That is a crash or a hang depending on the timing, and it needs a real device and a
+    //slow context creation to show up - six test processes sharing two V100s does it, a
+    //single run does not. Waiting here costs nothing: by this point the warm-up is long
+    //done in any run that did any work.
+    struct warmup_joiner
+    {
+        ~warmup_joiner()
+        {
+            //A destructor, so nothing may escape it; the warm-up has no result to report.
+            try { sf_gpu_warmup_wait(); } catch (...) {}
+        }
+    } join_warmup;
 #endif
     vector<WFN> wavy;
 
