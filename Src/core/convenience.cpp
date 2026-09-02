@@ -1818,6 +1818,10 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                     s >> fields[i];
                 if (debug)
                     log3 << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << endl;
+                //A CIF whose atom_site loop holds more atoms than the wavefunction has
+                //centres would otherwise be written past the end of 'positions'.
+                err_checkf(labels.size() < positions.size(),
+                    "The CIF lists more atoms than the wavefunction has centres, cannot assign U_iso!", std::cout);
                 positions[labels.size()] = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
                 bool found_this_one = false;
                 if (debug)

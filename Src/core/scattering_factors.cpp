@@ -1238,11 +1238,16 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 	{
 		if (line.empty())
 			continue;
-		// Trim leading spaces
-		size_t first = line.find_first_not_of(" \t");
-		if (first == std::string::npos)
+		// Trim whitespace at both ends, not just the front. The header comparisons
+		// below are exact, and a CIF written on Windows - which is what Olex2 hands
+		// out - ends every line with \r, so "_atom_site_label\r" never matched and
+		// the atom loop went unrecognised. That left the caller with no atoms at all
+		// and the next reader indexing an empty array, i.e. a segfault on a file the
+		// rest of NoSpherA2 reads without complaint, since the older CIF readers
+		// compare with find() rather than ==.
+		std::string trimmed = trim(line);
+		if (trimmed.empty())
 			continue;
-		std::string trimmed = line.substr(first);
 		// Detect loop_
 		if (trimmed == "loop_")
 		{

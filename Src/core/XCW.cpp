@@ -31,6 +31,7 @@ void XCW::construct(const options& opt_in) {
 	std::ofstream log3("log3.txt", std::ios::out);
 	bvec needs_grid;
 	read_atoms_from_CIF(cif_input, unit_cell, cryst.ncen, needs_grid, asym_atoms, opt->debug);
+	err_checkf(cryst.ncen > 0, "No atoms were read from " + cif.string() + "! Is there an _atom_site loop with labels, type symbols and fractional coordinates?", std::cout);
 
 	// Adds symmetry generated atoms
 	if (settings.grown) {
