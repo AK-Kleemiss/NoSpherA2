@@ -46,7 +46,8 @@ struct itensor_gpu_layout {
 
 //FP64 runs the whole device path in double, phase and GEMM alike; anything else runs it in
 //single. sf_precision::Auto is deliberately not honoured - see the definition.
-bool itensor_gpu_init(const itensor_gpu_layout& L, sf_precision prec = sf_precision::FP32);
+bool itensor_gpu_init(const itensor_gpu_layout& L, sf_precision prec = sf_precision::FP32,
+	bool tensor = false);
 
 //Submit one reflection to one of two result slots. collect() returns it after a later
 //reflection has started, so the device-to-host copy overlaps that calculation.

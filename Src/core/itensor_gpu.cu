@@ -49,6 +49,7 @@ struct Dev {
 
 template <typename T> Dev<T> g;
 bool g_fp64 = false;
+bool g_tensor = false;
 
 //The single-precision path keeps the reduced-argument trick the transform uses: the phase
 //and its reduction stay in double and only the transcendental drops. In double there is
@@ -326,12 +327,13 @@ bool itensor_gpu_available() { return sf_gpu_available(); }
 
 const char* itensor_gpu_gemm_name()
 {
+	if (g_tensor) return "cuBLAS Tensor Core";
 	if (cublas_dynamic_available()) return "cuBLAS";
 	//CUTLASS covers single precision only, so the double path names a different kernel.
 	return g_fp64 ? "built-in" : NOSPHERA2_ITENSOR_GEMM_NAME;
 }
 
-bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec)
+bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec, const bool tensor)
 {
 	itensor_gpu_free();
 	if (!itensor_gpu_available()) return false;
@@ -339,6 +341,15 @@ bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec)
 	//visible in the reference output, so the same input would produce different logs on
 	//different machines. Single precision unless the caller asks for double.
 	g_fp64 = (prec == sf_precision::FP64);
+	bool tensor_hardware = false;
+#ifndef NOSPHERA2_USE_HIP
+	int dev = 0;
+	gpuDeviceProp_t prop{};
+	if (gpuGetDevice(&dev) == gpuSuccess && gpuGetDeviceProperties(&prop, dev) == gpuSuccess)
+		tensor_hardware = prop.major >= 7;
+#endif
+	g_tensor = !g_fp64 && tensor && tensor_hardware && cublas_dynamic_fast_16f_available();
+	itensor_gemm::set_tensor_mode(g_tensor);
 	const bool ok = g_fp64 ? init_impl<double>(L) : init_impl<float>(L);
 	if (!ok) itensor_gpu_free();
 	return ok;
@@ -359,6 +370,8 @@ bool itensor_gpu_collect(const int slot, std::complex<double>* I_r)
 
 void itensor_gpu_free()
 {
+	g_tensor = false;
+	itensor_gemm::set_tensor_mode(false);
 	free_impl<float>();
 	free_impl<double>();
 }
