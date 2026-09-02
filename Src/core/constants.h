@@ -5,6 +5,7 @@
 namespace constants
 {
     extern double exp_cutoff;
+    extern bool hide_gpu_notes;
     static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
     constexpr int grid_max_no_flip = 50;
     double constexpr sqrtNewtonRaphson(double x, double curr, double prev)

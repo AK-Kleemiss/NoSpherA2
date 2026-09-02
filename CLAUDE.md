@@ -217,6 +217,14 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-09-02, `ctest --preset release-windows` reports **275/275 passing, 0 failed**
+(253 s; 6 not run: the four `full = true` XCW cases and two disabled `DeltaSeriesTests`).
+This baseline covers the pTB cartesian-f fix in `WFN::read_ptb` and the new
+`-no_date_but_gpu` flag. On a machine with a CUDA device, 16 golden-file cases had been
+failing on GPU notes absent from the references; those notes now follow `-no-date`, with
+`-no_date_but_gpu` for `sucrose_SF_gpu_grid`, whose reference must keep the note. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-08-25, `ctest --preset release-windows` reports **258/258 passing, 0 failed**
 (569 s; 5 skipped, all pre-existing: the four `full = true` XCW cases and the optional
 `Nbo47.EpoxideGennboMatchesReferenceWhenAvailable` fixture). This baseline includes the

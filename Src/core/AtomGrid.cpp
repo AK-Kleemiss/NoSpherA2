@@ -455,7 +455,7 @@ void AtomGrid::get_grid(const int num_centers,
                 //Once per run. Every other GPU path announces itself; this one did not, which
                 //is how it fell back to the CPU for a session with its test still passing.
                 static std::atomic<bool> announced{false};
-                if (!announced.exchange(true))
+                if (!announced.exchange(true) && !constants::hide_gpu_notes)
                     std::cout << "GPU in use: atomic grid weights (Becke and TFVC) on "
                               << grid_gpu_backend() << std::endl;
                 return;
@@ -463,7 +463,7 @@ void AtomGrid::get_grid(const int num_centers,
         }
         else if (grid_gpu_enabled() && !chi_fits) {
             static std::atomic<bool> warned{false};
-            if (!warned.exchange(true))
+            if (!warned.exchange(true) && !constants::hide_gpu_notes)
                 std::cout << "-gpu_grid asked for but not used: chi is " << chi.size()
                           << " entries, the kernel needs " << (size_t)num_centers * num_centers
                           << ". Weights stay on the CPU." << std::endl;

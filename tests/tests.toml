@@ -475,6 +475,8 @@ hkl = "olex2/Wfn_job/sucrose.hkl"
 wfn = "olex2/Wfn_job/sucrose.wfx"
 acc = 1
 gpu_grid = ""
+# The reference carries the GPU note, so this case keeps it where every other test drops it.
+no_date_but_gpu = ""
 
 [P1_test_XCW_gpu_itensor]
 directory = "P1_test"

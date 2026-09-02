@@ -1,4 +1,62 @@
 # Unit Test Status
+**Last updated: 2026-09-02** (pTB cartesian-f fix in `WFN::read_ptb`, and a new
+`-no_date_but_gpu` flag so golden files stop depending on whether the machine has a GPU.
+No cases added or removed; 275/275 pass on `release-windows`.)
+
+## 2026-09-02 — pTB cartesian f ordering, and GPU notes in golden files
+
+### `WFN::read_ptb` transposed two cartesian f components
+
+pTB writes cartesian f functions in Turbomole order, stated in its own
+`source/dtrf2.f:7`: `xxx,yyy,zzz,xxy,xxz,xyy,yyz,xzz,yzz,xyz`. So type 16 is `xyy` and
+type 17 is `yyz`. `constants::type_vector` uses the AIM/`.wfn` order, where 16 is `yyz`
+(0,2,1) and 17 is `xyy` (1,2,0). `read_ptb` passed `lao[i]` straight into
+`add_primitive`, so two of the ten cartesian f components were swapped for every
+f-containing pTB wavefunction — the lanthanides Ce-Lu, and anything else pTB gives f
+functions to. La has no f shell in the pTB valence basis and was never affected.
+
+The error was large. Integrating a neutral-atom density cube gave 15.64 e for Nd against
+the 14 its ECP demands, 12.30 for Ce against 12. Building the cartesian AO overlap from
+the `wfn.xtb` file's own exponents and contraction coefficients and contracting it with
+the MO coefficients reproduces the wrong totals exactly under the `type_vector` ordering
+and gives exactly Z-46 under pTB's — which is what identified the swap. pTB's file was
+correct throughout: every occupied MO normalises to 1.000000.
+
+After the fix all 15 lanthanides integrate to Z-46 on a 10 A box at 0.025 A. Yb is the
+one exception at 19.58 of 24, and is not a NoSpherA2 defect: its vDZP second d shell
+carries an exponent of 0.002065 against 0.067 for Tm and 0.0389 for Lu, so its density
+needs a 30 A box to reach 23.999. That exponent is the same in the ptb repo and in
+`ptb-vdzp` in `Src/basis_data.cpp`, and `.basis_vDZP` has not changed since 2022-04-27.
+
+`read_ptb` also never recorded `path`, so cubes from a `.xtb` input were written as a
+stem-less `_rho.cube` — the same omission fixed in `read_fchk` on 2026-08-25. And
+`-rho_cube` ignored `-radius`/`-resolution` and used a hardcoded 3 A box, which truncates
+a lanthanide valence density badly enough to make the integral unconvergeable.
+
+### GPU notes made golden files machine-dependent
+
+On a machine with a CUDA device, 16 golden-file cases failed. Every one was a line-offset
+cascade from a note the references do not carry, most of them
+`GPU in use: atomic grid weights (Becke and TFVC) on CUDA` from `AtomGrid.cpp`. All 16
+failed identically with the pTB changes stashed, so they were pre-existing.
+
+`XCW.cpp` and `scattering_factors.cpp` already gated their notes on `no_date`;
+`AtomGrid.cpp` and `SALTED_equicomb.cpp` had no access to the flag and were missed. They
+now consult `constants::hide_gpu_notes`, set by `-no-date` and following the
+`constants::exp_cutoff` precedent for a runtime-settable global.
+
+That alone breaks `sucrose_SF_gpu_grid`, whose reference deliberately contains the note:
+a silent CPU fallback produces exactly the CPU reference, so the note is the only evidence
+the device did the work. The harness hardcodes `no_date` for every test
+(`IntegrationTests.cpp:319`) with no opt-out, so `-no_date_but_gpu` suppresses dates while
+keeping the notes, and that one case carries it. Defaults are emitted before per-test
+args, so it is parsed second and wins.
+
+`P1_test_XCW_gpu_itensor` failed on a different line, the sibling warning
+`-gpu_grid asked for but not used: chi is N entries...`, which is equally
+machine-dependent and is now gated the same way. Its reference contains no GPU note at
+all: XCW writes that one to stderr, which never reaches the log.
+
 **Last updated: 2026-08-25** (added the Fukui-function feature and its tests: 7 new
 `FukuiTests` unit cases covering `find_frontier_orbitals`, plus one new
 `TomlIntegrationTests.Fukui` golden-file case. Net +8 cases.)

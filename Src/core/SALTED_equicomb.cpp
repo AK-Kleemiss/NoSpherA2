@@ -188,7 +188,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
         //Once per run, not once per lambda: nine identical lines say nothing extra.
         //Printed before the progress bar exists, whose carriage returns would eat it.
         static bool announced = false;
-        if (!announced) {
+        if (!announced && !constants::hide_gpu_notes) {
             announced = true;
             std::cout << "GPU in use: SALTED descriptors on "
                       << (gpu_ok ? "the device (double precision)" : "the CPU - device unavailable") << std::endl;
