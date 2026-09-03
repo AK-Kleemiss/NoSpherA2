@@ -118,6 +118,14 @@ private:
 		// which is the original behaviour. Set with `i_tensor_mb <n>` in the XCW
 		// settings, or `stream` for the default budget.
 		size_t i_tensor_max_mb;
+		// `i_float` in the settings file: hold the I tensor in single precision. The device
+		// computes it in single anyway, so this stores what was computed rather than a
+		// widened copy of it.
+		bool i_tensor_single = false;
+		// `I_tensor <path>` in the settings file: where the streamed tensor lives. Written
+		// there, and reused from there when it is already the right size for this problem,
+		// so that trying another refinement setting does not rebuild it.
+		std::filesystem::path i_tensor_file_path;
 
 		// Clears the convergence flags
 		void clear() {
@@ -306,6 +314,13 @@ private:
 	// Held resident only while it fits settings.i_tensor_max_mb; otherwise empty
 	// and i_file_ carries the tensor. Read through i_block(r) either way.
 	cvec I;
+	//The device computes the tensor in single precision and it was stored in double, so
+	//half of every byte the SCF loop reads was padding. Held in float it is half the memory
+	//and half the traffic of the two walks per iteration, and the values are the ones the
+	//GPU produced either way. NOSPHERA2_XCW_I_FLOAT=1 selects it; the streamed path is
+	//unchanged for now.
+	std::vector<std::complex<float>> I32;
+	bool i_float_ = false;
 	i_tensor_file i_file_;
 	bool i_streamed_ = false;
 	int i_window_ = 0;
@@ -314,6 +329,10 @@ private:
 	{
 		return i_streamed_ ? i_file_.block(r)
 			: I.data() + static_cast<size_t>(r) * (static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2);
+	}
+	const std::complex<float>* i_block32(const int r) const
+	{
+		return I32.data() + static_cast<size_t>(r) * (static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2);
 	}
 	std::vector<asym_atom> asym_atoms;
 	std::vector<scattering_data> obs;

@@ -114,6 +114,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
 	bool grown = false, safe_tensor = false, read_tensor = false, read_first_guess = false, nbo_output = false;
+	bool i_tensor_single = false;
+	std::filesystem::path i_tensor_file_path;
 	// 0 = hold the whole tensor, which is what every run did before this existed.
 	size_t i_tensor_max_mb = 0;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
@@ -266,8 +268,29 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 			safe_tensor = true;
 			};
 
-		handlers["read"] = [&](std::istream&) {
+		//`read` on its own reuses the whole-tensor dump `safe` wrote. Given a path it
+		//reuses the streamed tensor at that path instead, which is the expensive thing a
+		//run produces - 43 minutes and 112 GB on the twisted ethylene - and which depends
+		//only on the geometry, the basis and the reflections, not on any refinement
+		//setting. So trying another lambda range or convergence preset need not rebuild it.
+		//
+		//The path is optional, and the settings file is one whitespace-separated stream of
+		//tokens, so a bare `read` followed by another keyword must not swallow it: take the
+		//next token, put it back if it is a keyword.
+		handlers["read"] = [&](std::istream& is) {
 			read_tensor = true;
+			const std::streampos before = is.tellg();
+			std::string token;
+			if (!(is >> token)) { is.clear(); return; }
+			std::string lowered = token;
+			std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+				[](unsigned char c) { return std::tolower(c); });
+			if (handlers.find(lowered) != handlers.end()) {
+				is.clear();
+				is.seekg(before);
+				return;
+			}
+			i_tensor_file_path = token;
 			};
 		handlers["load_wfn"] = [&](std::istream&) {
 			read_first_guess = true;
@@ -281,6 +304,16 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		// default budget; `i_tensor_mb <n>` names the budget.
 		handlers["stream"] = [&](std::istream&) {
 			if (i_tensor_max_mb == 0) i_tensor_max_mb = 2048;
+			};
+
+		//The tensor comes off the device in single precision and was stored in double, so
+		//half of every byte the SCF loop reads back was padding. Holding it as computed is
+		//half the memory and, measured on the full twisted ethylene, 1.63x on the two walks
+		//each SCF iteration makes over it. Opt-in because it is a change of stored
+		//precision: the lambda scan agrees to 5e-13 and iteration for iteration, but that
+		//is a measurement on one system rather than a proof.
+		handlers["i_float"] = [&](std::istream&) {
+			i_tensor_single = true;
 			};
 
 		handlers["i_tensor_mb"] = [&](std::istream& in2) {
@@ -387,6 +420,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.read_tensor = read_tensor;
 	settings.read_first_guess = read_first_guess;
 	settings.i_tensor_max_mb = i_tensor_max_mb;
+	settings.i_tensor_single = i_tensor_single;
+	settings.i_tensor_file_path = i_tensor_file_path;
 	settings.nbo_output = nbo_output;
 
 	return settings;
@@ -1073,11 +1108,15 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 	eval_phase(phase_fact);
 	eval_DW(DW_fact);
 	eval_translation_phase(translation_phase);
-	if (read && settings.i_tensor_max_mb > 0) {
-		throw std::runtime_error("XCW: `read` loads the whole I tensor and cannot be combined "
-			"with a memory budget (`stream` / `i_tensor_mb`). Drop one of the two.");
+	//A bare `read` loads the whole dump into memory, which a budget contradicts. `read
+	//<path>` reads the streamed tensor a window at a time and is the opposite: it exists
+	//precisely so a large tensor need not be rebuilt, and a budget is welcome there.
+	if (read && settings.i_tensor_file_path.empty() && settings.i_tensor_max_mb > 0) {
+		throw std::runtime_error("XCW: `read` without a path loads the whole I tensor and "
+			"cannot be combined with a memory budget (`stream` / `i_tensor_mb`). Give `read` "
+			"the path of a streamed tensor, or drop one of the two.");
 	}
-	if (read) {
+	if (read && settings.i_tensor_file_path.empty()) {
 		std::ifstream in("I_tensor", std::ios::binary);
 		if (!in)
 			throw std::runtime_error("Cannot open file for reading");
@@ -1100,6 +1139,22 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 		I.resize(static_cast<size_t>(total_size_safe));
 		in.read(reinterpret_cast<char*>(I.data()),
 			static_cast<std::streamsize>(total_size_safe) * sizeof(cdouble));
+	}
+	else if (settings.read_tensor && !settings.i_tensor_file_path.empty()
+		&& std::filesystem::exists(i_tensor_path())
+		&& std::filesystem::file_size(i_tensor_path())
+			>= i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo)) {
+		//A streamed tensor already there and big enough for this problem. It depends on the
+		//geometry, the basis and the reflections and on none of the refinement settings, so
+		//a second run that changes those can read it rather than spend the build again.
+		//open() checks the header and throws if the shape does not match, which is what
+		//stops a tensor from a different structure being used by accident.
+		i_streamed_ = true;
+		i_window_ = std::max(1, std::min(cryst.nr_small, 64));
+		open_i_stream_for_reading();
+		std::cout << "I tensor read from " << i_tensor_path().string()
+			<< " (" << (i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo) / 1048576.0)
+			<< " MB), not recomputed" << std::endl;
 	}
 	else {
 		double time_taken;
@@ -1156,8 +1211,12 @@ void XCW::decide_i_storage() {
 		//shifts every reference output by a line, and the automatic budget would say it on
 		//every run - including the reference tests, which is why it stays quiet there.
 		if ((budget > 0 && !automatic) || ProgressBar::report_counts) {
+			const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
+			const bool single = settings.i_tensor_single || (f && std::atoi(f) != 0);
+			const double shown = single ? total / 2.0 : static_cast<double>(total);
 			std::cout << std::fixed << std::setprecision(2)
-				<< "I tensor held in memory: " << (total / 1048576.0) << " MB";
+				<< "I tensor held in memory: " << (shown / 1048576.0) << " MB"
+				<< (single ? " (single precision)" : "");
 			if (budget > 0)
 				std::cout << " (fits the " << (budget / 1048576.0) << " MB " << source << " budget)";
 			std::cout << std::endl;
@@ -1177,7 +1236,9 @@ void XCW::decide_i_storage() {
 }
 
 std::filesystem::path XCW::i_tensor_path() const {
-	return std::filesystem::path("I_tensor_stream.bin");
+	return settings.i_tensor_file_path.empty()
+		? std::filesystem::path("I_tensor_stream.bin")
+		: settings.i_tensor_file_path;
 }
 
 void XCW::open_i_stream_for_reading() {
@@ -1190,8 +1251,14 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//nr_small * packed_size deliberately in size_t: both are int and their product
 	//passes 2^31 at nmo = 500 with 20k reflections
 	decide_i_storage();
-	if (!i_streamed_)
-		I.assign(static_cast<size_t>(cryst.nr_small) * packed_size, cdouble{});
+	if (!i_streamed_) {
+		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
+		i_float_ = settings.i_tensor_single || (f && std::atoi(f) != 0);
+		if (i_float_)
+			I32.assign(static_cast<size_t>(cryst.nr_small) * packed_size, std::complex<float>{});
+		else
+			I.assign(static_cast<size_t>(cryst.nr_small) * packed_size, cdouble{});
+	}
 	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
 
 	cvec XCW_integrals;
@@ -1775,6 +1842,25 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			/ static_cast<double>(ao_slots_carrying) << "%) below "
 			<< std::scientific << std::setprecision(0) << ao_block_threshold
 			<< std::fixed << std::setprecision(2) << " on their block\n";
+
+		//The screenings in one number. Each of the lines above counts what it removed on its
+		//own axis - pairs, AO-block entries, whole grids - and none of them says what the
+		//run will actually cost. This does: the I tensor's work is the sum over blocks of
+		//n_active^2 times points, and the same sum with every AO on every point is what it
+		//would be with no screening at all. The ratio is what the GEMMs were spared.
+		double work_done = 0.0, work_unscreened = 0.0;
+		for (int g = 0; g < n_atom_grids; g++)
+			for (const GridBlock& b : grid_blocks[g]) {
+				const double na = static_cast<double>(b.active_aos.size());
+				work_done += na * na * b.point_count;
+				work_unscreened += static_cast<double>(cryst.nmo) * cryst.nmo * b.point_count;
+			}
+		if (work_done > 0.0)
+			std::cout << std::fixed << std::setprecision(2)
+				<< "I tensor work after all screening: " << (work_done / 1e12)
+				<< " of " << (work_unscreened / 1e12) << " Tflop-equivalents ("
+				<< 100.0 * work_done / work_unscreened << "%, "
+				<< (work_unscreened / work_done) << "x less than unscreened)\n";
 	}
 
 	//The whole cost of the device path in one number: sum over blocks of n_active^2 times
@@ -1896,16 +1982,22 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	if (itensor_on_gpu) {
 		const auto gpu_start = std::chrono::high_resolution_clock::now();
 		cvec blk_gpu;
-		if (i_streamed_) blk_gpu.assign(packed_size, cdouble{});
+		if (i_streamed_ || i_float_) blk_gpu.assign(packed_size, cdouble{});
 		vec kxs(num_syms), kys(num_syms), kzs(num_syms);
 		cvec facs(static_cast<size_t>(num_syms) * n_atom_grids);
 		auto collect_gpu = [&](const int rr) {
-			if (i_streamed_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
-			cdouble* const I_rr = i_streamed_ ? blk_gpu.data()
+			if (i_streamed_ || i_float_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
+			cdouble* const I_rr = (i_streamed_ || i_float_) ? blk_gpu.data()
 									  : I.data() + static_cast<size_t>(rr) * packed_size;
 			if (!itensor_gpu_collect(rr & 1, I_rr))
 				err_checkf(false, "I tensor GPU read-back failed", std::cout);
 			if (i_streamed_) i_file_.write_block(rr, blk_gpu.data());
+			else if (i_float_) {
+				std::complex<float>* const dst = I32.data() + static_cast<size_t>(rr) * packed_size;
+				for (int i = 0; i < packed_size; i++)
+					dst[i] = std::complex<float>(static_cast<float>(blk_gpu[i].real()),
+												 static_cast<float>(blk_gpu[i].imag()));
+			}
 			if (!(opt->no_date) && pb) pb->update();
 		};
 		for (int rr = 0; rr < cryst.nr_small; rr++) {
@@ -2005,7 +2097,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 #pragma omp for schedule(dynamic, 1)
 			for (int r = 0; r < cryst.nr_small; r++) {
 				if (i_streamed_) std::fill(blk.begin(), blk.end(), cdouble{});
-				cdouble* const I_r = i_streamed_ ? blk.data()
+				cdouble* const I_r = (i_streamed_ || i_float_) ? blk.data()
 					: I.data() + static_cast<size_t>(r) * packed_size;
 				const size_t base = static_cast<size_t>(r) * packed_size;
 				const int* asym_lookup_r = asym_lookup[r].data();
@@ -2150,17 +2242,22 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 #pragma omp for schedule(static)
 			for (int r = r0; r < r1; ++r) {
 				if (!io_error.empty()) continue;
-				const cdouble* I_r = i_block(r);
-				cdouble sum = F_calc[1][r];
-				size_t k = 0;
-				for (int mu = 0; mu < cryst.nmo; mu++) {
-					sum += 2.0 * I_r[k] * D(mu, mu);
-					k++;
-					for (int nu = mu + 1; nu < cryst.nmo; nu++, k++) {
-						sum += 4.0 * I_r[k] * D(mu, nu);
+				//One walk, either element type: the accumulation stays in double whatever
+				//the tensor is stored as, so float storage costs precision in the stored
+				//value and nothing in the sum.
+				auto accumulate = [&](const auto* I_r) {
+					cdouble sum = F_calc[1][r];
+					size_t k = 0;
+					for (int mu = 0; mu < cryst.nmo; mu++) {
+						sum += 2.0 * cdouble(I_r[k]) * D(mu, mu);
+						k++;
+						for (int nu = mu + 1; nu < cryst.nmo; nu++, k++) {
+							sum += 4.0 * cdouble(I_r[k]) * D(mu, nu);
+						}
 					}
-				}
-				F_calc[0][r] = sum;
+					F_calc[0][r] = sum;
+				};
+				if (i_float_) accumulate(i_block32(r)); else accumulate(i_block(r));
 			}
 		}
 	}
@@ -2216,15 +2313,20 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 				}
 				if (weighted) precompute *= inv_H2_[r];
 
-				const cdouble* I_r = i_block(r);
-				size_t offset = 0;
-				for (int mu = 0; mu < cryst.nmo; mu++) {
-					for (int nu = mu; nu < cryst.nmo; nu++) {
-						const cdouble& val = I_r[offset];
-						local_ptr[nu * cryst.nmo + mu] += precompute.real() * val.real() - precompute.imag() * val.imag();
-						offset++;
+				//As in calc_F_calc: one walk over whichever element type is resident, with
+				//the accumulation in double either way.
+				auto accumulate = [&](const auto* I_r) {
+					size_t offset = 0;
+					for (int mu = 0; mu < cryst.nmo; mu++) {
+						for (int nu = mu; nu < cryst.nmo; nu++) {
+							const double vr = static_cast<double>(I_r[offset].real());
+							const double vi = static_cast<double>(I_r[offset].imag());
+							local_ptr[nu * cryst.nmo + mu] += precompute.real() * vr - precompute.imag() * vi;
+							offset++;
+						}
 					}
-				}
+				};
+				if (i_float_) accumulate(i_block32(r)); else accumulate(i_block(r));
 			}
 		}
 #pragma omp critical
