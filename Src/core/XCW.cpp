@@ -113,7 +113,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768;
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
-	bool grown = false, safe_tensor = false, read_tensor = false, read_first_guess = false, nbo_output = false;
+	bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false;
 	bool i_tensor_single = false;
 	std::filesystem::path i_tensor_file_path;
 	std::filesystem::path i_tensor_save_path;
@@ -265,21 +265,22 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 			speed_preset = "fast_conv";
 			};
 
+		//`safe` is `save` to the default path, which is where `read` without a path looks.
 		handlers["safe"] = [&](std::istream&) {
-			safe_tensor = true;
+			i_tensor_save_path = i_tensor_default;
 			};
 
-		//`read` on its own reuses the whole-tensor dump `safe` wrote. Given a path it
-		//reuses the streamed tensor at that path instead, which is the expensive thing a
-		//run produces - 43 minutes and 112 GB on the twisted ethylene - and which depends
-		//only on the geometry, the basis and the reflections, not on any refinement
-		//setting. So trying another lambda range or convergence preset need not rebuild it.
+		//`read <path>` reuses the streamed tensor at that path, which is the expensive thing
+		//a run produces and which depends only on the geometry, the basis and the
+		//reflections, not on any refinement setting. So trying another lambda range or
+		//convergence preset need not rebuild it. It is held in memory when it fits.
 		//
 		//The path is optional, and the settings file is one whitespace-separated stream of
 		//tokens, so a bare `read` followed by another keyword must not swallow it: take the
 		//next token, put it back if it is a keyword.
 		handlers["read"] = [&](std::istream& is) {
 			read_tensor = true;
+			i_tensor_file_path = i_tensor_default;
 			const std::streampos before = is.tellg();
 			std::string token;
 			if (!(is >> token)) { is.clear(); return; }
@@ -395,8 +396,6 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		settings.diis_stop_shift = 1e-2;
 	}
 	else if (speed_preset == "fast_conv") {
-		settings.method_apply_damping = false;
-		settings.method_apply_shift = false;
 	}
 
 	if (basis_set_name == "Undefined") {
@@ -427,7 +426,6 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	}
 	settings.grown = grown;
 	settings.hf_type = hf_type;
-	settings.safe_tensor = safe_tensor;
 	settings.read_tensor = read_tensor;
 	settings.read_first_guess = read_first_guess;
 	settings.i_tensor_max_mb = i_tensor_max_mb;
@@ -1111,48 +1109,12 @@ size_t XCW::tri_index(int mu, int nu) const noexcept {
 	return mu * cryst.nmo - (mu * (mu - 1)) / 2 + (nu - mu);
 }
 
-size_t XCW::flattened_idx(int r, int mu, int nu) const noexcept {
-	return r * cryst.nmo * (cryst.nmo + 1) / 2 + tri_index(mu, nu);
-}
-
 void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 	cvec2 DW_fact, phase_fact, translation_phase;
 	eval_phase(phase_fact);
 	eval_DW(DW_fact);
 	eval_translation_phase(translation_phase);
-	//A bare `read` loads the whole dump into memory, which a budget contradicts. `read
-	//<path>` reads the streamed tensor a window at a time and is the opposite: it exists
-	//precisely so a large tensor need not be rebuilt, and a budget is welcome there.
-	if (read && settings.i_tensor_file_path.empty() && settings.i_tensor_max_mb > 0) {
-		throw std::runtime_error("XCW: `read` without a path loads the whole I tensor and "
-			"cannot be combined with a memory budget (`stream` / `i_tensor_mb`). Give `read` "
-			"the path of a streamed tensor, or drop one of the two.");
-	}
-	if (read && settings.i_tensor_file_path.empty()) {
-		std::ifstream in("I_tensor", std::ios::binary);
-		if (!in)
-			throw std::runtime_error("Cannot open file for reading");
-		int nr_safe;
-		int nmo_safe;
-		int num_elements_safe;
-		int total_size_safe;
-		in.read(reinterpret_cast<char*>(&nr_safe), sizeof(nr_safe));
-		in.read(reinterpret_cast<char*>(&nmo_safe), sizeof(nmo_safe));
-		in.read(reinterpret_cast<char*>(&num_elements_safe), sizeof(num_elements_safe));
-		in.read(reinterpret_cast<char*>(&total_size_safe), sizeof(total_size_safe));
-		if (total_size_safe < 0 ||
-			static_cast<size_t>(nr_safe) * num_elements_safe != static_cast<size_t>(total_size_safe)) {
-			//The count is stored as an int and wraps past 2^31 elements, so a large
-			//tensor reads back a truncated size and the file is silently short
-			throw std::runtime_error("XCW: I_tensor element count does not match nr * packed - "
-				"the file was written by a build that stored the count as a 32-bit int "
-				"and this tensor is too large for that. Recompute it.");
-		}
-		I.resize(static_cast<size_t>(total_size_safe));
-		in.read(reinterpret_cast<char*>(I.data()),
-			static_cast<std::streamsize>(total_size_safe) * sizeof(cdouble));
-	}
-	else if (settings.read_tensor && !settings.i_tensor_file_path.empty()
+	if (settings.read_tensor && !settings.i_tensor_file_path.empty()
 		&& std::filesystem::exists(i_tensor_path())
 		&& std::filesystem::file_size(i_tensor_path())
 			>= i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo)) {
@@ -1161,12 +1123,37 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 		//a second run that changes those can read it rather than spend the build again.
 		//open() checks the header and throws if the shape does not match, which is what
 		//stops a tensor from a different structure being used by accident.
-		i_streamed_ = true;
+		const size_t packed = static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2;
+		const char* source = "";
+		bool automatic = false;
+		i_streamed_ = items_within_budget(static_cast<size_t>(cryst.nr_small),
+			i_tensor_file::block_bytes(cryst.nmo), i_budget(source, automatic)) != 0;
 		i_window_ = std::max(1, std::min(cryst.nr_small, 64));
 		open_i_stream_for_reading();
 		std::cout << "I tensor read from " << i_tensor_path().string()
 			<< " (" << (i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo) / 1048576.0)
-			<< " MB), not recomputed" << std::endl;
+			<< " MB), not recomputed" << (i_streamed_ ? ", read a window at a time" : ", held in memory") << std::endl;
+		if (!i_streamed_) {
+			const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
+			i_float_ = settings.i_tensor_single || (f && std::atoi(f) != 0);
+			if (i_float_)
+				I32.assign(static_cast<size_t>(cryst.nr_small) * packed, std::complex<float>{});
+			else
+				I.resize(static_cast<size_t>(cryst.nr_small) * packed);
+			for (int r0 = 0; r0 < cryst.nr_small; r0 += i_window_) {
+				const int r1 = std::min(cryst.nr_small, r0 + i_window_);
+				i_file_.load(r0, r1);
+				for (int r = r0; r < r1; r++) {
+					const cdouble* src = i_file_.block(r);
+					if (i_float_)
+						for (size_t i = 0; i < packed; i++)
+							I32[static_cast<size_t>(r) * packed + i] = std::complex<float>(static_cast<float>(src[i].real()), static_cast<float>(src[i].imag()));
+					else
+						std::copy(src, src + packed, I.data() + static_cast<size_t>(r) * packed);
+				}
+			}
+			i_file_.close();
+		}
 	}
 	else {
 		double time_taken;
@@ -1236,19 +1223,10 @@ void XCW::finish_i_save()
 		std::cout << "I tensor written to " << settings.i_tensor_save_path.string() << std::endl;
 }
 
-void XCW::decide_i_storage() {
-	const size_t per_block = i_tensor_file::block_bytes(cryst.nmo);
-	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo);
-
-	//The settings file budget wins, then -mem; with neither, what the process can actually
-	//have. Left to a keyword this is the single most expensive decision in an XCW run and
-	//the wrong answer is silent: both SCF walks re-read the whole tensor every iteration, so
-	//streaming a tensor that would have fit cost 5.45 s per iteration against 0.30 s
-	//measured on a V100 node, an 18x on the stage a 200-step lambda scan spends its life in.
-	//Nobody should have to know that to get it right.
+size_t XCW::i_budget(const char*& source, bool& automatic) const {
 	size_t budget = settings.i_tensor_max_mb * 1024ULL * 1024ULL;
-	const char* source = "i_tensor_mb";
-	bool automatic = false;
+	source = "i_tensor_mb";
+	automatic = false;
 	if (budget == 0 && opt->mem_given && opt->mem > 0.0) {
 		budget = static_cast<size_t>(opt->mem * 1024.0 * 1024.0);
 		source = "-mem";
@@ -1265,7 +1243,22 @@ void XCW::decide_i_storage() {
 			automatic = true;
 		}
 	}
+	return budget;
+}
 
+void XCW::decide_i_storage() {
+	const size_t per_block = i_tensor_file::block_bytes(cryst.nmo);
+	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo);
+
+	//The settings file budget wins, then -mem; with neither, what the process can actually
+	//have. Left to a keyword this is the single most expensive decision in an XCW run and
+	//the wrong answer is silent: both SCF walks re-read the whole tensor every iteration, so
+	//streaming a tensor that would have fit cost 5.45 s per iteration against 0.30 s
+	//measured on a V100 node, an 18x on the stage a 200-step lambda scan spends its life in.
+	//Nobody should have to know that to get it right.
+	const char* source = "";
+	bool automatic = false;
+	const size_t budget = i_budget(source, automatic);
 	//items_within_budget returns 0 for "hold everything": no file, no re-read twice per SCF iteration
 	const size_t w = items_within_budget(static_cast<size_t>(cryst.nr_small), per_block, budget);
 	i_streamed_ = (w != 0);
@@ -1300,7 +1293,7 @@ void XCW::decide_i_storage() {
 
 std::filesystem::path XCW::i_tensor_path() const {
 	return settings.i_tensor_file_path.empty()
-		? std::filesystem::path("I_tensor_stream.bin")
+		? std::filesystem::path(i_tensor_default)
 		: settings.i_tensor_file_path;
 }
 
@@ -2645,8 +2638,8 @@ double XCW::compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& s
 		occ::Mat G_beta = Cvir_beta.transpose() * scf.ctx.F.bottomRows(cryst.nmo) * Cocc_beta;
 		return (std::hypot(G_alpha.norm(), G_beta.norm()));
 	}
-
-	// closing funciton
+	err_not_impl_f("Orbital gradient for a general spinorbital kind", std::cout);
+	return 0.0;
 }
 
 void XCW::get_density_criteria(double& RMSP_diff, double& maxP_diff, const occ::Mat& dm, const occ::Mat& dm_last) {
@@ -2820,7 +2813,7 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	//Roby_information Roby(sf_wave_vec[0]);
 }
 
-occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor, bool save_tensor) {
+occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
 	std::vector<ao_data> ao_data_shells;
 	occ::core::Molecule mol;
 	setup_SCF_mol(mol);
@@ -2829,32 +2822,6 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor, bool save_tensor
 	occ::qm::HartreeFock hf(occ_basis_set);
 	create_prims(ao_data_shells, occ_basis_set);
 	eval_I_anom_disp(ao_data_shells, read_tensor);
-	if (save_tensor) {
-		std::ofstream out("I_tensor", std::ios::binary);
-		if (!out)
-			throw std::runtime_error("Cannot open file for writing");
-		int nr_safe = cryst.nr_small;
-		int nmo_safe = cryst.nmo;
-		int num_elements_safe = (cryst.nmo * (cryst.nmo + 1)) / 2;
-		if (i_streamed_) {
-			std::cout << "I tensor is streamed; it is already on disk as "
-				<< i_tensor_path().string() << ", not rewriting it as I_tensor."
-				<< std::endl;
-			return hf;
-		}
-		if (I.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
-			throw std::runtime_error("XCW: I tensor has " + std::to_string(I.size()) +
-				" elements, more than the I_tensor format's 32-bit count can hold. "
-				"Use `stream` instead of `safe`.");
-		}
-		int total_size_safe = static_cast<int>(I.size());
-		out.write(reinterpret_cast<const char*>(&nr_safe), sizeof(nr_safe));
-		out.write(reinterpret_cast<const char*>(&nmo_safe), sizeof(nmo_safe));
-		out.write(reinterpret_cast<const char*>(&num_elements_safe), sizeof(num_elements_safe));
-		out.write(reinterpret_cast<const char*>(&total_size_safe), sizeof(total_size_safe));
-		out.write(reinterpret_cast<const char*>(I.data()),
-			total_size_safe * sizeof(cdouble));
-	}
 	return hf;
 	// closing function
 }
@@ -2928,7 +2895,7 @@ void XCW::run_XCW_fitting() {
 	//OCC parallelises through TBB, which does not read OMP_NUM_THREADS. Not a speedup - it
 	//already used every core - but it makes -cpus bind the 82% of a run that OCC owns.
 	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
-	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor, settings.safe_tensor);
+	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor);
 	occ::qm::SCF scf(hf, settings.hf_type);
 	bool has_guess = false;
 	occ::qm::Wavefunction last_wfn;

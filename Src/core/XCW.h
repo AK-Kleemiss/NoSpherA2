@@ -91,10 +91,8 @@ private:
 		double current_MaxP_diff;
 		bool conv_MaxP_diff = false;
 		double diis_stop_damping;
-		bool method_apply_shift = true;
 		bool apply_shift = true;
 		double diis_stop_shift;
-		bool method_apply_damping = true;
 		bool apply_damping = true;
 		std::string basis_set_name;
 		bool grown;
@@ -110,7 +108,6 @@ private:
 		int max_scf_iterations;
 		int charge;
 		int multiplicity;
-		bool safe_tensor;
 		bool read_tensor;
 		bool read_first_guess;
 		bool nbo_output = false;
@@ -181,7 +178,6 @@ private:
 	// Helper function for flattening the I tensor
 	size_t tri_index(int mu, int nu) const noexcept;
 	// Helper function for flattening the I tensor
-	size_t flattened_idx(int r, int mu, int nu) const noexcept;
 
 	// Converts the ADP matrix (just U) from cif format into reciprocal space
 	void U_cif2U_star();
@@ -217,7 +213,7 @@ private:
 	void create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set);
 
 	// Combined function that sets up the XCW procedure, evaluates I tensor (or loads it from file), sets up the Hartree-Fock object and evaluates anomalous dispersion correction
-	occ::qm::HartreeFock setup_XCW_procedure(bool read_tensor, bool save_tensor);
+	occ::qm::HartreeFock setup_XCW_procedure(bool read_tensor);
 
 	// I tensor storage: held resident, or written to disk and read back a window
 	// of reflections at a time. See decide_i_storage.
@@ -332,6 +328,8 @@ private:
 	std::string i_writer_error_;
 	void start_i_save();
 	void finish_i_save();
+	size_t i_budget(const char*& source, bool& automatic) const;
+	static constexpr const char* i_tensor_default = "I_tensor_stream.bin";
 	i_tensor_file i_file_;
 	bool i_streamed_ = false;
 	int i_window_ = 0;

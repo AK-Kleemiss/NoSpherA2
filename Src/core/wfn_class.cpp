@@ -4402,7 +4402,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
             basis_coefficients[a].push_back(temp_c);
         }
     }
-    vec norm_const;
     for (int a = 0; a < get_ncen(); a++)
     {
         double aiaj = 0.0;
@@ -4444,7 +4443,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                     }
                     // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                     basis_coefficients[a][i] *= factor;
-                    norm_const.emplace_back(basis_coefficients[a][i]);
                 }
                 break;
             case 2:
@@ -4471,8 +4469,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                     }
                     // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                     basis_coefficients[a][i] *= factor;
-                    for (int k = 0; k < 3; k++)
-                        norm_const.emplace_back(basis_coefficients[a][i]);
                 }
                 break;
             case 3:
@@ -4499,10 +4495,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                     }
                     // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                     basis_coefficients[a][i] *= factor;
-                    for (int k = 0; k < 3; k++)
-                        norm_const.emplace_back(basis_coefficients[a][i]);
-                    for (int k = 0; k < 3; k++)
-                        norm_const.emplace_back(sqrt(3) * basis_coefficients[a][i]);
                 }
                 break;
             case 4:
@@ -4529,11 +4521,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                     }
                     // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                     basis_coefficients[a][i] *= factor;
-                    for (int l = 0; l < 3; l++)
-                        norm_const.emplace_back(basis_coefficients[a][i]);
-                    for (int l = 0; l < 6; l++)
-                        norm_const.emplace_back(sqrt(5) * basis_coefficients[a][i]);
-                    norm_const.emplace_back(sqrt(15) * basis_coefficients[a][i]);
                 }
                 break;
             }
@@ -4759,7 +4746,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     }
 
     ofstream rf(fileName, ios::out);
-    stringstream stream;
     if (!rf.is_open())
     {
         std::cout << "Sorry, can't open the file...\n";
