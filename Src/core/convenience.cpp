@@ -569,6 +569,8 @@ std::string help_message =
  "                                    mostly by how fast the host CPU is. Single\n"
  "                                    precision by default, which moves the total\n"
  "                                    energy in the tenth significant figure.\n"
+ "  -cpu_itensor_fp32                  Single-precision GEMMs for the I tensor\n"
+ "                                    on the CPU, as the device path runs.\n"
  "  -gpu_itensor_tensor                FP16 Tensor Core operands with FP32\n"
  "                                    accumulation for the I tensor (default\n"
  "                                    when cuBLAS provides it); use\n"
@@ -3445,6 +3447,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
     }
     else if (temp == "-gpu_itensor")
         gpu_itensor = true;
+    else if (temp == "-cpu_itensor_fp32")
+        cpu_itensor_fp32 = true;
     else if (temp == "-no_gpu_itensor")
         gpu_itensor = false;
     else if (temp == "-gpu_itensor_tensor")

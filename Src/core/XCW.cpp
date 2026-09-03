@@ -1301,6 +1301,16 @@ void XCW::open_i_stream_for_reading() {
 	i_file_.open(i_tensor_path(), static_cast<size_t>(i_window_));
 }
 
+//One tile of the CPU I tensor, C = A * B^T row-major with k the block's points
+static void tile_gemm(const int m, const int n, const int k, const double* a, const double* b, double* c)
+{
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0, a, k, b, k, 0.0, c, n);
+}
+static void tile_gemm(const int m, const int n, const int k, const float* a, const float* b, float* c)
+{
+	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0f, a, k, b, k, 0.0f, c, n);
+}
+
 void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids_) {
 	long long skipped_grids = 0;
 	const int packed_size = (cryst.nmo * (cryst.nmo + 1)) / 2;
@@ -1704,10 +1714,13 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		int point_count;
 		ivec active_aos;
 		vec ao_values;
+		std::vector<float> ao_values_f;
 		std::vector<MatrixTile> matrix_tiles;
 		int tile_result_size = 0;
 	};
-	constexpr int screened_tile_size = 64;
+	//128 rows a tile: at 64 the GEMM calls are overhead-bound in both precisions, and above
+	//it a double tile pair leaves the core's L2 while single precision stays flat to 256
+	constexpr int screened_tile_size = 128;
 	std::vector<std::vector<GridBlock>> grid_blocks(n_atom_grids);
 	auto make_matrix_tiles = [&](GridBlock& block) {
 		const int n_active = static_cast<int>(block.active_aos.size());
@@ -1881,6 +1894,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			if (!block.active_aos.empty()) {
 				ao_slots_kept += static_cast<long long>(block.active_aos.size());
 				make_matrix_tiles(block);
+				if (opt->cpu_itensor_fp32) block.ao_values_f.assign(block.ao_values.begin(), block.ao_values.end());
 				skipstats(g, block.active_aos, block.point_count);
 				grid_blocks[g].push_back(std::move(block));
 			}
@@ -2119,10 +2133,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			vec phase_angles;
 			vec phase_sines;
 			vec phase_cosines;
-			vec weighted_values_real;
-			vec weighted_values_imag;
-			vec tile_real_values;
-			vec tile_imag_values;
+			vec w, c;
+			std::vector<float> wf, cf;
 			//One reflection's block, used only while streaming. No ordering is needed on
 			//the way out: the file is reflection-major and the writer seeks to r's offset
 			cvec blk;
@@ -2130,6 +2142,13 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 
 #if !defined(__APPLE__)
 			mkl_set_num_threads_local(1);
+#endif
+#if defined(__SSE2__) || defined(_M_X64)
+			//Single precision underflows into subnormals on this data - AO tails of 1e-40 are
+			//ordinary here - and an x86 core handles those a hundred times slower. Flush
+			//them, as the device does; the double path never gets near 1e-308.
+			const unsigned int csr_before = _mm_getcsr();
+			if (opt->cpu_itensor_fp32) _mm_setcsr(csr_before | 0x8040);
 #endif
 
 			size_t max_points = 0;
@@ -2149,10 +2168,14 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					}
 				}
 			}
-			weighted_values_real.resize(max_ao_block_size);
-			weighted_values_imag.resize(max_ao_block_size);
-			tile_real_values.resize(max_tile_result_size);
-			tile_imag_values.resize(max_tile_result_size);
+			if (opt->cpu_itensor_fp32) {
+				wf.resize(2 * max_ao_block_size);
+				cf.resize(2 * max_tile_result_size);
+			}
+			else {
+				w.resize(2 * max_ao_block_size);
+				c.resize(2 * max_tile_result_size);
+			}
 
 #pragma omp for schedule(dynamic, 1)
 			for (int r = 0; r < cryst.nr_small; r++) {
@@ -2201,52 +2224,38 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 							const ivec& active_aos = block.active_aos;
 							const int n_active = static_cast<int>(active_aos.size());
 							const int np = block.point_count;
-							const vec& ao_values = block.ao_values;
-
-							double* const real_w = weighted_values_real.data();
-							double* const imag_w = weighted_values_imag.data();
-							double* const tile_real = tile_real_values.data();
-							double* const tile_imag = tile_imag_values.data();
 							const cdouble* phase_values = phase_g + block.point_start;
-
-							for (int local_mu = 0; local_mu < n_active; local_mu++) {
-								const double* ao_row = ao_values.data() + static_cast<size_t>(local_mu) * np;
-								double* rw_row = real_w + static_cast<size_t>(local_mu) * np;
-								double* iw_row = imag_w + static_cast<size_t>(local_mu) * np;
-								for (int p = 0; p < np; p++) {
-									rw_row[p] = ao_row[p] * phase_values[p].real();
-									iw_row[p] = ao_row[p] * phase_values[p].imag();
+							//Weighted rows interleaved, 2j real and 2j + 1 imaginary of AO j, so a
+							//tile's B rows are contiguous and one GEMM of twice the width returns
+							//both parts; the result then alternates real, imaginary per column.
+							auto tiles = [&](const auto* ao, auto* wv, auto* cv) {
+								for (int local_mu = 0; local_mu < n_active; local_mu++) {
+									const auto* ao_row = ao + static_cast<size_t>(local_mu) * np;
+									auto* rw = wv + static_cast<size_t>(2 * local_mu) * np;
+									auto* iw = rw + np;
+									for (int p = 0; p < np; p++) {
+										rw[p] = ao_row[p] * phase_values[p].real();
+										iw[p] = ao_row[p] * phase_values[p].imag();
+									}
 								}
-							}
-
-							for (const MatrixTile& tile : block.matrix_tiles) {
-								const double* ao_tile_row = ao_values.data() + static_cast<size_t>(tile.row_start) * np;
-								cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
-									ao_tile_row, np,
-									real_w + static_cast<size_t>(tile.col_start) * np, np,
-									0.0, tile_real + tile.result_offset, tile.col_count);
-								cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, tile.row_count, tile.col_count, np, 1.0,
-									ao_tile_row, np,
-									imag_w + static_cast<size_t>(tile.col_start) * np, np,
-									0.0, tile_imag + tile.result_offset, tile.col_count);
-							}
-
-							// Retiling
-							for (const MatrixTile& tile : block.matrix_tiles) {
-								for (int tile_row = 0; tile_row < tile.row_count; tile_row++) {
-									const int local_mu = tile.row_start + tile_row;
-									const int mu = active_aos[local_mu];
-									const int first_tile_col = (tile.row_start == tile.col_start) ? tile_row : 0;
-									for (int tile_col = first_tile_col; tile_col < tile.col_count; tile_col++) {
-										const int local_nu = tile.col_start + tile_col;
-										const int nu = active_aos[local_nu];
-										if (!skip[mu][nu]) {
-											const size_t matrix_idx = tile.result_offset + static_cast<size_t>(tile_row) * tile.col_count + tile_col;
-											I_r[tri_index(mu, nu)] += cdouble(tile_real[matrix_idx], tile_imag[matrix_idx]) * factor;
+								for (const MatrixTile& tile : block.matrix_tiles)
+									tile_gemm(tile.row_count, 2 * tile.col_count, np, ao + static_cast<size_t>(tile.row_start) * np,
+										wv + static_cast<size_t>(2 * tile.col_start) * np, cv + 2 * tile.result_offset);
+								for (const MatrixTile& tile : block.matrix_tiles) {
+									for (int tile_row = 0; tile_row < tile.row_count; tile_row++) {
+										const int mu = active_aos[tile.row_start + tile_row];
+										const int first_tile_col = (tile.row_start == tile.col_start) ? tile_row : 0;
+										const auto* crow = cv + 2 * tile.result_offset + static_cast<size_t>(tile_row) * 2 * tile.col_count;
+										for (int tile_col = first_tile_col; tile_col < tile.col_count; tile_col++) {
+											const int nu = active_aos[tile.col_start + tile_col];
+											if (!skip[mu][nu])
+												I_r[tri_index(mu, nu)] += cdouble(crow[2 * tile_col], crow[2 * tile_col + 1]) * factor;
 										}
 									}
 								}
-							}
+							};
+							if (opt->cpu_itensor_fp32) tiles(block.ao_values_f.data(), wf.data(), cf.data());
+							else tiles(block.ao_values.data(), w.data(), c.data());
 						}
 					}
 				}
@@ -2260,6 +2269,10 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					pb->update();
 				}
 			}
+#if defined(__SSE2__) || defined(_M_X64)
+			_mm_setcsr(csr_before);
+#endif
+
 		}
 	}
 	if (i_streamed_) {
