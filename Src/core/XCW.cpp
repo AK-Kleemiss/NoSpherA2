@@ -7,7 +7,6 @@
 #include "scattering_factors.h"
 #include "nos_math.h"
 #include "basis_set.h"
-#include "cublas_dynamic.h"
 
 void XCW::construct(const options& opt_in) {
 	opt = &opt_in;
@@ -1864,21 +1863,12 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		L.skip = skip_flat.data(); L.grid_point_off = goff.data();
 		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
 		L.n_points = static_cast<long long>(fd1.size());
-		//What the device path actually issues. With syrkx that is two symmetric rank-k
-		//updates per block, each half the flops of the na x na GEMM it replaces; without it,
-		//the dense na x 2na GEMM. Counted the same way the path is chosen, or the GFLOP/s
-		//row is fiction.
-		{
-			const bool syrkx = cublas_dynamic_syrkx_available()
-				&& std::getenv("NOSPHERA2_ITENSOR_SYRKX")
-				&& std::atoi(std::getenv("NOSPHERA2_ITENSOR_SYRKX")) != 0;
-			for (int b = 0; b < L.n_blocks; b++) {
-				const int na = L.blk_n_active[b];
-				itensor_gpu_dense_flops += syrkx
-					? throughput::flops_gemm(na, na, L.blk_point_count[b])
-					: throughput::flops_gemm(na, 2.0 * na, L.blk_point_count[b]);
-			}
-		}
+		//What the device path actually issues: one dense na x 2na GEMM per block, the real
+		//and imaginary halves together. Counted the way the path runs, or the GFLOP/s row
+		//is fiction.
+		for (int b = 0; b < L.n_blocks; b++)
+			itensor_gpu_dense_flops += throughput::flops_gemm(L.blk_n_active[b],
+				2.0 * L.blk_n_active[b], L.blk_point_count[b]);
 		itensor_gpu_dense_flops *= static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
 		//-gpu_fp64 raises the whole device path to double. It is worth asking for on a card
 		//with real double-precision units and expensive on one without, which is why it is
