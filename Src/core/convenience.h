@@ -316,6 +316,39 @@ bool unsaved_files(std::vector<WFN>& wavy);
 
 std::string trim(const std::string& s);
 
+/**
+ * @brief Physical memory this process can actually get, in bytes, or 0 when it cannot be told.
+ *
+ * Not what the machine has: a scheduler or container ceiling counts, and on a cluster it is
+ * usually well below the node's total. Windows reads the available physical memory and any
+ * job object limit, macOS counts free, inactive and purgeable pages, Linux takes
+ * MemAvailable against the cgroup v2 or v1 limit. Zero means no answer was available and
+ * the caller should keep whatever it would have done without asking.
+ */
+size_t available_memory_bytes();
+
+/**
+ * @brief std::getline that also accepts CRLF line endings.
+ *
+ * Files here move between Windows and the Linux servers constantly, and a text
+ * file written on Windows ends every line with \r\n. std::getline splits on \n
+ * and leaves the \r on the string, where it survives every comparison, every
+ * substr() at a fixed column and every conversion of the last field on the line.
+ * That is not a theoretical problem: it silently cost the XCW CIF reader its
+ * whole atom loop. Every reader in NoSpherA2 uses this instead.
+ *
+ * @param is Stream to read from.
+ * @param line Receives the line without its terminator, \r included.
+ * @return The stream, so it can be tested as a condition like std::getline.
+ */
+inline std::istream& getline_universal(std::istream& is, std::string& line)
+{
+	std::getline(is, line);
+	if (!line.empty() && line.back() == '\r')
+		line.pop_back();
+	return is;
+}
+
 inline void print_centered_text(const std::string& text, int& bar_width, std::ostream& file = std::cout)
 {
 	const int text_length = static_cast<int>(text.length());

@@ -205,7 +205,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 	std::string line, temp;
 	while (!hkl_input.eof())
 	{
-		getline(hkl_input, line);
+		getline_universal(hkl_input, line);
 		if (hkl_input.eof())
 			break;
 		if (line.size() < 2)
@@ -331,7 +331,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	std::string line, temp;
 	while (!hkl_input.eof())
 	{
-		getline(hkl_input, line);
+		getline_universal(hkl_input, line);
 		if (hkl_input.eof())
 			break;
 		if (line.size() < 2)
@@ -891,7 +891,7 @@ static bool read_cif_loop_row(std::istream &input, std::string &line, int n, sve
             fields[got++] = value;
         }
         if (got >= n) return true;
-        if (!std::getline(input, rest)) return false;
+        if (!getline_universal(input, rest)) return false;
         line = rest;
     }
 }
@@ -929,13 +929,13 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 		file << "Starting search loop" << endl;
 	while (!cif_input.eof() && !atoms_read)
 	{
-		getline(cif_input, line);
+		getline_universal(cif_input, line);
 		// if (debug)
 		//     file << "line: " << line << endl;
 		if (line.find("loop_") != string::npos)
 		{
 			count_fields = 0;
-			getline(cif_input, line);
+			getline_universal(cif_input, line);
 			if (debug)
 				file << "line in loop field definition: " << trim(line) << endl;
 			while (trim(line).find("_") == 0)
@@ -958,7 +958,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 						file << "I don't think this is the atom block.. moving on!" << endl;
 					break;
 				}
-				getline(cif_input, line);
+				getline_universal(cif_input, line);
 				count_fields++;
 			}
 			if (label_field != 1000) {
@@ -1020,7 +1020,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				{
 					if (debug)
 						file << "Wrong part!" << endl;
-					getline(cif_input, line);
+					getline_universal(cif_input, line);
 					continue;
 				}
 				bool old_atom = false;
@@ -1041,7 +1041,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				}
 				if (old_atom)
 				{
-					getline(cif_input, line);
+					getline_universal(cif_input, line);
 					continue;
 				}
 				vec tolerances(3);
@@ -1165,7 +1165,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 						file << endl;
 					}
 				}
-				getline(cif_input, line);
+				getline_universal(cif_input, line);
 			}
 		}
 	}
@@ -1234,15 +1234,20 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 	int idx_x = -1;
 	int idx_y = -1;
 	int idx_z = -1;
-	while (std::getline(cif_input, line))
+	while (getline_universal(cif_input, line))
 	{
 		if (line.empty())
 			continue;
-		// Trim leading spaces
-		size_t first = line.find_first_not_of(" \t");
-		if (first == std::string::npos)
+		// Trim whitespace at both ends, not just the front. The header comparisons
+		// below are exact, and a CIF written on Windows - which is what Olex2 hands
+		// out - ends every line with \r, so "_atom_site_label\r" never matched and
+		// the atom loop went unrecognised. That left the caller with no atoms at all
+		// and the next reader indexing an empty array, i.e. a segfault on a file the
+		// rest of NoSpherA2 reads without complaint, since the older CIF readers
+		// compare with find() rather than ==.
+		std::string trimmed = trim(line);
+		if (trimmed.empty())
 			continue;
-		std::string trimmed = line.substr(first);
 		// Detect loop_
 		if (trimmed == "loop_")
 		{
@@ -1394,13 +1399,13 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //        file << "Starting search loop" << endl;
 //    while (!cif_input.eof() && !atoms_read)
 //    {
-//        getline(cif_input, line);
+//        getline_universal(cif_input, line);
 //        // if (debug)
 //        //     file << "line: " << line << endl;
 //        if (line.find("loop_") != string::npos)
 //        {
 //            count_fields = 0;
-//            getline(cif_input, line);
+//            getline_universal(cif_input, line);
 //            if (debug)
 //                file << "line in loop field definition: " << trim(line) << endl;
 //            while (trim(line).find("_") == 0)
@@ -1423,7 +1428,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //                        file << "I don't think this is the atom block.. moving on!" << endl;
 //                    break;
 //                }
-//                getline(cif_input, line);
+//                getline_universal(cif_input, line);
 //                count_fields++;
 //            }
 //            if (label_field != 1000) {
@@ -1478,7 +1483,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //                }
 //                if (old_atom)
 //                {
-//                    getline(cif_input, line);
+//                    getline_universal(cif_input, line);
 //                    continue;
 //                }
 //                vec tolerances(3);
@@ -1618,7 +1623,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //                        file << endl;
 //                    }
 //                }
-//                getline(cif_input, line);
+//                getline_universal(cif_input, line);
 //            }
 //        }
 //    }
@@ -1669,7 +1674,9 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //    return labels2;
 //}
 
-constexpr double cutoff(const int& accuracy)
+//Declared in the header so the XCW I tensor screens on the same ladder: what counts as
+//negligible is the run's accuracy setting, and there should be one answer to that.
+double cutoff(const int& accuracy)
 {
 	if (accuracy < 3)
 		return 1E-10;

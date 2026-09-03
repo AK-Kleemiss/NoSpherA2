@@ -58,7 +58,7 @@ bool gaussian(const string &programPath, const bool &debug){
   string preline;
   while (!ifile.eof()){
     preline=line;
-    getline(ifile,line);
+    getline_universal(ifile,line);
   }
   if(line.find("Normal termination")==-1&&preline.find("Normal termination")==-1) success=false;
   else success=true;
@@ -574,7 +574,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
   int dum_nao = 0;
   if (wave.get_origin() == 2 || wave.get_origin() == 4) {
     while (line.find("Alpha Orbital Energies") == -1 && !ifchk.eof()) {
-      getline(ifchk, line);
+      getline_universal(ifchk, line);
       if (debug)std::cout << "line: " << line << endl;
       if (line.find("Alpha Orbital Energies") == -1) ofchk << line << endl;
       else {
@@ -591,7 +591,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     }
     int counter = 0;
     while (line.find("Alpha MO") == -1 && !ifchk.eof()) {
-      getline(ifchk, line);
+      getline_universal(ifchk, line);
       string temp = " ";
       for (int j = 0; j < 5; j++) {
         if (counter + j < wave.get_nmo()) {
@@ -639,19 +639,19 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
       i += 4;
       temp += '\n';
       ofchk << temp;
-      getline(ifchk, line);
+      getline_universal(ifchk, line);
     }
   }
   if (wave.get_origin() == 1) {
     while (line.find("Total SCF Density") == -1 && !ifchk.eof()) {
-      getline(ifchk, line);
+      getline_universal(ifchk, line);
       if (debug)std::cout << "line: " << line << endl;
       if (line.find("Total SCF Density") == -1) ofchk << line << endl;
     }
     ofchk.flush();
   }
   ofchk << "Total SCF Density                          R   N=" << setw(12) << wave.get_DM_size() << endl;
-  getline(ifchk, line);
+  getline_universal(ifchk, line);
   //now write the DM and skip lines in IFCHK
   for (int i = 0; i < wave.get_DM_size(); i++) {
     string temp = " ";
@@ -671,10 +671,10 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     if (debug)std::cout << endl;
     temp += '\n';
     ofchk << temp;
-    getline(ifchk, line);
+    getline_universal(ifchk, line);
   }
   while (!ifchk.eof()) {
-    getline(ifchk, line);
+    getline_universal(ifchk, line);
     ofchk << line;
     if (!ifchk.eof()) ofchk << endl;
   }
@@ -708,7 +708,7 @@ bool read_fchk_integer_block(std::ifstream& in, const char* heading, ivec& resul
     int limit = read_fchk_integer(line);
     int run = 0;
     int temp;
-    getline(in, line);
+    getline_universal(in, line);
     while (run < limit)
     {
         if (in.eof())
@@ -717,7 +717,7 @@ bool read_fchk_integer_block(std::ifstream& in, const char* heading, ivec& resul
         result.push_back(temp);
         run++;
         if (run % 6 == 0)
-            getline(in, line);
+            getline_universal(in, line);
     }
     return true;
 };
@@ -729,7 +729,7 @@ bool read_fchk_double_block(std::ifstream& in, const char* heading, vec& result,
     int limit = read_fchk_integer(line);
     int run = 0;
     double temp;
-    getline(in, line);
+    getline_universal(in, line);
     while (run < limit)
     {
         if (in.eof())
@@ -738,7 +738,7 @@ bool read_fchk_double_block(std::ifstream& in, const char* heading, vec& result,
         result.push_back(temp);
         run++;
         if (run % 5 == 0)
-            getline(in, line);
+            getline_universal(in, line);
     }
     return true;
 };

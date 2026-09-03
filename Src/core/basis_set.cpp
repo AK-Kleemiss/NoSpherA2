@@ -442,43 +442,90 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 }
 
 
+namespace {
+	std::string normalize_basis_name(std::string basis_name) {
+		std::replace(basis_name.begin(), basis_name.end(), '_', '-');
+		std::transform(basis_name.begin(), basis_name.end(), basis_name.begin(),
+			[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+		return basis_name;
+	}
+
+	// Every stored name carries the suffix of the file it was generated from
+	// ("def2-tzvp-basis", "def2-tzvp-rifit", ...), so a plain substring search hits
+	// several entries for almost any query and used to return whichever one the
+	// generator happened to emit first ("def2-tzvp" -> "def2-tzvpd-basis").
+	// Match in decreasing order of specificity instead, and never silently pick one
+	// of several equally good candidates.
+	// Returns the index into basis_sets, or -1; on -1 'candidates' holds the
+	// ambiguous matches (empty if there was no match at all). 'exact' says whether
+	// the name was taken at face value - the name as stored, or the orbital basis
+	// set of that name - so that only a guess gets reported to the user.
+	int find_basis_set_index(const std::string& basis_name, std::vector<std::string>& candidates, bool& exact) {
+		const int count = static_cast<int>(basis_set_count);
+		candidates.clear();
+		exact = true;
+
+		//1: the name exactly as stored
+		for (int i = 0; i < count; i++)
+			if (basis_sets[i].name == basis_name) return i;
+
+		//2: the orbital basis set of that name
+		const std::string orbital_name = basis_name + "-basis";
+		for (int i = 0; i < count; i++)
+			if (basis_sets[i].name == orbital_name) return i;
+
+		exact = false;
+
+		//3: the name followed by any suffix, e.g. "def2-svpd" -> "def2-svpd-rifit"
+		std::vector<int> hits;
+		const std::string prefix = basis_name + "-";
+		for (int i = 0; i < count; i++)
+			if (basis_sets[i].name.substr(0, std::min(prefix.size(), basis_sets[i].name.size())) == prefix) hits.push_back(i);
+
+		//4: anywhere in the name, only used if 3 found nothing
+		if (hits.empty())
+			for (int i = 0; i < count; i++)
+				if (basis_sets[i].name.find(basis_name) != std::string_view::npos) hits.push_back(i);
+
+		if (hits.size() == 1) return hits.front();
+		for (const int i : hits) candidates.emplace_back(basis_sets[i].name);
+		return -1;
+	}
+
+	std::string join_candidates(const std::vector<std::string>& candidates) {
+		std::string list;
+		for (size_t i = 0; i < candidates.size(); i++) {
+			if (i != 0) list += ", ";
+			list += candidates[i];
+		}
+		return list;
+	}
+}
+
 std::shared_ptr<BasisSet> BasisSetLibrary::get_basis_set(std::string basis_name) {
-	//Check if the supplied basis name is contained in part of a given basis set name
-	std::string found_basis = "";
 	if (basis_name == "") {
 		std::cout << "No Basis Name Supplied! Aborting!!!" << std::endl;
 		exit(1);
 	}
-	std::replace(basis_name.begin(), basis_name.end(), '_', '-');
-	//Cast basis_name to lowercase
-	std::transform(basis_name.begin(), basis_name.end(), basis_name.begin(), ::tolower);
+	basis_name = normalize_basis_name(basis_name);
 
-	//Check if the supplied basis name is one of the precompiled basis sets
-	int selected_idx = 0;
-	for (; selected_idx < basis_set_count; selected_idx++) {
-		std::string_view name = basis_sets[selected_idx].name;
-		if (basis_sets[selected_idx].name.find(basis_name) != std::string::npos) {
-			found_basis = basis_sets[selected_idx].name;
-			break;
-		}
-	}
-	err_checkf(found_basis != "", "Basis set " + basis_name + " not defined in BasisSetLibrary!", std::cout);
+	std::vector<std::string> candidates;
+	bool exact = false;
+	const int selected_idx = find_basis_set_index(basis_name, candidates, exact);
+	err_checkf(selected_idx >= 0 || candidates.empty(),
+		"Basis set " + basis_name + " is ambiguous in BasisSetLibrary, candidates are: " + join_candidates(candidates) + ". Please give the full name!", std::cout);
+	err_checkf(selected_idx >= 0, "Basis set " + basis_name + " not defined in BasisSetLibrary!", std::cout);
+	//Only a guess is worth reporting; "def2-tzvp" -> "def2-tzvp-basis" is the convention.
+	if (!exact)
+		std::cout << "Basis set " << basis_name << " resolved to " << basis_sets[selected_idx].name << std::endl;
 	return std::make_shared<BasisSet>(basis_sets[selected_idx]);
 }
 
 
 bool BasisSetLibrary::check_basis_set_exists(std::string basis_name) {
-	//Check if the supplied basis name is in the basisSets map
-	bool found_basis = false;
-	std::replace(basis_name.begin(), basis_name.end(), '_', '-');
-	std::transform(basis_name.begin(), basis_name.end(), basis_name.begin(), ::tolower);
-	for (int basis_set_idx = 0; basis_set_idx < basis_set_count; basis_set_idx++) {
-		if (basis_sets[basis_set_idx].name.find(basis_name) != std::string::npos) {
-			found_basis = true;
-			break;
-		}
-	}
-	return found_basis;
+	std::vector<std::string> candidates;
+	bool exact = false;
+	return find_basis_set_index(normalize_basis_name(basis_name), candidates, exact) >= 0;
 }
 
 
@@ -685,11 +732,11 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 		}
 		// scan the tonto style basis set file for the entries we are looking or:
 		string line;
-		getline(ifile, line);
+		getline_universal(ifile, line);
 		int file_type = 0;
 		// check if we support that type of basis set
 		while (line.find("keys=") == -1 && !ifile.eof())
-			getline(ifile, line);
+			getline_universal(ifile, line);
 		if (debug)
 		{
 			std::cout << "Line after looking for keys=: " << line << endl;
@@ -733,7 +780,7 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 			return false;
 		}
 		while (!(line.find(elements_list[i]) < line.size()) && !ifile.eof())
-			getline(ifile, line);
+			getline_universal(ifile, line);
 		if (debug)
 			std::cout << "line while search for " << elements_list[i] << " :" << line << endl;
 		if (debug && line.find(elements_list[i]) != -1)
@@ -749,7 +796,7 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 		unsigned int shell = 0;
 		if (line.find("{") == -1)
 		{
-			getline(ifile, line);
+			getline_universal(ifile, line);
 			if (debug)
 			{
 				std::cout << "I read an additional line!" << endl;
@@ -757,7 +804,7 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 		}
 		while (line.find("}") == string::npos && !ifile.eof())
 		{
-			getline(ifile, line);
+			getline_universal(ifile, line);
 			stringstream stream;
 			stream << line;
 			if (line.find("}") != string::npos)
@@ -781,7 +828,7 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 			}
 			for (int j = 0; j < count; j++)
 			{
-				getline(ifile, line);
+				getline_universal(ifile, line);
 				if (debug)
 				{
 					std::cout << "read the " << j << ". line: " << line << endl;
@@ -938,7 +985,7 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 		}
 		// scan the tonto style basis set file for the entries we are looking or:
 		string line;
-		getline(ifile, line);
+		getline_universal(ifile, line);
 		int file_type = 0;
 		// check if we support that type of basis set
 		while (line.find("keys=") == -1 && !ifile.eof())
@@ -947,7 +994,7 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 			{
 				std::cout << "line.size of first line: " << line.size() << "line.find(\"keys=\"): " << line.find("keys=") << endl;
 			}
-			getline(ifile, line);
+			getline_universal(ifile, line);
 		}
 		if (debug)
 		{
@@ -986,7 +1033,7 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 		}
 		while (!(line.find(elements_list[i]) < line.size()) && !ifile.eof())
 		{
-			getline(ifile, line);
+			getline_universal(ifile, line);
 			if (debug)
 				std::cout << "line while search for " << elements_list[i] << " :" << line << endl;
 		}
@@ -1003,13 +1050,13 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 		unsigned int shell = 0;
 		if (line.find("{") == -1)
 		{
-			getline(ifile, line);
+			getline_universal(ifile, line);
 			if (debug)
 				std::cout << "I read an additional line!" << endl;
 		}
 		while (line.find("}") == -1 && !ifile.eof())
 		{
-			getline(ifile, line);
+			getline_universal(ifile, line);
 			stringstream stream;
 			stream << line;
 			int count = 0;
@@ -1037,7 +1084,7 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 			}
 			for (int j = 0; j < count; j++)
 			{
-				getline(ifile, line);
+				getline_universal(ifile, line);
 				if (debug)
 				{
 					std::cout << "read the " << j << ". line: " << line << endl;

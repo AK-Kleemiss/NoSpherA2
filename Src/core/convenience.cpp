@@ -16,6 +16,9 @@
 #include <windows.h>
 #include <commdlg.h>
 #include <cderr.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <sys/sysctl.h>
 #endif
 
 namespace {
@@ -1088,7 +1091,7 @@ std::string go_get_string(std::ifstream &file, std::string search, bool rewind)
         file.seekg(0, file.beg);
     }
     std::string line;
-    while (line.find(search) == std::string::npos && !file.eof() && getline(file, line))
+    while (line.find(search) == std::string::npos && !file.eof() && getline_universal(file, line))
         continue;
     if (file.eof())
         return "";
@@ -1792,12 +1795,12 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
     bool atoms_read = false;
     while (!asym_cif_input.eof() && !atoms_read)
     {
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("loop_") != string::npos)
         {
             while (line.find("_") != string::npos)
             {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (debug)
                     log3 << "line in loop field definition: " << line << endl;
                 if (line.find("label") != string::npos)
@@ -1826,6 +1829,10 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                     s >> fields[i];
                 if (debug)
                     log3 << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << endl;
+                //A CIF whose atom_site loop holds more atoms than the wavefunction has
+                //centres would otherwise be written past the end of 'positions'.
+                err_checkf(labels.size() < positions.size(),
+                    "The CIF lists more atoms than the wavefunction has centres, cannot assign U_iso!", std::cout);
                 positions[labels.size()] = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
                 bool found_this_one = false;
                 if (debug)
@@ -1846,7 +1853,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                 if (!found_this_one && debug)
                     log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
                 labels.push_back(fields[label_field]);
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
     }
@@ -1860,12 +1867,12 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
     Uij.resize(wavy.get_ncen());
     while (!asym_cif_input.eof() && !atoms_read)
     {
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("loop_") != string::npos)
         {
             while (line.find("_") != string::npos)
             {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (debug)
                     log3 << "line in loop field definition: " << line << endl;
                 if (line.find("aniso_label") != string::npos)
@@ -1914,7 +1921,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                 }
                 if (!found_this_one && debug)
                     log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
     }
@@ -1927,12 +1934,12 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
     Cijk.resize(wavy.get_ncen());
     while (!asym_cif_input.eof() && !atoms_read)
     {
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("loop_") != string::npos)
         {
             while (line.find("_") != string::npos)
             {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (debug)
                     log3 << "line in loop field definition: " << line << endl;
                 if (line.find("C_label") != string::npos)
@@ -1989,7 +1996,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                 }
                 if (!found_this_one && debug)
                     log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
     }
@@ -2002,12 +2009,12 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
     Dijkl.resize(wavy.get_ncen());
     while (!asym_cif_input.eof() && !atoms_read)
     {
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("loop_") != string::npos)
         {
             while (line.find("_") != string::npos)
             {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (debug)
                     log3 << "line in loop field definition: " << line << endl;
                 if (line.find("D_label") != string::npos)
@@ -2074,7 +2081,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                 }
                 if (!found_this_one && debug)
                     log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
     }
@@ -2105,7 +2112,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
         labels[i] = wavy.get_atoms()[i].get_label();
     }
 
-    while (getline(asym_cif_input, line)) {
+    while (getline_universal(asym_cif_input, line)) {
         if (!line.starts_with("loop_")) {
             if (debug)
                 log3 << "This is not part of a loop. Moving on.";
@@ -2113,14 +2120,14 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
         }
         if (debug)
             log3 << "Found a loop!";
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("_atom_site_aniso_label") != string::npos) {
             if (debug) {
                 log3 << "This loop contains anisotropic displacement parameters.";
             }
             ivec fields;
             while (line.find("_atom_site_aniso") != string::npos && line.length() > 3) {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (line.find("U_11") != string::npos)
 					fields.push_back(0);
 				else if (line.find("U_22") != string::npos)
@@ -2140,7 +2147,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                 std::string token;
                 while (entries.size() < 7 && iss >> token)
                     entries.push_back(token);
-                while (entries.size() < 7 && std::getline(asym_cif_input, line)) {
+                while (entries.size() < 7 && getline_universal(asym_cif_input, line)) {
                     std::istringstream nextLine(line);
                     while (entries.size() < 7 && nextLine >> token)
                         entries.push_back(token);
@@ -2166,7 +2173,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                     }
                 }
                 if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
         else if (line.find("_atom_site_anharm_GC_C_label") != string::npos) {
@@ -2174,7 +2181,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
 				log3 << "This loop contains anharmonic Gram-Charlier coefficients C.";
             ivec fields;
             while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (line.find("C_111") != string::npos)
                     fields.push_back(0);
                 else if (line.find("C_112") != string::npos)
@@ -2204,7 +2211,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                     const int pos = token.find('(');
                     entries.push_back(token);
                 }
-                while (entries.size() < 11 && std::getline(asym_cif_input, line)) {
+                while (entries.size() < 11 && getline_universal(asym_cif_input, line)) {
                     std::istringstream nextLine(line);
                     while (entries.size() < 11 && nextLine >> token) {
                         entries.push_back(token);
@@ -2231,7 +2238,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                     }
                 }
                 if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
         else if (line.find("_atom_site_anharm_GC_D_label") != string::npos) {
@@ -2239,7 +2246,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
 				log3 << "This loop contains anharmonic Gram-Charlier coefficients D.";
             ivec fields;
             while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (line.find("D_1111") != string::npos)
                     fields.push_back(0);
                 else if (line.find("D_1112") != string::npos)
@@ -2277,7 +2284,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                 std::string token;
                 while (entries.size() < 16 && iss >> token)
                     entries.push_back(token);
-                while (entries.size() < 16 && std::getline(asym_cif_input, line)) {
+                while (entries.size() < 16 && getline_universal(asym_cif_input, line)) {
                     std::istringstream nextLine(line);
                     while (entries.size() < 16 && nextLine >> token)
                         entries.push_back(token);
@@ -2303,7 +2310,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                     }
                 }
                 if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
         else {
@@ -2341,12 +2348,12 @@ vec read_U_iso_from_CIF(const std::filesystem::path &cif, WFN &wavy, cell &unit_
     bool atoms_read = false;
     while (!asym_cif_input.eof() && !atoms_read)
     {
-        getline(asym_cif_input, line);
+        getline_universal(asym_cif_input, line);
         if (line.find("loop_") != string::npos)
         {
             while (line.find("_") != string::npos)
             {
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
                 if (debug)
                     log3 << "line in loop field definition: " << line << endl;
                 if (line.find("_atom_site_label") != string::npos          // be specific to avoid
@@ -2425,7 +2432,7 @@ vec read_U_iso_from_CIF(const std::filesystem::path &cif, WFN &wavy, cell &unit_
                 if (!found_this_one && debug)
                     log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
                 labels.push_back(fields[label_field]);
-                getline(asym_cif_input, line);
+                getline_universal(asym_cif_input, line);
             }
         }
     }
@@ -3726,7 +3733,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         {
             std::ifstream list(list_file);
             std::string line;
-            while (std::getline(list, line))
+            while (getline_universal(list, line))
             {
                 const std::string entry = trim(line);
                 if (entry.empty() || entry[0] == '#') continue;
@@ -3786,7 +3793,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         {
             std::ifstream list(list_file);
             std::string line;
-            while (std::getline(list, line))
+            while (getline_universal(list, line))
             {
                 const std::string entry = trim(line);
                 if (entry.empty() || entry[0] == '#')
@@ -4215,6 +4222,90 @@ double double_from_string_with_esd(std::string in)
         return stod(in.substr(0, in.find('(')));
 }
 
+size_t available_memory_bytes()
+{
+	size_t avail = 0;
+#ifdef _WIN32
+	MEMORYSTATUSEX status{};
+	status.dwLength = sizeof(status);
+	if (GlobalMemoryStatusEx(&status))
+		avail = static_cast<size_t>(status.ullAvailPhys);
+	//A job object limit is what a scheduler or a container puts on a Windows process, the
+	//counterpart of the cgroup ceiling below. Passing nullptr asks about this process's own
+	//job, and a process outside one simply reports no limit flags.
+	JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+	DWORD returned = 0;
+	if (QueryInformationJobObject(nullptr, JobObjectExtendedLimitInformation,
+		&limits, sizeof(limits), &returned)) {
+		const DWORD flags = limits.BasicLimitInformation.LimitFlags;
+		if (flags & JOB_OBJECT_LIMIT_PROCESS_MEMORY) {
+			const size_t l = static_cast<size_t>(limits.ProcessMemoryLimit);
+			if (l > 0 && (avail == 0 || l < avail)) avail = l;
+		}
+		if (flags & JOB_OBJECT_LIMIT_JOB_MEMORY) {
+			const size_t l = static_cast<size_t>(limits.JobMemoryLimit);
+			if (l > 0 && (avail == 0 || l < avail)) avail = l;
+		}
+	}
+#elif defined(__APPLE__)
+	//Free alone understates it badly on a Mac, where the kernel keeps most of memory
+	//speculatively occupied: inactive and purgeable pages are handed back on demand and
+	//count as available, which is the same thing Activity Monitor calls memory pressure.
+	vm_size_t page_size = 0;
+	mach_port_t host = mach_host_self();
+	if (host_page_size(host, &page_size) == KERN_SUCCESS) {
+		vm_statistics64_data_t vm{};
+		mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+		if (host_statistics64(host, HOST_VM_INFO64,
+			reinterpret_cast<host_info64_t>(&vm), &count) == KERN_SUCCESS) {
+			const uint64_t pages = static_cast<uint64_t>(vm.free_count)
+				+ vm.inactive_count + vm.purgeable_count;
+			avail = static_cast<size_t>(pages * static_cast<uint64_t>(page_size));
+		}
+	}
+	if (avail == 0) {
+		//Nothing else answered: the physical size, which is at least an upper bound the
+		//caller's fraction keeps it under.
+		uint64_t total = 0;
+		size_t len = sizeof(total);
+		if (sysctlbyname("hw.memsize", &total, &len, nullptr, 0) == 0)
+			avail = static_cast<size_t>(total);
+	}
+#else
+	if (std::FILE *f = std::fopen("/proc/meminfo", "r")) {
+		char line[256];
+		while (std::fgets(line, sizeof(line), f)) {
+			unsigned long long kb = 0;
+			if (std::sscanf(line, "MemAvailable: %llu kB", &kb) == 1) {
+				avail = static_cast<size_t>(kb) * 1024ULL;
+				break;
+			}
+		}
+		std::fclose(f);
+	}
+	//Under a batch system or a container the cgroup limit is the real ceiling and
+	///proc/meminfo reports the whole machine: a job given 180 GB of a 376 GB node would
+	//otherwise decide it can have 300 and be killed for it. v2 first, then v1.
+	for (const char *path : { "/sys/fs/cgroup/memory.max",
+							  "/sys/fs/cgroup/memory/memory.limit_in_bytes" }) {
+		std::FILE *f = std::fopen(path, "r");
+		if (!f) continue;
+		char buf[64] = {};
+		if (std::fgets(buf, sizeof(buf), f)) {
+			unsigned long long lim = 0;
+			//v2 writes "max" when there is none; v1 writes a sentinel near SIZE_MAX
+			if (std::sscanf(buf, "%llu", &lim) == 1 && lim > 0) {
+				const size_t l = static_cast<size_t>(lim);
+				if (l < (static_cast<size_t>(1) << 62) && (avail == 0 || l < avail)) avail = l;
+			}
+		}
+		std::fclose(f);
+		break;
+	}
+#endif
+	return avail;
+}
+
 std::string trim(const std::string &s)
 {
     if (s == "")
@@ -4471,7 +4562,7 @@ bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std:
             std::cout << "No suitable file dialog tool found (zenity/kdialog)." << std::endl;
             std::cout << "Please enter the full path to the file: " << std::flush;
             std::string input_path;
-            std::getline(std::cin, input_path);
+            getline_universal(std::cin, input_path);
 
             // Trim leading/trailing whitespace
             input_path.erase(0, input_path.find_first_not_of(" \t\n\r"));
@@ -4625,7 +4716,7 @@ bool save_file_dialog(std::filesystem::path &path, bool debug, const std::vector
         path = file;
         std::stringstream ss(path);
         std::string name = path.string();
-        getline(ss, name);
+        getline_universal(ss, name);
         if (debug) std::cout << "Path: " << path << std::endl;
         if (pclose(f) != 0) std::cout << "Zenity returned non zero, whatever that means..." << std::endl;
         bool found = false;
@@ -4986,7 +5077,7 @@ void convert_tonto_XCW_lambda_steps(const std::string &str, const std::string &l
     std::ifstream rf(stdout_file.string().c_str(), std::ios::in);
     rf.seekg(0);
     while (rf.good() && line.find("Name ...") == std::string::npos) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     jobname = split_string<std::string>(line, " ")[2];
     std::cout << "Conervting XCW wavefunctions with lambda step " + std::to_string(ls) + " and jobname: " + jobname << std::endl;

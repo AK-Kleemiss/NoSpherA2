@@ -114,7 +114,7 @@ bool cube::read_values(std::ifstream &file) {
     string line;
     file.seekg(0);
     for (int i = 0; i < na + 6; i++)
-        getline(file, line);
+        getline_universal(file, line);
     values.resize(size[0]);
     for (int i = 0; i < size[0]; i++)
     {
@@ -134,7 +134,7 @@ bool cube::read_values(std::ifstream &file) {
         while (run_z < size[2] && !file.eof())
         {
             reads1 = 0;
-            getline(file, line);
+            getline_universal(file, line);
             std::istringstream iss(line);
             for (int i = 0; i < 6; i++) {
                 if (!(iss >> tmp[i]))
@@ -202,14 +202,14 @@ bool cube::read_file(bool full, bool header, bool expert)
     string line;
     if (header)
     {
-        getline(file, comment1);
-        getline(file, comment2);
-        getline(file, line);
+        getline_universal(file, comment1);
+        getline_universal(file, comment2);
+        getline_universal(file, line);
         std::istringstream iss(line);
         iss >> na >> origin[0] >> origin[1] >> origin[2];
 
         for (int i = 0; i < 3; i++) {
-            getline(file, line);
+            getline_universal(file, line);
             iss = std::istringstream(line);
             iss >> size[i] >> vectors[i][0] >> vectors[i][1] >> vectors[i][2];
         }
@@ -224,7 +224,7 @@ bool cube::read_file(bool full, bool header, bool expert)
         if (read_atoms)
             for (int i = 0; i < na; i++)
             {
-                getline(file, line);
+                getline_universal(file, line);
                 iss = std::istringstream(line);
                 double dum;
                 iss >> atnr >> dum >> atp[0] >> atp[1] >> atp[2];
@@ -346,10 +346,10 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
         ifstream f(path, ios::in);
         string line_buffer;
         for (int a = 0; a < na + 6; a++)
-            getline(f, line_buffer);
+            getline_universal(f, line_buffer);
         while (!f.eof())
         {
-            getline(f, line_buffer);
+            getline_universal(f, line_buffer);
             of << line_buffer << "\n";
         }
     }

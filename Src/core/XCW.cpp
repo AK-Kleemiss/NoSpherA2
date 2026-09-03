@@ -31,6 +31,7 @@ void XCW::construct(const options& opt_in) {
 	std::ofstream log3("log3.txt", std::ios::out);
 	bvec needs_grid;
 	read_atoms_from_CIF(cif_input, unit_cell, cryst.ncen, needs_grid, asym_atoms, opt->debug);
+	err_checkf(cryst.ncen > 0, "No atoms were read from " + cif.string() + "! Is there an _atom_site loop with labels, type symbols and fractional coordinates?", std::cout);
 
 	// Adds symmetry generated atoms
 	if (settings.grown) {
@@ -699,7 +700,7 @@ void XCW::parse_anom_atoms(std::vector<anom_atom>& anom_atoms) {
 		std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
 	}
 	std::string line;
-	while (std::getline(file, line)) {
+	while (getline_universal(file, line)) {
 		if (line.empty())
 			continue;
 		std::istringstream iss(line);
@@ -1121,12 +1122,30 @@ void XCW::decide_i_storage() {
 	const size_t per_block = i_tensor_file::block_bytes(cryst.nmo);
 	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo);
 
-	//The settings file budget wins, then -mem; with neither the tensor is held
+	//The settings file budget wins, then -mem; with neither, what the process can actually
+	//have. Left to a keyword this is the single most expensive decision in an XCW run and
+	//the wrong answer is silent: both SCF walks re-read the whole tensor every iteration, so
+	//streaming a tensor that would have fit cost 5.45 s per iteration against 0.30 s
+	//measured on a V100 node, an 18x on the stage a 200-step lambda scan spends its life in.
+	//Nobody should have to know that to get it right.
 	size_t budget = settings.i_tensor_max_mb * 1024ULL * 1024ULL;
 	const char* source = "i_tensor_mb";
+	bool automatic = false;
 	if (budget == 0 && opt->mem_given && opt->mem > 0.0) {
 		budget = static_cast<size_t>(opt->mem * 1024.0 * 1024.0);
 		source = "-mem";
+	}
+	if (budget == 0) {
+		const size_t avail = available_memory_bytes();
+		if (avail > 0) {
+			//Four fifths: the SCF matrices, the grids and OCC's own allocations live in the
+			//rest, and a tensor that only just fits would page rather than run. What the
+			//process can have is a platform question - a cgroup here, a job object on
+			//Windows, page classes on a Mac - and lives in convenience.cpp.
+			budget = avail / 5 * 4;
+			source = "four fifths of the memory this job can have";
+			automatic = true;
+		}
 	}
 
 	//items_within_budget returns 0 for "hold everything": no file, no re-read twice per SCF iteration
@@ -1134,8 +1153,9 @@ void XCW::decide_i_storage() {
 	i_streamed_ = (w != 0);
 	if (!i_streamed_) {
 		//Announced only when someone asked about memory: saying it unconditionally
-		//shifts every reference output by a line
-		if (budget > 0 || ProgressBar::report_counts) {
+		//shifts every reference output by a line, and the automatic budget would say it on
+		//every run - including the reference tests, which is why it stays quiet there.
+		if ((budget > 0 && !automatic) || ProgressBar::report_counts) {
 			std::cout << std::fixed << std::setprecision(2)
 				<< "I tensor held in memory: " << (total / 1048576.0) << " MB";
 			if (budget > 0)
@@ -1149,8 +1169,8 @@ void XCW::decide_i_storage() {
 	std::cout << std::fixed << std::setprecision(2)
 		<< "I tensor streamed to disk: " << (total / 1048576.0) << " MB total, "
 		<< i_window_ << " of " << cryst.nr_small << " reflections resident ("
-		<< (i_window_ * per_block / 1048576.0) << " MB) to fit the "
-		<< (budget / 1048576.0) << " MB " << source << " budget" << std::endl;
+		<< (i_window_ * per_block / 1048576.0) << " MB) to fit " << source
+		<< " (" << (budget / 1048576.0) << " MB)" << std::endl;
 	if (i_window_ == 1 && per_block > budget)
 		std::cout << "  NOTE: one reflection alone is " << (per_block / 1048576.0)
 		<< " MB, over the budget. Running one at a time." << std::endl;
@@ -1381,6 +1401,137 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 	}
 	std::cout << "AO values calculated for all grids." << std::endl;
+	//Morton-order every atom grid's points, so that a run of consecutive points is a
+	//compact ball rather than a spherical shell. This is what OCC does
+	//(occ/qm/spatial_grid_hierarchy.h) and what grid-based codes do generally, and the
+	//permutation is the point of it: the grid arrives sorted by radius, so consecutive
+	//points span a whole sphere and every AO reaching any part of it stays active. Measured
+	//on the twisted ethylene at def2-TZVP, cutting the radial bands into chunks without
+	//reordering moved the work by 2.7% and left n_active at 852; the innermost eighth of a
+	//grid, which is compact because its radius is small, needs 370 AOs against 803.
+	//
+	//Work is sum over blocks of n_active^2 * points, so this is quadratic in what it saves.
+	//Sums over points are order independent, so the reordering changes no result.
+	//Compaction and the AO threshold are worth nothing apart and a great deal together:
+	//measured on the twisted ethylene at def2-TZVP, reordering alone is 1.39x SLOWER (the
+	//blocks shrink and n_active does not), the threshold alone moves the work by 2%, and
+	//together they are 1.29x faster with the GooF, energies and convergence lines identical.
+	//So only reorder when the threshold can actually prune: at -acc 4 cutoff() is 1e-30 and
+	//nothing would be dropped, and paying the compaction cost for that would make asking for
+	//more accuracy slower for no reason.
+	const double ao_block_threshold = [&] {
+		const char* e = std::getenv("NOSPHERA2_ITENSOR_AO_TOL");
+		if (e) { const double v = std::atof(e); return v >= 0.0 ? v : 0.0; }
+		return cutoff(opt->accuracy);
+	}();
+	const bool morton_applied = (std::getenv("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr)
+		&& ao_block_threshold >= 1e-20;
+	if (morton_applied) {
+		for (int g = 0; g < n_atom_grids; g++) {
+			const int npts = points[g];
+			if (npts < 2) continue;
+			vec2& grid = grids[g];
+			double* xs = grid[GridData::GridIndex::X].data();
+			double* ys = grid[GridData::GridIndex::Y].data();
+			double* zs = grid[GridData::GridIndex::Z].data();
+			std::array<double, 3> lo{ 1e30, 1e30, 1e30 }, hi{ -1e30, -1e30, -1e30 };
+			for (int p = 0; p < npts; p++) {
+				lo[0] = std::min(lo[0], xs[p]); hi[0] = std::max(hi[0], xs[p]);
+				lo[1] = std::min(lo[1], ys[p]); hi[1] = std::max(hi[1], ys[p]);
+				lo[2] = std::min(lo[2], zs[p]); hi[2] = std::max(hi[2], zs[p]);
+			}
+			auto spread = [](const unsigned int v) {
+				unsigned long long x = v & 0x1fffffu;   //21 bits, three of them interleave to 63
+				x = (x | (x << 32)) & 0x1f00000000ffffull;
+				x = (x | (x << 16)) & 0x1f0000ff0000ffull;
+				x = (x | (x << 8))  & 0x100f00f00f00f00full;
+				x = (x | (x << 4))  & 0x10c30c30c30c30c3ull;
+				x = (x | (x << 2))  & 0x1249249249249249ull;
+				return x;
+			};
+			std::vector<std::pair<unsigned long long, int>> keyed(npts);
+			for (int p = 0; p < npts; p++) {
+				unsigned int c[3];
+				const double v[3] = { xs[p], ys[p], zs[p] };
+				for (int d = 0; d < 3; d++) {
+					const double span = hi[d] - lo[d];
+					const double t = span > 1e-12 ? (v[d] - lo[d]) / span : 0.0;
+					c[d] = static_cast<unsigned int>(std::min(2097151.0, std::max(0.0, t * 2097151.0)));
+				}
+				keyed[p] = { spread(c[0]) | (spread(c[1]) << 1) | (spread(c[2]) << 2), p };
+			}
+			std::sort(keyed.begin(), keyed.end());
+			ivec perm(npts);
+			for (int p = 0; p < npts; p++) perm[p] = keyed[p].second;
+			auto apply = [&](double* a) {
+				vec tmp(npts);
+				for (int p = 0; p < npts; p++) tmp[p] = a[perm[p]];
+				std::copy(tmp.begin(), tmp.end(), a);
+			};
+			apply(xs); apply(ys); apply(zs);
+			apply(grid[GridData::GridIndex::WEIGHT].data());
+			//The coordinates and weights the phase factor and the GEMM actually use are
+			//these, taken from getDensityVectors above and not the grid arrays: reordering
+			//the AO values without them pairs each value with another point's coordinate,
+			//which is wrong everywhere rather than only where a screening decision was made.
+			if (static_cast<int>(d1[g].size()) >= npts) apply(d1[g].data());
+			if (static_cast<int>(d2[g].size()) >= npts) apply(d2[g].data());
+			if (static_cast<int>(d3[g].size()) >= npts) apply(d3[g].data());
+			if (static_cast<int>(weights[g].size()) >= npts) apply(weights[g].data());
+			for (int mu = 0; mu < cryst.nmo; mu++) {
+				vec& v = mu_vals[mu][g];
+				if (static_cast<int>(v.size()) == npts) apply(v.data());
+				else if (!v.empty()) {
+					//Values were only filled to the radial prefix; the tail is zero and the
+					//permutation mixes the two, so grow it before reordering.
+					v.resize(npts, 0.0);
+					apply(v.data());
+				}
+			}
+			//Radial distance follows its point, and the band bounds below are recomputed
+			//from it - they are no longer monotone, which is what the chunking wants.
+			vec& rd = grid_radial_distances[g];
+			if (static_cast<int>(rd.size()) == npts) apply(rd.data());
+		}
+	}
+
+
+
+	//NOSPHERA2_ITENSOR_AOSTATS=1: how much of each block's AO set is actually carrying
+	//anything. The active set comes from a cutoff clamped into an 11-12 bohr band
+	//(std::clamp above), so it is set by the distance between two atom centres and barely
+	//by the block - a 266-point block keeps 756 of 852 AOs and a 7968-point one keeps 803.
+	//Work is sum over blocks of na^2 * points, so what an OCC-style per-batch bounding
+	//sphere would save is quadratic in whatever this measures. The AO values are already
+	//computed here, so the honest number is a max over the points they hold, not an estimate.
+	if (std::getenv("NOSPHERA2_ITENSOR_AOSTATS")) {
+		for (int g = 0; g < n_atom_grids; g++) {
+			const int npts = points[g];
+			if (npts <= 0) continue;
+			//max |chi| per AO over this grid, and over the first eighth of it as a stand-in
+			//for a compact spatial batch
+			const int batch = std::max(1, npts / 8);
+			long long active_full = 0, active_batch = 0, kept = 0;
+			for (int ao = 0; ao < cryst.nmo; ao++) kept += ao_within_cutoff[ao][g] ? 1 : 0;
+			for (int ao = 0; ao < cryst.nmo; ao++) {
+				const vec& v = mu_vals[ao][g];
+				if (v.empty()) continue;
+				double mx_full = 0.0, mx_batch = 0.0;
+				const int end = std::min<int>(static_cast<int>(v.size()), npts);
+				for (int p = 0; p < end; p++) {
+					const double a = std::abs(v[p]);
+					mx_full = std::max(mx_full, a);
+					if (p < batch) mx_batch = std::max(mx_batch, a);
+				}
+				if (mx_full > 1e-10) active_full++;
+				if (mx_batch > 1e-10) active_batch++;
+			}
+			std::fprintf(stderr, "aostats grid %d: points %d  nmo %d  kept by cutoff %d"
+				"  carrying |chi|>1e-10: whole grid %lld  first eighth %lld\n",
+				g, npts, cryst.nmo, static_cast<int>(kept),
+				active_full, active_batch);
+		}
+	}
 
 	ivec2 active_grids(packed_size);
 	ivec skipped_grids_per_pair(packed_size, 0);
@@ -1460,6 +1611,79 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 		block.tile_result_size = static_cast<int>(result_offset);
 		};
+	//NOSPHERA2_ITENSOR_SKIPSTATS=1: what a spatial reordering of the active AOs would buy.
+	//Half the mu,nu pairs are screened out and none of the 64x64 tiles are, because AO index
+	//order is atom order as the CIF lists them and dead pairs land scattered. Sorting the
+	//active AOs of a block along a Morton curve over their centres puts distant atoms in
+	//distant tiles, which is the only way a tile becomes wholly dead. Measured here, per
+	//block, before anyone writes a kernel that depends on it.
+	auto skipstats = [&](const int g, const ivec& active, const int npoints) {
+		if (!std::getenv("NOSPHERA2_ITENSOR_SKIPSTATS")) return;
+		const int na = static_cast<int>(active.size());
+		if (na < 2) return;
+		auto tiles_alive = [&](const ivec& order, const int T) {
+			int alive = 0, total = 0;
+			for (int r0 = 0; r0 < na; r0 += T)
+				for (int c0 = r0; c0 < na; c0 += T) {
+					total++;
+					bool needed = false;
+					for (int r = r0; r < std::min(r0 + T, na) && !needed; r++) {
+						const int first = (r0 == c0) ? r : c0;
+						for (int c = first; c < std::min(c0 + T, na); c++)
+							if (!skip[order[r]][order[c]]) { needed = true; break; }
+					}
+					if (needed) alive++;
+				}
+			return std::pair<int, int>{ alive, total };
+		};
+		//Morton key over the AO centres, 10 bits per axis on the block's own bounding box
+		std::array<double, 3> lo{ 1e30, 1e30, 1e30 }, hi{ -1e30, -1e30, -1e30 };
+		for (const int ao : active)
+			for (int d = 0; d < 3; d++) {
+				lo[d] = std::min(lo[d], ao_data_shells[ao].pos[d]);
+				hi[d] = std::max(hi[d], ao_data_shells[ao].pos[d]);
+			}
+		auto spread = [](unsigned int v) {
+			unsigned long long x = v & 0x3ffu;
+			x = (x | (x << 16)) & 0x30000ffull; x = (x | (x << 8)) & 0x300f00full;
+			x = (x | (x << 4)) & 0x30c30c3ull;  x = (x | (x << 2)) & 0x9249249ull;
+			return x;
+		};
+		std::vector<std::pair<unsigned long long, int>> keyed;
+		keyed.reserve(na);
+		for (const int ao : active) {
+			unsigned int c[3];
+			for (int d = 0; d < 3; d++) {
+				const double span = hi[d] - lo[d];
+				const double t = span > 1e-12 ? (ao_data_shells[ao].pos[d] - lo[d]) / span : 0.0;
+				c[d] = static_cast<unsigned int>(std::min(1023.0, std::max(0.0, t * 1023.0)));
+			}
+			keyed.emplace_back(spread(c[0]) | (spread(c[1]) << 1) | (spread(c[2]) << 2), ao);
+		}
+		std::sort(keyed.begin(), keyed.end());
+		ivec sorted_order(na), plain_order(na);
+		for (int i = 0; i < na; i++) { sorted_order[i] = keyed[i].second; plain_order[i] = active[i]; }
+		long long pairs = 0, dead = 0;
+		for (int i = 0; i < na; i++)
+			for (int j = i; j < na; j++) { pairs++; dead += skip[active[i]][active[j]] ? 1 : 0; }
+		std::fprintf(stderr, "skipstats grid %d: na %d points %d  pairs dead %.1f%%", g, na, npoints,
+			100.0 * (double)dead / (double)pairs);
+		for (const int T : { 32, 64, 128 }) {
+			const auto [a0, t0] = tiles_alive(plain_order, T);
+			const auto [a1, t1] = tiles_alive(sorted_order, T);
+			std::fprintf(stderr, "  | T=%d tiles pruned: as-is %.1f%% morton %.1f%%", T,
+				100.0 * (1.0 - (double)a0 / t0), 100.0 * (1.0 - (double)a1 / t1));
+		}
+		std::fprintf(stderr, "\n");
+	};
+
+	//Counted the way the mu,nu screening is, so a run says what this cost it as well as
+	//what it saved: how many AO-block entries were dropped, and what that did to the work
+	//the GEMMs actually do.
+	long long ao_slots_carrying = 0, ao_slots_kept = 0;
+	//ao_block_threshold is defined above, with the reordering it enables. What counts as
+	//nothing is the run's -acc setting, not a number invented here: cutoff() is the same
+	//ladder the scattering-factor code screens on, 1e-10 up to -acc 2 and 1e-14 at 3.
 	for (int g = 0; g < n_atom_grids; g++) {
 		const ivec& active_aos = grid_active_aos[g];
 		const vec& full_ao_values = grid_ao_values[g];
@@ -1467,9 +1691,47 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		const int inner_end = static_cast<int>(std::upper_bound(radial_distances.begin(), radial_distances.end(), minimum_ao_grid_cutoff) - radial_distances.begin());
 		const int middle_end = static_cast<int>(std::upper_bound(radial_distances.begin(), radial_distances.end(), maximum_ao_grid_cutoff) - radial_distances.begin());
 		const std::array<int, 4> block_bounds{ 0, inner_end, middle_end, points[g] };
-		for (int block_index = 0; block_index < 3; block_index++) {
-			const int point_start = block_bounds[block_index];
-			const int point_end = block_bounds[block_index + 1];
+		//A block keeps every AO that is non-zero anywhere in it, and the work is
+		//sum over blocks of n_active^2 * points, so the block's spatial extent is what sets
+		//the cost. Three radial bands make the first one nearly the whole grid: measured on
+		//the twisted ethylene at def2-TZVP, a 7934-point band keeps 803 of 852 AOs while its
+		//innermost eighth needs 370. Cutting the bands into chunks is what OCC does with its
+		//Morton leaves (occ/qm/spatial_grid_hierarchy.h, 128 points a leaf) and what every
+		//grid-based code does for the same reason. The points come radially sorted, so
+		//consecutive chunks are already spatially compact and nothing has to be permuted.
+		//
+		//NOSPHERA2_ITENSOR_CHUNK sets the target; 0 restores the three whole bands.
+		const int chunk = [] {
+			const char* e = std::getenv("NOSPHERA2_ITENSOR_CHUNK");
+			return e ? std::atoi(e) : 1024;
+		}();
+		//Even chunks rather than a short tail: a 40-point remainder is a GEMM that costs a
+		//launch and returns almost nothing.
+		auto cut = [&](const int from, const int to, std::vector<std::pair<int, int>>& out) {
+			const int n = to - from;
+			if (n <= 0) return;
+			if (chunk <= 0) { out.emplace_back(from, to); return; }
+			const int pieces = std::max(1, (n + chunk - 1) / chunk);
+			const int per = (n + pieces - 1) / pieces;
+			for (int p0 = from; p0 < to; p0 += per) out.emplace_back(p0, std::min(p0 + per, to));
+		};
+		std::vector<std::pair<int, int>> spans;
+		if (morton_applied) {
+			//The three radial bands are what the point order was for, and after Morton
+			//ordering it is gone: block_bounds comes from upper_bound over the radial
+			//distances, which needs a sorted range and no longer has one. Left in, the
+			//bounds come back arbitrary, a band with end below start is skipped, and its
+			//points drop out of the integration entirely - the structure factors then move
+			//far more than any screening would explain (GooF 3.82 -> 26.34 on the twisted
+			//ethylene, which is how this was found). Cut the grid itself instead: the bands
+			//existed to group points by cutoff regime and a compact chunk does that better.
+			cut(0, points[g], spans);
+		}
+		else {
+			for (int block_index = 0; block_index < 3; block_index++)
+				cut(block_bounds[block_index], block_bounds[block_index + 1], spans);
+		}
+		for (const auto& [point_start, point_end] : spans) {
 			const int point_count = point_end - point_start;
 			if (point_count == 0) {
 				continue;
@@ -1477,23 +1739,62 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			GridBlock block{ point_start, point_count };
 			for (int local_ao = 0; local_ao < static_cast<int>(active_aos.size()); local_ao++) {
 				const double* full_row = full_ao_values.data() + static_cast<size_t>(local_ao) * points[g];
-				bool nonzero = false;
-				for (int p = point_start; p < point_end; p++) {
-					if (full_row[p] != 0.0) {
-						nonzero = true;
-						break;
-					}
-				}
-				if (nonzero) {
+				//Not "is it exactly zero" but "does it carry anything here". The values were
+				//only zeroed where the 11-12 bohr cutoff cut them off, so a function whose
+				//value on this block is 1e-40 was counted as active and multiplied at full
+				//cost: n_active stayed at 852 of 852 where the AOs actually carrying more
+				//than 1e-10 numbered 370. Work is n_active^2 * points, so this is quadratic.
+				//What every grid-based code does, and the threshold is the same kind of
+				//number as the 5e-4 the pair screening above already accepts.
+				double largest = 0.0;
+				for (int p = point_start; p < point_end; p++)
+					largest = std::max(largest, std::abs(full_row[p]));
+				if (largest > 0.0) ao_slots_carrying++;
+				if (largest > ao_block_threshold) {
 					block.active_aos.push_back(active_aos[local_ao]);
 					block.ao_values.insert(block.ao_values.end(), full_row + point_start, full_row + point_end);
 				}
 			}
 			if (!block.active_aos.empty()) {
+				ao_slots_kept += static_cast<long long>(block.active_aos.size());
 				make_matrix_tiles(block);
+				skipstats(g, block.active_aos, block.point_count);
 				grid_blocks[g].push_back(std::move(block));
 			}
 		}
+	}
+	//Said next to "Screened out ... unique pairs of mu, nu", because it is the same kind of
+	//saving measured on the other axis: that one drops pairs whose product cannot reach the
+	//grid, this one drops an AO from a block where it carries nothing. Gated on no_date like
+	//the timing lines, so the reference outputs keep their shape.
+	if (!(opt->no_date) && ao_slots_carrying > 0) {
+		const long long dropped = ao_slots_carrying - ao_slots_kept;
+		std::cout << std::fixed << std::setprecision(2)
+			<< "Screened out " << dropped << " of " << ao_slots_carrying
+			<< " AO-block entries (" << 100.0 * static_cast<double>(dropped)
+			/ static_cast<double>(ao_slots_carrying) << "%) below "
+			<< std::scientific << std::setprecision(0) << ao_block_threshold
+			<< std::fixed << std::setprecision(2) << " on their block\n";
+	}
+
+	//The whole cost of the device path in one number: sum over blocks of n_active^2 times
+	//points, which is what the GEMMs do per reflection and symmetry operation. Printed under
+	//-gflops so a chunk size can be judged without running a reflection.
+	if (throughput::enabled()) {
+		double work = 0.0;
+		long long nblocks = 0, na_min = 1LL << 60, na_max = 0, pts_min = 1LL << 60, pts_max = 0;
+		for (int g = 0; g < n_atom_grids; g++)
+			for (const GridBlock& b : grid_blocks[g]) {
+				const long long na = static_cast<long long>(b.active_aos.size());
+				work += static_cast<double>(na) * na * b.point_count;
+				nblocks++;
+				na_min = std::min(na_min, na); na_max = std::max(na_max, na);
+				pts_min = std::min<long long>(pts_min, b.point_count);
+				pts_max = std::max<long long>(pts_max, b.point_count);
+			}
+		std::fprintf(stderr, "I tensor blocks: %lld, n_active %lld-%lld, points %lld-%lld, "
+			"sum n_active^2 * points = %.3e (lower is less work per reflection)\n",
+			nblocks, na_min, na_max, pts_min, pts_max, work);
 	}
 	ivec2().swap(grid_active_aos);
 	vec2().swap(grid_ao_values);
@@ -1562,6 +1863,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		L.skip = skip_flat.data(); L.grid_point_off = goff.data();
 		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
 		L.n_points = static_cast<long long>(fd1.size());
+		//What the device path actually issues: one dense na x 2na GEMM per block, the real
+		//and imaginary halves together. Counted the way the path runs, or the GFLOP/s row
+		//is fiction.
 		for (int b = 0; b < L.n_blocks; b++)
 			itensor_gpu_dense_flops += throughput::flops_gemm(L.blk_n_active[b],
 				2.0 * L.blk_n_active[b], L.blk_point_count[b]);

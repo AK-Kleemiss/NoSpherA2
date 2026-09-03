@@ -91,7 +91,7 @@ std::vector<T> readVectorFromFile(const std::filesystem::path &filename)
 
     err_checkf(file.is_open(), "Could not open file: " + filename.string(), std::cout);
 
-    while (std::getline(file, line))
+    while (getline_universal(file, line))
     {
         try
         {
@@ -128,14 +128,14 @@ void Config::populateFromFile(const std::filesystem::path &filename)
     err_checkf(std::filesystem::exists(filename), "Couldn't open or find " + filename.string() + ", leaving", std::cout);
     std::ifstream file(filename);
     std::string line;
-    while (std::getline(file, line))
+    while (getline_universal(file, line))
     {
         std::istringstream iss(line);
         std::string key;
         if (std::getline(iss, key, '='))
         {
             std::string value;
-            if (std::getline(iss, value))
+            if (getline_universal(iss, value))
             {
                 value = trim(value);
                 key = trim(key);
