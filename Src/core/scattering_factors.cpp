@@ -1674,7 +1674,9 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //    return labels2;
 //}
 
-constexpr double cutoff(const int& accuracy)
+//Declared in the header so the XCW I tensor screens on the same ladder: what counts as
+//negligible is the run's accuracy setting, and there should be one answer to that.
+double cutoff(const int& accuracy)
 {
 	if (accuracy < 3)
 		return 1E-10;

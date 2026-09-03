@@ -175,6 +175,15 @@ void generate_fractional_hkl(
  * @param file The output stream to write the results to.
  * @param debug Flag indicating whether to enable debug mode.
  */
+/**
+ * @brief The magnitude below which a contribution is negligible at a given -acc level.
+ *
+ * 1e-10 up to -acc 2, 1e-14 at 3, 1e-30 above: the ladder the scattering-factor code has
+ * always used, shared so that the XCW I tensor drops AO contributions on the same terms
+ * rather than on a constant of its own.
+ */
+double cutoff(const int& accuracy);
+
 svec read_atoms_from_CIF(
     std::ifstream& cif_input,
     const ivec& input_groups,
