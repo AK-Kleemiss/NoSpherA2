@@ -833,9 +833,9 @@ struct options
     bool use_gpu = true;
     //-gpu_fp64 keeps the double sincos on a card that would otherwise pick the fp32 one
     bool gpu_fp64 = false;
-    //Single-precision tiles for the CPU I tensor: sgemm runs at twice dgemm's rate and the
-    //device path is single already. Opt-in.
-    bool cpu_itensor_fp32 = false;
+    //Single-precision tiles for the CPU I tensor, as the device path runs; sgemm is twice
+    //dgemm's rate. -no_cpu_itensor_fp32 keeps double.
+    bool cpu_itensor_fp32 = true;
     //-gflops reports achieved GFLOP/s per stage for the CPU and GPU paths at the end of a
     //run. The thresholds deciding what goes to the device were calibrated on one machine;
     //this is how they get re-derived on another.
