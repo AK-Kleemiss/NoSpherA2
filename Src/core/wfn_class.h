@@ -29,7 +29,11 @@ enum e_origin {
     tonto = 10,
     xtb = 11,
     ptb = 12,
-    OCC = 13
+    OCC = 13,
+    // An XCW refinement's result: OCC converged it over a basis this program loaded from
+    // BasisSetLibrary (l + 1 in get_type(), coefficients carrying OCC's normalisation), so
+    // Int_Params reads its shells like a gbw's and normalises the contraction only.
+    XCW_fit = 14
 };
 
 /**
@@ -106,6 +110,9 @@ private:
     vec UT_SpinDensityMatrix;
     // Density Matrix in mdarray
     dMatrix2 DM;
+    // Spherical MO coefficients as OCC converged them, rows = AO in OCC's m = -l..l order
+    // (beta block below alpha when unrestricted), columns = MO. Filled by the OCC constructor.
+    dMatrix2 MO_sph;
     // basis set definition (118 elements for each element in the periodic table)
     std::shared_ptr<std::array<std::vector<primitive>, 118>> basis_set;
     // Vector of cube files associated with the wavefunction (e.g. for the density or MOs)

@@ -308,6 +308,10 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 		}
         is_unrestricted = true;
 	}
+    MO_sph = dMatrix2(occ_WF.mo.C.rows(), occ_WF.mo.C.cols());
+    for (long i = 0; i < occ_WF.mo.C.rows(); i++)
+        for (long j = 0; j < occ_WF.mo.C.cols(); j++)
+            MO_sph(i, j) = occ_WF.mo.C(i, j);
 }
 
 // Hokus pokus freestyle modus, hopefully converts a WFN object to the occ wavefunction
@@ -4258,6 +4262,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
         }
     };
 
+    const int first_type[5] = { 1, 2, 5, 11, 21 };
     auto nbo_labels = [](const int type) -> ivec {
         switch (type) {
         case 1: return { 1 };
@@ -4280,9 +4285,15 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
         const int cart_count = cart_component_count(type);
         const int nbo_count = nbo_component_count(type);
         vec2 transform(cart_count, vec(nbo_count, 0.0));
-        if (type == 1 || type == 2) {
-            for (int i = 0; i < cart_count; i++)
-                transform[i][i] = 1.0;
+        if (type == 1) {
+            transform[0][0] = 1.0;
+        }
+        else if (type == 2) {
+            //z, x, y as the .47 labels p (ORCA order, like d..g below); p_pure_2_cart is the
+            //m = -1..1 order y, z, x and does not fit here
+            transform[2][0] = 1.0;
+            transform[0][1] = 1.0;
+            transform[1][2] = 1.0;
         }
         else if (type == 3) {
             transform = d_pure_2_cart;
@@ -4313,7 +4324,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     };
 
     vector<NboShell> shells;
-    int internal_nao = 0;
     int nbo_nao = 0;
     int nbo_nexp = 0;
     int highest_angular = -1;
@@ -4329,16 +4339,33 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
             shell.type = type;
             shell.nprim = get_atom_shell_primitives(a, s);
             shell.atom_prim_start = get_shell_start(a, s);
-            shell.internal_start = internal_nao;
+            shell.internal_start = 0;
             shell.nbo_start = nbo_nao;
             shell.cart_components = cart_count;
             shell.nbo_components = nbo_count;
             shells.push_back(shell);
-            internal_nao += cart_count;
             nbo_nao += nbo_count;
             nbo_nexp += shell.nprim;
             highest_angular = std::max(highest_angular, type - 1);
         }
+    }
+    //Int_Params, the gbw reader and OCC group an atom's shells by angular momentum, the loop
+    //above follows the wavefunction's shell order. internal_start indexes the spherical
+    //overlap, density and coefficient matrices in the grouped order, nbo_start the .47 order.
+    {
+        int internal_run = 0;
+        for (int a = 0; a < get_ncen(); a++) {
+            int max_l = 0;
+            for (auto& sh : shells)
+                if (sh.atom == a) max_l = std::max(max_l, sh.type - 1);
+            for (int l = 0; l <= max_l; l++)
+                for (auto& sh : shells)
+                    if (sh.atom == a && sh.type - 1 == l) {
+                        sh.internal_start = internal_run;
+                        internal_run += sh.nbo_components;
+                    }
+        }
+        err_checkf(internal_run == nbo_nao, "Angular-momentum regrouping lost basis functions in the .47 writer", std::cout);
     }
     progress("Built NBO shell model: atoms=" + std::to_string(get_ncen()) +
         ", shells=" + std::to_string(shells.size()) +
@@ -4514,29 +4541,45 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                 std::cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << endl;
         }
     }
-    vec2 changed_coefs;
-    changed_coefs.resize(get_nmo());
-#pragma omp parallel for
-    for (int m = 0; m < get_nmo(); m++)
-    {
-        changed_coefs[m].resize(get_MO_primitive_count(m), 0.0);
-        for (int p = 0; p < get_MO_primitive_count(m); p++)
-        {
-            changed_coefs[m][p] = get_MO_coef(m, p) / norm_const[p];
+    //NBO slot c of a shell (m = 0, +1, -1, +2, -2, ... as ORCA orders it) holds pure function
+    //orca_2_pySCF(l, c) of the m = -l..l order libcint, OCC and the gbw reader keep their
+    //matrices in; sph_index maps a slot to its row in those matrices.
+    ivec sph_index(nbo_nao, 0);
+    for (const auto& shell : shells)
+        for (int c = 0; c < shell.nbo_components; c++) {
+            const auto offset = constants::orca_2_pySCF(shell.type - 1, c);
+            err_checkf(offset.has_value(), "Unsupported NBO AO order in .47 writer", std::cout);
+            sph_index[shell.nbo_start + c] = shell.internal_start + static_cast<int>(offset.value());
         }
-    }
 
     const int alpha_mos = get_MO_op_count(0);
     const int beta_mos = get_MO_op_count(1);
-    progress("Reconstructing MO coefficients in NBO AO order: alpha=" + std::to_string(alpha_mos) +
-        ", beta=" + std::to_string(beta_mos));
     vec2 CMO(alpha_mos, vec(nbo_nao, 0.0));
     vec2 CMO_beta(beta_mos, vec(nbo_nao, 0.0));
+    //An XCW_fit wavefunction still holds the spherical coefficients OCC converged; rebuilding
+    //them from the primitives below needs OCC's normalization convention, which the WFN does
+    //not carry. Other origins that cache their coefficients could take this path as well.
+    const int spin_blocks = get_is_unrestricted() ? 2 : 1;
+    const bool cached_mos = get_origin() == e_origin::XCW_fit
+        && static_cast<int>(MO_sph.extent(0)) == spin_blocks * nbo_nao
+        && static_cast<int>(MO_sph.extent(1)) >= std::max(alpha_mos, beta_mos);
+    if (cached_mos) {
+        progress("Taking MO coefficients from the cached spherical coefficient matrix");
+        for (int m = 0; m < alpha_mos; m++)
+            for (int i = 0; i < nbo_nao; i++)
+                CMO[m][i] = MO_sph(sph_index[i], m);
+        for (int m = 0; m < beta_mos; m++)
+            for (int i = 0; i < nbo_nao; i++)
+                CMO_beta[m][i] = MO_sph(nbo_nao + sph_index[i], m);
+    }
+    else
+        progress("Reconstructing MO coefficients in NBO AO order: alpha=" + std::to_string(alpha_mos) +
+            ", beta=" + std::to_string(beta_mos));
     int alpha_run = 0;
     int beta_run = 0;
     int mo_progress_next = 10;
     int mo_seen = 0;
-    for (int m = 0; m < get_nmo(); m++)
+    for (int m = 0; m < get_nmo() && !cached_mos; m++)
     {
         if (MOs[m].get_op() != 0 && MOs[m].get_op() != 1)
             continue;
@@ -4551,15 +4594,28 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
         for (const auto& shell : shells) {
             vec cart_values(shell.cart_components, 0.0);
             const int primitive_start = get_shell_start_in_primitives(shell.atom, shell.shell);
-            double contraction = 0.0;
-            for (int p = 0; p < shell.nprim; p++) {
-                contraction = get_atom_basis_set_coefficient(shell.atom, shell.atom_prim_start + p);
-                if (std::abs(contraction) > 1E-14)
-                    break;
-            }
+            //Every primitive of a contracted shell is AO coefficient times its stored contraction
+            //coefficient, so the largest one is the safest divisor. The gbw reader stores a
+            //shell primitive-major (x, y, z of primitive 0, then of primitive 1), the OCC
+            //constructor component-major (all primitives of x, then of y); equal consecutive
+            //types tell the two apart.
+            const int shell_start = get_shell_start(shell.atom, shell.shell);
+            int rep = 0;
+            for (int p = 1; p < shell.nprim; p++)
+                if (std::abs(get_atom_basis_set_coefficient(shell.atom, shell_start + p)) >
+                    std::abs(get_atom_basis_set_coefficient(shell.atom, shell_start + rep)))
+                    rep = p;
+            const double contraction = get_atom_basis_set_coefficient(shell.atom, shell_start + rep);
             err_checkf(std::abs(contraction) > 1E-14, "Cannot reconstruct pure MO coefficients for .47 output", std::cout);
-            for (int c = 0; c < shell.cart_components; c++)
-                cart_values[c] = get_MO_coef(m, primitive_start + c) / contraction;
+            const bool component_major = shell.nprim > 1 && shell.cart_components > 1
+                && get_type(primitive_start) == get_type(primitive_start + 1);
+            const int stride = component_major ? shell.nprim : 1;
+            const int rep_offset = component_major ? rep : rep * shell.cart_components;
+            //the components may be permuted as well (gbw stores p as z, x, y): the type says which row
+            for (int c = 0; c < shell.cart_components; c++) {
+                const int prim = primitive_start + c * stride + rep_offset;
+                cart_values[get_type(prim) - first_type[shell.type - 1]] = get_MO_coef(m, prim) / contraction;
+            }
             const vec nbo_values = project_to_nbo(shell_transform(shell.type), cart_values);
             for (int c = 0; c < shell.nbo_components; c++)
                 (*target)[shell.nbo_start + c] = nbo_values[c];
@@ -4600,18 +4656,10 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     bool density_from_cached_dm = false;
     if (static_cast<int>(DM.extent(0)) == nbo_nao && static_cast<int>(DM.extent(1)) == nbo_nao) {
         density_from_cached_dm = true;
-        ivec dm_to_nbo(nbo_nao, 0);
-        for (const auto& shell : shells) {
-            for (int c = 0; c < shell.nbo_components; c++) {
-                const auto offset = constants::orca_2_pySCF(shell.type - 1, c);
-                err_checkf(offset.has_value(), "Unsupported NBO AO order in .47 density writer", std::cout);
-                dm_to_nbo[shell.nbo_start + c] = shell.nbo_start + static_cast<int>(offset.value());
-            }
-        }
         for (int iu = 0; iu < nbo_nao; iu++) {
             for (int iv = 0; iv <= iu; iv++) {
                 const int iuv = (iu * (iu + 1) / 2) + iv;
-                CDM[iuv] = DM(dm_to_nbo[iu], dm_to_nbo[iv]);
+                CDM[iuv] = DM(sph_index[iu], sph_index[iv]);
             }
         }
     }
@@ -4620,74 +4668,34 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     }
 
     vec OVLP_matrix = {};
+    //Int_Params reads each shell's angular momentum by origin (OCC and NOT_YET_DEFINED
+    //store l, everything else l + 1) and normalises by origin; an XCW_fit wavefunction
+    //says which convention it has, so it is handed over as it is.
     Int_Params int_params(*this);
-
-    progress("Computing Cartesian AO overlap integrals");
-    compute2C<Overlap2C_CRT>(int_params, OVLP_matrix);
-    progress("Transforming overlap matrix to NBO AO order");
-    dMatrixRef2 OVLP_cart(OVLP_matrix.data(), internal_nao, internal_nao);
+    progress("Computing spherical AO overlap integrals");
+    compute2C<Overlap2C_SPH>(int_params, OVLP_matrix);
+    err_checkf(static_cast<int>(OVLP_matrix.size()) == nbo_nao * nbo_nao, "Spherical overlap has the wrong size in the .47 writer", std::cout);
+    dMatrixRef2 OVLP_sph(OVLP_matrix.data(), nbo_nao, nbo_nao);
+    //libcint and OCC use the standard phases; ORCA's f(+-3), g(+-3), g(+-4) have the opposite
+    //sign and the gbw reader keeps them, so the overlap takes ORCA's sign there. Other origins
+    //with ORCA-like conventions may need the same and are not checked.
+    vec phase(nbo_nao, 1.0);
+    if (get_origin() == e_origin::gbw)
+        for (const auto& shell : shells)
+            for (int c = 5; c < shell.nbo_components; c++)
+                phase[shell.nbo_start + c] = -1.0;
     vec2 OVLP_nbo(nbo_nao, vec(nbo_nao, 0.0));
-    int overlap_progress_next = 10;
-    int overlap_shells_done = 0;
-#pragma omp parallel for schedule(dynamic)
-    for (int si = 0; si < static_cast<int>(shells.size()); si++) {
-        const auto& shell_i = shells[si];
-        const vec2 transform_i = shell_transform(shell_i.type);
-        for (const auto& shell_j : shells) {
-            const vec2 transform_j = shell_transform(shell_j.type);
-            for (int i = 0; i < shell_i.nbo_components; i++) {
-                for (int j = 0; j < shell_j.nbo_components; j++) {
-                    double value = 0.0;
-                    for (int ci = 0; ci < shell_i.cart_components; ci++) {
-                        const double left = transform_i[ci][i];
-                        if (left == 0.0)
-                            continue;
-                        for (int cj = 0; cj < shell_j.cart_components; cj++)
-                            value += left * OVLP_cart(shell_i.internal_start + ci, shell_j.internal_start + cj) * transform_j[cj][j];
-                    }
-                    OVLP_nbo[shell_i.nbo_start + i][shell_j.nbo_start + j] = value;
-                }
-            }
-        }
-#pragma omp critical(nbo_progress)
-        {
-            overlap_shells_done++;
-            progress_percent("Overlap transform", overlap_shells_done, static_cast<int>(shells.size()), overlap_progress_next);
-        }
-    }
-    for (const auto& shell_i : shells) {
-        for (const auto& shell_j : shells) {
-            if (shell_i.atom != shell_j.atom)
-                continue;
-            if (shell_i.type != shell_j.type) {
-                for (int i = 0; i < shell_i.nbo_components; i++)
-                    for (int j = 0; j < shell_j.nbo_components; j++)
-                        OVLP_nbo[shell_i.nbo_start + i][shell_j.nbo_start + j] = 0.0;
-            }
-            else if (shell_i.shell == shell_j.shell) {
-                for (int i = 0; i < shell_i.nbo_components; i++)
-                    for (int j = 0; j < shell_j.nbo_components; j++)
-                        OVLP_nbo[shell_i.nbo_start + i][shell_j.nbo_start + j] = i == j ? 1.0 : 0.0;
-            }
-        }
-    }
-    if (alpha_mos == nbo_nao) {
-        progress("Reconstructing overlap from MO inverse for a square alpha coefficient matrix");
-        dMatrix2 pure_mo(nbo_nao, nbo_nao);
-        for (int m = 0; m < nbo_nao; m++)
-            for (int ao = 0; ao < nbo_nao; ao++)
-                pure_mo(m, ao) = CMO[m][ao];
-        const dMatrix2 pure_mo_inverse = LAPACKE_invert(pure_mo, 1E-12);
-#pragma omp parallel for schedule(dynamic)
-        for (int i = 0; i < nbo_nao; i++) {
-            for (int j = 0; j < nbo_nao; j++) {
-                double value = 0.0;
-                for (int m = 0; m < nbo_nao; m++)
-                    value += pure_mo_inverse(i, m) * pure_mo_inverse(j, m);
-                OVLP_nbo[i][j] = value;
-            }
-        }
-    }
+    for (int i = 0; i < nbo_nao; i++)
+        for (int j = 0; j < nbo_nao; j++)
+            OVLP_nbo[i][j] = phase[i] * phase[j] * OVLP_sph(sph_index[i], sph_index[j]);
+    //A diagonal off 1 means Int_Params normalised this origin with the wrong convention; the
+    //density beside it is in a normalised basis, so rescaling S alone would only hide it.
+    int unnormalised = 0;
+    for (int i = 0; i < nbo_nao; i++)
+        if (std::abs(OVLP_nbo[i][i] - 1.0) > 1e-8) unnormalised++;
+    if (unnormalised > 0)
+        progress(std::to_string(unnormalised) + " of " + std::to_string(nbo_nao)
+            + " AOs are not normalised in the .47 overlap; check the origin's normalisation in Int_Params");
     auto packed_trace_product = [&](const vec& density) {
         double trace = 0.0;
         for (int i = 0; i < nbo_nao; i++) {

@@ -64,13 +64,16 @@ Int_Params::Int_Params(const Int_Params &first, const Int_Params &second)
     nao = first.nao + second.nao;
 }
 
-vec Int_Params::normalize_gto(vec coef, const vec &exp, const int l)
+vec Int_Params::normalize_gto(vec coef, const vec &exp, const int l, const bool primitives_normalized)
 {
     // GTO norm Ref: H. B. Schlegel and M. J. Frisch, Int. J. Quant.  Chem., 54(1995), 83-87.
-    for (int i = 0; i < coef.size(); i++)
-    {
-        coef[i] *= 1.0 / std::sqrt(gaussian_int(l * 2 + 2, 2 * exp[i]));
-    }
+    //OCC's contraction coefficients already carry the primitive normalization; a second one
+    //distorts the contraction while the overlap diagonal still comes out 1
+    if (!primitives_normalized)
+        for (int i = 0; i < coef.size(); i++)
+        {
+            coef[i] *= 1.0 / std::sqrt(gaussian_int(l * 2 + 2, 2 * exp[i]));
+        }
 
     vec2 ee(exp.size(), vec(exp.size(), 0.0));
     for (int i = 0; i < exp.size(); i++)
@@ -148,17 +151,8 @@ void Int_Params::collect_basis_data()
                     coefficients[i] *= std::sqrt(10. / 4.0 / constants::PI); // ... something something, cartesian harmonics...^2
             }
         }
-        else if (wfn_origin == e_origin::tonto)
-        {
-            for (int i = 0; i < coefficients.size(); i++)
-            {
-                int l = basis[i].get_type() - 1;
-                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from Tonto to libcint  ... something something, cartesian harmonics...
-                if (l == 2) // D functions need an extra normalization factor
-                    coefficients[i] *= std::sqrt(10. / 4.0 / constants::PI); // ... something something, cartesian harmonics...^2
-            }
-        }
-        else if (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::ptb)
+        else if (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::ptb
+            || wfn_origin == e_origin::XCW_fit)
         {
             int coef_idx = 0;
             for (unsigned int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++)
@@ -167,16 +161,23 @@ void Int_Params::collect_basis_data()
                 vec shell_coefs(coefficients.begin() + coef_idx, coefficients.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
                 vec shell_exp(exponents.begin() + coef_idx, exponents.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
 
-                shell_coefs = normalize_gto(shell_coefs, shell_exp, type);
+                shell_coefs = normalize_gto(shell_coefs, shell_exp, type, wfn_origin == e_origin::XCW_fit);
 
                 // Place the new coefs at the correct place in the coefficients vector
                 std::copy(shell_coefs.begin(), shell_coefs.end(), coefficients.begin() + coef_idx);
                 coef_idx += atoms[atom_idx].get_shellcount(shell);
             }
         }
-        else if (wfn_origin != e_origin::OCC)
+        else if (wfn_origin == e_origin::OCC)
         {
-            std::cout << "WFN Origin not recognized, thread carefully! No normalisation was performed!" << std::endl;
+            //OCC hands out shells normalised in its own convention. A wavefunction that only
+            //passed through OCC over a basis this program loaded is XCW_fit, handled above.
+        }
+        else
+        {
+            std::cout << "WFN Origin " << static_cast<int>(wfn_origin)
+                << " not recognized, tread carefully! No normalisation was performed, so any "
+                "overlap computed from this basis will not have a unit diagonal." << std::endl;
         }
 
         int max_l = 1;
@@ -184,7 +185,7 @@ void Int_Params::collect_basis_data()
         {
             int new_l = 0;
             if (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC)      new_l = basis[func].get_type();
-            else if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb) new_l = basis[func].get_type() - 1;
+            else if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb || wfn_origin == e_origin::XCW_fit) new_l = basis[func].get_type() - 1;
             else {
                 std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
                 new_l = basis[func].get_type() - 1;
@@ -203,7 +204,7 @@ void Int_Params::collect_basis_data()
 
                 //Sort functions regarding the angular momentum
                 if (((basis[n_funcs].get_type()-1 != l) && //First case, function type start with s=1
-                        (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb || wfn_origin == e_origin::xtb))  ||
+                        (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb || wfn_origin == e_origin::xtb || wfn_origin == e_origin::XCW_fit))  ||
                         ((basis[n_funcs].get_type() != l) && (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC))) {  //Second type s = 0
                     n_funcs += curr_funcs;
                     continue;
