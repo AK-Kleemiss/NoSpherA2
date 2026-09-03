@@ -8,6 +8,7 @@
 #include "xcw_halting.h"
 #include <occ/qm/hf.h>
 #include "i_tensor_stream.h"
+#include <thread>
 
 class XCW {
 public:
@@ -126,6 +127,9 @@ private:
 		// there, and reused from there when it is already the right size for this problem,
 		// so that trying another refinement setting does not rebuild it.
 		std::filesystem::path i_tensor_file_path;
+		// `save <path>`: write the tensor there for a later `read <path>`, on a thread, so
+		// the refinement starts at once instead of waiting for 100 GB to reach the disk.
+		std::filesystem::path i_tensor_save_path;
 
 		// Clears the convergence flags
 		void clear() {
@@ -321,6 +325,13 @@ private:
 	//unchanged for now.
 	std::vector<std::complex<float>> I32;
 	bool i_float_ = false;
+	// The background writer for `save <path>`. Joined, never detached: a thread still
+	// running at exit is how the GPU warm-up bug of 939268f happened, and this one holds a
+	// FILE* and reads the resident tensor.
+	std::thread i_writer_;
+	std::string i_writer_error_;
+	void start_i_save();
+	void finish_i_save();
 	i_tensor_file i_file_;
 	bool i_streamed_ = false;
 	int i_window_ = 0;

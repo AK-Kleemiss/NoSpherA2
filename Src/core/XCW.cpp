@@ -116,6 +116,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	bool grown = false, safe_tensor = false, read_tensor = false, read_first_guess = false, nbo_output = false;
 	bool i_tensor_single = false;
 	std::filesystem::path i_tensor_file_path;
+	std::filesystem::path i_tensor_save_path;
 	// 0 = hold the whole tensor, which is what every run did before this existed.
 	size_t i_tensor_max_mb = 0;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
@@ -312,6 +313,16 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		//each SCF iteration makes over it. Opt-in because it is a change of stored
 		//precision: the lambda scan agrees to 5e-13 and iteration for iteration, but that
 		//is a measurement on one system rather than a proof.
+		//Writing the tensor is worth ~40 minutes to a later run and costs this one nothing:
+		//the refinement only reads the tensor, so a thread can push it to disk while the SCF
+		//gets on with it. The path is what `read <path>` will want afterwards.
+		handlers["save"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> path))
+				throw std::runtime_error("Expected a path after 'save'");
+			i_tensor_save_path = path;
+			};
+
 		handlers["i_float"] = [&](std::istream&) {
 			i_tensor_single = true;
 			};
@@ -422,6 +433,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.i_tensor_max_mb = i_tensor_max_mb;
 	settings.i_tensor_single = i_tensor_single;
 	settings.i_tensor_file_path = i_tensor_file_path;
+	settings.i_tensor_save_path = i_tensor_save_path;
 	settings.nbo_output = nbo_output;
 
 	return settings;
@@ -1164,6 +1176,7 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 		if (!(opt->no_date)) {
 			std::cout << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << time_taken << " seconds. \n";
 		}
+		start_i_save();
 		std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter << " unique pairs of mu, nu (" << static_cast<size_t>(screen_counter) / (static_cast<double>(cryst.nmo * (cryst.nmo + 1)) / 2) * 100.00 << "%) \n";
 		std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / ((static_cast<double>(cryst.nmo * (cryst.nmo + 1)) / 2) * cryst.nr * cryst.ncen) * 100.00 << "%) \n";
 
@@ -1173,6 +1186,56 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 }
 
 //Whether the I tensor is held or streamed, and the largest window that fits the budget
+//The tensor is written on a thread while the refinement runs. Nothing in the SCF modifies
+//it - both walks only read - so a reader alongside them needs no lock, and the run pays only
+//the disk bandwidth, which it is not competing for while it works out of memory.
+void XCW::start_i_save()
+{
+	if (settings.i_tensor_save_path.empty() || i_streamed_) return;
+	const int packed = (cryst.nmo * (cryst.nmo + 1)) / 2;
+	const int nr = cryst.nr_small;
+	const std::filesystem::path path = settings.i_tensor_save_path;
+	const bool from_float = i_float_;
+	std::cout << "Writing the I tensor to " << path.string()
+		<< " in the background; a later run can `read " << path.string()
+		<< "` instead of building it" << std::endl;
+	i_writer_ = std::thread([this, path, nr, packed, from_float]() {
+		try {
+			i_tensor_file out;
+			out.create(path, nr, cryst.nmo);
+			std::vector<cdouble> block(packed);
+			for (int r = 0; r < nr; r++) {
+				if (from_float) {
+					const std::complex<float>* src = I32.data() + static_cast<size_t>(r) * packed;
+					for (int i = 0; i < packed; i++)
+						block[i] = cdouble(src[i].real(), src[i].imag());
+					out.write_block(r, block.data());
+				}
+				else {
+					out.write_block(r, I.data() + static_cast<size_t>(r) * packed);
+				}
+			}
+			out.finish_write();
+		}
+		catch (const std::exception& e) { i_writer_error_ = e.what(); }
+		catch (...) { i_writer_error_ = "unknown error"; }
+		});
+}
+
+//Called before the run ends, and before anything that could invalidate the tensor. A thread
+//left running past main is the bug 939268f was about; this one also holds a file handle.
+void XCW::finish_i_save()
+{
+	if (!i_writer_.joinable()) return;
+	i_writer_.join();
+	if (!i_writer_error_.empty())
+		std::cout << "Could not write the I tensor to "
+			<< settings.i_tensor_save_path.string() << ": " << i_writer_error_
+			<< " (the refinement itself is unaffected)" << std::endl;
+	else
+		std::cout << "I tensor written to " << settings.i_tensor_save_path.string() << std::endl;
+}
+
 void XCW::decide_i_storage() {
 	const size_t per_block = i_tensor_file::block_bytes(cryst.nmo);
 	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo);
@@ -1855,11 +1918,15 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				work_done += na * na * b.point_count;
 				work_unscreened += static_cast<double>(cryst.nmo) * cryst.nmo * b.point_count;
 			}
+		//Per reflection and symmetry operation the sum is a small number and says nothing;
+		//what the run costs is that times both, so scale it before printing or the figure
+		//reads as a thousandth of the truth.
+		const double runs = static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
 		if (work_done > 0.0)
-			std::cout << std::fixed << std::setprecision(2)
-				<< "I tensor work after all screening: " << (work_done / 1e12)
-				<< " of " << (work_unscreened / 1e12) << " Tflop-equivalents ("
-				<< 100.0 * work_done / work_unscreened << "%, "
+			std::cout << std::fixed << std::setprecision(1)
+				<< "I tensor work after all screening: " << (work_done * runs / 1e15)
+				<< " of " << (work_unscreened * runs / 1e15) << " Pflop-equivalents ("
+				<< std::setprecision(2) << 100.0 * work_done / work_unscreened << "%, "
 				<< (work_unscreened / work_done) << "x less than unscreened)\n";
 	}
 
@@ -2714,6 +2781,10 @@ bool XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Ma
 void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda) {
 	XCW_log << "Creating .tscb file from converged SCF calculation..." << std::endl;
 	std::vector<WFN> sf_wave_vec(1, { scf.wavefunction(), false });
+	//The constructor marks anything taken from OCC as OCC-origin. What this refinement holds
+	//is an OCC result over a basis this program loaded, so say that: Int_Params then reads the
+	//shells with the convention they actually have.
+	sf_wave_vec[0].set_origin(e_origin::XCW_fit);
 	svec known_atoms_;
 	tsc_block<int, cdouble> result;
 	vec2 known_kpts_;
@@ -2917,6 +2988,11 @@ void XCW::run_XCW_fitting() {
 	if (opt->xcw_gaussian_halt) {
 		report_gaussian_halting_summary();
 	}
+
+	//Before the run ends: the writer holds a file handle and reads the resident tensor, and
+	//by now it has usually been finished for a long while - the refinement takes far longer
+	//than the write. Joining is what keeps it from outliving the process.
+	finish_i_save();
 
 	std::cout << "Finished XCW fitting procedure." << std::endl;
 }
