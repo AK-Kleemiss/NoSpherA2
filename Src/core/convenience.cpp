@@ -752,6 +752,14 @@ std::string help_message =
  "                                    coefficients.\n"
  "  -convert_XCW <stdout> <lambda-step> Convert Tonto XCW lambda-step output.\n"
  "  -do_XCW  -calc_F  -anom_disp <file> XCW/Fcalc/anomalous-dispersion modes.\n"
+ "  -no_xcw_extrapolate                Seed each lambda step from the last one\n"
+ "                                    alone instead of the density extrapolated\n"
+ "                                    through the two previous steps.\n"
+ "  -xcw_incremental                   Two-electron Fock build from the change of\n"
+ "                                    the density each iteration; needs\n"
+ "                                    -xcw_int_precision 1e-12.\n"
+ "  -xcw_int_precision <p>             Integral screening threshold of the XCW\n"
+ "                                    Fock build, default 1e-10 (OCC's own 1e-12).\n"
  "  -XCW_settings <file>                Keywords for -do_XCW. Besides the\n"
  "                                    refinement settings, three control how\n"
  "                                    the I tensor - nr_refl blocks of\n"
@@ -3452,6 +3460,16 @@ bool options::digest_property_options(const std::string &temp, int &i)
         cpu_itensor_fp32 = true;
     else if (temp == "-no_cpu_itensor_fp32")
         cpu_itensor_fp32 = false;
+    else if (temp == "-xcw_extrapolate")
+        xcw_extrapolate = true;
+    else if (temp == "-no_xcw_extrapolate")
+        xcw_extrapolate = false;
+    else if (temp == "-xcw_incremental")
+        xcw_incremental = true;
+    else if (temp == "-no_xcw_incremental")
+        xcw_incremental = false;
+    else if (temp == "-xcw_int_precision")
+        xcw_int_precision = stod(arguments[i + 1]);
     else if (temp == "-no_gpu_itensor")
         gpu_itensor = false;
     else if (temp == "-gpu_itensor_tensor")

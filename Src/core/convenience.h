@@ -836,6 +836,17 @@ struct options
     //Single-precision tiles for the CPU I tensor, as the device path runs; sgemm is twice
     //dgemm's rate. -no_cpu_itensor_fp32 keeps double.
     bool cpu_itensor_fp32 = true;
+    //Seed each lambda step from the density extrapolated through the two previous steps
+    //rather than the last one alone; the step is small and the trajectory smooth.
+    bool xcw_extrapolate = true;
+    //Build the two-electron Fock matrix from the change of the density between iterations,
+    //which the integral kernel screens on, rather than from the whole density every time.
+    //Only with xcw_int_precision 1e-12: at 1e-10 the increments' screening error accumulates
+    //to a gradient floor of 3e-5 and the SCF never meets its 1e-5, and the full build at
+    //1e-10 is the faster of the two anyway.
+    bool xcw_incremental = false;
+    //Integral screening threshold of the XCW Fock build; OCC's own default is 1e-12.
+    double xcw_int_precision = 1e-10;
     //-gflops reports achieved GFLOP/s per stage for the CPU and GPU paths at the end of a
     //run. The thresholds deciding what goes to the device were calibrated on one machine;
     //this is how they get re-derived on another.

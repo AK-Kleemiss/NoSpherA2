@@ -2528,6 +2528,9 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	}
 	scf.ctx.K = scf.m_procedure.compute_schwarz_ints();
 	scf.update_scf_energy(false);
+	G_last_.resize(0, 0);
+	last_full_build_ = 0;
+	next_full_build_error_ = 0.0;
 
 	scf.ctx.H = scf.ctx.T + scf.ctx.V;
 	bool converged;
@@ -2686,7 +2689,27 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	//scf.ctx.H = scf.ctx.T + scf.ctx.V + scf.ctx.Vecp + scf.ctx.V_ext;
 	scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H);
 	scf.ctx.F = scf.ctx.H;
-	scf.ctx.F += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
+	const _time_point fock_t0 = get_time();
+	//G(D) = G(D_last) + G(D - D_last): the kernel screens shell quartets on the density's
+	//shell-block norms, and the difference shrinks as the SCF converges. Rebuilt in full
+	//every 8 iterations or once the DIIS error has fallen tenfold since the last full build,
+	//as OCC's own loop does, so the screening error does not accumulate.
+	const bool incremental = opt->xcw_incremental && G_last_.size() > 0
+		&& scf.iter - last_full_build_ < 8 && scf.diis_error > next_full_build_error_;
+	if (incremental) {
+		occ::Mat D_diff = scf.ctx.mo.D - D_last_build_;
+		std::swap(scf.ctx.mo.D, D_diff);
+		G_last_ += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
+		std::swap(scf.ctx.mo.D, D_diff);
+	}
+	else {
+		G_last_ = scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
+		last_full_build_ = scf.iter;
+		next_full_build_error_ = scf.diis_error / 10.0;
+	}
+	D_last_build_ = scf.ctx.mo.D;
+	scf.ctx.F += G_last_;
+	throughput::record_time("XCW Fock build (OCC)", false, get_msec(fock_t0, get_time()));
 	scf.update_scf_energy(false);
 
 	double current_criterion = 0;
@@ -2833,6 +2856,7 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
 	occ::qm::AOBasis occ_basis_set;
 	setup_basis(mol, settings.basis_set_name, occ_basis_set);
 	occ::qm::HartreeFock hf(occ_basis_set);
+	if (opt->xcw_int_precision > 0.0) hf.set_precision(opt->xcw_int_precision);
 	create_prims(ao_data_shells, occ_basis_set);
 	eval_I_anom_disp(ao_data_shells, read_tensor);
 	return hf;
@@ -2911,7 +2935,8 @@ void XCW::run_XCW_fitting() {
 	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor);
 	occ::qm::SCF scf(hf, settings.hf_type);
 	bool has_guess = false;
-	occ::qm::Wavefunction last_wfn;
+	occ::qm::Wavefunction last_wfn, prev_wfn;
+	const occ::Mat S_ao = hf.compute_overlap_matrix();
 	if (settings.read_first_guess) {
 		std::ostringstream oss2;
 		std::string start_value_str = std::to_string(settings.xcw_start_value);
@@ -2955,7 +2980,22 @@ void XCW::run_XCW_fitting() {
 		scf.update_occupied_orbital_count();
 		scf.convergence_accelerator.set_strategy(scf.convergence_settings.diis_strategy);
 		scf.convergence_accelerator.set_switch_threshold(scf.convergence_settings.diis_switch_threshold);
-		do_SCF(lambda, alpha, scf, last_wfn, has_guess);
+		if (opt->xcw_extrapolate && step >= 2 && settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
+			//The density extrapolated through the two previous steps, pulled back to
+			//idempotency by two McWeeny steps D <- 3DSD - 2DSDSD; the orbitals stay those of
+			//the last step, they only seed the level shift and the gradient
+			occ::qm::Wavefunction guess = last_wfn;
+			occ::Mat D = 2.0 * last_wfn.mo.D - prev_wfn.mo.D;
+			for (int k = 0; k < 2; k++) {
+				const occ::Mat DS = D * S_ao;
+				D = 3.0 * DS * D - 2.0 * DS * DS * D;
+			}
+			guess.mo.D = D;
+			do_SCF(lambda, alpha, scf, guess, has_guess);
+		}
+		else
+			do_SCF(lambda, alpha, scf, last_wfn, has_guess);
+		prev_wfn = last_wfn;
 		last_wfn = scf.wavefunction();
 
 		//Progress estimate every 5 lambda steps; the last step is skipped because the

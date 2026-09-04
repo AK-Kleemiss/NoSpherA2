@@ -325,6 +325,10 @@ private:
 	// running at exit is how the GPU warm-up bug of 939268f happened, and this one holds a
 	// FILE* and reads the resident tensor.
 	std::thread i_writer_;
+	//Incremental Fock build: the two-electron part and the density it was built from
+	occ::Mat G_last_, D_last_build_;
+	int last_full_build_ = 0;
+	double next_full_build_error_ = 0.0;
 	std::string i_writer_error_;
 	void start_i_save();
 	void finish_i_save();
