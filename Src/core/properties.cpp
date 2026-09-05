@@ -5,6 +5,7 @@
 #include "spherical_density.h"
 #include "cube.h"
 #include "constants.h"
+#include "GridManager.h"
 
 void print_time(_time_point &start, _time_point &end, std::ostream &file) {
     if (get_sec(start, end) < 60)
@@ -668,6 +669,467 @@ void Calc_MO(
     print_time(start, end, file);
 };
 
+bool find_frontier_orbitals(
+    const WFN &wavy,
+    int &homo,
+    int &lumo,
+    bool &unrestricted)
+{
+    homo = -1;
+    lumo = -1;
+    unrestricted = wavy.get_is_unrestricted();
+
+    const int n = wavy.get_nmo();
+    if (n <= 0)
+        return false;
+
+    // Some formats (notably plain .wfn) carry no orbital energies at all. Only
+    // trust energy ordering if at least one energy is non-zero.
+    bool have_energies = false;
+    for (int i = 0; i < n; i++) {
+        if (wavy.get_MO_energy(i) != 0.0) {
+            have_energies = true;
+            break;
+        }
+    }
+
+    // An occupation of exactly zero marks a virtual orbital. Use a small
+    // threshold so that near-zero natural-orbital occupations from correlated
+    // methods are still treated as occupied rather than virtual.
+    constexpr double occ_threshold = 1.0e-6;
+
+    double best_occ_energy = 0.0;
+    double best_vir_energy = 0.0;
+    for (int i = 0; i < n; i++) {
+        const double occ = wavy.get_MO_occ(i);
+        const double ener = wavy.get_MO_energy(i);
+        if (occ > occ_threshold) {
+            if (homo == -1 || (have_energies ? (ener > best_occ_energy) : (i > homo))) {
+                homo = i;
+                best_occ_energy = ener;
+            }
+        }
+        else {
+            if (lumo == -1 || (have_energies ? (ener < best_vir_energy) : (i < lumo))) {
+                lumo = i;
+                best_vir_energy = ener;
+            }
+        }
+    }
+
+    return (homo != -1 && lumo != -1);
+}
+
+void Calc_Fukui(
+    std::vector<cube> &Cubes,
+    const WFN &wavy,
+    int homo,
+    int lumo,
+    double radius,
+    std::ostream &file,
+    bool wrap)
+{
+    using namespace std;
+    _time_point start = get_time();
+    const double radius_bohr = constants::ang2bohr(radius);
+    const vector<atom> atoms = wavy.get_atoms();
+
+    if (!Cubes[cube_type::Fukui_plus].get_loaded())
+        return;
+
+    // The caller is expected to have obtained these from find_frontier_orbitals,
+    // which returns false rather than a negative index when no frontier pair
+    // exists. Guard anyway: a negative index reaches computeMO as an
+    // out-of-bounds orbital lookup, which is undefined rather than merely wrong.
+    err_checkf(homo >= 0 && homo < wavy.get_nmo(), "Invalid HOMO index " + std::to_string(homo) + " for Fukui calculation!", file);
+    err_checkf(lumo >= 0 && lumo < wavy.get_nmo(), "Invalid LUMO index " + std::to_string(lumo) + " for Fukui calculation!", file);
+
+    // Deliberately TWO grid passes, each returning its value, rather than one
+    // pass that fills all four cubes from a single lambda.
+    //
+    // The tempting single-pass version writes the other three cubes from inside
+    // the functor with a get_value/set_value read-modify-write. That is a data
+    // race in the wrapped (periodic) path: evaluate_on_grid parallelises over
+    // the outer index and several raw indices wrap onto the SAME voxel, so two
+    // threads can read-modify-write one value concurrently. Only the functor's
+    // RETURN value is protected, by the "#pragma omp atomic" in evaluate_on_grid.
+    //
+    // Two passes cost exactly the same: one computeMO per point each, versus two
+    // per point in a single pass. The orbital evaluation dominates, so this is
+    // free, and f0 and the dual descriptor then follow elementwise from the two
+    // finished cubes where nothing is shared between threads.
+    evaluate_cube_in_radius(
+        Cubes[cube_type::Fukui_plus],
+        wrap,
+        atoms,
+        radius_bohr,
+        [&](const d3 &pos) {
+            // computeMO returns the orbital AMPLITUDE psi, so square it here.
+            const double psi_lumo = wavy.computeMO(pos, lumo);
+            return sanitize_finite(psi_lumo * psi_lumo);
+        });
+
+    evaluate_cube_in_radius(
+        Cubes[cube_type::Fukui_minus],
+        wrap,
+        atoms,
+        radius_bohr,
+        [&](const d3 &pos) {
+            const double psi_homo = wavy.computeMO(pos, homo);
+            return sanitize_finite(psi_homo * psi_homo);
+        });
+
+    // f0 = (f+ + f-) / 2 and df = f+ - f-, elementwise. Each voxel is written by
+    // exactly one thread here, so no synchronisation is needed.
+    const i3 sizes = Cubes[cube_type::Fukui_plus].get_sizes();
+#pragma omp parallel for schedule(dynamic)
+    for (int x = 0; x < sizes[0]; x++)
+        for (int y = 0; y < sizes[1]; y++)
+            for (int z = 0; z < sizes[2]; z++)
+            {
+                const double f_plus = Cubes[cube_type::Fukui_plus].get_value(x, y, z);
+                const double f_minus = Cubes[cube_type::Fukui_minus].get_value(x, y, z);
+                Cubes[cube_type::Fukui_zero].set_value(x, y, z, 0.5 * (f_plus + f_minus));
+                Cubes[cube_type::Dual_Descriptor].set_value(x, y, z, f_plus - f_minus);
+            }
+    // All four cubes were allocated together with loaded = true, so no flag needs
+    // setting here; evaluate_on_grid has already re-set it for f+ and f-.
+
+    _time_point end = get_time();
+    print_time(start, end, file);
+};
+
+namespace {
+
+// Overwrite the WFN_DENSITY column of an already-built integration grid with the
+// density of a single molecular orbital, |psi_mo(r)|^2.
+//
+// This is the whole trick behind the condensed Fukui functions. GridManager's
+// calculatePartitionedCharges() integrates whatever sits in that column against
+// all five partition weight columns at once; it does not recompute the density.
+// So substituting the frontier-orbital density for the total density turns the
+// existing five-way charge accumulation into a five-way condensed-Fukui
+// accumulation, with no change to GridManager at all.
+//
+// @p wavy must be the ORIGINAL wavefunction, still carrying its virtual
+// orbitals - the grid itself is built from a pruned copy (see below).
+void fill_density_column_with_orbital(GridManager &gm, const WFN &wavy, int mo)
+{
+    GridData &gd = gm.getGridData();
+    const bool helper = gm.getNeedsHelper();
+    vec3 &grids = helper ? gd.helper_grids : gd.atomic_grids;
+    const ivec &npts = helper ? gd.helper_num_points_per_atom : gd.num_points_per_atom;
+
+    const int n_grids = static_cast<int>(grids.size());
+    for (int g = 0; g < n_grids; g++) {
+        vec2 &atom_grid = grids[g];
+        const int num_points = npts[g];
+        const double *x = atom_grid[GridData::GridIndex::X].data();
+        const double *y = atom_grid[GridData::GridIndex::Y].data();
+        const double *z = atom_grid[GridData::GridIndex::Z].data();
+        double *dens = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
+#pragma omp parallel for schedule(dynamic, 64)
+        for (int p = 0; p < num_points; p++) {
+            const double psi = wavy.computeMO({ x[p], y[p], z[p] }, mo);
+            dens[p] = psi * psi;
+        }
+    }
+}
+
+} // namespace
+
+CondensedFukuiResults Calc_Condensed_Fukui(
+    const WFN &wavy,
+    int homo,
+    int lumo,
+    const cell &unit_cell,
+    int accuracy,
+    std::ostream &file)
+{
+    CondensedFukuiResults out;
+    const int ncen = wavy.get_ncen();
+    if (ncen <= 0 || homo < 0 || lumo < 0)
+        return out;
+
+    GridConfiguration config;
+    config.accuracy = accuracy;
+    config.pbc = 0;
+    config.debug = false;
+    // Forces calculatePartitionedCharges down its five-wide branch, so one pass
+    // yields Becke, Hirshfeld, TFVC, MBIS and EMBIS together.
+    config.all_charges = true;
+
+    ivec atom_list(ncen);
+    for (int i = 0; i < ncen; i++)
+        atom_list[i] = i;
+
+    out.labels.resize(ncen);
+    const std::vector<atom> atoms = wavy.get_atoms();
+    for (int i = 0; i < ncen; i++)
+        out.labels[i] = atoms[i].get_label();
+
+    GridManager gm(config);
+
+    // Build the grid and the five weight sets from a copy with the virtual
+    // orbitals removed. Two reasons, and the first is a crash rather than a
+    // preference: compute_dens sizes its scratch array by get_nmo(true), so
+    // leaving several hundred virtuals in place overruns it. Second, the
+    // partition weights are properties of the GROUND-STATE density - MBIS and
+    // EMBIS are refined self-consistently against it - so they must be built
+    // from rho, not from a frontier orbital. Only the integrand changes below.
+    WFN temp = wavy;
+    temp.delete_unoccupied_MOs();
+    gm.setup3DGridsForMolecule(temp, atom_list, {}, unit_cell, false, file);
+
+    // ECP cores are added to the populations by calculatePartitionedCharges.
+    // That is right for a charge and wrong for a Fukui function, which knows
+    // nothing about core electrons, so it is subtracted back out below.
+    const bool has_ecps = temp.get_has_ECPs();
+
+    auto accumulate = [&](int mo, vec2 &dest) {
+        fill_density_column_with_orbital(gm, wavy, mo);
+        PartitionResults res = gm.calculatePartitionedCharges(temp, unit_cell);
+        dest.resize(5);
+        for (int s = 0; s < 5; s++) {
+            dest[s].resize(ncen, 0.0);
+            for (int a = 0; a < ncen && a < static_cast<int>(res.atom_charges[s].size()); a++) {
+                double v = res.atom_charges[s][a];
+                if (has_ecps)
+                    v -= temp.get_atom_ECP_electrons(a);
+                dest[s][a] = v;
+            }
+        }
+    };
+
+    accumulate(lumo, out.f_plus);
+    accumulate(homo, out.f_minus);
+    out.valid = true;
+    return out;
+}
+
+void print_condensed_fukui(
+    const CondensedFukuiResults &r,
+    std::ostream &file)
+{
+    if (!r.valid)
+        return;
+    using namespace std;
+    // Column order matches PartitionResults::CHARGE_ORDER.
+    static const char *scheme[5] = { "Becke", "TFVC", "Hirshfeld", "MBIS", "EMBIS" };
+    static const int order[5] = {
+        PartitionResults::CHARGE_ORDER::S_HIRSH,
+        PartitionResults::CHARGE_ORDER::S_BECKE,
+        PartitionResults::CHARGE_ORDER::S_TFVC,
+        PartitionResults::CHARGE_ORDER::S_MBIS,
+        PartitionResults::CHARGE_ORDER::S_EMBIS
+    };
+    static const char *order_name[5] = { "Hirshfeld", "Becke", "TFVC", "MBIS", "EMBIS" };
+    (void)scheme;
+
+    const size_t n = r.labels.size();
+    file << "\nCondensed (atom-summed) Fukui functions" << endl;
+    file << "  f+_A = integral of w_A(r) |psi_LUMO(r)|^2   (A is attacked by a nucleophile -> electrophilic site)" << endl;
+    file << "  f-_A = integral of w_A(r) |psi_HOMO(r)|^2   (A is attacked by an electrophile -> nucleophilic site)" << endl;
+    file << "  df_A = f+_A - f-_A                          (> 0 electrophilic, < 0 nucleophilic)" << endl;
+    file << "  Each column uses a different atomic partition w_A. Sum over atoms is 1 for each of f+ and f-." << endl;
+
+    for (int quantity = 0; quantity < 3; quantity++) {
+        const char *qname = (quantity == 0) ? "f+" : (quantity == 1) ? "f-" : "dual descriptor (f+ - f-)";
+        file << "\n  " << qname << endl;
+        file << "  " << setw(8) << left << "Atom" << right;
+        for (int s = 0; s < 5; s++)
+            file << setw(13) << order_name[s];
+        file << endl;
+        file << "  " << string(8 + 5 * 13, '-') << endl;
+        vec totals(5, 0.0);
+        for (size_t a = 0; a < n; a++) {
+            file << "  " << setw(8) << left << r.labels[a] << right;
+            for (int s = 0; s < 5; s++) {
+                const int idx = order[s];
+                double v = 0.0;
+                if (quantity == 0)
+                    v = r.f_plus[idx][a];
+                else if (quantity == 1)
+                    v = r.f_minus[idx][a];
+                else
+                    v = r.f_plus[idx][a] - r.f_minus[idx][a];
+                totals[s] += v;
+                file << setw(13) << fixed << setprecision(5) << v;
+            }
+            file << endl;
+        }
+        file << "  " << string(8 + 5 * 13, '-') << endl;
+        file << "  " << setw(8) << left << "sum" << right;
+        for (int s = 0; s < 5; s++)
+            file << setw(13) << fixed << setprecision(5) << totals[s];
+        file << endl;
+    }
+    file << endl;
+}
+
+void fukui_analysis(options &opt, std::ostream &log2)
+{
+    using namespace std;
+    log2 << NoSpherA2_message(opt.no_date);
+    if (!opt.no_date)
+        log2 << build_date;
+
+    err_checkf(opt.wfn != "", "Error, no wfn file specified! Use -fukui_analysis <wfn> or -wfn <wfn>.", log2);
+    WFN wavy(opt.wfn);
+    log2 << "\nConceptual-DFT reactivity analysis of " << opt.wfn.string() << endl;
+    log2 << "Read " << wavy.get_ncen() << " atoms and " << wavy.get_nmo()
+         << " molecular orbitals (" << wavy.get_nmo(true) << " occupied)." << endl;
+
+    int homo = -1, lumo = -1;
+    bool unrestricted = false;
+    if (!find_frontier_orbitals(wavy, homo, lumo, unrestricted))
+    {
+        log2 << "\nERROR: no HOMO/LUMO pair found (HOMO index " << homo
+             << ", LUMO index " << lumo << ")." << endl;
+        if (lumo == -1)
+            log2 << "This wavefunction stores no virtual orbitals, so no Fukui function can be\n"
+                 << "formed from it. Plain .wfn files and many .wfx files keep only the occupied\n"
+                 << "orbitals; use a .gbw, .molden or .fchk instead." << endl;
+        return;
+    }
+
+    log2 << "HOMO = MO " << homo << "  energy " << fixed << setprecision(6) << wavy.get_MO_energy(homo)
+         << "  occupation " << setprecision(3) << wavy.get_MO_occ(homo) << endl;
+    log2 << "LUMO = MO " << lumo << "  energy " << setprecision(6) << wavy.get_MO_energy(lumo)
+         << "  occupation " << setprecision(3) << wavy.get_MO_occ(lumo) << endl;
+    const double gap = wavy.get_MO_energy(lumo) - wavy.get_MO_energy(homo);
+    log2 << "HOMO-LUMO gap: " << setprecision(6) << gap << " Hartree ("
+         << setprecision(3) << gap * constants::keV_per_hartree * 1000.0 << " eV)" << endl;
+    if (unrestricted)
+    {
+        // Say which manifold actually supplied the pair, and what each manifold's
+        // own frontier is. "Taken across both manifolds" on its own is not
+        // actionable: for an open-shell system the answer usually comes entirely
+        // from one spin, and which one changes the chemistry being described.
+        static const char *spin_name[2] = { "alpha", "beta" };
+        const int homo_op = wavy.get_MO_op(homo);
+        const int lumo_op = wavy.get_MO_op(lumo);
+        log2 << "\nUnrestricted wavefunction." << endl;
+        log2 << "  The frontier pair is the globally highest occupied and globally lowest virtual\n"
+             << "  spin orbital, i.e. the electron that is easiest to remove and the level an added\n"
+             << "  electron would enter, regardless of spin. That is the spin-UNRESOLVED Fukui\n"
+             << "  function; it is not a spin-polarised (f_N / f_S) treatment." << endl;
+        log2 << "  Chosen HOMO is " << spin_name[homo_op == 1 ? 1 : 0]
+             << ", chosen LUMO is " << spin_name[lumo_op == 1 ? 1 : 0] << "." << endl;
+
+        // Per-manifold frontiers, so a suspicious global answer can be checked.
+        for (int op = 0; op < 2; op++)
+        {
+            int h = -1, l = -1;
+            double he = 0.0, le = 0.0;
+            for (int i = 0; i < wavy.get_nmo(); i++)
+            {
+                if (wavy.get_MO_op(i) != op)
+                    continue;
+                const double o = wavy.get_MO_occ(i);
+                const double e = wavy.get_MO_energy(i);
+                if (o > 1.0e-6) {
+                    if (h == -1 || e > he) { h = i; he = e; }
+                }
+                else {
+                    if (l == -1 || e < le) { l = i; le = e; }
+                }
+            }
+            if (h == -1 && l == -1)
+                continue;
+            log2 << "  " << setw(5) << spin_name[op] << ": HOMO = MO ";
+            if (h >= 0) log2 << h << " (" << fixed << setprecision(6) << he << ")"; else log2 << "none";
+            log2 << ", LUMO = MO ";
+            if (l >= 0) log2 << l << " (" << fixed << setprecision(6) << le << ")"; else log2 << "none";
+            log2 << endl;
+        }
+        if (homo_op == lumo_op)
+            log2 << "  Both come from the " << spin_name[homo_op == 1 ? 1 : 0]
+                 << " manifold, so this is effectively a " << spin_name[homo_op == 1 ? 1 : 0]
+                 << "-only Fukui function." << endl;
+        else
+            log2 << "  They come from DIFFERENT manifolds, so f+ and f- describe different spin\n"
+                 << "  channels. Interpret the dual descriptor with care." << endl;
+        log2 << "  For a high-spin system the lowest virtual is often the spatial partner of a\n"
+             << "  singly-occupied orbital, which makes f+ and f- describe nearly the same region\n"
+             << "  and drives the dual descriptor toward zero. That is a property of the\n"
+             << "  approximation, not a statement about the molecule." << endl;
+    }
+
+    const CondensedFukuiResults condensed =
+        Calc_Condensed_Fukui(wavy, homo, lumo, cell(), opt.accuracy, log2);
+    if (!condensed.valid)
+    {
+        log2 << "Condensed Fukui functions could not be calculated." << endl;
+        return;
+    }
+    print_condensed_fukui(condensed, log2);
+
+    // The "so what" line. Ranked on the Hirshfeld column because that is the
+    // partition the condensed-Fukui literature uses, so it is the one a reader
+    // can compare against published numbers.
+    const int H = PartitionResults::CHARGE_ORDER::S_HIRSH;
+    const size_t n = condensed.labels.size();
+    if (n > 0)
+    {
+        size_t most_electrophilic = 0, most_nucleophilic = 0;
+        double best_pos = -1e300, best_neg = 1e300;
+        for (size_t a = 0; a < n; a++)
+        {
+            const double df = condensed.f_plus[H][a] - condensed.f_minus[H][a];
+            if (df > best_pos) { best_pos = df; most_electrophilic = a; }
+            if (df < best_neg) { best_neg = df; most_nucleophilic = a; }
+        }
+        log2 << "Summary (Hirshfeld partition):" << endl;
+        log2 << "  Most ELECTROPHILIC site (a nucleophile attacks here): "
+             << condensed.labels[most_electrophilic]
+             << "   df = " << fixed << setprecision(5) << best_pos << endl;
+        log2 << "  Most NUCLEOPHILIC site (an electrophile attacks here): "
+             << condensed.labels[most_nucleophilic]
+             << "   df = " << fixed << setprecision(5) << best_neg << endl;
+        log2 << "\nNote: these atom-summed values, not the cube maxima, are what carry the\n"
+             << "chemistry. A point-wise Fukui function peaks near the heaviest nucleus\n"
+             << "regardless of where the molecule actually reacts." << endl;
+    }
+
+    // Machine-readable copy beside the wavefunction, same format as the -fukui run.
+    const std::filesystem::path summary_path =
+        (wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui.dat";
+    ofstream summary(summary_path, ios::out);
+    summary << "# NoSpherA2 condensed Fukui analysis\n";
+    summary << "# Frontier-orbital approximation; no cubes were calculated.\n";
+    summary << fixed;
+    summary << "HOMO_index " << homo << "\n";
+    summary << "HOMO_energy " << setprecision(6) << wavy.get_MO_energy(homo) << "\n";
+    summary << "LUMO_index " << lumo << "\n";
+    summary << "LUMO_energy " << setprecision(6) << wavy.get_MO_energy(lumo) << "\n";
+    summary << "unrestricted " << (unrestricted ? 1 : 0) << "\n";
+    static const int ord[5] = {
+        PartitionResults::CHARGE_ORDER::S_HIRSH,
+        PartitionResults::CHARGE_ORDER::S_BECKE,
+        PartitionResults::CHARGE_ORDER::S_TFVC,
+        PartitionResults::CHARGE_ORDER::S_MBIS,
+        PartitionResults::CHARGE_ORDER::S_EMBIS
+    };
+    static const char *ord_name[5] = { "hirshfeld", "becke", "tfvc", "mbis", "embis" };
+    summary << "# condensed Fukui: atom f+ f- df, one block per partition\n";
+    for (int s = 0; s < 5; s++)
+    {
+        summary << "partition " << ord_name[s] << "\n";
+        for (size_t a = 0; a < n; a++)
+        {
+            const double fp = condensed.f_plus[ord[s]][a];
+            const double fm = condensed.f_minus[ord[s]][a];
+            summary << "  " << condensed.labels[a]
+                    << " " << setprecision(6) << fp
+                    << " " << setprecision(6) << fm
+                    << " " << setprecision(6) << (fp - fm) << "\n";
+        }
+    }
+    summary.close();
+    log2 << "\nWrote " << summary_path.filename().string() << endl;
+}
+
 namespace {
 
 struct PromolecularFragmentDensities {
@@ -1239,6 +1701,15 @@ void properties_calculation(options &opt)
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hirsh);
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hirsh);
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef || opt.properties.hirsh);
+    // Fukui_plus / Fukui_minus / Fukui_zero / Dual_Descriptor. All four are
+    // allocated together: they come out of a single grid pass over the same two
+    // frontier orbitals, so computing one and not the others saves nothing, and
+    // an unloaded cube has no storage allocated at all (see cube's grow_values
+    // constructor) which would make the shared evaluation path unsafe.
+    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
+    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
+    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
+    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
 
     for (cube &cube : cubes)
         cube.give_parent_wfn(wavy);
@@ -1270,6 +1741,10 @@ void properties_calculation(options &opt)
     cubes[cube_type::DEF].set_comment1("Calculated static deformation density values using NoSpherA2");
     cubes[cube_type::Hirsh].set_comment1("Calculated Hirshfeld atom density values using NoSpherA2");
     cubes[cube_type::Spin_Density].set_comment1("Calculated spin density using NoSpherA2");
+    cubes[cube_type::Fukui_plus].set_comment1("Calculated Fukui f+ (LUMO density, nucleophilic attack) using NoSpherA2");
+    cubes[cube_type::Fukui_minus].set_comment1("Calculated Fukui f- (HOMO density, electrophilic attack) using NoSpherA2");
+    cubes[cube_type::Fukui_zero].set_comment1("Calculated Fukui f0 (radical attack) using NoSpherA2");
+    cubes[cube_type::Dual_Descriptor].set_comment1("Calculated dual descriptor f+ minus f- using NoSpherA2");
     for (auto cube : cubes)
         cube.set_comment2("from " + wavy.get_path().string());
 
@@ -1282,6 +1757,10 @@ void properties_calculation(options &opt)
     cubes[cube_type::DEF].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_def.cube");
     cubes[cube_type::Hirsh].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_hirsh.cube");
     cubes[cube_type::Spin_Density].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_s_rho.cube");
+    cubes[cube_type::Fukui_plus].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_plus.cube");
+    cubes[cube_type::Fukui_minus].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_minus.cube");
+    cubes[cube_type::Fukui_zero].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_zero.cube");
+    cubes[cube_type::Dual_Descriptor].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_dual_descriptor.cube");
 
     log2 << "\nCalculating:" << endl;
     if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
@@ -1308,6 +1787,8 @@ void properties_calculation(options &opt)
         log2 << "MOs, ";
     if (opt.properties.s_rho)
         log2 << "Spin density, ";
+    if (opt.properties.fukui)
+        log2 << "Fukui functions and dual descriptor, ";
     log2 << endl;
 
     log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
@@ -1330,6 +1811,134 @@ void properties_calculation(options &opt)
             Calc_MO(cubes[cube_type::MO_val], opt.properties.MO_numbers[i], wavy, opt.properties.radius, log2, opt.cif != "");
             cubes[cube_type::MO_val].write_file(true);
         }
+
+    // The Fukui functions need the LUMO, which is an UNOCCUPIED orbital. This
+    // block must therefore stay above the delete_unoccupied_MOs() call below -
+    // moving it further down leaves the virtual space empty and silently yields
+    // an all-zero f+ cube rather than an error that names the cause.
+    if (opt.properties.fukui)
+    {
+        int homo = -1, lumo = -1;
+        bool unrestricted = false;
+        const bool found = find_frontier_orbitals(wavy, homo, lumo, unrestricted);
+        if (!found)
+        {
+            log2 << "WARNING: Could not identify a HOMO/LUMO pair (found HOMO index " << homo
+                 << ", LUMO index " << lumo << "). "
+                 << "The wavefunction has no virtual orbitals, or no occupied ones. "
+                 << "Skipping the Fukui functions." << endl;
+        }
+        else
+        {
+            log2 << "Frontier orbitals: HOMO = MO " << homo
+                 << " (energy " << fixed << setprecision(6) << wavy.get_MO_energy(homo)
+                 << ", occupation " << setprecision(3) << wavy.get_MO_occ(homo) << "), "
+                 << "LUMO = MO " << lumo
+                 << " (energy " << setprecision(6) << wavy.get_MO_energy(lumo)
+                 << ", occupation " << setprecision(3) << wavy.get_MO_occ(lumo) << ")" << endl;
+            if (unrestricted)
+                log2 << "WARNING: unrestricted wavefunction. The frontier pair is taken across both "
+                     << "spin manifolds, so the result is not a spin-resolved Fukui function." << endl;
+            log2 << "Calculating Fukui functions..." << endl;
+            Calc_Fukui(cubes, wavy, homo, lumo, opt.properties.radius, log2, opt.cif != "");
+
+            // Written here, next to the MO cubes, rather than in the common
+            // write block further down: everything below this point runs after
+            // the virtual orbitals have been discarded.
+            cubes[cube_type::Fukui_plus].write_file(true);
+            cubes[cube_type::Fukui_minus].write_file(true);
+            cubes[cube_type::Fukui_zero].write_file(true);
+            cubes[cube_type::Dual_Descriptor].write_file(true);
+
+            // Integrated norms. For the exact Fukui function each of f+ and f-
+            // integrates to 1; in the frontier-orbital approximation this holds
+            // only as far as the orbital is normalised inside the evaluated
+            // radius, so a value below 1 means the grid or the radius is
+            // clipping the orbital rather than that anything is wrong with the
+            // theory. Cheap, and the honest self-check to print.
+            // cube::sum() already multiplies by the volume element dv, so it
+            // returns the integral rather than a bare sum. Multiplying by
+            // get_dv() here as well would apply dv twice and make the reported
+            // norm scale with the grid spacing.
+            const double int_plus = cubes[cube_type::Fukui_plus].sum();
+            const double int_minus = cubes[cube_type::Fukui_minus].sum();
+            log2 << "Integrated f+ over the grid: " << fixed << setprecision(4) << int_plus
+                 << " (exact value 1.0)" << endl;
+            log2 << "Integrated f- over the grid: " << fixed << setprecision(4) << int_minus
+                 << " (exact value 1.0)" << endl;
+
+            // Machine-readable summary beside the cubes. This exists separately
+            // from the log because the log carries wall-clock timings, which are
+            // not reproducible and so cannot be used as golden-file test output.
+            const std::filesystem::path summary_path =
+                (wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui.dat";
+            ofstream summary(summary_path, ios::out);
+            summary << "# NoSpherA2 Fukui function summary\n";
+            summary << "# Frontier-orbital (frozen-orbital) approximation:\n";
+            summary << "#   f+ = |psi_LUMO|^2, f- = |psi_HOMO|^2, f0 = (f+ + f-)/2, df = f+ - f-\n";
+            summary << "# The integrals are over the evaluated grid only; each equals 1 for the\n";
+            summary << "# exact function, so a smaller value means the grid or radius is clipping\n";
+            summary << "# the orbital rather than that anything is wrong.\n";
+            summary << fixed;
+            summary << "HOMO_index " << homo << "\n";
+            summary << "HOMO_energy " << setprecision(6) << wavy.get_MO_energy(homo) << "\n";
+            summary << "HOMO_occupation " << setprecision(6) << wavy.get_MO_occ(homo) << "\n";
+            summary << "LUMO_index " << lumo << "\n";
+            summary << "LUMO_energy " << setprecision(6) << wavy.get_MO_energy(lumo) << "\n";
+            summary << "LUMO_occupation " << setprecision(6) << wavy.get_MO_occ(lumo) << "\n";
+            summary << "unrestricted " << (unrestricted ? 1 : 0) << "\n";
+            summary << "integral_f_plus " << setprecision(6) << int_plus << "\n";
+            summary << "integral_f_minus " << setprecision(6) << int_minus << "\n";
+
+            // Condensed (atom-summed) Fukui functions under all five partitions.
+            // Uses its own Becke-style atomic integration grid rather than the
+            // cube grid: the cube is a display object, clipped by -radius and
+            // coarse enough that integrating it per atom would be a much worse
+            // number than the one GridManager already knows how to produce.
+            log2 << "\nCalculating condensed Fukui functions..." << endl;
+            _time_point cf_start = get_time();
+            // Default cell with pbc = 0, i.e. the MOLECULAR treatment - the same
+            // choice integrator.cpp makes for atomic charges. The condensed
+            // values therefore describe the molecule in the wavefunction, even
+            // when a CIF was supplied for the cube grid.
+            const CondensedFukuiResults condensed =
+                Calc_Condensed_Fukui(wavy, homo, lumo, cell(), opt.accuracy, log2);
+            _time_point cf_end = get_time();
+            if (condensed.valid) {
+                print_condensed_fukui(condensed, log2);
+                log2 << "Time for condensed Fukui functions: "
+                     << fixed << setprecision(1) << get_sec(cf_start, cf_end) << " s" << endl;
+                // Same values into the machine-readable summary, Hirshfeld first
+                // because it is the scheme the condensed-Fukui literature uses.
+                static const int ord[5] = {
+                    PartitionResults::CHARGE_ORDER::S_HIRSH,
+                    PartitionResults::CHARGE_ORDER::S_BECKE,
+                    PartitionResults::CHARGE_ORDER::S_TFVC,
+                    PartitionResults::CHARGE_ORDER::S_MBIS,
+                    PartitionResults::CHARGE_ORDER::S_EMBIS
+                };
+                static const char *ord_name[5] = { "hirshfeld", "becke", "tfvc", "mbis", "embis" };
+                summary << "# condensed Fukui: atom f+ f- df, one block per partition\n";
+                for (int s = 0; s < 5; s++) {
+                    summary << "partition " << ord_name[s] << "\n";
+                    for (size_t a = 0; a < condensed.labels.size(); a++) {
+                        const double fp = condensed.f_plus[ord[s]][a];
+                        const double fm = condensed.f_minus[ord[s]][a];
+                        summary << "  " << condensed.labels[a]
+                                << " " << setprecision(6) << fp
+                                << " " << setprecision(6) << fm
+                                << " " << setprecision(6) << (fp - fm) << "\n";
+                    }
+                }
+            }
+            else {
+                log2 << "Condensed Fukui functions could not be calculated." << endl;
+            }
+
+            summary.close();
+            log2 << "Wrote Fukui summary to " << summary_path.filename().string() << endl;
+        }
+    }
 
     wavy.delete_unoccupied_MOs();
     wavy.delete_Qs();

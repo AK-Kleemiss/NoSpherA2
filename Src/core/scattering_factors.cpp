@@ -5,6 +5,7 @@
  */
 #include "pch.h"
 #include "tsc_block.h"
+#include "tsc_stream.h"
 #include "scattering_factors.h"
 #include "convenience.h"
 #include "cell.h"
@@ -14,9 +15,17 @@
 #include "npy.h"
 #include "integrator.h"
 #include "basis_set.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "SALTED_equicomb.h"
+#include "grid_gpu.h"
+#include "blas_gpu.h"
+#endif
 #include "SALTED_utilities.h"
 #include "GridManager.h"
 #include "cube.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "sf_gpu.h"
+#endif
 
 
 #ifdef PEOJECT_NAME
@@ -196,7 +205,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 	std::string line, temp;
 	while (!hkl_input.eof())
 	{
-		getline(hkl_input, line);
+		getline_universal(hkl_input, line);
 		if (hkl_input.eof())
 			break;
 		if (line.size() < 2)
@@ -314,8 +323,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 {
 	file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
 	i3 hkl_;
-	double F_, sigma_;
-	int positive_;
+	double F_, abs_F_, F2_, sigma_, sigma2_;
 	err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
 	std::ifstream hkl_input(hkl_filename, std::ios::in);
 	hkl_input.seekg(0, hkl_input.beg);
@@ -323,7 +331,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	std::string line, temp;
 	while (!hkl_input.eof())
 	{
-		getline(hkl_input, line);
+		getline_universal(hkl_input, line);
 		if (hkl_input.eof())
 			break;
 		if (line.size() < 2)
@@ -339,30 +347,31 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 			hkl_[i] = stoi(temp);
 			// if (debug) file << setw(4) << temp;
 		}
-		for (int i = 0; i < 2; i++) {
-			temp = line;
-			temp.erase(0, 12);
-			int dot = temp.find_first_of('.');
-			std::string temp_F = temp.substr(0, dot + 3);
-			std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
-			temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
-			sigma_ = stof(temp_sigma);
-			temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
-			F_ = stof(temp_F);
-			if (F_ < 0) {
-				F_ = -std::sqrt(-F_);
-				positive_ = -1;
-				sigma_ = sigma_ * 0.5 / -F_;
-			}
-			else {
-				positive_ = 1;
-				F_ = std::sqrt(F_);
-				sigma_ = sigma_ * 0.5 / F_;
-			}
+		temp = line;
+		temp.erase(0, 12);
+		int dot = temp.find_first_of('.');
+		std::string temp_F = temp.substr(0, dot + 3);
+		std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
+		temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
+		sigma2_ = stof(temp_sigma);
+		temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
+		F_ = stof(temp_F);
+		//the two branches differ only in sign; they are NOT std::abs/copysign, which would turn a -0.00 F2 into +0.0 and flip sigma's infinity
+		if (F_ < 0) {
+			F2_ = -F_;
+			abs_F_ = std::sqrt(F2_);
+			F_ = -abs_F_;
+			sigma_ = sigma2_ * 0.5 / -F_;
+		}
+		else {
+			F2_ = F_;
+			abs_F_ = std::sqrt(F2_);
+			F_ = abs_F_;
+			sigma_ = sigma2_ * 0.5 / F_;
 		}
 		// if (debug) file << endl;
 		hkl.emplace(hkl_);
-		scattering_data temp_data = { F_, sigma_, positive_ };
+		scattering_data temp_data = { F_, abs_F_, F2_, sigma_, sigma2_ };
 		obs.push_back(temp_data);
 	}
 	hkl_list_it found = hkl.find(i3{ 0, 0, 0 });
@@ -840,6 +849,54 @@ void generate_fractional_hkl(const double& dmin,
  * @param file The output stream for the file.
  * @param debug A boolean indicating whether to enable debug mode.
  */
+// Read exactly n whitespace-separated values of one CIF loop row.
+//
+// Two things a real CIF does that "one stringstream per line" does not survive:
+//
+//   * a row may be WRAPPED over several lines. CIF has an 80-column heritage and
+//     writers still break long rows. Seen on a disordered structure whose carbon
+//     rows carry 14 of 15 values with the last on the following line - the empty
+//     field then reached std::stoi and aborted the whole run.
+//   * a value may be QUOTED and contain spaces, e.g. 'x, y, z'. Splitting on
+//     whitespace turns one value into three.
+//
+// Returns false if the file ends with the row incomplete. `line` is left holding
+// the last line consumed, which is what the surrounding loops expect.
+static bool read_cif_loop_row(std::istream &input, std::string &line, int n, svec &fields)
+{
+    fields.assign(n, "");
+    int got = 0;
+    std::string rest = line;
+    while (true)
+    {
+        size_t i = 0;
+        while (got < n && i < rest.size())
+        {
+            while (i < rest.size() && std::isspace(static_cast<unsigned char>(rest[i]))) i++;
+            if (i >= rest.size()) break;
+            std::string value;
+            const char c = rest[i];
+            if (c == 0x27 || c == '"')
+            {
+                const char quote = c;
+                i++;
+                while (i < rest.size() && rest[i] != quote) value.push_back(rest[i++]);
+                if (i < rest.size()) i++;              // closing quote
+            }
+            else
+            {
+                while (i < rest.size() && !std::isspace(static_cast<unsigned char>(rest[i])))
+                    value.push_back(rest[i++]);
+            }
+            fields[got++] = value;
+        }
+        if (got >= n) return true;
+        if (!getline_universal(input, rest)) return false;
+        line = rest;
+    }
+}
+
+
 svec read_atoms_from_CIF(std::ifstream& cif_input,
 	const ivec& input_groups,
 	const cell& unit_cell,
@@ -850,7 +907,8 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 	ivec& asym_atom_list,
 	bvec& needs_grid,
 	std::ostream& file,
-	const bool debug)
+	const bool debug,
+	const bool allow_empty)
 {
 	using namespace std;
 	if (debug)
@@ -871,13 +929,13 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 		file << "Starting search loop" << endl;
 	while (!cif_input.eof() && !atoms_read)
 	{
-		getline(cif_input, line);
+		getline_universal(cif_input, line);
 		// if (debug)
 		//     file << "line: " << line << endl;
 		if (line.find("loop_") != string::npos)
 		{
 			count_fields = 0;
-			getline(cif_input, line);
+			getline_universal(cif_input, line);
 			if (debug)
 				file << "line in loop field definition: " << trim(line) << endl;
 			while (trim(line).find("_") == 0)
@@ -900,7 +958,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 						file << "I don't think this is the atom block.. moving on!" << endl;
 					break;
 				}
-				getline(cif_input, line);
+				getline_universal(cif_input, line);
 				count_fields++;
 			}
 			if (label_field != 1000) {
@@ -912,12 +970,13 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 			while (trim(line).find("_") > 0 && line.length() > 3)
 			{
 				atoms_read = true;
-				stringstream s(line);
 				svec fields;
-				fields.resize(count_fields);
 				int nr = -1;
-				for (int i = 0; i < count_fields; i++)
-					s >> fields[i];
+				if (!read_cif_loop_row(cif_input, line, count_fields, fields))
+				{
+					file << "CIF atom loop ended mid-row; ignoring the incomplete entry." << std::endl;
+					break;
+				}
 				fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
 				fields[type_field].erase(remove_if(fields[type_field].begin(), fields[type_field].end(), ::isspace), fields[type_field].end());
 				if (debug)
@@ -941,8 +1000,16 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
 				int group_nr = 0;
-				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?") {
-					group_nr = std::stoi(fields[group_field]);
+				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?"
+					&& !fields[group_field].empty()) {
+					// Belt and braces: an unreadable disorder group should not abort a
+					// run that is otherwise perfectly fine.
+					try { group_nr = std::stoi(fields[group_field]); }
+					catch (const std::exception &) {
+						file << "Could not read disorder group for atom " << fields[label_field]
+							 << "; treating it as 0." << std::endl;
+						group_nr = 0;
+					}
 				}
 				// Filter PART before matching this CIF row to a WFN atom.  Disorder
 				// positions can be close enough to match an atom in another PART;
@@ -953,7 +1020,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				{
 					if (debug)
 						file << "Wrong part!" << endl;
-					getline(cif_input, line);
+					getline_universal(cif_input, line);
 					continue;
 				}
 				bool old_atom = false;
@@ -974,7 +1041,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				}
 				if (old_atom)
 				{
-					getline(cif_input, line);
+					getline_universal(cif_input, line);
 					continue;
 				}
 				vec tolerances(3);
@@ -1098,7 +1165,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 						file << endl;
 					}
 				}
-				getline(cif_input, line);
+				getline_universal(cif_input, line);
 			}
 		}
 	}
@@ -1122,7 +1189,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 	}
 
 	err_checkf(asym_atom_list.size() <= wave.get_ncen(), "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
-	err_checkf(asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
+	err_checkf(allow_empty || asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
 
 	for (int i = 0; i < atom_type_list.size(); i++)
 		err_checkf((atom_type_list[i] <= 113 || atom_type_list[i] == 119) && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
@@ -1167,15 +1234,20 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 	int idx_x = -1;
 	int idx_y = -1;
 	int idx_z = -1;
-	while (std::getline(cif_input, line))
+	while (getline_universal(cif_input, line))
 	{
 		if (line.empty())
 			continue;
-		// Trim leading spaces
-		size_t first = line.find_first_not_of(" \t");
-		if (first == std::string::npos)
+		// Trim whitespace at both ends, not just the front. The header comparisons
+		// below are exact, and a CIF written on Windows - which is what Olex2 hands
+		// out - ends every line with \r, so "_atom_site_label\r" never matched and
+		// the atom loop went unrecognised. That left the caller with no atoms at all
+		// and the next reader indexing an empty array, i.e. a segfault on a file the
+		// rest of NoSpherA2 reads without complaint, since the older CIF readers
+		// compare with find() rather than ==.
+		std::string trimmed = trim(line);
+		if (trimmed.empty())
 			continue;
-		std::string trimmed = line.substr(first);
 		// Detect loop_
 		if (trimmed == "loop_")
 		{
@@ -1327,13 +1399,13 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //        file << "Starting search loop" << endl;
 //    while (!cif_input.eof() && !atoms_read)
 //    {
-//        getline(cif_input, line);
+//        getline_universal(cif_input, line);
 //        // if (debug)
 //        //     file << "line: " << line << endl;
 //        if (line.find("loop_") != string::npos)
 //        {
 //            count_fields = 0;
-//            getline(cif_input, line);
+//            getline_universal(cif_input, line);
 //            if (debug)
 //                file << "line in loop field definition: " << trim(line) << endl;
 //            while (trim(line).find("_") == 0)
@@ -1356,7 +1428,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //                        file << "I don't think this is the atom block.. moving on!" << endl;
 //                    break;
 //                }
-//                getline(cif_input, line);
+//                getline_universal(cif_input, line);
 //                count_fields++;
 //            }
 //            if (label_field != 1000) {
@@ -1411,7 +1483,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //                }
 //                if (old_atom)
 //                {
-//                    getline(cif_input, line);
+//                    getline_universal(cif_input, line);
 //                    continue;
 //                }
 //                vec tolerances(3);
@@ -1551,7 +1623,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //                        file << endl;
 //                    }
 //                }
-//                getline(cif_input, line);
+//                getline_universal(cif_input, line);
 //            }
 //        }
 //    }
@@ -1602,7 +1674,9 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //    return labels2;
 //}
 
-constexpr double cutoff(const int& accuracy)
+//Declared in the header so the XCW I tensor screens on the same ladder: what counts as
+//negligible is the run's accuracy setting, and there should be one answer to that.
+double cutoff(const int& accuracy)
 {
 	if (accuracy < 3)
 		return 1E-10;
@@ -1643,12 +1717,34 @@ cdouble sfac_bessel(
 	}
 }
 
+//Radial part of the Fourier-Bessel transform, keyed on (exponent, l) so it can be tabulated per k-point
+static inline double fourier_bessel_radial(const double b, const int l, const double exp_l_plus_3_2, const double H)
+{
+	return (pow(H, l) * exp(-H * H / (4.0 * b))) / (constants::pow_2[l] * exp_l_plus_3_2);
+}
+
+//As sfac_bessel(), but with the radial factor already evaluated
+static inline cdouble sfac_bessel_r(const primitive& p, const double* k_point, const double* coefs, const double radial)
+{
+	const int l = p.get_type();
+	const double v = constants::PI3_2 * radial * p.get_normalized_coefficient() * constants::spherical_harmonic(l, k_point, coefs);
+	switch (l % 4) {
+	case 0: return cdouble(v, 0);
+	case 1: return cdouble(0, v);
+	case 2: return cdouble(-v, 0);
+	case 3: return cdouble(0, -v);
+	default: return constants::cnull;
+	}
+}
+
 //TODO�: This breaks if the aux_basis is contracted... Need to fix that!
+//a streaming caller owns one bar for the whole table and passes it in, else every block draws its own
 void calc_SF_SALTED(const vec2& k_pt,
 	const vec& coefs,
 	const std::vector<atom>& atom_list,
 	const ivec& asym_atom_list,
-	cvec2& sf)
+	cvec2& sf,
+	ProgressBar* progress = nullptr)
 {
 	const int num_atoms = (int)atom_list.size();
 	const int num_asym_atoms = (int)asym_atom_list.size();
@@ -1688,7 +1784,33 @@ void calc_SF_SALTED(const vec2& k_pt,
 	}
 
 	sf.resize(num_asym_atoms);
-	ProgressBar pb(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
+	//The radial factor depends only on (exponent, l) and |k|, so collect the distinct pairs once instead of recomputing per atom
+	vec uniq_b, uniq_elp32;
+	ivec uniq_l;
+	ivec2 bl_index(num_asym_atoms);
+	for (int ia = 0; ia < num_asym_atoms; ia++) {
+		const atom& a = atom_list[asym_atom_list[ia]];
+		const int lim = (int)a.get_basis_set_size();
+		bl_index[ia].resize(lim);
+		for (int ib = 0; ib < lim; ib++) {
+			const primitive& pr = a.get_basis_set_entry(ib).get_primitive();
+			int slot = -1;
+			for (int u = 0; u < (int)uniq_b.size(); u++)
+				if (uniq_b[u] == pr.get_exp() && uniq_l[u] == pr.get_type()) { slot = u; break; }
+			if (slot < 0) {
+				slot = (int)uniq_b.size();
+				uniq_b.push_back(pr.get_exp());
+				uniq_l.push_back(pr.get_type());
+				uniq_elp32.push_back(pr.get_exp_l_plus_3_2());
+			}
+			bl_index[ia][ib] = slot;
+		}
+	}
+	const int n_uniq = (int)uniq_b.size();
+	std::unique_ptr<ProgressBar> local_pb;
+	if (!progress)
+		local_pb = std::make_unique<ProgressBar>(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
+	ProgressBar& pb = progress ? *progress : *local_pb;
 
 #pragma omp parallel shared(pb, sf)
 	{
@@ -1698,6 +1820,7 @@ void calc_SF_SALTED(const vec2& k_pt,
 			sf[ia].assign(k_pt[0].size(), constants::cnull);
 		}
 
+		vec radial(n_uniq, 0.0);
 #pragma omp for
 		for (int i_kpt = 0; i_kpt < (int)k_pt[0].size(); ++i_kpt)
 		{
@@ -1712,6 +1835,8 @@ void calc_SF_SALTED(const vec2& k_pt,
 
 			for (int i = 0; i < 3; i++)
 				k_pt_local[i] /= k_pt_local[3];
+			for (int u = 0; u < n_uniq; u++)
+				radial[u] = fourier_bessel_radial(uniq_b[u], uniq_l[u], uniq_elp32[u], k_pt_local[3]);
 
 			for (int ia = 0; ia < num_asym_atoms; ++ia)
 			{
@@ -1722,11 +1847,12 @@ void calc_SF_SALTED(const vec2& k_pt,
 
 				const double* coef_slice_ptr = coefs.data() + coef_offsets[ia];
 
+				const int* bl_row = bl_index[ia].data();
 				for (int i_basis = 0; i_basis < lim; ++i_basis, ++basis_ptr)
 				{
 					// IMPORTANT: make basis local, not shared between threads
 					const primitive& basis = basis_ptr->get_primitive();
-					sf[ia][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
+					sf[ia][i_kpt] += sfac_bessel_r(basis, k_pt_local, coef_slice_ptr, radial[bl_row[i_basis]]);
 					coef_slice_ptr += 2 * basis.get_type() + 1;
 				}
 			}
@@ -1751,18 +1877,21 @@ void calc_SF_SALTED(const vec2& k_pt,
  * @param no_date Flag indicating whether to exclude the date in the output.
  */
 void calc_SF(const int& points,
-	vec2& k_pt,
-	vec2& d1,
-	vec2& d2,
-	vec2& d3,
-	vec2& dens,
+	const vec2& k_pt,
+	const vec2& d1,
+	const vec2& d2,
+	const vec2& d3,
+	const vec2& dens,
 	cvec2& sf,
 	std::ostream& file,
 	_time_point& start,
 	_time_point& end1,
 	bool debug,
 	bool no_date,
-	bool do_XCW)
+	bool do_XCW,
+	bool use_gpu,
+	bool gpu_fp64,
+	bool gpu_fp32)
 {
 	const long long int imax = static_cast<long long int>(dens.size());
 	const long long int smax = static_cast<long long int>(k_pt[0].size());
@@ -1775,6 +1904,10 @@ void calc_SF(const int& points,
 	if (debug)
 		file << "Initialized FFs" << std::endl
 		<< "asym atom list size: " << imax << " total grid size: " << points << endl;
+#ifdef NOSPHERA2_USE_GPU
+	if (use_gpu)
+		sf_gpu_warmup_wait();
+#endif
 	end1 = get_time();
 
 	if (!no_date)
@@ -1785,22 +1918,77 @@ void calc_SF(const int& points,
 		else
 			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
 	}
+#ifdef NOSPHERA2_USE_GPU
+	if (use_gpu && sf_gpu_available()) {
+		ivec offs(imax + 1, 0);
+		for (int i = 0; i < imax; i++)
+			offs[i + 1] = offs[i] + (int)dens[i].size();
+		const long long tot = offs[imax];
+		vec fd1(tot), fd2(tot), fd3(tot), fde(tot);
+		for (int i = 0; i < imax; i++) {
+			const int lo = offs[i], n = (int)dens[i].size();
+			for (int p = 0; p < n; p++) {
+				fd1[lo + p] = d1[i][p]; fd2[lo + p] = d2[i][p];
+				fd3[lo + p] = d3[i][p]; fde[lo + p] = dens[i][p];
+			}
+		}
+		std::vector<double*> rows(imax);
+		for (int i = 0; i < imax; i++)
+			rows[i] = reinterpret_cast<double*>(sf[i].data());
+		//-gpu_fp64 wins over -gpu_fp32 if both are given: between two explicit requests the
+		//accurate one is the safer default.
+		const sf_precision prec = gpu_fp64 ? sf_precision::FP64
+			: gpu_fp32 ? sf_precision::FP32 : sf_precision::Auto;
+		const _time_point sf_gpu_t0 = get_time();
+		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
+			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
+			rows.data(), prec)) {
+			//Transfers included. What decides where this work belongs is the rate the caller
+			//actually gets, not the one the kernel would post with the copies left out.
+			throughput::record("scattering-factor transform", true,
+				throughput::flops_ndft(static_cast<double>(tot), static_cast<double>(smax)),
+				get_msec(sf_gpu_t0, get_time()));
+			//The bar is what the reference logs expect, so draw it even though the work is done
+			if (!do_XCW) {
+				ProgressBar gprogress(imax, 60, "=", " ", "Calculating Scattering Factors", file);
+				for (int i = 0; i < imax; i++)
+					gprogress.update();
+			}
+			if (!no_date) {
+				_time_point gend = get_time();
+				const int ratio = sf_gpu_fp64_ratio();
+				file << "GPU in use: scattering-factor Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
+				     << (sf_gpu_uses_fp32(prec) ? "reduced-argument f32 sincos" : "f64 sincos")
+				     << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
+			}
+			return;
+		}
+	}
+#endif
 	ProgressBar* progress = nullptr;
 	if (!do_XCW) {
-		progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
+		progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors", file);
 	}
 	long long int pmax, p, s;
 	complex<double>* sf_local;
-	double work, rho, c, si, * dens_local, re, im, * d1_local, * d2_local, * d3_local;
+	double work, rho, c, si, re, im;
+	const double* d1_local, * d2_local, * d3_local, * dens_local;
 
 	// Pre-fetch k_pt data pointers for better cache locality
 	const double* k1_data = k_pt[0].data();
 	const double* k2_data = k_pt[1].data();
 	const double* k3_data = k_pt[2].data();
 
+	//Timed around the whole atom loop, not inside it. The inner loop is an omp parallel for,
+	//and a per-thread timer there would sum concurrent time into a total larger than the
+	//wall clock - a profile that cannot be true is worse than none.
+	const _time_point sf_cpu_t0 = get_time();
+	double sf_cpu_points = 0.0;
+
 	for (int i = 0; i < imax; i++)
 	{
 		pmax = static_cast<long long int>(dens[i].size());
+		sf_cpu_points += static_cast<double>(pmax);
 		dens_local = dens[i].data();
 		d1_local = d1[i].data();
 		d2_local = d2[i].data();
@@ -1892,6 +2080,9 @@ void calc_SF(const int& points,
 			progress->update();
 		}
 	}
+	throughput::record("scattering-factor transform", false,
+		throughput::flops_ndft(sf_cpu_points, static_cast<double>(smax)),
+		get_msec(sf_cpu_t0, get_time()));
 	if (!do_XCW) {
 		delete (progress);
 	}
@@ -2082,42 +2273,273 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
  * @param unit_cell The unit cell.
  * @param hkl The hkl list.
  */
+//sf[i][s] depends on stl[s] and atom i alone, so this applies to a block as readily as to a whole table
+void convert_to_ED(const ivec& asym_atom_list,
+	const WFN& wave,
+	cvec2& sf,
+	const vec& stl)
+{
+    const int n = (int)stl.size();
+#pragma omp parallel for
+    for (int s = 0; s < n; s++)
+    {
+        const double h2 = pow(stl[s], 2);
+        for (int i = 0; i < asym_atom_list.size(); i++)
+            sf[i][s] = cdouble(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
+    }
+}
+
+void convert_to_ED(const ivec& asym_atom_list,
+	const WFN& wave,
+	cvec2& sf,
+	const cell& unit_cell,
+	const std::vector<i3>& hkl_vector)
+{
+    vec stl(hkl_vector.size());
+    for (size_t s = 0; s < hkl_vector.size(); s++)
+        stl[s] = unit_cell.get_stl_of_hkl(hkl_vector[s]);
+    convert_to_ED(asym_atom_list, wave, sf, stl);
+}
+
 void convert_to_ED(const ivec& asym_atom_list,
 	const WFN& wave,
 	cvec2& sf,
 	const cell& unit_cell,
 	const hkl_list& hkl)
 {
-    const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
-    const int hkl_size = hkl.size();
-#pragma omp parallel for shared(hkl_vector)
-    for (int s = 0; s < hkl_size; s++)
+    convert_to_ED(asym_atom_list, wave, sf, unit_cell,
+        std::vector<i3>(hkl.begin(), hkl.end()));
+}
+
+//shared machinery of the streamed tsc writes; the fill of one reflection block is all that differs
+namespace {
+
+//a table must hold either all labels or all atomIDs, mixed ones are rejected on write
+void append_scatterer_ids(ScattererLabels& ids,
+    const options& opt,
+    const svec& labels,
+    WFN& wave,                 // non-const: get_id_for_atom() is not a const method
+    const ivec& asym_atom_list)
+{
+    for (size_t a = 0; a < asym_atom_list.size(); a++)
     {
-        const double h2 = pow(unit_cell.get_stl_of_hkl(hkl_vector[s]), 2);
-        for (int i = 0; i < asym_atom_list.size(); i++)
-            sf[i][s] = cdouble(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
+        if (opt.label_tsc_output)
+            ids.emplace_back(labels[a]);
+        else
+            ids.emplace_back(wave.get_id_for_atom(asym_atom_list[a]));
     }
 }
+
+//reflections [lo, hi) transposed to [dimension][reflection], the layout write_tscb_reflection_block expects
+std::vector<std::vector<int>> slice_hkl(const std::vector<i3>& hkl_v,
+    const size_t lo, const size_t hi)
+{
+    std::vector<std::vector<int>> idx(3, std::vector<int>(hi - lo));
+    for (size_t r = lo; r < hi; r++)
+        for (int dm = 0; dm < 3; dm++)
+            idx[dm][r - lo] = hkl_v[r][dm];
+    return idx;
+}
+
+//calc_SF_SALTED sizes its output from the k-points it is handed, so a slice needs no change on its side
+vec2 slice_k_points(const vec2& k_pt, const size_t lo, const size_t hi)
+{
+    vec2 k_slice(3, vec(hi - lo));
+    for (size_t r = lo; r < hi; r++)
+        for (int dm = 0; dm < 3; dm++)
+            k_slice[dm][r - lo] = k_pt[dm][r];
+    return k_slice;
+}
+
+//one Thakkar evaluator per element; depends on the element list alone, so it is built outside the block loop
+std::vector<Thakkar> make_spherical_evaluators(const ivec& atom_type_list)
+{
+    std::vector<Thakkar> spheres;
+    spheres.reserve(atom_type_list.size());
+    for (size_t t = 0; t < atom_type_list.size(); t++)
+        spheres.emplace_back(atom_type_list[t]);
+    return spheres;
+}
+
+//the file list a spherical fill runs over, and the index into it; nr also selects opt.groups[nr] and the part's cif,
+//so it must be the whole file list: a one-element vector takes part 0's atoms whatever part is filled, or reads tempy[1] if nr is passed
+int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>& tempy)
+{
+    if (!opt.wfn.empty())
+    {
+        tempy.emplace_back(opt.wfn);
+        return 0;
+    }
+    for (const std::filesystem::path& part_file : opt.combined_tsc_calc_files)
+        tempy.emplace_back(part_file);
+    return nr;
+}
+
+//One evaluator per ATOM, not per element type. Two atoms of the same element in
+//different environments carry different EEQ charges, and the tsc gives each atom
+//its own row anyway, so there is nothing to be gained by sharing.
+//
+//Charges are matched by position because the fill rebuilds its wavefunction from
+//the original file; that is also how CIF atoms are matched to WFN atoms here.
+//An atom with no recorded charge, or an element with no tabulated ion, falls
+//back to the neutral density.
+std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
+    const WFN& fill_wavy, const options& opt, std::ostream& file)
+{
+    std::vector<HE_Spherical_Atom> out;
+    out.reserve(sph.asym_atom_list.size());
+    int n_charged = 0, n_extrap = 0, n_nofit = 0, n_delta = 0;
+    double worst_neg = 0.0;
+    for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
+    {
+        const int idx = sph.asym_atom_list[a];
+        const int Z = fill_wavy.get_atom_charge(idx);
+        double q = 0.0;
+        double best = 1e-3;   // squared tolerance in the wavefunction's units
+        for (const auto& e : opt.spherical_fill_charges)
+        {
+            double d = 0.0;
+            for (int ax = 0; ax < 3; ax++)
+            {
+                const double dx = fill_wavy.get_atom_coordinate(idx, ax) - e[ax];
+                d += dx * dx;
+            }
+            if (d < best) { best = d; q = e[3]; }
+        }
+        if (std::abs(q) > 1e-6) n_charged++;
+        else if (!opt.spherical_fill_charges.empty()) n_nofit++;
+        out.emplace_back(Z, q);
+        if (out.back().is_extrapolating()) n_extrap++;
+        if (out.back().uses_delta_series()) n_delta++;
+        worst_neg = std::min(worst_neg, out.back().most_negative_density());
+    }
+    if (n_charged)
+    {
+        file << "Spherical fill: " << n_charged << " of " << out.size()
+             << " atom(s) given a fractional charge";
+        if (n_delta)
+            file << ", " << n_delta << " past +1 via the delta_k series (interpolated between bound states)";
+        if (n_extrap)
+            file << ", " << n_extrap << " beyond the tabulated +/-1 ion (shape extrapolated)";
+        file << "." << std::endl;
+        if (worst_neg < -1e-8)
+            file << "      most negative density from the blend: " << worst_neg
+                 << " e/bohr^3 - an extrapolation artefact, not clipped." << std::endl;
+        if (n_nofit)
+            file << "      " << n_nofit << " atom(s) had no charge recorded and stay neutral." << std::endl;
+    }
+    return out;
+}
+
+//rows for atoms the SALTED model could not predict (unknown species, or nothing inside the descriptor cutoff)
+//a Thakkar factor depends only on element and reflection, so these chunk like everything else here
+void append_spherical_rows(cvec2& chunk,
+    const salted_part_prep& sph,
+    const std::vector<HE_Spherical_Atom>& spheres,
+    const bool electron_diffraction,
+    const size_t lo, const size_t hi)
+{
+    for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
+    {
+        const int t = sph.asym_atom_to_type_list[a];
+        cvec row(hi - lo);
+        for (size_t r = lo; r < hi; r++)
+        {
+            const double f = spheres[a].get_form_factor(sph.k_of_reflection[r]);
+            //IAM form of Mott-Bethe: tabulated charge, no imaginary part
+            row[r - lo] = electron_diffraction
+                ? cdouble(constants::ED_fact * (sph.atom_type_list[t] - f) /
+                    pow(sph.stl_of_reflection[r], 2), 0.0)
+                : cdouble(f, 0.0);
+        }
+        chunk.push_back(std::move(row));
+    }
+}
+
+//writes a tsc as a sequence of reflection blocks; peak memory is queue depth * scatterers * block size * 16 bytes
+//fill_block(lo, hi, progress) returns the rows for reflections [lo, hi) in the order `ids` declares them
+//progress_items is the bar total: reflections, or reflections * parts when a block is filled part by part
+template <typename FillBlock>
+void stream_blocks(options& opt,
+    std::ostream& file,
+    const std::filesystem::path& name,
+    const ScattererLabels& ids,
+    const std::vector<i3>& hkl_v,
+    const size_t progress_items,
+    FillBlock fill_block)
+{
+    const size_t n_refl = hkl_v.size();
+    const size_t derived = opt.tsc_block_for(n_refl, ids.size());
+    const size_t bs = std::min(derived ? derived : n_refl, n_refl ? n_refl : 1);
+    file << "Streaming tsc in blocks of " << bs << " reflections" << std::endl;
+
+    tsc_stream_writer<int, cdouble> writer(name, ids, std::string(), n_refl, 2);
+    //declared after the writer so it is destroyed first: the bar rewinds to its own line and must finish first
+    ProgressBar progress(progress_items, 60, "#", " ", "Generating scattering factors...");
+    size_t block_id = 0;
+    for (size_t lo = 0; lo < n_refl; lo += bs)
+    {
+        const size_t hi = std::min(lo + bs, n_refl);
+        writer.submit(block_id++, slice_hkl(hkl_v, lo, hi), fill_block(lo, hi, progress));
+    }
+    writer.finish();
+    opt.tsc_written_by_stream = true;
+}
+
+//runs a nested calculate_scattering_factors() as a spherical (Thakkar) fill over exactly the reflections written
+//restores every flag on the way out, exceptions included: these flags are read all over this file
+struct spherical_fill_scope
+{
+    options& opt;
+    const bool saved_iam;
+    const hkl_list saved_hkl;
+
+    spherical_fill_scope(options& o, const hkl_list& reflections)
+        : opt(o), saved_iam(o.iam_switch), saved_hkl(o.m_hkl_list)
+    {
+        //pin the fill to our reflections, else it builds its own list of a different length and is read off the end
+        opt.m_hkl_list = reflections;
+        opt.iam_switch = true;
+        opt.allow_empty_asym = true;
+        opt.spherical_fill = true;
+    }
+    ~spherical_fill_scope()
+    {
+        opt.m_hkl_list = saved_hkl;
+        opt.iam_switch = saved_iam;
+        opt.allow_empty_asym = false;
+        opt.spherical_fill = false;
+    }
+
+    spherical_fill_scope(const spherical_fill_scope&) = delete;
+    spherical_fill_scope& operator=(const spherical_fill_scope&) = delete;
+};
+
+}  // namespace
 
 
 int make_atomic_grids_wrapper(
 	const WFN& wave, const bvec& needs_grid, const ivec& asym_atom_list, const cell& unit_cell, const svec& labels, //
 	std::vector<_time_point>& time_points, svec& time_descriptions, vec2& d1, vec2& d2, vec2& d3, vec2& dens,
-	const options& opt) {
+	const options& opt, std::ostream& file = std::cout) {
 
 	const int atoms_with_grids = vec_sum(needs_grid);
-	err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", std::cout);
-	err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", std::cout);
-	err_checkf(atoms_with_grids == asym_atom_list.size(), "Number of atoms with grids does not match the number of atoms in the CIF file!", std::cout);
-	std::cout << "There are:\n"
+	err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", file);
+	err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", file);
+	err_checkf(atoms_with_grids == asym_atom_list.size(), "Number of atoms with grids does not match the number of atoms in the CIF file!", file);
+	file << "There are:\n"
 		<< std::setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
 		//<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
 		<< std::setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << std::endl;
 
 
-	std::cout << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::endl;
+	file << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::endl;
 
 	GridConfiguration config;
+#ifdef NOSPHERA2_USE_GPU
+	grid_gpu_set_enabled(opt.use_gpu && opt.gpu_grid);
+	blas_gpu_set_enabled(opt.gpu_blas);
+#endif
 	config.accuracy = opt.accuracy;
 	config.partition_type = opt.partition_type;
 	config.pbc = opt.pbc;
@@ -2130,13 +2552,13 @@ int make_atomic_grids_wrapper(
 	temp.delete_unoccupied_MOs();
 
 	// Setup grids for the molecule
-	grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell, opt.get_g);
+	grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell, opt.get_g, file);
 	grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
 
 
 	// Calculate partitioned charges
 	PartitionResults results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
-	grid_manager.printChargeTable(labels, temp, asym_atom_list, std::cout, results);
+	grid_manager.printChargeTable(labels, temp, asym_atom_list, file, results);
 	time_points.push_back(get_time());
 	time_descriptions.push_back("calculate charges");
 
@@ -2162,6 +2584,10 @@ itsc_block calculate_scattering_factors_from_cube(
 	vector<_time_point> time_points;
 	vector<string> time_descriptions;
 	time_points.push_back(get_time());
+#ifdef NOSPHERA2_USE_GPU
+	if (opt.use_gpu)
+		sf_gpu_warmup_start();
+#endif
 
 	cell unit_cell(opt.cif, file, opt.debug);
 	ifstream cif_input(opt.cif.c_str(), ios::in);
@@ -2226,6 +2652,10 @@ itsc_block calculate_scattering_factors_from_cube(
 	time_descriptions.push_back("k-points preparation");
 
 	GridConfiguration config;
+#ifdef NOSPHERA2_USE_GPU
+	grid_gpu_set_enabled(opt.use_gpu && opt.gpu_grid);
+	blas_gpu_set_enabled(opt.gpu_blas);
+#endif
 	config.accuracy = opt.accuracy;
 	config.partition_type = opt.partition_type;
 	config.pbc = opt.pbc;
@@ -2266,7 +2696,11 @@ itsc_block calculate_scattering_factors_from_cube(
 		time_points.front(),
 		end1,
 		opt.debug,
-		opt.no_date);
+		opt.no_date,
+		false,
+		opt.use_gpu,
+		opt.gpu_fp64,
+		opt.gpu_fp32);
 	time_points.push_back(get_time());
 	time_descriptions.push_back("Fourier transform");
 
@@ -2324,9 +2758,14 @@ tsc_block_type calculate_scattering_factors(
 	std::ostream& file,
 	svec& known_atoms,
 	const int& nr,
-	vec2* kpts
+	vec2* kpts,
+	salted_part_prep* prep_out
 ) {
 	using namespace std;
+#ifdef NOSPHERA2_USE_GPU
+	if (opt.use_gpu)
+		sf_gpu_warmup_start();
+#endif
 	int nat = 0;
 	WFN* wavy = NULL;
 	if constexpr (std::is_same_v<calculator_type, std::vector<WFN> &>) {
@@ -2389,9 +2828,17 @@ tsc_block_type calculate_scattering_factors(
 		asym_atom_list,
 		needs_grid,
 		file,
-		opt.debug);
+		opt.debug,
+		opt.allow_empty_asym);
 
 	cif_input.close();
+
+	//empty only means a broken CIF unless the caller allowed it: a spherical fill of an already covered part finds nothing
+	if (asym_atom_list.empty())
+	{
+		if (prep_out) *prep_out = salted_part_prep();
+		return tsc_block_type();
+	}
 
 	if (opt.debug)
 		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
@@ -2440,31 +2887,80 @@ tsc_block_type calculate_scattering_factors(
 
 	time_points.push_back(get_time());
 	time_descriptions.push_back("k-points preparation");
+	//streaming emits the table in reflection blocks instead of holding scatterers * reflections * 16 bytes at once
+	//excluded: prep_out and spherical_fill must hand their rows back rather than write a file, and a combined
+	//table needs every part present - stream_mtc_salted() at the bottom inverts those loops instead
+	//tsc_block_for returns 0 when -mem says the table fits whole; not named tsc_block, that is the class template below
+	const size_t block_reflections = opt.tsc_block_for(hkl.size(), asym_atom_list.size());
+	const bool stream_tsc = block_reflections > 0
+		&& prep_out == NULL
+		&& !opt.spherical_fill
+		&& opt.combined_tsc_calc_files.size() <= 1;
 	cvec2 sf;
-	sf.resize(asym_atom_list.size());
+	if (!stream_tsc)
+	{
+		sf.resize(asym_atom_list.size());
 #pragma omp parallel for
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        sf[i].resize(hkl.size());
+		for (int i = 0; i < asym_atom_list.size(); i++)
+			sf[i].resize(hkl.size());
+	}
 
     if (opt.iam_switch) {
-        vector<Thakkar> spherical_atoms;
-        spherical_atoms.reserve(atom_type_list.size());
-        for (int i = 0; i < atom_type_list.size(); i++)
-            spherical_atoms.emplace_back(atom_type_list[i]);
-
+        if (prep_out != NULL)
+        {
+            // hand back what a per-block spherical calculation needs and stop
+            const std::vector<i3> hv(hkl.begin(), hkl.end());
+            prep_out->asym_atom_list = asym_atom_list;
+            prep_out->labels = labels;
+            prep_out->atom_type_list = atom_type_list;
+            prep_out->asym_atom_to_type_list = asym_atom_to_type_list;
+            prep_out->hkl_v = hv;
+            prep_out->k_of_reflection.resize(hv.size());
+            prep_out->stl_of_reflection.resize(hv.size());
+            for (size_t s = 0; s < hv.size(); s++)
+            {
+                const double stl = unit_cell.get_stl_of_hkl(hv[s]);
+                prep_out->stl_of_reflection[s] = stl;
+                prep_out->k_of_reflection[s] = constants::bohr2ang(constants::FOUR_PI * stl);
+            }
+            return tsc_block_type();
+        }
+        std::vector<Thakkar> spherical_atoms = make_spherical_evaluators(atom_type_list);
         const int imax = (int)asym_atom_list.size();
         const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
         const int hkl_max = hkl.size();
 
-        if (!opt.electron_diffraction)
+        if (stream_tsc)
         {
-#pragma omp parallel for shared(hkl_vector)
-            for (int s = 0; s < hkl_max; s++)
-            {
-                const double k = constants::bohr2ang(constants::FOUR_PI * unit_cell.get_stl_of_hkl(hkl_vector[s]));
-                for (int i = 0; i < imax; i++)
-                    sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
-            }
+            //a Thakkar factor depends on element and reflection alone, so no state crosses a block boundary
+            ScattererLabels stream_ids;
+            append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
+
+            stream_blocks(opt, file,
+                opt.binary_tsc ? "experimental.tscb" : "experimental.tsc",
+                stream_ids, hkl_vector, hkl_vector.size(),
+                [&](const size_t lo, const size_t hi, ProgressBar& progress)
+                {
+                    cvec2 chunk(imax, cvec(hi - lo));
+#pragma omp parallel for
+                    for (int s = 0; s < (int)(hi - lo); s++)
+                    {
+                        const double stl = unit_cell.get_stl_of_hkl(hkl_vector[lo + s]);
+                        const double k = constants::bohr2ang(constants::FOUR_PI * stl);
+                        const double h2 = pow(stl, 2);
+                        for (int i = 0; i < imax; i++)
+                        {
+                            const int type = asym_atom_to_type_list[i];
+                            const double f = spherical_atoms[type].get_form_factor(k);
+                            //IAM form of Mott-Bethe: tabulated charge, no imaginary part
+                            chunk[i][s] = opt.electron_diffraction
+                                ? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
+                                : cdouble(f, 0.0);
+                        }
+                    }
+                    progress.update(hi - lo);
+                    return chunk;
+                });
         }
         else
         {
@@ -2474,10 +2970,14 @@ tsc_block_type calculate_scattering_factors(
                 const double stl = unit_cell.get_stl_of_hkl(hkl_vector[s]);
                 const double k = constants::bohr2ang(constants::FOUR_PI * stl);
                 const double h2 = pow(stl, 2);
-                double sf_x = 0;
-                for (int i = 0; i < imax; i++) {
-                    sf_x = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
-                    sf[i][s] = cdouble(constants::ED_fact * (atom_type_list[asym_atom_to_type_list[i]] - sf_x) / h2, 0);
+                for (int i = 0; i < imax; i++)
+                {
+                    const int type = asym_atom_to_type_list[i];
+                    const double f = spherical_atoms[type].get_form_factor(k);
+                    //IAM form of Mott-Bethe: tabulated charge, no imaginary part
+                    sf[i][s] = opt.electron_diffraction
+                        ? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
+                        : cdouble(f, 0.0);
                 }
             }
         }
@@ -2486,6 +2986,9 @@ tsc_block_type calculate_scattering_factors(
     {
         // Generation of SALTED density coefficients
         file << "\nGenerating densities... " << endl;
+#ifdef NOSPHERA2_USE_GPU
+        equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
+#endif
         vec coefs = calculator.gen_SALTED_densities();
         file << setw(13 * 4) << "... done!" << endl;
         time_points.push_back(get_time());
@@ -2513,12 +3016,81 @@ tsc_block_type calculate_scattering_factors(
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Calculation of Charges");
 
-		calc_SF_SALTED(
-			k_pt,
-			coefs,
-			calculator.wavy.get_atoms(),
-			asym_atom_list,
-			sf);
+		if (prep_out != NULL)
+		{
+			//-mtc streaming: the reflection loop lives outside, so hand back the reflection-independent part and stop
+			prep_out->coefs = std::move(coefs);
+			prep_out->asym_atom_list = asym_atom_list;
+			prep_out->labels = labels;
+			prep_out->atoms = calculator.wavy.get_atoms_ptr();
+			prep_out->k_pt = k_pt;
+			prep_out->hkl_v.assign(hkl.begin(), hkl.end());
+			//carried so the -mtc loop can convert to ED per block without a unit cell of its own
+			prep_out->stl_of_reflection.resize(prep_out->hkl_v.size());
+			for (size_t s = 0; s < prep_out->hkl_v.size(); s++)
+				prep_out->stl_of_reflection[s] = unit_cell.get_stl_of_hkl(prep_out->hkl_v[s]);
+			return tsc_block_type();
+		}
+
+		if (stream_tsc)
+		{
+			ScattererLabels stream_ids;
+			append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
+
+			const std::vector<i3> hkl_v(hkl.begin(), hkl.end());
+			const size_t n_refl = hkl_v.size();
+
+			//atoms the model cannot predict were erased before the prediction; append_spherical_rows() emits them per block
+			salted_part_prep spherical;
+			std::vector<HE_Spherical_Atom> spheres;
+			if (opt.needs_Thakkar_fill)
+			{
+				std::vector<WFN> tempy;
+				const int fill_nr = build_fill_wavefunctions(opt, nr, tempy);
+				{
+					const spherical_fill_scope fill(opt, hkl);
+					calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+						opt, tempy, file, labels, fill_nr, kpts, &spherical);
+				}
+				if (!spherical.asym_atom_list.empty())
+				{
+					err_checkf(spherical.k_of_reflection.size() == n_refl,
+						"Spherical remainder covers " + std::to_string(spherical.k_of_reflection.size()) +
+						" reflections, the table covers " + std::to_string(n_refl), file);
+					append_scatterer_ids(stream_ids, opt, spherical.labels,
+						tempy[fill_nr], spherical.asym_atom_list);
+					spheres = make_he_evaluators(spherical, tempy[fill_nr], opt, file);
+					file << "Spherical remainder: " << spherical.asym_atom_list.size()
+						 << " atom(s) the model cannot predict" << endl;
+				}
+				opt.needs_Thakkar_fill = false;   // emitted here, not appended later
+			}
+
+			stream_blocks(opt, file, "experimental.tscb", stream_ids, hkl_v, n_refl,
+				[&](const size_t lo, const size_t hi, ProgressBar& progress)
+				{
+					cvec2 chunk;
+					calc_SF_SALTED(slice_k_points(k_pt, lo, hi), coefs,
+						calculator.wavy.get_atoms(), asym_atom_list, chunk, &progress);
+					//Mott-Bethe never looks outside one reflection, so a block is as valid a unit as a table
+					if (opt.electron_diffraction)
+						convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
+							std::vector<i3>(hkl_v.begin() + lo, hkl_v.begin() + hi));
+					if (!spheres.empty())
+						append_spherical_rows(chunk, spherical, spheres,
+							opt.electron_diffraction, lo, hi);
+					return chunk;
+				});
+		}
+		else
+		{
+			calc_SF_SALTED(
+				k_pt,
+				coefs,
+				calculator.wavy.get_atoms(),
+				asym_atom_list,
+				sf);
+		}
 		file << setw(13 * 4) << "... done!\n"
 			<< flush;
 		time_points.push_back(get_time());
@@ -2554,7 +3126,7 @@ tsc_block_type calculate_scattering_factors(
 				time_points,
 				time_descriptions,
 				d1, d2, d3, dens,
-				opt);
+				opt, file);
 
 			_time_point end1;
 			calc_SF(points,
@@ -2565,7 +3137,11 @@ tsc_block_type calculate_scattering_factors(
 				time_points.front(),
 				end1,
 				opt.debug,
-				opt.no_date);
+				opt.no_date,
+				false,
+				opt.use_gpu,
+				opt.gpu_fp64,
+				opt.gpu_fp32);
 
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Fourier transform");
@@ -2609,12 +3185,36 @@ tsc_block_type calculate_scattering_factors(
             time_points.push_back(get_time());
             time_descriptions.push_back("Calculation of Charges");
 
-            calc_SF_SALTED(
-                k_pt,
-                coefs,
-                wavy_aux.get_atoms(),
-                asym_atom_list,
-                sf);
+            if (stream_tsc)
+            {
+                //as the SALTED case above, but the atoms come from the auxiliary wavefunction, so no spherical remainder
+                ScattererLabels stream_ids;
+                append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
+
+                const std::vector<i3> hkl_v(hkl.begin(), hkl.end());
+                stream_blocks(opt, file,
+                    opt.binary_tsc ? "experimental.tscb" : "experimental.tsc",
+                    stream_ids, hkl_v, hkl_v.size(),
+                    [&](const size_t lo, const size_t hi, ProgressBar& progress)
+                    {
+                        cvec2 chunk;
+                        calc_SF_SALTED(slice_k_points(k_pt, lo, hi), coefs,
+                            wavy_aux.get_atoms(), asym_atom_list, chunk, &progress);
+                        if (opt.electron_diffraction)
+                            convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
+                                std::vector<i3>(hkl_v.begin() + lo, hkl_v.begin() + hi));
+                        return chunk;
+                    });
+            }
+            else
+            {
+                calc_SF_SALTED(
+                    k_pt,
+                    coefs,
+                    wavy_aux.get_atoms(),
+                    asym_atom_list,
+                    sf);
+            }
             file << setw(12 * 4 + 2) << "... done!" << endl;
             time_points.push_back(get_time());
             time_descriptions.push_back("Fourier transform");
@@ -2636,7 +3236,8 @@ tsc_block_type calculate_scattering_factors(
         }
     }
 
-    if (opt.electron_diffraction && !opt.iam_switch)
+    //not when streaming: sf is empty there and each block was converted as it was produced
+    if (opt.electron_diffraction && !opt.iam_switch && !stream_tsc)
     {
         convert_to_ED(asym_atom_list,
             *wavy,
@@ -2664,47 +3265,175 @@ tsc_block_type calculate_scattering_factors(
     {
         file << "Performing the remaining calculation of spherical atoms..." << std::endl;
         opt.needs_Thakkar_fill = false;
-        vector<WFN> tempy;
-        if (!opt.wfn.empty()) {
-            tempy.emplace_back(opt.wfn);
+        std::vector<WFN> tempy;
+        const int fill_nr = build_fill_wavefunctions(opt, nr, tempy);
+        //no_date is not part of spherical_fill_scope: only this caller suppresses the banner
+        const bool no_date_was = opt.no_date;
+        opt.no_date = true;
+        tsc_block<int, cdouble> blocky_thakkar;
+        {
+            const spherical_fill_scope fill(opt, hkl);
+            blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
         }
-        else {
-            tempy.emplace_back(opt.combined_tsc_calc_files[nr]);
-        }
-        opt.m_hkl_list = hkl;
-        opt.iam_switch = true; opt.no_date = true;
-        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, 0);
-        opt.iam_switch = false; opt.no_date = false;
+        opt.no_date = no_date_was;
         blocky.append(std::move(blocky_thakkar), file);
         time_points.push_back(get_time());
         time_descriptions.push_back("Spherical Atoms");
     }
 
-
 	time_points.push_back(get_time());
 	time_descriptions.push_back("tsc calculation");
-
 	if (!opt.no_date)
 	{
 		write_timing_to_file(file,
 			time_points,
 			time_descriptions);
 	}
-
 	return blocky;
 }
+//streams a combined (-mtc) table one block of reflections at a time, inverting the sequential loops:
+//prepare every disorder part once, then per block compute every part and hand the assembled block to the writer
+//the inversion works because the expensive parts (CIF read, SALTED prediction) do not depend on reflections,
+//which is what salted_part_prep holds
+//row order must equal the merged path's exactly, or values are attributed to the wrong atom without any error
+//it is a plain concatenation because each part is prepared with the identifiers of the parts before it (the
+//growing `known` list) and read_atoms_from_CIF skips atoms already in it
+//that list must hold atomID hex strings, as result.get_scatterers_string() gives: labels are not unique across
+//parts, so a later part skips atoms it should keep and the table silently loses rows - check any change against
+//a multi-part structure byte for byte, not by size
+//species the model does not know are erased from every part and return as extra Thakkar rows of each block
+bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file, vec2* known_kpts)
+{
+	const size_t n_parts = opt.combined_tsc_calc_files.size();
+	//electron diffraction is not excluded: the prep carries the stl, so no unit cell is needed down here
+	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2 || opt.iam_switch)
+		return false;
+
+	std::vector<std::shared_ptr<SALTEDPredictor>> preds;
+	std::vector<salted_part_prep> preps;
+	svec known;
+	for (size_t i = 0; i < n_parts; i++)
+	{
+		auto pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
+		if (!pred->basis_set_loaded())
+			load_basis_into_WFN(pred->wavy, BasisSetLibrary::get_basis_set(pred->get_dfbasis_name()));
+		salted_part_prep prep;
+		calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
+			opt, *pred, file, known, static_cast<int>(i), known_kpts, &prep);
+		//feed the next part what the sequential path feeds it: get_scatterers_string(), the atomID hex string
+		for (size_t a = 0; a < prep.asym_atom_list.size(); a++)
+		{
+			if (opt.label_tsc_output)
+				known.push_back(prep.labels[a]);
+			else
+				known.push_back(pred->wavy.get_id_for_atom(prep.asym_atom_list[a]).to_hex_string());
+		}
+		preds.push_back(pred);
+		preps.push_back(std::move(prep));
+	}
+
+	//atoms the model cannot predict (unknown species, or nothing inside the descriptor cutoff) become extra rows here
+	//every part must be walked: a part file only yields atoms of the parts it covers, so part 0 alone drops the rest
+	//feed `known` as we go so no atom is produced twice
+	std::vector<salted_part_prep> spherical(n_parts);
+	std::vector<char> have_spherical(n_parts, 0);
+	//a table must hold either all atomIDs or all labels; salted_part_prep::labels holds hex strings while the
+	//predicted parts contribute atomID objects, so the spherical rows are converted here rather than passed through
+	std::vector<ScattererLabels> spherical_ids(n_parts);
+	//built inside the block below: the per-atom charges are matched against the
+	//fill wavefunctions, which only exist there
+	std::vector<std::vector<HE_Spherical_Atom>> spheres(n_parts);
+	if (opt.needs_Thakkar_fill)
+	{
+		hkl_list fill_reflections;
+		for (const auto& h : preps[0].hkl_v)
+			fill_reflections.emplace(h);
+		const spherical_fill_scope fill(opt, fill_reflections);
+
+		//the whole file list, not one file: the index also selects opt.groups[nr], see the sequential path above
+		std::vector<WFN> tempy;
+		for (const auto& part_file : opt.combined_tsc_calc_files)
+			tempy.emplace_back(part_file);
+
+		size_t n_filled = 0;
+		for (size_t i = 0; i < n_parts; i++)
+		{
+			calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+				opt, tempy, file, known, static_cast<int>(i), known_kpts, &spherical[i]);
+			have_spherical[i] = spherical[i].asym_atom_list.empty() ? 0 : 1;
+			if (!have_spherical[i]) continue;
+			n_filled += spherical[i].asym_atom_list.size();
+			err_checkf(spherical[i].k_of_reflection.size() == preps[0].hkl_v.size(),
+				"Spherical remainder of part " + std::to_string(i + 1) + " covers " +
+				std::to_string(spherical[i].k_of_reflection.size()) +
+				" reflections, the parts cover " + std::to_string(preps[0].hkl_v.size()), file);
+			// keep feeding `known`, so a later part cannot claim these atoms again
+			for (size_t a = 0; a < spherical[i].labels.size(); a++)
+				known.push_back(spherical[i].labels[a]);
+			append_scatterer_ids(spherical_ids[i], opt, spherical[i].labels,
+				tempy[i], spherical[i].asym_atom_list);
+			spheres[i] = make_he_evaluators(spherical[i], tempy[i], opt, file);
+		}
+		file << "Spherical remainder: " << n_filled
+			 << " atom(s) the model cannot predict" << std::endl;
+	}
+
+	//each spherical remainder straight after its own predicted atoms, as the sequential path appends it per part;
+	//collecting them at the end gives the same scatterers in a different order and breaks a byte-for-byte comparison
+	ScattererLabels ids;
+	for (size_t p = 0; p < preps.size(); p++)
+	{
+		append_scatterer_ids(ids, opt, preps[p].labels, preds[p]->wavy, preps[p].asym_atom_list);
+		for (const auto& sid : spherical_ids[p])
+			ids.emplace_back(sid);
+	}
+
+	const size_t n_refl = preps[0].hkl_v.size();
+	file << "Combined tsc: " << ids.size() << " scatterers from "
+		<< n_parts << " parts" << std::endl;
+
+	//the bar counts reflections * parts, since every part is evaluated for every block
+	stream_blocks(opt, file, "experimental.tscb", ids, preps[0].hkl_v,
+		n_refl * preps.size(),
+		[&](const size_t lo, const size_t hi, ProgressBar& progress)
+		{
+			cvec2 combined;
+			combined.reserve(ids.size());
+			for (size_t p = 0; p < preps.size(); p++)
+			{
+				cvec2 chunk;
+				calc_SF_SALTED(slice_k_points(preps[p].k_pt, lo, hi), preps[p].coefs,
+					*preps[p].atoms, preps[p].asym_atom_list, chunk, &progress);
+				if (opt.electron_diffraction)
+					convert_to_ED(preps[p].asym_atom_list, preds[p]->wavy, chunk,
+						vec(preps[p].stl_of_reflection.begin() + lo,
+							preps[p].stl_of_reflection.begin() + hi));
+				for (auto& row : chunk)
+					combined.push_back(std::move(row));
+				// this part's spherical remainder, where the id list put it
+				if (have_spherical[p])
+					append_spherical_rows(combined, spherical[p], spheres[p],
+						opt.electron_diffraction, lo, hi);
+			}
+			return combined;
+		});
+	return true;
+}
+
 template itsc_block calculate_scattering_factors(options& opt,
 	std::vector<WFN>& calculator,
 	std::ostream& file,
 	svec& known_atoms,
 	const int& nr,
-	vec2* kpts);
+	vec2* kpts,
+	salted_part_prep* prep_out);
 template itsc_block calculate_scattering_factors(options& opt,
 	SALTEDPredictor& calculator,
 	std::ostream& file,
 	svec& known_atoms,
 	const int& nr,
-	vec2* kpts);
+	vec2* kpts,
+	salted_part_prep* prep_out);
 
 
 /**

@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "convenience.h"
 #include "AtomGrid.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "grid_gpu.h"
+#endif
 #include "sphere_lebedev_rule.h"
 #include "constants.h"
 #include "wfn_class.h"
@@ -247,7 +250,7 @@ int AtomGrid::get_num_grid_points() const { return (int)atom_grid_x_bohr_.size()
 
 int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
-vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
+vec make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
     const int ncen = wfn.get_ncen();
     const int nmo = wfn.get_nmo();
     if (nmo == 0) {
@@ -255,7 +258,7 @@ vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
             std::cout << "make_chi: No molecular orbitals found, skipping chi calculation." << std::endl;
         return vec(0); // Default to all pairs being "far apart" if no MOs
     }
-    vec chi(ncen * ncen, 0.0);
+    vec chi(static_cast<size_t>(ncen) * ncen, 0.0);
     std::vector<std::vector<bool>> neighbours(ncen, bvec(ncen, true));
     double rijx2, rijy2, rijz2, xdist, disth;
     for (int a = 0; a < wfn.get_ncen(); a++) {
@@ -402,6 +405,11 @@ vec make_chi(const WFN &wfn, int samples, bool refine, bool debug) {
         }
     }
 
+    if (std::getenv("NOSPHERA2_CHI_DEBUG")) {
+        double s = 0.0;
+        for (int i = 0; i < chi.size(); i++) s += chi[i] * chi[i];
+        std::fprintf(stderr, "chi checksum %.17g size %zu\n", s, chi.size());
+    }
     return chi;
 }
 
@@ -426,6 +434,41 @@ void AtomGrid::get_grid(const int num_centers,
         if (chi.size() == 0)
             chi = make_chi(wfn, 40, true, debug);
         const int np = get_num_grid_points();
+#ifdef NOSPHERA2_USE_GPU
+        //Same walk on the device. Bragg radii are looked up here so the kernel takes
+        //plain doubles and needs no constants table of its own.
+        //The kernel transcribes the chi-present branch and indexes chi with a stride of
+        //num_centers. make_chi returns empty without MOs and uses a stride of ncen, so
+        //neither is guaranteed; a wrongly sized chi would copy and come back wrong.
+        const bool chi_fits = chi.size() == (size_t)num_centers * (size_t)num_centers;
+        if (grid_gpu_enabled() && chi_fits) {
+            vec R_v(num_centers);
+            for (int a = 0; a < num_centers; a++)
+                R_v[a] = constants::bragg_angstrom[proton_charges[a]];
+            if (grid_gpu_becke_weights(np, num_centers, center_index,
+                    atom_grid_x_bohr_.data(), atom_grid_y_bohr_.data(),
+                    atom_grid_z_bohr_.data(), atom_grid_w_.data(),
+                    x_coordinates_bohr, y_coordinates_bohr, z_coordinates_bohr,
+                    R_v.data(), chi.data(), constants::far_away, constants::cutoff,
+                    grid_x_bohr, grid_y_bohr, grid_z_bohr,
+                    grid_aw, grid_becke_w, grid_TFVC_w)) {
+                //Once per run. Every other GPU path announces itself; this one did not, which
+                //is how it fell back to the CPU for a session with its test still passing.
+                static std::atomic<bool> announced{false};
+                if (!announced.exchange(true) && !constants::hide_gpu_notes)
+                    std::cout << "GPU in use: atomic grid weights (Becke and TFVC) on "
+                              << grid_gpu_backend() << std::endl;
+                return;
+            }
+        }
+        else if (grid_gpu_enabled() && !chi_fits) {
+            static std::atomic<bool> warned{false};
+            if (!warned.exchange(true) && !constants::hide_gpu_notes)
+                std::cout << "-gpu_grid asked for but not used: chi is " << chi.size()
+                          << " entries, the kernel needs " << (size_t)num_centers * num_centers
+                          << ". Weights stay on the CPU." << std::endl;
+        }
+#endif
 #pragma omp parallel
         {
             vec pa_b(num_centers);
@@ -531,26 +574,26 @@ constexpr double f(const double &x)
 
 // JCP 139, 071103 (2013) for TFVC
 // JCP 88, 2547 (1988) for Becke
-std::array<double, 2> get_integration_weights(const int &num_centers,
-    const int *proton_charges,
-    const double *x_coordinates_bohr,
-    const double *y_coordinates_bohr,
-    const double *z_coordinates_bohr,
-    const int &center_index,
-    const double &x,
-    const double &y,
-    const double &z,
-    std::vector<double> &pa_b,
-    std::vector<double> &pa_tv,
-    const vec &chi)
+std::array<double, 2> get_integration_weights(const int& num_centers,
+    const int* proton_charges,
+    const double* x_coordinates_bohr,
+    const double* y_coordinates_bohr,
+    const double* z_coordinates_bohr,
+    const int& center_index,
+    const double& x,
+    const double& y,
+    const double& z,
+    std::vector<double>& pa_b,
+    std::vector<double>& pa_tv,
+    const vec& chi)
 {
     double mu_ab, nu_ab, f, dist_ab;
     double dist_a, dist_b;
     double vx, vy, vz;
     double R_a, R_b, chi_becke, u_ab, chi_mod;
-    const double *chi_off, *bragg = constants::bragg_angstrom;
-    double *R_v = new double[num_centers];
-    const double &cut = constants::cutoff;
+    const double* chi_off, * bragg = constants::bragg_angstrom;
+    double* R_v = new double[num_centers];
+    const double& cut = constants::cutoff;
     for (int a = 0; a < num_centers; a++) {
         pa_b[a] = 1.0;
         pa_tv[a] = 1.0;
@@ -946,7 +989,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     const WFN &wavy,
     const vec3 &grid,
     const ivec &num_grid_points,
-    const bool debug)
+    const bool debug,
+    std::ostream &file)
 {
     using sp_vec = std::vector<std::pair<vec, vec>>;
     const auto atoms = wavy.get_atoms();
@@ -973,7 +1017,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         atom_coords[j * 3 + 2] = atoms[j].get_coordinate(2);
         const int c = atoms[j].get_charge();
         nshell_cache[j] = constants::MBIS_function[c];
-        ECP_electron_helper.emplace_back(c);
+        ECP_electron_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_els[j] = atoms[j].get_ECP_electrons();
     }
@@ -982,7 +1026,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
             std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
             std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
         }
-        it == 0 ? std::cout << "Starting MBIS iterations..." << std::endl : std::cout << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
+        it == 0 ? file << "Starting MBIS iterations..." << std::endl : file << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
         for (int i = 0; i < ncen; i++) {
             const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
@@ -1089,13 +1133,13 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
             charges[i] = wavy.get_atom_charge(i) - vec_sum(sig_pop_vector[i].second) + wavy.get_atom_ECP_electrons(i);
             varmax = std::max(varmax, std::abs(charges[i] - last_charges[i]));
             if (debug)
-                std::cout << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
+                file << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
         }
         if (varmax < crit || varsig < crit) {
-            std::cout << "MBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
-            std::cout << "Promolecular charges:\n";
+            file << "MBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
+            file << "Promolecular charges:\n";
             for (int i = 0; i < wavy.get_ncen(); i++) {
-                std::cout << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
+                file << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
             }
             return sig_pop_vector;
         }
@@ -1103,7 +1147,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         last_charges = charges;
 
     }
-    std::cout << "MBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
+    file << "MBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
     return sig_pop_vector;
 }
 
@@ -1114,7 +1158,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     const vec3 &grid,
     const ivec &num_grid_points,
     const bool debug,
-    const std::vector<std::pair<vec, vec>> MBIS_vectors)
+    const std::vector<std::pair<vec, vec>> MBIS_vectors,
+    std::ostream &file)
 {
     using sp_vec = std::vector<std::pair<vec2, vec>>;
     const double crit = 0.001;
@@ -1151,7 +1196,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         atom_coords[j * 3 + 2] = atoms[j].get_coordinate(2);
         const int c = atoms[j].get_charge();
         nshell_cache[j] = constants::MBIS_function[c];
-        ECP_electron_helper.emplace_back(c);
+        ECP_electron_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
         ECP_els[j] = atoms[j].get_ECP_electrons();
         has_ECP[j] = (atoms[j].get_ECP_electrons() > 0);
@@ -1207,7 +1252,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
             std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_6);
             std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
         }
-        it == 0 ? std::cout << "Starting EMBIS iterations..." << std::endl : std::cout << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
+        it == 0 ? file << "Starting EMBIS iterations..." << std::endl : file << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
         for (int i = 0; i < ncen; i++) {
             const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
@@ -1394,13 +1439,13 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
             charges[i] = wavy.get_atom_charge(i) - vec_sum(sig_pop_vector[i].second) + wavy.get_atom_ECP_electrons(i);
             varmax = std::max(varmax, std::abs(charges[i] - last_charges[i]));
             if (debug)
-                std::cout << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
+                file << "Atom " << std::setw(3) << i << " charge: " << charges[i] << std::endl;
         }
         if (varmax < crit || varsig < crit) {
-            std::cout << "EMBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
-            std::cout << "Promolecular charges:\n";
+            file << "EMBIS converged after " << it << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl;
+            file << "Promolecular charges:\n";
             for (int i = 0; i < wavy.get_ncen(); i++) {
-                std::cout << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
+                file << "Atom " << std::setw(3) << i << ": " << charges[i] << "\n";
             }
             return sig_pop_vector;
         }
@@ -1408,7 +1453,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         last_charges = charges;
 
     }
-    std::cout << "EMBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
+    file << "EMBIS NOT converged after " << 200 << " iterations with max charge change: " << varmax << " and max sig change: " << varsig << std::endl << "Returning last iteration results." << std::endl << "BE CAREFUL WITH THESE RESULTS, THEY MIGHT NOT BE RELIABLE!" << std::endl;
     return sig_pop_vector;
 }
 

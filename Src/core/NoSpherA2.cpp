@@ -11,17 +11,22 @@
 #include "cif.h"
 #include "bondwise_analysis.h"
 #include "XCW.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "grid_gpu.h"
+#include "sf_gpu.h"
+#include "blas_gpu.h"
+#include "cublas_dynamic.h"
+#include "SALTED_equicomb.h"
+#endif
 
 int QCT(options &opt, std::vector<WFN> &wavy);
 
 static int run_app_impl(int argc, char **argv);
 
-// Wrapper around the actual application, so that an exception thrown deep inside a file
-// parser reports what went wrong instead of terminating the process with a fail-fast.
+//Wrapper so an exception from deep inside a file parser reports instead of fail-fast
 int run_app(int argc, char **argv)
 {
-    // Remember the console before run_app_impl() redirects std::cout into NoSpherA2.log;
-    // by the time we get here in a catch block the log file has already been destroyed.
+    //Remember the console before run_app_impl() redirects cout into NoSpherA2.log; in the catch block the log file is already destroyed
     std::streambuf *const console = std::cout.rdbuf();
     try
     {
@@ -51,9 +56,65 @@ static int run_app_impl(int argc, char **argv)
 
     ofstream log_file("NoSpherA2.log", ios::out);
     std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+
+    //Restores cout's buffer AND its sticky fixed/setprecision state on every exit path, including an unwinding exception
+    //Declared after log_file so it detaches cout while that buffer is still alive
+    struct cout_restorer
+    {
+        std::streambuf *saved_buf;
+        std::ios::fmtflags saved_flags;
+        std::streamsize saved_precision;
+        std::streamsize saved_width;
+        ~cout_restorer()
+        {
+            std::cout.rdbuf(saved_buf);
+            std::cout.flags(saved_flags);
+            std::cout.precision(saved_precision);
+            std::cout.width(saved_width);
+        }
+    } restore_cout{_coutbuf, std::cout.flags(), std::cout.precision(), std::cout.width()};
+
+    //A destructor because run_app_impl returns from a dozen places, and log_file rather than
+    //cout because most of those places put cout back on the console first.
+    struct throughput_reporter
+    {
+        std::ostream& out;
+        ~throughput_reporter() { throughput::report(out); }
+    } report_throughput{log_file};
+
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
+#ifdef NOSPHERA2_USE_GPU
+    //Every GPU toggle, from opt alone, once per run. These are globals and used to be set
+    //only inside the scattering-factor entry points, so a run reaching XCW instead inherited
+    //whatever the previous run in the process had left on. Olex2 calls run_app repeatedly.
+    grid_gpu_set_enabled(opt.use_gpu && opt.gpu_grid);
+    blas_gpu_set_enabled(opt.gpu_blas);
+    equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
+    cublas_dynamic_set_enabled(opt.gpu_cublas);
+    //Started here so context creation overlaps the file reading rather than landing inside
+    //whichever kernel runs first.
+    if (opt.use_gpu && (opt.gpu_grid || opt.gpu_salted || opt.gpu_itensor || opt.gpu_blas))
+        sf_gpu_warmup_start();
+    //A destructor for the same reason as the two above, and because only calc_SF waits for
+    //this thread: a run that never reaches the transform - IAM, properties, RGBI, RI fit -
+    //used to leave it running. What then joined it was the destructor of the static future
+    //in sf_gpu.cu, which runs after the CUDA runtime's own atexit teardown, so the thread
+    //was still inside cuDevicePrimaryCtxRetain with the driver already torn down under it.
+    //That is a crash or a hang depending on the timing, and it needs a real device and a
+    //slow context creation to show up - six test processes sharing two V100s does it, a
+    //single run does not. Waiting here costs nothing: by this point the warm-up is long
+    //done in any run that did any work.
+    struct warmup_joiner
+    {
+        ~warmup_joiner()
+        {
+            //A destructor, so nothing may escape it; the warm-up has no result to report.
+            try { sf_gpu_warmup_wait(); } catch (...) {}
+        }
+    } join_warmup;
+#endif
     vector<WFN> wavy;
 
     if (opt.promol_nci)
@@ -82,6 +143,14 @@ static int run_app_impl(int argc, char **argv)
         cls();
         std::cout << "Starting QCT menu..." << endl;
         return QCT(opt, wavy);
+    }
+    //Conceptual-DFT reactivity analysis and quit; its table goes to stdout, not the log
+    if (opt.fukui_analysis_run)
+    {
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
+        fukui_analysis(opt, std::cout);
+        return 0;
     }
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
@@ -325,6 +394,18 @@ static int run_app_impl(int argc, char **argv)
         svec known_scatterer;
         vec2 known_kpts;
         tsc_block<int, cdouble> result;
+        //Streamed combined table when eligible: parts first, then one pass over reflection blocks; falls through to the loop otherwise
+        if (stream_mtc_salted(opt, wavy, log_file, &known_kpts))
+        {
+            //Olex2 greps the log for this exact string; changing it reads as a failed run
+            log_file << "Writing tsc file...  ... done!" << endl;
+            log_file << "  (written block by block while the factors were computed)" << endl;
+            log_file.flush();
+            std::cout.rdbuf(_coutbuf);
+            std::cout << "Finished!" << endl;
+            return 0;
+        }
+
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
             known_scatterer = result.get_scatterers_string();
@@ -366,6 +447,16 @@ static int run_app_impl(int argc, char **argv)
             }
         }
 
+        if (opt.tsc_written_by_stream)
+        {
+            //the streamed path already wrote the file block by block; writing the (empty) in-memory block now would truncate it
+            log_file << "Writing tsc file...  ... done!" << endl;
+            log_file << "  (written block by block while the factors were computed)" << endl;
+            log_file.flush();
+            std::cout.rdbuf(_coutbuf);
+            std::cout << "Finished!" << endl;
+            return 0;
+        }
         known_scatterer = result.get_scatterers_string();
         log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
         _time_point start = get_time();
@@ -414,16 +505,25 @@ static int run_app_impl(int argc, char **argv)
         //use atoms of group 0
         opt.groups[0].push_back(0);
         itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, wavy, log_file, empty, 0);
-        log_file << "Writing tsc file... " << flush;
-        if (opt.binary_tsc)
-            res.write_tscb_file();
-        if (opt.old_tsc)
+        //the streamed path already wrote the file; res is the empty placeholder and writing it would truncate
+        if (opt.tsc_written_by_stream)
         {
-            res.write_tsc_file(opt.cif);
+            log_file << "Writing tsc file...  ... done!" << endl;
+            log_file << "  (written block by block while the factors were computed)" << endl;
         }
-        log_file << " ... done!" << endl;
-        if (opt.write_CIF)
-            write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+        else
+        {
+            log_file << "Writing tsc file... " << flush;
+            if (opt.binary_tsc)
+                res.write_tscb_file();
+            if (opt.old_tsc)
+            {
+                res.write_tsc_file(opt.cif);
+            }
+            log_file << " ... done!" << endl;
+            if (opt.write_CIF)
+                write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+        }
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
@@ -524,7 +624,6 @@ static int run_app_impl(int argc, char **argv)
         // this one is for generation of an fchk file
         if (opt.fchk != "")
         {
-            // Make a fchk out of the wfn/wfx file
             filesystem::path tmp = opt.basis_set_path / opt.basis_set;
             if (opt.debug)
                 log_file << "Checking for " << opt.basis_set_path << " " << exists(opt.basis_set_path) << endl;
@@ -597,16 +696,25 @@ static int run_app_impl(int argc, char **argv)
 
                 delete temp_pred;
             }
-            log_file << "Writing tsc file... " << flush;
-            if (opt.binary_tsc)
-                res.write_tscb_file();
-            if (opt.old_tsc)
+            //as above: the streamed path already wrote the file itself
+            if (opt.tsc_written_by_stream)
             {
-                res.write_tsc_file(opt.cif);
+                log_file << "Writing tsc file...  ... done!" << endl;
+                log_file << "  (written block by block while the factors were computed)" << endl;
             }
-            log_file << " ... done!" << endl;
-            if (opt.write_CIF)
-                write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+            else
+            {
+                log_file << "Writing tsc file... " << flush;
+                if (opt.binary_tsc)
+                    res.write_tscb_file();
+                if (opt.old_tsc)
+                {
+                    res.write_tsc_file(opt.cif);
+                }
+                log_file << " ... done!" << endl;
+                if (opt.write_CIF)
+                    write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+            }
         }
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
@@ -623,9 +731,12 @@ static int run_app_impl(int argc, char **argv)
             xcw.run_XCW_fitting();
         }
         if (opt.calc_F_calc) {
-            xcw.calc_F_calc_fast();
+			std::cout << "Currently not implemented..." << std::endl;
+            //xcw.calc_F_calc_fast();
         }
-        exit(0);
+        log_file.flush();
+        std::cout.rdbuf(_coutbuf);
+        return 0;
     }
     // Contains all calculations of properties and cubes
     if (opt.properties.calc())

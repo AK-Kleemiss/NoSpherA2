@@ -190,34 +190,34 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
 }
 
 // Reads the descriptor buffer and fills the expansion coefficients vector
-static cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+static SALTEDDescriptors get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
     int n_atoms = (int)featomic_system.size();
     int nspe = (int)parameters.species.size();
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
-    // cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
-    cvec4 omega(n_atoms, std::vector<cvec2>((size_t)nspe * parameters.max_radial, cvec2((size_t)parameters.max_angular + 1, cvec((size_t)2 * parameters.max_angular + 1, { 0.0, 0.0 }))));
+    const int nchannels = nspe * parameters.max_radial;
+    SALTEDDescriptors omega(n_atoms, nchannels, parameters.max_angular);
     for (int l = 0; l < parameters.max_angular + 1; ++l)
     {
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ (2 * l) + 1 })[0];
         metatensor::TensorBlock descriptor_block = descriptor.block_by_id(l);
         metatensor::NDArray<double> descriptor_values = descriptor_block.values();
 
-        // Perform the matrix multiplication and assignment
+        // descriptor_values is contiguous in its property (d) dimension. The
+        // packed l slab keeps the corresponding output m values contiguous.
         for (int a = 0; a < n_atoms; ++a)
         {
-            for (int c = 0; c < 2 * l + 1; ++c)
+            for (int r = 0; r < 2 * l + 1; ++r)
             {
-                for (int d = 0; d < nspe * parameters.max_radial; ++d)
+                for (int d = 0; d < nchannels; ++d)
                 {
-                    // omega[l][a][c][d] = 0.0;
-                    omega[a][d][l][c] = 0.0;
-                    for (int r = 0; r < 2 * l + 1; ++r)
+                    cdouble* output = omega.block(a, d, l);
+                    const double value = descriptor_values(a, r, d);
+                    for (int c = 0; c < 2 * l + 1; ++c)
                     {
-                        // omega[l][a][c][d] += conj(c2r[r][c]) * descriptor_values(a, r, d);
-                        omega[a][d][l][c] += conj(c2r[r][c]) * descriptor_values(a, r, d);
+                        output[c] += conj(c2r[r][c]) * value;
                     }
-                } /*cvec* v2_ptr = (cvec*)&v2[iat][l2][n2];*/
+                }
             }
         }
         c2r.clear();
@@ -227,7 +227,7 @@ static cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const 
 }
 
 
-cvec4 SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+SALTEDDescriptors SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
     metatensor::TensorMap descriptor = get_feats_projs(featomic_system, parameters);
     std::vector<uint8_t> descriptor_buffer = descriptor.save_buffer();
@@ -235,10 +235,50 @@ cvec4 SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& f
 }
 
 
+namespace
+{
+    // Constructing a calculator splines the radial integral for every (n, l)
+    // pair to `spline_accuracy`, which depends only on the hyperparameters, so
+    // it is computed once and kept.
+    //
+    // Keyed on the parameter JSON, so a caller that changes any hyperparameter
+    // gets a new calculator rather than a silently wrong one -- a descriptor of
+    // the right shape computed with the wrong settings.
+    //
+    // `featomic::Calculator` is move-only, hence the indirection, and it is not
+    // safe to use one calculator from several threads at once. The only caller
+    // of `calculate_SOAP_Powerspectrum` is the serial descriptor path; SALTED
+    // builds its own calculator in `get_feats_projs`.
+    featomic::Calculator& cached_calculator(const std::string& name, const std::string& json)
+    {
+        static std::map<std::string, std::unique_ptr<featomic::Calculator>> cache;
+        const std::string key = name + '\n' + json;
+        auto found = cache.find(key);
+        if (found == cache.end())
+        {
+            found = cache.emplace(key, std::make_unique<featomic::Calculator>(name, json)).first;
+        }
+        return *found->second;
+    }
+}
+
 //FEATOMIC POWER Spectrum
 metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters) {
-    // create the calculator with its name and parameters
-    auto calculator = featomic::Calculator("soap_power_spectrum", parameters.to_json().c_str());
+    // Phase timings, off unless NOSPHERA2_TIME_SOAP is set. Caching the
+    // calculator does not remove the fixed per-call cost; it is in what follows.
+    const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr;
+    auto mark = std::chrono::steady_clock::now();
+    auto lap = [&mark](const char* what, bool on) {
+        if (!on) return;
+        const auto now = std::chrono::steady_clock::now();
+        std::cout << "  SOAP_PHASE " << what << " "
+                  << std::chrono::duration<double>(now - mark).count() << std::endl;
+        mark = now;
+    };
+
+    // Built once per set of hyperparameters and kept: see `cached_calculator`.
+    auto& calculator = cached_calculator("soap_power_spectrum", parameters.to_json());
+    lap("calculator", time_phases);
 
     std::vector<std::array<int32_t,3>> keys_array;
     for (const std::string& center_type : parameters.species)
@@ -274,13 +314,17 @@ metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::Simpl
     calc_opts.selected_keys = keys_selection;
     // run the calculation
     // Initialize descriptor directly from computation result
+    lap("keys", time_phases);
     metatensor::TensorMap descriptor = calculator.compute(featomic_system, calc_opts);
+    lap("compute", time_phases);
 
     // The descriptor is a metatensor `TensorMap`, containing multiple blocks.
     // We can transform it to a single block containing a dense representation,
     // with one sample for each atom-centered environment.
     descriptor = descriptor.keys_to_samples("center_type");
+    lap("keys_to_samples", time_phases);
     descriptor = descriptor.keys_to_properties(svec{ "neighbor_1_type" , "neighbor_2_type" });
+    lap("keys_to_properties", time_phases);
 
     return descriptor;
 }
@@ -444,6 +488,164 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs)
         atom_elecs[a] += atoms[a].get_ECP_electrons();
     }
     return atom_elecs;
+}
+
+double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs,
+                               int net_charge, bool spherical_fill_used,
+                               int n_filled, double filled_eeq_charge,
+                               double applied_fill_charge, std::ostream& file)
+{
+    // The auxiliary fit does not conserve the integral: measured over this
+    // training set the REFERENCE coefficients are already -0.208 % short and
+    // the ML prediction -0.235 %, so most of the deficit is inherited from the
+    // density fitting rather than learned. The exact target is fixed by the
+    // composition, so it can be imposed here.
+    //
+    // With the spherical Thakkar fill active, `atoms` is already only the
+    // ML-predicted subset (the predictor erases the filled atoms from its
+    // copy of the wavefunction), and Thakkar densities are exactly neutral,
+    // so the sum of nuclear charges over THESE atoms is the right target.
+    //
+    // Only l=0 functions have a non-zero integral, so only they are scaled.
+    // The scaling is GLOBAL on purpose: the atom-centred auxiliary basis is not
+    // an atomic-charge partition (measured per-element ratios span 0.899 for Al
+    // to 1.150 for B, with ~10 % scatter, which is bonding rather than error),
+    // so a per-element correction would distort the chemistry to fix a total.
+    vec atom_elecs = calc_atomic_density(atoms, coefs);
+
+    double predicted = 0.0, target = 0.0, ecp = 0.0;
+    for (int a = 0; a < static_cast<int>(atoms.size()); a++)
+    {
+        predicted += atom_elecs[a];
+        target += static_cast<double>(atoms[a].get_charge());
+        ecp += static_cast<double>(atoms[a].get_ECP_electrons());
+    }
+    // calc_atomic_density folds the ECP electrons in, but those do not come
+    // from the coefficients and must not be rescaled.
+    const double from_coefs = predicted - ecp;
+    double target_from_coefs = target - ecp;
+
+    // A charged system does not integrate to the sum of the nuclear charges.
+    // Ignoring this would silently pull an anion back to neutral: -1 on a
+    // 300-electron system is 0.33 %, well inside the sanity guard below, so it
+    // would be applied without complaint and be wrong.
+    // The spherically filled atoms are no longer assumed neutral: each carries
+    // Z - q. Those q electrons have to come from somewhere, and the only place
+    // they can come from is the predicted region - so the target moves by
+    // exactly the charge the fill took on. Without this the two halves disagree
+    // and the SYSTEM total stops being exact, which is the one guarantee this
+    // whole mechanism exists to provide.
+    if (std::abs(applied_fill_charge) > 1e-12)
+    {
+        target_from_coefs += applied_fill_charge;
+        file << "Charge constraint: " << std::showpos << std::fixed << std::setprecision(3)
+             << applied_fill_charge << std::noshowpos
+             << " e moved to the spherically filled atom(s), so the predicted"
+             << " region is targeted accordingly and the system total stays exact."
+             << std::endl;
+    }
+
+    if (net_charge != 0)
+    {
+        if (spherical_fill_used)
+        {
+            // Some atoms are Thakkar-filled, so `atoms` is only the ML subset.
+            // Thakkar densities are strictly neutral, but how a NET charge
+            // divides between the ML region and the filled region is not
+            // defined here. Refusing beats guessing.
+            file << "Charge constraint SKIPPED: net charge " << net_charge
+                 << " on a structure that also uses the spherical fill. The split"
+                 << " of that charge between the predicted and filled regions is"
+                 << " undefined, so the density is left alone." << std::endl;
+            return 1.0;
+        }
+        target_from_coefs -= static_cast<double>(net_charge);
+        file << "Charge constraint: net charge " << net_charge
+             << " taken into account." << std::endl;
+    }
+
+    if (from_coefs <= 0.0 || target_from_coefs <= 0.0)
+    {
+        file << "Charge constraint skipped: non-positive electron count." << std::endl;
+        return 1.0;
+    }
+    // With the spherical fill in play the target assumes every filled atom is
+    // NEUTRAL. That is exactly right for a Thakkar density of a neutral atom
+    // and wrong whenever the filled atom is a formal ion. Seen in practice on a
+    // calcium salt: Ca filled as neutral (20 e) puts the ML target at 116, the
+    // model predicted 116.48 because the organic part is really a dianion, and
+    // the constraint then pulled it the WRONG way. The net charge is zero, so
+    // no charge check can catch this - say so and let the user judge.
+    if (spherical_fill_used)
+    {
+        // The TOTAL stays exact either way - the filled atoms carry a fixed
+        // neutral count and the rest is imposed here - so F(000) is safe. What
+        // the neutral assumption gets wrong is WHERE the electrons sit, and an
+        // exact total hides that. Quantify it instead.
+        if (std::isnan(filled_eeq_charge))
+        {
+            file << "NOTE: " << n_filled << " atom(s) are spherically filled and their"
+                 << " charge could not be estimated, so they are left neutral." << std::endl;
+        }
+        else
+        {
+            const double missed = filled_eeq_charge - applied_fill_charge;
+            file << "NOTE: " << n_filled << " atom(s) are spherically filled. EEQ puts "
+                 << std::showpos << std::fixed << std::setprecision(2) << filled_eeq_charge
+                 << std::noshowpos << " e on them, of which " << std::showpos
+                 << applied_fill_charge << std::noshowpos << " e is applied." << std::endl;
+            if (std::abs(missed) > 0.05)
+                file << "      " << std::showpos << std::setprecision(2) << missed
+                     << std::noshowpos << " e could not be applied because no ion is"
+                     << " tabulated for that element; those atoms stay neutral and that"
+                     << " charge remains on the predicted region." << std::endl;
+        }
+    }
+
+    const double factor = target_from_coefs / from_coefs;
+    if (std::abs(factor - 1.0) > 0.05)
+    {
+        file << "Charge constraint SKIPPED: factor " << factor
+             << " is further than 5 % from unity, which means something else is"
+             << " wrong - refusing to paper over it." << std::endl;
+        return 1.0;
+    }
+
+    int coef_counter = 0;
+    for (int a = 0; a < static_cast<int>(atoms.size()); a++)
+    {
+        int prim = 0;
+        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++)
+        {
+            const int type = atoms[a].get_basis_set_entry(prim).get_type();
+            if (type != 0)
+            {
+                coef_counter += (2 * type + 1);
+                prim += atoms[a].get_shellcount()[shell];
+                continue;
+            }
+            prim += atoms[a].get_shellcount()[shell];
+            coefs[coef_counter] *= factor;
+            coef_counter++;
+        }
+    }
+
+    // On the training chemistry this factor sits at 1.00235 +/- 0.0008. A much
+    // larger one means the density shape is being extrapolated, and a fixed
+    // integral would otherwise hide that.
+    if (std::abs(factor - 1.0) > 0.005)
+    {
+        file << "NOTE: correction of " << std::fixed << std::setprecision(3)
+             << 100.0 * (factor - 1.0) << " % is well outside the ~0.24 % seen on"
+             << " training-like systems - treat this prediction with caution."
+             << std::endl;
+    }
+
+    file << "Charge constraint applied: " << std::fixed << std::setprecision(4)
+         << from_coefs << " -> " << target_from_coefs << " electrons over "
+         << atoms.size() << (spherical_fill_used ? " ML-predicted" : "")
+         << " atoms (factor " << std::setprecision(8) << factor << ")" << std::endl;
+    return factor;
 }
 
 void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr)

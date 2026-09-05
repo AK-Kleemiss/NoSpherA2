@@ -52,6 +52,9 @@ public:
   const vec& get_coefficients() const {
     return coefficients;
   };
+  int get_spin() const {
+	  return op;
+  };
   void assign_coefficients_size(int size)
   {
     coefficients.assign(size, 0.0);

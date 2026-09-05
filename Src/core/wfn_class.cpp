@@ -9,6 +9,7 @@
 #include "nos_math.h"
 #include "libCintMain.h"
 #include "basis_set.h"
+#include "cell.h"
 
 #include "occ/OrbitalDefs.h"
 long long int WFN::pre[9][5][5][9] = {};
@@ -130,10 +131,10 @@ constexpr unsigned int sum_subshells(unsigned int l, bool cartesian = true) {
 
 WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 {
-    // Only works with restricted WFNs for now
+	// Should work for unrestricted now, if something seems weird this is the place to check
     using namespace Eigen;
     using occ::gto::num_subshells;
-    origin = e_origin::OCC;
+    set_origin(e_origin::OCC);
     basis_set_name = occ_WF.basis.name();
     has_ECPs = occ_WF.basis.have_ecps();
     charge = occ_WF.charge();
@@ -164,7 +165,8 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
         std::cout);
 
     auto &mo = occ_WF.mo;
-    if (mo.kind != occ::qm::Restricted) throw std::runtime_error("This constructor only supports Restricted for now.");
+    const bool unrestricted = (mo.kind == occ::qm::Unrestricted);
+    const int n_spin = unrestricted ? 2 : 1;
     auto shell2atom = occ_WF.basis.shell_to_atom();
     vec con_coefs;
     VectorXd shellType(shells.size() + 1);
@@ -196,7 +198,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     {
         const auto &shell = shells[i];
         l = shell.l;
-        shellType(i) = l;
+        shellType(i) = l + 1;
         nprim = shell.num_primitives();
         n_cart = num_subshells(true, l);
         sum_ncart = sum_subshells(l);
@@ -211,7 +213,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
         }
         // insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
         for (int j = 0; j < shell.exponents.size(); j++) {
-            push_back_atom_basis_set(atom, shell.exponents(j), shell.contraction_coefficients(j), shell.l, k);
+            push_back_atom_basis_set(atom, shell.exponents(j), shell.contraction_coefficients(j), shell.l + 1, k);
         }
         k++;
         auto repeated = std::views::iota(0u, n_cart * nprim) | std::views::transform([&](auto) { return atom + 1; });
@@ -242,53 +244,225 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
     double scalar;
 
     // confac = pow(8 * pow(exp[exp_run], 3) / constants::PI3, 0.25);
-    for (int n = 0; n < occ_WF.nbf; ++n)
-    {
-        basis_offset = 0;
-        write_cursor = 0;
-        occ = n < occ_WF.n_alpha() ? 2 : 0;
-        push_back_MO(n + 1, occ, mo.energies[n]);
-        MOs[n].assign_coefficients_size(nex);
-        coeffs_ptr = const_cast<double *>(MOs[n].get_coefficient_ptr());  //Casting away const-ness is bad practice, but in this case we know that the data will be modified and we need a non-const pointer to write into it.
-        for (const auto &shell : shells) {
-            l = shell.l;
-            p = (2.0 * l + 3.0) / 4.0;
-            scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25);
-            const auto &A = MappedMatrices[l];
-            n_sph = A.cols();
-            n_prim = shell.num_primitives();
-            n_cart = A.rows();
-            chunk_size = n_cart * n_prim;
-            const auto &exp_arr = shell.exponents.array();
-            // normalizing the contraction_coeffs
-            ArrayXd CC = shell.u_coefficients.array();
-            if (!from_file)
-                CC = VectorXd::NullaryExpr(CC.size(), [shell](const Index i) {
-                return shell.coeff_normalized(0, i);
-                    });
-            const VectorXd &contraction_coeffs = scalar * (2 * exp_arr).pow(p) * CC;
-            const auto &MOc = mo_go.C.block(basis_offset, n, n_sph, 1);
-            Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);
-            // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
-            dest_block = contraction_coeffs * (A * MOc).transpose();
+    for (int spin = 0; spin < n_spin; spin++) {
+        const int row_offset = unrestricted ? spin * occ_WF.nbf : 0;
+        const int nocc = unrestricted ? (spin == 0 ? occ_WF.n_alpha() : occ_WF.n_beta()) : occ_WF.n_alpha();
+        for (int n = 0; n < occ_WF.nbf; n++)
+        {
+            basis_offset = 0;
+            write_cursor = 0;
+            occ = (n < nocc) ? (unrestricted ? 1.0 : 2.0) : 0.0;
+            int energy_index = unrestricted ? spin * occ_WF.nbf + n : n;
+            push_back_MO(energy_index + 1, occ, mo.energies[energy_index], spin);
+            MO& currentMO = MOs.back();
+            currentMO.assign_coefficients_size(nex);
+			coeffs_ptr = const_cast<double*>(currentMO.get_coefficient_ptr());
+            for (const auto& shell : shells) {
+                l = shell.l;
+                p = (2.0 * l + 3.0) / 4.0;
+                scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25);
+                const auto& A = MappedMatrices[l];
+                n_sph = A.cols();
+                n_prim = shell.num_primitives();
+                n_cart = A.rows();
+                chunk_size = n_cart * n_prim;
+                const auto& exp_arr = shell.exponents.array();
+                // normalizing the contraction_coeffs
+                ArrayXd CC = shell.u_coefficients.array();
+                if (!from_file)
+                    CC = VectorXd::NullaryExpr(CC.size(), [shell](const Index i) {
+                    return shell.coeff_normalized(0, i);
+                        });
+                const VectorXd& contraction_coeffs = scalar * (2 * exp_arr).pow(p) * CC;
+                const auto& MOc = mo_go.C.block(row_offset + basis_offset, n, n_sph, 1);
+                Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);
+                // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
+                dest_block = contraction_coeffs * (A * MOc).transpose();
 
-            write_cursor += chunk_size;
-            basis_offset += n_sph;
+                write_cursor += chunk_size;
+                basis_offset += n_sph;
+            }
         }
     }
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
 
-    set_origin(e_origin::OCC);
     d_f_switch = false;
-    int nmo_ = occ_WF.mo.D.rows();
+    int nmo_ = occ_WF.mo.D.cols();
     DM = dMatrix2(nmo_, nmo_);
-    for (int i = 0; i < nmo_; i++) {
-        DM(i, i) = 2 * occ_WF.mo.D(i, i);
-        for (int j = i + 1; j < nmo_; j++) {
-            DM(i, j) = 2 * occ_WF.mo.D(i, j);
-            DM(j, i) = DM(i, j);
+    if (occ_WF.mo.kind == occ::qm::Restricted) {
+        for (int i = 0; i < nmo_; i++) {
+            DM(i, i) = 2 * occ_WF.mo.D(i, i);
+            for (int j = i + 1; j < nmo_; j++) {
+                DM(i, j) = 2 * occ_WF.mo.D(i, j);
+                DM(j, i) = DM(i, j);
+            }
         }
     }
+	else if (occ_WF.mo.kind == occ::qm::Unrestricted) {
+		for (int i = 0; i < nmo_; i++) {
+			DM(i, i) = occ_WF.mo.D(i, i) + occ_WF.mo.D(i + nmo_, i);
+			for (int j = i + 1; j < nmo_; j++) {
+				DM(i, j) = occ_WF.mo.D(i, j) + occ_WF.mo.D(i + nmo_, j);
+				DM(j, i) = DM(i, j);
+			}
+		}
+        is_unrestricted = true;
+	}
+    MO_sph = dMatrix2(occ_WF.mo.C.rows(), occ_WF.mo.C.cols());
+    for (long i = 0; i < occ_WF.mo.C.rows(); i++)
+        for (long j = 0; j < occ_WF.mo.C.cols(); j++)
+            MO_sph(i, j) = occ_WF.mo.C(i, j);
+}
+
+// Hokus pokus freestyle modus, hopefully converts a WFN object to the occ wavefunction
+// Fully vibe coded without application because WFNs don't include virtual orbitals
+void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
+{
+    using occ::gto::num_subshells;
+    using AOBasisT = std::remove_cvref_t<decltype(occ_wf.basis)>;
+    using AtomListT = AOBasisT::AtomList;
+    using ShellListT = AOBasisT::ShellList;
+    const int n_atoms = get_ncen();
+    AtomListT occ_atoms(n_atoms);
+    for (int i = 0; i < n_atoms; i++) {
+        const atom& at = get_atom(i);
+        occ_atoms[i].atomic_number = at.get_charge();
+        occ_atoms[i].x = at.get_pos()[0];  
+        occ_atoms[i].y = at.get_pos()[1];
+        occ_atoms[i].z = at.get_pos()[2];
+    }
+    struct RebuiltShell {
+        int atom, l, n_cart, n_prim, nex_start;
+        occ::Vec exponents;
+    };
+    std::vector<RebuiltShell> rebuilt_shells;
+    {
+        int pos = 0;
+        const int nex_total = get_nex();
+        while (pos < nex_total) {
+            const int type0 = get_type(pos);
+            const int atom0 = get_center(pos);
+            int l = 0;
+            while (type0 > static_cast<int>(sum_subshells(l)) + static_cast<int>(num_subshells(true, l)))
+                l++;
+            const int n_cart = num_subshells(true, l);
+            int n_prim = 0;
+            int scan = pos;
+            while (scan < nex_total &&
+                get_type(scan) == type0 &&
+                get_center(scan) == atom0) {
+                n_prim++;
+                scan++;
+            }
+
+            std::vector<double> exp_v(n_prim);
+            for (int i = 0; i < n_prim; i++)
+                exp_v[i] = get_exponent(pos + i);
+
+            RebuiltShell rs;
+            rs.atom = atom0 - 1;
+            rs.l = l;
+            rs.n_cart = n_cart;
+            rs.n_prim = n_prim;
+            rs.nex_start = pos;
+            rs.exponents = Eigen::Map<occ::Vec>(exp_v.data(), n_prim);
+            rebuilt_shells.push_back(rs);
+            pos += n_prim * n_cart; 
+        }
+    }
+
+    const auto& mo0 = get_MO(0);
+    const double* mo0_coeffs = mo0.get_coefficient_ptr();
+    ShellListT occ_shells;
+    occ_shells.reserve(rebuilt_shells.size());
+    std::vector<occ::Vec> actual_contraction_coeffs(rebuilt_shells.size()); 
+
+    for (size_t k = 0; k < rebuilt_shells.size(); k++) {
+        const auto& rs = rebuilt_shells[k];
+        const int l = rs.l, n_prim = rs.n_prim, n_cart = rs.n_cart;
+        int write_cursor = 0;
+        for (size_t k2 = 0; k2 < k; k2++)
+            write_cursor += rebuilt_shells[k2].n_prim * rebuilt_shells[k2].n_cart;
+        Eigen::Map<const Eigen::MatrixXd> dest_block0(mo0_coeffs + write_cursor, n_prim, n_cart);
+        int j_ref = 0; double best = 0;
+        for (int j = 0; j < n_cart; j++) {
+            double m = dest_block0.col(j).cwiseAbs().maxCoeff();
+            if (m > best) { best = m; j_ref = j; }
+        }
+        occ::Vec ratio = dest_block0.col(j_ref);
+        const double scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25);
+        const double p = (2.0 * l + 3.0) / 4.0;
+        std::vector<double> cc_input(n_prim), expo(n_prim);
+        for (int i = 0; i < n_prim; i++) {
+            expo[i] = rs.exponents(i);
+            cc_input[i] = ratio(i) / (scalar * std::pow(2.0 * expo[i], p));
+        }
+        std::array<double, 3> pos{ occ_atoms[rs.atom].x,
+                                    occ_atoms[rs.atom].y,
+                                    occ_atoms[rs.atom].z };
+        occ::gto::Shell sh(l, expo, { cc_input }, pos);
+        sh.kind = occ::gto::Shell::Kind::Spherical;
+        occ::Vec true_cc(n_prim);
+        for (int i = 0; i < n_prim; i++)
+            true_cc(i) = scalar * std::pow(2.0 * expo[i], p) * sh.coeff_normalized(0, i);
+
+        actual_contraction_coeffs[k] = true_cc;
+        occ_shells.push_back(std::move(sh));
+    }
+    occ_wf.basis = AOBasisT(occ_atoms, occ_shells);
+    occ_wf.atoms = occ_atoms;
+    occ_wf.basis.set_pure(true);
+    const int nbf_sph = static_cast<int>(occ_wf.basis.nbf());
+    const int n_mo_total = get_nmo();
+    const bool unrestricted = get_is_unrestricted();
+    const int n_spin = unrestricted ? 2 : 1;
+    occ::Mat C_gaussian_order(nbf_sph * n_spin, n_mo_total / n_spin);
+    occ::Vec energies(n_mo_total);
+	occ::Vec occupations(n_mo_total);
+    int n_alpha = 0, n_beta = 0;
+    for (int spin = 0; spin < n_spin; spin++) {
+        for (int n = 0; n < n_mo_total / n_spin; n++) {
+            const int mo_index = unrestricted ? spin * (n_mo_total / n_spin) + n : n;
+            const auto& mo = get_MO(mo_index);
+            energies(mo_index) = mo.get_energy();
+            occupations(mo_index) = mo.get_occ();
+            if (unrestricted) {
+                if (spin == 0 && mo.get_occ() > 0.5) n_alpha++;
+                if (spin == 1 && mo.get_occ() > 0.5) n_beta++;
+            }
+            else {
+                if (mo.get_occ() > 1.5) { n_alpha++; n_beta++; }
+                else if (mo.get_occ() > 0.5) n_alpha++;
+            }
+            const double* coeffs_ptr = mo.get_coefficient_ptr();
+            int write_cursor = 0, sph_offset = spin * nbf_sph;
+            for (size_t k = 0; k < rebuilt_shells.size(); k++) {
+                const auto& rs = rebuilt_shells[k];
+                Eigen::Map<const Eigen::MatrixXd> dest_block(coeffs_ptr + write_cursor, rs.n_prim, rs.n_cart);
+                const occ::Vec& cc = actual_contraction_coeffs[k];
+                occ::Vec cart_mo_coeffs =
+                    (dest_block.transpose() * cc) / cc.squaredNorm();
+                const auto& A = MappedMatrices[rs.l];
+                occ::Vec MOc = A.completeOrthogonalDecomposition().pseudoInverse() * cart_mo_coeffs;
+                C_gaussian_order.block(sph_offset, n, MOc.size(), 1) = MOc;
+                sph_offset += A.cols();
+                write_cursor += rs.n_prim * rs.n_cart;
+            }
+        }
+    }
+    occ::qm::MolecularOrbitals mo_go;
+    mo_go.kind = unrestricted ? occ::qm::Unrestricted : occ::qm::Restricted;
+    mo_go.n_alpha = n_alpha;
+    mo_go.n_beta = n_beta;
+    mo_go.n_ao = nbf_sph;
+    mo_go.C = C_gaussian_order;
+    mo_go.energies = energies;
+    mo_go.occupation = occupations;
+    occ_wf.num_electrons = n_alpha + n_beta;
+    occ_wf.mo = occ::io::conversion::orb::from_gaussian_order(occ_wf.basis, mo_go);
+    occ_wf.mo.update_occupied_orbitals();
+    occ_wf.mo.update_density_matrix();
+    occ_wf.nbf = occ_wf.basis.nbf();
 }
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const atomID &ID)
@@ -689,9 +863,9 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         path = fileName;
     string line;
     rf.seekg(0);
-    getline(rf, line);
+    getline_universal(rf, line);
     comment = line;
-    getline(rf, line);
+    getline_universal(rf, line);
     stringstream stream(line);
     string header_tmp;
     int e_nmo, e_nex, e_nuc = 0; // number of expected MOs, Exponents and nuclei
@@ -714,7 +888,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     for (int i = 0; i < e_nuc; i++)
     {
         // int dump = 0;
-        getline(rf, line);
+        getline_universal(rf, line);
         if (debug)
             file << i << ".run, line:" << line << endl;
         length = line.copy(tempchar, 4, 0);
@@ -747,7 +921,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     // int run = 0;
     int exnum = 0;
     // int dump = 0;
-    getline(rf, line);
+    getline_universal(rf, line);
     while (line.compare(0, 6, "CENTRE") == 0 && !rf.eof())
     {
         if (exnum + 20 <= e_nex)
@@ -784,11 +958,11 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
             }
             else
             {
-                getline(rf, line);
+                getline_universal(rf, line);
                 continue;
             }
         }
-        getline(rf, line);
+        getline_universal(rf, line);
         if (exnum > e_nex)
         {
             file << "run went higher than expected values in center reading, thats suspicius, lets stop here...\n";
@@ -836,10 +1010,10 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         }
         else
         {
-            getline(rf, line);
+            getline_universal(rf, line);
             continue;
         }
-        getline(rf, line);
+        getline_universal(rf, line);
         if (exnum > e_nex)
         {
             file << "exnum went higher than expected values in type reading, thats suspicius, lets stop here...\n";
@@ -918,10 +1092,10 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         }
         else
         {
-            getline(rf, line);
+            getline_universal(rf, line);
             continue;
         }
-        getline(rf, line);
+        getline_universal(rf, line);
         if (exnum > e_nex)
         {
             file << "exnum went higher than expected values in exponent reading, thats suspicius, lets stop here...\n";
@@ -995,7 +1169,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         }
         push_back_MO(temp_nr, temp_occ, temp_ener, oper);
         //---------------------------Start reading MO coefficients-----------------------
-        getline(rf, line);
+        getline_universal(rf, line);
         linecount = 0;
         exnum = 0;
         while (!(line.compare(0, 2, "MO") == 0) && !rf.eof())
@@ -1037,10 +1211,10 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
             }
             else
             {
-                getline(rf, line);
+                getline_universal(rf, line);
                 continue;
             }
-            getline(rf, line);
+            getline_universal(rf, line);
             if (linecount * 5 > e_nex + 1)
             {
                 file << "linecount went higher than expected values in exponent reading, thats suspicius, lets stop here...\n";
@@ -1073,13 +1247,13 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
     string line;
     rf.seekg(0);
 
-    getline(rf, line);
+    getline_universal(rf, line);
     stringstream stream(line);
     int e_nuc = 0; // number of expected MOs, Exponents and nuclei
     stream >> e_nuc;
     if (debug)
         file << "e_nuc: " << e_nuc << endl;
-    getline(rf, line);
+    getline_universal(rf, line);
     comment = line;
     //----------------------------- Read Atoms ------------------------------------------------------------
     ivec dum_nr, dum_ch;
@@ -1094,7 +1268,7 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
     for (int i = 0; i < e_nuc; i++)
     {
         svec temp;
-        getline(rf, line);
+        getline_universal(rf, line);
         stream.str(line);
         if (debug)
             file << i << ".run, line:" << line << endl;
@@ -1126,6 +1300,27 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
     return true;
 };
 
+std::vector<asym_atom> WFN::extract_xyz(const std::string& unit) {
+    std::vector<asym_atom> atoms;
+    const d3 dummy_coords({0, 0, 0});
+    for (int i = 0; i < ncen; i++) {
+        atom temp_atom = get_atom(i);
+        d3 temp_coords = temp_atom.get_pos();
+        if (isBohr == true && unit == "angstrom") {
+            temp_coords[0] = constants::bohr2ang(temp_coords[0]);
+            temp_coords[1] = constants::bohr2ang(temp_coords[1]);
+            temp_coords[2] = constants::bohr2ang(temp_coords[2]);
+        }
+        else if (isBohr == false && unit == "bohr") {
+            temp_coords[0] = constants::ang2bohr(temp_coords[0]);
+            temp_coords[1] = constants::ang2bohr(temp_coords[1]);
+            temp_coords[2] = constants::ang2bohr(temp_coords[2]);
+        }
+        atoms.emplace_back(asym_atom(temp_atom.get_label(), temp_atom.get_charge(), temp_coords, dummy_coords, 1.0, cdouble(0.0, 0.0)));
+	}
+    return atoms;
+}
+
 bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
 {
     origin = e_origin::wfx;
@@ -1136,41 +1331,41 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     path = fileName;
     string line;
     rf.seekg(0);
-    getline(rf, line);
+    getline_universal(rf, line);
     while (line.find("<Title>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     if (debug)
         file << "comment line " << line << endl;
     comment = line;
     rf.seekg(0);
     while (line.find("<Number of Nuclei>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     if (debug)
         file << line << endl;
     int temp_ncen = stoi(line);
     rf.seekg(0);
     while (line.find("<Number of Primitives>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     if (debug)
         file << "nex line: " << line << endl;
     int temp_nex = stoi(line);
     rf.seekg(0);
     while (line.find("<Number of Occupied Molecular Orbitals>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     if (debug)
         file << "nmo line: " << line << endl;
     int temp_nmo = stoi(line);
     rf.seekg(0);
     while (line.find("<Atomic Numbers>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     ivec nrs;
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         // if (debug) file << "atom number line: " << line << endl;
         if (line.find("</Atomic Numbers>") != string::npos)
             break;
@@ -1179,13 +1374,13 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     err_checkf(nrs.size() == temp_ncen, "Mismatch in atom number size", file);
     rf.seekg(0);
     while (line.find("<Nuclear Cartesian Coordinates>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     vec2 pos;
     pos.resize(3);
     double temp[3]{ 0, 0, 0 };
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         if (line.find("</Nuclear Cartesian Coordinates>") != string::npos)
             break;
         istringstream is(line);
@@ -1203,20 +1398,20 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     pos.resize(0);
     rf.seekg(0);
     while (line.find("<Net Charge>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     charge = stoi(line);
     rf.seekg(0);
     while (line.find("<Electronic Spin Multiplicity>") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     multi = stoi(line);
     rf.seekg(0);
     while (line.find("<Primitive Centers>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         if (line.find("</Primitive Centers>") != string::npos)
             break;
         int number = CountWords(line.c_str());
@@ -1230,10 +1425,10 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     }
     rf.seekg(0);
     while (line.find("<Primitive Types>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         if (line.find("</Primitive Types>") != string::npos)
             break;
         int number = CountWords(line.c_str());
@@ -1247,10 +1442,10 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     }
     rf.seekg(0);
     while (line.find("<Primitive Exponents>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         bool please_break = false;
         if (line.find("</Primitive Exponents>") != string::npos)
         {
@@ -1276,11 +1471,11 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     nex = temp_nex;
     rf.seekg(0);
     while (line.find("<Molecular Orbital Occupation Numbers>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     vec occ;
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         bool please_break = false;
         if (line.find("</Molecular Orbital Occupation Numbers>") != string::npos)
         {
@@ -1302,11 +1497,11 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     }
     rf.seekg(0);
     while (line.find("<Molecular Orbital Energies>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     vec ener;
     while (true)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
         bool please_break = false;
         if (line.find("</Molecular Orbital Energies>") != string::npos)
         {
@@ -1346,21 +1541,21 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     ener.resize(0);
     rf.seekg(0);
     while (line.find("<Molecular Orbital Primitive Coefficients>") == string::npos)
-        getline(rf, line);
+        getline_universal(rf, line);
     vec coef;
     while (line.find("</Molecular Orbital Primitive Coefficients>") == string::npos)
     {
         while (line.find("<MO Number>") == string::npos)
-            getline(rf, line);
-        getline(rf, line);
+            getline_universal(rf, line);
+        getline_universal(rf, line);
         // if (debug) file << "mo Nr line: " << line << endl;
         int nr = stoi(line);
         nr--;
         while (line.find("</MO Number>") == string::npos)
-            getline(rf, line);
+            getline_universal(rf, line);
         while (coef.size() != nex)
         {
-            getline(rf, line);
+            getline_universal(rf, line);
             // if (nr == 1 && debug) file << "first MO Coef lines: " << line << endl;
             int number = CountWords(line.c_str());
             istringstream is(line);
@@ -1375,7 +1570,7 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
         for (int i = 0; i < nex; i++)
             MOs[nr].push_back_coef(coef[i]);
         coef.resize(0);
-        getline(rf, line);
+        getline_universal(rf, line);
     }
 
     //Trying to actually read in all the information where it belongs
@@ -1443,12 +1638,12 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
 
 
     while (line.find("<Energy =") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     total_energy = stod(line);
     while (line.find("<Virial Ratio") == string::npos)
-        getline(rf, line);
-    getline(rf, line);
+        getline_universal(rf, line);
+    getline_universal(rf, line);
     virial_ratio = stod(line);
     rf.close();
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
@@ -1484,20 +1679,20 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     rf.seekg(0);
     // d_f_switch = true;
 
-    getline(rf, line);
+    getline_universal(rf, line);
     err_checkf(line.find("Molden Format") != string::npos, "Does not look like proper molden format file!", file);
-    getline(rf, line);
+    getline_universal(rf, line);
     comment = split_string<string>(line, "]")[1];
     bool au_bohr = false; // au = false, angs = true;
     while (line.find("[Atoms]") == string::npos)
     {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     if (split_string<string>(line, "]")[1].find("angs") != string::npos)
         au_bohr = true;
     else if (split_string<string>(line, "]")[1].find("Angs") != string::npos)
         au_bohr = true;
-    getline(rf, line);
+    getline_universal(rf, line);
     svec temp;
     while (line.find("]") == string::npos)
     {
@@ -1517,17 +1712,17 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 stod(temp[5]),
                 stoi(temp[2])),
                 "Error pushing back atom", file);
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     err_checkf(line.find("[STO]") == string::npos, "ERROR: STOs are not yet suupported!", file);
-    getline(rf, line);
+    getline_universal(rf, line);
     int atoms_with_basis = 0;
     while (atoms_with_basis < ncen && line.find("[") == string::npos)
     {
         svec line_digest = split_string<string>(line, " ");
         remove_empty_elements(line_digest);
         const int atom_based = stoi(line_digest[0]) - 1;
-        getline(rf, line);
+        getline_universal(rf, line);
         int shell = 0;
         while (line.size() > 2)
         {
@@ -1546,19 +1741,19 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 shell_type = 5;
             else if (line_digest[0] == "h" || line_digest[0] == "H" || line_digest[0] == "i" || line_digest[0] == "I")
                 err_not_impl_f("Higher angular momentum basis functions than G", file);
-            getline(rf, line);
+            getline_universal(rf, line);
             const int number_of_functions = stoi(line_digest[1]);
             for (int i = 0; i < number_of_functions; i++)
             {
                 line_digest = split_string<string>(line, " ");
                 remove_empty_elements(line_digest);
                 err_checkf(atoms[atom_based].push_back_basis_set(stod(line_digest[0]), stod(line_digest[1]), shell_type, shell), "Error pushing back basis", file);
-                getline(rf, line);
+                getline_universal(rf, line);
             }
             shell++;
         }
         atoms_with_basis++;
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     bool d5 = false;
     bool f7 = false;
@@ -1588,7 +1783,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             d5 = true;
             g9 = true;
         }
-        getline(rf, line); // Read more lines until we reach MO block
+        getline_universal(rf, line); // Read more lines until we reach MO block
     }
     vec3 coefficients(2);
     vec occ;
@@ -1638,7 +1833,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     atoms[a].get_basis_set_coefficient(s)));
             }
         }
-        getline(rf, line);
+        getline_universal(rf, line);
         int MO_run = 0;
         vec2 p_pure_2_cart;
         vec2 d_pure_2_cart;
@@ -1651,11 +1846,11 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             sym = temp[1];
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             ene = stod(temp[1]);
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             if (temp[1] == "Alpha" || temp[1] == "alpha")
@@ -1664,7 +1859,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 spin = true;
                 is_unrestricted = true;
             }
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             occup = stod(temp[1]);
@@ -1683,7 +1878,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             int basis_run = 0;
             for (int i = 0; i < expected_coefs; i++)
             {
-                getline(rf, line);
+                getline_universal(rf, line);
                 temp = split_string<string>(line, " ");
                 remove_empty_elements(temp);
                 coefficients[spin][MO_run].push_back(stod(temp[1]));
@@ -1886,7 +2081,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             }
             err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
             MO_run++;
-            getline(rf, line);
+            getline_universal(rf, line);
         }
     }
     else if (!d5 && !f7 && !g9)
@@ -1936,7 +2131,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     atoms[a].get_basis_set_coefficient(s)));
             }
         }
-        getline(rf, line);
+        getline_universal(rf, line);
         int MO_run = 0;
         while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos)
         {
@@ -1944,18 +2139,18 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             sym = temp[1];
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             ene = stod(temp[1]);
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             if (temp[1] == "Alpha" || temp[1] == "alpha")
                 spin = false;
             else
                 spin = true;
-            getline(rf, line);
+            getline_universal(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
             occup = stod(temp[1]);
@@ -1974,7 +2169,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             int basis_run = 0;
             for (int i = 0; i < expected_coefs; i++)
             {
-                getline(rf, line);
+                getline_universal(rf, line);
                 temp = split_string<string>(line, " ");
                 remove_empty_elements(temp);
                 coefficients[spin][MO_run].push_back(stod(temp[1]));
@@ -2167,7 +2362,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             }
             err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
             MO_run++;
-            getline(rf, line);
+            getline_universal(rf, line);
         }
     }
     else
@@ -2210,13 +2405,13 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
             rf.open(stdout_file.string().c_str(), ios::in);
             rf.seekg(0);
             while (rf.good() && line.find("Name ...") == string::npos) {
-                getline(rf, line);
+                getline_universal(rf, line);
             }
             jobname = split_string<string>(line, " ")[2];
 
             rf.seekg(0);
             while (rf.good() && line.find("SCF kind ....") == string::npos) {
-                getline(rf, line);
+                getline_universal(rf, line);
             }
             scf_kind = split_string<string>(line, " ")[3];
             if (scf_kind == "rhf" || scf_kind == "rks" || scf_kind == "xray_rhf" || scf_kind == "xray_rks")
@@ -2370,32 +2565,32 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
     err_checkf(rf.good(), "couldn't open " + stdout_file.string() + ", leaving", file);
     //fast forward to the atom section
     while (rf.good() && line.find("Molecule information") == string::npos) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     err_checkf(rf.good(), "Couldn't find molecule information in " + stdout_file.string(), file);
     //skip 8 lines to get to the charge
     for (int i = 0; i < 8; i++) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     svec line_digest = split_string<string>(line, " ");
     //get the charge form the last element in the line
     charge = stoi(line_digest[line_digest.size() - 1]);
-    getline(rf, line);
+    getline_universal(rf, line);
     line_digest = split_string<string>(line, " ");
     multi = stoi(line_digest[line_digest.size() - 1]);
-    getline(rf, line);
-    getline(rf, line);
+    getline_universal(rf, line);
+    getline_universal(rf, line);
     line_digest = split_string<string>(line, " ");
     const int expected_atoms = stoi(line_digest[line_digest.size() - 1]);
-    getline(rf, line);
+    getline_universal(rf, line);
     line_digest = split_string<string>(line, " ");
     const int expected_electrons = stoi(line_digest[line_digest.size() - 1]);
     while (rf.good() && line.find("Atom coordinates") == string::npos) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     //skip 11 lines to get to the atom list
     for (int i = 0; i < 11; i++) {
-        getline(rf, line);
+        getline_universal(rf, line);
         if (line.find("This molecule has non trivial group") != string::npos)
             i -= 3;
     }
@@ -2422,7 +2617,7 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
             z = constants::ang2bohr(stod(line_digest[6]));
         }
         err_checkf(push_back_atom(label, x, y, z, atomic_number), "Error pushing back an atom!", std::cout);
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     err_checkf(ncen == expected_atoms, "Did not read expected number of atoms!", std::cout);
 
@@ -2455,35 +2650,35 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
     }
 
     while (rf.good() && line.find("Gaussian basis sets") == string::npos) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     //get 3 lines down to the basis set name
     for (int i = 0; i < 3; i++) {
-        getline(rf, line);
+        getline_universal(rf, line);
     }
     //read basis set
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
     basis_set_name = line_digest[line_digest.size() - 1];
-    getline(rf, line);//emtpy line
-    getline(rf, line);//number of basis sets that will be printed below
+    getline_universal(rf, line);//emtpy line
+    getline_universal(rf, line);//number of basis sets that will be printed below
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
     const int no_basis_sets = stoi(line_digest[line_digest.size() - 1]);
-    getline(rf, line);//number of shells
+    getline_universal(rf, line);//number of shells
 
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
     const int no_shells = stoi(line_digest[line_digest.size() - 1]);
 
-    getline(rf, line);//number of shell pair (we do not consider this)
-    getline(rf, line);//No of basis functions
+    getline_universal(rf, line);//number of shell pair (we do not consider this)
+    getline_universal(rf, line);//No of basis functions
 
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
     const int no_bf = stoi(line_digest[line_digest.size() - 1]);
 
-    getline(rf, line);//No of primitives
+    getline_universal(rf, line);//No of primitives
 
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
@@ -2493,19 +2688,19 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
     for (int nbs = 0; nbs < no_basis_sets; nbs++)
     {
         //two empty lines
-        getline(rf, line);
-        getline(rf, line);
-        getline(rf, line);//looks like "Basis set H:3-21G"
+        getline_universal(rf, line);
+        getline_universal(rf, line);
+        getline_universal(rf, line);//looks like "Basis set H:3-21G"
         line_digest = split_string<string>(line, " ");
         const string atom_type = split_string<string>(line_digest[2], ":")[0];
-        getline(rf, line); // empty line
-        getline(rf, line);//looks like "No. of shells .... N"
+        getline_universal(rf, line); // empty line
+        getline_universal(rf, line);//looks like "No. of shells .... N"
         line_digest = split_string<string>(line, " ");
         const int shells_local = stoi(line_digest[4]);
-        getline(rf, line);//looks like "No. of basis functions .... N"
+        getline_universal(rf, line);//looks like "No. of basis functions .... N"
         line_digest = split_string<string>(line, " ");
         const int bfs_local = stoi(line_digest[5]);
-        getline(rf, line);//looks like "No. of primitives .... N"
+        getline_universal(rf, line);//looks like "No. of primitives .... N"
         line_digest = split_string<string>(line, " ");
         const int prims_local = stoi(line_digest[4]);
         /*
@@ -2516,11 +2711,11 @@ __________________________________
 __________________________________
 
 */
-        for (int i = 0; i < 7; i++) getline(rf, line); //skip 6 lines to get to the shells
+        for (int i = 0; i < 7; i++) getline_universal(rf, line); //skip 6 lines to get to the shells
         atom temp_at(atom_type, {}, 0, 0, 0, 0, constants::get_Z_from_label(atom_type.c_str()));
         for (int s = 0; s < shells_local; s++)
         {
-            //getline(rf, line); //get shell line
+            //getline_universal(rf, line); //get shell line
             line_digest = split_string<string>(line, " ");
             remove_empty_elements(line_digest);
             err_checkf(l_map.contains(line_digest[0][0]), "Angular momentum not found: " + line_digest[0], std::cout);
@@ -2531,7 +2726,7 @@ __________________________________
                 const double coefficient = stod(line_digest[line_digest.size() == 2 ? 1 : 3]);
                 const double norm_fac = pow(pow(2, 3 + 4 * angul) * pow(exponent, 2 * angul + 3) / constants::PI3 / pow(constants::double_ft[angul], 2), 0.25);
                 temp_at.push_back_basis_set(exponent, coefficient * norm_fac, angul + 1, s);
-                getline(rf, line);
+                getline_universal(rf, line);
                 line_digest = split_string<string>(line, " ");
                 remove_empty_elements(line_digest);
             } while (line_digest.size() == 2);
@@ -4067,6 +4262,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
         }
     };
 
+    const int first_type[5] = { 1, 2, 5, 11, 21 };
     auto nbo_labels = [](const int type) -> ivec {
         switch (type) {
         case 1: return { 1 };
@@ -4089,9 +4285,15 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
         const int cart_count = cart_component_count(type);
         const int nbo_count = nbo_component_count(type);
         vec2 transform(cart_count, vec(nbo_count, 0.0));
-        if (type == 1 || type == 2) {
-            for (int i = 0; i < cart_count; i++)
-                transform[i][i] = 1.0;
+        if (type == 1) {
+            transform[0][0] = 1.0;
+        }
+        else if (type == 2) {
+            //z, x, y as the .47 labels p (ORCA order, like d..g below); p_pure_2_cart is the
+            //m = -1..1 order y, z, x and does not fit here
+            transform[2][0] = 1.0;
+            transform[0][1] = 1.0;
+            transform[1][2] = 1.0;
         }
         else if (type == 3) {
             transform = d_pure_2_cart;
@@ -4122,7 +4324,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     };
 
     vector<NboShell> shells;
-    int internal_nao = 0;
     int nbo_nao = 0;
     int nbo_nexp = 0;
     int highest_angular = -1;
@@ -4138,16 +4339,33 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
             shell.type = type;
             shell.nprim = get_atom_shell_primitives(a, s);
             shell.atom_prim_start = get_shell_start(a, s);
-            shell.internal_start = internal_nao;
+            shell.internal_start = 0;
             shell.nbo_start = nbo_nao;
             shell.cart_components = cart_count;
             shell.nbo_components = nbo_count;
             shells.push_back(shell);
-            internal_nao += cart_count;
             nbo_nao += nbo_count;
             nbo_nexp += shell.nprim;
             highest_angular = std::max(highest_angular, type - 1);
         }
+    }
+    //Int_Params, the gbw reader and OCC group an atom's shells by angular momentum, the loop
+    //above follows the wavefunction's shell order. internal_start indexes the spherical
+    //overlap, density and coefficient matrices in the grouped order, nbo_start the .47 order.
+    {
+        int internal_run = 0;
+        for (int a = 0; a < get_ncen(); a++) {
+            int max_l = 0;
+            for (auto& sh : shells)
+                if (sh.atom == a) max_l = std::max(max_l, sh.type - 1);
+            for (int l = 0; l <= max_l; l++)
+                for (auto& sh : shells)
+                    if (sh.atom == a && sh.type - 1 == l) {
+                        sh.internal_start = internal_run;
+                        internal_run += sh.nbo_components;
+                    }
+        }
+        err_checkf(internal_run == nbo_nao, "Angular-momentum regrouping lost basis functions in the .47 writer", std::cout);
     }
     progress("Built NBO shell model: atoms=" + std::to_string(get_ncen()) +
         ", shells=" + std::to_string(shells.size()) +
@@ -4184,7 +4402,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
             basis_coefficients[a].push_back(temp_c);
         }
     }
-    vec norm_const;
     for (int a = 0; a < get_ncen(); a++)
     {
         double aiaj = 0.0;
@@ -4226,7 +4443,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                     }
                     // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                     basis_coefficients[a][i] *= factor;
-                    norm_const.emplace_back(basis_coefficients[a][i]);
                 }
                 break;
             case 2:
@@ -4253,8 +4469,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                     }
                     // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                     basis_coefficients[a][i] *= factor;
-                    for (int k = 0; k < 3; k++)
-                        norm_const.emplace_back(basis_coefficients[a][i]);
                 }
                 break;
             case 3:
@@ -4281,10 +4495,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                     }
                     // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                     basis_coefficients[a][i] *= factor;
-                    for (int k = 0; k < 3; k++)
-                        norm_const.emplace_back(basis_coefficients[a][i]);
-                    for (int k = 0; k < 3; k++)
-                        norm_const.emplace_back(sqrt(3) * basis_coefficients[a][i]);
                 }
                 break;
             case 4:
@@ -4311,11 +4521,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                     }
                     // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                     basis_coefficients[a][i] *= factor;
-                    for (int l = 0; l < 3; l++)
-                        norm_const.emplace_back(basis_coefficients[a][i]);
-                    for (int l = 0; l < 6; l++)
-                        norm_const.emplace_back(sqrt(5) * basis_coefficients[a][i]);
-                    norm_const.emplace_back(sqrt(15) * basis_coefficients[a][i]);
                 }
                 break;
             }
@@ -4323,29 +4528,45 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
                 std::cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << endl;
         }
     }
-    vec2 changed_coefs;
-    changed_coefs.resize(get_nmo());
-#pragma omp parallel for
-    for (int m = 0; m < get_nmo(); m++)
-    {
-        changed_coefs[m].resize(get_MO_primitive_count(m), 0.0);
-        for (int p = 0; p < get_MO_primitive_count(m); p++)
-        {
-            changed_coefs[m][p] = get_MO_coef(m, p) / norm_const[p];
+    //NBO slot c of a shell (m = 0, +1, -1, +2, -2, ... as ORCA orders it) holds pure function
+    //orca_2_pySCF(l, c) of the m = -l..l order libcint, OCC and the gbw reader keep their
+    //matrices in; sph_index maps a slot to its row in those matrices.
+    ivec sph_index(nbo_nao, 0);
+    for (const auto& shell : shells)
+        for (int c = 0; c < shell.nbo_components; c++) {
+            const auto offset = constants::orca_2_pySCF(shell.type - 1, c);
+            err_checkf(offset.has_value(), "Unsupported NBO AO order in .47 writer", std::cout);
+            sph_index[shell.nbo_start + c] = shell.internal_start + static_cast<int>(offset.value());
         }
-    }
 
     const int alpha_mos = get_MO_op_count(0);
     const int beta_mos = get_MO_op_count(1);
-    progress("Reconstructing MO coefficients in NBO AO order: alpha=" + std::to_string(alpha_mos) +
-        ", beta=" + std::to_string(beta_mos));
     vec2 CMO(alpha_mos, vec(nbo_nao, 0.0));
     vec2 CMO_beta(beta_mos, vec(nbo_nao, 0.0));
+    //An XCW_fit wavefunction still holds the spherical coefficients OCC converged; rebuilding
+    //them from the primitives below needs OCC's normalization convention, which the WFN does
+    //not carry. Other origins that cache their coefficients could take this path as well.
+    const int spin_blocks = get_is_unrestricted() ? 2 : 1;
+    const bool cached_mos = get_origin() == e_origin::XCW_fit
+        && static_cast<int>(MO_sph.extent(0)) == spin_blocks * nbo_nao
+        && static_cast<int>(MO_sph.extent(1)) >= std::max(alpha_mos, beta_mos);
+    if (cached_mos) {
+        progress("Taking MO coefficients from the cached spherical coefficient matrix");
+        for (int m = 0; m < alpha_mos; m++)
+            for (int i = 0; i < nbo_nao; i++)
+                CMO[m][i] = MO_sph(sph_index[i], m);
+        for (int m = 0; m < beta_mos; m++)
+            for (int i = 0; i < nbo_nao; i++)
+                CMO_beta[m][i] = MO_sph(nbo_nao + sph_index[i], m);
+    }
+    else
+        progress("Reconstructing MO coefficients in NBO AO order: alpha=" + std::to_string(alpha_mos) +
+            ", beta=" + std::to_string(beta_mos));
     int alpha_run = 0;
     int beta_run = 0;
     int mo_progress_next = 10;
     int mo_seen = 0;
-    for (int m = 0; m < get_nmo(); m++)
+    for (int m = 0; m < get_nmo() && !cached_mos; m++)
     {
         if (MOs[m].get_op() != 0 && MOs[m].get_op() != 1)
             continue;
@@ -4360,15 +4581,28 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
         for (const auto& shell : shells) {
             vec cart_values(shell.cart_components, 0.0);
             const int primitive_start = get_shell_start_in_primitives(shell.atom, shell.shell);
-            double contraction = 0.0;
-            for (int p = 0; p < shell.nprim; p++) {
-                contraction = get_atom_basis_set_coefficient(shell.atom, shell.atom_prim_start + p);
-                if (std::abs(contraction) > 1E-14)
-                    break;
-            }
+            //Every primitive of a contracted shell is AO coefficient times its stored contraction
+            //coefficient, so the largest one is the safest divisor. The gbw reader stores a
+            //shell primitive-major (x, y, z of primitive 0, then of primitive 1), the OCC
+            //constructor component-major (all primitives of x, then of y); equal consecutive
+            //types tell the two apart.
+            const int shell_start = get_shell_start(shell.atom, shell.shell);
+            int rep = 0;
+            for (int p = 1; p < shell.nprim; p++)
+                if (std::abs(get_atom_basis_set_coefficient(shell.atom, shell_start + p)) >
+                    std::abs(get_atom_basis_set_coefficient(shell.atom, shell_start + rep)))
+                    rep = p;
+            const double contraction = get_atom_basis_set_coefficient(shell.atom, shell_start + rep);
             err_checkf(std::abs(contraction) > 1E-14, "Cannot reconstruct pure MO coefficients for .47 output", std::cout);
-            for (int c = 0; c < shell.cart_components; c++)
-                cart_values[c] = get_MO_coef(m, primitive_start + c) / contraction;
+            const bool component_major = shell.nprim > 1 && shell.cart_components > 1
+                && get_type(primitive_start) == get_type(primitive_start + 1);
+            const int stride = component_major ? shell.nprim : 1;
+            const int rep_offset = component_major ? rep : rep * shell.cart_components;
+            //the components may be permuted as well (gbw stores p as z, x, y): the type says which row
+            for (int c = 0; c < shell.cart_components; c++) {
+                const int prim = primitive_start + c * stride + rep_offset;
+                cart_values[get_type(prim) - first_type[shell.type - 1]] = get_MO_coef(m, prim) / contraction;
+            }
             const vec nbo_values = project_to_nbo(shell_transform(shell.type), cart_values);
             for (int c = 0; c < shell.nbo_components; c++)
                 (*target)[shell.nbo_start + c] = nbo_values[c];
@@ -4409,18 +4643,10 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     bool density_from_cached_dm = false;
     if (static_cast<int>(DM.extent(0)) == nbo_nao && static_cast<int>(DM.extent(1)) == nbo_nao) {
         density_from_cached_dm = true;
-        ivec dm_to_nbo(nbo_nao, 0);
-        for (const auto& shell : shells) {
-            for (int c = 0; c < shell.nbo_components; c++) {
-                const auto offset = constants::orca_2_pySCF(shell.type - 1, c);
-                err_checkf(offset.has_value(), "Unsupported NBO AO order in .47 density writer", std::cout);
-                dm_to_nbo[shell.nbo_start + c] = shell.nbo_start + static_cast<int>(offset.value());
-            }
-        }
         for (int iu = 0; iu < nbo_nao; iu++) {
             for (int iv = 0; iv <= iu; iv++) {
                 const int iuv = (iu * (iu + 1) / 2) + iv;
-                CDM[iuv] = DM(dm_to_nbo[iu], dm_to_nbo[iv]);
+                CDM[iuv] = DM(sph_index[iu], sph_index[iv]);
             }
         }
     }
@@ -4429,74 +4655,34 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     }
 
     vec OVLP_matrix = {};
+    //Int_Params reads each shell's angular momentum by origin (OCC and NOT_YET_DEFINED
+    //store l, everything else l + 1) and normalises by origin; an XCW_fit wavefunction
+    //says which convention it has, so it is handed over as it is.
     Int_Params int_params(*this);
-
-    progress("Computing Cartesian AO overlap integrals");
-    compute2C<Overlap2C_CRT>(int_params, OVLP_matrix);
-    progress("Transforming overlap matrix to NBO AO order");
-    dMatrixRef2 OVLP_cart(OVLP_matrix.data(), internal_nao, internal_nao);
+    progress("Computing spherical AO overlap integrals");
+    compute2C<Overlap2C_SPH>(int_params, OVLP_matrix);
+    err_checkf(static_cast<int>(OVLP_matrix.size()) == nbo_nao * nbo_nao, "Spherical overlap has the wrong size in the .47 writer", std::cout);
+    dMatrixRef2 OVLP_sph(OVLP_matrix.data(), nbo_nao, nbo_nao);
+    //libcint and OCC use the standard phases; ORCA's f(+-3), g(+-3), g(+-4) have the opposite
+    //sign and the gbw reader keeps them, so the overlap takes ORCA's sign there. Other origins
+    //with ORCA-like conventions may need the same and are not checked.
+    vec phase(nbo_nao, 1.0);
+    if (get_origin() == e_origin::gbw)
+        for (const auto& shell : shells)
+            for (int c = 5; c < shell.nbo_components; c++)
+                phase[shell.nbo_start + c] = -1.0;
     vec2 OVLP_nbo(nbo_nao, vec(nbo_nao, 0.0));
-    int overlap_progress_next = 10;
-    int overlap_shells_done = 0;
-#pragma omp parallel for schedule(dynamic)
-    for (int si = 0; si < static_cast<int>(shells.size()); si++) {
-        const auto& shell_i = shells[si];
-        const vec2 transform_i = shell_transform(shell_i.type);
-        for (const auto& shell_j : shells) {
-            const vec2 transform_j = shell_transform(shell_j.type);
-            for (int i = 0; i < shell_i.nbo_components; i++) {
-                for (int j = 0; j < shell_j.nbo_components; j++) {
-                    double value = 0.0;
-                    for (int ci = 0; ci < shell_i.cart_components; ci++) {
-                        const double left = transform_i[ci][i];
-                        if (left == 0.0)
-                            continue;
-                        for (int cj = 0; cj < shell_j.cart_components; cj++)
-                            value += left * OVLP_cart(shell_i.internal_start + ci, shell_j.internal_start + cj) * transform_j[cj][j];
-                    }
-                    OVLP_nbo[shell_i.nbo_start + i][shell_j.nbo_start + j] = value;
-                }
-            }
-        }
-#pragma omp critical(nbo_progress)
-        {
-            overlap_shells_done++;
-            progress_percent("Overlap transform", overlap_shells_done, static_cast<int>(shells.size()), overlap_progress_next);
-        }
-    }
-    for (const auto& shell_i : shells) {
-        for (const auto& shell_j : shells) {
-            if (shell_i.atom != shell_j.atom)
-                continue;
-            if (shell_i.type != shell_j.type) {
-                for (int i = 0; i < shell_i.nbo_components; i++)
-                    for (int j = 0; j < shell_j.nbo_components; j++)
-                        OVLP_nbo[shell_i.nbo_start + i][shell_j.nbo_start + j] = 0.0;
-            }
-            else if (shell_i.shell == shell_j.shell) {
-                for (int i = 0; i < shell_i.nbo_components; i++)
-                    for (int j = 0; j < shell_j.nbo_components; j++)
-                        OVLP_nbo[shell_i.nbo_start + i][shell_j.nbo_start + j] = i == j ? 1.0 : 0.0;
-            }
-        }
-    }
-    if (alpha_mos == nbo_nao) {
-        progress("Reconstructing overlap from MO inverse for a square alpha coefficient matrix");
-        dMatrix2 pure_mo(nbo_nao, nbo_nao);
-        for (int m = 0; m < nbo_nao; m++)
-            for (int ao = 0; ao < nbo_nao; ao++)
-                pure_mo(m, ao) = CMO[m][ao];
-        const dMatrix2 pure_mo_inverse = LAPACKE_invert(pure_mo, 1E-12);
-#pragma omp parallel for schedule(dynamic)
-        for (int i = 0; i < nbo_nao; i++) {
-            for (int j = 0; j < nbo_nao; j++) {
-                double value = 0.0;
-                for (int m = 0; m < nbo_nao; m++)
-                    value += pure_mo_inverse(i, m) * pure_mo_inverse(j, m);
-                OVLP_nbo[i][j] = value;
-            }
-        }
-    }
+    for (int i = 0; i < nbo_nao; i++)
+        for (int j = 0; j < nbo_nao; j++)
+            OVLP_nbo[i][j] = phase[i] * phase[j] * OVLP_sph(sph_index[i], sph_index[j]);
+    //A diagonal off 1 means Int_Params normalised this origin with the wrong convention; the
+    //density beside it is in a normalised basis, so rescaling S alone would only hide it.
+    int unnormalised = 0;
+    for (int i = 0; i < nbo_nao; i++)
+        if (std::abs(OVLP_nbo[i][i] - 1.0) > 1e-8) unnormalised++;
+    if (unnormalised > 0)
+        progress(std::to_string(unnormalised) + " of " + std::to_string(nbo_nao)
+            + " AOs are not normalised in the .47 overlap; check the origin's normalisation in Int_Params");
     auto packed_trace_product = [&](const vec& density) {
         double trace = 0.0;
         for (int i = 0; i < nbo_nao; i++) {
@@ -4560,7 +4746,6 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
     }
 
     ofstream rf(fileName, ios::out);
-    stringstream stream;
     if (!rf.is_open())
     {
         std::cout << "Sorry, can't open the file...\n";
@@ -4808,6 +4993,24 @@ double WFN::count_nr_electrons(void) const
         count += MOs[i].get_occ();
     return count;
 };
+
+double WFN::count_alpha_electrons(void) const
+{
+	double count = 0;
+	for (int i = 0; i < nmo; i++)
+		if (MOs[i].get_spin() == 0)
+			count += MOs[i].get_occ();
+	return count;
+}
+
+double WFN::count_beta_electrons(void) const
+{
+	double count = 0;
+	for (int i = 0; i < nmo; i++)
+		if (MOs[i].get_spin() == 1)
+			count += MOs[i].get_occ();
+	return count;
+}
 
 const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim) const
 {
@@ -6490,10 +6693,16 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         return false;
     }
     origin = e_origin::fchk;
+    // Every other reader (read_wfn, read_wfx, read_xyz, read_molden, ...) records
+    // the source path here; read_fchk did not. The path is what the property code
+    // builds cube filenames from, so without it an fchk-driven run wrote
+    // "_rho.cube", "_lap.cube", "_fukui_plus.cube" etc. with an empty stem - which
+    // silently collide when more than one structure is processed in one directory.
+    path = filename;
     std::string line;
-    getline(fchk, line);
+    getline_universal(fchk, line);
     std::string title = line;
-    getline(fchk, line);
+    getline_universal(fchk, line);
     std::string calculation_level = line;
     if (line[10] == 'R')
     {
@@ -6508,9 +6717,9 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     else if (line[10] == 'U') // Unrestricted
         r_u_ro_switch = 1;
     const int el = read_fchk_integer(fchk, "Number of electrons", false);
-    getline(fchk, line);
+    getline_universal(fchk, line);
     const int ael = read_fchk_integer(line);
-    getline(fchk, line);
+    getline_universal(fchk, line);
     const int bel = read_fchk_integer(line);
     err_checkf(el == ael + bel, "Error in number of electrons!", log);
     if (ael != bel && r_u_ro_switch == 0)
@@ -7022,11 +7231,9 @@ const double WFN::compute_dens_cartesian(
     const MO *MOs_data = MOs.data();
     double *phi_data = phi.data();
     const double exp_cutoff = constants::exp_cutoff;
-    const double **MO_coefs_data = new const double *[nmo];
-    for (j = 0; j < nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major: every MO for one primitive is contiguous, where MOs keeps them nex
+    //apart. Same arithmetic in the same order, and no per-point allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -7100,19 +7307,13 @@ const double WFN::compute_dens_cartesian(
 
         // use pointer arithmetic and cache coefficient pointer
         // This avoids repeated virtual function calls to get_coefficient_f
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi_data;
-        const double *phi_end = phi_ptr + nmo;
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; phi_ptr != phi_end; ++phi_ptr, ++mo_coef_ptr)
+        for (int mo = 0; mo < nmo; ++mo, ++phi_ptr)
         {
-            *phi_ptr += (*mo_coef_ptr)[j] * ex;
+            *phi_ptr += c_row[mo] * ex;
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     // use pointer arithmetic and minimize overhead
     const double *phi_ptr = phi_data;
@@ -7327,11 +7528,10 @@ const double WFN::compute_spin_dens_cartesian(
     const double *exponents_data = exponents.data();
     const MO *MOs_data = MOs.data();
     double *phi_data = phi.data();
-    const double **MO_coefs_data = new const double *[nmo];
-    for (j = 0; j < nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -7404,19 +7604,13 @@ const double WFN::compute_spin_dens_cartesian(
         }
         // use pointer arithmetic and cache coefficient pointer
         // This avoids repeated virtual function calls to get_coefficient_f
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi_data;
-        const double *phi_end = phi_ptr + nmo;
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; phi_ptr != phi_end; ++phi_ptr, ++mo_coef_ptr)
+        for (int mo = 0; mo < nmo; ++mo, ++phi_ptr)
         {
-            *phi_ptr += (*mo_coef_ptr)[j] * ex;
+            *phi_ptr += c_row[mo] * ex;
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     // use pointer arithmetic and minimize overhead
     const double *phi_ptr = phi_data;
@@ -7758,6 +7952,31 @@ void WFN::pop_back_MO()
     nmo--;
 }
 
+//Transposed MO coefficients, [primitive * nmo + mo], built once and reused by every point.
+//Locked because the first caller is usually several threads at once: make_chi parallelises
+//over atom pairs, and compute_dens underneath it is what asks for this. Unlocked, two
+//threads both find it cold and one reallocates under the other. A plain bool cannot be
+//double-checked and an atomic member would make WFN non-copyable.
+const double* WFN::get_coef_primitive_major() const
+{
+	const int _nmo = get_nmo(false);
+	if (_nmo <= 0 || nex <= 0) return nullptr;
+	static std::mutex coef_cache_mutex;
+	std::lock_guard<std::mutex> lock(coef_cache_mutex);
+	if (coef_primitive_major_valid
+	    && coef_primitive_major.size() == (size_t)nex * (size_t)_nmo)
+		return coef_primitive_major.data();
+	coef_primitive_major.assign((size_t)nex * (size_t)_nmo, 0.0);
+	for (int mo = 0; mo < _nmo; mo++) {
+		const double* src = MOs[mo].get_coefficient_ptr();
+		if (!src) continue;
+		for (int j = 0; j < nex; j++)
+			coef_primitive_major[(size_t)j * _nmo + mo] = src[j];
+	}
+	coef_primitive_major_valid = true;
+	return coef_primitive_major.data();
+}
+
 const void WFN::computeValues(
     const d3 &PosGrid, // [3] vector with current position on te grid
     double &Rho,           // Value of Electron Density
@@ -7790,11 +8009,10 @@ const void WFN::computeValues(
     Hess[5] = 0;
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -7861,23 +8079,15 @@ const void WFN::computeValues(
         chi[8] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[1][0] * ex;
         chi[9] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 10)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 10)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 10; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
-
     for (int mo = 0; mo < _nmo; mo++)
     {
         const double occ = get_MO_occ(mo);
@@ -7928,11 +8138,10 @@ const void WFN::computeELIELF(
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -7991,23 +8200,15 @@ const void WFN::computeELIELF(
         chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
         chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 4)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 4; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
     double tau = 0;
@@ -8049,11 +8250,10 @@ const double WFN::computeELI(
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8112,23 +8312,15 @@ const double WFN::computeELI(
         chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
         chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 4)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 4; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
     double tau = 0;
@@ -8196,11 +8388,10 @@ void WFN::computeRhoELI(
     const double exp_cutoff = constants::exp_cutoff;
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8262,23 +8453,15 @@ void WFN::computeRhoELI(
         chi[2] = (y1 - ex2 * ynext) * x0 * z0 * ex;
         chi[3] = (z1 - ex2 * znext) * x0 * y0 * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + _nmo;
+        const double *c_row = coefs + (size_t)j * _nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
+        for (int mo = 0; mo < _nmo; ++mo, phi_ptr += 4)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 4; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
     double tau = 0;
@@ -8346,11 +8529,10 @@ void WFN::computeGrad(
     const double exp_cutoff = constants::exp_cutoff;
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8412,23 +8594,15 @@ void WFN::computeGrad(
         chi[2] = (y1 - ex2 * ynext) * x0 * z0 * ex;
         chi[3] = (z1 - ex2 * znext) * x0 * y0 * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + _nmo;
+        const double *c_row = coefs + (size_t)j * _nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 4)
+        for (int mo = 0; mo < _nmo; ++mo, phi_ptr += 4)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 4; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
 
@@ -8568,11 +8742,10 @@ const void WFN::computeLapELIELF(
     double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8635,23 +8808,15 @@ const void WFN::computeLapELIELF(
         chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
         chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 7)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             for (k = 0; k < 7; k++)
                 phi_ptr[k] += c * chi[k];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
     double Hess[3]{ 0, 0, 0 };
@@ -8700,11 +8865,10 @@ const void WFN::computeLapELI(
 
     const MO *MOs_data = MOs.data();
     double *phi_data = phi.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8775,16 +8939,11 @@ const void WFN::computeLapELI(
         chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
         chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
 
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 7)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             phi_ptr[0] += c * chi[0];
             phi_ptr[1] += c * chi[1];
             phi_ptr[2] += c * chi[2];
@@ -8794,9 +8953,6 @@ const void WFN::computeLapELI(
             phi_ptr[6] += c * chi[6];
         }
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Grad[3]{ 0, 0, 0 };
     double Hess[3]{ 0, 0, 0 };
@@ -8843,11 +8999,10 @@ const double WFN::computeLap(
     double xl[9]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     const MO *MOs_data = MOs.data();
-    const double **MO_coefs_data = new const double *[_nmo];
-    for (j = 0; j < _nmo; j++) {
-        MO_coefs_data[j] = MOs_data[j].get_coefficient_ptr();
-    }
-    const double ***start_MO_coefs_data = &MO_coefs_data;
+    //Primitive-major coefficients: every MO for one primitive is contiguous here, where
+    //MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
+    //read per primitive instead of nmo scattered ones, and no per-point heap allocation.
+    const double *const coefs = get_coef_primitive_major();
 
     for (j = 0; j < nex; j++)
     {
@@ -8918,16 +9073,11 @@ const double WFN::computeLap(
         chi[4] = (xl[2] - ex2 * (2 * l[0] + 1) * xl[0] + ex4 * pow(d[0], l[0] + 2)) * xl[3] * xl[6] * ex;
         chi[5] = (xl[5] - ex2 * (2 * l[1] + 1) * xl[3] + ex4 * pow(d[1], l[1] + 2)) * xl[6] * xl[0] * ex;
         chi[6] = (xl[8] - ex2 * (2 * l[2] + 1) * xl[6] + ex4 * pow(d[2], l[2] + 2)) * xl[0] * xl[3] * ex;
-        // use pointer arithmetic and cache coefficient pointer
-        // This avoids repeated virtual function calls to get_coefficient_f
-        const double **mo_coef_ptr = *start_MO_coefs_data; // Cache the pointer to the MO coefficients array
-        const double **mo_end = *start_MO_coefs_data + nmo;
+        const double *c_row = coefs + (size_t)j * nmo;
         double *phi_ptr = phi.data();
-
-        // Cache the coefficient pointer for this primitive across all MOs
-        for (; mo_coef_ptr != mo_end; ++mo_coef_ptr, phi_ptr += 7)
+        for (int mo = 0; mo < nmo; ++mo, phi_ptr += 7)
         {
-            const double c = (*mo_coef_ptr)[j];
+            const double c = c_row[mo];
             phi_ptr[0] += c * chi[0];
             phi_ptr[1] += c * chi[1];
             phi_ptr[2] += c * chi[2];
@@ -8938,9 +9088,6 @@ const double WFN::computeLap(
         }
 
     }
-
-    delete[] MO_coefs_data;
-    MO_coefs_data = nullptr;
 
     double Hess[3]{ 0, 0, 0 };
 
@@ -9084,6 +9231,7 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
 bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
     origin = e_origin::ptb;
+    path = filename;
     if (debug)
         file << "Reading pTB file: " << filename << std::endl;
     std::ifstream inFile(filename, std::ios::binary | std::ios::in);
@@ -9272,6 +9420,8 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     err_checkf(nmo == nmomax, "Error adding MOs to WFN!", file);
 
     // we need to generate the primitive coefficients from the contr and exp from the momat, then we cann add them MO-wise
+    // pTB orders cartesian f as xxx,yyy,zzz,xxy,xxz,xyy,yyz,xzz,yzz,xyz, so its 16 and 17
+    // are xyy and yyz where type_vector has them the other way round
     for (int i = 0; i < nprims; i++)
     {
         vec values;
@@ -9279,7 +9429,10 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         {
             values.push_back(momat(j, ipao[i] - 1) * contr[i]);
         }
-        add_primitive(aoatcart[i], lao[i], exps[i], values.data());
+        int type = lao[i];
+        if (type == 16) type = 17;
+        else if (type == 17) type = 16;
+        add_primitive(aoatcart[i], type, exps[i], values.data());
     }
 
     //Now turn Pmat into a full matrix

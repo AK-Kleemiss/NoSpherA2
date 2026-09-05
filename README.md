@@ -55,7 +55,26 @@ Common presets include:
 
 ##### Configuration Options:
 
-`NOSPHERA2_BUILD_TESTS` (default: `OFF`) - Build the test suite.
+Pass options while configuring a preset, for example:
+
+```sh
+cmake --preset release-windows -DNOSPHERA2_BUILD_TESTS=ON
+```
+
+- `NOSPHERA2_BUILD_TESTS` (default: `OFF`): build the CTest/GTest suite.
+- `NOSPHERA2_BUILD_DLL` (default: `OFF`): build the optional Windows DLL.
+- `NOSPHERA2_DEPENDENCIES_ONLY` (default: `OFF`): build dependency targets only; this is intended for dependency-cache preparation.
+- `NOSPHERA2_GPU_AUTO` (default: `ON`): select CUDA for an NVIDIA driver or HIP for an AMD driver detected on the build host. Set it to `OFF` when choosing a backend explicitly.
+- `NOSPHERA2_USE_CUDA` (default: `OFF`): compile the CUDA GPU paths. This can be enabled explicitly on a GPU-less build host when a CUDA compiler is available.
+- `NOSPHERA2_USE_HIP` (default: `OFF`): compile the HIP GPU paths. It is mutually exclusive with `NOSPHERA2_USE_CUDA`.
+- `NOSPHERA2_CUDA_PORTABLE` (default: `OFF`): with CUDA enabled, compile for the supported NVIDIA architectures instead of only the build machine's GPU. Use this for a binary distributed to different NVIDIA GPUs.
+- `NOSPHERA2_USE_CUTLASS` (default: `ON`): use CUTLASS headers for the CUDA single-precision I-tensor GEMM. It has no additional runtime dependency.
+
+The CUDA runtime is linked statically and cuBLAS is loaded only when `-gpu_cublas` is requested and a matching library is installed. A CUDA-enabled executable therefore has no required CUDA DLL import and starts normally on a machine without an NVIDIA GPU; GPU requests fall back to the CPU when no usable device is present. HIP builds use Windows delay loading for their HIP runtime for the same startup behaviour. No CUDA, HIP, or cuBLAS runtime is copied into the executable directory.
+
+At runtime, supported GPU paths are enabled by default: Fourier transforms, XCW I-tensor contractions, SALTED descriptor combinations, and Becke/TFVC atomic-grid weights. Each automatically falls back to the CPU if the device, memory budget, or input layout is unsuitable. Use `-no_gpu` to disable every GPU path, or `-no_gpu_grid`, `-no_gpu_itensor`, and `-no_gpu_salted` to pin an individual calculation to the CPU. `-gpu_blas` remains opt-in because its transfers only pay off for sufficiently large dense matrix products.
+
+On Windows, configure from the x64 Visual Studio developer environment and use a CUDA/toolset combination supported by NVIDIA. If CMake cannot validate the selected CUDA compiler, configuration continues as a CPU-only build and reports the fallback; choose a compatible MSVC toolset or CUDA release before relying on GPU support.
 
 #### Step 3: Build the project
 
@@ -80,6 +99,8 @@ If you want to develop NoSpherA2 on Windows using Visual Studio please also init
 ```powershell
 cmake -P scripts/SetupVSEnvironment.cmake
 ```
+
+For the repeatable Visual Studio-developer-shell path used in this checkout, run `run_vsdev_build.cmd`. It initializes the x64 Visual Studio environment, configures `release-windows` with tests enabled and `NOSPHERA2_DEPENDENCIES_ONLY=OFF` (including GPU auto-detection), builds the application and tests, then runs CTest. Run the micromamba bootstrap first; on an NVIDIA host it also installs the CUDA compiler used by auto-detection.
 
 ### Run Tests
 

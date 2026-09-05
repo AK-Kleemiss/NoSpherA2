@@ -1,0 +1,46 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                            "P1_test_NA2.cif"Reading:                                "P1_test.hkl" done!
+Nr of reflections read from file: 3215
+Number of symmetry operations: 1
+Nr of reflections to be used: 3215
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 3215
+XCW orbital basis set: sto-3g-basis
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 102932 grid points.
+Total number of grid points after pruning: 102920
+AO values calculated for all grids.
+Screened out 1798 unique pairs of mu, nu (33.57%) 
+Skipped evaluation of 64013865 grids (16.16%) 
+More detailed output in XCW.log file...
+____________________________________________________________________________________
+ Lambda		Criterion	GooF(F2)	Total Energy	Perturbation	Target quantity 	A^2 (halt)
+										(Eh)		   (a. u.)			(a. u.)
+____________________________________________________________________________________
+0.00000		4.665		4.695		-1961.923538504		0.000		-1961.923538504		188.1284
+0.01000		4.226		4.242		-1961.906548811		0.042		-1961.864287382		157.5746
+0.02000		3.977		3.986		-1961.876707298		0.080		-1961.797162948		141.1150
+0.03000		3.809		3.813		-1961.844372043		0.114		-1961.730088445		130.8552
+0.04000		3.686		3.686		-1961.812037577		0.147		-1961.664612083		123.8926
+____________________________________________________________________________
+Gaussian halting criterion: progress update after 5 lambda steps
+Recommended halting lambda* = 0.04000 (A^2=123.8926) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+  candidate fit: degree=2 RSS=12.0132 R^2=0.9954 AIC=12.3829 [chosen]
+  candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
+WARNING: A^2 is still falling at the last evaluated lambda (0.04000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. Degree-2 polynomial extrapolation (best fit by AIC, R^2=0.9954) of the A^2(lambda) trend so far estimates the minimum near lambda ~= 0.04034 (extrapolated, not yet observed -- treat as a rough guide to where to extend the scan, not a final answer).
+0.05000		3.589		3.587		-1961.780420425		0.179		-1961.600978415		118.7369
+____________________________________________________________________________
+Recommended halting lambda* = 0.05000 (A^2=118.7369) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+  candidate fit: degree=2 RSS=28.8499 R^2=0.9914 AIC=17.4221 [chosen]
+  candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
+WARNING: A^2 is still falling at the last evaluated lambda (0.05000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum.
+Finished XCW fitting procedure.

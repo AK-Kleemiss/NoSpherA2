@@ -19,6 +19,18 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
 )
 
+#One source, two languages: nvcc takes it as CUDA, hipcc as HIP
+if(NOSPHERA2_USE_CUDA OR NOSPHERA2_USE_HIP)
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu")
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu")
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu")
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu")
+    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu")
+    if(NOSPHERA2_USE_HIP)
+        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu" PROPERTIES LANGUAGE HIP)
+    endif()
+endif()
+
 #Basis Set Generator:
 set(
     NOSPHERA2_BASIS_SET_DIRECTORY
@@ -29,6 +41,35 @@ set(
     NOSPHERA2_GENERATED_BASIS_SOURCE
     "${PROJECT_SOURCE_DIR}/Src/basis_data.cpp"
 )
+
+# The generated source depends on the CSVs it is generated FROM, not only on the
+# converter that reads them.
+#
+# Without this the rule only ever fired when BasisSetConverter itself was rebuilt,
+# so adding or editing a basis set left a stale basis_data.cpp in place - and it
+# is .gitignore'd, so nothing in the repository showed a difference either. That
+# is how this checkout ended up with 98 basis sets against 117 CSVs: STO-3G was
+# missing, and every XCW test failed with "Basis set sto-3g not defined" until the
+# file was deleted by hand.
+#
+# CONFIGURE_DEPENDS re-globs at build time, so a NEW csv triggers a reconfigure;
+# naming the files in DEPENDS below covers an EDITED one. Both are needed - the
+# glob alone would not notice a change to a file already in the list.
+file(
+    GLOB NOSPHERA2_BASIS_SET_FILES
+    CONFIGURE_DEPENDS
+    "${NOSPHERA2_BASIS_SET_DIRECTORY}/*.csv"
+)
+
+if(NOT NOSPHERA2_BASIS_SET_FILES)
+    # Not fatal: the converter target would already be missing if the submodule
+    # were absent. But silence here means a stale basis_data.cpp again, so say so.
+    message(WARNING
+        "No .csv basis sets found in ${NOSPHERA2_BASIS_SET_DIRECTORY} - "
+        "basis_data.cpp will not regenerate when basis sets change. "
+        "Is the BasisSetGenerator submodule checked out?"
+    )
+endif()
 
 add_custom_command(
     OUTPUT
@@ -41,6 +82,7 @@ add_custom_command(
 
     DEPENDS
         BasisSetConverter
+        ${NOSPHERA2_BASIS_SET_FILES}
 
     WORKING_DIRECTORY
         "${PROJECT_SOURCE_DIR}/BasisSetGenerator"
@@ -74,6 +116,35 @@ target_compile_definitions(
     PRIVATE
         NOSPHERA2_BASIS_DATA_SEPARATE
 )
+
+if(NOSPHERA2_USE_CUDA)
+    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_CUDA)
+    set_target_properties(NoSpherA2Core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    #No cuBLAS to link, delay-load or ship: the GEMMs are ours. cudart is static. cuBLAS can
+    #still be opened by name at run time under -gpu_cublas, which needs no more from the
+    #build than the major version to look for.
+    target_compile_definitions(NoSpherA2Core PRIVATE
+        NOSPHERA2_CUDART_MAJOR=${CUDAToolkit_VERSION_MAJOR})
+    if(NOSPHERA2_CUTLASS_INCLUDE)
+        target_include_directories(NoSpherA2Core SYSTEM PRIVATE "${NOSPHERA2_CUTLASS_INCLUDE}")
+        target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_HAVE_CUTLASS)
+        #CUTLASS pulls in cuda/std, which refuses to compile under MSVC's traditional
+        #preprocessor, and calls constexpr host functions from host-device ones.
+        target_compile_options(NoSpherA2Core PRIVATE
+            $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
+            $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=20013,20015>)
+        if(MSVC)
+            target_compile_options(NoSpherA2Core PRIVATE
+                $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>)
+        endif()
+    endif()
+endif()
+
+if(NOSPHERA2_USE_HIP)
+    find_package(hip REQUIRED)
+    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_HIP)
+    target_link_libraries(NoSpherA2Core PRIVATE hip::device)
+endif()
 
 target_compile_features(
     NoSpherA2Core

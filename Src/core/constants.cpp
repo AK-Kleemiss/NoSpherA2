@@ -6,6 +6,7 @@
 
 namespace constants {
     double exp_cutoff = -23.5;
+    bool hide_gpu_notes = false;
     const char* atnr2letter(const int& nr)
     {
         if (nr == 0)

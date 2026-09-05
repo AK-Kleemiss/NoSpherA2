@@ -1,7 +1,183 @@
 # Unit Test Status
-**Last updated: 2026-08-15** (added `AtomTest.ID_IsRebuiltWhenCIFPartChanges`, made the
+**Last updated: 2026-09-02** (pTB cartesian-f fix in `WFN::read_ptb`, and a new
+`-no_date_but_gpu` flag so golden files stop depending on whether the machine has a GPU.
+No cases added or removed; 275/275 pass on `release-windows`.)
+
+## 2026-09-02 — pTB cartesian f ordering, and GPU notes in golden files
+
+### `WFN::read_ptb` transposed two cartesian f components
+
+pTB writes cartesian f functions in Turbomole order, stated in its own
+`source/dtrf2.f:7`: `xxx,yyy,zzz,xxy,xxz,xyy,yyz,xzz,yzz,xyz`. So type 16 is `xyy` and
+type 17 is `yyz`. `constants::type_vector` uses the AIM/`.wfn` order, where 16 is `yyz`
+(0,2,1) and 17 is `xyy` (1,2,0). `read_ptb` passed `lao[i]` straight into
+`add_primitive`, so two of the ten cartesian f components were swapped for every
+f-containing pTB wavefunction — the lanthanides Ce-Lu, and anything else pTB gives f
+functions to. La has no f shell in the pTB valence basis and was never affected.
+
+The error was large. Integrating a neutral-atom density cube gave 15.64 e for Nd against
+the 14 its ECP demands, 12.30 for Ce against 12. Building the cartesian AO overlap from
+the `wfn.xtb` file's own exponents and contraction coefficients and contracting it with
+the MO coefficients reproduces the wrong totals exactly under the `type_vector` ordering
+and gives exactly Z-46 under pTB's — which is what identified the swap. pTB's file was
+correct throughout: every occupied MO normalises to 1.000000.
+
+After the fix all 15 lanthanides integrate to Z-46 on a 10 A box at 0.025 A. Yb is the
+one exception at 19.58 of 24, and is not a NoSpherA2 defect: its vDZP second d shell
+carries an exponent of 0.002065 against 0.067 for Tm and 0.0389 for Lu, so its density
+needs a 30 A box to reach 23.999. That exponent is the same in the ptb repo and in
+`ptb-vdzp` in `Src/basis_data.cpp`, and `.basis_vDZP` has not changed since 2022-04-27.
+
+`read_ptb` also never recorded `path`, so cubes from a `.xtb` input were written as a
+stem-less `_rho.cube` — the same omission fixed in `read_fchk` on 2026-08-25. And
+`-rho_cube` ignored `-radius`/`-resolution` and used a hardcoded 3 A box, which truncates
+a lanthanide valence density badly enough to make the integral unconvergeable.
+
+### GPU notes made golden files machine-dependent
+
+On a machine with a CUDA device, 16 golden-file cases failed. Every one was a line-offset
+cascade from a note the references do not carry, most of them
+`GPU in use: atomic grid weights (Becke and TFVC) on CUDA` from `AtomGrid.cpp`. All 16
+failed identically with the pTB changes stashed, so they were pre-existing.
+
+`XCW.cpp` and `scattering_factors.cpp` already gated their notes on `no_date`;
+`AtomGrid.cpp` and `SALTED_equicomb.cpp` had no access to the flag and were missed. They
+now consult `constants::hide_gpu_notes`, set by `-no-date` and following the
+`constants::exp_cutoff` precedent for a runtime-settable global.
+
+That alone breaks `sucrose_SF_gpu_grid`, whose reference deliberately contains the note:
+a silent CPU fallback produces exactly the CPU reference, so the note is the only evidence
+the device did the work. The harness hardcodes `no_date` for every test
+(`IntegrationTests.cpp:319`) with no opt-out, so `-no_date_but_gpu` suppresses dates while
+keeping the notes, and that one case carries it. Defaults are emitted before per-test
+args, so it is parsed second and wins.
+
+`P1_test_XCW_gpu_itensor` failed on a different line, the sibling warning
+`-gpu_grid asked for but not used: chi is N entries...`, which is equally
+machine-dependent and is now gated the same way. Its reference contains no GPU note at
+all: XCW writes that one to stderr, which never reaches the log.
+
+**Last updated: 2026-08-25** (added the Fukui-function feature and its tests: 7 new
+`FukuiTests` unit cases covering `find_frontier_orbitals`, plus one new
+`TomlIntegrationTests.Fukui` golden-file case. Net +8 cases.)
+
+## 2026-08-25 — Fukui functions (`-fukui`)
+
+New `-fukui` flag computes f+, f-, f0 and the dual descriptor in the frontier-orbital
+approximation and writes four cubes plus a `<stem>_fukui.dat` summary.
+
+It also computes the **condensed (atom-summed) Fukui functions under all five atomic
+partitions** — Hirshfeld, Becke, TFVC, MBIS, EMBIS — in one pass. This required **no
+change to GridManager at all**: `calculatePartitionedCharges` integrates whatever is in
+the `WFN_DENSITY` column against all five weight columns and does not recompute it, so
+substituting a frontier-orbital density for the total density turns the existing
+five-way charge accumulation into a five-way condensed-Fukui accumulation.
+`getGridData()` already returns a mutable reference.
+
+There is also a **standalone `-fukui_analysis <wfn>`** that does the reactivity analysis
+with no cube machinery at all — no grid, radius or CIF. It is dispatched from
+`run_app_impl`, **not** from `options::digest_options()`, and that placement is load
+bearing: `run_app_impl` redirects `std::cout` into `NoSpherA2.log` before
+`digest_options()` runs, so a flag handled at parse time prints into the log and nothing
+onto the terminal. Verified on the existing `-dipole_moments`, which uses the parse-time
+pattern: 0 bytes to stdout, 2.9 kB to `NoSpherA2.log`. Fine for a side-effect command,
+useless for one whose whole output is meant to be read, so this one restores the console
+buffer first.
+
+Two correctness points that are easy to get wrong here:
+
+- The grid and the weights are built from a copy with `delete_unoccupied_MOs()` applied,
+  but the frontier orbitals are evaluated from the **original** wavefunction. Both parts
+  matter: `compute_dens` sizes its scratch by `get_nmo(true)`, so leaving several hundred
+  virtuals in place overruns it — and the partition weights must come from the
+  ground-state density anyway, since MBIS and EMBIS are refined self-consistently
+  against it. Only the integrand changes.
+- `calculatePartitionedCharges` adds ECP core electrons to the populations. Correct for a
+  charge, wrong for a Fukui function, so it is subtracted back out.
+
+The sum over atoms of each column is exactly 1 for f+ and f-, and 0 for the dual
+descriptor, which makes every run self-checking. Measured on ethylene oxide:
+0.99991–1.00000 across the five partitions. Verified byte-identical across
+`OMP_NUM_THREADS` of 4, 8 and 16, including the iterative MBIS/EMBIS refinement, which
+is what makes it safe as golden-file output. Costs ~0.9 s for 7 atoms and ~2.9 s for
+sucrose's 45.
+
+| Test | Kind | Covers |
+|------|------|--------|
+| `FukuiTests.FrontierOrbitalsRestrictedWithEnergies` | unit | HOMO/LUMO by orbital energy |
+| `FukuiTests.FrontierOrbitalsFallsBackToOrderWithoutEnergies` | unit | `.wfn`-style files with no stored energies |
+| `FukuiTests.FrontierOrbitalsPreferEnergyOverIndexOrder` | unit | energy-unsorted MO sets |
+| `FukuiTests.FrontierOrbitalsFailWhenNoVirtualsExist` | unit | occupied-only files must fail loudly |
+| `FukuiTests.FrontierOrbitalsFailWhenNoOccupiedExist` | unit | mirror case |
+| `FukuiTests.FrontierOrbitalsFailOnEmptyWavefunction` | unit | empty WFN |
+| `FukuiTests.FrontierOrbitalsTreatFractionalOccupationAsOccupied` | unit | natural-orbital occupations |
+| `TomlIntegrationTests.Fukui` | integration | end-to-end run, pins frontier pair and integrated norms |
+| `TomlIntegrationTests.FukuiPBC` | integration | the same through the periodic (`-cif`) path |
+
+Both integration tests were added to the `integration_sucrose_fchk_SF` `RESOURCE_LOCK`
+group in `tests/src/SetIntegrationTestLocks.cmake`. They share that directory with
+`Fractal`, `Properties`, `SucroseSF` and `SucroseTwin`, and both write
+`sucrose_fukui.dat`, so without the lock a parallel `ctest` run would have them
+clobbering each other.
+
+`FukuiPBC` exists because `-cif` is a genuinely different code path in
+`cube::evaluate_on_grid` — it sweeps each index over `[-size, 2*size)` and wraps,
+costing ~27x — and it is the path Olex2 actually drives, since
+`cubes_maps.calculate_cubes` always passes `-cif`. The non-periodic test never touches
+it. It runs in ~0.2 s at resolution 1.5.
+
+Four things worth recording, because each is a trap rather than a preference:
+
+1. **The integration test uses `sucrose.fchk`, NOT the `sucrose.wfx`** that the
+   neighbouring `[properties]` test uses. That wfx stores only the 91 occupied
+   orbitals, so it has no LUMO and cannot produce a Fukui function at all. The fchk
+   carries all 432 orbitals (91 occupied, 341 virtual).
+2. **The golden file is `sucrose_fukui.dat`, not a log.** Property runs write to
+   `NoSpherA2_cube.log`, which contains wall-clock timings; at the harness's 1%
+   tolerance a `0 s` → `1 s` drift would fail the comparison. The `.dat` summary is
+   deterministic and carries the numbers actually worth asserting.
+3. **`Calc_Fukui` must run before `delete_unoccupied_MOs()`** in
+   `properties_calculation` (`properties.cpp`). The LUMO is an unoccupied orbital;
+   calling it after would yield an all-zero f+ cube with no error.
+4. **`Calc_Fukui` uses two grid passes on purpose, not one.** Filling all four cubes
+   from a single functor means a non-atomic read-modify-write on three of them from
+   inside a parallel region; in the wrapped path several raw indices map onto the same
+   voxel, so that is a data race. Only the functor's *return* value is protected, by
+   the `#pragma omp atomic` inside `evaluate_on_grid`. Two passes cost the same (one
+   `computeMO` per point either way) and leave every voxel with a single writer.
+   Verified empirically as well: the periodic run is byte-identical across 5 repeats at
+   `OMP_NUM_THREADS=16`. Note the same single-functor pattern still exists in
+   `Calc_Prop`/`accumulate_prop_values` for ELF/ELI/Lap/RDG and was left alone here.
+
+**Validation on 2026-08-25 (`release-windows`): `ctest --preset release-windows` reports
+258/258 passing, 0 failed, in 569 s** (5 skipped, all pre-existing: the four
+`full = true` XCW cases and the optional `Nbo47.EpoxideGennboMatchesReferenceWhenAvailable`
+fixture). That includes the 9 new cases here, and confirms the `read_fchk` path fix
+below regressed nothing — it was the one change with reach outside this feature.
+
+Correctness was additionally checked by grid convergence rather than by a golden file
+alone — the integrated norms approach the exact value of 1.0 as the grid is refined:
+
+| resolution (A) | integral f+ | integral f- |
+|---|---|---|
+| 0.8 | 1.0045 | 0.9327 |
+| 0.4 | 1.0004 | 1.0088 |
+| 0.2 | 0.9966 | 0.9994 |
+
+and the cube contents satisfy f+ >= 0, f- >= 0, f0 == (f+ + f-)/2 and
+df == f+ - f- to within cube-file write precision (~1e-7).
+
+**Also fixed here:** `WFN::read_fchk` never recorded `path`, unlike every other reader.
+Cube filenames are built from that path, so any fchk-driven property run wrote
+`_rho.cube`, `_lap.cube` etc. with an empty stem, which silently collide when more than
+one structure is processed in one directory. Pre-existing, unrelated to Fukui, and no
+test or `.good` file depended on the stem-less names.
+
+## Earlier history
+
+The previous 2026-08-15 update added `AtomTest.ID_IsRebuiltWhenCIFPartChanges`, made the
 CIF reader store and immediately rebuild its PART-aware `SCATTERER_ID`, and moved PART filtering ahead of WFN matching
-to prevent another PART from overwriting atom IDs during `-mtc`; validation pending.)
+to prevent another PART from overwriting atom IDs during `-mtc`; validation pending.
 
 The previous 2026-08-02 update
 `TscBlockTests.BinaryFileRoundTripsWith32BitSizes` so `SCATTERER_IDS` is inferred from
@@ -87,7 +263,7 @@ Added: 2026-06-14.
 | RGBI_NH3Li | RGBI | nh3li_nao.good | no | ✅ passing (macOS arm64, regenerated with `-rgbi` 2026-07-03) |
 | RGBI_NH3Li_ANO | RGBI | nh3li_ano.good | no | ✅ passing (macOS arm64, regenerated with `-rgbi` 2026-07-03) |
 | rubredoxin_cmtc | rubredoxin_cmtc | rubredoxin_cmtc.good | no | ✅ passing |
-| SALTED | SALTED | SALTED.good | no | ✅ passing |
+| SALTED | SALTED | SALTED.good | no | ✅ passing (CPU-pinned with `-no_gpu_salted` for hardware-independent golden output) |
 | sucrose_IAM | sucrose_IAM_SF | sucrose_IAM.good | no | ✅ passing |
 | sucrose_ptb | sucrose_IAM_SF | sucrose_ptb.good | no | ✅ passing |
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |
@@ -97,6 +273,10 @@ Added: 2026-06-14.
 | TFVC | TFVC | TFVC.good | no | ✅ passing |
 | TFVC_ECP | TFVC | TFVC_ECP.good | no | ✅ passing |
 | fchk_conversion | NiP3_fchk | good.fchk | **yes** | ✅ passing (tolerated numeric warn) |
+| P1_test_XCW | P1_test | P1_test_XCW.good | no | ✅ passing (added 2026-07-18, in-process only; see note below) |
+| P1_test_XCW_full | P1_test | P1_test_XCW_full.good | **yes** (`RUN_FULL_TEST=1`) | ✅ passing (added 2026-07-19, 11-step lambda scan to 0.1 with `-xcw_gaussian_halt`; see note below) |
+| P1_test_XCW_h2 | P1_test | P1_test_XCW_h2.good | no | ✅ passing (added 2026-07-19, 2-step scan with `-xcw_h2_weighting`; see note below) |
+| P1_test_XCW_h2_full | P1_test | P1_test_XCW_h2_full.good | **yes** (`RUN_FULL_TEST=1`) | ✅ passing (added 2026-07-19, 9-step lambda scan to 0.08 — capped below 0.1 due to an SCF convergence limitation of `-xcw_h2_weighting`, see note below) |
 
 ---
 
@@ -130,6 +310,181 @@ files generated before they can be registered.
 ---
 
 ## Known Issues
+
+- **Focused P1 XCW validation pending after the 2026-09-01 `XCW_Test` merge**: both the CPU-pinned
+  `TomlIntegrationTests.P1_test_XCW` and GPU `TomlIntegrationTests.P1_test_XCW_gpu_itensor` complete
+  their XCW calculations locally, but the golden comparator stops at the shared screening lines:
+  expected 1798 pairs / 64,013,865 grids and actual 1473 / 74,067,170. The CPU failure proves this
+  is not caused by the asynchronous GPU read-back path. The current P1 numerical outputs need a clean
+  merged-baseline review before this focused pair can be reported passing again.
+
+- **XCW test output race condition (RESOURCE_LOCK), found and fixed 2026-07-20**: after the
+  `-b sto-3g` fix below was pushed, CI failed again on **all three platforms** (Linux, Windows,
+  macOS) with `P1_test_XCW` and `P1_test_XCW_h2` both producing visibly *interleaved, byte-level
+  corrupted* `NoSpherA2.log` content — lines from one test's output spliced into the middle of the
+  other's. Actual root cause: `P1_test_XCW`, `P1_test_XCW_full`, `P1_test_XCW_h2`, and
+  `P1_test_XCW_h2_full` all use `directory = "P1_test"` in `tests/tests.toml`, and NoSpherA2's log
+  filename (`"NoSpherA2.log"`, `Src/core/NoSpherA2.cpp`) is hardcoded, not configurable via CLI —
+  so all four write to the exact same file. The CI workflow sets `CTEST_PARALLEL_LEVEL: 4`
+  (`.github/workflows/c-cpp_all.yml`), and this repo already has an established mechanism for
+  exactly this scenario — `tests/src/SetIntegrationTestLocks.cmake`, applying `RESOURCE_LOCK` via
+  `set_tests_properties()` to serialize tests that share a directory (already used for the
+  sucrose/TFVC/RGBI/SALTED test groups) — but the new P1_test entry was simply never added when
+  these four tests were created. Fixed by adding it. Verified locally with
+  `CTEST_PARALLEL_LEVEL=4` (matching CI exactly): the two fast tests now run serially instead of
+  concurrently and both pass; a full local 225-test suite run with the same parallel level found
+  no other regressions (one unrelated pre-existing failure, `Nbo47.EpoxideGennboMatchesReferenceWhenAvailable`,
+  requires an external WSL/gennbo tool not present in this environment).
+
+  This likely means the **original** (pre-`sto-3g`) Linux `bad_alloc`/Windows `(Timeout)`
+  failures documented below were *also* substantially caused by this same race — two full XCW
+  quantum-chemistry runs racing on the same output file, and incidentally roughly doubling peak
+  CPU/RAM demand by running concurrently, rather than being purely a `def2-svp` resource-sizing
+  problem as diagnosed at the time. The `-b sto-3g` switch remains a real, worthwhile improvement
+  (faster/lighter tests that also regression-test the STO-3G L-shell fix), but the `RESOURCE_LOCK`
+  entry is the fix that actually addresses the failure mode observed on all three platforms.
+
+- **CI failures in the four new XCW tests, found and fixed 2026-07-20**: after
+  `P1_test_XCW`/`P1_test_XCW_full`/`P1_test_XCW_h2`/`P1_test_XCW_h2_full` were first pushed to CI,
+  three platform-specific failures surfaced:
+  - **macOS: build error**, `use of undeclared identifier 'vdSinCos'` at `Src/core/XCW.cpp`
+    (in `XCW::eval_I`). `vdSinCos` is an Intel MKL batched sin/cos call; macOS uses Apple
+    Accelerate instead of MKL (see `cmake/NoSpherA2Optimizations.cmake`) and has no equivalent
+    under that name. This is **pre-existing code** (commit `e7597d5`, predates the XCW work this
+    week) that had simply never been exercised by macOS CI before `P1_test_XCW` existed as an
+    automated test — the `mkl_set_num_threads_local` call two lines above it already had an
+    `#if !defined(__APPLE__)` guard, but the `vdSinCos` call itself didn't. Fixed by keeping the
+    batched `vdSinCos` path for non-Apple platforms and adding a per-element `__sincos` loop for
+    `__APPLE__`, mirroring the existing portable-sincos pattern already used in
+    `scattering_factors.cpp` (`sincos`/`__sincos`/plain `sin`+`cos` three-way split).
+  - **Linux: `std::bad_alloc`** thrown ~100ms into `P1_test_XCW`/`P1_test_XCW_h2`, and
+    **Windows: `(Timeout)`** on the same two tests plus (collaterally) the unrelated, previously
+    passing `DisorderTHPP`. Root cause: `def2-svp` for this 23-atom, 3215-reflection system needs
+    a multi-GB `I`-tensor (`packed_size = nmo*(nmo+1)/2` times `nr_small` complex doubles) and
+    took ~80s+ just for integral evaluation locally — too much for GitHub's standard shared
+    CI runners (4 vCPU, ~16GB RAM), and slow enough to drag the whole Windows ctest run past
+    its timeout. Fixed by switching all four tests to `-b sto-3g` (the now-fixed minimal basis,
+    see the entry below): far fewer basis functions, so both the `I`-tensor size and integral
+    evaluation time drop sharply. Locally, all four tests together now run in ~2 minutes total
+    (previously ~20+ minutes with `def2-svp`); the fast tests dropped from ~3 minutes to ~18
+    seconds each. This also turns each of these tests into a real regression test for the
+    STO-3G L-shell fix below, rather than only being smoke-tested manually. All four `.good`
+    files were regenerated against the new basis; convergence was re-verified for
+    `P1_test_XCW_h2_full`'s lambda=0.08 cap (still holds with STO-3G — SCF iteration counts stay
+    flat, 15 through 36, no escalation).
+
+- **Gaussian/Anderson-Darling XCW halting criterion + H²-weighted fitting criterion, added
+  2026-07-19**: two new opt-in `-do_XCW` features (`-xcw_gaussian_halt`,
+  `-xcw_h2_weighting`) implementing a distributional lambda-scan halting criterion and an
+  alternative `1/|H|²`-weighted fitting criterion, per `tests/P1_test/XCW_plan.md`
+  ("Distributional (Gaussian) Halting Criterion for XCW/XRW"). New module
+  `Src/core/xcw_halting.h`/`.cpp` (Anderson-Darling statistic, normal probability-plot fit,
+  skewness/kurtosis/Jarque-Bera, resolution-/intensity-binned ⟨z²⟩ trend, and a multi-degree
+  polynomial fit with AIC-based model selection used to extrapolate a stopping estimate when
+  the scan hasn't found an interior minimum yet). Both features are off by default with no
+  behavior change for existing `-do_XCW` users. `XCW_plan.md` now carries an honest per-item
+  checklist (§8) of what's actually implemented versus the original spec — the biggest gap is
+  §5 (free/working-set cross-validation): the current implementation computes everything on
+  the **full** reflection set, not a held-out free set, which was the spec's stated main
+  defense against XCW's structural overfitting. Test coverage: `P1_test_XCW` (2-step,
+  classical), `P1_test_XCW_full` (11-step to λ=0.1, `-xcw_gaussian_halt`, `RUN_FULL_TEST=1`),
+  `P1_test_XCW_h2` (2-step, `-xcw_h2_weighting`), `P1_test_XCW_h2_full` (9-step to λ=0.08,
+  `-xcw_h2_weighting`, `RUN_FULL_TEST=1`) — all passing.
+
+  **`-xcw_h2_weighting` SCF convergence instability at higher lambda**: for the P1 test system,
+  the `1/|H|²`-weighted SCF converges progressively more slowly as lambda increases (iteration
+  count 15 → 17 → 19 → 25 → 28 → 30 → 31 → 33 at λ=0.00–0.08, then jumps to 55 at λ=0.09) and
+  fails to converge by λ=0.10 within the default 100-iteration cap. This is why
+  `P1_test_XCW_h2_full` is capped at λ=0.08 rather than 0.1 like its classical counterpart —
+  not a test bug, a genuine numerical property of this weighting at this system's higher
+  lambda values, plausibly related to the slow/conditionally-convergent `Σ1/|H|²` series noted
+  in the plan's own §6.2 caveats. Not yet root-caused further (e.g. whether better
+  damping/DIIS settings would fix it, or it's inherent to the weighting) — see `XCW_plan.md`
+  §8 for the current status.
+
+- **`P1_test_XCW` access violation, root-caused and fixed 2026-07-18**: the in-process
+  `TomlIntegrationTests.P1_test_XCW` test reliably crashed (`0xC0000005`) inside
+  `GridManager::setup3DGridsForMolecule`, but only when driven through the in-process GoogleTest
+  harness — not the standalone `NoSpherA2.exe`. A debug-CRT build (`cmake --preset debug-windows
+  -DNOSPHERA2_BUILD_TESTS=ON`) reproduced it deterministically (independent of thread count) as a
+  clean `vector subscript out of range` assertion, which narrowed it to
+  `GridManager::calculateMBISWeights`/`calculateEMBISWeights`: both unconditionally called
+  `calculateNonSphericalDensities()` whenever `!non_spherical_densities_calculated_`, ignoring
+  `config_.no_density_eval`. `XCW::eval_I` (`Src/core/XCW.cpp`) sets `no_density_eval = true` and
+  fills `WFN_DENSITY` with a placeholder value itself *after* grid setup returns — it deliberately
+  skips real density evaluation on `dummy_wave`, which has had `delete_unoccupied_MOs()` called on
+  it. The `[defaults]` block in `tests/tests.toml` (and the equivalent hardcoded defaults in the
+  C++ harness, `tests/src/IntegrationTests.cpp`) injects `-all_charges` into every toml-driven
+  test, which triggers the MBIS/EMBIS "every scheme" branch inside
+  `GridManager::setup3DGridsForMolecule` — and that branch called the offending function on the
+  MO-pruned wavefunction, corrupting memory. It happened to not crash when run as a standalone
+  process (undefined-behavior heap read that landed in still-mapped memory there), but reliably
+  faulted in the larger, differently-laid-out in-process test binary.
+  Fix (`Src/core/GridManager.cpp`): guard both call sites with `&& !config_.no_density_eval`, and
+  gate the whole "every scheme" (`debug`/`all_charges`) computation in
+  `setup3DGridsForMolecule` on `!config_.no_density_eval` (`want_every_scheme`), since
+  MBIS/EMBIS are density-based and produce meaningless zero output without real density anyway —
+  unlike Hirshfeld, which stays available since it only needs spherical, not WFN, density.
+  A second, independent bug was found in the same investigation: `XCW::run_XCW_fitting()`
+  (`Src/core/XCW.cpp`) ended with `exit(0)`, which — when running in-process — terminates the
+  whole GoogleTest binary immediately, skipping the `EXPECT_TRUE(result.success)` golden-file
+  comparison entirely and making earlier "passing" runs a false positive rather than a real pass.
+  Replaced with falling off the end of the (void) function; `NoSpherA2.cpp`'s caller already does
+  the proper `log_file.flush(); std::cout.rdbuf(_coutbuf); return 0;` cleanup after the call
+  returns.
+  Also fixed as part of the same session: `make_MBIS_vectors`/`make_EMBIS_tensors`
+  (`Src/core/AtomGrid.cpp`/`.h`) hardcoded `std::cout` for their verbose per-iteration
+  convergence/"Promolecular charges" output; they now take an `std::ostream&` parameter
+  (default `std::cout`, so all other callers are unaffected) that `GridManager::calculateMBISWeights`/
+  `calculateEMBISWeights` forward from their own new `file` parameter, itself forwarded from
+  `setup3DGridsForMolecule`'s existing `file` parameter. XCW passes `XCW_log` through this chain
+  (via `scattering_factors.cpp`'s `calculate_scattering_factors(..., XCW_log, ...)`
+  call inside `XCW::create_tscb`), so that output now lands in `XCW.log` instead of leaking into
+  the shared `NoSpherA2.log`.
+  `P1_test_XCW`'s `tests.toml` args were changed from a bare `do_XCW = ""` flag to
+  `do_XCW = [0.01, 0.01]`, using a new `-do_XCW stepsize max_value` CLI form
+  (`Src/core/convenience.h`/`.cpp`, `options::xcw_lambda_step`/`xcw_lambda_max`, consumed in
+  `XCW::construct`) that limits the lambda scan to 2 steps (`lambda = 0.00, 0.01`) instead of the
+  previous hardcoded 10-step (`0.00`–`0.09`) default, cutting the test from several minutes to
+  ~2.5 minutes. The plain `-do_XCW` flag (no trailing numbers) is unaffected and now defaults to
+  `lambda_step = 0.01`, `lambda_max = 1.0` (101 steps) rather than the old hardcoded 10 steps —
+  this is a real behavior change for any existing non-test `-do_XCW` invocation without explicit
+  step/max arguments.
+  `tests/P1_test/P1_test_XCW.good` was regenerated from a real passing in-process run against
+  this new 2-step invocation (previous `.good` was captured from a manual standalone run that
+  never used the `-all_charges`/`-no_date` flags the test harness actually injects, so it could
+  not have matched even before this fix). Verified byte-identical against a standalone
+  `NoSpherA2.exe` run with the same arguments.
+  **Follow-up bug found 2026-07-19, root-caused and fixed**: while investigating whether
+  `P1_test_XCW` could use a smaller/faster orbital basis, a `-b <name>` override was wired into
+  `XCW::construct` (sets `settings.basis_set_name`, reusing the existing general-purpose `-b`
+  flag). Any basis other than the hardcoded default `def2-svp` (tried `3-21g` and `sto-3g`)
+  reliably crashed with a real access violation inside OCC's SOAD initial-guess step, reproduced
+  standalone (`NoSpherA2.exe -do_XCW 0.01 0.01 -b sto-3g ...` → `0xC0000005`), independent of the
+  `to_AOBasis()`/`XCW::setup_basis` code itself. A debug build (`cmake --preset debug-windows`)
+  turned this into a clean assertion: `Eigen/src/Core/Block.h:147`, an out-of-range block access
+  inside OCC's SOAD guess. Root cause was one level further down, in the **`BasisSetGenerator`
+  submodule** (not this repo): `BasisSetGenerator/src/create_basis_sets.py` grouped Basis Set
+  Exchange shells by `angular_momentum[0]` and only ever read `coefficients[0]`. Combined
+  `"L"`/`"SP"` shells — Basis Set Exchange's representation for classic Pople-style contractions,
+  `angular_momentum: [0, 1]` with two separate coefficient rows sharing one set of exponents —
+  always resolved to the s-type component, silently dropping the p-type coefficients entirely.
+  STO-3G and 3-21G both use this representation for every non-H/He element, so e.g. carbon ended
+  up with only a 1s + 2s basis and **no 2p functions at all** — hence the out-of-range Eigen
+  block access once OCC's SOAD guess tried to work with the (too-small) resulting `AOBasis`.
+  Fixed in the submodule (commit `2f6372b` on branch `fix-lshell-p-orbital-drop`, not yet pushed
+  to `origin/BasisSetGenerator`) by unrolling combined shells into their individual angular-
+  momentum components before grouping; also fixed `import bse` (no such installable package) to
+  `import basis_set_exchange as bse`, and generalized the script to regenerate all three of its
+  target CSVs instead of only `def2-svp`. Regenerated `STO-3G-basis.csv`/`3-21G-basis.csv` via a
+  freshly-installed `basis_set_exchange`; `def2-SVP-basis.csv` (this project's XCW default, never
+  affected since it has no combined L-shells) regenerated byte-identical as a regression check.
+  `Src/basis_data.cpp` (gitignored, generated from these CSVs by the `BasisSetConverter` tool at
+  build time) was regenerated and the project rebuilt. Verified fixed end-to-end: `-do_XCW -b
+  sto-3g` and `-b 3-21g` both now run a full, correct lambda scan instead of crashing; no
+  regression on `P1_test_XCW`/`P1_test_XCW_h2` (both use the unaffected default `def2-svp`). The
+  parent repo's submodule pointer was updated locally (commit `831975f`) but, like the submodule
+  commit itself, has not been pushed.
 
 - **Transient 13-test failure episode, 2026-07-03** (`alanine_occ`, `disorder_THPP`,
   `grown_water`, `Hybrid_mode`, `malbac_SF_ECP`, `rubredoxin_cmtc`, `sucrose_ptb`, `sucrose_SF`,
