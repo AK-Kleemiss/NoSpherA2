@@ -2867,6 +2867,10 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
 		//but reads a .json path as given: the library's set is written out once, for the
 		//elements present, and handed over that way
 		std::shared_ptr<BasisSet> aux = BasisSetLibrary::get_basis_set(settings.df_basis_name);
+		//a Coulomb-only set fits J and leaves the exchange to a basis never meant for it
+		if (aux->get_name().find("jkfit") == std::string::npos)
+			std::cout << "WARNING: " << aux->get_name() << " is not a JK-fitting basis; Hartree-Fock exchange is fitted with it all the same. "
+				"def2-universal-jkfit serves the def2 family, cc-pvXz-jkfit the cc-pVXZ family." << std::endl;
 		ivec elements;
 		for (int i = 0; i < static_cast<int>(mol.atoms().size()); i++)
 			if (std::find(elements.begin(), elements.end(), mol.atoms()[i].atomic_number) == elements.end())
