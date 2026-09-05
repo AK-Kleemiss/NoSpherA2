@@ -57,6 +57,29 @@ void BasisSet::operator+=(const BasisSet& other) {
 }
 
 
+void BasisSet::write_occ_json(const std::filesystem::path& path, const ivec& atomic_numbers) const {
+	std::ofstream f(path);
+	err_checkf(f.is_open(), "Cannot write " + path.string(), std::cout);
+	f << std::setprecision(17) << "{\"elements\":{";
+	for (int i = 0; i < static_cast<int>(atomic_numbers.size()); i++) {
+		const std::span<const SimplePrimitive> primitives = this->operator[](atomic_numbers[i] - 1);
+		f << (i ? ",\"" : "\"") << atomic_numbers[i] << "\":{\"electron_shells\":[";
+		int p = 0;
+		for (int shell_nr = 0; shell_nr <= primitives.back().shell; shell_nr++) {
+			f << (shell_nr ? ",{" : "{") << "\"function_type\":\"gto\",\"angular_momentum\":[" << primitives[p].type << "],\"exponents\":[";
+			const int p0 = p;
+			for (; p < static_cast<int>(primitives.size()) && primitives[p].shell == shell_nr; p++)
+				f << (p > p0 ? "," : "") << primitives[p].exp;
+			f << "],\"coefficients\":[[";
+			for (int q = p0; q < p; q++)
+				f << (q > p0 ? "," : "") << primitives[q].coefficient;
+			f << "]]}";
+		}
+		f << "]}";
+	}
+	f << "}}" << std::endl;
+}
+
 occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms) const {
 	err_checkf(_primitiveCount != 0, "No basis data available in BasisSet Object, please load something first!", std::cout);
 	std::vector<occ::gto::Shell> shells;

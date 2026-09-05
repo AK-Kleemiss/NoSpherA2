@@ -113,6 +113,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768;
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
+	std::string df_basis_name;
 	bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false;
 	bool i_tensor_single = false;
 	std::filesystem::path i_tensor_file_path;
@@ -208,6 +209,10 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		handlers["basis_set"] = [&](std::istream& is) {
 			if (!(is >> basis_set_name))
 				throw std::runtime_error("Expected basis set name");
+			};
+		handlers["df_basis"] = [&](std::istream& is) {
+			if (!(is >> df_basis_name))
+				throw std::runtime_error("Expected a fitting basis name after 'df_basis'");
 			};
 
 		handlers["start"] = [&](std::istream& is) {
@@ -433,6 +438,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.i_tensor_file_path = i_tensor_file_path;
 	settings.i_tensor_save_path = i_tensor_save_path;
 	settings.nbo_output = nbo_output;
+	settings.df_basis_name = df_basis_name;
 
 	return settings;
 }
@@ -2694,7 +2700,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	//shell-block norms, and the difference shrinks as the SCF converges. Rebuilt in full
 	//every 8 iterations or once the DIIS error has fallen tenfold since the last full build,
 	//as OCC's own loop does, so the screening error does not accumulate.
-	const bool incremental = opt->xcw_incremental && G_last_.size() > 0
+	const bool incremental = opt->xcw_incremental && scf.m_procedure.supports_incremental_fock_build() && G_last_.size() > 0
 		&& scf.iter - last_full_build_ < 8 && scf.diis_error > next_full_build_error_;
 	if (incremental) {
 		occ::Mat D_diff = scf.ctx.mo.D - D_last_build_;
@@ -2856,6 +2862,30 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
 	occ::qm::AOBasis occ_basis_set;
 	setup_basis(mol, settings.basis_set_name, occ_basis_set);
 	occ::qm::HartreeFock hf(occ_basis_set);
+	if (!settings.df_basis_name.empty()) {
+		//OCC loads a fitting basis by name from a data directory this build does not ship,
+		//but reads a .json path as given: the library's set is written out once, for the
+		//elements present, and handed over that way
+		std::shared_ptr<BasisSet> aux = BasisSetLibrary::get_basis_set(settings.df_basis_name);
+		ivec elements;
+		for (int i = 0; i < static_cast<int>(mol.atoms().size()); i++)
+			if (std::find(elements.begin(), elements.end(), mol.atoms()[i].atomic_number) == elements.end())
+				elements.push_back(mol.atoms()[i].atomic_number);
+		const std::string file = aux->get_name() + "_df.json";
+		aux->write_occ_json(file, elements);
+		hf.set_density_fitting_basis(file);
+		//OCC keeps the three-index integrals only under a 512 MB limit and otherwise recomputes
+		//them every iteration, which costs twice a direct build here. Held whenever they fit in
+		//half of what the process can have; they are computed once for the whole lambda scan.
+		const size_t naux = aux->to_AOBasis(mol.atoms()).nbf();
+		const size_t nbf = occ_basis_set.nbf();
+		const size_t store = naux * nbf * (nbf + 1) / 2 * sizeof(double);
+		const size_t avail = available_memory_bytes();
+		const bool stored = avail == 0 || store < avail / 2;
+		hf.set_density_fitting_policy(stored ? occ::qm::IntegralEngineDF::Policy::Stored : occ::qm::IntegralEngineDF::Policy::Direct);
+		std::cout << "XCW density fitting with " << aux->get_name() << ": " << naux << " functions, "
+			<< (store / 1048576.0) << " MB of three-index integrals " << (stored ? "held in memory" : "recomputed every iteration") << std::endl;
+	}
 	if (opt->xcw_int_precision > 0.0) hf.set_precision(opt->xcw_int_precision);
 	create_prims(ao_data_shells, occ_basis_set);
 	eval_I_anom_disp(ao_data_shells, read_tensor);

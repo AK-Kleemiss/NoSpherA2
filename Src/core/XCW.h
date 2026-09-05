@@ -95,6 +95,8 @@ private:
 		double diis_stop_shift;
 		bool apply_damping = true;
 		std::string basis_set_name;
+		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
+		std::string df_basis_name;
 		bool grown;
 		int n_params;
 		int refine_against;
