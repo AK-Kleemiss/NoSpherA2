@@ -181,7 +181,7 @@ jobs:
             cargo-downloads-v1-${{ runner.os }}-${{ matrix.architecture }}-
 
       - name: Set up sccache
-        uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: "v0.16.0"
 
@@ -453,7 +453,7 @@ jobs:
 
       - name: Upload Flawfinder results to Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         with:
           sarif_file: flawfinder-results.sarif
           category: flawfinder
