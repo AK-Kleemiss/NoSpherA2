@@ -48,9 +48,23 @@ static int run_app_impl(int argc, char **argv)
 {
     using namespace std;
     const std::filesystem::path cwd = std::filesystem::current_path();
+	string output_file = "NoSpherA2.log";
+    {
+        for (int i = 0; i < argc; i++) {
+            string temp = argv[i];
 
-    ofstream log_file("NoSpherA2.log", ios::out);
-    std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+            if (temp == "-out") {
+                err_checkf(i + 1 < argc && argv[i + 1][0] != '-',
+                    "Missing argument for -out option",
+                    std::cout);
+                output_file = argv[i + 1];
+                i++;
+            }
+        }
+    }
+
+    ofstream log_file(output_file, ios::out);
+    std::streambuf* _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);
     opt.digest_options();
     opt.cwd = cwd;
