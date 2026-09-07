@@ -122,6 +122,7 @@ private:
 		// computes it in single anyway, so this stores what was computed rather than a
 		// widened copy of it.
 		bool i_tensor_single = false;
+		bool i_tensor_double = false;
 		// `I_tensor <path>` in the settings file: where the streamed tensor lives. Written
 		// there, and reused from there when it is already the right size for this problem,
 		// so that trying another refinement setting does not rebuild it.
@@ -316,11 +317,10 @@ private:
 	// Held resident only while it fits settings.i_tensor_max_mb; otherwise empty
 	// and i_file_ carries the tensor. Read through i_block(r) either way.
 	cvec I;
-	//The device computes the tensor in single precision and it was stored in double, so
-	//half of every byte the SCF loop reads was padding. Held in float it is half the memory
-	//and half the traffic of the two walks per iteration, and the values are the ones the
-	//GPU produced either way. NOSPHERA2_XCW_I_FLOAT=1 selects it; the streamed path is
-	//unchanged for now.
+	//A tensor built in single precision is held, streamed and saved in single: half the
+	//memory and half the traffic of the two walks per iteration, and the values are the
+	//ones the GEMM produced either way. i_float / i_double in the settings override the
+	//choice the build precision makes.
 	std::vector<std::complex<float>> I32;
 	bool i_float_ = false;
 	// The background writer for `save <path>`. Joined, never detached: a thread still
@@ -342,13 +342,16 @@ private:
 	// The packed (mu, nu) run of reflection r, from the loaded window or from the resident tensor
 	const cdouble* i_block(const int r) const
 	{
-		return i_streamed_ ? i_file_.block(r)
-			: I.data() + static_cast<size_t>(r) * (static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2);
+		return i_streamed_ ? i_file_.block(r) : I.data() + static_cast<size_t>(r) * i_compact_;
 	}
 	const std::complex<float>* i_block32(const int r) const
 	{
-		return I32.data() + static_cast<size_t>(r) * (static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2);
+		return i_streamed_ ? i_file_.block32(r) : I32.data() + static_cast<size_t>(r) * i_compact_;
 	}
+	//Only the (mu, nu) pairs the overlap screening kept are stored, i_compact_ of the
+	//nmo (nmo + 1) / 2, in the order these two lists give
+	ivec i_pair_mu_, i_pair_nu_;
+	size_t i_compact_ = 0;
 	std::vector<asym_atom> asym_atoms;
 	std::vector<scattering_data> obs;
 	hkl_list hkl;

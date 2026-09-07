@@ -26,7 +26,7 @@ struct Dev {
 	//Uploaded once
 	T* ao = nullptr;
 	int* aos = nullptr;
-	unsigned char* skip = nullptr;
+	int* compact = nullptr;
 	double *d1 = nullptr, *d2 = nullptr, *d3 = nullptr, *w = nullptr;
 	//Per reflection scratch
 	T *phase_re = nullptr, *phase_im = nullptr;
@@ -104,10 +104,10 @@ __global__ void weight_kernel(const int n_active, const int np, const long long 
 }
 
 //C is symmetric, so only the upper triangle is read back. Distinct (i,j) map to distinct
-//packed indices, and launches are ordered on one stream, so no atomics are needed.
+//stored indices, and launches are ordered on one stream, so no atomics are needed.
 template <typename T>
 __global__ void accumulate_kernel(const int n_active, const int nmo, const long long aos_off,
-	const int* __restrict__ aos, const unsigned char* __restrict__ skip,
+	const int* __restrict__ aos, const int* __restrict__ compact,
 	const T* __restrict__ cre, const T* __restrict__ cim,
 	const double fre, const double fim,
 	double* __restrict__ I_re, double* __restrict__ I_im)
@@ -117,11 +117,11 @@ __global__ void accumulate_kernel(const int n_active, const int nmo, const long 
 	if (i >= n_active || j >= n_active || j < i) return;
 	const int mu = aos[aos_off + i];
 	const int nu = aos[aos_off + j];
-	if (skip[(long long)mu * nmo + nu]) return;
+	const int t = compact[(long long)mu * nmo + nu];
+	if (t < 0) return;
 	//The GEMM wrote column-major n_active x n_active; C is symmetric so either index works
 	const double re = (double)cre[(long long)j * n_active + i];
 	const double im = (double)cim[(long long)j * n_active + i];
-	const long long t = (long long)mu * nmo - ((long long)mu * (mu - 1)) / 2 + (nu - mu);
 	I_re[t] += re * fre - im * fim;
 	I_im[t] += re * fim + im * fre;
 }
@@ -154,7 +154,7 @@ template <typename T>
 void free_impl()
 {
 	Dev<T>& d = g<T>;
-	gpuFree(d.ao); gpuFree(d.aos); gpuFree(d.skip);
+	gpuFree(d.ao); gpuFree(d.aos); gpuFree(d.compact);
 	gpuFree(d.d1); gpuFree(d.d2); gpuFree(d.d3); gpuFree(d.w);
 	gpuFree(d.phase_re); gpuFree(d.phase_im);
 	gpuFree(d.wri); gpuFree(d.cri); gpuFree(d.gemm_ws);
@@ -207,7 +207,7 @@ bool init_impl(const itensor_gpu_layout& L)
 	const size_t need =
 		sizeof(T) * (size_t)L.ao_all_len +
 		sizeof(int) * (size_t)L.aos_all_len +
-		(size_t)L.nmo * L.nmo +
+		sizeof(int) * (size_t)L.nmo * L.nmo +
 		sizeof(double) * 4 * (size_t)L.n_points +
 		sizeof(T) * 2 * (size_t)L.n_points +
 		sizeof(T) * 2 * (size_t)max_elems +
@@ -220,7 +220,7 @@ bool init_impl(const itensor_gpu_layout& L)
 
 	GPU_TRY(gpuMalloc(&d.ao, sizeof(T) * (size_t)L.ao_all_len));
 	GPU_TRY(gpuMalloc(&d.aos, sizeof(int) * (size_t)L.aos_all_len));
-	GPU_TRY(gpuMalloc(&d.skip, (size_t)L.nmo * L.nmo));
+	GPU_TRY(gpuMalloc(&d.compact, sizeof(int) * (size_t)L.nmo * L.nmo));
 	GPU_TRY(gpuMalloc(&d.d1, sizeof(double) * (size_t)L.n_points));
 	GPU_TRY(gpuMalloc(&d.d2, sizeof(double) * (size_t)L.n_points));
 	GPU_TRY(gpuMalloc(&d.d3, sizeof(double) * (size_t)L.n_points));
@@ -241,7 +241,7 @@ bool init_impl(const itensor_gpu_layout& L)
 
 	if (!upload_ao<T>(d.ao, L.ao_all, L.ao_all_len)) return false;
 	GPU_TRY(gpuMemcpy(d.aos, L.aos_all, sizeof(int) * (size_t)L.aos_all_len, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMemcpy(d.skip, L.skip, (size_t)L.nmo * L.nmo, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d.compact, L.compact, sizeof(int) * (size_t)L.nmo * L.nmo, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(d.d1, L.d1, sizeof(double) * (size_t)L.n_points, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(d.d2, L.d2, sizeof(double) * (size_t)L.n_points, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(d.d3, L.d3, sizeof(double) * (size_t)L.n_points, gpuMemcpyHostToDevice));
@@ -295,7 +295,7 @@ bool submit_impl(const int slot, const int num_syms,
 				d.ao + d.blk_ao_off[b], np, d.wri, np, d.cri, na, d.gemm_ws);
 			const dim3 thr(16, 16);
 			const dim3 blk((na + 15) / 16, (na + 15) / 16);
-			accumulate_kernel<T><<<blk, thr>>>(na, d.nmo, d.blk_aos_off[b], d.aos, d.skip,
+			accumulate_kernel<T><<<blk, thr>>>(na, d.nmo, d.blk_aos_off[b], d.aos, d.compact,
 				d.cri, d.cri + (long long)na * na, f.real(), f.imag(), d.I_re[slot], d.I_im[slot]);
 		}
 	}

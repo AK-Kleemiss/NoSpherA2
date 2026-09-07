@@ -102,10 +102,10 @@ kernel void weight_kernel(device const float* ao [[buffer(0)]],
 struct acc_args { uint na, nmo, ldc, aos_off; float fre, fim; };
 
 //C is row-major 2 n_active x n_active: the real rows first, the imaginary ones below. It is
-//symmetric, so only i <= j is read. Distinct (i,j) map to distinct packed indices and the
+//symmetric, so only i <= j is read. Distinct (i,j) map to distinct stored indices and the
 //dispatches of one command buffer run in order, so the read-modify-write needs no atomics.
 kernel void accumulate_kernel(device const int* aos [[buffer(0)]],
-	device const uchar* skip [[buffer(1)]], device const float* c [[buffer(2)]],
+	device const int* compact [[buffer(1)]], device const float* c [[buffer(2)]],
 	device float* I_re_hi [[buffer(3)]], device float* I_re_lo [[buffer(4)]],
 	device float* I_im_hi [[buffer(5)]], device float* I_im_lo [[buffer(6)]],
 	constant acc_args& a [[buffer(7)]], uint2 id [[thread_position_in_grid]])
@@ -114,11 +114,10 @@ kernel void accumulate_kernel(device const int* aos [[buffer(0)]],
 	if (i >= a.na || j >= a.na || j < i) return;
 	const long mu = aos[a.aos_off + i];
 	const long nu = aos[a.aos_off + j];
-	const long nmo = a.nmo;
-	if (skip[mu * nmo + nu]) return;
+	const int t = compact[mu * (long)a.nmo + nu];
+	if (t < 0) return;
 	const float re = c[(ulong)j * a.ldc + i];
 	const float im = c[(ulong)(a.na + j) * a.ldc + i];
-	const long t = mu * nmo - (mu * (mu - 1)) / 2 + (nu - mu);
 	const float2 dre = df_add(two_prod(re, a.fre), two_prod(-im, a.fim));
 	const float2 dim = df_add(two_prod(re, a.fim), two_prod(im, a.fre));
 	const float2 sre = df_add(float2(I_re_hi[t], I_re_lo[t]), dre);
@@ -216,7 +215,7 @@ struct State {
 	bool ready = false;
 	int nmo = 0, packed = 0, n_grids = 0;
 	long long n_points = 0;
-	id<MTLBuffer> ao = nil, aos = nil, skip = nil;
+	id<MTLBuffer> ao = nil, aos = nil, compact = nil;
 	id<MTLBuffer> d1 = nil, d2 = nil, d3 = nil, w = nil;
 	id<MTLBuffer> phase_re = nil, phase_im = nil;
 	id<MTLBuffer> wri = nil, cri = nil;
@@ -275,7 +274,7 @@ bool init_impl(const itensor_gpu_layout& L)
 	const size_t need =
 		sizeof(float) * (size_t)ao_len +
 		sizeof(int) * (size_t)L.aos_all_len +
-		(size_t)L.nmo * L.nmo +
+		sizeof(int) * (size_t)L.nmo * L.nmo +
 		sizeof(float) * 7 * (size_t)L.n_points +
 		sizeof(float) * 2 * (size_t)max_na * max_ld +
 		sizeof(float) * 2 * (size_t)max_na * max_ldc +
@@ -289,7 +288,7 @@ bool init_impl(const itensor_gpu_layout& L)
 
 	s.ao = make_buffer(sizeof(float) * ao_len);
 	s.aos = make_buffer(sizeof(int) * L.aos_all_len);
-	s.skip = make_buffer((size_t)L.nmo * L.nmo);
+	s.compact = make_buffer(sizeof(int) * (size_t)L.nmo * L.nmo);
 	s.d1 = make_buffer(sizeof(float) * 2 * L.n_points);
 	s.d2 = make_buffer(sizeof(float) * 2 * L.n_points);
 	s.d3 = make_buffer(sizeof(float) * 2 * L.n_points);
@@ -299,7 +298,7 @@ bool init_impl(const itensor_gpu_layout& L)
 	s.wri = make_buffer(sizeof(float) * 2 * (size_t)max_na * max_ld);
 	s.cri = make_buffer(sizeof(float) * 2 * (size_t)max_na * max_ldc);
 	for (int i = 0; i < 2; i++) s.I[i] = make_buffer(sizeof(float) * 4 * (size_t)L.packed);
-	for (id<MTLBuffer> b : { s.ao, s.aos, s.skip, s.d1, s.d2, s.d3, s.w, s.phase_re, s.phase_im,
+	for (id<MTLBuffer> b : { s.ao, s.aos, s.compact, s.d1, s.d2, s.d3, s.w, s.phase_re, s.phase_im,
 		s.wri, s.cri, s.I[0], s.I[1] })
 		if (b == nil) return false;
 
@@ -339,7 +338,7 @@ bool init_impl(const itensor_gpu_layout& L)
 		blk.gemm = it->second;
 	}
 	std::copy(L.aos_all, L.aos_all + L.aos_all_len, (int*)s.aos.contents);
-	std::copy(L.skip, L.skip + (size_t)L.nmo * L.nmo, (unsigned char*)s.skip.contents);
+	std::copy(L.compact, L.compact + (size_t)L.nmo * L.nmo, (int*)s.compact.contents);
 	float* d1 = (float*)s.d1.contents;
 	float* d2 = (float*)s.d2.contents;
 	float* d3 = (float*)s.d3.contents;
@@ -419,7 +418,7 @@ bool submit_impl(const int slot, const int num_syms,
 					id<MTLComputeCommandEncoder> enc = [cb computeCommandEncoder];
 					[enc setComputePipelineState:d.accumulate];
 					[enc setBuffer:s.aos offset:0 atIndex:0];
-					[enc setBuffer:s.skip offset:0 atIndex:1];
+					[enc setBuffer:s.compact offset:0 atIndex:1];
 					[enc setBuffer:s.cri offset:0 atIndex:2];
 					for (int q = 0; q < 4; q++) [enc setBuffer:s.I[slot] offset:q * I_bytes atIndex:3 + q];
 					[enc setBytes:&aa length:sizeof(aa) atIndex:7];

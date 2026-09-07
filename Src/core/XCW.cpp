@@ -116,7 +116,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	std::string basis_set_name = "Undefined";
 	std::string df_basis_name;
 	bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false;
-	bool i_tensor_single = false;
+	bool i_tensor_single = false, i_tensor_double = false;
 	std::filesystem::path i_tensor_file_path;
 	std::filesystem::path i_tensor_save_path;
 	// 0 = hold the whole tensor, which is what every run did before this existed.
@@ -334,6 +334,10 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 			i_tensor_single = true;
 			};
 
+		handlers["i_double"] = [&](std::istream&) {
+			i_tensor_double = true;
+			};
+
 		handlers["i_tensor_mb"] = [&](std::istream& in2) {
 			long long mb = 0;
 			in2 >> mb;
@@ -436,6 +440,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.read_first_guess = read_first_guess;
 	settings.i_tensor_max_mb = i_tensor_max_mb;
 	settings.i_tensor_single = i_tensor_single;
+	settings.i_tensor_double = i_tensor_double;
 	settings.i_tensor_file_path = i_tensor_file_path;
 	settings.i_tensor_save_path = i_tensor_save_path;
 	settings.nbo_output = nbo_output;
@@ -1121,28 +1126,38 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 	eval_phase(phase_fact);
 	eval_DW(DW_fact);
 	eval_translation_phase(translation_phase);
+	size_t kept_on_disk = 0;
+	bool single_on_disk = false;
 	if (settings.read_tensor && !settings.i_tensor_file_path.empty()
-		&& std::filesystem::exists(i_tensor_path())
-		&& std::filesystem::file_size(i_tensor_path())
-			>= i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo)) {
+		&& i_tensor_file::matches(i_tensor_path(), cryst.nr_small, cryst.nmo, kept_on_disk, single_on_disk)) {
 		//A streamed tensor already there and big enough for this problem. It depends on the
 		//geometry, the basis and the reflections and on none of the refinement settings, so
 		//a second run that changes those can read it rather than spend the build again.
 		//open() checks the header and throws if the shape does not match, which is what
 		//stops a tensor from a different structure being used by accident.
-		const size_t packed = static_cast<size_t>(cryst.nmo) * (cryst.nmo + 1) / 2;
+		i_compact_ = kept_on_disk;
+		const size_t packed = i_compact_;
 		const char* source = "";
 		bool automatic = false;
 		i_streamed_ = items_within_budget(static_cast<size_t>(cryst.nr_small),
-			i_tensor_file::block_bytes(cryst.nmo), i_budget(source, automatic)) != 0;
+			i_tensor_file::block_bytes(i_compact_, single_on_disk), i_budget(source, automatic)) != 0;
 		i_window_ = std::max(1, std::min(cryst.nr_small, 64));
 		open_i_stream_for_reading();
+		i_pair_mu_ = i_file_.pair_mu();
+		i_pair_nu_ = i_file_.pair_nu();
+		//The file's element type is kept as it is: a single-precision tensor cannot regain
+		//anything by widening, and a double one is narrowed only on request
+		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
+		i_float_ = single_on_disk || (!i_streamed_ && (settings.i_tensor_single || (f && std::atoi(f) != 0)));
 		std::cout << "I tensor read from " << i_tensor_path().string()
-			<< " (" << (i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo) / 1048576.0)
-			<< " MB), not recomputed" << (i_streamed_ ? ", read a window at a time" : ", held in memory") << std::endl;
+			<< " (" << (i_tensor_file::total_bytes(cryst.nr_small, i_compact_, single_on_disk) / 1048576.0)
+			<< " MB" << (single_on_disk ? ", single precision" : "") << "), not recomputed"
+			<< (i_streamed_ ? ", read a window at a time" : ", held in memory") << std::endl;
+		if (i_float_ && !single_on_disk)
+			std::cout << "NOTE: the tensor on disk is double precision; it is narrowed to single as i_float asks" << std::endl;
+		if (single_on_disk && settings.i_tensor_double)
+			std::cout << "NOTE: the tensor on disk is single precision; i_double cannot widen it, it is used as stored" << std::endl;
 		if (!i_streamed_) {
-			const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
-			i_float_ = settings.i_tensor_single || (f && std::atoi(f) != 0);
 			if (i_float_)
 				I32.assign(static_cast<size_t>(cryst.nr_small) * packed, std::complex<float>{});
 			else
@@ -1151,12 +1166,13 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 				const int r1 = std::min(cryst.nr_small, r0 + i_window_);
 				i_file_.load(r0, r1);
 				for (int r = r0; r < r1; r++) {
-					const cdouble* src = i_file_.block(r);
-					if (i_float_)
+					if (single_on_disk)
+						std::copy(i_file_.block32(r), i_file_.block32(r) + packed, I32.data() + static_cast<size_t>(r) * packed);
+					else if (i_float_)
 						for (size_t i = 0; i < packed; i++)
-							I32[static_cast<size_t>(r) * packed + i] = std::complex<float>(static_cast<float>(src[i].real()), static_cast<float>(src[i].imag()));
+							I32[static_cast<size_t>(r) * packed + i] = std::complex<float>(static_cast<float>(i_file_.block(r)[i].real()), static_cast<float>(i_file_.block(r)[i].imag()));
 					else
-						std::copy(src, src + packed, I.data() + static_cast<size_t>(r) * packed);
+						std::copy(i_file_.block(r), i_file_.block(r) + packed, I.data() + static_cast<size_t>(r) * packed);
 				}
 			}
 			i_file_.close();
@@ -1186,7 +1202,7 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 void XCW::start_i_save()
 {
 	if (settings.i_tensor_save_path.empty() || i_streamed_) return;
-	const int packed = (cryst.nmo * (cryst.nmo + 1)) / 2;
+	const size_t packed = i_compact_;
 	const int nr = cryst.nr_small;
 	const std::filesystem::path path = settings.i_tensor_save_path;
 	const bool from_float = i_float_;
@@ -1196,18 +1212,10 @@ void XCW::start_i_save()
 	i_writer_ = std::thread([this, path, nr, packed, from_float]() {
 		try {
 			i_tensor_file out;
-			out.create(path, nr, cryst.nmo);
-			std::vector<cdouble> block(packed);
+			out.create(path, nr, cryst.nmo, i_pair_mu_, i_pair_nu_, from_float);
 			for (int r = 0; r < nr; r++) {
-				if (from_float) {
-					const std::complex<float>* src = I32.data() + static_cast<size_t>(r) * packed;
-					for (int i = 0; i < packed; i++)
-						block[i] = cdouble(src[i].real(), src[i].imag());
-					out.write_block(r, block.data());
-				}
-				else {
-					out.write_block(r, I.data() + static_cast<size_t>(r) * packed);
-				}
+				if (from_float) out.write_block(r, I32.data() + static_cast<size_t>(r) * packed);
+				else out.write_block(r, I.data() + static_cast<size_t>(r) * packed);
 			}
 			out.finish_write();
 		}
@@ -1254,8 +1262,8 @@ size_t XCW::i_budget(const char*& source, bool& automatic) const {
 }
 
 void XCW::decide_i_storage() {
-	const size_t per_block = i_tensor_file::block_bytes(cryst.nmo);
-	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, cryst.nmo);
+	const size_t per_block = i_tensor_file::block_bytes(i_compact_, i_float_);
+	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, i_compact_, i_float_);
 
 	//The settings file budget wins, then -mem; with neither, what the process can actually
 	//have. Left to a keyword this is the single most expensive decision in an XCW run and
@@ -1274,12 +1282,9 @@ void XCW::decide_i_storage() {
 		//shifts every reference output by a line, and the automatic budget would say it on
 		//every run - including the reference tests, which is why it stays quiet there.
 		if ((budget > 0 && !automatic) || ProgressBar::report_counts) {
-			const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
-			const bool single = settings.i_tensor_single || (f && std::atoi(f) != 0);
-			const double shown = single ? total / 2.0 : static_cast<double>(total);
 			std::cout << std::fixed << std::setprecision(2)
-				<< "I tensor held in memory: " << (shown / 1048576.0) << " MB"
-				<< (single ? " (single precision)" : "");
+				<< "I tensor held in memory: " << (total / 1048576.0) << " MB"
+				<< (i_float_ ? " (single precision)" : "");
 			if (budget > 0)
 				std::cout << " (fits the " << (budget / 1048576.0) << " MB " << source << " budget)";
 			std::cout << std::endl;
@@ -1287,9 +1292,9 @@ void XCW::decide_i_storage() {
 		return;
 	}
 	i_window_ = static_cast<int>(std::min(w, static_cast<size_t>(cryst.nr_small)));
-	i_file_.create(i_tensor_path(), cryst.nr_small, cryst.nmo);
+	i_file_.create(i_tensor_path(), cryst.nr_small, cryst.nmo, i_pair_mu_, i_pair_nu_, i_float_);
 	std::cout << std::fixed << std::setprecision(2)
-		<< "I tensor streamed to disk: " << (total / 1048576.0) << " MB total, "
+		<< "I tensor streamed to disk: " << (total / 1048576.0) << " MB" << (i_float_ ? " (single precision)" : "") << " total, "
 		<< i_window_ << " of " << cryst.nr_small << " reflections resident ("
 		<< (i_window_ * per_block / 1048576.0) << " MB) to fit " << source
 		<< " (" << (budget / 1048576.0) << " MB)" << std::endl;
@@ -1321,17 +1326,6 @@ static void tile_gemm(const int m, const int n, const int k, const float* a, con
 void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids_) {
 	long long skipped_grids = 0;
 	const int packed_size = (cryst.nmo * (cryst.nmo + 1)) / 2;
-	//nr_small * packed_size deliberately in size_t: both are int and their product
-	//passes 2^31 at nmo = 500 with 20k reflections
-	decide_i_storage();
-	if (!i_streamed_) {
-		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
-		i_float_ = settings.i_tensor_single || (f && std::atoi(f) != 0);
-		if (i_float_)
-			I32.assign(static_cast<size_t>(cryst.nr_small) * packed_size, std::complex<float>{});
-		else
-			I.assign(static_cast<size_t>(cryst.nr_small) * packed_size, cdouble{});
-	}
 	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
 
 	cvec XCW_integrals;
@@ -1693,6 +1687,19 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			skipped_grids_per_pair[pair_idx] = n_atom_grids - static_cast<int>(pair_grids.size());
 		}
 	}
+	//Only the pairs that survive the screening are stored, in (mu, nu) order; tri_compact
+	//takes a packed slot to its stored index, -1 when screened out
+	ivec tri_compact(packed_size, -1);
+	i_pair_mu_.clear();
+	i_pair_nu_.clear();
+	for (mu = 0; mu < cryst.nmo; mu++)
+		for (nu = mu; nu < cryst.nmo; nu++)
+			if (!skip[mu][nu]) {
+				tri_compact[tri_index(mu, nu)] = static_cast<int>(i_pair_mu_.size());
+				i_pair_mu_.push_back(mu);
+				i_pair_nu_.push_back(nu);
+			}
+	i_compact_ = i_pair_mu_.size();
 	ivec2 grid_active_aos(n_atom_grids);
 	vec2 grid_ao_values(n_atom_grids);
 	for (int g = 0; g < n_atom_grids; g++) {
@@ -1969,10 +1976,6 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	vec3().swap(mu_vals);
 
 	std::optional<ProgressBar> pb;
-
-	if (!(opt->no_date)) {
-		pb.emplace((unsigned long long)cryst.nr_small, 60, "=", "|", "Calculating XCW integrals...", std::cout);
-	}
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// Bookkeeping skipped pairs and grids
@@ -2015,10 +2018,10 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				aos_all.insert(aos_all.end(), blkk.active_aos.begin(), blkk.active_aos.end());
 			}
 		}
-		std::vector<unsigned char> skip_flat(static_cast<size_t>(cryst.nmo) * cryst.nmo, 0);
+		ivec compact_flat(static_cast<size_t>(cryst.nmo) * cryst.nmo, -1);
 		for (int m = 0; m < cryst.nmo; m++)
-			for (int n = 0; n < cryst.nmo; n++)
-				skip_flat[static_cast<size_t>(m) * cryst.nmo + n] = skip[m][n] ? 1 : 0;
+			for (int n = m; n < cryst.nmo; n++)
+				compact_flat[static_cast<size_t>(m) * cryst.nmo + n] = tri_compact[tri_index(m, n)];
 		vec fd1, fd2, fd3, fw;
 		for (int gg = 0; gg < n_atom_grids; gg++) {
 			fd1.insert(fd1.end(), d1[gg].begin(), d1[gg].begin() + points[gg]);
@@ -2027,13 +2030,13 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			fw.insert(fw.end(), weights[gg].begin(), weights[gg].begin() + points[gg]);
 		}
 		itensor_gpu_layout L;
-		L.nmo = cryst.nmo; L.packed = packed_size; L.n_grids = n_atom_grids;
+		L.nmo = cryst.nmo; L.packed = static_cast<int>(i_compact_); L.n_grids = n_atom_grids;
 		L.n_blocks = static_cast<int>(bg.size());
 		L.blk_grid = bg.data(); L.blk_point_start = bps.data(); L.blk_point_count = bpc.data();
 		L.blk_n_active = bna.data(); L.blk_ao_off = bao.data(); L.blk_aos_off = baos.data();
 		L.ao_all = ao_all.data(); L.ao_all_len = static_cast<long long>(ao_all.size());
 		L.aos_all = aos_all.data(); L.aos_all_len = static_cast<long long>(aos_all.size());
-		L.skip = skip_flat.data(); L.grid_point_off = goff.data();
+		L.compact = compact_flat.data(); L.grid_point_off = goff.data();
 		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
 		L.n_points = static_cast<long long>(fd1.size());
 		//What the device path actually issues: one dense na x 2na GEMM per block, the real
@@ -2067,17 +2070,43 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			std::cerr << std::endl;
 		}
 	}
+#endif
+	//Held in the precision it is built in unless the settings say otherwise: single when
+	//any path that contributes runs single. nr_small * i_compact_ deliberately in size_t,
+	//the product passes 2^31 at nmo = 500 with 20k reflections.
+	{
+		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
+		const bool single_build = (itensor_on_gpu && !opt->gpu_fp64)
+			|| ((!itensor_on_gpu || opt->itensor_hybrid) && opt->cpu_itensor_fp32);
+		i_float_ = settings.i_tensor_single || (f && std::atoi(f) != 0) || (single_build && !settings.i_tensor_double);
+		if (single_build && !i_float_)
+			std::cout << "NOTE: the I tensor is built in single precision and held in double as i_double asks" << std::endl;
+		if (!single_build && i_float_)
+			std::cout << "NOTE: the I tensor is built in double precision and narrowed to single as i_float asks" << std::endl;
+	}
+	decide_i_storage();
+	if (!i_streamed_) {
+		if (i_float_)
+			I32.assign(static_cast<size_t>(cryst.nr_small) * i_compact_, std::complex<float>{});
+		else
+			I.assign(static_cast<size_t>(cryst.nr_small) * i_compact_, cdouble{});
+	}
+	//After the storage line: the bar owns the console from here until the last reflection
+	if (!(opt->no_date)) {
+		pb.emplace((unsigned long long)cryst.nr_small, 60, "=", "|", "Calculating XCW integrals...", std::cout);
+	}
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	if (itensor_on_gpu) gpu_thread = std::thread([&]() {
 		const auto gpu_start = std::chrono::high_resolution_clock::now();
 		cvec blk_gpu;
-		if (i_streamed_ || i_float_) blk_gpu.assign(packed_size, cdouble{});
+		if (i_streamed_ || i_float_) blk_gpu.assign(i_compact_, cdouble{});
 		vec kxs(num_syms), kys(num_syms), kzs(num_syms);
 		cvec facs(static_cast<size_t>(num_syms) * n_atom_grids);
 		int done = 0;
 		auto collect_gpu = [&](const int rr, const int slot) {
 			if (i_streamed_ || i_float_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
 			cdouble* const I_rr = (i_streamed_ || i_float_) ? blk_gpu.data()
-									  : I.data() + static_cast<size_t>(rr) * packed_size;
+									  : I.data() + static_cast<size_t>(rr) * i_compact_;
 			if (!itensor_gpu_collect(slot, I_rr))
 				err_checkf(false, "I tensor GPU read-back failed", std::cout);
 			if (i_streamed_) {
@@ -2085,8 +2114,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				i_file_.write_block(rr, blk_gpu.data());
 			}
 			else if (i_float_) {
-				std::complex<float>* const dst = I32.data() + static_cast<size_t>(rr) * packed_size;
-				for (int i = 0; i < packed_size; i++)
+				std::complex<float>* const dst = I32.data() + static_cast<size_t>(rr) * i_compact_;
+				for (size_t i = 0; i < i_compact_; i++)
 					dst[i] = std::complex<float>(static_cast<float>(blk_gpu[i].real()),
 												 static_cast<float>(blk_gpu[i].imag()));
 			}
@@ -2167,10 +2196,10 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			vec phase_cosines;
 			vec w, c;
 			std::vector<float> wf, cf;
-			//One reflection's block, used only while streaming. No ordering is needed on
+			//One reflection's block while streaming or holding the tensor in single. No ordering is needed on
 			//the way out: the file is reflection-major and the writer seeks to r's offset
 			cvec blk;
-			if (i_streamed_) blk.assign(packed_size, cdouble{});
+			if (i_streamed_ || i_float_) blk.assign(i_compact_, cdouble{});
 
 #if !defined(__APPLE__)
 			mkl_set_num_threads_local(1);
@@ -2218,10 +2247,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					static_cast<long long>(cryst.nr_small - r) * gpu_ns_per_refl.load() < my_ns / my_done) break;
 				if (!next_refl.compare_exchange_strong(r, r + 1)) continue;
 				const auto r_start = std::chrono::high_resolution_clock::now();
-				if (i_streamed_) std::fill(blk.begin(), blk.end(), cdouble{});
+				if (i_streamed_ || i_float_) std::fill(blk.begin(), blk.end(), cdouble{});
 				cdouble* const I_r = (i_streamed_ || i_float_) ? blk.data()
-					: I.data() + static_cast<size_t>(r) * packed_size;
-				const size_t base = static_cast<size_t>(r) * packed_size;
+					: I.data() + static_cast<size_t>(r) * i_compact_;
 				const int* asym_lookup_r = asym_lookup[r].data();
 				// Precompute weighted phase factors for integration
 				for (int syms = 0; syms < num_syms; syms++) {
@@ -2287,8 +2315,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 										const auto* crow = cv + 2 * tile.result_offset + static_cast<size_t>(tile_row) * 2 * tile.col_count;
 										for (int tile_col = first_tile_col; tile_col < tile.col_count; tile_col++) {
 											const int nu = active_aos[tile.col_start + tile_col];
-											if (!skip[mu][nu])
-												I_r[tri_index(mu, nu)] += cdouble(crow[2 * tile_col], crow[2 * tile_col + 1]) * factor;
+											const int t = tri_compact[tri_index(mu, nu)];
+											if (t >= 0)
+												I_r[t] += cdouble(crow[2 * tile_col], crow[2 * tile_col + 1]) * factor;
 										}
 									}
 								}
@@ -2303,6 +2332,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					//of integration, so the lock is not on the hot path
 					std::lock_guard<std::mutex> lock(i_write_mutex);
 					i_file_.write_block(r, blk.data());
+				}
+				else if (i_float_) {
+					std::complex<float>* const dst = I32.data() + static_cast<size_t>(r) * i_compact_;
+					for (size_t i = 0; i < i_compact_; i++)
+						dst[i] = std::complex<float>(static_cast<float>(blk[i].real()), static_cast<float>(blk[i].imag()));
 				}
 				my_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - r_start).count();
 				my_done++;
@@ -2362,14 +2396,10 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 				//value and nothing in the sum.
 				auto accumulate = [&](const auto* I_r) {
 					cdouble sum = F_calc[1][r];
-					size_t k = 0;
-					for (int mu = 0; mu < cryst.nmo; mu++) {
-						sum += 2.0 * cdouble(I_r[k]) * D(mu, mu);
-						k++;
-						for (int nu = mu + 1; nu < cryst.nmo; nu++, k++) {
-							sum += 4.0 * cdouble(I_r[k]) * D(mu, nu);
-						}
-					}
+					const int* pmu = i_pair_mu_.data();
+					const int* pnu = i_pair_nu_.data();
+					for (size_t k = 0; k < i_compact_; k++)
+						sum += (pmu[k] == pnu[k] ? 2.0 : 4.0) * cdouble(I_r[k]) * D(pmu[k], pnu[k]);
 					F_calc[0][r] = sum;
 				};
 				if (i_float_) accumulate(i_block32(r)); else accumulate(i_block(r));
@@ -2431,14 +2461,12 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 				//As in calc_F_calc: one walk over whichever element type is resident, with
 				//the accumulation in double either way.
 				auto accumulate = [&](const auto* I_r) {
-					size_t offset = 0;
-					for (int mu = 0; mu < cryst.nmo; mu++) {
-						for (int nu = mu; nu < cryst.nmo; nu++) {
-							const double vr = static_cast<double>(I_r[offset].real());
-							const double vi = static_cast<double>(I_r[offset].imag());
-							local_ptr[nu * cryst.nmo + mu] += precompute.real() * vr - precompute.imag() * vi;
-							offset++;
-						}
+					const int* pmu = i_pair_mu_.data();
+					const int* pnu = i_pair_nu_.data();
+					for (size_t k = 0; k < i_compact_; k++) {
+						const double vr = static_cast<double>(I_r[k].real());
+						const double vi = static_cast<double>(I_r[k].imag());
+						local_ptr[pnu[k] * cryst.nmo + pmu[k]] += precompute.real() * vr - precompute.imag() * vi;
 					}
 				};
 				if (i_float_) accumulate(i_block32(r)); else accumulate(i_block(r));

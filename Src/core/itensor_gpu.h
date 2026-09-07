@@ -20,7 +20,7 @@ const char* itensor_gpu_gemm_name();
 
 struct itensor_gpu_layout {
 	int nmo = 0;
-	int packed = 0;
+	int packed = 0;              //stored pairs per reflection
 	int n_grids = 0;             //atom grids carrying the blocks
 	int n_blocks = 0;
 	const int* blk_grid = nullptr;        //[n_blocks] owning grid
@@ -35,7 +35,7 @@ struct itensor_gpu_layout {
 	long long ao_all_len = 0;
 	const int* aos_all = nullptr;         //AO index per active row, ascending
 	long long aos_all_len = 0;
-	const unsigned char* skip = nullptr;  //[nmo*nmo], 1 = pair screened out
+	const int* compact = nullptr;         //[nmo*nmo], stored index of (mu, nu), -1 if screened out
 	const int* grid_point_off = nullptr;  //[n_grids+1] into the flattened point arrays
 	const double* d1 = nullptr;           //flattened atom-centred coordinates and weights
 	const double* d2 = nullptr;
