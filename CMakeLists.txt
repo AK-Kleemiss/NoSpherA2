@@ -9,6 +9,13 @@ option(NOSPHERA2_BUILD_TESTS "Build NoSpherA2 tests" OFF)
 option(NOSPHERA2_DEPENDENCIES_ONLY "Build dependencies without building NoSpherA2" OFF)
 option(NOSPHERA2_USE_CUDA "Build the CUDA scattering-factor path" OFF)
 option(NOSPHERA2_USE_HIP "Build the HIP (AMD) scattering-factor path" OFF)
+#Apple silicon only: the Metal I tensor path wants unified memory, which an Intel Mac has not.
+if(APPLE AND (CMAKE_OSX_ARCHITECTURES MATCHES "arm64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64"))
+    set(_nosphera2_metal_default ON)
+else()
+    set(_nosphera2_metal_default OFF)
+endif()
+option(NOSPHERA2_USE_METAL "Build the Metal XCW I tensor path (Apple silicon)" ${_nosphera2_metal_default})
 option(NOSPHERA2_GPU_AUTO "Pick the GPU backend from the hardware present" ON)
 #For a binary that will be copied to other machines rather than run where it was built.
 option(NOSPHERA2_CUDA_PORTABLE "Build CUDA code for every major architecture, not just this card" OFF)

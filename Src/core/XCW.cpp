@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "XCW.h"
-#ifdef NOSPHERA2_USE_GPU
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 #include "itensor_gpu.h"
 #endif
 #include "convenience.h"
@@ -1985,7 +1985,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 	bool itensor_on_gpu = false;
 	double itensor_gpu_dense_flops = 0.0;
-#ifdef NOSPHERA2_USE_GPU
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	//Read with use_gpu rather than on its own, so -no_gpu means what it says. Checking the
 	//pair here rather than clearing the flag at parse time keeps it order-independent.
 	if (opt->gpu_itensor && opt->use_gpu) {

@@ -171,6 +171,17 @@ if(APPLE)
         Accelerate
         REQUIRED
     )
+    #Apple silicon runs the XCW I tensor on the GPU through Metal Performance Shaders. The
+    #kernels are compiled at run time, so only the frameworks are needed here; an Intel Mac
+    #has no unified memory and keeps the CPU path.
+    if(NOSPHERA2_USE_METAL)
+        enable_language(OBJCXX)
+        target_sources(NoSpherA2Core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/itensor_metal.mm")
+        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/itensor_metal.mm"
+            PROPERTIES COMPILE_OPTIONS "-fobjc-arc" SKIP_PRECOMPILE_HEADERS ON)
+        target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_METAL)
+        target_link_libraries(NoSpherA2Core PRIVATE "-framework Metal" "-framework MetalPerformanceShaders" "-framework Foundation")
+    endif()
     target_link_libraries(
         NoSpherA2Core
         PRIVATE
