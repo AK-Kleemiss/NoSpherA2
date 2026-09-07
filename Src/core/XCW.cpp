@@ -7,6 +7,7 @@
 #include "scattering_factors.h"
 #include "nos_math.h"
 #include "basis_set.h"
+#include <mutex>
 
 void XCW::construct(const options& opt_in) {
 	opt = &opt_in;
@@ -1985,6 +1986,12 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 	bool itensor_on_gpu = false;
 	double itensor_gpu_dense_flops = 0.0;
+	//The device and the CPU threads draw reflections from one counter, the CPU stopping
+	//once the device would finish what is left before a thread finished one more.
+	std::atomic<int> next_refl{0};
+	std::atomic<long long> gpu_ns_per_refl{0};
+	std::mutex i_write_mutex;
+	std::thread gpu_thread;
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	//Read with use_gpu rather than on its own, so -no_gpu means what it says. Checking the
 	//pair here rather than clearing the flag at parse time keeps it order-independent.
@@ -2053,34 +2060,47 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			std::cerr << "GPU in use: XCW I tensor on ";
 			if (itensor_on_gpu)
 				std::cerr << "the device (" << (opt->gpu_fp64 ? "double" : "single")
-				<< "-precision " << itensor_gpu_gemm_name() << " GEMM)";
+				<< "-precision " << itensor_gpu_gemm_name() << " GEMM)"
+				<< (opt->itensor_hybrid ? " with the CPU threads taking reflections alongside" : "");
 			else
 				std::cerr << "the CPU - device unavailable or problem too large";
 			std::cerr << std::endl;
 		}
 	}
-	if (itensor_on_gpu) {
+	if (itensor_on_gpu) gpu_thread = std::thread([&]() {
 		const auto gpu_start = std::chrono::high_resolution_clock::now();
 		cvec blk_gpu;
 		if (i_streamed_ || i_float_) blk_gpu.assign(packed_size, cdouble{});
 		vec kxs(num_syms), kys(num_syms), kzs(num_syms);
 		cvec facs(static_cast<size_t>(num_syms) * n_atom_grids);
-		auto collect_gpu = [&](const int rr) {
+		int done = 0;
+		auto collect_gpu = [&](const int rr, const int slot) {
 			if (i_streamed_ || i_float_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
 			cdouble* const I_rr = (i_streamed_ || i_float_) ? blk_gpu.data()
 									  : I.data() + static_cast<size_t>(rr) * packed_size;
-			if (!itensor_gpu_collect(rr & 1, I_rr))
+			if (!itensor_gpu_collect(slot, I_rr))
 				err_checkf(false, "I tensor GPU read-back failed", std::cout);
-			if (i_streamed_) i_file_.write_block(rr, blk_gpu.data());
+			if (i_streamed_) {
+				std::lock_guard<std::mutex> lock(i_write_mutex);
+				i_file_.write_block(rr, blk_gpu.data());
+			}
 			else if (i_float_) {
 				std::complex<float>* const dst = I32.data() + static_cast<size_t>(rr) * packed_size;
 				for (int i = 0; i < packed_size; i++)
 					dst[i] = std::complex<float>(static_cast<float>(blk_gpu[i].real()),
 												 static_cast<float>(blk_gpu[i].imag()));
 			}
+			done++;
+			gpu_ns_per_refl = std::chrono::duration_cast<std::chrono::nanoseconds>(
+				std::chrono::high_resolution_clock::now() - gpu_start).count() / done;
 			if (!(opt->no_date) && pb) pb->update();
 		};
-		for (int rr = 0; rr < cryst.nr_small; rr++) {
+		//Two result slots: a reflection is collected after the next one has been
+		//submitted, so the read-back overlaps that calculation
+		int prev = -1, slot = 0;
+		for (;;) {
+			const int rr = next_refl.fetch_add(1);
+			if (rr >= cryst.nr_small) break;
 			for (int sy = 0; sy < static_cast<int>(num_syms); sy++) {
 				kxs[sy] = k_pt[0][asym_lookup[rr][sy]];
 				kys[sy] = k_pt[1][asym_lookup[rr][sy]];
@@ -2090,18 +2110,21 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
 					* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
 			}
-			if (!itensor_gpu_submit(rr & 1, static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data()))
+			if (!itensor_gpu_submit(slot, static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data()))
 				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
-			if (rr > 0) collect_gpu(rr - 1);
+			if (prev >= 0) collect_gpu(prev, slot ^ 1);
+			prev = rr;
+			slot ^= 1;
 		}
-		if (cryst.nr_small > 0) collect_gpu(cryst.nr_small - 1);
+		if (prev >= 0) collect_gpu(prev, slot ^ 1);
 		itensor_gpu_free();
 		if (throughput::enabled())
-			std::fprintf(stderr, "I tensor GPU: %.3f s wall time\n",
-				std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - gpu_start).count());
+			std::fprintf(stderr, "I tensor GPU: %.3f s wall time, %d of %d reflections\n",
+				std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - gpu_start).count(),
+				done, cryst.nr_small);
 		//No bookkeeping here: the loop above runs for both paths and eval_I multiplies the
 		//total by nr_small on the way out, so anything added here counts twice.
-	}
+	});
 #endif
 	//Counted serially from the block structure both paths walk, so the CPU and GPU rows are
 	//the same work measured two ways and no counter is touched by two threads.
@@ -2131,9 +2154,12 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			itensor_flops / 1.0e9, screened);
 	}
 
-	if (!itensor_on_gpu)
+	if (!itensor_on_gpu || opt->itensor_hybrid)
 	{
-#pragma omp parallel reduction(+:skipped_grids)
+		//One core stays free for the thread feeding the device, which must not queue
+		//behind a tile GEMM to submit the next reflection
+		const int cpu_threads = itensor_on_gpu ? std::max(1, omp_get_max_threads() - 1) : omp_get_max_threads();
+#pragma omp parallel num_threads(cpu_threads) reduction(+:skipped_grids)
 		{
 			vec2 single_k_pts(num_syms, vec(3));
 			vec phase_angles;
@@ -2183,8 +2209,15 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				c.resize(2 * max_tile_result_size);
 			}
 
-#pragma omp for schedule(dynamic, 1)
-			for (int r = 0; r < cryst.nr_small; r++) {
+			long long my_ns = 0;
+			int my_done = 0;
+			for (;;) {
+				int r = next_refl.load();
+				if (r >= cryst.nr_small) break;
+				if (itensor_on_gpu && my_done > 0 && gpu_ns_per_refl.load() > 0 &&
+					static_cast<long long>(cryst.nr_small - r) * gpu_ns_per_refl.load() < my_ns / my_done) break;
+				if (!next_refl.compare_exchange_strong(r, r + 1)) continue;
+				const auto r_start = std::chrono::high_resolution_clock::now();
 				if (i_streamed_) std::fill(blk.begin(), blk.end(), cdouble{});
 				cdouble* const I_r = (i_streamed_ || i_float_) ? blk.data()
 					: I.data() + static_cast<size_t>(r) * packed_size;
@@ -2268,9 +2301,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				if (i_streamed_) {
 					//A write is packed_size * 16 bytes against a whole reflection's worth
 					//of integration, so the lock is not on the hot path
-#pragma omp critical(i_tensor_write)
+					std::lock_guard<std::mutex> lock(i_write_mutex);
 					i_file_.write_block(r, blk.data());
 				}
+				my_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - r_start).count();
+				my_done++;
 				if (!(opt->no_date) && pb) {
 					pb->update();
 				}
@@ -2281,6 +2316,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 
 		}
 	}
+	if (gpu_thread.joinable()) gpu_thread.join();
 	if (i_streamed_) {
 		i_file_.finish_write();
 		open_i_stream_for_reading();

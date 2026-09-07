@@ -836,6 +836,9 @@ struct options
     //Single-precision tiles for the CPU I tensor, as the device path runs; sgemm is twice
     //dgemm's rate. -no_cpu_itensor_fp32 keeps double.
     bool cpu_itensor_fp32 = true;
+    //CPU threads take reflections alongside the device; -no_itensor_hybrid leaves them all
+    //to the device.
+    bool itensor_hybrid = true;
     //Seed each lambda step from the density extrapolated through the two previous steps
     //rather than the last one alone; the step is small and the trajectory smooth.
     bool xcw_extrapolate = true;

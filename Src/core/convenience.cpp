@@ -572,6 +572,11 @@ std::string help_message =
  "  -no_cpu_itensor_fp32               Build the I tensor on the CPU in double;\n"
  "                                    single precision, as the device path\n"
  "                                    runs, is the default.\n"
+ "  -no_itensor_hybrid                 Leave every reflection of the I tensor to\n"
+ "                                    the device. By default the CPU threads\n"
+ "                                    take reflections alongside it and stop\n"
+ "                                    when the device would finish the rest\n"
+ "                                    sooner than they would one more.\n"
  "  -gpu_itensor_tensor                FP16 Tensor Core operands with FP32\n"
  "                                    accumulation for the I tensor (default\n"
  "                                    when cuBLAS provides it); use\n"
@@ -3465,6 +3470,10 @@ bool options::digest_property_options(const std::string &temp, int &i)
         cpu_itensor_fp32 = true;
     else if (temp == "-no_cpu_itensor_fp32")
         cpu_itensor_fp32 = false;
+    else if (temp == "-itensor_hybrid")
+        itensor_hybrid = true;
+    else if (temp == "-no_itensor_hybrid")
+        itensor_hybrid = false;
     else if (temp == "-xcw_extrapolate")
         xcw_extrapolate = true;
     else if (temp == "-no_xcw_extrapolate")
