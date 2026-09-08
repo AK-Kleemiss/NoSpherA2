@@ -705,9 +705,11 @@ std::string help_message =
  "                                    -ri_fit first.\n"
  "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn, -ri_fit\n"
  "                                    and -multipole_moments first.\n"
- "  -interaction_energy <A> <A.npy> <B> <B.npy>\n"
- "                                    Electrostatic interaction energy of two\n"
- "                                    fitted or SALTED densities; use -ri_fit.\n"
+ "  -interaction_energy <A> <B>         Electrostatic interaction energy of two\n"
+ "                                    fitted densities: two wavefunctions with\n"
+ "                                    -ri_fit, or two .xyz with -SALTED. With\n"
+ "                                    <A> <A.npy> <B> <B.npy> the coefficient\n"
+ "                                    files are read instead; use -ri_fit.\n"
  "  -combine_mos <wfn1> <wfn2>          Combine molecular orbitals.\n"
  "  -cmos1 <MO ...>  -cmos2 <MO ...>   MO selections for -combine_mos.\n"
  "  -QCT                               Enter the legacy QCT workflow.\n\n"
@@ -4021,16 +4023,44 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         exit(0);
     }
     else if (temp == "-interaction_energy") {
-        //-interaction_energy <A> <A.npy> <B> <B.npy> -ri_fit <basis>: electrostatics between two fitted or SALTED-predicted densities
-        err_checkf(i + 4 < argc, "-interaction_energy needs two structure files, each followed by its coefficient file", std::cout);
-        err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -ri_fit BEFORE -interaction_energy", std::cout);
-        WFN wavy_A(arguments[i + 1]), wavy_B(arguments[i + 3]);
-        WFN aux_A = generate_aux_wfn(wavy_A, aux_basis), aux_B = generate_aux_wfn(wavy_B, aux_basis);
-        std::vector<unsigned long> shape;
-        bool fortran_order;
+        //-interaction_energy <A> <B>: electrostatics between two fitted densities. With -SALTED <model-dir> both are predicted
+        //from the model, otherwise A and B are wavefunctions and each is RI-fitted with the -ri_fit basis.
+        //<A> <A.npy> <B> <B.npy> takes coefficient files in the fitted_multipoles layout instead
+        err_checkf(i + 2 < argc, "-interaction_energy needs two structure files", std::cout);
+        const bool from_files = i + 4 < argc && std::filesystem::path(arguments[i + 2]).extension() == ".npy";
+        WFN wavy_A(arguments[i + 1]), wavy_B(arguments[from_files ? i + 3 : i + 2]);
+        WFN aux_A(e_origin::NOT_YET_DEFINED), aux_B(e_origin::NOT_YET_DEFINED);
         vec coef_A, coef_B;
-        npy::LoadArrayFromNumpy(arguments[i + 2], shape, fortran_order, coef_A);
-        npy::LoadArrayFromNumpy(arguments[i + 4], shape, fortran_order, coef_B);
+        if (from_files) {
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -ri_fit BEFORE -interaction_energy", std::cout);
+            aux_A = generate_aux_wfn(wavy_A, aux_basis), aux_B = generate_aux_wfn(wavy_B, aux_basis);
+            std::vector<unsigned long> shape; bool fortran_order;
+            npy::LoadArrayFromNumpy(arguments[i + 2], shape, fortran_order, coef_A);
+            npy::LoadArrayFromNumpy(arguments[i + 4], shape, fortran_order, coef_B);
+        }
+        else if (SALTED) {
+            err_checkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED <model-dir> BEFORE -interaction_energy", std::cout);
+            auto predict = [this](const WFN& wavy, WFN& aux) {
+                SALTEDPredictor SP(wavy, *this);
+                if (!SP.basis_set_loaded()) load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+                vec coefs = SP.gen_SALTED_densities();
+                err_checkf(SP.wavy.get_ncen() == wavy.get_ncen(), "The SALTED model does not cover every atom of " + wavy.get_path().string(), std::cout);
+                aux = SP.wavy;
+                aux.set_origin(e_origin::NOT_YET_DEFINED);
+                return coefs;
+            };
+            std::cout << "Predicting both densities with the SALTED model in " << salted_model_dir << std::endl;
+            coef_A = predict(wavy_A, aux_A);
+            coef_B = predict(wavy_B, aux_B);
+        }
+        else {
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -ri_fit <basis> or -SALTED <model-dir> BEFORE -interaction_energy", std::cout);
+            err_checkf(wavy_A.get_nmo() > 0 && wavy_B.get_nmo() > 0, "-interaction_energy needs two wavefunctions to fit; structures alone need -SALTED <model-dir>", std::cout);
+            DensityFitting::CONFIG config = DensityFitting::config_from_options(*this);
+            aux_A = generate_aux_wfn(wavy_A, aux_basis), aux_B = generate_aux_wfn(wavy_B, aux_basis);
+            coef_A = DensityFitting::density_fit(wavy_A, aux_A, config);
+            coef_B = DensityFitting::density_fit(wavy_B, aux_B, config);
+        }
         DensityFitting::print_interaction_energy(DensityFitting::interaction_energy(coef_A, aux_A, coef_B, aux_B), aux_A, aux_B, std::cout);
         exit(0);
     }

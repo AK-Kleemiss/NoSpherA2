@@ -557,12 +557,11 @@ DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A
 
 void DensityFitting::print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file)
 {
-    const double K = 627.5094740631;
     const char* names[5] = { "nucleus-nucleus  ", "nuclei A - rho B ", "nuclei B - rho A ", "rho A - rho B    ", "total            " };
     const double parts[5] = { E.nuc_nuc, E.nucA_rhoB, E.nucB_rhoA, E.rho_rho, E.total() };
     file << "\nElectrostatic interaction energy of the fitted densities\n";
     for (int i = 0; i < 5; i++)
-        file << "  " << names[i] << std::fixed << std::setprecision(6) << std::setw(14) << parts[i] << " Eh" << std::setprecision(4) << std::setw(12) << parts[i] * K << " kcal/mol\n";
+        file << "  " << names[i] << std::fixed << std::setprecision(6) << std::setw(14) << parts[i] << " Eh" << std::setprecision(4) << std::setw(12) << parts[i] * constants::kcal_mol_per_hartree << " kcal/mol\n";
     file << "\nBy atom pair, kcal/mol, rows A columns B\n      ";
     for (int b = 0; b < aux_B.get_ncen(); b++) file << std::setw(9) << aux_B.get_atom_label(b);
     file << "      sum\n" << std::setprecision(3);
@@ -570,10 +569,10 @@ void DensityFitting::print_interaction_energy(const INTERACTION& E, const WFN& a
         double s = 0.0;
         file << std::setw(6) << aux_A.get_atom_label(a);
         for (int b = 0; b < aux_B.get_ncen(); b++) {
-            file << std::setw(9) << E.pair[a][b] * K;
+            file << std::setw(9) << E.pair[a][b] * constants::kcal_mol_per_hartree;
             s += E.pair[a][b];
         }
-        file << std::setw(9) << s * K << "\n";
+        file << std::setw(9) << s * constants::kcal_mol_per_hartree << "\n";
     }
     file << "\nBy rank, kcal/mol, rows A columns B, n = nuclei\n      ";
     for (int j = 0; j < (int)E.rank[0].size(); j++) file << std::setw(11) << (j == 0 ? std::string("n") : "l=" + std::to_string(j - 1));
@@ -582,10 +581,10 @@ void DensityFitting::print_interaction_energy(const INTERACTION& E, const WFN& a
         double s = 0.0;
         file << std::setw(6) << (i == 0 ? std::string("n") : "l=" + std::to_string(i - 1));
         for (int j = 0; j < (int)E.rank[i].size(); j++) {
-            file << std::setw(11) << E.rank[i][j] * K;
+            file << std::setw(11) << E.rank[i][j] * constants::kcal_mol_per_hartree;
             s += E.rank[i][j];
         }
-        file << std::setw(11) << s * K << "\n";
+        file << std::setw(11) << s * constants::kcal_mol_per_hartree << "\n";
     }
     file << std::endl;
 }

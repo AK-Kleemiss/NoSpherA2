@@ -1,8 +1,11 @@
 # Unit Test Status
-**Last updated: 2026-09-08** (electrostatic interaction energy of two fitted or SALTED densities,
-`-interaction_energy <A> <A.npy> <B> <B.npy>`: 3 new `RiInteractionTests` unit cases and a fix to the
-combining `Int_Params` constructor. Net +3; 281 cases, 277 pass and the usual 4 `*_full` XCW cases skip
-on `release-windows`. Earlier the same day: multipole-restrained RI fit, `computeRho` screening fix.)
+**Last updated: 2026-09-08** (`-interaction_energy` now takes two wavefunctions and fits them, or two
+structures with `-SALTED <model-dir>` and predicts them, besides the `<A> <A.npy> <B> <B.npy>` form;
+fixed the `WFN::isBohr` flag the gbw, molden, fchk, tonto and ptb readers never set, which had the
+SALTED predictor describe a wavefunction's molecule 1.89 times too large. No new cases: 281, 277 pass
+and the usual 4 `*_full` XCW cases skip on `release-windows`. Earlier the same day: the interaction
+energy itself with 3 `RiInteractionTests`, the `Int_Params` fix, multipole-restrained RI fit,
+`computeRho` screening fix.)
 
 ## 2026-09-08 — Multipole restraints on the RI fit (`-multipole_moments`)
 
@@ -94,6 +97,30 @@ read past the vector). It now loops over the second object's atoms.
   must cancel (nuclei-nuclei against nuclei-density, analytic potential against the
   libcint block), the two tables must sum to the total, and swapping the two molecules
   must give the same numbers. The swap is what caught the constructor bug.
+
+### Input modes of `-interaction_energy`, and the bohr flag of the wavefunction readers
+
+`-interaction_energy <A> <B>` takes three kinds of input. Two wavefunctions are each
+RI-fitted internally with the `-ri_fit` basis (`config_from_options`, the same free fit
+`-write_ri_coefs` writes); two structures with `-SALTED <model-dir>` are both predicted
+with the model and its own aux basis (the predictor's `wavy` carries it, origin reset to
+`NOT_YET_DEFINED` so `Int_Params` reads the shell types unshifted); `<A> <A.npy> <B> <B.npy>`
+reads coefficient files as before. On water-methanol the internal fit reproduces the
+-8.1673 kcal/mol of the coefficient files exactly and the prediction from `E:\Model_V6`
+gives -22.36, identical from `.gbw` and from `.xyz` input.
+
+That identity is a fix: `WFN::isBohr` was set only by the wfn, wfx and xyz readers,
+although every reader stores bohr. `write_xyz` writes the coordinates unconverted when the
+flag is off, so the descriptor file `temp_rascaline.xyz` of a gbw, molden, fchk, tonto or
+ptb input held bohr values labelled as angstrom, a molecule stretched by 1.89, and the
+predictor's neighbour cutoff was compared in the wrong unit as well. `-SALTED_COEFS` on
+`A.gbw` predicted a water of 10.50 e where the same model on `A.xyz` gives 9.63 e (RI cube
+grid). The five readers set the flag now and the two predictions agree to 3e-9.
+
+The remaining gap to the fit is the model: its water holds 9.63 e against 9.92 for the
+free fit on the same grid, and Model V6 was trained on coefficients from before the
+screening fix above. Not covered by a test case: the handler exits and the predictor needs
+the 782 MB model.
 
 ## 2026-09-02 — pTB cartesian f ordering, and GPU notes in golden files
 
