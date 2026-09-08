@@ -3,6 +3,16 @@
 `TomlIntegrationTests.ELI_NH3Li`. 267/267 non-XCW cases pass on `release-linux`, the nine
 XCW cases on a V100 node, a CPU node and the M2 Mac.)
 
+## 2026-09-09 — f-function phases in the OCC-to-WFN constructor
+
+`WFN::WFN(const occ::qm::Wavefunction&)` applied Gaussian-convention spherical-to-cartesian
+matrices to coefficients that OCC's `to_gaussian_order` had reordered but not rephased; Gaussian's
+f(±3), g(±3), g(±4) carry the opposite sign to libcint's. Every XCW `.wfn` and `.tscb` from a basis
+with f functions was affected (P1 def2-TZVP: 149.576 of 150 electrons, MO norms down to 0.97;
+AIMAll rejects such files). Fixed by flipping those rows after the reordering; the P1 TZVP file
+now integrates to 150.0000 with unit norms and AIMAll accepts it. No golden case has f functions on
+the OCC path, so none changed; the fix is covered by the AIMAll check documented in the handover.
+
 ## 2026-09-08 — `-eli_analysis` basins against AIMAll and DGrid
 
 `TomlIntegrationTests.ELI_NH3Li` (`tests/RGBI/nh3li_eli.good`, input `../RGBI_groups/nh3li.gbw`,
