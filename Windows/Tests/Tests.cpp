@@ -186,6 +186,16 @@ namespace NoSpherA2IntegrationTests
             });
         }
 
+        TEST_METHOD(SALTED_charge_constraint)
+        {
+            RunTest({
+                "SALTED_charge_constraint", "SALTED", "SALTED_charge_constraint.good", "",
+                {"-SALTED","Model", "-cif","test_cysteine.cif",
+                 "-wfn","test_cysteine.xyz", "-dmin","0.73",
+                 "-salted_charge_constraint", "-all_charges", "-no_date"}
+            });
+        }
+
         TEST_METHOD(sucrose_IAM)
         {
             RunTest({

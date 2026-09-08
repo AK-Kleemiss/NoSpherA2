@@ -1,11 +1,10 @@
 # Unit Test Status
-**Last updated: 2026-09-08** (`-interaction_energy` now takes two wavefunctions and fits them, or two
-structures with `-SALTED <model-dir>` and predicts them, besides the `<A> <A.npy> <B> <B.npy>` form;
-fixed the `WFN::isBohr` flag the gbw, molden, fchk, tonto and ptb readers never set, which had the
-SALTED predictor describe a wavefunction's molecule 1.89 times too large. No new cases: 281, 277 pass
-and the usual 4 `*_full` XCW cases skip on `release-windows`. Earlier the same day: the interaction
-energy itself with 3 `RiInteractionTests`, the `Int_Params` fix, multipole-restrained RI fit,
-`computeRho` screening fix.)
+**Last updated: 2026-09-08** (`-salted_charge_constraint` forces the global l=0 rescaling of every
+SALTED prediction to the electron count, whether or not the model file asks for it; one new golden
+case `SALTED_charge_constraint`: 282, 278 pass and the usual 4 `*_full` XCW cases skip on
+`release-windows`. Earlier the same day: `-interaction_energy` input modes and the `WFN::isBohr`
+reader fix, the interaction energy itself with 3 `RiInteractionTests`, the `Int_Params` fix,
+multipole-restrained RI fit, `computeRho` screening fix.)
 
 ## 2026-09-08 — Multipole restraints on the RI fit (`-multipole_moments`)
 
@@ -121,6 +120,21 @@ The remaining gap to the fit is the model: its water holds 9.63 e against 9.92 f
 free fit on the same grid, and Model V6 was trained on coefficients from before the
 screening fix above. Not covered by a test case: the handler exits and the predictor needs
 the 782 MB model.
+
+### `-salted_charge_constraint`, and what it does to the predicted interaction energy
+
+`apply_charge_constraint` (the global rescaling of the l=0 coefficients to the electron count,
+5 % refusal guard) ran only when a VERSION 3 model file carries a NORMC block with MODE 1.
+`-salted_charge_constraint` forces it after every prediction, in `gen_SALTED_densities`, so
+`-SALTED` refinements, `-SALTED_COEFS` and the SALTED mode of `-interaction_energy` all see it.
+New golden case `SALTED_charge_constraint`: the cysteine SALTED case with the flag, whose
+63.9897 e become 64.0000 (factor 1.00016) and whose ML charges move by 0.001-0.002 e.
+
+On water-methanol the constraint moves both models most of the way to the free fit
+(-8.17 kcal/mol, exact -8.171): Model V6 -22.36 -> -8.76 (water 9.71 -> 10 e, methanol
+18.23 -> 18 e), Model V7 -1.11 -> -4.71 (water 9.70 -> 10 e, methanol 17.87 -> 18 e). Both models
+are 0.3 e short on water, so a total-charge rescaling helps but does not replace retraining on
+charge-conserving coefficients.
 
 ## 2026-09-02 — pTB cartesian f ordering, and GPU notes in golden files
 

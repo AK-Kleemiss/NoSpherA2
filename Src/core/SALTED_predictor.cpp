@@ -21,6 +21,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     std::filesystem::path _path = opt_in.salted_model_dir;
     SALTED_DIR = opt_in.salted_model_dir;
     debug = opt_in.debug;
+    force_charge_constraint = opt_in.salted_charge_constraint;
 
     config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
 
@@ -725,7 +726,11 @@ vec SALTEDPredictor::gen_SALTED_densities()
     // electron count to be constrained. Applied here rather than at each call
     // site so the tsc, the charge table and the cubes all see the same density.
     // V2 models have no such block, so they are untouched.
-    if (model_file && model_file->charge_constraint_defined())
+    if (force_charge_constraint)
+        apply_charge_constraint(wavy.get_atoms(), coefs, wavy.get_charge(),
+                                spherical_fill_used, n_filled,
+                                filled_eeq_charge, applied_fill_charge, std::cout);
+    else if (model_file && model_file->charge_constraint_defined())
     {
         const auto entries = model_file->read_charge_constraint();
         const auto mode_it = entries.find("MODE");

@@ -36,6 +36,8 @@ private:
     // this, so predicted + filled still sums to the right number of electrons.
     double applied_fill_charge = 0.0;
     int n_filled = 0;
+    //-salted_charge_constraint: apply the constraint even when the model file does not ask for it
+    bool force_charge_constraint = false;
     Config config;
     int natoms;
     std::filesystem::path SALTED_DIR;

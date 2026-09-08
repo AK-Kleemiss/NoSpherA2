@@ -199,6 +199,18 @@ wfn = "test_cysteine.xyz"
 dmin = 0.73
 no_gpu_salted = ""
 
+[SALTED_charge_constraint]
+directory = "SALTED"
+good = "SALTED_charge_constraint.good"
+
+[SALTED_charge_constraint.args]
+SALTED = "Model"
+cif = "test_cysteine.cif"
+wfn = "test_cysteine.xyz"
+dmin = 0.73
+no_gpu_salted = ""
+salted_charge_constraint = ""
+
 [sucrose_IAM]
 directory = "sucrose_IAM_SF"
 
