@@ -217,6 +217,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-09-08, `ctest --preset release-linux` reports **267/267 passing** outside the XCW
+cases (`-E XCW`), including the new `TomlIntegrationTests.ELI_NH3Li` golden case for the
+rewritten `-eli_analysis` basin analysis; the nine XCW cases pass on a V100 node, a CPU node
+and the M2 Mac. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-09-02, `ctest --preset release-windows` reports **275/275 passing, 0 failed**
 (253 s; 6 not run: the four `full = true` XCW cases and two disabled `DeltaSeriesTests`).
 This baseline covers the pTB cartesian-f fix in `WFN::read_ptb` and the new

@@ -720,6 +720,13 @@ std::string help_message =
  "  -draw_orbits l,m[,resolution,radius]\n"
  "                                    Draw a spherical-harmonic orbital.\n"
  "  -eli_analysis <wfn> <resolution> <radius>\n"
+ "                                    QTAIM and ELI-D basins of the density and\n"
+ "                                    ELI-D cubes (resolution and radius in\n"
+ "                                    Angstrom), each basin's electrons by a\n"
+ "                                    voxel sum and on the atomic quadrature\n"
+ "                                    grids, the boundary followed along the\n"
+ "                                    field; -acc 4 before it tightens the\n"
+ "                                    latter from 0.005 to 0.002 e.\n"
  "  -ewal_sum <cube> [kmax] [accuracy] Ewald sum of a cube.\n"
  "  -atom_dens <wfn> [alpha-MOs beta-MOs]\n"
  "  -atom_dens_diff <gbw1> <gbw2>      Difference density from two GBW files.\n"
@@ -3394,8 +3401,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         wfn = arguments[i + 1];
         properties.resolution = stod(arguments[i + 2]);
         properties.radius = stod(arguments[i + 3]);
-        ELI_analysis(wfn, *this);
-        exit(0);
+        eli_analysis_run = true;
+        i += 3;
     }
     else if (temp == "-qtaim_eli") {
         // Cube-files mode:  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [<bg_value>]

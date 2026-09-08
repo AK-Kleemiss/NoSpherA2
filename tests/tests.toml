@@ -297,6 +297,13 @@ good = "nh3li_nao.good"
 wfn = "../RGBI_groups/nh3li.gbw"
 rgbi = ""
 
+[ELI_NH3Li]
+directory = "RGBI"
+good = "nh3li_eli.good"
+
+[ELI_NH3Li.args]
+eli_analysis = ["../RGBI_groups/nh3li.gbw", 0.1, 3.0]
+
 [RGBI_NH3Li_ANO]
 directory = "RGBI"
 good = "nh3li_ano.good"
