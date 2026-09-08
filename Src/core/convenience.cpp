@@ -544,6 +544,11 @@ std::string help_message =
  "  -Becke | -TFVC | -mbis | -embis    Select partitioning (default Hirshfeld).\n"
  "  -ri_fit [basis ...]                RI partitioning; omit a basis or use\n"
  "                                    auto_aux to generate one automatically.\n"
+ "  -multipole_moments <scheme> <N>    Restrain the RI fit to the Hirshfeld, TFVC,\n"
+ "                                    MBIS or EMBIS atomic charges and multipoles\n"
+ "                                    up to order N (implies -ri_fit).\n"
+ "  -multipole_strength <x>            Weight of the restraint rows against the\n"
+ "                                    density-fit metric, default 1.\n"
  "  -cpus <n>                          Maximum worker threads [all available].\n"
  "  -mem <MB>                          Memory budget for everything sliceable\n"
  "                                    [unset]. When given, the tsc block size\n"
@@ -698,8 +703,8 @@ std::string help_message =
  "  -SALTED_COEFS <model-dir>          Write SALTED_COEFS.npy (requires -wfn).\n"
  "  -RI_CUBE <coefficients.npy>        Write an RI density cube; use -wfn and\n"
  "                                    -ri_fit first.\n"
- "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn and\n"
- "                                    -ri_fit first.\n"
+ "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn, -ri_fit\n"
+ "                                    and -multipole_moments first.\n"
  "  -combine_mos <wfn1> <wfn2>          Combine molecular orbitals.\n"
  "  -cmos1 <MO ...>  -cmos2 <MO ...>   MO selections for -combine_mos.\n"
  "  -QCT                               Enter the legacy QCT workflow.\n\n"
@@ -3959,11 +3964,34 @@ bool options::digest_ri_options(const std::string &temp, int &i)
             aux_basis.push_back(std::make_shared<BasisSet>());
         }
     }
+    else if (temp == "-multipole_moments" || temp == "-multipole-moments") {
+        err_checkf(i + 2 < argc, "-multipole_moments needs a partitioning scheme and the highest order, e.g. -multipole_moments Hirshfeld 2", std::cout);
+        std::string scheme = arguments[++i];
+        std::transform(scheme.begin(), scheme.end(), scheme.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (scheme == "hirshfeld" || scheme == "hirsh")
+            multipole_scheme = PartitionType::Hirshfeld;
+        else if (scheme == "tfvc")
+            multipole_scheme = PartitionType::TFVC;
+        else if (scheme == "mbis")
+            multipole_scheme = PartitionType::MBIS;
+        else if (scheme == "embis")
+            multipole_scheme = PartitionType::EMBIS;
+        else
+            err("Unknown partitioning for -multipole_moments: " + arguments[i] + " (Hirshfeld, TFVC, MBIS or EMBIS)", std::cout);
+        multipole_lmax = std::stoi(arguments[++i]);
+        err_checkf(multipole_lmax >= 0 && multipole_lmax <= 8, "-multipole_moments: the order must be between 0 and 8", std::cout);
+        RI_FIT = true;
+        partition_type = PartitionType::RI;
+    }
+    else if (temp == "-multipole_strength") {
+        multipole_strength = std::stod(arguments[++i]);
+        err_checkf(multipole_strength > 0.0, "-multipole_strength must be positive", std::cout);
+    }
     else if (temp == "-write_ri_coefs") {
         WFN wavy(wfn);
         WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-        DensityFitting::CONFIG config;
-        config.analyze_quality = debug;
+        DensityFitting::CONFIG config = DensityFitting::config_from_options(*this);
         //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
         //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
         vec ri_coefs = DensityFitting::density_fit(wavy, wavy_aux, config);
@@ -4176,6 +4204,9 @@ void options::digest_options()
         if (debug)
             log_file << "Using -xyz input as the SALTED structure: " << wfn << endl;
     }
+    //-multipole_moments without -ri_fit: auto_aux, whichever order the two came in
+    if (multipole_lmax >= 0 && aux_basis.empty())
+        aux_basis.push_back(std::make_shared<BasisSet>());
 };
 
 namespace {

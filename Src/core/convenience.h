@@ -891,6 +891,10 @@ struct options
     int charge = 0;
     int ECP_mode = 0;
     PartitionType partition_type = PartitionType::Hirshfeld;
+    //-multipole_moments: the RI fit is restrained to this scheme's atomic moments up to this order, -1 = unrestrained
+    int multipole_lmax = -1;
+    PartitionType multipole_scheme = PartitionType::Hirshfeld;
+    double multipole_strength = 1.0;
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 
