@@ -1,7 +1,49 @@
 # Unit Test Status
-**Last updated: 2026-09-02** (pTB cartesian-f fix in `WFN::read_ptb`, and a new
-`-no_date_but_gpu` flag so golden files stop depending on whether the machine has a GPU.
-No cases added or removed; 275/275 pass on `release-windows`.)
+**Last updated: 2026-09-08** (multipole-restrained RI fit, `-multipole_moments <scheme> <N>`:
+2 new `RiMultipoleTests` unit cases and 1 new `TomlIntegrationTests.RiFitMultipoles`
+golden-file case. Net +3; 278 cases, 274 pass and the usual 4 `*_full` XCW cases skip on
+`release-windows`.)
+
+## 2026-09-08 — Multipole restraints on the RI fit (`-multipole_moments`)
+
+Branch `ri_multipole_restraints`. The RI fit can now be restrained to the atomic charges
+and multipole moments of a grid partitioning (Hirshfeld, TFVC, MBIS, EMBIS) up to order
+N. `GridManager::calculatePartitionedMultipoles` integrates `rho w_A r^l Y_lm` about each
+nucleus, `DensityFitting::add_multipole_restraint` appends one row per atom and (l, m)
+whose only non-zero entries sit on that atom's l-shells, because the moment of an
+atom-centred aux function about its own centre is the one-line integral
+`N c Gamma(l+3/2) / (2 alpha^(l+3/2))` (`radial_moment`). The rows are scaled by
+`1 / r_cov^l` so every order enters with the magnitude of the population row, and in
+this mode all restraint rows carry `-multipole_strength` (default 1) instead of Seifert's
+adaptive `5e-5` weights, which only nudge: on epoxide with strength 1 the fitted moments
+sit within 0.008 e (l=0), 0.004 (l=1) and 0.0003 e bohr^2 (l=2) of the Hirshfeld targets
+and the O charge is -0.207 against the target -0.199; the adaptive weights left it at
+-0.684. The default path (no flag) is untouched and `ri_fit.good` is byte-identical.
+
+### New cases
+
+- `RiMultipoleTests.RadialMomentMatchesQuadratureAndTheChargeRow`: `radial_moment`
+  against the trapezoid rule for l = 0..4 and three exponents, and for l = 0 against the
+  `pi / (2 alpha^(3/2)) N c` row that `add_electron_restraint` has always used (the
+  `sqrt(4 pi)` of Y_00 is the difference).
+- `RiMultipoleTests.RestraintRowsReproduceTheGridMomentsOfTheAtomicDensity`: closure
+  of the whole restraint on one oxygen with the `combo_basis_fit` aux basis. Arbitrary
+  coefficients, the density from `calc_density_ML` integrated on an `AtomGrid` for the
+  moments up to l = 2, and the restraint rows applied to the same coefficients must give
+  those moments back, the targets must land in the matching rows, and `fitted_multipoles`
+  must agree. This pins the row placement, the l/m ordering of the coefficients against
+  `constants::spherical_harmonic`, and the normalisation in one go.
+- `TomlIntegrationTests.RiFitMultipoles` (`tests/epoxide_gbw/ri_fit_multipoles.good`):
+  the `ri_fit` case with `multipole_moments = ["Hirshfeld", 2]`, which also prints the
+  target/fitted/deviation table of every moment.
+
+### A trap found on the way
+
+`WFN::get_atoms()` returns the vector by value. `const atom& A = wavy.get_atoms()[a]`
+binds a reference to an element of a temporary that dies at the end of the statement,
+and the closure test then saw an atom with no shells and an `AtomGrid` with a negative
+radial count (`vector too long`). `const atom A = wavy.get_atom(a)` is the pattern the
+rest of `integrator.cpp` uses.
 
 ## 2026-09-02 — pTB cartesian f ordering, and GPU notes in golden files
 

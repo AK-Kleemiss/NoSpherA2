@@ -148,6 +148,16 @@ namespace NoSpherA2IntegrationTests
                  "-all_charges", "-no_date"}
             });
         }
+        TEST_METHOD(ri_fit_multipoles)
+        {
+            RunTest({
+                "ri_fit_multipoles", "epoxide_gbw", "ri_fit_multipoles.good", "",
+                {"-wfn","epoxide.gbw", "-cif","epoxide.cif",
+                 "-dmin","0.4", "-ri_fit","combo_basis_fit",
+                 "-multipole_moments","Hirshfeld","2",
+                 "-all_charges", "-no_date"}
+            });
+        }
 
         TEST_METHOD(rubredoxin_cmtc)
         {

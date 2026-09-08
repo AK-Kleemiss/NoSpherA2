@@ -154,6 +154,17 @@ cif = "epoxide.cif"
 dmin = 0.4
 ri_fit = "combo_basis_fit"
 
+[ri_fit_multipoles]
+directory = "epoxide_gbw"
+good = "ri_fit_multipoles.good"
+
+[ri_fit_multipoles.args]
+wfn = "epoxide.gbw"
+cif = "epoxide.cif"
+dmin = 0.4
+ri_fit = "combo_basis_fit"
+multipole_moments = ["Hirshfeld", 2]
+
 [rubredoxin_cmtc]
 directory = "rubredoxin_cmtc"
 
