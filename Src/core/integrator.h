@@ -21,7 +21,9 @@ namespace DensityFitting
         MULLIKEN,
         SANDERSON_ESTIMATE,
         TFVC,
-        HIRSHFELD
+        HIRSHFELD,
+        MBIS,
+        EMBIS
     };
 
     struct CONFIG {
@@ -34,20 +36,33 @@ namespace DensityFitting
         double tikhonov_lambda = 1e-6;
         bool adaptive_restraint = true; // Whether to use adaptive weighting for restraints
         CHARGE_SCHEME charge_scheme = CHARGE_SCHEME::TFVC; // Scheme to use for calculating expected electron populations
+        int multipole_lmax = -1; // >= 0: restrain the grid moments of charge_scheme's atoms up to this order with weight multipole_strength, replacing the adaptive weights
+        double multipole_strength = 1.0;
 
         std::optional<ivec> asym_atm_list = std::nullopt; //Currently unsued till fixed!// Optional list of atom indices to only compute atoms actually present in the assymetic unit
     };
 
 
     vec density_fit(const WFN& wavy, const WFN& wavy_aux, const CONFIG& config);
+    // Fit settings from the command line: -multipole_moments switches the restraints on
+    CONFIG config_from_options(const options& opt);
 
     // Helper functions for charge analysis and restraints
     vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME & = CHARGE_SCHEME::NUCLEAR);
+    // Grid moments of the partitioned density about each nucleus, [atom][l*l+l+m] for l = 0..lmax, electrons only
+    vec2 calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax);
 
     void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const vec& expected_charges = vec());
+    // Per-atom row weight of the restraints
+    vec restraint_weights(const WFN& wavy_aux, const size_t n_aux, double base_restraint_coef = 0.00005, bool adaptive_weighting = true);
     void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
-        double base_restraint_coef = 0.00005, bool adaptive_weighting = true,
-        const vec& expected_charges = vec());
+        const vec& atom_weights, const vec& expected_charges = vec());
+    // Moment of one aux primitive about its own centre, Int r^l Y_lm chi = N c Gamma(l+3/2) / (2 alpha^(l+3/2))
+    double radial_moment(const double exponent, const double coef, const int l);
+    void add_multipole_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
+        const vec2& targets, const vec& atom_weights, const int lmax);
+    // Moments of the fitted density, same layout as the targets, from the coefficients alone
+    vec2 fitted_multipoles(const vec& coefficients, const WFN& wavy_aux, const int lmax);
 
     // Demonstration function
     void demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& wavy_aux);
