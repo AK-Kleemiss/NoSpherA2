@@ -705,6 +705,9 @@ std::string help_message =
  "                                    -ri_fit first.\n"
  "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn, -ri_fit\n"
  "                                    and -multipole_moments first.\n"
+ "  -interaction_energy <A> <A.npy> <B> <B.npy>\n"
+ "                                    Electrostatic interaction energy of two\n"
+ "                                    fitted or SALTED densities; use -ri_fit.\n"
  "  -combine_mos <wfn1> <wfn2>          Combine molecular orbitals.\n"
  "  -cmos1 <MO ...>  -cmos2 <MO ...>   MO selections for -combine_mos.\n"
  "  -QCT                               Enter the legacy QCT workflow.\n\n"
@@ -4015,6 +4018,20 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         np_coeffs.fortran_order = false;
         np_coeffs.shape = { static_cast<unsigned long>(ri_coefs.size()) };
         npy::write_npy("RI_COEFS.npy", np_coeffs);
+        exit(0);
+    }
+    else if (temp == "-interaction_energy") {
+        //-interaction_energy <A> <A.npy> <B> <B.npy> -ri_fit <basis>: electrostatics between two fitted or SALTED-predicted densities
+        err_checkf(i + 4 < argc, "-interaction_energy needs two structure files, each followed by its coefficient file", std::cout);
+        err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -ri_fit BEFORE -interaction_energy", std::cout);
+        WFN wavy_A(arguments[i + 1]), wavy_B(arguments[i + 3]);
+        WFN aux_A = generate_aux_wfn(wavy_A, aux_basis), aux_B = generate_aux_wfn(wavy_B, aux_basis);
+        std::vector<unsigned long> shape;
+        bool fortran_order;
+        vec coef_A, coef_B;
+        npy::LoadArrayFromNumpy(arguments[i + 2], shape, fortran_order, coef_A);
+        npy::LoadArrayFromNumpy(arguments[i + 4], shape, fortran_order, coef_B);
+        DensityFitting::print_interaction_energy(DensityFitting::interaction_energy(coef_A, aux_A, coef_B, aux_B), aux_A, aux_B, std::cout);
         exit(0);
     }
     else if (temp == "-RI_CUBE" || temp == "-ri_cube")

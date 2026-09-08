@@ -64,6 +64,21 @@ namespace DensityFitting
     // Moments of the fitted density, same layout as the targets, from the coefficients alone
     vec2 fitted_multipoles(const vec& coefficients, const WFN& wavy_aux, const int lmax);
 
+    // First-order electrostatics between two fitted densities and their nuclei, Hartree; needs only the
+    // coefficients and the aux basis, so RI-fitted and SALTED-predicted coefficients enter alike.
+    // pair[a][b] over the atoms of A and B, rank[i][j] with 0 the nuclei and l+1 the aux functions of rank l
+    struct INTERACTION {
+        double nuc_nuc = 0.0, nucA_rhoB = 0.0, nucB_rhoA = 0.0, rho_rho = 0.0;
+        double total() const { return nuc_nuc + nucA_rhoB + nucB_rhoA + rho_rho; };
+        vec2 pair, rank;
+    };
+    // Lower incomplete gamma function gamma(l+3/2, x)
+    double lower_gamma_half(const int l, const double x);
+    // Coulomb potential Int chi(r)/|r-R| of one aux primitive centred at the origin, Y_lm(R^) included
+    double aux_potential(const double exponent, const double coef, const int l, const int m, const double* R);
+    INTERACTION interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B);
+    void print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file);
+
     // Demonstration function
     void demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& wavy_aux);
     // Calculate the difference between the QM density and the RI density and write it to a cube file

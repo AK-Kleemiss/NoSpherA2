@@ -432,6 +432,164 @@ vec2 DensityFitting::fitted_multipoles(const vec& coefficients, const WFN& wavy_
     return moments;
 }
 
+double DensityFitting::lower_gamma_half(const int l, const double x)
+{
+    const double a = l + 1.5;
+    if (x < a + 1.0) {
+        double term = 1.0 / a, sum = term;
+        for (int k = 1; k < 500 && term > 1e-17 * sum; k++) {
+            term *= x / (a + k);
+            sum += term;
+        }
+        return std::pow(x, a) * std::exp(-x) * sum;
+    }
+    double g = std::sqrt(constants::PI) * std::erf(std::sqrt(x)), xa = std::sqrt(x);
+    const double ex = std::exp(-x);
+    for (int k = 0; k <= l; k++) {
+        g = (k + 0.5) * g - xa * ex;
+        xa *= x;
+    }
+    return g;
+}
+
+// V(R) = 4pi/(2l+1) N c [R^-l-1 gamma(l+3/2, aR^2)/(2a^(l+3/2)) + R^l exp(-aR^2)/(2a)] Y_lm(R^)
+double DensityFitting::aux_potential(const double exponent, const double coef, const int l, const int m, const double* R)
+{
+    const primitive p(0, l, exponent, coef);
+    const double nc = p.normalization_constant() * p.get_coef(), r2 = R[0] * R[0] + R[1] * R[1] + R[2] * R[2], r = std::sqrt(r2);
+    if (r < 1e-10) return l == 0 ? constants::FOUR_PI * nc * constants::c_1_4p / (2.0 * exponent) : 0.0;
+    const double d[3] = { R[0] / r, R[1] / r, R[2] / r };
+    const double rad = std::pow(r, -l - 1) * lower_gamma_half(l, exponent * r2) / (2.0 * std::pow(exponent, l + 1.5)) + std::pow(r, l) * std::exp(-exponent * r2) / (2.0 * exponent);
+    return constants::FOUR_PI / (2 * l + 1) * nc * rad * constants::spherical_harmonic(l, m, d);
+}
+
+namespace {
+    // Atom, rank, m and primitive range of every aux function in coefficient order
+    struct aux_index { ivec atom, l, m, prim, nprim; int lmax = 0; };
+    aux_index index_aux(const WFN& aux)
+    {
+        aux_index ix;
+        for (int a = 0; a < aux.get_ncen(); a++) {
+            const atom A = aux.get_atom(a);
+            int prim = 0;
+            for (int shell = 0; shell < (int)A.get_shellcount_size(); shell++) {
+                const int l = A.get_basis_set_entry(prim).get_type(), n = A.get_shellcount(shell);
+                for (int m = -l; m <= l; m++) {
+                    ix.atom.push_back(a);
+                    ix.l.push_back(l);
+                    ix.m.push_back(m);
+                    ix.prim.push_back(prim);
+                    ix.nprim.push_back(n);
+                }
+                ix.lmax = std::max(ix.lmax, l);
+                prim += n;
+            }
+        }
+        return ix;
+    }
+    // Potential of aux function i at R, electrons counted positive
+    double function_potential(const WFN& aux, const aux_index& ix, const int i, const double* R)
+    {
+        const atom A = aux.get_atom(ix.atom[i]);
+        const double d[3] = { R[0] - A.get_coordinate(0), R[1] - A.get_coordinate(1), R[2] - A.get_coordinate(2) };
+        double v = 0.0;
+        for (int e = 0; e < ix.nprim[i]; e++) {
+            const basis_set_entry& bf = A.get_basis_set_entry(ix.prim[i] + e);
+            v += DensityFitting::aux_potential(bf.get_exponent(), bf.get_coefficient(), ix.l[i], ix.m[i], d);
+        }
+        return v;
+    }
+}
+
+DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B)
+{
+    const aux_index ixA = index_aux(aux_A), ixB = index_aux(aux_B);
+    err_checkf(coef_A.size() == ixA.atom.size() && coef_B.size() == ixB.atom.size(), "Coefficient count does not match the auxiliary basis", std::cout);
+    const int nA = aux_A.get_ncen(), nB = aux_B.get_ncen(), LA = ixA.lmax, LB = ixB.lmax;
+    INTERACTION E;
+    E.pair.assign(nA, vec(nB, 0.0));
+    E.rank.assign(LA + 2, vec(LB + 2, 0.0));
+    ivec ZA(nA), ZB(nB);
+    for (int a = 0; a < nA; a++) ZA[a] = aux_A.get_atom_charge(a) - aux_A.get_atom_ECP_electrons(a);
+    for (int b = 0; b < nB; b++) ZB[b] = aux_B.get_atom_charge(b) - aux_B.get_atom_ECP_electrons(b);
+    for (int a = 0; a < nA; a++)
+        for (int b = 0; b < nB; b++) {
+            double d2 = 0.0;
+            for (int x = 0; x < 3; x++) d2 += std::pow(aux_A.get_atom_coordinate(a, x) - aux_B.get_atom_coordinate(b, x), 2);
+            const double e = ZA[a] * ZB[b] / std::sqrt(d2);
+            E.nuc_nuc += e;
+            E.pair[a][b] += e;
+        }
+    E.rank[0][0] = E.nuc_nuc;
+    for (int a = 0; a < nA; a++) {
+        const double R[3] = { aux_A.get_atom_coordinate(a, 0), aux_A.get_atom_coordinate(a, 1), aux_A.get_atom_coordinate(a, 2) };
+        for (int i = 0; i < (int)coef_B.size(); i++) {
+            const double e = -ZA[a] * coef_B[i] * function_potential(aux_B, ixB, i, R);
+            E.nucA_rhoB += e;
+            E.pair[a][ixB.atom[i]] += e;
+            E.rank[0][ixB.l[i] + 1] += e;
+        }
+    }
+    for (int b = 0; b < nB; b++) {
+        const double R[3] = { aux_B.get_atom_coordinate(b, 0), aux_B.get_atom_coordinate(b, 1), aux_B.get_atom_coordinate(b, 2) };
+        for (int i = 0; i < (int)coef_A.size(); i++) {
+            const double e = -ZB[b] * coef_A[i] * function_potential(aux_A, ixA, i, R);
+            E.nucB_rhoA += e;
+            E.pair[ixA.atom[i]][b] += e;
+            E.rank[ixA.l[i] + 1][0] += e;
+        }
+    }
+    Int_Params pA(aux_A), pB(aux_B);
+    Int_Params pAB(pA, pB);
+    const int na = pA.get_nao(), nao = pAB.get_nao();
+    err_checkf(na == (int)coef_A.size() && nao - na == (int)coef_B.size(), "Two-centre integral dimension does not match the coefficients", std::cout);
+    vec J;
+    compute2C<Coulomb2C_SPH>(pAB, J);
+    for (int i = 0; i < na; i++)
+        for (int j = 0; j < nao - na; j++) {
+            const double e = coef_A[i] * J[i * nao + na + j] * coef_B[j];
+            E.rho_rho += e;
+            E.pair[ixA.atom[i]][ixB.atom[j]] += e;
+            E.rank[ixA.l[i] + 1][ixB.l[j] + 1] += e;
+        }
+    return E;
+}
+
+void DensityFitting::print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file)
+{
+    const double K = 627.5094740631;
+    const char* names[5] = { "nucleus-nucleus  ", "nuclei A - rho B ", "nuclei B - rho A ", "rho A - rho B    ", "total            " };
+    const double parts[5] = { E.nuc_nuc, E.nucA_rhoB, E.nucB_rhoA, E.rho_rho, E.total() };
+    file << "\nElectrostatic interaction energy of the fitted densities\n";
+    for (int i = 0; i < 5; i++)
+        file << "  " << names[i] << std::fixed << std::setprecision(6) << std::setw(14) << parts[i] << " Eh" << std::setprecision(4) << std::setw(12) << parts[i] * K << " kcal/mol\n";
+    file << "\nBy atom pair, kcal/mol, rows A columns B\n      ";
+    for (int b = 0; b < aux_B.get_ncen(); b++) file << std::setw(9) << aux_B.get_atom_label(b);
+    file << "      sum\n" << std::setprecision(3);
+    for (int a = 0; a < aux_A.get_ncen(); a++) {
+        double s = 0.0;
+        file << std::setw(6) << aux_A.get_atom_label(a);
+        for (int b = 0; b < aux_B.get_ncen(); b++) {
+            file << std::setw(9) << E.pair[a][b] * K;
+            s += E.pair[a][b];
+        }
+        file << std::setw(9) << s * K << "\n";
+    }
+    file << "\nBy rank, kcal/mol, rows A columns B, n = nuclei\n      ";
+    for (int j = 0; j < (int)E.rank[0].size(); j++) file << std::setw(11) << (j == 0 ? std::string("n") : "l=" + std::to_string(j - 1));
+    file << "      sum\n";
+    for (int i = 0; i < (int)E.rank.size(); i++) {
+        double s = 0.0;
+        file << std::setw(6) << (i == 0 ? std::string("n") : "l=" + std::to_string(i - 1));
+        for (int j = 0; j < (int)E.rank[i].size(); j++) {
+            file << std::setw(11) << E.rank[i][j] * K;
+            s += E.rank[i][j];
+        }
+        file << std::setw(11) << s * K << "\n";
+    }
+    file << std::endl;
+}
+
 static PartitionType scheme_partition(const DensityFitting::CHARGE_SCHEME& scheme)
 {
     switch (scheme) {

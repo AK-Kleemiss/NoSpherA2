@@ -1,8 +1,8 @@
 # Unit Test Status
-**Last updated: 2026-09-08** (multipole-restrained RI fit, `-multipole_moments <scheme> <N>`:
-2 new `RiMultipoleTests` unit cases and 1 new `TomlIntegrationTests.RiFitMultipoles`
-golden-file case. Net +3; 278 cases, 274 pass and the usual 4 `*_full` XCW cases skip on
-`release-windows`. Same day: `computeRho` atom-pair screening fixed, both `ri_fit*` goldens regenerated.)
+**Last updated: 2026-09-08** (electrostatic interaction energy of two fitted or SALTED densities,
+`-interaction_energy <A> <A.npy> <B> <B.npy>`: 3 new `RiInteractionTests` unit cases and a fix to the
+combining `Int_Params` constructor. Net +3; 281 cases, 277 pass and the usual 4 `*_full` XCW cases skip
+on `release-windows`. Earlier the same day: multipole-restrained RI fit, `computeRho` screening fix.)
 
 ## 2026-09-08 — Multipole restraints on the RI fit (`-multipole_moments`)
 
@@ -63,6 +63,37 @@ binds a reference to an element of a temporary that dies at the end of the state
 and the closure test then saw an atom with no shells and an `AtomGrid` with a negative
 radial count (`vector too long`). `const atom A = wavy.get_atom(a)` is the pattern the
 rest of `integrator.cpp` uses.
+
+### Interaction energy of two fitted densities (`-interaction_energy`)
+
+`DensityFitting::interaction_energy` takes only the two coefficient vectors and the two
+aux-basis WFNs, so it runs on RI-fitted and SALTED-predicted coefficients alike and never
+touches an orbital wavefunction. Nuclear repulsion is a double loop, the nucleus-density
+halves use the analytic potential of an aux function (`aux_potential`, a lower incomplete
+gamma of half-integer order times `Y_lm`), and the density-density term is `c_A^T J_AB c_B`
+with the off-diagonal block of libcint's `Coulomb2C_SPH` on the combined `Int_Params`.
+The printout gives the four components in Eh and kcal/mol, an atom-pair table and a
+rank-pair table (nuclei plus l = 0..lmax). Water-methanol with free fits of both monomers
+gives -8.167 kcal/mol against -8.171 from the exact ORCA monomer densities.
+
+The combining constructor `Int_Params(first, second)` offset the coordinate pointers of
+the second object's atoms in a loop over the *first* object's atom count. Every earlier
+caller combines two bases of the same molecule, so it never showed; with two different
+molecules the surplus atoms of the second kept stale pointers (or, with fewer, the loop
+read past the vector). It now loops over the second object's atoms.
+
+- `RiInteractionTests.LowerIncompleteGammaMatchesQuadrature`: `lower_gamma_half` against
+  the trapezoid rule for l = 0..4 in the series and the recurrence regime.
+- `RiInteractionTests.AuxPotentialIsTheGaussianChargeAndThePointMultipoleLimit`: the s
+  potential is `erf(sqrt(a) R) / R` times the charge, and at five times the sample
+  distance every rank up to 4 is the point multipole `4 pi / (2l+1) Q_lm Y_lm / R^(l+1)`
+  with the `Q_lm` of `radial_moment`.
+- `RiInteractionTests.NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables`: water-
+  like OH with arbitrary `combo_basis_fit` coefficients against a partner whose density is
+  one very tight s Gaussian holding exactly its nuclear charge. Both halves of the energy
+  must cancel (nuclei-nuclei against nuclei-density, analytic potential against the
+  libcint block), the two tables must sum to the total, and swapping the two molecules
+  must give the same numbers. The swap is what caught the constructor bug.
 
 ## 2026-09-02 — pTB cartesian f ordering, and GPU notes in golden files
 
