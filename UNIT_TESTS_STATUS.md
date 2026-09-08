@@ -20,6 +20,14 @@ sit within 0.008 e (l=0), 0.004 (l=1) and 0.0003 e bohr^2 (l=2) of the Hirshfeld
 and the O charge is -0.207 against the target -0.199; the adaptive weights left it at
 -0.684. The default path (no flag) is untouched and `ri_fit.good` is byte-identical.
 
+Later the same day the restrained solve was changed from a stacked least-squares
+(`dgels` on `[J; R]`, which minimises `|J c - rho|^2` instead of the Coulomb functional
+and let near-dependent diffuse aux functions run to coefficients of 100 on acetic acid)
+to the penalised normal equations `(J + R^T R) c = rho + R^T t` with `dgesv`. The log now
+prints `Restraint residual:` instead of `Error:`, the epoxide O charge moves from -0.207
+to -0.217 and `ri_fit_multipoles.good` was regenerated. The legacy charge-restraint path
+(`-charge_constraint` without `-multipole_moments`) still uses the stacked solve.
+
 ### New cases
 
 - `RiMultipoleTests.RadialMomentMatchesQuadratureAndTheChargeRow`: `radial_moment`

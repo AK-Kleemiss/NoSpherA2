@@ -173,9 +173,35 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
             add_multipole_restraint(eri2c, rho, wavy_aux, targets, weights, config.multipole_lmax);
         // Solve the regularized 
         std::cout << "Solving regularized linear system..." << std::endl;
-        solve_linear_system(eri2c, rho.size(), aux_basis.get_nao(), rho);
-        //dgels leaves the restraint residuals behind the solution
-        rho.resize(aux_basis.get_nao());
+        if (config.multipole_lmax >= 0) {
+            //Penalty on the Coulomb-metric objective, (J + R^T R) c = rho + R^T t: a deviation from the targets is paid
+            //for in residual self-energy dc^T J dc. Least squares on the stacked [J; R] measures it as |J dc|^2 instead,
+            //which costs nothing along the near-dependent diffuse functions and blew |c| up to ~100 on three heavy atoms.
+            const int n = (int)aux_basis.get_nao(), m = (int)rho.size();
+            vec J(eri2c.begin(), eri2c.begin() + (size_t)n * n), b(rho.begin(), rho.begin() + n);
+            for (int k = n; k < m; k++) {
+                const double* r = eri2c.data() + (size_t)k * n;
+                for (int i = 0; i < n; i++) {
+                    if (r[i] == 0.0) continue;
+                    b[i] += r[i] * rho[k];
+                    for (int j = 0; j < n; j++) J[(size_t)i * n + j] += r[i] * r[j];
+                }
+            }
+            solve_linear_system(J, (size_t)n, b);
+            double error = 0.0;
+            for (int k = n; k < m; k++) {
+                double d = -rho[k];
+                for (int i = 0; i < n; i++) d += eri2c[(size_t)k * n + i] * b[i];
+                error += d * d;
+            }
+            std::cout << "Restraint residual: " << std::fixed << std::setprecision(12) << std::sqrt(error) << std::endl;
+            rho = b;
+        }
+        else {
+            solve_linear_system(eri2c, rho.size(), aux_basis.get_nao(), rho);
+            //dgels leaves the restraint residuals behind the solution
+            rho.resize(aux_basis.get_nao());
+        }
         if (config.multipole_lmax >= 0) {
             const vec2 fitted = fitted_multipoles(rho, wavy_aux, config.multipole_lmax);
             const double stone = std::sqrt(constants::FOUR_PI);
