@@ -77,6 +77,7 @@ private:
     std::vector<std::tuple<std::string, _time_point>> timing_points_;
     bool non_spherical_densities_calculated_ = false;
     bool needs_helper_grids_ = false;
+    GridData::GridIndex partitionWeightIndex() const;
 
     // Internal helper methods
     void setupPrototypeGrids(const WFN &wave, const ivec &atom_types, std::ostream& file = std::cout);
@@ -108,6 +109,8 @@ public:
     void calculateNonSphericalg(const WFN &wave, const cell &unit_cell);
 
     PartitionResults calculatePartitionedCharges(const WFN &wave, const cell &unit_cell = cell());
+    //Sum_p rho w_A r^l Y_lm(r_hat) about each nucleus for the configured scheme, [atom][l*l+l+m], l = 0..lmax
+    vec2 calculatePartitionedMultipoles(const WFN &wave, const int lmax);
 
     void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g = false);
     void getDensityVectorsFromCube(const WFN &wave, const ivec &atom_list, const cube &density_cube, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, vec &atom_electrons);
