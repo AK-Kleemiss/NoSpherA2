@@ -897,6 +897,8 @@ struct options
     int multipole_lmax = -1;
     PartitionType multipole_scheme = PartitionType::Hirshfeld;
     double multipole_strength = 1.0;
+    //-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
+    double repulsion_overlap = 0.0;
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 

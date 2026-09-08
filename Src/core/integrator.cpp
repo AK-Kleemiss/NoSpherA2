@@ -5,6 +5,8 @@
 #include "nos_math.h"
 #include "GridManager.h"
 #include "basis_set.h"
+#include <occ/disp/dftd4.h>
+#include <occ/interaction/polarization.h>
 
 
 vec einsum_ijk_ij_p(const dMatrix3& v1, const dMatrix2& v2)
@@ -499,9 +501,54 @@ namespace {
         }
         return v;
     }
+    // Field -grad phi at R of the nuclei and fitted density of one molecule, the density part by central differences of the potential
+    void molecule_field(const WFN& aux, const aux_index& ix, const vec& coef, const double* R, double* F)
+    {
+        const double h = 1e-4;
+        F[0] = F[1] = F[2] = 0.0;
+        for (int a = 0; a < aux.get_ncen(); a++) {
+            double d[3], r2 = 0.0;
+            for (int x = 0; x < 3; x++) { d[x] = R[x] - aux.get_atom_coordinate(a, x); r2 += d[x] * d[x]; }
+            const double f = (aux.get_atom_charge(a) - aux.get_atom_ECP_electrons(a)) / (r2 * std::sqrt(r2));
+            for (int x = 0; x < 3; x++) F[x] += f * d[x];
+        }
+        for (int i = 0; i < (int)coef.size(); i++)
+            for (int x = 0; x < 3; x++) {
+                double Rp[3] = { R[0], R[1], R[2] }, Rm[3] = { R[0], R[1], R[2] };
+                Rp[x] += h, Rm[x] -= h;
+                F[x] += coef[i] * (function_potential(aux, ix, i, Rp) - function_potential(aux, ix, i, Rm)) / (2 * h);
+            }
+    }
+    // -1/2 sum alpha_a |F_a|^2 over the atoms of aux in the field of partner, Thakkar polarizabilities as in CrystalExplorer
+    double polarization(const WFN& aux, const WFN& partner, const aux_index& ixP, const vec& coef_P)
+    {
+        occ::IVec Z(aux.get_ncen());
+        occ::Mat3N F(3, aux.get_ncen());
+        for (int a = 0; a < aux.get_ncen(); a++) {
+            const double R[3] = { aux.get_atom_coordinate(a, 0), aux.get_atom_coordinate(a, 1), aux.get_atom_coordinate(a, 2) };
+            double f[3];
+            molecule_field(partner, ixP, coef_P, R, f);
+            Z(a) = aux.get_atom_charge(a);
+            for (int x = 0; x < 3; x++) F(x, a) = f[x];
+        }
+        return occ::interaction::ce_model_polarization_energy(Z, F, aux.get_charge() != 0);
+    }
+    std::vector<occ::core::Atom> occ_atoms(const WFN& aux)
+    {
+        std::vector<occ::core::Atom> atoms(aux.get_ncen());
+        for (int a = 0; a < aux.get_ncen(); a++)
+            atoms[a] = { aux.get_atom_charge(a), aux.get_atom_coordinate(a, 0), aux.get_atom_coordinate(a, 1), aux.get_atom_coordinate(a, 2) };
+        return atoms;
+    }
+    double d4_energy(const std::vector<occ::core::Atom>& atoms, const int charge)
+    {
+        occ::disp::D4Dispersion d4(atoms);
+        d4.set_charge(charge);
+        return d4.energy();
+    }
 }
 
-DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B)
+DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K)
 {
     const aux_index ixA = index_aux(aux_A), ixB = index_aux(aux_B);
     err_checkf(coef_A.size() == ixA.atom.size() && coef_B.size() == ixB.atom.size(), "Coefficient count does not match the auxiliary basis", std::cout);
@@ -552,16 +599,33 @@ DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A
             E.pair[ixA.atom[i]][ixB.atom[j]] += e;
             E.rank[ixA.l[i] + 1][ixB.l[j] + 1] += e;
         }
+    vec S;
+    compute2C<Overlap2C_SPH>(pAB, S);
+    for (int i = 0; i < na; i++)
+        for (int j = 0; j < nao - na; j++) E.overlap += coef_A[i] * S[i * nao + na + j] * coef_B[j];
+    E.rep = repulsion_K * E.overlap;
+    E.pol_A = polarization(aux_A, aux_B, ixB, coef_B);
+    E.pol_B = polarization(aux_B, aux_A, ixA, coef_A);
+    std::vector<occ::core::Atom> atoms = occ_atoms(aux_A), atoms_B = occ_atoms(aux_B);
+    E.disp = -d4_energy(atoms, aux_A.get_charge()) - d4_energy(atoms_B, aux_B.get_charge());
+    atoms.insert(atoms.end(), atoms_B.begin(), atoms_B.end());
+    E.disp += d4_energy(atoms, aux_A.get_charge() + aux_B.get_charge());
     return E;
 }
 
 void DensityFitting::print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file)
 {
-    const char* names[5] = { "nucleus-nucleus  ", "nuclei A - rho B ", "nuclei B - rho A ", "rho A - rho B    ", "total            " };
-    const double parts[5] = { E.nuc_nuc, E.nucA_rhoB, E.nucB_rhoA, E.rho_rho, E.total() };
+    const char* names[10] = { "nucleus-nucleus  ", "nuclei A - rho B ", "nuclei B - rho A ", "rho A - rho B    ", "electrostatic    ",
+                              "pol. A in field B", "pol. B in field A", "dispersion D4    ", "repulsion K*S    ", "total            " };
+    const double parts[10] = { E.nuc_nuc, E.nucA_rhoB, E.nucB_rhoA, E.rho_rho, E.electrostatic(), E.pol_A, E.pol_B, E.disp, E.rep, E.total() };
     file << "\nElectrostatic interaction energy of the fitted densities\n";
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 10; i++) {
+        if (i == 5) {
+            file << "\nBeyond electrostatics: Thakkar polarizabilities in the partner's field, D4 with PBE damping, density overlap S = Int rhoA rhoB\n";
+            file << "  S                " << std::scientific << std::setprecision(6) << std::setw(14) << E.overlap << " e^2/bohr^3" << std::fixed << (E.rep == 0.0 ? "  (repulsion needs -repulsion_overlap <K>)" : "") << "\n";
+        }
         file << "  " << names[i] << std::fixed << std::setprecision(6) << std::setw(14) << parts[i] << " Eh" << std::setprecision(4) << std::setw(12) << parts[i] * constants::kcal_mol_per_hartree << " kcal/mol\n";
+    }
     file << "\nBy atom pair, kcal/mol, rows A columns B\n      ";
     for (int b = 0; b < aux_B.get_ncen(); b++) file << std::setw(9) << aux_B.get_atom_label(b);
     file << "      sum\n" << std::setprecision(3);

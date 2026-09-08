@@ -1,10 +1,11 @@
 # Unit Test Status
-**Last updated: 2026-09-08** (`-salted_charge_constraint` forces the global l=0 rescaling of every
-SALTED prediction to the electron count, whether or not the model file asks for it; one new golden
-case `SALTED_charge_constraint`: 282, 278 pass and the usual 4 `*_full` XCW cases skip on
-`release-windows`. Earlier the same day: `-interaction_energy` input modes and the `WFN::isBohr`
-reader fix, the interaction energy itself with 3 `RiInteractionTests`, the `Int_Params` fix,
-multipole-restrained RI fit, `computeRho` screening fix.)
+**Last updated: 2026-09-08** (`-interaction_energy` now adds Thakkar polarization in the partner's
+field, D4 dispersion and the density overlap S with an optional `-repulsion_overlap <K>`; the
+`RiInteractionTests` point-partner case checks the new terms: 282, 278 pass and the usual 4
+`*_full` XCW cases skip on `release-windows`. Earlier the same day: `-salted_charge_constraint`
+with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
+`WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
+RI fit, `computeRho` screening fix.)
 
 ## 2026-09-08 — Multipole restraints on the RI fit (`-multipole_moments`)
 
@@ -135,6 +136,30 @@ On water-methanol the constraint moves both models most of the way to the free f
 18.23 -> 18 e), Model V7 -1.11 -> -4.71 (water 9.70 -> 10 e, methanol 17.87 -> 18 e). Both models
 are 0.3 e short on water, so a total-charge rescaling helps but does not replace retraining on
 charge-conserving coefficients.
+
+### Beyond electrostatics: polarization, dispersion and the density overlap
+
+`DensityFitting::interaction_energy` now returns, next to the four electrostatic parts, `pol_A`,
+`pol_B`, `disp`, `overlap` and `rep`. `electrostatic()` is the old sum, `total()` adds the new
+terms; the atom-pair and rank tables stay electrostatic. Polarization is the CrystalExplorer form
+-1/2 sum alpha_a |F_a|^2 with Thakkar polarizabilities (`occ::interaction::ce_model_polarization_energy`,
+the charged set for a charged molecule) in the field of the partner's nuclei and fitted density,
+the density part by central differences (h = 1e-4 bohr) of the analytic aux-function potential.
+Dispersion is `occ::disp::D4Dispersion` with the PBE damping defaults, dimer minus monomers.
+S = c_A^T S_AB c_B from `compute2C<Overlap2C_SPH>` on the combined `Int_Params`, and
+`-repulsion_overlap <K>` reports K * S as the exchange-repulsion; K defaults to 0 and is
+uncalibrated, the report says so. Everything uses only the fitted coefficients.
+
+`NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables` now also asserts that the point-like
+neutral partner produces no field on A (`pol_A` = 0 to 1e-12, which pins the finite-difference
+field against the analytic nuclear term), that `pol_B` is negative, that pol/disp/overlap are
+symmetric under swapping the molecules, and that `rep` = K * `overlap`.
+
+Water-methanol, free fit on def2-universal-jkfit: electrostatic -8.55, pol. A in field B -1.11,
+pol. B in field A -0.57, D4 -0.62 kcal/mol, S = 1.76e-3 e^2/bohr^3, total without repulsion
+-10.84 kcal/mol. Model V7 with `-salted_charge_constraint`: electrostatic -4.71, pol -0.29/-0.49,
+S = 1.32e-3. Reproducing a CCSD(T)-like -5.5 kcal/mol from the free fit would need K near 5 Eh
+bohr^3/e^2; the fit of K (and of per-term scale factors) against S66x8 is WP3 of the proposal.
 
 ## 2026-09-02 — pTB cartesian f ordering, and GPU notes in golden files
 

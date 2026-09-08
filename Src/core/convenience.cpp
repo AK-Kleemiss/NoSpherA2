@@ -712,6 +712,8 @@ std::string help_message =
  "                                    -ri_fit, or two .xyz with -SALTED. With\n"
  "                                    <A> <A.npy> <B> <B.npy> the coefficient\n"
  "                                    files are read instead; use -ri_fit.\n"
+ "  -repulsion_overlap <K>             Exchange-repulsion of -interaction_energy\n"
+ "                                    as K * Int rhoA rhoB, K in Eh bohr^3/e^2.\n"
  "  -combine_mos <wfn1> <wfn2>          Combine molecular orbitals.\n"
  "  -cmos1 <MO ...>  -cmos2 <MO ...>   MO selections for -combine_mos.\n"
  "  -QCT                               Enter the legacy QCT workflow.\n\n"
@@ -4026,6 +4028,10 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         npy::write_npy("RI_COEFS.npy", np_coeffs);
         exit(0);
     }
+    else if (temp == "-repulsion_overlap") {
+        repulsion_overlap = std::stod(arguments[++i]);
+        err_checkf(repulsion_overlap >= 0.0, "-repulsion_overlap must not be negative", std::cout);
+    }
     else if (temp == "-interaction_energy") {
         //-interaction_energy <A> <B>: electrostatics between two fitted densities. With -SALTED <model-dir> both are predicted
         //from the model, otherwise A and B are wavefunctions and each is RI-fitted with the -ri_fit basis.
@@ -4065,7 +4071,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
             coef_A = DensityFitting::density_fit(wavy_A, aux_A, config);
             coef_B = DensityFitting::density_fit(wavy_B, aux_B, config);
         }
-        DensityFitting::print_interaction_energy(DensityFitting::interaction_energy(coef_A, aux_A, coef_B, aux_B), aux_A, aux_B, std::cout);
+        DensityFitting::print_interaction_energy(DensityFitting::interaction_energy(coef_A, aux_A, coef_B, aux_B, repulsion_overlap), aux_A, aux_B, std::cout);
         exit(0);
     }
     else if (temp == "-RI_CUBE" || temp == "-ri_cube")

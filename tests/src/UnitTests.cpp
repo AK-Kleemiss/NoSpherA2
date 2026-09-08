@@ -2716,11 +2716,21 @@ namespace NoSpherA2UnitTests
             for (int b = 0; b < (int)E.pair[a].size(); b++) pair += E.pair[a][b];
         for (int i = 0; i < (int)E.rank.size(); i++)
             for (int j = 0; j < (int)E.rank[i].size(); j++) rank += E.rank[i][j];
-        EXPECT_NEAR(pair, E.total(), 1e-12);
-        EXPECT_NEAR(rank, E.total(), 1e-12);
+        EXPECT_NEAR(pair, E.electrostatic(), 1e-12);
+        EXPECT_NEAR(rank, E.electrostatic(), 1e-12);
         EXPECT_EQ(E.rank[0].size(), 2);
-        const DensityFitting::INTERACTION F = DensityFitting::interaction_energy(coef_B, wavy_B, coef_A, aux_A);
-        EXPECT_NEAR(F.total(), E.total(), 1e-12);
+        const DensityFitting::INTERACTION F = DensityFitting::interaction_energy(coef_B, wavy_B, coef_A, aux_A, 2.0);
+        EXPECT_NEAR(F.electrostatic(), E.electrostatic(), 1e-12);
+        EXPECT_NEAR(E.pol_A, 0.0, 1e-12);
+        EXPECT_LT(E.pol_B, -1e-8);
+        EXPECT_NEAR(F.pol_A, E.pol_B, 1e-14);
+        EXPECT_NEAR(F.pol_B, E.pol_A, 1e-14);
+        EXPECT_LT(E.disp, 0.0);
+        EXPECT_NEAR(F.disp, E.disp, 1e-12);
+        EXPECT_NEAR(F.overlap, E.overlap, 1e-10);
+        EXPECT_EQ(E.rep, 0.0);
+        EXPECT_NEAR(F.rep, 2.0 * F.overlap, 1e-14);
+        EXPECT_NEAR(F.total() - F.rep, E.total(), 1e-10);
         EXPECT_NEAR(F.nucA_rhoB, E.nucB_rhoA, 1e-12);
         EXPECT_NEAR(F.rho_rho, E.rho_rho, 1e-10);
         for (int a = 0; a < 2; a++) EXPECT_NEAR(F.pair[0][a], E.pair[a][0], 1e-12);
