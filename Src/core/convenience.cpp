@@ -3735,6 +3735,21 @@ bool options::digest_property_options(const std::string &temp, int &i)
         get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
         exit(0);
     }
+    else if (temp == "-rho_at_points")
+    {
+        //-wfn <file> -rho_at_points <points>: total density at the points (count, then x y z in bohr per line) to <points>.rho
+        err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -rho_at_points.", std::cout);
+        WFN wavy(wfn);
+        ifstream in(arguments[i + 1]);
+        int n = 0; in >> n;
+        std::vector<d3> pts(n); vec rho(n);
+        for (int p = 0; p < n; p++) in >> pts[p][0] >> pts[p][1] >> pts[p][2];
+#pragma omp parallel for
+        for (int p = 0; p < n; p++) rho[p] = wavy.compute_dens(pts[p]);
+        ofstream out(arguments[i + 1] + ".rho"); out << setprecision(12);
+        for (int p = 0; p < n; p++) out << rho[p] << "\n";
+        exit(0);
+    }
     else
         return false;
     return true;
