@@ -2700,7 +2700,10 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
         std::cout << "\n";
     }
 
-    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius);
+    //Every nucleus is a maximum of the density, whatever the grid says
+    std::vector<d3> nuclei;
+    for (const atom &a : atoms) nuclei.push_back(a.get_pos());
+    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius, 5e-3, &nuclei, &l_w);
     svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
 
     //ELI-D is a ratio of quantities that both vanish in the density's tail and turns to noise
