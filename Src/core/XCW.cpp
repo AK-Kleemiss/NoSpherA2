@@ -7,6 +7,7 @@
 #include "scattering_factors.h"
 #include "nos_math.h"
 #include "basis_set.h"
+#include "bondwise_analysis.h"
 #include <mutex>
 
 void XCW::construct(const options& opt_in) {
@@ -2916,7 +2917,19 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 		oss4 << "NA2_" << value << ".47";
 		sf_wave_vec[0].write_nbo(oss4.str(), opt->debug, &XCW_log);
 	}
-	//Roby_information Roby(sf_wave_vec[0]);
+	//Neither file written above can carry this analysis - a .wfn has bare primitives and
+	//the fchk reader keeps no shells - so -rgbi runs it here, on the refined wavefunction,
+	//and its report goes to a file of its own per lambda
+	if (opt->rgbi) {
+		std::ostringstream oss5;
+		oss5 << "NA2_" << value << "_RGBI.txt";
+		std::ofstream rgbi_out(oss5.str());
+		std::streambuf* const cout_buf = std::cout.rdbuf(rgbi_out.rdbuf());
+		Roby_information Roby(sf_wave_vec[0], opt->rgbi_group_sets, !opt->rgbi_no_sym,
+			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs);
+		std::cout.rdbuf(cout_buf);
+		XCW_log << "RGBI analysis written to " << oss5.str() << std::endl;
+	}
 }
 
 occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
