@@ -2878,6 +2878,30 @@ bool XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Ma
 	// closing function
 }
 
+//The sign of f(+-3), g(+-3) and g(+-4) in every orbital, in OCC's own m = -l..l order,
+//and the density matrix rebuilt from them. Applied once on the way out and once on the
+//way back in, it is its own inverse.
+void XCW::flip_high_m_phases(occ::qm::Wavefunction& w) {
+	int row = 0;
+	const int spins = w.mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
+	for (const auto& shell : w.basis.shells()) {
+		const int nsph = 2 * shell.l + 1;
+		if (shell.l >= 3)
+			for (int spin = 0; spin < spins; spin++) {
+				const int base = spin * w.nbf + row;
+				w.mo.C.row(base).array() *= -1.0;
+				w.mo.C.row(base + nsph - 1).array() *= -1.0;
+				if (shell.l >= 4) {
+					w.mo.C.row(base + 1).array() *= -1.0;
+					w.mo.C.row(base + nsph - 2).array() *= -1.0;
+				}
+			}
+		row += nsph;
+	}
+	w.mo.update_occupied_orbitals();
+	w.mo.update_density_matrix();
+}
+
 void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda) {
 	XCW_log << "Creating .tscb file from converged SCF calculation..." << std::endl;
 	std::vector<WFN> sf_wave_vec(1, { scf.wavefunction(), false });
@@ -2911,7 +2935,14 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	sf_wave_vec[0].write_wfn(oss2.str(), false, true);
 	std::ostringstream oss3;
 	oss3 << "NA2_" << value << ".fchk";
-	scf.wavefunction().save(oss3.str());
+	//OCC's fchk writer reorders to Gaussian's basis functions but keeps libcint's phases,
+	//and Gaussian's f(+-3), g(+-3), g(+-4) are the opposite sign; the file has to carry
+	//Gaussian's so that anything reading an fchk gets the density right
+	{
+		occ::qm::Wavefunction w = scf.wavefunction();
+		flip_high_m_phases(w);
+		w.save(oss3.str());
+	}
 	if (settings.nbo_output) {
 		std::ostringstream oss4;
 		oss4 << "NA2_" << value << ".47";
@@ -3060,6 +3091,8 @@ void XCW::run_XCW_fitting() {
 		}
 		oss2 << "NA2_" << start_value_str << ".fchk";
 		last_wfn = occ::qm::Wavefunction::load(oss2.str());
+		//Written in Gaussian's phases by create_tscb; OCC's loader does not undo that
+		flip_high_m_phases(last_wfn);
 		has_guess = true;
 	}
 
