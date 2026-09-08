@@ -2,7 +2,7 @@
 **Last updated: 2026-09-08** (multipole-restrained RI fit, `-multipole_moments <scheme> <N>`:
 2 new `RiMultipoleTests` unit cases and 1 new `TomlIntegrationTests.RiFitMultipoles`
 golden-file case. Net +3; 278 cases, 274 pass and the usual 4 `*_full` XCW cases skip on
-`release-windows`.)
+`release-windows`. Same day: `computeRho` atom-pair screening fixed, both `ri_fit*` goldens regenerated.)
 
 ## 2026-09-08 — Multipole restraints on the RI fit (`-multipole_moments`)
 
@@ -27,6 +27,17 @@ to the penalised normal equations `(J + R^T R) c = rho + R^T t` with `dgesv`. Th
 prints `Restraint residual:` instead of `Error:`, the epoxide O charge moves from -0.207
 to -0.217 and `ri_fit_multipoles.good` was regenerated. The legacy charge-restraint path
 (`-charge_constraint` without `-multipole_moments`) still uses the stacked solve.
+
+A benchmark of the fitted densities against exact ORCA monomer electrostatics on 12
+dimers then exposed a bug in `computeRho`'s atom-pair screening
+(`calc_screend_functions_and_max_ij` in `libCintMain.cpp`): the criterion used the sum of
+the two most diffuse exponents against half of `exp_cutoff`, so pairs beyond about 2.2 A
+were dropped from the three-centre integrals and larger molecules lost up to 0.6 fitted
+electrons (epoxide: 6 pairs, 24.159 analytic electrons). It now uses the Gaussian product
+exponent `a b / (a + b)` against the full cutoff. `ri_fit.good` and
+`ri_fit_multipoles.good` were regenerated (0 pairs screened, 24.0005 electrons, restraint
+residual 0.036 -> 0.0012); no other golden file moved. Every RI fit made before this,
+SALTED training data included, carries the old error.
 
 ### New cases
 
