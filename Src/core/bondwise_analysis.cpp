@@ -2604,7 +2604,32 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     //eli_cube.write_file(true);
 
     const double density_floor = std::max(1e-8, rho.max_value() * 1e-6);
-    const std::vector<critical_point> density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+    std::vector<critical_point> density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+    //Core shells make critical points of their own and an ECP atom a whole sphere of them,
+    //none of which says anything about bonding and none of which any two machines find at
+    //the same spots; only the nuclear attractor survives inside an atom's core radius. Sorted
+    //by type, density and position so the listing reads the same everywhere.
+    {
+        std::vector<critical_point> kept;
+        for (const critical_point &cp : density_critical_points) {
+            bool core = false, nuclear = false;
+            for (int a = 0; a < l_w.get_ncen(); a++) {
+                const d3 apos = l_w.get_atom_pos(a);
+                const double d2 = std::pow(cp.position[0] - apos[0], 2) + std::pow(cp.position[1] - apos[1], 2) + std::pow(cp.position[2] - apos[2], 2);
+                if (d2 < 0.01) nuclear = true;
+                else if (d2 < std::pow(core_shell_radius(l_w.get_atom_charge(a)), 2)) core = true;
+            }
+            if (!core || nuclear) kept.push_back(cp);
+        }
+        std::sort(kept.begin(), kept.end(), [](const critical_point &a, const critical_point &b) {
+            if (a.type != b.type) return a.type < b.type;
+            if (std::abs(a.density - b.density) > 1e-6 * std::max(1.0, std::abs(a.density))) return a.density > b.density;
+            for (int k = 0; k < 3; k++)
+                if (std::abs(a.position[k] - b.position[k]) > 1e-4) return a.position[k] < b.position[k];
+            return false;
+        });
+        density_critical_points.swap(kept);
+    }
     std::cout << "Density Critical Points";
     if (!density_critical_points.empty())
         std::cout << " (" << density_critical_points.size() << " found)";
@@ -2674,18 +2699,22 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
                 << std::setw(nw) << cp.hessian_eigenvalues[1]
                 << std::setw(nw) << cp.hessian_eigenvalues[2]
                 << std::fixed << std::setprecision(4) << "\n";
-            std::cout << "    HessRho_EigVecs v1:"
-                << std::setw(nw) << cp.hessian_eigenvectors[0][0]
-                << std::setw(nw) << cp.hessian_eigenvectors[0][1]
-                << std::setw(nw) << cp.hessian_eigenvectors[0][2] << "\n";
-            std::cout << "                    v2:"
-                << std::setw(nw) << cp.hessian_eigenvectors[1][0]
-                << std::setw(nw) << cp.hessian_eigenvectors[1][1]
-                << std::setw(nw) << cp.hessian_eigenvectors[1][2] << "\n";
-            std::cout << "                    v3:"
-                << std::setw(nw) << cp.hessian_eigenvectors[2][0]
-                << std::setw(nw) << cp.hessian_eigenvectors[2][1]
-                << std::setw(nw) << cp.hessian_eigenvectors[2][2] << "\n";
+            //The eigenvectors of a degenerate pair are any two in their plane and their signs
+            //are free; both differ from machine to machine, so they are for -debug
+            if (opt.debug) {
+                std::cout << "    HessRho_EigVecs v1:"
+                    << std::setw(nw) << cp.hessian_eigenvectors[0][0]
+                    << std::setw(nw) << cp.hessian_eigenvectors[0][1]
+                    << std::setw(nw) << cp.hessian_eigenvectors[0][2] << "\n";
+                std::cout << "                    v2:"
+                    << std::setw(nw) << cp.hessian_eigenvectors[1][0]
+                    << std::setw(nw) << cp.hessian_eigenvectors[1][1]
+                    << std::setw(nw) << cp.hessian_eigenvectors[1][2] << "\n";
+                std::cout << "                    v3:"
+                    << std::setw(nw) << cp.hessian_eigenvectors[2][0]
+                    << std::setw(nw) << cp.hessian_eigenvectors[2][1]
+                    << std::setw(nw) << cp.hessian_eigenvectors[2][2] << "\n";
+            }
             std::cout << "    DelSqRho  :" << std::setw(nw) << cp.laplacian << "\n";
             if (std::isfinite(cp.ellipticity))
                 std::cout << "    Bond Ellipticity:" << std::setw(nw) << cp.ellipticity << "\n";

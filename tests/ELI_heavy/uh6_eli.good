@@ -28,146 +28,107 @@ Density Critical Points (13 found):
     Rho       :  27946116.9797
     GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -2.5634e+15    -2.5634e+15    -2.5634e+15
-    HessRho_EigVecs v1:         0.1689         0.2056         0.9639
-                    v2:        -0.1484        -0.9615         0.2311
-                    v3:         0.9744        -0.1821        -0.1319
     DelSqRho  :-7690297652384896.0000
    V         :     1.9226e+15   G         :9302899556.1495   K         :     1.9226e+15   L         :     1.9226e+15
 
-  CP   2  [attractor   ]  converged   H1
-    Position  :         3.7649        -0.0000         0.0000
-    Rho       :         0.3608
-    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
-    HessRho_EigVecs v1:        -0.0000         0.6049         0.7963
-                    v2:        -0.0000         0.7963        -0.6049
-                    v3:         1.0000         0.0000        -0.0000
-    DelSqRho  :       -21.2503
-   V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
-
-  CP   3  [attractor   ]  converged   H3
-    Position  :        -0.0000         3.7649        -0.0000
-    Rho       :         0.3608
-    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
-    HessRho_EigVecs v1:        -0.7613         0.0000         0.6484
-                    v2:        -0.6484         0.0000        -0.7613
-                    v3:         0.0000         1.0000         0.0000
-    DelSqRho  :       -21.2503
-   V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
-
-  CP   4  [attractor   ]  converged   H4
-    Position  :        -0.0000        -3.7649         0.0000
-    Rho       :         0.3608
-    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
-    HessRho_EigVecs v1:        -0.7654        -0.0000        -0.6435
-                    v2:         0.6435         0.0000        -0.7654
-                    v3:        -0.0000         1.0000         0.0000
-    DelSqRho  :       -21.2503
-   V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
-
-  CP   5  [attractor   ]  converged   H2
+  CP   2  [attractor   ]  converged   H2
     Position  :        -3.7649        -0.0000        -0.0000
     Rho       :         0.3608
     GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
-    HessRho_EigVecs v1:         0.0000        -0.0012         1.0000
-                    v2:         0.0000         1.0000         0.0012
-                    v3:        -1.0000         0.0000         0.0000
     DelSqRho  :       -21.2503
    V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
 
-  CP   6  [attractor   ]  converged   H5
-    Position  :        -0.0000         0.0000         3.7649
+  CP   3  [attractor   ]  converged   H4
+    Position  :        -0.0000        -3.7649         0.0000
     Rho       :         0.3608
-    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
-    HessRho_EigVecs v1:        -0.6955        -0.7186         0.0000
-                    v2:        -0.7186         0.6955         0.0000
-                    v3:         0.0000        -0.0000         1.0000
     DelSqRho  :       -21.2503
    V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
 
-  CP   7  [attractor   ]  converged   H6
+  CP   4  [attractor   ]  converged   H6
     Position  :         0.0000        -0.0000        -3.7649
     Rho       :         0.3608
     GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
-    HessRho_EigVecs v1:         0.7567        -0.6538        -0.0000
-                    v2:        -0.6538        -0.7567        -0.0000
-                    v3:         0.0000        -0.0000         1.0000
     DelSqRho  :       -21.2503
    V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
 
-  CP   8  [bond        ]  converged   H5-U0 bond
-    Position  :        -0.0000         0.0000         2.4702
-    Rho       :         0.1100
-    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    HessRho_EigVecs v1:         0.7278         0.6858         0.0000
-                    v2:         0.6858        -0.7278        -0.0000
-                    v3:         0.0000        -0.0000         1.0000
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+  CP   5  [attractor   ]  converged   H5
+    Position  :        -0.0000         0.0000         3.7649
+    Rho       :         0.3608
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
+    DelSqRho  :       -21.2503
+   V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
 
-  CP   9  [bond        ]  converged   H6-U0 bond
-    Position  :         0.0000        -0.0000        -2.4702
-    Rho       :         0.1100
-    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    HessRho_EigVecs v1:         0.9165        -0.3999        -0.0000
-                    v2:        -0.3999        -0.9165        -0.0000
-                    v3:        -0.0000        -0.0000         1.0000
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
-
-  CP  10  [bond        ]  converged   H1-U0 bond
-    Position  :         2.4702        -0.0000        -0.0000
-    Rho       :         0.1100
-    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    HessRho_EigVecs v1:        -0.0000         0.5502         0.8350
-                    v2:         0.0000        -0.8350         0.5502
-                    v3:         1.0000         0.0000         0.0000
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
-
-  CP  11  [bond        ]  converged   H3-U0 bond
-    Position  :        -0.0000         2.4702        -0.0000
-    Rho       :         0.1100
+  CP   6  [attractor   ]  converged   H3
+    Position  :        -0.0000         3.7649        -0.0000
+    Rho       :         0.3608
     GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    HessRho_EigVecs v1:        -0.8589         0.0000         0.5122
-                    v2:        -0.5122         0.0000        -0.8589
-                    v3:         0.0000         1.0000         0.0000
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+    HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
+    DelSqRho  :       -21.2503
+   V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
 
-  CP  12  [bond        ]  converged   H4-U0 bond
-    Position  :        -0.0000        -2.4702         0.0000
-    Rho       :         0.1100
-    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    HessRho_EigVecs v1:         0.8031         0.0000         0.5959
-                    v2:         0.5959         0.0000        -0.8031
-                    v3:         0.0000        -1.0000         0.0000
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+  CP   7  [attractor   ]  converged   H1
+    Position  :         3.7649        -0.0000         0.0000
+    Rho       :         0.3608
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
+    DelSqRho  :       -21.2503
+   V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
 
-  CP  13  [bond        ]  converged   H2-U0 bond
+  CP   8  [bond        ]  converged   H2-U0 bond
     Position  :        -2.4702        -0.0000        -0.0000
     Rho       :         0.1100
     GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    HessRho_EigVecs v1:        -0.0000         0.6518        -0.7584
-                    v2:        -0.0000        -0.7584        -0.6518
-                    v3:        -1.0000        -0.0000         0.0000
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
+  CP   9  [bond        ]  converged   H4-U0 bond
+    Position  :        -0.0000        -2.4702         0.0000
+    Rho       :         0.1100
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
+  CP  10  [bond        ]  converged   H6-U0 bond
+    Position  :         0.0000        -0.0000        -2.4702
+    Rho       :         0.1100
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
+  CP  11  [bond        ]  converged   H5-U0 bond
+    Position  :        -0.0000         0.0000         2.4702
+    Rho       :         0.1100
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
+  CP  12  [bond        ]  converged   H3-U0 bond
+    Position  :        -0.0000         2.4702        -0.0000
+    Rho       :         0.1100
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
+  CP  13  [bond        ]  converged   H1-U0 bond
+    Position  :         2.4702        -0.0000        -0.0000
+    Rho       :         0.1100
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
     DelSqRho  :        -0.0626
     Bond Ellipticity:         0.0000
    V         :     1.5642e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02

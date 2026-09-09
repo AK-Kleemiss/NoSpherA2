@@ -26,9 +26,6 @@ Density Critical Points (9 found):
     Rho       :       198.5481
     GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.3910e+05    -7.3910e+05    -7.3909e+05
-    HessRho_EigVecs v1:        -0.6775        -0.0377         0.7346
-                    v2:        -0.7351         0.0013        -0.6779
-                    v3:        -0.0246         0.9993         0.0286
     DelSqRho  :  -2217289.4414
    V         :     5.5432e+05   G         :        27.6340   K         :     5.5435e+05   L         :     5.5432e+05
 
@@ -37,9 +34,6 @@ Density Critical Points (9 found):
     Rho       :        13.6761
     GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.2435e+04    -1.2435e+04    -1.2435e+04
-    HessRho_EigVecs v1:        -0.3903        -0.0359         0.9200
-                    v2:        -0.9204        -0.0115        -0.3909
-                    v3:         0.0247        -0.9993        -0.0286
     DelSqRho  :    -37304.6716
    V         :     9.3262e+03   G         :         0.0125   K         :     9.3262e+03   L         :     9.3262e+03
 
@@ -48,9 +42,6 @@ Density Critical Points (9 found):
     Rho       :         0.4044
     GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -8.2086e+00    -8.1953e+00    -7.2667e+00
-    HessRho_EigVecs v1:         0.8241         0.0364        -0.5653
-                    v2:        -0.1684        -0.9370        -0.3059
-                    v3:         0.5409        -0.3473         0.7660
     DelSqRho  :       -23.6706
    V         :     5.9177e+00   G         :         0.0155   K         :     5.9332e+00   L         :     5.9177e+00
 
@@ -59,9 +50,6 @@ Density Critical Points (9 found):
     Rho       :         0.4044
     GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -8.2086e+00    -8.1952e+00    -7.2667e+00
-    HessRho_EigVecs v1:         0.0781        -0.0266         0.9966
-                    v2:         0.3606        -0.9312        -0.0531
-                    v3:         0.9295         0.3635        -0.0631
     DelSqRho  :       -23.6705
    V         :     5.9176e+00   G         :         0.0155   K         :     5.9332e+00   L         :     5.9176e+00
 
@@ -70,9 +58,6 @@ Density Critical Points (9 found):
     Rho       :         0.4044
     GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -8.2086e+00    -8.1952e+00    -7.2667e+00
-    HessRho_EigVecs v1:         0.9021         0.0099         0.4313
-                    v2:        -0.1226        -0.9526         0.2784
-                    v3:        -0.4136         0.3040         0.8582
     DelSqRho  :       -23.6704
    V         :     5.9176e+00   G         :         0.0155   K         :     5.9332e+00   L         :     5.9176e+00
 
@@ -81,9 +66,6 @@ Density Critical Points (9 found):
     Rho       :         0.3090
     GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.1221e+00    -1.0858e+00     8.3089e-01
-    HessRho_EigVecs v1:         0.8241         0.0364        -0.5653
-                    v2:        -0.1759        -0.9322        -0.3164
-                    v3:         0.5385        -0.3602         0.7618
     DelSqRho  :        -1.3770
     Bond Ellipticity:         0.0334
    V         :     3.4424e-01   G         :         0.0528   K         :     3.9705e-01   L         :     3.4424e-01
@@ -93,9 +75,6 @@ Density Critical Points (9 found):
     Rho       :         0.3090
     GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.1220e+00    -1.0858e+00     8.3089e-01
-    HessRho_EigVecs v1:         0.0781        -0.0266         0.9966
-                    v2:         0.3733        -0.9261        -0.0539
-                    v3:         0.9244         0.3763        -0.0624
     DelSqRho  :        -1.3769
     Bond Ellipticity:         0.0334
    V         :     3.4423e-01   G         :         0.0528   K         :     3.9704e-01   L         :     3.4423e-01
@@ -105,9 +84,6 @@ Density Critical Points (9 found):
     Rho       :         0.3090
     GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.1220e+00    -1.0857e+00     8.3089e-01
-    HessRho_EigVecs v1:         0.9021         0.0099         0.4313
-                    v2:        -0.1283        -0.9483         0.2902
-                    v3:        -0.4119         0.3171         0.8543
     DelSqRho  :        -1.3769
     Bond Ellipticity:         0.0334
    V         :     3.4422e-01   G         :         0.0528   K         :     3.9703e-01   L         :     3.4422e-01
@@ -117,9 +93,6 @@ Density Critical Points (9 found):
     Rho       :         0.0348
     GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -6.1341e-02    -6.1341e-02     3.4394e-01
-    HessRho_EigVecs v1:        -0.4750        -0.0369         0.8792
-                    v2:         0.8796         0.0081         0.4756
-                    v3:        -0.0246         0.9993         0.0286
     DelSqRho  :         0.2213
     Bond Ellipticity:         0.0000
    V         :    -5.5315e-02   G         :         0.0479   K         :    -7.4091e-03   L         :    -5.5315e-02
@@ -143,10 +116,10 @@ Quadrature points sent along the field: 535740, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume     maximum        x          y          z
-      1  N0                     8.2837    -1.2837    668.5572    128.6761    -10.483     10.089      2.209
-      2  H1                     0.6360     0.3640    345.4001      0.3566     -9.421      9.375      3.711
-      3  H2                     0.6355     0.3645    436.4223      0.3506    -12.306      9.343      2.332
-      4  H3                     0.6328     0.3672    366.3172      0.3844     -9.671      9.459      0.524
+      1  N0                     8.2821    -1.2821    668.0824    128.6761    -10.483     10.089      2.209
+      2  H1                     0.6360     0.3640    345.7953      0.3566     -9.421      9.375      3.711
+      3  H2                     0.6360     0.3640    436.4436      0.3506    -12.306      9.343      2.332
+      4  H3                     0.6339     0.3661    366.3754      0.3844     -9.671      9.459      0.524
       5  Li4                    2.7664     0.2336   1465.6472      6.5745    -10.574     13.775      2.315
   total in basins: 12.9544   outside every basin: 0.0530
 
