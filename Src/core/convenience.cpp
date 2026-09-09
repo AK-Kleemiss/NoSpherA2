@@ -3243,7 +3243,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
         WFN wavy(wfn);
         WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
 
-        create_SALTED_training_data(wavy, wavy_aux);
+        create_SALTED_training_data(wavy, wavy_aux, *this);
         exit(0);
     }
     else if (temp == "-sfac_diffuse")
@@ -3799,15 +3799,6 @@ bool options::digest_ri_options(const std::string &temp, int &i)
                   << geometry_aid_cutoff_radius << " A ("
                   << (geometry_aid_cutoff_radius > 3.25 ? "c_only" : "dirty")
                   << " model family)" << std::endl;
-    }
-    else if (temp == "-calc_featomic_descriptor") {
-        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
-        // Unchanged behaviour, down to the output file name: Olex2 calls
-        // exactly this and reads `descriptor.npy` from the working
-        // directory. The hyperparameters moved to a shared function so the
-        // batch flag below cannot drift away from them.
-        write_featomic_descriptor(wfn, "descriptor.npy", geometry_aid_hyperparameters());
-        exit(0);
     }
     else if (temp == "-classify_atoms") {
         // -wfn <structure> -classify_atoms <model.bin> [<out.npy>]
