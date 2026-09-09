@@ -11,6 +11,7 @@
 #include "basis_set.h"
 #include "fchk.h"
 #include "bondwise_analysis.h"
+#include "geometry_aid.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -162,370 +163,6 @@ namespace {
             }
         }
     }
-
-    // One definition of the geometry-aid hyperparameters, for both the single
-    // structure and the batch flag. They must match what the models were
-    // trained with, in geometry-aid/multi_layer_classifier/c_only_training.py
-    // :: SOAP_HP, NOT the older values in geometry-aid/external_script.py.
-    // A descriptor of the right length computed with the wrong settings is
-    // rejected by nothing downstream. The feature count is the check: 11
-    // species give 66 unique pairs and the length is
-    // 66 * (max_radial+1)^2 * (max_angular+1) = 66 * 7^2 * 13 = 42,042.
-    // SALTED is unaffected; it builds its own FeatomicHyperParameters from
-    // config.nang1 / config.nang2 in SALTED_predictor.cpp.
-    //
-    // The cutoff radius is the one field that differs between the two shipped
-    // model families: 3.5 for `c_only`, trained on all-carbon input, and 3.0
-    // for `dirty`. Both descriptors are 42,042 long. Only `dirty` may be
-    // iterated (predict, relabel, recompute); relabelled input is out of
-    // distribution for `c_only`.
-    double geometry_aid_cutoff_radius = 3.5;
-
-    SALTED_Utils::FeatomicHyperParameters geometry_aid_hyperparameters()
-    {
-        const std::vector<std::string> species{ "B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I" };
-
-        // Diagnostic override, never for production output. A descriptor
-        // computed at a different spline accuracy is not comparable with any
-        // trained model, and nothing downstream rejects it -- hence the
-        // warning.
-        double spline_accuracy = 1E-6;
-        if (const char* override_accuracy = std::getenv("NOSPHERA2_SPLINE_ACCURACY"))
-        {
-            spline_accuracy = std::atof(override_accuracy);
-            std::cout << "  WARNING spline_accuracy overridden to " << spline_accuracy
-                      << " -- this descriptor does NOT match any trained model "
-                         "and must be used for timing only" << std::endl;
-        }
-
-        // Same diagnostic, for the two parameters that set the descriptor's
-        // size: 66 pairs * (max_radial+1)^2 * (max_angular+1) = 42,042 today.
-        // Changing either invalidates every shipped model.
-        int max_radial = 6, max_angular = 12;
-        if (const char* override_radial = std::getenv("NOSPHERA2_MAX_RADIAL"))
-        {
-            max_radial = std::atoi(override_radial);
-            std::cout << "  WARNING max_radial overridden to " << max_radial
-                      << " -- timing only" << std::endl;
-        }
-        if (const char* override_angular = std::getenv("NOSPHERA2_MAX_ANGULAR"))
-        {
-            max_angular = std::atoi(override_angular);
-            std::cout << "  WARNING max_angular overridden to " << max_angular
-                      << " -- timing only" << std::endl;
-        }
-
-        return SALTED_Utils::FeatomicHyperParameters{
-            .cutoff_radius = geometry_aid_cutoff_radius,
-            .max_radial = max_radial,
-            .max_angular = max_angular,
-            .atomic_gaussian_width = 0.2,
-            .center_atom_weight = 1.0,
-            .species = species,
-            .neighspe = species,
-            .radial_basis = {.type = "Gto", .spline_accuracy = spline_accuracy },
-            .cutoff_function = {.type = "ShiftedCosine", .width = 0.7 }
-        };
-    }
-
-    // geometry-aid classifier: the PCA and the three dense layers Olex2 used to
-    // run in Python, same arithmetic. The weights come from
-    // `geometry_aid_model.bin`, produced by `make_geometry_aid_bin.py`; the
-    // `.npz` it replaces is a deflated ZIP and there is no zlib here.
-    struct GeometryAidModel
-    {
-        int n_features = 0, n_components = 0, n_layers = 0, n_classes = 0;
-        bool whiten = false;
-        std::vector<std::string> classes;
-        vec mean;                       // n_features
-        vec components;                 // n_features x n_components, transposed
-        vec mean_projection;            // n_components: mean . components^T
-        vec explained_variance;         // n_components, only when whiten
-        std::vector<int> rows, cols;
-        std::vector<vec> w, b;
-    };
-
-    template <typename T>
-    void read_exact(std::istream& in, T* into, size_t count, const char* what)
-    {
-        in.read(reinterpret_cast<char*>(into), static_cast<std::streamsize>(count*sizeof(T)));
-        err_checkf(static_cast<size_t>(in.gcount()) == count*sizeof(T),
-            std::string("geometry-aid model truncated while reading ") + what, std::cout);
-    }
-
-    GeometryAidModel load_geometry_aid_model(const std::filesystem::path& path)
-    {
-        std::ifstream in(path, std::ios::binary);
-        err_checkf(in.good(), "Cannot open the geometry-aid model: " + path.string(), std::cout);
-
-        char magic[8] = { 0 };
-        read_exact(in, magic, 8, "the magic");
-        err_checkf(std::string(magic, 8) == "GEOAID01",
-            "This is not a GEOAID01 file. Regenerate it with "
-            "make_geometry_aid_bin.py -- a stale .bin beside a newer .npz is "
-            "exactly the mismatch the magic exists to catch.", std::cout);
-
-        GeometryAidModel m;
-        int header[5] = { 0 };
-        read_exact(in, header, 5, "the header");
-        m.n_features = header[0];
-        m.n_components = header[1];
-        m.n_layers = header[2];
-        m.n_classes = header[3];
-        m.whiten = header[4] != 0;
-
-        for (int c = 0; c < m.n_classes; ++c)
-        {
-            int length = 0;
-            read_exact(in, &length, 1, "a class name length");
-            std::string name(static_cast<size_t>(length), '\0');
-            if (length > 0) read_exact(in, name.data(), static_cast<size_t>(length), "a class name");
-            m.classes.push_back(name);
-        }
-
-        m.mean.resize(static_cast<size_t>(m.n_features));
-        read_exact(in, m.mean.data(), m.mean.size(), "the PCA mean");
-        m.components.resize(static_cast<size_t>(m.n_features)*m.n_components);
-        read_exact(in, m.components.data(), m.components.size(), "the PCA components");
-        if (m.whiten)
-        {
-            m.explained_variance.resize(static_cast<size_t>(m.n_components));
-            read_exact(in, m.explained_variance.data(), m.explained_variance.size(), "the explained variance");
-        }
-
-        for (int l = 0; l < m.n_layers; ++l)
-        {
-            int shape[2] = { 0, 0 };
-            read_exact(in, shape, 2, "a layer shape");
-            m.rows.push_back(shape[0]);
-            m.cols.push_back(shape[1]);
-            vec weights(static_cast<size_t>(shape[0])*shape[1]);
-            read_exact(in, weights.data(), weights.size(), "a weight matrix");
-            vec bias(static_cast<size_t>(shape[1]));
-            read_exact(in, bias.data(), bias.size(), "a bias vector");
-            m.w.push_back(std::move(weights));
-            m.b.push_back(std::move(bias));
-        }
-
-        // The constant term of the projection, computed once here so the hot
-        // loop can skip the descriptor's structural zeros. See
-        // `classify_descriptor` for why that is worth 8x.
-        m.mean_projection.assign(static_cast<size_t>(m.n_components), 0.0);
-        for (size_t f = 0; f < m.mean.size(); ++f)
-        {
-            const double mf = m.mean[f];
-            if (mf == 0.0) continue;
-            const double* comp = m.components.data() + f*static_cast<size_t>(m.n_components);
-            for (size_t c = 0; c < static_cast<size_t>(m.n_components); ++c)
-                m.mean_projection[c] += mf*comp[c];
-        }
-        return m;
-    }
-
-    const GeometryAidModel& cached_geometry_aid_model(const std::filesystem::path& path)
-    {
-        static std::map<std::string, GeometryAidModel> cache;
-        const std::string key = path.string();
-        auto found = cache.find(key);
-        if (found == cache.end())
-            found = cache.emplace(key, load_geometry_aid_model(path)).first;
-        return found->second;
-    }
-
-    // (n_atoms, n_classes) row-major probabilities. Summation order is not
-    // numpy's, so the last bits differ from the Python route;
-    // `bench_geometry_cpp.py` checks the argmax and the full ranking instead.
-    vec classify_descriptor(const double* descriptor, size_t n_atoms,
-        size_t n_features, const GeometryAidModel& m)
-    {
-        err_checkf(n_features == static_cast<size_t>(m.n_features),
-            "The descriptor has " + std::to_string(n_features) + " features and "
-            "the model expects " + std::to_string(m.n_features) + ". These come "
-            "from different SOAP hyperparameters and the result would be "
-            "meaningless rather than merely worse.", std::cout);
-
-        const size_t k = static_cast<size_t>(m.n_components);
-        vec projected(n_atoms*k, 0.0);
-
-        // (x - mean) . C^T  ==  x . C^T  -  mean . C^T, and only the first term
-        // touches the descriptor. Centring first destroys its sparsity: an
-        // all-carbon .xyz -- what Olex2 sends on the first pass -- populates one
-        // of the 66 species-pair blocks, so 637 of 42,042 entries are non-zero,
-        // but `row[f] - mean[f]` is non-zero wherever the mean is and the skip
-        // below never fires.
-        const double* mean_projection = m.mean_projection.data();
-#pragma omp parallel for
-        for (long long a = 0; a < static_cast<long long>(n_atoms); ++a)
-        {
-            const double* row = descriptor + static_cast<size_t>(a)*n_features;
-            double* out = projected.data() + static_cast<size_t>(a)*k;
-            for (size_t c = 0; c < k; ++c) out[c] = -mean_projection[c];
-            for (size_t f = 0; f < n_features; ++f)
-            {
-                const double value = row[f];
-                if (value == 0.0) continue;
-                const double* comp = m.components.data() + f*k;
-                for (size_t c = 0; c < k; ++c) out[c] += value*comp[c];
-            }
-            if (m.whiten)
-                for (size_t c = 0; c < k; ++c) out[c] /= std::sqrt(m.explained_variance[c]);
-        }
-
-        vec current = std::move(projected);
-        size_t width = k;
-        for (int l = 0; l < m.n_layers; ++l)
-        {
-            const size_t out_width = static_cast<size_t>(m.cols[l]);
-            vec next(n_atoms*out_width, 0.0);
-            const bool last = (l == m.n_layers - 1);
-#pragma omp parallel for
-            for (long long a = 0; a < static_cast<long long>(n_atoms); ++a)
-            {
-                const double* in_row = current.data() + static_cast<size_t>(a)*width;
-                double* out_row = next.data() + static_cast<size_t>(a)*out_width;
-                for (size_t o = 0; o < out_width; ++o) out_row[o] = m.b[l][o];
-                for (size_t i = 0; i < width; ++i)
-                {
-                    const double v = in_row[i];
-                    if (v == 0.0) continue;
-                    const double* wrow = m.w[l].data() + i*out_width;
-                    for (size_t o = 0; o < out_width; ++o) out_row[o] += v*wrow[o];
-                }
-                if (!last)
-                    for (size_t o = 0; o < out_width; ++o) out_row[o] = std::max(out_row[o], 0.0);
-            }
-            current = std::move(next);
-            width = out_width;
-        }
-
-        // softmax, shifted by the row maximum exactly as the Python does
-#pragma omp parallel for
-        for (long long a = 0; a < static_cast<long long>(n_atoms); ++a)
-        {
-            double* row = current.data() + static_cast<size_t>(a)*width;
-            double biggest = row[0];
-            for (size_t o = 1; o < width; ++o) biggest = std::max(biggest, row[o]);
-            double total = 0.0;
-            for (size_t o = 0; o < width; ++o) { row[o] = std::exp(row[o] - biggest); total += row[o]; }
-            if (total <= 0.0) total = 1.0;
-            for (size_t o = 0; o < width; ++o) row[o] /= total;
-        }
-        return current;
-    }
-
-    void write_featomic_descriptor(const std::filesystem::path& structure,
-        const std::filesystem::path& out_path,
-        const SALTED_Utils::FeatomicHyperParameters& hyperparams)
-    {
-        const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr;
-        auto mark = std::chrono::steady_clock::now();
-        auto lap = [&mark, time_phases](const char* what) {
-            if (!time_phases) return;
-            const auto now = std::chrono::steady_clock::now();
-            std::cout << "  SOAP_PHASE " << what << " "
-                      << std::chrono::duration<double>(now - mark).count() << std::endl;
-            mark = now;
-        };
-
-        featomic::SimpleSystem system = SALTED_Utils::gen_featomic_system(structure);
-        lap("read_structure");
-        metatensor::TensorMap descriptor = SALTED_Utils::calculate_SOAP_Powerspectrum(
-            std::move(system), hyperparams);
-        // Reset here or the next lap spans the whole SOAP call as well, which
-        // reported the 13 MB copy below as 0.6 s when it is 15 ms.
-        mark = std::chrono::steady_clock::now();
-
-        metatensor::TensorBlock temp_block = descriptor.block_by_id(0);
-        metatensor::NDArray<double> temp_values = temp_block.values();
-        std::vector<size_t> sizes = temp_block.values_shape();
-        vec data(sizes[0] * sizes[1]);
-        std::copy(temp_values.data(), temp_values.data() + data.size(), data.data());
-
-        npy::npy_data<double> np_descr;
-        np_descr.data = data;
-        np_descr.fortran_order = false;
-        np_descr.shape = { static_cast<unsigned long>(sizes[0]), static_cast<unsigned long>(sizes[1]) };
-        lap("copy_out");
-        npy::write_npy(out_path.string(), np_descr);
-        lap("write_npy");
-    }
-
-    // One loop for -calc_featomic_descriptor and -calc_featomic_descriptors: (structure, output) pairs,
-    // one unreadable structure must not abort the rest. Returns the exit code.
-    int write_featomic_descriptors(const std::vector<std::pair<std::filesystem::path, std::filesystem::path>>& jobs)
-    {
-        const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
-        const auto started = std::chrono::steady_clock::now();
-        size_t done = 0, failed = 0;
-        for (const auto& [structure, out_path] : jobs)
-        {
-            if (!std::filesystem::exists(structure))
-            {
-                std::cout << "MISSING " << structure.string() << std::endl;
-                ++failed;
-                continue;
-            }
-            try
-            {
-                const auto one = std::chrono::steady_clock::now();
-                write_featomic_descriptor(structure, out_path, hyperparams);
-                std::cout << "DESCRIPTOR " << out_path.string() << " seconds="
-                          << std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count() << std::endl;
-                ++done;
-            }
-            catch (const std::exception& e)
-            {
-                std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
-                ++failed;
-            }
-        }
-        const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-        std::cout << "BATCH done=" << done << " failed=" << failed
-                  << " seconds=" << total
-                  << " per_structure=" << (done ? total / done : 0.0) << std::endl;
-        return failed && !done ? 1 : 0;
-    }
-
-    // The same descriptor, classified here and written as (n_atoms, n_classes)
-    // instead of (n_atoms, 42042). For a 40-atom structure that is 3.5 kB out
-    // rather than 13.5 MB.
-    void write_geometry_aid_probabilities(const std::filesystem::path& structure,
-        const std::filesystem::path& out_path,
-        const std::filesystem::path& model_path,
-        const SALTED_Utils::FeatomicHyperParameters& hyperparams)
-    {
-        const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr;
-        auto mark = std::chrono::steady_clock::now();
-        auto lap = [&mark, time_phases](const char* what) {
-            if (!time_phases) return;
-            const auto now = std::chrono::steady_clock::now();
-            std::cout << "  SOAP_PHASE " << what << " "
-                      << std::chrono::duration<double>(now - mark).count() << std::endl;
-            mark = now;
-        };
-
-        const GeometryAidModel& model = cached_geometry_aid_model(model_path);
-        lap("load_model");
-
-        metatensor::TensorMap descriptor = SALTED_Utils::calculate_SOAP_Powerspectrum(
-            SALTED_Utils::gen_featomic_system(structure), hyperparams);
-        mark = std::chrono::steady_clock::now();
-
-        metatensor::TensorBlock temp_block = descriptor.block_by_id(0);
-        metatensor::NDArray<double> temp_values = temp_block.values();
-        std::vector<size_t> sizes = temp_block.values_shape();
-        const vec probabilities = classify_descriptor(temp_values.data(), sizes[0], sizes[1], model);
-        lap("classify");
-
-        npy::npy_data<double> np_probs;
-        np_probs.data = probabilities;
-        np_probs.fortran_order = false;
-        np_probs.shape = { static_cast<unsigned long>(sizes[0]),
-                           static_cast<unsigned long>(model.n_classes) };
-        npy::write_npy(out_path.string(), np_probs);
-        lap("write_npy");
-    }
-
 }
 
 std::string help_message =
@@ -788,8 +425,7 @@ std::string help_message =
  "  -dipole_moments  -polarizabilities <7 wfn files>\n"
  "  -geometry_aid_cutoff <r>            SOAP cutoff for the geometry-aid descriptor:\n"
  "                                      3.5 (default) matches the c_only models,\n"
- "                                      3.0 matches the dirty models. Give it BEFORE\n"
- "                                      the descriptor flag.\n"
+ "                                      3.0 matches the dirty models.\n"
  "  -calc_featomic_descriptor           Write descriptor.npy (requires -wfn).\n"
  "  -calc_featomic_descriptors <list>   Same, for many structures in one run.\n"
  "                                      <list> holds one structure path per\n"
@@ -3822,124 +3458,37 @@ bool options::digest_ri_options(const std::string &temp, int &i)
     using namespace std;
     const int argc = (int)arguments.size();
     if (temp == "-geometry_aid_cutoff") {
-        // Selects the geometry-aid model family: 3.5 the `c_only` models,
-        // 3.0 the `dirty` ones. Must appear BEFORE the flag that computes
-        // anything -- the descriptor flags exit(0) as soon as they have run.
-        // A descriptor at the wrong cutoff is 42,042 long either way and is
-        // rejected by nothing downstream, so the value used is echoed.
-        // `arguments`, not `argv` -- this parser walks a vector<string>.
-        err_chkf(i + 1 < arguments.size(),
-                 "-geometry_aid_cutoff needs a radius in Angstrom", std::cout);
-        geometry_aid_cutoff_radius = std::stod(arguments[++i]);
-        std::cout << "  geometry-aid SOAP cutoff radius set to "
-                  << geometry_aid_cutoff_radius << " A ("
-                  << (geometry_aid_cutoff_radius > 3.25 ? "c_only" : "dirty")
-                  << " model family)" << std::endl;
+        //3.5 selects the c_only model family, 3.0 the dirty one. Both descriptors are 42,042 long and
+        //nothing downstream rejects the wrong one, so the value used is echoed.
+        err_checkf(i + 1 < argc, "-geometry_aid_cutoff needs a radius in Angstrom", std::cout);
+        geometry_aid_cutoff = std::stod(arguments[++i]);
+        std::cout << "  geometry-aid SOAP cutoff radius set to " << geometry_aid_cutoff << " A ("
+                  << (geometry_aid_cutoff > 3.25 ? "c_only" : "dirty") << " model family)" << std::endl;
     }
     else if (temp == "-classify_atoms") {
-        // -wfn <structure> -classify_atoms <model.bin> [<out.npy>]
-        //
-        // Writes class probabilities, one row per atom, in the class order
-        // the model carries. Default output `probabilities.npy`, matching
-        // the way `-calc_featomic_descriptor` defaults to descriptor.npy.
-        err_chkf(!wfn.empty(), "No structure specified! Use -wfn BEFORE -classify_atoms.", std::cout);
-        const std::filesystem::path model_path = arguments[i + 1];
-        err_chkf(std::filesystem::exists(model_path),
-            "The geometry-aid model does not exist: " + model_path.string(), std::cout);
-        std::filesystem::path out_path = "probabilities.npy";
-        if (i + 2 < arguments.size() && !arguments[i + 2].empty() && arguments[i + 2][0] != '-')
-            out_path = arguments[i + 2];
-        write_geometry_aid_probabilities(wfn, out_path, model_path,
-            geometry_aid_hyperparameters());
-        exit(0);
+        //-wfn <structure> -classify_atoms <model.bin> [<out.npy>], default probabilities.npy
+        err_checkf(i + 1 < argc, "-classify_atoms needs the model file", std::cout);
+        geometry_aid_model = arguments[++i];
+        err_checkf(std::filesystem::exists(geometry_aid_model), "The geometry-aid model does not exist: " + geometry_aid_model.string(), std::cout);
+        classify_atoms_out = "probabilities.npy";
+        if (i + 1 < argc && !arguments[i + 1].empty() && arguments[i + 1][0] != '-')
+            classify_atoms_out = arguments[++i];
     }
     else if (temp == "-classify_atoms_list") {
-        // The batch form: -classify_atoms_list <list> <model.bin>, one
-        // structure path per line, each written as <path>.probs.npy.
-        const std::filesystem::path list_file = arguments[i + 1];
-        const std::filesystem::path model_path = arguments[i + 2];
-        err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
-        err_chkf(std::filesystem::exists(model_path), "The geometry-aid model does not exist: " + model_path.string(), std::cout);
-
-        std::vector<std::filesystem::path> jobs;
-        {
-            std::ifstream list(list_file);
-            std::string line;
-            while (getline_universal(list, line))
-            {
-                const std::string entry = trim(line);
-                if (entry.empty() || entry[0] == '#') continue;
-                jobs.push_back(std::filesystem::path(entry));
-            }
-        }
-        err_chkf(!jobs.empty(), "The structure list is empty: " + list_file.string(), std::cout);
-
-        const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
-        const auto started = std::chrono::steady_clock::now();
-        size_t done = 0, failed = 0;
-        for (const std::filesystem::path& structure : jobs)
-        {
-            if (!std::filesystem::exists(structure))
-            {
-                std::cout << "MISSING " << structure.string() << std::endl;
-                ++failed;
-                continue;
-            }
-            try
-            {
-                const auto one = std::chrono::steady_clock::now();
-                std::filesystem::path out_path = structure;
-                out_path += ".probs.npy";
-                write_geometry_aid_probabilities(structure, out_path, model_path, hyperparams);
-                std::cout << "PROBABILITIES " << out_path.string() << " seconds="
-                          << std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count()
-                          << std::endl;
-                ++done;
-            }
-            catch (const std::exception& e)
-            {
-                std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
-                ++failed;
-            }
-        }
-        const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-        std::cout << "BATCH done=" << done << " failed=" << failed
-                  << " seconds=" << total
-                  << " per_structure=" << (done ? total / done : 0.0) << std::endl;
-        exit(failed && !done ? 1 : 0);
+        //<list> <model.bin>, one structure path per line, each written as <path>.probs.npy
+        err_checkf(i + 2 < argc, "-classify_atoms_list needs the list and the model file", std::cout);
+        classify_structures = geometry_aid::read_structure_list(arguments[++i]);
+        geometry_aid_model = arguments[++i];
+        err_checkf(std::filesystem::exists(geometry_aid_model), "The geometry-aid model does not exist: " + geometry_aid_model.string(), std::cout);
     }
-    else if (temp == "-calc_featomic_descriptor") {
-        // Olex2 calls exactly this and reads descriptor.npy from the working directory.
-        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
-        exit(write_featomic_descriptors({ { wfn, "descriptor.npy" } }));
-    }
+    else if (temp == "-calc_featomic_descriptor")
+        //Olex2 calls exactly this and reads descriptor.npy from the working directory
+        calc_featomic_descriptor = true;
     else if (temp == "-calc_featomic_descriptors") {
-        // Many structures in one process: a descriptor call carries a fixed
-        // setup cost of roughly 0.7 s against about 0.0009 s per atom, and
-        // `calculate_SOAP_Powerspectrum` keeps its calculator for the lifetime
-        // of the process (see `cached_calculator`).
-        //
-        // The list file is one structure path per line; blank lines and lines
-        // beginning with '#' are ignored. Each descriptor is written beside its
-        // structure as `<path>.npy` -- one field per line, so paths with spaces
-        // need no quoting rules.
-        const std::filesystem::path list_file = arguments[i + 1];
-        err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
-
-        std::vector<std::pair<std::filesystem::path, std::filesystem::path>> jobs;
-        {
-            std::ifstream list(list_file);
-            std::string line;
-            while (getline_universal(list, line))
-            {
-                const std::string entry = trim(line);
-                if (entry.empty() || entry[0] == '#')
-                    continue;
-                jobs.emplace_back(entry, entry + ".npy");
-            }
-        }
-        err_chkf(!jobs.empty(), "The structure list is empty: " + list_file.string(), std::cout);
-        exit(write_featomic_descriptors(jobs));
+        //One structure path per line, each descriptor written as <path>.npy. One process for all of
+        //them because the calculator setup costs 0.7 s against 0.0009 s per atom (cached_calculator).
+        err_checkf(i + 1 < argc, "-calc_featomic_descriptors needs the list file", std::cout);
+        featomic_structures = geometry_aid::read_structure_list(arguments[++i]);
     }
     else if (temp == "-rgbi")
         rgbi = true;

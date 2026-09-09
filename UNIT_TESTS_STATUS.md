@@ -1,13 +1,44 @@
 # Unit Test Status
-**Last updated: 2026-09-09** (`-repulsion_exchange <dirac|pbe|b88>` picks the exchange functional of
+**Last updated: 2026-09-09** (geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
+four flags through `run_app`; `-repulsion_exchange <dirac|pbe|b88>` picks the exchange functional of
 the Gordon-Kim repulsion, with an H-atom gtest for the three functionals; `-interaction_energy` computes
 the exchange-repulsion by the Gordon-Kim functionals of the fitted densities on a Becke grid over the
 dimer; `-repulsion_overlap <K>` keeps the K * S model. `XCW_Test` merged in (f-function phases, ELI
-basins). 284, 280 pass and the usual 4 `*_full` XCW cases skip on `release-windows`. 2026-09-08: Thakkar polarization in the
+basins). 292, 288 pass and the usual 4 `*_full` XCW cases skip on `release-windows`. 2026-09-08: Thakkar polarization in the
 partner's field, D4 dispersion and the density overlap S; `-salted_charge_constraint`
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
+
+## 2026-09-09 — Geometry-aid pipeline tests (`GeometryAidTests`, `GeometryAidDeathTest`)
+
+The structure-solution flags Olex2 drives (`-calc_featomic_descriptor`, `-calc_featomic_descriptors`,
+`-classify_atoms`, `-classify_atoms_list`, `-geometry_aid_cutoff`) used to run and `exit()` inside the
+option parser, so nothing could be tested through the in-process `run_app`. The pipeline now lives in
+`Src/core/geometry_aid.h/.cpp` (namespace `geometry_aid`): the flags only queue jobs in `options`
+(`calc_featomic_descriptor`, `featomic_structures`, `classify_atoms_out`, `geometry_aid_model`,
+`classify_structures`, `geometry_aid_cutoff`) and `run_app_impl` runs `geometry_aid::run(opt)` and
+returns its code. Side effect: flag order no longer matters, `-geometry_aid_cutoff` after the
+descriptor flag applies (it was silently ignored before); the help text lost its "give it BEFORE" note.
+
+No `geometry_aid_model.bin` and no `make_geometry_aid_bin.py` ship with the repository, so the tests
+write their own GEOAID01 models: a 2-feature one small enough to classify by hand and a 42,042-feature
+one for the end-to-end run. Eight tests, ~5 s on `../Lukas_Test/thpp_p1.xyz` (32 atoms, 18 SOAP centres
+because H is no species):
+
+| Test | Checks |
+|---|---|
+| `HyperparametersMatchTheTrainedModels` | every field of `hyperparameters()` (species, 6/12, 0.2, 1.0, Gto 1e-6, ShiftedCosine 0.7), 66·7²·13 = 42042, the 3.0 variant differs only in the cutoff |
+| `DescriptorHasARowPerHeavyAtomAnd42042Features` | shape (18, 42042) at both cutoffs, finite, per row between 1 and 6 species-pair blocks of 637 nonzeros, the two cutoffs differ |
+| `BatchSkipsAMissingStructureAndFailsOnlyWhenNothingWasWritten` | MISSING is skipped, exit 0 with one success, 1 with none; `read_structure_list` drops `#` lines, blanks, CRLF and padding |
+| `ModelRoundTripsThroughTheBinaryFormatAndClassifiesByHand` | GEOAID01 header, classes, `mean_projection`, layer shapes; softmax probabilities against hand-computed logits with and without whitening, to 1e-12; `cached_model` returns the same object |
+| `RejectsAForeignFileAndAMismatchedDescriptor` | death test: wrong magic and a 3-feature descriptor on a 2-feature model both hit `err_checkf` |
+| `FlagsQueueTheirJobsInAnyOrder` | all five flags through `options::digest_options`, including the optional output name of `-classify_atoms` and flags on either side of `-wfn` |
+| `RunAppWritesDescriptorNpyTheWayOlex2CallsIt` | `run_app` with the Olex2 command line writes `descriptor.npy` (18, 42042); the list flag with `-geometry_aid_cutoff 3.0` given afterwards writes `<path>.npy` bit-identical to a direct 3.0 call |
+| `ClassifierWritesOneProbabilityRowPerAtomThroughBothFlags` | `-classify_atoms` writes (18, 2), rows sum to 1, equal to `classify_descriptor` on the descriptor to 1e-12; `-classify_atoms_list` writes the identical `<path>.probs.npy` |
+
+Note for the helper `load_npy`: `npy::LoadArrayFromNumpy` appends to the target vector, it does not
+replace it. The helper clears first.
 
 ## 2026-09-08 — Multipole restraints on the RI fit (`-multipole_moments`)
 

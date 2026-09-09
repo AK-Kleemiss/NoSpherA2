@@ -11,6 +11,7 @@
 #include "cif.h"
 #include "bondwise_analysis.h"
 #include "XCW.h"
+#include "geometry_aid.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
 #include "sf_gpu.h"
@@ -149,6 +150,9 @@ static int run_app_impl(int argc, char **argv)
     }
     log_file.flush();
 
+    //Geometry-aid descriptors or element probabilities and quit; the flags queue jobs, so -wfn and -geometry_aid_cutoff may come in any order
+    if (opt.calc_featomic_descriptor || !opt.featomic_structures.empty() || !opt.classify_atoms_out.empty() || !opt.classify_structures.empty())
+        return geometry_aid::run(opt);
     //Start QCT menu and leave
     if (opt.qct) {
         //restore cout

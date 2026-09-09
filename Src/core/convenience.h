@@ -768,6 +768,13 @@ struct options
     std::filesystem::path profiling_tests_root = "tests";
     std::filesystem::path promol_nci_xyz1;
     std::filesystem::path promol_nci_xyz2;
+    //Geometry-aid jobs (-calc_featomic_descriptor(s), -classify_atoms(_list)): the flags queue, run_app_impl runs geometry_aid::run and quits
+    bool calc_featomic_descriptor = false;
+    std::filesystem::path classify_atoms_out;
+    std::filesystem::path geometry_aid_model;
+    pathvec featomic_structures;
+    pathvec classify_structures;
+    double geometry_aid_cutoff = 3.5;
 	std::filesystem::path xcw_settings_path;
     properties_options properties;
     bool debug = false;

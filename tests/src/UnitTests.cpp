@@ -16,6 +16,9 @@
 #include "core/properties.h"
 #include "core/integrator.h"
 #include "core/basis_set.h"
+#include "core/geometry_aid.h"
+#include "core/NoSpherA2.h"
+#include "core/npy.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "core/blas_gpu.h"
 #endif
@@ -2763,5 +2766,290 @@ namespace NoSpherA2UnitTests
         EXPECT_NEAR(F.nucA_rhoB, E.nucB_rhoA, 1e-12);
         EXPECT_NEAR(F.rho_rho, E.rho_rho, 1e-10);
         for (int a = 0; a < 2; a++) EXPECT_NEAR(F.pair[0][a], E.pair[a][0], 1e-12);
+    }
+    namespace {
+        const std::filesystem::path thpp = "../Lukas_Test/thpp_p1.xyz";
+        std::filesystem::path geometry_aid_tmp(const std::string& name)
+        {
+            return std::filesystem::temp_directory_path() / ("nosphera2_geometry_aid_" + name);
+        }
+        void load_npy(const std::filesystem::path& path, std::vector<unsigned long>& shape, vec& data)
+        {
+            bool fortran_order = true;
+            data.clear();
+            npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
+            EXPECT_FALSE(fortran_order);
+        }
+        //A GEOAID01 file laid out the way load_model reads it
+        void write_model(const std::filesystem::path& path, const geometry_aid::Model& m)
+        {
+            std::ofstream out(path, std::ios::binary);
+            out.write("GEOAID01", 8);
+            const int header[5] = { m.n_features, m.n_components, m.n_layers, m.n_classes, m.whiten };
+            out.write((const char*)header, sizeof(header));
+            for (int c = 0; c < m.n_classes; c++) {
+                const int length = (int)m.classes[c].size();
+                out.write((const char*)&length, sizeof(int));
+                out.write(m.classes[c].data(), length);
+            }
+            out.write((const char*)m.mean.data(), m.mean.size() * sizeof(double));
+            out.write((const char*)m.components.data(), m.components.size() * sizeof(double));
+            if (m.whiten) out.write((const char*)m.explained_variance.data(), m.explained_variance.size() * sizeof(double));
+            for (int l = 0; l < m.n_layers; l++) {
+                const int shape[2] = { m.rows[l], m.cols[l] };
+                out.write((const char*)shape, sizeof(shape));
+                out.write((const char*)m.w[l].data(), m.w[l].size() * sizeof(double));
+                out.write((const char*)m.b[l].data(), m.b[l].size() * sizeof(double));
+            }
+        }
+        //Two features, two components, a ReLU layer and three classes: small enough to classify by hand
+        geometry_aid::Model tiny_model(bool whiten)
+        {
+            geometry_aid::Model m;
+            m.n_features = 2, m.n_components = 2, m.n_layers = 2, m.n_classes = 3, m.whiten = whiten;
+            m.classes = { "C", "N", "O" };
+            m.mean = { 1.0, -1.0 };
+            m.components = { 1.0, 0.0, 0.0, 2.0 };
+            m.explained_variance = { 4.0, 1.0 };
+            m.rows = { 2, 2 }, m.cols = { 2, 3 };
+            m.w = { { 1.0, 0.0, 0.0, 1.0 }, { 1.0, 0.0, -1.0, 0.0, 1.0, 1.0 } };
+            m.b = { { -1.5, 0.0 }, { 0.0, 0.5, 0.0 } };
+            return m;
+        }
+        vec softmax(vec z)
+        {
+            double total = 0.0;
+            for (int i = 0; i < z.size(); i++) total += (z[i] = std::exp(z[i]));
+            for (int i = 0; i < z.size(); i++) z[i] /= total;
+            return z;
+        }
+        //A model of the descriptor's real width, so the whole pipeline can run on a structure
+        geometry_aid::Model wide_model()
+        {
+            geometry_aid::Model m;
+            m.n_features = 42042, m.n_components = 3, m.n_layers = 1, m.n_classes = 2;
+            m.classes = { "C", "N" };
+            m.mean.assign(42042, 0.0);
+            m.components.resize(42042 * 3);
+            for (int f = 0; f < 42042; f++)
+                for (int c = 0; c < 3; c++) m.components[f * 3 + c] = ((f * 7 + c * 13) % 11 - 5) * 1e-3;
+            m.rows = { 3 }, m.cols = { 2 };
+            m.w = { { 1.0, -1.0, 0.5, 0.5, -1.0, 1.0 } }, m.b = { { 0.0, 0.0 } };
+            return m;
+        }
+        int run_nosphera2(std::vector<std::string> args)
+        {
+            args.insert(args.begin(), "NoSpherA2");
+            std::vector<char*> argv;
+            for (int i = 0; i < args.size(); i++) argv.push_back(args[i].data());
+            argv.push_back(nullptr);
+            return run_app((int)args.size(), argv.data());
+        }
+        options parse_options(std::vector<std::string> args)
+        {
+            args.insert(args.begin(), "NoSpherA2");
+            std::vector<char*> argv;
+            for (int i = 0; i < args.size(); i++) argv.push_back(args[i].data());
+            int argc = (int)args.size();
+            options opt(argc, argv.data(), std::cout);
+            opt.digest_options();
+            return opt;
+        }
+    }
+
+    TEST(GeometryAidTests, HyperparametersMatchTheTrainedModels)
+    {
+        const SALTED_Utils::FeatomicHyperParameters hp = geometry_aid::hyperparameters();
+        const svec species{ "B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I" };
+        EXPECT_EQ(hp.cutoff_radius, 3.5);
+        EXPECT_EQ(hp.max_radial, 6);
+        EXPECT_EQ(hp.max_angular, 12);
+        EXPECT_EQ(hp.atomic_gaussian_width, 0.2);
+        EXPECT_EQ(hp.center_atom_weight, 1.0);
+        EXPECT_EQ(hp.species, species);
+        EXPECT_EQ(hp.neighspe, species);
+        EXPECT_EQ(hp.radial_basis.type, "Gto");
+        EXPECT_EQ(hp.radial_basis.spline_accuracy, 1e-6);
+        EXPECT_EQ(hp.cutoff_function.type, "ShiftedCosine");
+        EXPECT_EQ(hp.cutoff_function.width, 0.7);
+        const int pairs = (int)species.size() * ((int)species.size() + 1) / 2;
+        EXPECT_EQ(pairs * (hp.max_radial + 1) * (hp.max_radial + 1) * (hp.max_angular + 1), 42042);
+        EXPECT_EQ(geometry_aid::hyperparameters(3.0).cutoff_radius, 3.0);
+        EXPECT_NE(geometry_aid::hyperparameters(3.0).to_json(), hp.to_json());
+    }
+
+    TEST(GeometryAidTests, DescriptorHasARowPerHeavyAtomAnd42042Features)
+    {
+        //thpp_p1 has 12 C, 4 N, 2 F and 14 H; H is no SOAP species, so 18 centres and at most the 6 pair blocks of C, N, F, each 7 * 7 * 13 wide
+        const std::filesystem::path out = geometry_aid_tmp("thpp.npy"), dirty = geometry_aid_tmp("thpp_dirty.npy");
+        geometry_aid::write_descriptor(thpp, out, geometry_aid::hyperparameters());
+        geometry_aid::write_descriptor(thpp, dirty, geometry_aid::hyperparameters(3.0));
+        std::vector<unsigned long> shape, shape_dirty;
+        vec d, d_dirty;
+        load_npy(out, shape, d);
+        load_npy(dirty, shape_dirty, d_dirty);
+        ASSERT_EQ(shape, (std::vector<unsigned long>{ 18, 42042 }));
+        ASSERT_EQ(shape_dirty, shape);
+        double diff = 0.0;
+        for (int a = 0; a < 18; a++) {
+            int nonzero = 0;
+            for (int f = 0; f < 42042; f++) {
+                const double v = d[a * 42042 + f];
+                EXPECT_TRUE(std::isfinite(v));
+                if (v != 0.0) nonzero++;
+                diff += std::abs(v - d_dirty[a * 42042 + f]);
+            }
+            EXPECT_GE(nonzero, 637) << a;
+            EXPECT_LE(nonzero, 6 * 637) << a;
+        }
+        EXPECT_GT(diff, 1.0);
+        std::filesystem::remove(out);
+        std::filesystem::remove(dirty);
+    }
+
+    TEST(GeometryAidTests, BatchSkipsAMissingStructureAndFailsOnlyWhenNothingWasWritten)
+    {
+        const std::filesystem::path good = geometry_aid_tmp("batch.npy"), missing = geometry_aid_tmp("missing.npy");
+        const geometry_aid::jobvec jobs{ { thpp, good }, { geometry_aid_tmp("does_not_exist.xyz"), missing } };
+        EXPECT_EQ(geometry_aid::write_descriptors(jobs, geometry_aid::hyperparameters()), 0);
+        EXPECT_TRUE(std::filesystem::exists(good));
+        EXPECT_FALSE(std::filesystem::exists(missing));
+        EXPECT_EQ(geometry_aid::write_descriptors({ jobs[1] }, geometry_aid::hyperparameters()), 1);
+        std::filesystem::remove(good);
+        const std::filesystem::path list = geometry_aid_tmp("list.txt");
+        { std::ofstream(list) << "# comment\r\n\r\n  a.xyz  \r\nb c.xyz\n"; }
+        EXPECT_EQ(geometry_aid::read_structure_list(list), (pathvec{ "a.xyz", "b c.xyz" }));
+        std::filesystem::remove(list);
+    }
+
+    TEST(GeometryAidTests, ModelRoundTripsThroughTheBinaryFormatAndClassifiesByHand)
+    {
+        //x = (3, 1): centred (2, 2), projected (2, 4), whitened (1, 4); x = (0, 5) exercises the sparse skip with mean_projection = (1, -2)
+        const double x[4] = { 3.0, 1.0, 0.0, 5.0 };
+        const vec expect_plain[2] = { softmax({ 0.5, 4.5, 3.5 }), softmax({ 0.0, 12.5, 12.0 }) };
+        const vec expect_white[2] = { softmax({ 0.0, 4.5, 4.0 }), softmax({ 0.0, 12.5, 12.0 }) };
+        for (int whiten = 0; whiten < 2; whiten++) {
+            const std::filesystem::path path = geometry_aid_tmp(whiten ? "white.bin" : "plain.bin");
+            write_model(path, tiny_model(whiten));
+            const geometry_aid::Model m = geometry_aid::load_model(path);
+            EXPECT_EQ(m.n_features, 2);
+            EXPECT_EQ(m.n_components, 2);
+            EXPECT_EQ(m.n_layers, 2);
+            EXPECT_EQ(m.n_classes, 3);
+            EXPECT_EQ(m.whiten, whiten == 1);
+            EXPECT_EQ(m.classes, (svec{ "C", "N", "O" }));
+            EXPECT_EQ(m.mean_projection, (vec{ 1.0, -2.0 }));
+            EXPECT_EQ(m.rows, (ivec{ 2, 2 }));
+            EXPECT_EQ(m.cols, (ivec{ 2, 3 }));
+            EXPECT_EQ(m.w[1].size(), 6);
+            const vec p = geometry_aid::classify_descriptor(x, 2, 2, m);
+            ASSERT_EQ(p.size(), 6);
+            for (int a = 0; a < 2; a++)
+                for (int c = 0; c < 3; c++)
+                    EXPECT_NEAR(p[a * 3 + c], (whiten ? expect_white : expect_plain)[a][c], 1e-12) << whiten << " " << a << " " << c;
+            EXPECT_EQ(&geometry_aid::cached_model(path), &geometry_aid::cached_model(path));
+            std::filesystem::remove(path);
+        }
+    }
+
+    TEST(GeometryAidDeathTest, RejectsAForeignFileAndAMismatchedDescriptor)
+    {
+        const std::filesystem::path foreign = geometry_aid_tmp("foreign.bin");
+        { std::ofstream(foreign, std::ios::binary) << "NOTGEOAID"; }
+        EXPECT_EXIT(geometry_aid::load_model(foreign), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+        std::filesystem::remove(foreign);
+        const double x[3] = { 1.0, 2.0, 3.0 };
+        EXPECT_EXIT(geometry_aid::classify_descriptor(x, 1, 3, tiny_model(false)), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+    }
+
+    TEST(GeometryAidTests, FlagsQueueTheirJobsInAnyOrder)
+    {
+        const std::filesystem::path list = geometry_aid_tmp("flags.txt"), model = geometry_aid_tmp("flags.bin");
+        { std::ofstream(list) << "# structures\n\n" << thpp.string() << "\n"; }
+        write_model(model, tiny_model(false));
+        options a = parse_options({ "-calc_featomic_descriptor", "-wfn", thpp.string() });
+        EXPECT_TRUE(a.calc_featomic_descriptor);
+        EXPECT_EQ(a.wfn, thpp);
+        EXPECT_EQ(a.geometry_aid_cutoff, 3.5);
+        EXPECT_TRUE(a.featomic_structures.empty() && a.classify_atoms_out.empty() && a.classify_structures.empty());
+        options b = parse_options({ "-calc_featomic_descriptors", list.string(), "-geometry_aid_cutoff", "3.0" });
+        EXPECT_FALSE(b.calc_featomic_descriptor);
+        EXPECT_EQ(b.featomic_structures, (pathvec{ thpp }));
+        EXPECT_EQ(b.geometry_aid_cutoff, 3.0);
+        options c = parse_options({ "-wfn", thpp.string(), "-classify_atoms", model.string() });
+        EXPECT_EQ(c.classify_atoms_out, "probabilities.npy");
+        EXPECT_EQ(c.geometry_aid_model, model);
+        options d = parse_options({ "-classify_atoms", model.string(), "out.npy", "-no_date", "-wfn", thpp.string() });
+        EXPECT_EQ(d.classify_atoms_out, "out.npy");
+        EXPECT_TRUE(d.no_date);
+        EXPECT_EQ(d.wfn, thpp);
+        options e = parse_options({ "-classify_atoms_list", list.string(), model.string() });
+        EXPECT_EQ(e.classify_structures, (pathvec{ thpp }));
+        EXPECT_EQ(e.geometry_aid_model, model);
+        EXPECT_TRUE(e.classify_atoms_out.empty());
+        std::filesystem::remove(list);
+        std::filesystem::remove(model);
+    }
+
+    TEST(GeometryAidTests, RunAppWritesDescriptorNpyTheWayOlex2CallsIt)
+    {
+        //A copy of the structure in the temp directory, because the batch flag writes <path>.npy beside it
+        const std::filesystem::path copy = geometry_aid_tmp("copy.xyz"), list = geometry_aid_tmp("run.txt"), copy_npy = copy.string() + ".npy", direct = geometry_aid_tmp("direct.npy");
+        std::filesystem::copy_file(thpp, copy, std::filesystem::copy_options::overwrite_existing);
+        { std::ofstream(list) << copy.string() << "\n"; }
+        std::filesystem::remove("descriptor.npy");
+        ASSERT_EQ(run_nosphera2({ "-wfn", thpp.string(), "-calc_featomic_descriptor", "-no_date" }), 0);
+        std::vector<unsigned long> shape;
+        vec d, d_direct;
+        load_npy("descriptor.npy", shape, d);
+        EXPECT_EQ(shape, (std::vector<unsigned long>{ 18, 42042 }));
+        std::filesystem::remove("descriptor.npy");
+        //The cutoff after the descriptor flag must still apply, so the batch output is the dirty descriptor
+        ASSERT_EQ(run_nosphera2({ "-calc_featomic_descriptors", list.string(), "-geometry_aid_cutoff", "3.0", "-no_date" }), 0);
+        geometry_aid::write_descriptor(thpp, direct, geometry_aid::hyperparameters(3.0));
+        load_npy(copy_npy, shape, d);
+        load_npy(direct, shape, d_direct);
+        ASSERT_EQ(d.size(), d_direct.size());
+        double diff = 0.0;
+        for (int i = 0; i < d.size(); i++) diff += std::abs(d[i] - d_direct[i]);
+        EXPECT_EQ(diff, 0.0);
+        std::filesystem::remove(copy_npy);
+        std::filesystem::remove(direct);
+        std::filesystem::remove(copy);
+        std::filesystem::remove(list);
+    }
+
+    TEST(GeometryAidTests, ClassifierWritesOneProbabilityRowPerAtomThroughBothFlags)
+    {
+        const std::filesystem::path model = geometry_aid_tmp("wide.bin"), out = geometry_aid_tmp("probs.npy"), copy = geometry_aid_tmp("copy2.xyz"), list = geometry_aid_tmp("classify.txt"), copy_probs = copy.string() + ".probs.npy", descr = geometry_aid_tmp("descr.npy");
+        write_model(model, wide_model());
+        std::filesystem::copy_file(thpp, copy, std::filesystem::copy_options::overwrite_existing);
+        { std::ofstream(list) << copy.string() << "\n"; }
+        ASSERT_EQ(run_nosphera2({ "-wfn", thpp.string(), "-classify_atoms", model.string(), out.string(), "-no_date" }), 0);
+        std::vector<unsigned long> shape;
+        vec p, p_batch, d;
+        load_npy(out, shape, p);
+        ASSERT_EQ(shape, (std::vector<unsigned long>{ 18, 2 }));
+        for (int a = 0; a < 18; a++) {
+            EXPECT_NEAR(p[2 * a] + p[2 * a + 1], 1.0, 1e-12) << a;
+            EXPECT_GT(p[2 * a], 0.0);
+            EXPECT_GT(p[2 * a + 1], 0.0);
+        }
+        //The same numbers from the pieces: the descriptor written by the other flag, classified with the loaded model
+        geometry_aid::write_descriptor(thpp, descr, geometry_aid::hyperparameters());
+        load_npy(descr, shape, d);
+        const vec direct = geometry_aid::classify_descriptor(d.data(), 18, 42042, geometry_aid::load_model(model));
+        ASSERT_EQ(direct.size(), p.size());
+        double spread = 0.0;
+        for (int i = 0; i < 36; i++) {
+            EXPECT_NEAR(direct[i], p[i], 1e-12) << i;
+            spread = std::max(spread, std::abs(p[i] - 0.5));
+        }
+        EXPECT_GT(spread, 1e-3);
+        ASSERT_EQ(run_nosphera2({ "-classify_atoms_list", list.string(), model.string(), "-no_date" }), 0);
+        load_npy(copy_probs, shape, p_batch);
+        ASSERT_EQ(p_batch.size(), p.size());
+        for (int i = 0; i < 36; i++) EXPECT_EQ(p_batch[i], p[i]) << i;
+        for (const std::filesystem::path& f : { model, out, copy, list, copy_probs, descr }) std::filesystem::remove(f);
     }
 } // namespace NoSpherA2UnitTests
