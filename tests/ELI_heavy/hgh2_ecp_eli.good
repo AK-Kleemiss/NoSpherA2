@@ -1,0 +1,670 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Analysing ELI basins in the wavefunction...
+Calcualting grid of size 120 x 120 x 187...
+Number of points: 2692800
+Grid parameters:
+  Min: (-5.66918, -5.66918, -8.78723)
+  Max: (5.66918, 5.66918, 8.78723)
+Atom positions:
+  Atom 0: (0, 0, 0)
+  Atom 1: (0, 0, 3.11805)
+  Atom 2: (0, 0, -3.11805)
+Density Critical Points (55 found):
+
+  CP   1  [attractor   ]  converged   H2
+    Position  :         0.0000         0.0000        -3.1029
+    Rho       :         0.3485
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -6.9607e+00    -6.9607e+00    -6.8000e+00
+    HessRho_EigVecs v1:         1.0000         0.0000         0.0000
+                    v2:        -0.0000         1.0000         0.0000
+                    v3:         0.0000         0.0000         1.0000
+    DelSqRho  :       -20.7214
+   V         :     5.1804e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
+
+  CP   2  [attractor   ]  converged   H1
+    Position  :         0.0000         0.0000         3.1029
+    Rho       :         0.3485
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -6.9607e+00    -6.9607e+00    -6.8000e+00
+    HessRho_EigVecs v1:         1.0000         0.0000         0.0000
+                    v2:        -0.0000         1.0000         0.0000
+                    v3:         0.0000         0.0000         1.0000
+    DelSqRho  :       -20.7214
+   V         :     5.1804e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
+
+  CP   3  [attractor   ]  converged   Hg0
+    Position  :         0.0000         0.0000         0.0000
+    Rho       :         0.0007
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -7.5323e-02    -7.5323e-02    -6.7014e-02
+    HessRho_EigVecs v1:        -0.4325         0.9016         0.0000
+                    v2:        -0.9016        -0.4325        -0.0000
+                    v3:         0.0000         0.0000         1.0000
+    DelSqRho  :        -0.2177
+   V         :     5.4415e-02   G         :         0.0154   K         :     6.9816e-02   L         :     5.4415e-02
+
+  CP   4  [bond        ]  converged   H2-Hg0 bond
+    Position  :         0.0000         0.0000        -2.1083
+    Rho       :         0.1396
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
+    HessRho_EigVecs v1:        -0.9998        -0.0198        -0.0000
+                    v2:         0.0198        -0.9998         0.0000
+                    v3:         0.0000         0.0000         1.0000
+    DelSqRho  :         0.0176
+    Bond Ellipticity:         0.0000
+   V         :    -4.4108e-03   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
+
+  CP   5  [bond        ]  converged   H1-Hg0 bond
+    Position  :         0.0000         0.0000         2.1083
+    Rho       :         0.1396
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
+    HessRho_EigVecs v1:        -0.9999        -0.0128        -0.0000
+                    v2:         0.0128        -0.9999         0.0000
+                    v3:         0.0000         0.0000         1.0000
+    DelSqRho  :         0.0176
+    Bond Ellipticity:         0.0000
+   V         :    -4.4108e-03   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
+
+  CP   6  [degenerate  ]  converged
+    Position  :        -0.0682         0.4090         0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.1961e-09
+    HessRho_EigVecs v1:        -0.0859         0.5154         0.8526
+                    v2:        -0.1402         0.8410        -0.5225
+                    v3:         0.9864         0.1644         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP   7  [degenerate  ]  converged
+    Position  :         0.0682        -0.4090         0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.1961e-09
+    HessRho_EigVecs v1:         0.0859        -0.5154         0.8526
+                    v2:        -0.1402         0.8410         0.5225
+                    v3:         0.9864         0.1644        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP   8  [degenerate  ]  converged
+    Position  :         0.0682        -0.4090        -0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.1961e-09
+    HessRho_EigVecs v1:        -0.0859         0.5154         0.8526
+                    v2:        -0.1402         0.8410        -0.5225
+                    v3:         0.9864         0.1644         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP   9  [degenerate  ]  converged
+    Position  :        -0.0682         0.4090        -0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.1961e-09
+    HessRho_EigVecs v1:         0.0859        -0.5154         0.8526
+                    v2:        -0.1402         0.8410         0.5225
+                    v3:         0.9864         0.1644        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  10  [degenerate  ]  converged
+    Position  :         0.4090         0.0682         0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.1953e-09
+    HessRho_EigVecs v1:         0.5154         0.0859         0.8526
+                    v2:         0.8410         0.1402        -0.5225
+                    v3:         0.1644        -0.9864         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  11  [degenerate  ]  converged
+    Position  :        -0.4090        -0.0682         0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.1953e-09
+    HessRho_EigVecs v1:        -0.5154        -0.0859         0.8526
+                    v2:         0.8410         0.1402         0.5225
+                    v3:         0.1644        -0.9864        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  12  [degenerate  ]  converged
+    Position  :         0.4090         0.0682        -0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.1953e-09
+    HessRho_EigVecs v1:        -0.5154        -0.0859         0.8526
+                    v2:         0.8410         0.1402         0.5225
+                    v3:         0.1644        -0.9864        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  13  [degenerate  ]  converged
+    Position  :        -0.4090        -0.0682        -0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.1953e-09
+    HessRho_EigVecs v1:         0.5154         0.0859         0.8526
+                    v2:         0.8410         0.1402        -0.5225
+                    v3:         0.1644        -0.9864         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  14  [degenerate  ]  NOT converged
+    Position  :         0.1853        -0.3709         0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.4208e-07
+    HessRho_EigVecs v1:         0.2335        -0.4674         0.8526
+                    v2:        -0.3811         0.7627         0.5225
+                    v3:         0.8946         0.4470         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  15  [degenerate  ]  NOT converged
+    Position  :        -0.1853         0.3709         0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.4208e-07
+    HessRho_EigVecs v1:        -0.2335         0.4674         0.8526
+                    v2:        -0.3811         0.7627        -0.5225
+                    v3:         0.8946         0.4470        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  16  [degenerate  ]  NOT converged
+    Position  :        -0.1853         0.3709        -0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.4208e-07
+    HessRho_EigVecs v1:         0.2335        -0.4674         0.8526
+                    v2:        -0.3811         0.7627         0.5225
+                    v3:         0.8946         0.4470         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  17  [degenerate  ]  NOT converged
+    Position  :         0.1853        -0.3709        -0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.4208e-07
+    HessRho_EigVecs v1:        -0.2335         0.4674         0.8526
+                    v2:        -0.3811         0.7627        -0.5225
+                    v3:         0.8946         0.4470        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  18  [degenerate  ]  NOT converged
+    Position  :        -0.3709        -0.1853         0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.4165e-07
+    HessRho_EigVecs v1:        -0.4674        -0.2335         0.8526
+                    v2:         0.7627         0.3811         0.5225
+                    v3:         0.4470        -0.8946         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  19  [degenerate  ]  NOT converged
+    Position  :         0.3709         0.1853         0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.4165e-07
+    HessRho_EigVecs v1:         0.4674         0.2335         0.8526
+                    v2:         0.7627         0.3811        -0.5225
+                    v3:         0.4470        -0.8946        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  20  [degenerate  ]  NOT converged
+    Position  :         0.3709         0.1853        -0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.4165e-07
+    HessRho_EigVecs v1:        -0.4674        -0.2335         0.8526
+                    v2:         0.7627         0.3811         0.5225
+                    v3:         0.4470        -0.8946         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  21  [degenerate  ]  NOT converged
+    Position  :        -0.3709        -0.1853        -0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -1.4165e-07
+    HessRho_EigVecs v1:         0.4674         0.2335         0.8526
+                    v2:         0.7627         0.3811        -0.5225
+                    v3:         0.4470        -0.8946        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  22  [degenerate  ]  converged
+    Position  :         0.0682         0.4090         0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -2.8072e-09
+    HessRho_EigVecs v1:         0.0859         0.5154         0.8526
+                    v2:         0.1402         0.8410        -0.5225
+                    v3:         0.9864        -0.1644         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  23  [degenerate  ]  converged
+    Position  :        -0.0682        -0.4090         0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -2.8072e-09
+    HessRho_EigVecs v1:        -0.0859        -0.5154         0.8526
+                    v2:         0.1402         0.8410         0.5225
+                    v3:         0.9864        -0.1644        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  24  [degenerate  ]  converged
+    Position  :        -0.0682        -0.4090        -0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -2.8072e-09
+    HessRho_EigVecs v1:         0.0859         0.5154         0.8526
+                    v2:         0.1402         0.8410        -0.5225
+                    v3:         0.9864        -0.1644         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  25  [degenerate  ]  converged
+    Position  :         0.0682         0.4090        -0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -2.8072e-09
+    HessRho_EigVecs v1:        -0.0859        -0.5154         0.8526
+                    v2:         0.1402         0.8410         0.5225
+                    v3:         0.9864        -0.1644        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  26  [degenerate  ]  converged
+    Position  :         0.4090        -0.0682         0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -2.8019e-09
+    HessRho_EigVecs v1:         0.5154        -0.0859         0.8526
+                    v2:        -0.8410         0.1402         0.5225
+                    v3:         0.1644         0.9864        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  27  [degenerate  ]  converged
+    Position  :        -0.4090         0.0682         0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -2.8019e-09
+    HessRho_EigVecs v1:        -0.5154         0.0859         0.8526
+                    v2:        -0.8410         0.1402        -0.5225
+                    v3:         0.1644         0.9864         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  28  [degenerate  ]  converged
+    Position  :        -0.4090         0.0682        -0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -2.8019e-09
+    HessRho_EigVecs v1:         0.5154        -0.0859         0.8526
+                    v2:        -0.8410         0.1402         0.5225
+                    v3:         0.1644         0.9864        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  29  [degenerate  ]  converged
+    Position  :         0.4090        -0.0682        -0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -2.8019e-09
+    HessRho_EigVecs v1:        -0.5154         0.0859         0.8526
+                    v2:        -0.8410         0.1402        -0.5225
+                    v3:         0.1644         0.9864         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  30  [degenerate  ]  converged
+    Position  :        -0.2932         0.2932         0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -4.7967e-09
+    HessRho_EigVecs v1:        -0.3695         0.3695         0.8526
+                    v2:        -0.6029         0.6029        -0.5225
+                    v3:         0.7071         0.7071        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  31  [degenerate  ]  converged
+    Position  :         0.2932        -0.2932         0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -4.7967e-09
+    HessRho_EigVecs v1:         0.3695        -0.3695         0.8526
+                    v2:        -0.6029         0.6029         0.5225
+                    v3:         0.7071         0.7071         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  32  [degenerate  ]  converged
+    Position  :        -0.2932        -0.2932         0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -4.7638e-09
+    HessRho_EigVecs v1:        -0.3695        -0.3695         0.8526
+                    v2:         0.6029         0.6029         0.5225
+                    v3:         0.7071        -0.7071         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  33  [degenerate  ]  converged
+    Position  :         0.2932         0.2932         0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -4.7638e-09
+    HessRho_EigVecs v1:         0.3695         0.3695         0.8526
+                    v2:         0.6029         0.6029        -0.5225
+                    v3:         0.7071        -0.7071        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  34  [degenerate  ]  converged
+    Position  :        -0.2932         0.2932        -0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -4.7967e-09
+    HessRho_EigVecs v1:         0.3695        -0.3695         0.8526
+                    v2:        -0.6029         0.6029         0.5225
+                    v3:         0.7071         0.7071         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  35  [degenerate  ]  converged
+    Position  :         0.2932        -0.2932        -0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -4.7967e-09
+    HessRho_EigVecs v1:        -0.3695         0.3695         0.8526
+                    v2:        -0.6029         0.6029        -0.5225
+                    v3:         0.7071         0.7071        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  36  [degenerate  ]  converged
+    Position  :        -0.2932        -0.2932        -0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -4.7638e-09
+    HessRho_EigVecs v1:         0.3695         0.3695         0.8526
+                    v2:         0.6029         0.6029        -0.5225
+                    v3:         0.7071        -0.7071        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  37  [degenerate  ]  converged
+    Position  :         0.2932         0.2932        -0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01    -4.7639e-09
+    HessRho_EigVecs v1:        -0.3695        -0.3695         0.8526
+                    v2:         0.6029         0.6029         0.5225
+                    v3:         0.7071        -0.7071         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  38  [degenerate  ]  converged
+    Position  :        -0.2488        -0.3317         0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01     3.2192e-10
+    HessRho_EigVecs v1:        -0.3135        -0.4180         0.8526
+                    v2:         0.5116         0.6821         0.5225
+                    v3:         0.8000        -0.6000         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  39  [degenerate  ]  converged
+    Position  :         0.2488         0.3317         0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01     3.2195e-10
+    HessRho_EigVecs v1:         0.3135         0.4180         0.8526
+                    v2:         0.5116         0.6821        -0.5225
+                    v3:         0.8000        -0.6000        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  40  [degenerate  ]  converged
+    Position  :         0.2488         0.3317        -0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01     3.2195e-10
+    HessRho_EigVecs v1:        -0.3135        -0.4180         0.8526
+                    v2:         0.5116         0.6821         0.5225
+                    v3:         0.8000        -0.6000         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  41  [degenerate  ]  converged
+    Position  :        -0.2488        -0.3317        -0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01     3.2195e-10
+    HessRho_EigVecs v1:         0.3135         0.4180         0.8526
+                    v2:         0.5116         0.6821        -0.5225
+                    v3:         0.8000        -0.6000        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  42  [degenerate  ]  converged
+    Position  :         0.3317        -0.2488         0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01     3.1310e-10
+    HessRho_EigVecs v1:         0.4180        -0.3135         0.8526
+                    v2:        -0.6821         0.5116         0.5225
+                    v3:         0.6000         0.8000         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  43  [degenerate  ]  converged
+    Position  :        -0.3317         0.2488         0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01     3.1308e-10
+    HessRho_EigVecs v1:        -0.4180         0.3135         0.8526
+                    v2:        -0.6821         0.5116        -0.5225
+                    v3:         0.6000         0.8000        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  44  [degenerate  ]  converged
+    Position  :        -0.3317         0.2488        -0.6548
+    Rho       :         1.9705
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01     3.1307e-10
+    HessRho_EigVecs v1:         0.4180        -0.3135         0.8526
+                    v2:        -0.6821         0.5116         0.5225
+                    v3:         0.6000         0.8000         0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  45  [degenerate  ]  converged
+    Position  :         0.3317        -0.2488        -0.6548
+    Rho       :         1.9705
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.3422e+01    -3.9933e-01     3.1307e-10
+    HessRho_EigVecs v1:        -0.4180         0.3135         0.8526
+                    v2:        -0.6821         0.5116        -0.5225
+                    v3:         0.6000         0.8000        -0.0000
+    DelSqRho  :       -33.8209
+   V         :     8.4552e+00   G         :         4.8030   K         :     1.3258e+01   L         :     8.4552e+00
+
+  CP  46  [degenerate  ]  NOT converged
+    Position  :        -0.7570        -0.1892         0.0000
+    Rho       :         1.8941
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.0763e+01    -2.5464e-08     7.0937e-01
+    HessRho_EigVecs v1:         0.9701         0.2425        -0.0000
+                    v2:         0.2425        -0.9701        -0.0000
+                    v3:        -0.0000        -0.0000        -1.0000
+    DelSqRho  :       -30.0534
+   V         :     7.5133e+00   G         :         4.9639   K         :     1.2477e+01   L         :     7.5133e+00
+
+  CP  47  [degenerate  ]  NOT converged
+    Position  :         0.7570         0.1892         0.0000
+    Rho       :         1.8941
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.0763e+01    -2.5464e-08     7.0937e-01
+    HessRho_EigVecs v1:         0.9701         0.2425         0.0000
+                    v2:         0.2425        -0.9701         0.0000
+                    v3:         0.0000         0.0000        -1.0000
+    DelSqRho  :       -30.0534
+   V         :     7.5133e+00   G         :         4.9639   K         :     1.2477e+01   L         :     7.5133e+00
+
+  CP  48  [degenerate  ]  NOT converged
+    Position  :         0.1892        -0.7570         0.0000
+    Rho       :         1.8941
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.0763e+01    -2.5443e-08     7.0937e-01
+    HessRho_EigVecs v1:        -0.2425         0.9701        -0.0000
+                    v2:         0.9701         0.2425         0.0000
+                    v3:         0.0000        -0.0000        -1.0000
+    DelSqRho  :       -30.0534
+   V         :     7.5133e+00   G         :         4.9639   K         :     1.2477e+01   L         :     7.5133e+00
+
+  CP  49  [degenerate  ]  NOT converged
+    Position  :        -0.1892         0.7570         0.0000
+    Rho       :         1.8941
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.0763e+01    -2.5443e-08     7.0937e-01
+    HessRho_EigVecs v1:        -0.2425         0.9701         0.0000
+                    v2:         0.9701         0.2425        -0.0000
+                    v3:        -0.0000         0.0000        -1.0000
+    DelSqRho  :       -30.0534
+   V         :     7.5133e+00   G         :         4.9639   K         :     1.2477e+01   L         :     7.5133e+00
+
+  CP  50  [degenerate  ]  NOT converged
+    Position  :        -0.7570         0.1892         0.0000
+    Rho       :         1.8941
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.0763e+01    -2.5541e-07     7.0937e-01
+    HessRho_EigVecs v1:        -0.9702         0.2424         0.0000
+                    v2:         0.2424         0.9702         0.0000
+                    v3:        -0.0000         0.0000        -1.0000
+    DelSqRho  :       -30.0534
+   V         :     7.5133e+00   G         :         4.9639   K         :     1.2477e+01   L         :     7.5133e+00
+
+  CP  51  [degenerate  ]  NOT converged
+    Position  :         0.7570        -0.1892         0.0000
+    Rho       :         1.8941
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.0763e+01    -2.5541e-07     7.0937e-01
+    HessRho_EigVecs v1:        -0.9702         0.2424        -0.0000
+                    v2:         0.2424         0.9702        -0.0000
+                    v3:         0.0000        -0.0000        -1.0000
+    DelSqRho  :       -30.0534
+   V         :     7.5133e+00   G         :         4.9639   K         :     1.2477e+01   L         :     7.5133e+00
+
+  CP  52  [degenerate  ]  NOT converged
+    Position  :        -0.1892        -0.7570         0.0000
+    Rho       :         1.8941
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.0763e+01    -2.5536e-07     7.0937e-01
+    HessRho_EigVecs v1:         0.2424         0.9702        -0.0000
+                    v2:         0.9702        -0.2424         0.0000
+                    v3:        -0.0000        -0.0000        -1.0000
+    DelSqRho  :       -30.0534
+   V         :     7.5133e+00   G         :         4.9639   K         :     1.2477e+01   L         :     7.5133e+00
+
+  CP  53  [degenerate  ]  NOT converged
+    Position  :         0.1892         0.7570         0.0000
+    Rho       :         1.8941
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.0763e+01    -2.5536e-07     7.0937e-01
+    HessRho_EigVecs v1:         0.2424         0.9702         0.0000
+                    v2:         0.9702        -0.2424        -0.0000
+                    v3:         0.0000         0.0000        -1.0000
+    DelSqRho  :       -30.0534
+   V         :     7.5133e+00   G         :         4.9639   K         :     1.2477e+01   L         :     7.5133e+00
+
+  CP  54  [ring        ]  converged
+    Position  :         0.0000         0.0000         0.7709
+    Rho       :         1.9586
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.4138e+01     2.7810e-01     2.7810e-01
+    HessRho_EigVecs v1:         0.0000         0.0000         1.0000
+                    v2:        -0.9995        -0.0317        -0.0000
+                    v3:        -0.0317         0.9995         0.0000
+    DelSqRho  :       -33.5823
+   V         :     8.3956e+00   G         :         4.8785   K         :     1.3274e+01   L         :     8.3956e+00
+
+  CP  55  [ring        ]  converged
+    Position  :         0.0000         0.0000        -0.7709
+    Rho       :         1.9586
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.4138e+01     2.7810e-01     2.7810e-01
+    HessRho_EigVecs v1:         0.0000         0.0000         1.0000
+                    v2:        -0.9995        -0.0317        -0.0000
+                    v3:        -0.0317         0.9995         0.0000
+    DelSqRho  :       -33.5823
+   V         :     8.3956e+00   G         :         4.8785   K         :     1.3274e+01   L         :     8.3956e+00
+
+Assigning basins along the density gradient...
+I found 3 Basins.
+Assigning basins by near-grid ascent...
+I found 28 Basins.
+Merged 22 noise maxima, 6 basins remain.
+Unified 1 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
+
+QTAIM Analysis (voxel sum):
+basin:    0 label:              Hg0 integrated value:  19.4128 volume:  484.1309
+basin:    1 label:               H1 integrated value:   1.2894 volume:  446.2226
+basin:    2 label:               H2 integrated value:   1.2894 volume:  446.2226
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 65266 grid points.
+Quadrature points sent along the field: 328799, left the grid: 0
+
+QTAIM Analysis (atomic quadrature grids):
+  basin  label               electrons     charge      volume     maximum        x          y          z
+      1  Hg0                   19.4314    60.5686    808.4662      0.0007      0.000      0.000      0.000
+      2  H1                     1.2825    -0.2825    744.9110      0.3415      0.000      0.000      3.118
+      3  H2                     1.2826    -0.2826    748.7134      0.3415      0.000      0.000     -3.118
+  total in basins: 21.9965   outside every basin: 0.0035
+
+ELI-D Analysis (voxel sum):
+basin:    0 label:      H2-Hg0 bond integrated value:   0.4967 volume:  280.4184
+basin:    1 label:      H1-Hg0 bond integrated value:   0.4595 volume:  274.7415
+basin:    2 label:               H2 integrated value:   1.4002 volume:   32.9865
+basin:    3 label:               H1 integrated value:   1.4373 volume:   38.7011
+basin:    4 label:         Hg0 core integrated value:  18.1764 volume:  231.8184
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 65266 grid points.
+Quadrature points sent along the field: 5538, left the grid: 0
+
+ELI-D Analysis (atomic quadrature grids):
+  basin  label               electrons      volume     maximum        x          y          z
+      1  H2-Hg0 bond            0.4559    283.4283      5.0732      0.000      0.000     -5.028
+      2  H1-Hg0 bond            0.4426    281.3620      5.0732      0.000      0.000      5.028
+      3  H2                     1.4428     37.7030      7.2168      0.000      0.000     -3.148
+      4  H1                     1.4561     39.7694      7.2168      0.000      0.000      3.148
+      5  Hg0 core              18.1726    213.0064      1.4330      0.283     -0.472      0.705
+  total in basins: 21.9700   outside every basin: 0.0300

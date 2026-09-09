@@ -1129,13 +1129,19 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                 const int x = static_cast<int>(i / (static_cast<size_t>(ny) * nz)), y = static_cast<int>((i / nz) % ny), z = static_cast<int>(i % nz);
                 d3 r = cub->get_pos(x, y, z), g;
                 int id = 0;
-                for (int step = 0; step < 100000 && id == 0; step++) {
+                double last_rho = -1.0;
+                for (int step = 0; step < 4000 && id == 0; step++) {
                     for (int m = 0; m < n_seeded; m++)
                         if (std::pow(r[0] - seed_pos[m][0], 2) + std::pow(r[1] - seed_pos[m][1], 2) + std::pow(r[2] - seed_pos[m][2], 2) < catch2) { id = m + 1; break; }
                     if (id) break;
                     double near2 = 1e300;
                     for (const d3 &sp : seed_pos) near2 = std::min(near2, std::pow(r[0] - sp[0], 2) + std::pow(r[1] - sp[1], 2) + std::pow(r[2] - sp[2], 2));
                     const double sl = (near2 < 1.0 ? 0.3 : 0.6) * hmin;
+                    //A nucleus an ECP hollowed out has a sphere of maxima around it instead
+                    //of a cusp; a trajectory that stops climbing has reached such a top
+                    const double rho_here = field_wfn->compute_dens(r);
+                    if (rho_here <= last_rho) break;
+                    last_rho = rho_here;
                     field_wfn->computeGrad(r, g);
                     double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
                     if (gn < 1e-14) break;
@@ -1155,6 +1161,10 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                         if (std::find(crossed.begin(), crossed.end(), static_cast<int>(ci)) == crossed.end()) crossed.push_back(static_cast<int>(ci));
                     }
                 }
+                if (id == 0)
+                    //A top within a bohr of a seed is the seed's - the ECP shell again
+                    for (int m = 0; m < n_seeded && id == 0; m++)
+                        if (std::pow(r[0] - seed_pos[m][0], 2) + std::pow(r[1] - seed_pos[m][1], 2) + std::pow(r[2] - seed_pos[m][2], 2) < 1.0) id = m + 1;
                 if (id == 0) {
                     //Nothing caught it: a maximum between voxels, a non-nuclear one, or a
                     //trajectory that left the region; the highest voxel crossed stands for it,
@@ -1432,9 +1442,21 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
         if (!cell(p, c, f)) return 0;
         lb++;
         d3 r = p, g;
+        double last_rho = -1.0;
         for (int s = 0; s < 2000; s++) {
             const int m = at_maximum(r);
             if (m) return m;
+            if (!eli_field) {
+                //Stopped climbing: the sphere of maxima around an ECP nucleus; that nucleus
+                //owns it when it is the seed within a bohr
+                const double rho_here = wavy.compute_dens(r);
+                if (rho_here <= last_rho) {
+                    for (size_t q = 0; q < maxima.size(); q++)
+                        if (std::pow(r[0] - maxima[q][0], 2) + std::pow(r[1] - maxima[q][1], 2) + std::pow(r[2] - maxima[q][2], 2) < 1.0) return static_cast<int>(q) + 1;
+                    break;
+                }
+                last_rho = rho_here;
+            }
             const double sl = step_at(r);
             gradient(r, g);
             double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);

@@ -3,6 +3,18 @@
 `TomlIntegrationTests.ELI_NH3Li`. 267/267 non-XCW cases pass on `release-linux`, the nine
 XCW cases on a V100 node, a CPU node and the M2 Mac.)
 
+## 2026-09-09 — heavy-element basin cases: `ELI_HgH2_ECP` and `ELI_UH6`
+
+Two golden cases in the new `tests/ELI_heavy` directory (one resource lock, they share the log):
+HgH2 with the def2 ECP on mercury (RHF/def2-TZVP, 10 s) and UH6 all-electron (RHF/DKH2 with
+SARC-DKH-TZVP, 34 s), both from ORCA 6.1.1 inputs kept in the handover. They pin the ECP
+handling (a nucleus without core density wears a sphere of valence maxima, which the trajectory
+code folds into it) and the core-shell unification for Z = 92. Reference values: HgH2-ECP QTAIM
+Hg 19.431 (AIMAll 19.454), ELI-D Hg core 18.17 (the 5s5p5d semicore); UH6 QTAIM U 89.115 / H
+1.4807 (AIMAll 89.020 / 1.4967; `-acc 4` gives 89.075 / 1.4874), ELI-D U core 85.7, six hydride
+basins of 1.71-1.75 e plus U-H fragments of 0.31. DGrid is no reference here: its voxel
+integration of a Z = 80 cusp gives 478 electrons for the mercury core.
+
 ## 2026-09-09 — f-function phases in the OCC-to-WFN constructor
 
 `WFN::WFN(const occ::qm::Wavefunction&)` applied Gaussian-convention spherical-to-cartesian
