@@ -1281,6 +1281,52 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
     return { basin_cube, Maxima };
 }
 
+double core_shell_radius(const int Z)
+{
+    if (Z <= 2) return 0.0;
+    if (Z <= 10) return 0.25;
+    if (Z <= 18) return 0.55;
+    if (Z <= 36) return 1.0;
+    if (Z <= 54) return 1.4;
+    return 1.8;
+}
+
+int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vector<atom> &atoms)
+{
+    const int nb = static_cast<int>(maxima.size());
+    ivec owner(nb, -1);
+    for (int b = 0; b < nb; b++)
+        for (size_t a = 0; a < atoms.size(); a++) {
+            const d3 ap = atoms[a].get_pos();
+            const double r = core_shell_radius(atoms[a].get_charge());
+            if (std::pow(maxima[b][0] - ap[0], 2) + std::pow(maxima[b][1] - ap[1], 2) + std::pow(maxima[b][2] - ap[2], 2) < r * r) { owner[b] = static_cast<int>(a); break; }
+        }
+    //The atom's core keeps the highest of its maxima; the merged ones are dropped
+    ivec target(nb + 1);
+    for (int b = 0; b <= nb; b++) target[b] = b;
+    for (int b = 0; b < nb; b++) {
+        if (owner[b] < 0) continue;
+        for (int c = 0; c < b; c++)
+            if (owner[c] == owner[b]) { target[b + 1] = target[c + 1]; break; }
+        if (target[b + 1] == b + 1) continue;
+        const int keep = target[b + 1] - 1;
+        if (maxima[b][3] > maxima[keep][3]) std::swap(maxima[b], maxima[keep]);
+    }
+    ivec renumber(nb + 1, 0);
+    std::vector<d4> kept;
+    for (int b = 1; b <= nb; b++)
+        if (target[b] == b) { kept.push_back(maxima[b - 1]); renumber[b] = static_cast<int>(kept.size()); }
+    for (int x = 0; x < basin_cube.get_size(0); x++)
+        for (int y = 0; y < basin_cube.get_size(1); y++)
+            for (int z = 0; z < basin_cube.get_size(2); z++) {
+                const int b = basin_cube.get_value(x, y, z);
+                if (b > 0) basin_cube.set_value(x, y, z, renumber[target[b]]);
+            }
+    const int merged = nb - static_cast<int>(kept.size());
+    maxima.swap(kept);
+    return merged;
+}
+
 //Populations of the basins integrated on the molecule's atom-centred quadrature grids, which
 //carry the cusps a uniform cube cannot. A quadrature point takes the basin of its cube cell
 //when every voxel within three of it agrees; otherwise it is sent up the analytic field
@@ -1408,11 +1454,10 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
     };
     //Radial shells of an atom's grid, so a boundary point near a heavy nucleus can be split
     //along its radius: a core boundary sits where the density is several e/bohr^3 and the
-    //shell spacing alone misplaces 0.05 e, the split brings that below 0.005
+    //shell spacing alone misplaces 0.05 e, the split brings that below 0.005. Out to half a
+    //bohr beyond the outermost core shell; further out the quadrature's own spacing serves,
+    //and the split costs twelve trajectories a point
     constexpr int radial_split = 12;
-    //The core shell of a first- or second-row atom lies within 0.8 bohr; further out the
-    //quadrature's own spacing serves, and the split costs twelve trajectories a point
-    const double heavy_r2 = 0.8 * 0.8;
     long long boundary_points = 0, lost = 0;
     for (size_t a = 0; a < gd.atomic_grids.size(); a++) {
         const vec &X = gd.atomic_grids[a][GridData::X], &Y = gd.atomic_grids[a][GridData::Y], &Z = gd.atomic_grids[a][GridData::Z], &W = gd.atomic_grids[a][GridData::BECKE_WEIGHT];
@@ -1440,7 +1485,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
                     for (const atom &at : atoms) {
                         if (at.get_charge() <= 2) continue;
                         const d3 ap = at.get_pos();
-                        if (std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2) < heavy_r2) { heavy = true; break; }
+                        const double rc = core_shell_radius(at.get_charge()) + 0.5;
+                        if (std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2) < rc * rc) { heavy = true; break; }
                     }
                 const double rho = wavy.compute_dens(p);
                 if (heavy) {
@@ -1574,7 +1620,7 @@ svec assign_labels_to_basins(const vector<d4> &Maxima, const vector<atom> &atoms
                         atom_index2 = j;
                     }
                 }
-                const double core_dist = atoms[atom_index1].get_charge() < 18 ? 0.125 : atoms[atom_index1].get_charge() < 36 ? 0.35 : 0.7;
+                const double core_dist = std::pow(core_shell_radius(atoms[atom_index1].get_charge()), 2);
                 err_checkf(atom_index1 >= 0, "No atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
                 err_checkf(atom_index2 >= 0, "Only one atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
                 double ratio = std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2);

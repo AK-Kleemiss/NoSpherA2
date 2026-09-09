@@ -139,7 +139,7 @@ basin:    4 label:              Li4 integrated value:   2.6423 volume:  447.9382
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 546432, left the grid: 0
+Quadrature points sent along the field: 535740, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume     maximum        x          y          z
@@ -165,17 +165,17 @@ WARNING: Integrated value in basin 11 is very low (0.0002) and might be inaccura
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 311688, left the grid: 667
+Quadrature points sent along the field: 305541, left the grid: 667
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume     maximum        x          y          z
       1  Li4-N0 bond            0.0108     15.6654      9.5286    -14.606     17.754      2.401
       2  Li4-N0 bond            0.7437    734.5996     14.5844    -10.676     19.256      2.401
       3  H2-Li4 bond            0.0014      7.1136      2.0069    -15.917     12.873     -0.240
-      4  H2                     1.9314    117.2167      4.4974    -12.361      9.306      2.401
-      5  N0 LP                  2.1669     56.5862      1.9588    -10.489     11.371      2.212
-      6  H3                     1.9253    118.7532      4.2793     -9.741      9.494      0.514
-      7  H1                     1.9191    116.6915      4.5131     -9.366      9.306      3.721
+      4  H2                     1.9315    117.2169      4.4974    -12.361      9.306      2.401
+      5  N0 LP                  2.1668     56.5859      1.9588    -10.489     11.371      2.212
+      6  H3                     1.9252    118.7528      4.2793     -9.741      9.494      0.514
+      7  H1                     1.9192    116.6920      4.5131     -9.366      9.306      3.721
       8  Li4 core               2.0214     16.3887     26.2975    -10.489     13.812      2.401
       9  N0 core                2.1095      0.4452      9.4356    -10.489     10.057      2.212
      10  H3-H1 bond             0.0003      1.8503      1.1136     -4.313     11.183      1.080

@@ -2714,6 +2714,10 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
             for (int z = 0; z < eli_cube.get_size(2); z++)
                 if (rho.get_value(x, y, z) < 1e-4) eli_cube.set_value(x, y, z, 0.0);
     std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+    //The shells of a heavy atom's core structure ELI-D into several basins each; one core
+    //basin per atom is what a bonding analysis wants, and what DGrid's ELIDcore gives
+    const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms);
+    if (core_merged) std::cout << "Unified " << core_merged << " core-shell basins into their atoms' cores, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
     svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
 
     //Two integrations of the density over each basin set: the voxel sum, which is what the cube
