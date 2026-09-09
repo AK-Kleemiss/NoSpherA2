@@ -47,7 +47,7 @@ Int_Params::Int_Params(const Int_Params &first, const Int_Params &second)
     const int natm_off = first._atm.size() / 6;
     ivec atm2 = second._atm;
     ivec bas2 = second._bas;
-    for (int a = 0; a < natm_off; a++)
+    for (int a = 0; a < (int)second._atm.size() / 6; a++)
     {
         atm2[a * 6 + 1] += off;
         atm2[a * 6 + 3] += off;

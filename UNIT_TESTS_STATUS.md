@@ -1,7 +1,204 @@
 # Unit Test Status
-**Last updated: 2026-09-08** (ELI-D/QTAIM basin analysis rewritten; one golden case added,
-`TomlIntegrationTests.ELI_NH3Li`. 267/267 non-XCW cases pass on `release-linux`, the nine
-XCW cases on a V100 node, a CPU node and the M2 Mac.)
+**Last updated: 2026-09-09** (`-repulsion_exchange <dirac|pbe|b88>` picks the exchange functional of
+the Gordon-Kim repulsion, with an H-atom gtest for the three functionals; `-interaction_energy` computes
+the exchange-repulsion by the Gordon-Kim functionals of the fitted densities on a Becke grid over the
+dimer; `-repulsion_overlap <K>` keeps the K * S model. `XCW_Test` merged in (f-function phases, ELI
+basins). 284, 280 pass and the usual 4 `*_full` XCW cases skip on `release-windows`. 2026-09-08: Thakkar polarization in the
+partner's field, D4 dispersion and the density overlap S; `-salted_charge_constraint`
+with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
+`WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
+RI fit, `computeRho` screening fix.)
+
+## 2026-09-08 — Multipole restraints on the RI fit (`-multipole_moments`)
+
+Branch `ri_multipole_restraints`. The RI fit can now be restrained to the atomic charges
+and multipole moments of a grid partitioning (Hirshfeld, TFVC, MBIS, EMBIS) up to order
+N. `GridManager::calculatePartitionedMultipoles` integrates `rho w_A r^l Y_lm` about each
+nucleus, `DensityFitting::add_multipole_restraint` appends one row per atom and (l, m)
+whose only non-zero entries sit on that atom's l-shells, because the moment of an
+atom-centred aux function about its own centre is the one-line integral
+`N c Gamma(l+3/2) / (2 alpha^(l+3/2))` (`radial_moment`). The rows are scaled by
+`1 / r_cov^l` so every order enters with the magnitude of the population row, and in
+this mode all restraint rows carry `-multipole_strength` (default 1) instead of Seifert's
+adaptive `5e-5` weights, which only nudge: on epoxide with strength 1 the fitted moments
+sit within 0.008 e (l=0), 0.004 (l=1) and 0.0003 e bohr^2 (l=2) of the Hirshfeld targets
+and the O charge is -0.207 against the target -0.199; the adaptive weights left it at
+-0.684. The default path (no flag) is untouched and `ri_fit.good` is byte-identical.
+
+Later the same day the restrained solve was changed from a stacked least-squares
+(`dgels` on `[J; R]`, which minimises `|J c - rho|^2` instead of the Coulomb functional
+and let near-dependent diffuse aux functions run to coefficients of 100 on acetic acid)
+to the penalised normal equations `(J + R^T R) c = rho + R^T t` with `dgesv`. The log now
+prints `Restraint residual:` instead of `Error:`, the epoxide O charge moves from -0.207
+to -0.217 and `ri_fit_multipoles.good` was regenerated. The legacy charge-restraint path
+(`-charge_constraint` without `-multipole_moments`) still uses the stacked solve.
+
+A benchmark of the fitted densities against exact ORCA monomer electrostatics on 12
+dimers then exposed a bug in `computeRho`'s atom-pair screening
+(`calc_screend_functions_and_max_ij` in `libCintMain.cpp`): the criterion used the sum of
+the two most diffuse exponents against half of `exp_cutoff`, so pairs beyond about 2.2 A
+were dropped from the three-centre integrals and larger molecules lost up to 0.6 fitted
+electrons (epoxide: 6 pairs, 24.159 analytic electrons). It now uses the Gaussian product
+exponent `a b / (a + b)` against the full cutoff. `ri_fit.good` and
+`ri_fit_multipoles.good` were regenerated (0 pairs screened, 24.0005 electrons, restraint
+residual 0.036 -> 0.0012); no other golden file moved. Every RI fit made before this,
+SALTED training data included, carries the old error.
+
+### New cases
+
+- `RiMultipoleTests.RadialMomentMatchesQuadratureAndTheChargeRow`: `radial_moment`
+  against the trapezoid rule for l = 0..4 and three exponents, and for l = 0 against the
+  `pi / (2 alpha^(3/2)) N c` row that `add_electron_restraint` has always used (the
+  `sqrt(4 pi)` of Y_00 is the difference).
+- `RiMultipoleTests.RestraintRowsReproduceTheGridMomentsOfTheAtomicDensity`: closure
+  of the whole restraint on one oxygen with the `combo_basis_fit` aux basis. Arbitrary
+  coefficients, the density from `calc_density_ML` integrated on an `AtomGrid` for the
+  moments up to l = 2, and the restraint rows applied to the same coefficients must give
+  those moments back, the targets must land in the matching rows, and `fitted_multipoles`
+  must agree. This pins the row placement, the l/m ordering of the coefficients against
+  `constants::spherical_harmonic`, and the normalisation in one go.
+- `TomlIntegrationTests.RiFitMultipoles` (`tests/epoxide_gbw/ri_fit_multipoles.good`):
+  the `ri_fit` case with `multipole_moments = ["Hirshfeld", 2]`, which also prints the
+  target/fitted/deviation table of every moment.
+
+### A trap found on the way
+
+`WFN::get_atoms()` returns the vector by value. `const atom& A = wavy.get_atoms()[a]`
+binds a reference to an element of a temporary that dies at the end of the statement,
+and the closure test then saw an atom with no shells and an `AtomGrid` with a negative
+radial count (`vector too long`). `const atom A = wavy.get_atom(a)` is the pattern the
+rest of `integrator.cpp` uses.
+
+### Interaction energy of two fitted densities (`-interaction_energy`)
+
+`DensityFitting::interaction_energy` takes only the two coefficient vectors and the two
+aux-basis WFNs, so it runs on RI-fitted and SALTED-predicted coefficients alike and never
+touches an orbital wavefunction. Nuclear repulsion is a double loop, the nucleus-density
+halves use the analytic potential of an aux function (`aux_potential`, a lower incomplete
+gamma of half-integer order times `Y_lm`), and the density-density term is `c_A^T J_AB c_B`
+with the off-diagonal block of libcint's `Coulomb2C_SPH` on the combined `Int_Params`.
+The printout gives the four components in Eh and kcal/mol, an atom-pair table and a
+rank-pair table (nuclei plus l = 0..lmax). Water-methanol with free fits of both monomers
+gives -8.167 kcal/mol against -8.171 from the exact ORCA monomer densities.
+
+The combining constructor `Int_Params(first, second)` offset the coordinate pointers of
+the second object's atoms in a loop over the *first* object's atom count. Every earlier
+caller combines two bases of the same molecule, so it never showed; with two different
+molecules the surplus atoms of the second kept stale pointers (or, with fewer, the loop
+read past the vector). It now loops over the second object's atoms.
+
+- `RiInteractionTests.LowerIncompleteGammaMatchesQuadrature`: `lower_gamma_half` against
+  the trapezoid rule for l = 0..4 in the series and the recurrence regime.
+- `RiInteractionTests.AuxPotentialIsTheGaussianChargeAndThePointMultipoleLimit`: the s
+  potential is `erf(sqrt(a) R) / R` times the charge, and at five times the sample
+  distance every rank up to 4 is the point multipole `4 pi / (2l+1) Q_lm Y_lm / R^(l+1)`
+  with the `Q_lm` of `radial_moment`.
+- `RiInteractionTests.NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables`: water-
+  like OH with arbitrary `combo_basis_fit` coefficients against a partner whose density is
+  one very tight s Gaussian holding exactly its nuclear charge. Both halves of the energy
+  must cancel (nuclei-nuclei against nuclei-density, analytic potential against the
+  libcint block), the two tables must sum to the total, and swapping the two molecules
+  must give the same numbers. The swap is what caught the constructor bug.
+
+### Input modes of `-interaction_energy`, and the bohr flag of the wavefunction readers
+
+`-interaction_energy <A> <B>` takes three kinds of input. Two wavefunctions are each
+RI-fitted internally with the `-ri_fit` basis (`config_from_options`, the same free fit
+`-write_ri_coefs` writes); two structures with `-SALTED <model-dir>` are both predicted
+with the model and its own aux basis (the predictor's `wavy` carries it, origin reset to
+`NOT_YET_DEFINED` so `Int_Params` reads the shell types unshifted); `<A> <A.npy> <B> <B.npy>`
+reads coefficient files as before. On water-methanol the internal fit reproduces the
+-8.1673 kcal/mol of the coefficient files exactly and the prediction from `E:\Model_V6`
+gives -22.36, identical from `.gbw` and from `.xyz` input.
+
+That identity is a fix: `WFN::isBohr` was set only by the wfn, wfx and xyz readers,
+although every reader stores bohr. `write_xyz` writes the coordinates unconverted when the
+flag is off, so the descriptor file `temp_rascaline.xyz` of a gbw, molden, fchk, tonto or
+ptb input held bohr values labelled as angstrom, a molecule stretched by 1.89, and the
+predictor's neighbour cutoff was compared in the wrong unit as well. `-SALTED_COEFS` on
+`A.gbw` predicted a water of 10.50 e where the same model on `A.xyz` gives 9.63 e (RI cube
+grid). The five readers set the flag now and the two predictions agree to 3e-9.
+
+The remaining gap to the fit is the model: its water holds 9.63 e against 9.92 for the
+free fit on the same grid, and Model V6 was trained on coefficients from before the
+screening fix above. Not covered by a test case: the handler exits and the predictor needs
+the 782 MB model.
+
+### `-salted_charge_constraint`, and what it does to the predicted interaction energy
+
+`apply_charge_constraint` (the global rescaling of the l=0 coefficients to the electron count,
+5 % refusal guard) ran only when a VERSION 3 model file carries a NORMC block with MODE 1.
+`-salted_charge_constraint` forces it after every prediction, in `gen_SALTED_densities`, so
+`-SALTED` refinements, `-SALTED_COEFS` and the SALTED mode of `-interaction_energy` all see it.
+New golden case `SALTED_charge_constraint`: the cysteine SALTED case with the flag, whose
+63.9897 e become 64.0000 (factor 1.00016) and whose ML charges move by 0.001-0.002 e.
+
+On water-methanol the constraint moves both models most of the way to the free fit
+(-8.17 kcal/mol, exact -8.171): Model V6 -22.36 -> -8.76 (water 9.71 -> 10 e, methanol
+18.23 -> 18 e), Model V7 -1.11 -> -4.71 (water 9.70 -> 10 e, methanol 17.87 -> 18 e). Both models
+are 0.3 e short on water, so a total-charge rescaling helps but does not replace retraining on
+charge-conserving coefficients.
+
+### Beyond electrostatics: polarization, dispersion and the density overlap
+
+`DensityFitting::interaction_energy` now returns, next to the four electrostatic parts, `pol_A`,
+`pol_B`, `disp`, `overlap` and `rep`. `electrostatic()` is the old sum, `total()` adds the new
+terms; the atom-pair and rank tables stay electrostatic. Polarization is the CrystalExplorer form
+-1/2 sum alpha_a |F_a|^2 with Thakkar polarizabilities (`occ::interaction::ce_model_polarization_energy`,
+the charged set for a charged molecule) in the field of the partner's nuclei and fitted density,
+the density part by central differences (h = 1e-4 bohr) of the analytic aux-function potential.
+Dispersion is `occ::disp::D4Dispersion` with the PBE damping defaults, dimer minus monomers.
+S = c_A^T S_AB c_B from `compute2C<Overlap2C_SPH>` on the combined `Int_Params`, and
+`-repulsion_overlap <K>` reports K * S as the exchange-repulsion; K defaults to 0 and is
+uncalibrated, the report says so. Everything uses only the fitted coefficients.
+
+`NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables` now also asserts that the point-like
+neutral partner produces no field on A (`pol_A` = 0 to 1e-12, which pins the finite-difference
+field against the analytic nuclear term), that `pol_B` is negative, that pol/disp/overlap are
+symmetric under swapping the molecules, and that `rep` = K * `overlap`.
+
+Water-methanol, free fit on def2-universal-jkfit: electrostatic -8.55, pol. A in field B -1.11,
+pol. B in field A -0.57, D4 -0.62 kcal/mol, S = 1.76e-3 e^2/bohr^3, total without repulsion
+-10.84 kcal/mol. Model V7 with `-salted_charge_constraint`: electrostatic -4.71, pol -0.29/-0.49,
+S = 1.32e-3. Reproducing a CCSD(T)-like -5.5 kcal/mol from the free fit would need K near 5 Eh
+bohr^3/e^2; the fit of K (and of per-term scale factors) against S66x8 is WP3 of the proposal.
+
+### Gordon-Kim exchange-repulsion (2026-09-09)
+
+`rep` now defaults to the Gordon-Kim model from the fitted densities: `rep_kin` = T_TF[rho_A + rho_B]
+- T_TF[rho_A] - T_TF[rho_B] with the Thomas-Fermi functional and `rep_x` the same difference of Dirac
+exchange, `rep = rep_kin + rep_x`; `-repulsion_overlap <K>` with K > 0 still gives K * S. The grid is
+`GridManager` (Becke partition, `no_density_eval`) on a dummy `WFN` that holds the atoms of both
+molecules and their aux exponents through `add_exp`, because `setupPrototypeGrids` sizes the radial
+grids from the primitive list, not from the atoms' basis-set entries. Densities from `calc_density_ML`,
+gradients by central differences for the 1/9 von Weizsaecker term `rep_vw`, which is printed but not
+added: T_vW is subadditive, so the difference is always negative (-10 kcal/mol here) and would turn
+the repulsion into an attraction. `n_A`, `n_B` are the grid electron counts and are printed as the
+grid check (10.0004 / 17.9994 e for the free fit, 10.0000 / 18.0001 for Model V7).
+
+`NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables` additionally asserts `rep_x` < 0,
+`rep` = `rep_kin` + `rep_x` in the default call, `rep` = K * S and `n_A` = 0 in the K = 2 call, and
+that `rep_kin`, `rep_vw`, `rep_x` (1e-6 Eh) and the electron counts (1e-4 e) are symmetric under
+swapping the molecules; the swapped dimer builds its grid in the other atom order, which is where
+the noise comes from. The alpha = 2e5 partner is too tight for the grid (2.54 of 3 e), so the
+electron count is not compared to Z there.
+
+Water-methanol, kcal/mol: free fit rep. kin. TF +12.37, rep. exch. Dirac -6.19, repulsion GK +6.19,
+total -4.66 (CCSD(T)-like reference -5.5); Model V7 with charge constraint +10.51, -5.60, +4.91,
+total -1.20, the shortfall being the electrostatics of the model density. Delta E_x / Delta T_TF is
+about -0.5 in both, as in the rare-gas Gordon-Kim literature. Scale factors on the two pieces
+(Waldman-Gordon style) are part of the WP3 calibration.
+
+`-repulsion_exchange <dirac|pbe|b88>` swaps the Dirac exchange for the PBE or B88 GGA exchange of the
+closed-shell density (`DensityFitting::exchange_density`, the gradient the one already computed for the
+von Weizsaecker term). `ExchangeFunctionalsReproduceTheHydrogenAtom` integrates the spin-scaled H 1s
+density, E_x[rho_up] = E_x[2 rho_up] / 2, and checks -0.2680 (LDA), -0.3059 (PBE) and -0.3098 (B88) Eh
+to 2e-4; the point-partner case checks that PBE and B88 leave `rep_kin` alone and change `rep_x`.
+Water-methanol, kcal/mol, Delta E_x with Dirac / PBE / B88: free fit -6.19 / -2.54 / -0.78, totals
+-4.66 / -1.01 / +0.75; Model V7 -5.60 / -2.22 / -0.46, totals -1.20 / +2.18 / +3.94. The GGA enhancement
+is largest in the low-density tails, where the monomers' reduced gradients exceed the dimer's, so the
+gradient correction cancels most of the exchange attraction and the repulsion grows; Dirac stays the
+default, as in the classical Gordon-Kim model.
 
 ## 2026-09-09 — ECP cores filled for QTAIM, and the Flawfinder check
 
@@ -58,9 +255,6 @@ file carried an ELI-D value before this case.
 `-eli_analysis` no longer calls `exit(0)` from the option parser; it records the request and
 `run_app_impl` runs it, which is what lets the in-process harness test it at all.
 
-**Last updated: 2026-09-02** (pTB cartesian-f fix in `WFN::read_ptb`, and a new
-`-no_date_but_gpu` flag so golden files stop depending on whether the machine has a GPU.
-No cases added or removed; 275/275 pass on `release-windows`.)
 
 ## 2026-09-02 — pTB cartesian f ordering, and GPU notes in golden files
 

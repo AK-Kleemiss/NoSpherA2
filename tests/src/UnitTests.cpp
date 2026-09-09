@@ -14,6 +14,8 @@
 #include "core/cell.h"
 #include "core/wfn_class.h"
 #include "core/properties.h"
+#include "core/integrator.h"
+#include "core/basis_set.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "core/blas_gpu.h"
 #endif
@@ -2550,4 +2552,216 @@ namespace NoSpherA2UnitTests
     }
 #endif
 
+    // The multipole restraint rests on one integral, int r^(l+2) N c e^(-a r^2) dr = N c Gamma(l+3/2) / (2 a^(l+3/2)),
+    // checked against the trapezoid rule and, for l = 0, against the pi/(2 a^(3/2)) N c row that
+    // add_electron_restraint has used all along (which carries the sqrt(4 pi) of Y_00).
+    TEST(RiMultipoleTests, RadialMomentMatchesQuadratureAndTheChargeRow)
+    {
+        const double exps[] = { 0.3, 2.5, 40.0 }, coef = 1.3;
+        for (int e = 0; e < 3; e++) {
+            const double a = exps[e];
+            const primitive p0(0, 0, a, coef);
+            EXPECT_NEAR(std::sqrt(4.0 * PI_VAL) * DensityFitting::radial_moment(a, coef, 0), PI_VAL / (2.0 * std::pow(a, 1.5)) * p0.normalization_constant() * p0.get_coef(), 1e-12);
+            for (int l = 0; l <= 4; l++) {
+                const primitive p(0, l, a, coef);
+                const int n = 200000;
+                const double h = 12.0 / std::sqrt(a) / n;
+                double sum = 0.0;
+                for (int i = 1; i < n; i++) {
+                    const double r = i * h;
+                    sum += std::pow(r, 2 * l + 2) * std::exp(-a * r * r);
+                }
+                sum *= h * p.normalization_constant() * p.get_coef();
+                EXPECT_NEAR(sum, DensityFitting::radial_moment(a, coef, l), 1e-9 * sum);
+            }
+        }
+    }
+
+    // Closure of the whole restraint: for one oxygen with the combo_basis_fit aux basis and arbitrary
+    // coefficients, the density that calc_density_ML evaluates from them is integrated on an atomic
+    // grid to give the moments Q_lm = int rho r^l Y_lm, exactly what calculatePartitionedMultipoles
+    // produces for the fit target. The restraint rows applied to the same coefficients must return
+    // those moments (times the r_cov^-l row scaling), the targets must land in the matching rows,
+    // and fitted_multipoles must agree. This pins the row placement, the l/m ordering of the
+    // coefficients against constants::spherical_harmonic, and the normalisation in one go.
+    TEST(RiMultipoleTests, RestraintRowsReproduceTheGridMomentsOfTheAtomicDensity)
+    {
+        const double pos[3] = { 0.3, -0.7, 1.1 };
+        const int Z = 8, lmax = 2, n_moments = (lmax + 1) * (lmax + 1);
+        WFN wavy(e_origin::NOT_YET_DEFINED);
+        wavy.push_back_atom("O", pos[0], pos[1], pos[2], Z);
+        std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+        WFN aux = generate_aux_wfn(wavy, basis);
+        const atom A = aux.get_atom(0);
+        double alpha_min[9] = { 0.0 }, alpha_max = 0.0;
+        int max_l = 0, n_aux = 0, prim = 0;
+        for (int shell = 0; shell < (int)A.get_shellcount_size(); shell++) {
+            const int l = A.get_basis_set_entry(prim).get_type();
+            for (int e = 0; e < (int)A.get_shellcount(shell); e++) {
+                const double a = A.get_basis_set_entry(prim + e).get_exponent();
+                alpha_max = std::max(alpha_max, a);
+                if (alpha_min[l] == 0.0 || a < alpha_min[l]) alpha_min[l] = a;
+            }
+            max_l = std::max(max_l, l);
+            n_aux += 2 * l + 1;
+            prim += A.get_shellcount(shell);
+        }
+        AtomGrid grid(1e-12, 350, 5000, Z, alpha_max, max_l, alpha_min, std::cout);
+        const int n_points = grid.get_num_grid_points();
+        vec gx(n_points), gy(n_points), gz(n_points), aw(n_points), bw(n_points), tw(n_points), chi(1, 0.0);
+        grid.get_grid(1, 0, &pos[0], &pos[1], &pos[2], &Z, gx.data(), gy.data(), gz.data(), aw.data(), bw.data(), tw.data(), WFN(), chi);
+        vec coefs(n_aux);
+        for (int i = 0; i < n_aux; i++) coefs[i] = std::sin(1.0 + i);
+        vec2 Q(1, vec(n_moments, 0.0));
+        for (int p = 0; p < n_points; p++) {
+            const double f = calc_density_ML(gx[p], gy[p], gz[p], coefs, aux.get_atoms()) * bw[p];
+            double d[3] = { gx[p] - pos[0], gy[p] - pos[1], gz[p] - pos[2] };
+            const double r = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+            for (int i = 0; i < 3; i++) d[i] /= r;
+            double rl = 1.0;
+            for (int l = 0; l <= lmax; l++) {
+                for (int m = -l; m <= l; m++)
+                    Q[0][l * l + l + m] += f * rl * constants::spherical_harmonic(l, m, d);
+                rl *= r;
+            }
+        }
+        vec eri2c(n_aux * n_aux, 0.0), rho(n_aux, 0.0);
+        const vec weights(1, 1.0);
+        DensityFitting::add_electron_restraint(eri2c, rho, aux, weights, vec(1, 0.0));
+        DensityFitting::add_multipole_restraint(eri2c, rho, aux, Q, weights, lmax);
+        ASSERT_EQ(eri2c.size(), (size_t)(n_aux + n_moments) * n_aux);
+        ASSERT_EQ(rho.size(), (size_t)(n_aux + n_moments));
+        const double r_cov = constants::ang2bohr(constants::covalent_radii[Z]);
+        const vec2 fitted = DensityFitting::fitted_multipoles(coefs, aux, lmax);
+        for (int row = 0; row < n_moments; row++) {
+            const int l = (int)std::floor(std::sqrt(row + 1e-9));
+            const double scale = row == 0 ? std::sqrt(4.0 * PI_VAL) : std::pow(r_cov, -l);
+            double lhs = 0.0;
+            for (int i = 0; i < n_aux; i++) lhs += eri2c[(n_aux + row) * n_aux + i] * coefs[i];
+            EXPECT_NEAR(lhs, scale * Q[0][row], 1e-6 * std::max(1.0, std::abs(scale * Q[0][row]))) << "row " << row;
+            EXPECT_NEAR(rho[n_aux + row], row == 0 ? 0.0 : scale * Q[0][row], 1e-12) << "row " << row;
+            EXPECT_NEAR(fitted[0][row], Q[0][row], 1e-6 * std::max(1.0, std::abs(Q[0][row]))) << "row " << row;
+        }
+    }
+
+    // gamma(l+3/2, x) = 2 int_0^sqrt(x) u^(2l+2) exp(-u^2) du, in the series and the recurrence regime
+    TEST(RiInteractionTests, LowerIncompleteGammaMatchesQuadrature)
+    {
+        const double xs[] = { 0.05, 0.7, 3.0, 9.0, 30.0 };
+        for (int l = 0; l <= 4; l++)
+            for (int k = 0; k < 5; k++) {
+                const int n = 200000;
+                const double x = xs[k], h = std::sqrt(x) / n;
+                double sum = 0.5 * std::pow(std::sqrt(x), 2 * l + 2) * std::exp(-x);
+                for (int i = 1; i < n; i++) {
+                    const double u = i * h;
+                    sum += std::pow(u, 2 * l + 2) * std::exp(-u * u);
+                }
+                sum *= 2.0 * h;
+                EXPECT_NEAR(sum, DensityFitting::lower_gamma_half(l, x), 1e-9 * sum) << "l " << l << " x " << x;
+            }
+    }
+
+    // The s potential is the Gaussian charge erf(sqrt(a)R)/R; outside the density every rank is the point
+    // multipole 4pi/(2l+1) Q_lm Y_lm / R^(l+1) with the same Q_lm that fitted_multipoles reports
+    TEST(RiInteractionTests, AuxPotentialIsTheGaussianChargeAndThePointMultipoleLimit)
+    {
+        const double a = 0.9, c = 1.7, R[3] = { 0.8, -0.3, 1.1 };
+        const double r = std::sqrt(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]);
+        const double q = std::sqrt(4.0 * PI_VAL) * DensityFitting::radial_moment(a, c, 0);
+        EXPECT_NEAR(DensityFitting::aux_potential(a, c, 0, 0, R), q * std::erf(std::sqrt(a) * r) / r, 1e-12 * q);
+        const double Rf[3] = { 5.0 * R[0], 5.0 * R[1], 5.0 * R[2] }, rf = 5.0 * r, d[3] = { R[0] / r, R[1] / r, R[2] / r };
+        for (int l = 1; l <= 4; l++)
+            for (int m = -l; m <= l; m++) {
+                const double V = 4.0 * PI_VAL / (2 * l + 1) * DensityFitting::radial_moment(a, c, l) * constants::spherical_harmonic(l, m, d) / std::pow(rf, l + 1);
+                EXPECT_NEAR(DensityFitting::aux_potential(a, c, l, m, Rf), V, 1e-9 * std::abs(V) + 1e-15) << "l " << l << " m " << m;
+            }
+    }
+
+    // A partner B whose density is one very tight s Gaussian holding exactly Z_B electrons is neutral and
+    // point-like, so the energy cancels in both halves: the analytic aux potential of A at B's nucleus against
+    // the libcint two-centre integrals, and A's nuclear repulsion against A's nuclei in B's density. This ties
+    // the potential, the coefficient layout and the combined Int_Params block together
+    // Spin-scaled hydrogen atom, E_x[rho_up] = E_x[2 rho_up] / 2: LDA -0.2680, PBE -0.3059, B88 -0.3098 Eh
+    TEST(RiInteractionTests, ExchangeFunctionalsReproduceTheHydrogenAtom)
+    {
+        const double ref[3] = { -0.2680, -0.3059, -0.3098 }, dr = 1e-4;
+        for (int f = 0; f < 3; f++) {
+            double e = 0.0;
+            for (int i = 1; i < 300000; i++) {
+                const double r = i * dr, rho = 2 * std::exp(-2 * r) / constants::PI;
+                e += 4 * constants::PI * r * r * DensityFitting::exchange_density(rho, 4 * rho * rho, f) * dr;
+            }
+            EXPECT_NEAR(0.5 * e, ref[f], 2e-4) << f;
+        }
+    }
+
+    TEST(RiInteractionTests, NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables)
+    {
+        WFN wavy(e_origin::NOT_YET_DEFINED);
+        wavy.push_back_atom("O", 0.0, 0.0, 0.0, 8);
+        wavy.push_back_atom("H", 1.8, 0.0, 0.0, 1);
+        std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+        WFN aux_A = generate_aux_wfn(wavy, basis);
+        int n_aux = 0;
+        for (int a = 0; a < aux_A.get_ncen(); a++) {
+            const atom A = aux_A.get_atom(a);
+            int prim = 0;
+            for (int shell = 0; shell < (int)A.get_shellcount_size(); shell++) {
+                n_aux += 2 * A.get_basis_set_entry(prim).get_type() + 1;
+                prim += A.get_shellcount(shell);
+            }
+        }
+        vec coef_A(n_aux);
+        for (int i = 0; i < n_aux; i++) coef_A[i] = 0.3 * std::sin(1.0 + i);
+        const int ZB = 3;
+        const double alpha = 2.0e5;
+        atom B("Li", {}, 1, 0.0, 3.1, 1.4, ZB);
+        B.push_back_basis_set(alpha, 1.0, 0, 0);
+        WFN wavy_B(e_origin::NOT_YET_DEFINED);
+        wavy_B.push_back_atom(B);
+        const vec coef_B{ ZB / (std::sqrt(4.0 * PI_VAL) * DensityFitting::radial_moment(alpha, 1.0, 0)) };
+        const DensityFitting::INTERACTION E = DensityFitting::interaction_energy(coef_A, aux_A, coef_B, wavy_B);
+        EXPECT_NEAR(E.nuc_nuc + E.nucA_rhoB, 0.0, 1e-10 * E.nuc_nuc);
+        EXPECT_GT(std::abs(E.nucB_rhoA), 1e-3);
+        EXPECT_NEAR(E.nucB_rhoA + E.rho_rho, 0.0, 1e-5 * std::abs(E.nucB_rhoA));
+        double pair = 0.0, rank = 0.0;
+        for (int a = 0; a < (int)E.pair.size(); a++)
+            for (int b = 0; b < (int)E.pair[a].size(); b++) pair += E.pair[a][b];
+        for (int i = 0; i < (int)E.rank.size(); i++)
+            for (int j = 0; j < (int)E.rank[i].size(); j++) rank += E.rank[i][j];
+        EXPECT_NEAR(pair, E.electrostatic(), 1e-12);
+        EXPECT_NEAR(rank, E.electrostatic(), 1e-12);
+        EXPECT_EQ(E.rank[0].size(), 2);
+        const DensityFitting::INTERACTION F = DensityFitting::interaction_energy(coef_B, wavy_B, coef_A, aux_A, 2.0);
+        EXPECT_NEAR(F.electrostatic(), E.electrostatic(), 1e-12);
+        EXPECT_NEAR(E.pol_A, 0.0, 1e-12);
+        EXPECT_LT(E.pol_B, -1e-8);
+        EXPECT_NEAR(F.pol_A, E.pol_B, 1e-14);
+        EXPECT_NEAR(F.pol_B, E.pol_A, 1e-14);
+        EXPECT_LT(E.disp, 0.0);
+        EXPECT_NEAR(F.disp, E.disp, 1e-12);
+        EXPECT_NEAR(F.overlap, E.overlap, 1e-10);
+        EXPECT_NEAR(F.rep, 2.0 * F.overlap, 1e-14);
+        EXPECT_EQ(F.n_A, 0.0);
+        EXPECT_NEAR(F.total() - F.rep, E.total() - E.rep, 1e-10);
+        EXPECT_LT(E.rep_x, 0.0);
+        EXPECT_NEAR(E.rep, E.rep_kin + E.rep_x, 1e-14);
+        const DensityFitting::INTERACTION G = DensityFitting::interaction_energy(coef_B, wavy_B, coef_A, aux_A);
+        EXPECT_NEAR(G.rep_kin, E.rep_kin, 1e-6);
+        EXPECT_NEAR(G.rep_vw, E.rep_vw, 1e-6);
+        EXPECT_NEAR(G.rep_x, E.rep_x, 1e-6);
+        EXPECT_NEAR(G.n_A, E.n_B, 1e-4);
+        EXPECT_NEAR(G.n_B, E.n_A, 1e-4);
+        for (int f = 1; f < 3; f++) {
+            const DensityFitting::INTERACTION H = DensityFitting::interaction_energy(coef_A, aux_A, coef_B, wavy_B, 0.0, f);
+            EXPECT_EQ(H.x_fun, f);
+            EXPECT_NEAR(H.rep_kin, E.rep_kin, 1e-12);
+            EXPECT_LT(H.rep_x, 0.0);
+            EXPECT_GT(std::abs(H.rep_x - E.rep_x), 1e-8);
+        }
+        EXPECT_NEAR(F.nucA_rhoB, E.nucB_rhoA, 1e-12);
+        EXPECT_NEAR(F.rho_rho, E.rho_rho, 1e-10);
+        for (int a = 0; a < 2; a++) EXPECT_NEAR(F.pair[0][a], E.pair[a][0], 1e-12);
+    }
 } // namespace NoSpherA2UnitTests

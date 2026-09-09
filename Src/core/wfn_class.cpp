@@ -1690,6 +1690,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         file << "File is valid, continuing...\n"
         << GetCurrentDir << endl;
     origin = e_origin::molden;
+    isBohr = true;
     ifstream rf(filename.c_str());
     if (rf.good())
         path = filename;
@@ -2521,6 +2522,7 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
     if (debug)
         file << "File is valid, continuing...\n" << GetCurrentDir << endl;
     origin = e_origin::tonto;
+    isBohr = true;
     //open the files as read-only binary files
     ifstream rf_e(energies_file.c_str(), ios::binary);
     ifstream rf_o(orbitals_file.c_str(), ios::binary);
@@ -3099,6 +3101,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         file << "File is valid, continuing...\n"
         << GetCurrentDir << endl;
     origin = e_origin::gbw;
+    isBohr = true;
     ifstream rf(filename.c_str(), ios::binary);
     if (rf.good())
         path = filename;
@@ -6711,6 +6714,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         return false;
     }
     origin = e_origin::fchk;
+    isBohr = true;
     // Every other reader (read_wfn, read_wfx, read_xyz, read_molden, ...) records
     // the source path here; read_fchk did not. The path is what the property code
     // builds cube filenames from, so without it an fchk-driven run wrote
@@ -9252,6 +9256,7 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
 bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
     origin = e_origin::ptb;
+    isBohr = true;
     path = filename;
     if (debug)
         file << "Reading pTB file: " << filename << std::endl;

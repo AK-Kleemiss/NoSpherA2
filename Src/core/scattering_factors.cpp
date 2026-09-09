@@ -3152,8 +3152,7 @@ tsc_block_type calculate_scattering_factors(
 			WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis);
 
             //TODO: only compute coefs for atoms that are actually in the symmetric unit!
-            DensityFitting::CONFIG config;
-            config.analyze_quality = opt.debug;
+            DensityFitting::CONFIG config = DensityFitting::config_from_options(opt);
             config.asym_atm_list = asym_atom_list;
             //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
             //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;

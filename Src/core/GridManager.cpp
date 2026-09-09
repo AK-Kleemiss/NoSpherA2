@@ -599,6 +599,53 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
     file << "GridManager: Generated total of " << grid_data_.total_points << " grid points." << std::endl;
 }
 
+GridData::GridIndex GridManager::partitionWeightIndex() const {
+    switch (config_.partition_type) {
+    case PartitionType::TFVC:      return GridData::GridIndex::TFVC_WEIGHT;
+    case PartitionType::Hirshfeld: return GridData::GridIndex::HIRSH_WEIGHT;
+    case PartitionType::MBIS:      return GridData::GridIndex::MBIS_WEIGHT;
+    case PartitionType::EMBIS:     return GridData::GridIndex::EMBIS_WEIGHT;
+    default:                       return GridData::GridIndex::BECKE_WEIGHT;
+    }
+}
+
+vec2 GridManager::calculatePartitionedMultipoles(const WFN &wave, const int lmax) {
+    vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids;
+    const int num_atoms = (int)grid->size();
+    const GridData::GridIndex weight_index = partitionWeightIndex();
+    vec2 moments(num_atoms, vec((lmax + 1) * (lmax + 1), 0.0));
+#pragma omp parallel for schedule(dynamic)
+    for (int atom = 0; atom < num_atoms; atom++) {
+        const vec2 &atomic_grid = (*grid)[atom];
+        const int n_points = needs_helper_grids_ ? grid_data_.helper_num_points_per_atom[atom] : grid_data_.num_points_per_atom[atom];
+        const double *x = atomic_grid[GridData::GridIndex::X].data();
+        const double *y = atomic_grid[GridData::GridIndex::Y].data();
+        const double *z = atomic_grid[GridData::GridIndex::Z].data();
+        const double *rho = atomic_grid[GridData::GridIndex::WFN_DENSITY].data();
+        const double *w = atomic_grid[weight_index].data();
+        const double cx = wave.get_atom_coordinate(atom, 0), cy = wave.get_atom_coordinate(atom, 1), cz = wave.get_atom_coordinate(atom, 2);
+        vec &Q = moments[atom];
+        for (int p = 0; p < n_points; p++) {
+            const double f = rho[p] * w[p];
+            if (f == 0.0) continue;
+            double d[3] = { x[p] - cx, y[p] - cy, z[p] - cz };
+            const double r = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+            if (r > 0.0)
+                for (int i = 0; i < 3; i++) d[i] /= r;
+            double rl = 1.0;
+            for (int l = 0; l <= lmax; l++) {
+                for (int m = -l; m <= l; m++)
+                    Q[l * l + l + m] += f * rl * constants::spherical_harmonic(l, m, d);
+                rl *= r;
+            }
+        }
+    }
+    if (config_.debug)
+        for (int atom = 0; atom < num_atoms; atom++)
+            std::cout << "GridManager: atom " << atom + 1 << " population from Q_00: " << std::sqrt(constants::FOUR_PI) * moments[atom][0] << std::endl;
+    return moments;
+}
+
 PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const cell &unit_cell) {
     if (config_.debug) {
         std::string scheme_name = (config_.debug || config_.all_charges) ? "every" : config_.getPartitionName();
@@ -618,15 +665,7 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const
     }
 
     //Choose grids to consider for charge calculation
-    GridData::GridIndex weight_index;
-    switch (config_.partition_type) {
-    case PartitionType::Becke:     weight_index = GridData::GridIndex::BECKE_WEIGHT;  break;
-    case PartitionType::TFVC:      weight_index = GridData::GridIndex::TFVC_WEIGHT;   break;
-    case PartitionType::Hirshfeld: weight_index = GridData::GridIndex::HIRSH_WEIGHT;  break;
-    case PartitionType::MBIS:      weight_index = GridData::GridIndex::MBIS_WEIGHT;   break;
-    case PartitionType::EMBIS:     weight_index = GridData::GridIndex::EMBIS_WEIGHT;  break;
-    default:                       weight_index = GridData::GridIndex::BECKE_WEIGHT;  break;
-    }
+    const GridData::GridIndex weight_index = partitionWeightIndex();
 
     const double cutoff = config_.getCutoff();
 #pragma omp parallel for schedule(static)

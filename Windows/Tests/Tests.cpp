@@ -148,6 +148,16 @@ namespace NoSpherA2IntegrationTests
                  "-all_charges", "-no_date"}
             });
         }
+        TEST_METHOD(ri_fit_multipoles)
+        {
+            RunTest({
+                "ri_fit_multipoles", "epoxide_gbw", "ri_fit_multipoles.good", "",
+                {"-wfn","epoxide.gbw", "-cif","epoxide.cif",
+                 "-dmin","0.4", "-ri_fit","combo_basis_fit",
+                 "-multipole_moments","Hirshfeld","2",
+                 "-all_charges", "-no_date"}
+            });
+        }
 
         TEST_METHOD(rubredoxin_cmtc)
         {
@@ -173,6 +183,16 @@ namespace NoSpherA2IntegrationTests
                 {"-SALTED","Model", "-cif","test_cysteine.cif",
                  "-wfn","test_cysteine.xyz", "-dmin","0.73",
                  "-all_charges", "-no_date"}
+            });
+        }
+
+        TEST_METHOD(SALTED_charge_constraint)
+        {
+            RunTest({
+                "SALTED_charge_constraint", "SALTED", "SALTED_charge_constraint.good", "",
+                {"-SALTED","Model", "-cif","test_cysteine.cif",
+                 "-wfn","test_cysteine.xyz", "-dmin","0.73",
+                 "-salted_charge_constraint", "-all_charges", "-no_date"}
             });
         }
 

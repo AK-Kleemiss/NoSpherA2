@@ -21,7 +21,9 @@ namespace DensityFitting
         MULLIKEN,
         SANDERSON_ESTIMATE,
         TFVC,
-        HIRSHFELD
+        HIRSHFELD,
+        MBIS,
+        EMBIS
     };
 
     struct CONFIG {
@@ -34,20 +36,59 @@ namespace DensityFitting
         double tikhonov_lambda = 1e-6;
         bool adaptive_restraint = true; // Whether to use adaptive weighting for restraints
         CHARGE_SCHEME charge_scheme = CHARGE_SCHEME::TFVC; // Scheme to use for calculating expected electron populations
+        int multipole_lmax = -1; // >= 0: restrain the grid moments of charge_scheme's atoms up to this order with weight multipole_strength, replacing the adaptive weights
+        double multipole_strength = 1.0;
 
         std::optional<ivec> asym_atm_list = std::nullopt; //Currently unsued till fixed!// Optional list of atom indices to only compute atoms actually present in the assymetic unit
     };
 
 
     vec density_fit(const WFN& wavy, const WFN& wavy_aux, const CONFIG& config);
+    // Fit settings from the command line: -multipole_moments switches the restraints on
+    CONFIG config_from_options(const options& opt);
 
     // Helper functions for charge analysis and restraints
     vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME & = CHARGE_SCHEME::NUCLEAR);
+    // Grid moments of the partitioned density about each nucleus, [atom][l*l+l+m] for l = 0..lmax, electrons only
+    vec2 calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax);
 
     void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const vec& expected_charges = vec());
+    // Per-atom row weight of the restraints
+    vec restraint_weights(const WFN& wavy_aux, const size_t n_aux, double base_restraint_coef = 0.00005, bool adaptive_weighting = true);
     void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
-        double base_restraint_coef = 0.00005, bool adaptive_weighting = true,
-        const vec& expected_charges = vec());
+        const vec& atom_weights, const vec& expected_charges = vec());
+    // Moment of one aux primitive about its own centre, Int r^l Y_lm chi = N c Gamma(l+3/2) / (2 alpha^(l+3/2))
+    double radial_moment(const double exponent, const double coef, const int l);
+    void add_multipole_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
+        const vec2& targets, const vec& atom_weights, const int lmax);
+    // Moments of the fitted density, same layout as the targets, from the coefficients alone
+    vec2 fitted_multipoles(const vec& coefficients, const WFN& wavy_aux, const int lmax);
+
+    // First-order electrostatics between two fitted densities and their nuclei, Hartree; needs only the
+    // coefficients and the aux basis, so RI-fitted and SALTED-predicted coefficients enter alike.
+    // pair[a][b] over the atoms of A and B, rank[i][j] with 0 the nuclei and l+1 the aux functions of rank l.
+    // Beyond electrostatics: pol_X = -1/2 sum alpha_a F_a^2 over the atoms of X with Thakkar polarizabilities in the
+    // partner's field, disp the D4 energy of the dimer minus the monomers, overlap = Int rhoA rhoB. Exchange-repulsion
+    // rep = K * overlap when K > 0, else Gordon-Kim rep_kin + rep_x: rep_kin = T[rhoA+rhoB] - T[rhoA] - T[rhoB] with the
+    // Thomas-Fermi functional, rep_x the same difference of Dirac exchange, rep_vw the 1/9 von Weizsaecker correction to
+    // rep_kin reported but not added, on a Becke grid over the dimer that integrates the fitted densities to n_A, n_B.
+    // x_fun picks the exchange functional: 0 Dirac, 1 PBE, 2 B88
+    struct INTERACTION {
+        double nuc_nuc = 0.0, nucA_rhoB = 0.0, nucB_rhoA = 0.0, rho_rho = 0.0;
+        double pol_A = 0.0, pol_B = 0.0, disp = 0.0, overlap = 0.0, rep = 0.0, rep_kin = 0.0, rep_vw = 0.0, rep_x = 0.0, n_A = 0.0, n_B = 0.0;
+        int x_fun = 0;
+        double electrostatic() const { return nuc_nuc + nucA_rhoB + nucB_rhoA + rho_rho; };
+        double total() const { return electrostatic() + pol_A + pol_B + disp + rep; };
+        vec2 pair, rank;
+    };
+    // Lower incomplete gamma function gamma(l+3/2, x)
+    double lower_gamma_half(const int l, const double x);
+    // Coulomb potential Int chi(r)/|r-R| of one aux primitive centred at the origin, Y_lm(R^) included
+    double aux_potential(const double exponent, const double coef, const int l, const int m, const double* R);
+    INTERACTION interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K = 0.0, const int x_fun = 0);
+    // Exchange energy density of the closed-shell rho with |grad rho|^2 = g2: x_fun 0 Dirac, 1 PBE, 2 B88
+    double exchange_density(const double rho, const double g2, const int x_fun);
+    void print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file);
 
     // Demonstration function
     void demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& wavy_aux);

@@ -733,9 +733,9 @@ cube calc_cube_ML(const vec& data, WFN& dummy, const int& atom_nr)
 #include "libCintMain.h"
 #include "nos_math.h"
 #include "npy.h"
-void create_SALTED_training_data(const WFN& orbital, const WFN& aux) {
+void create_SALTED_training_data(const WFN& orbital, const WFN& aux, const options& opts) {
     std::cout << "Calculating density fitting coefficients..." << std::endl;
-    DensityFitting::CONFIG config;
+    DensityFitting::CONFIG config = DensityFitting::config_from_options(opts);
     config.analyze_quality = true;
     //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
     //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
@@ -754,19 +754,10 @@ void create_SALTED_training_data(const WFN& orbital, const WFN& aux) {
     dMatrix2 overlap_mat(nao_max, nao_max);
     overlap_mat.container() = overlap;
 
-    dMatrix1 proj = dot(overlap_mat, coefs_vec);
-
     npy::write_npy("coefficients.npy", 
         npy::npy_data<double>{
             coefs, 
             { static_cast<unsigned long>(coefs.size()) },
-            false}
-    );
-
-    npy::write_npy("projections.npy",
-        npy::npy_data<double>{
-        proj.container(),
-        { static_cast<unsigned long>(proj.size()) },
             false}
     );
 

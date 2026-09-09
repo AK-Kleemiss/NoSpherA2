@@ -678,6 +678,12 @@ TEST(TomlIntegrationTests, RiFit)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, RiFitMultipoles)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit_multipoles");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, RubredoxinCmtc)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "rubredoxin_cmtc");
@@ -687,6 +693,12 @@ TEST(TomlIntegrationTests, RubredoxinCmtc)
 TEST(TomlIntegrationTests, SALTED)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, SALTEDChargeConstraint)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_charge_constraint");
     EXPECT_TRUE(result.success) << result.message;
 }
 

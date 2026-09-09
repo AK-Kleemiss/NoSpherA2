@@ -869,6 +869,8 @@ struct options
     bool gpu_itensor_tensor = true;
     //SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
     bool gpu_salted = true;
+    //-salted_charge_constraint rescales the l=0 coefficients of every SALTED prediction to the electron count, whether or not the model asks for it
+    bool salted_charge_constraint = false;
     //-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
     bool gpu_grid = true;
     //-gpu_blas offers large dense GEMMs in nos_math to the device
@@ -896,6 +898,14 @@ struct options
     int charge = 0;
     int ECP_mode = 0;
     PartitionType partition_type = PartitionType::Hirshfeld;
+    //-multipole_moments: the RI fit is restrained to this scheme's atomic moments up to this order, -1 = unrestrained
+    int multipole_lmax = -1;
+    PartitionType multipole_scheme = PartitionType::Hirshfeld;
+    double multipole_strength = 1.0;
+    //-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
+    double repulsion_overlap = 0.0;
+    //-repulsion_exchange: exchange functional of the Gordon-Kim repulsion, 0 Dirac, 1 PBE, 2 B88
+    int repulsion_exchange = 0;
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 

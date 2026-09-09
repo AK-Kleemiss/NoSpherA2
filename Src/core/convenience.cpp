@@ -450,6 +450,42 @@ namespace {
         lap("write_npy");
     }
 
+    // One loop for -calc_featomic_descriptor and -calc_featomic_descriptors: (structure, output) pairs,
+    // one unreadable structure must not abort the rest. Returns the exit code.
+    int write_featomic_descriptors(const std::vector<std::pair<std::filesystem::path, std::filesystem::path>>& jobs)
+    {
+        const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
+        const auto started = std::chrono::steady_clock::now();
+        size_t done = 0, failed = 0;
+        for (const auto& [structure, out_path] : jobs)
+        {
+            if (!std::filesystem::exists(structure))
+            {
+                std::cout << "MISSING " << structure.string() << std::endl;
+                ++failed;
+                continue;
+            }
+            try
+            {
+                const auto one = std::chrono::steady_clock::now();
+                write_featomic_descriptor(structure, out_path, hyperparams);
+                std::cout << "DESCRIPTOR " << out_path.string() << " seconds="
+                          << std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count() << std::endl;
+                ++done;
+            }
+            catch (const std::exception& e)
+            {
+                std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
+                ++failed;
+            }
+        }
+        const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+        std::cout << "BATCH done=" << done << " failed=" << failed
+                  << " seconds=" << total
+                  << " per_structure=" << (done ? total / done : 0.0) << std::endl;
+        return failed && !done ? 1 : 0;
+    }
+
     // The same descriptor, classified here and written as (n_atoms, n_classes)
     // instead of (n_atoms, 42042). For a 40-atom structure that is 3.5 kB out
     // rather than 13.5 MB.
@@ -544,6 +580,11 @@ std::string help_message =
  "  -Becke | -TFVC | -mbis | -embis    Select partitioning (default Hirshfeld).\n"
  "  -ri_fit [basis ...]                RI partitioning; omit a basis or use\n"
  "                                    auto_aux to generate one automatically.\n"
+ "  -multipole_moments <scheme> <N>    Restrain the RI fit to the Hirshfeld, TFVC,\n"
+ "                                    MBIS or EMBIS atomic charges and multipoles\n"
+ "                                    up to order N (implies -ri_fit).\n"
+ "  -multipole_strength <x>            Weight of the restraint rows against the\n"
+ "                                    density-fit metric, default 1.\n"
  "  -cpus <n>                          Maximum worker threads [all available].\n"
  "  -mem <MB>                          Memory budget for everything sliceable\n"
  "                                    [unset]. When given, the tsc block size\n"
@@ -700,10 +741,22 @@ std::string help_message =
  "  -fchk <output.fchk>                Write FCHK output (requires -b and -d).\n"
  "  -SALTED <model-dir>                Predict density with a SALTED model.\n"
  "  -SALTED_COEFS <model-dir>          Write SALTED_COEFS.npy (requires -wfn).\n"
+ "  -salted_charge_constraint          Rescale the l=0 coefficients of every\n"
+ "                                    SALTED prediction to the electron count.\n"
  "  -RI_CUBE <coefficients.npy>        Write an RI density cube; use -wfn and\n"
  "                                    -ri_fit first.\n"
- "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn and\n"
- "                                    -ri_fit first.\n"
+ "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn, -ri_fit\n"
+ "                                    and -multipole_moments first.\n"
+ "  -interaction_energy <A> <B>         Electrostatic interaction energy of two\n"
+ "                                    fitted densities: two wavefunctions with\n"
+ "                                    -ri_fit, or two .xyz with -SALTED. With\n"
+ "                                    <A> <A.npy> <B> <B.npy> the coefficient\n"
+ "                                    files are read instead; use -ri_fit.\n"
+ "  -repulsion_overlap <K>             Exchange-repulsion of -interaction_energy\n"
+ "                                    as K * Int rhoA rhoB, K in Eh bohr^3/e^2,\n"
+ "                                    instead of the Gordon-Kim default.\n"
+ "  -repulsion_exchange <dirac|pbe|b88> Exchange functional of the Gordon-Kim\n"
+ "                                    repulsion, default dirac.\n"
  "  -combine_mos <wfn1> <wfn2>          Combine molecular orbitals.\n"
  "  -cmos1 <MO ...>  -cmos2 <MO ...>   MO selections for -combine_mos.\n"
  "  -QCT                               Enter the legacy QCT workflow.\n\n"
@@ -3234,7 +3287,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
         WFN wavy(wfn);
         WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
 
-        create_SALTED_training_data(wavy, wavy_aux);
+        create_SALTED_training_data(wavy, wavy_aux, *this);
         exit(0);
     }
     else if (temp == "-sfac_diffuse")
@@ -3520,6 +3573,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_salted = true;
     else if (temp == "-no_gpu_salted")
         gpu_salted = false;
+    else if (temp == "-salted_charge_constraint")
+        salted_charge_constraint = true;
     else if (temp == "-gpu_grid")
         gpu_grid = true;
     else if (temp == "-no_gpu_grid")
@@ -3749,6 +3804,21 @@ bool options::digest_property_options(const std::string &temp, int &i)
         get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
         exit(0);
     }
+    else if (temp == "-rho_at_points")
+    {
+        //-wfn <file> -rho_at_points <points>: total density at the points (count, then x y z in bohr per line) to <points>.rho
+        err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -rho_at_points.", std::cout);
+        WFN wavy(wfn);
+        ifstream in(arguments[i + 1]);
+        int n = 0; in >> n;
+        std::vector<d3> pts(n); vec rho(n);
+        for (int p = 0; p < n; p++) in >> pts[p][0] >> pts[p][1] >> pts[p][2];
+#pragma omp parallel for
+        for (int p = 0; p < n; p++) rho[p] = wavy.compute_dens(pts[p]);
+        ofstream out(arguments[i + 1] + ".rho"); out << setprecision(12);
+        for (int p = 0; p < n; p++) out << rho[p] << "\n";
+        exit(0);
+    }
     else
         return false;
     return true;
@@ -3773,15 +3843,6 @@ bool options::digest_ri_options(const std::string &temp, int &i)
                   << geometry_aid_cutoff_radius << " A ("
                   << (geometry_aid_cutoff_radius > 3.25 ? "c_only" : "dirty")
                   << " model family)" << std::endl;
-    }
-    else if (temp == "-calc_featomic_descriptor") {
-        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
-        // Unchanged behaviour, down to the output file name: Olex2 calls
-        // exactly this and reads `descriptor.npy` from the working
-        // directory. The hyperparameters moved to a shared function so the
-        // batch flag below cannot drift away from them.
-        write_featomic_descriptor(wfn, "descriptor.npy", geometry_aid_hyperparameters());
-        exit(0);
     }
     else if (temp == "-classify_atoms") {
         // -wfn <structure> -classify_atoms <model.bin> [<out.npy>]
@@ -3855,6 +3916,11 @@ bool options::digest_ri_options(const std::string &temp, int &i)
                   << " per_structure=" << (done ? total / done : 0.0) << std::endl;
         exit(failed && !done ? 1 : 0);
     }
+    else if (temp == "-calc_featomic_descriptor") {
+        // Olex2 calls exactly this and reads descriptor.npy from the working directory.
+        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
+        exit(write_featomic_descriptors({ { wfn, "descriptor.npy" } }));
+    }
     else if (temp == "-calc_featomic_descriptors") {
         // Many structures in one process: a descriptor call carries a fixed
         // setup cost of roughly 0.7 s against about 0.0009 s per atom, and
@@ -3868,7 +3934,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         const std::filesystem::path list_file = arguments[i + 1];
         err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
 
-        std::vector<std::filesystem::path> jobs;
+        std::vector<std::pair<std::filesystem::path, std::filesystem::path>> jobs;
         {
             std::ifstream list(list_file);
             std::string line;
@@ -3877,44 +3943,11 @@ bool options::digest_ri_options(const std::string &temp, int &i)
                 const std::string entry = trim(line);
                 if (entry.empty() || entry[0] == '#')
                     continue;
-                jobs.push_back(std::filesystem::path(entry));
+                jobs.emplace_back(entry, entry + ".npy");
             }
         }
         err_chkf(!jobs.empty(), "The structure list is empty: " + list_file.string(), std::cout);
-
-        const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
-        const auto started = std::chrono::steady_clock::now();
-        size_t done = 0, failed = 0;
-        for (const std::filesystem::path& structure : jobs)
-        {
-            // One unreadable structure must not abort the rest of the batch.
-            if (!std::filesystem::exists(structure))
-            {
-                std::cout << "MISSING " << structure.string() << std::endl;
-                ++failed;
-                continue;
-            }
-            try
-            {
-                const auto one = std::chrono::steady_clock::now();
-                std::filesystem::path out_path = structure;
-                out_path += ".npy";
-                write_featomic_descriptor(structure, out_path, hyperparams);
-                const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count();
-                std::cout << "DESCRIPTOR " << out_path.string() << " seconds=" << seconds << std::endl;
-                ++done;
-            }
-            catch (const std::exception& e)
-            {
-                std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
-                ++failed;
-            }
-        }
-        const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-        std::cout << "BATCH done=" << done << " failed=" << failed
-                  << " seconds=" << total
-                  << " per_structure=" << (done ? total / done : 0.0) << std::endl;
-        exit(failed && !done ? 1 : 0);
+        exit(write_featomic_descriptors(jobs));
     }
     else if (temp == "-rgbi")
         rgbi = true;
@@ -3978,11 +4011,34 @@ bool options::digest_ri_options(const std::string &temp, int &i)
             aux_basis.push_back(std::make_shared<BasisSet>());
         }
     }
+    else if (temp == "-multipole_moments" || temp == "-multipole-moments") {
+        err_checkf(i + 2 < argc, "-multipole_moments needs a partitioning scheme and the highest order, e.g. -multipole_moments Hirshfeld 2", std::cout);
+        std::string scheme = arguments[++i];
+        std::transform(scheme.begin(), scheme.end(), scheme.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (scheme == "hirshfeld" || scheme == "hirsh")
+            multipole_scheme = PartitionType::Hirshfeld;
+        else if (scheme == "tfvc")
+            multipole_scheme = PartitionType::TFVC;
+        else if (scheme == "mbis")
+            multipole_scheme = PartitionType::MBIS;
+        else if (scheme == "embis")
+            multipole_scheme = PartitionType::EMBIS;
+        else
+            err("Unknown partitioning for -multipole_moments: " + arguments[i] + " (Hirshfeld, TFVC, MBIS or EMBIS)", std::cout);
+        multipole_lmax = std::stoi(arguments[++i]);
+        err_checkf(multipole_lmax >= 0 && multipole_lmax <= 8, "-multipole_moments: the order must be between 0 and 8", std::cout);
+        RI_FIT = true;
+        partition_type = PartitionType::RI;
+    }
+    else if (temp == "-multipole_strength") {
+        multipole_strength = std::stod(arguments[++i]);
+        err_checkf(multipole_strength > 0.0, "-multipole_strength must be positive", std::cout);
+    }
     else if (temp == "-write_ri_coefs") {
         WFN wavy(wfn);
         WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-        DensityFitting::CONFIG config;
-        config.analyze_quality = debug;
+        DensityFitting::CONFIG config = DensityFitting::config_from_options(*this);
         //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
         //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
         vec ri_coefs = DensityFitting::density_fit(wavy, wavy_aux, config);
@@ -3991,6 +4047,57 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         np_coeffs.fortran_order = false;
         np_coeffs.shape = { static_cast<unsigned long>(ri_coefs.size()) };
         npy::write_npy("RI_COEFS.npy", np_coeffs);
+        exit(0);
+    }
+    else if (temp == "-repulsion_overlap") {
+        repulsion_overlap = std::stod(arguments[++i]);
+        err_checkf(repulsion_overlap >= 0.0, "-repulsion_overlap must not be negative", std::cout);
+    }
+    else if (temp == "-repulsion_exchange") {
+        const std::string f = arguments[++i];
+        repulsion_exchange = f == "dirac" ? 0 : f == "pbe" ? 1 : f == "b88" ? 2 : -1;
+        err_checkf(repulsion_exchange >= 0, "-repulsion_exchange takes dirac, pbe or b88", std::cout);
+    }
+    else if (temp == "-interaction_energy") {
+        //-interaction_energy <A> <B>: electrostatics between two fitted densities. With -SALTED <model-dir> both are predicted
+        //from the model, otherwise A and B are wavefunctions and each is RI-fitted with the -ri_fit basis.
+        //<A> <A.npy> <B> <B.npy> takes coefficient files in the fitted_multipoles layout instead
+        err_checkf(i + 2 < argc, "-interaction_energy needs two structure files", std::cout);
+        const bool from_files = i + 4 < argc && std::filesystem::path(arguments[i + 2]).extension() == ".npy";
+        WFN wavy_A(arguments[i + 1]), wavy_B(arguments[from_files ? i + 3 : i + 2]);
+        WFN aux_A(e_origin::NOT_YET_DEFINED), aux_B(e_origin::NOT_YET_DEFINED);
+        vec coef_A, coef_B;
+        if (from_files) {
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -ri_fit BEFORE -interaction_energy", std::cout);
+            aux_A = generate_aux_wfn(wavy_A, aux_basis), aux_B = generate_aux_wfn(wavy_B, aux_basis);
+            std::vector<unsigned long> shape; bool fortran_order;
+            npy::LoadArrayFromNumpy(arguments[i + 2], shape, fortran_order, coef_A);
+            npy::LoadArrayFromNumpy(arguments[i + 4], shape, fortran_order, coef_B);
+        }
+        else if (SALTED) {
+            err_checkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED <model-dir> BEFORE -interaction_energy", std::cout);
+            auto predict = [this](const WFN& wavy, WFN& aux) {
+                SALTEDPredictor SP(wavy, *this);
+                if (!SP.basis_set_loaded()) load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+                vec coefs = SP.gen_SALTED_densities();
+                err_checkf(SP.wavy.get_ncen() == wavy.get_ncen(), "The SALTED model does not cover every atom of " + wavy.get_path().string(), std::cout);
+                aux = SP.wavy;
+                aux.set_origin(e_origin::NOT_YET_DEFINED);
+                return coefs;
+            };
+            std::cout << "Predicting both densities with the SALTED model in " << salted_model_dir << std::endl;
+            coef_A = predict(wavy_A, aux_A);
+            coef_B = predict(wavy_B, aux_B);
+        }
+        else {
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -ri_fit <basis> or -SALTED <model-dir> BEFORE -interaction_energy", std::cout);
+            err_checkf(wavy_A.get_nmo() > 0 && wavy_B.get_nmo() > 0, "-interaction_energy needs two wavefunctions to fit; structures alone need -SALTED <model-dir>", std::cout);
+            DensityFitting::CONFIG config = DensityFitting::config_from_options(*this);
+            aux_A = generate_aux_wfn(wavy_A, aux_basis), aux_B = generate_aux_wfn(wavy_B, aux_basis);
+            coef_A = DensityFitting::density_fit(wavy_A, aux_A, config);
+            coef_B = DensityFitting::density_fit(wavy_B, aux_B, config);
+        }
+        DensityFitting::print_interaction_energy(DensityFitting::interaction_energy(coef_A, aux_A, coef_B, aux_B, repulsion_overlap, repulsion_exchange), aux_A, aux_B, std::cout);
         exit(0);
     }
     else if (temp == "-RI_CUBE" || temp == "-ri_cube")
@@ -4195,6 +4302,9 @@ void options::digest_options()
         if (debug)
             log_file << "Using -xyz input as the SALTED structure: " << wfn << endl;
     }
+    //-multipole_moments without -ri_fit: auto_aux, whichever order the two came in
+    if (multipole_lmax >= 0 && aux_basis.empty())
+        aux_basis.push_back(std::make_shared<BasisSet>());
 };
 
 namespace {
