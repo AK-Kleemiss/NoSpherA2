@@ -17,6 +17,7 @@
 #include "core/integrator.h"
 #include "core/basis_set.h"
 #include "core/geometry_aid.h"
+#include "core/crystal_energies.h"
 #include "core/NoSpherA2.h"
 #include "core/npy.h"
 #ifdef NOSPHERA2_USE_GPU
@@ -3051,5 +3052,205 @@ namespace NoSpherA2UnitTests
         ASSERT_EQ(p_batch.size(), p.size());
         for (int i = 0; i < 36; i++) EXPECT_EQ(p_batch[i], p[i]) << i;
         for (const std::filesystem::path& f : { model, out, copy, list, copy_probs, descr }) std::filesystem::remove(f);
+    }
+    namespace {
+        vec2 rotation(const double a, const double b, const double c)
+        {
+            const double ca = std::cos(a), sa = std::sin(a), cb = std::cos(b), sb = std::sin(b), cc = std::cos(c), sc = std::sin(c);
+            const vec2 Z1{ {ca, -sa, 0}, {sa, ca, 0}, {0, 0, 1} }, Y{ {cb, 0, sb}, {0, 1, 0}, {-sb, 0, cb} }, Z2{ {cc, -sc, 0}, {sc, cc, 0}, {0, 0, 1} };
+            vec2 R(3, vec(3, 0.0));
+            for (int i = 0; i < 3; i++)
+                for (int j = 0; j < 3; j++)
+                    for (int k = 0; k < 3; k++)
+                        for (int l = 0; l < 3; l++) R[i][j] += Z1[i][k] * Y[k][l] * Z2[l][j];
+            return R;
+        }
+        int aux_size(const WFN& aux)
+        {
+            int n = 0;
+            for (int a = 0; a < aux.get_ncen(); a++) {
+                const atom A = aux.get_atom(a);
+                int prim = 0;
+                for (int shell = 0; shell < (int)A.get_shellcount_size(); shell++) {
+                    n += 2 * A.get_basis_set_entry(prim).get_type() + 1;
+                    prim += A.get_shellcount(shell);
+                }
+            }
+            return n;
+        }
+        WFN oh_molecule(const double z)
+        {
+            WFN wavy(e_origin::NOT_YET_DEFINED);
+            wavy.push_back_atom("O", 0.0, 0.0, z, 8);
+            wavy.push_back_atom("H", 1.8, 0.0, z, 1);
+            return wavy;
+        }
+        void write_p1bar_cif(const std::filesystem::path& cif, const std::string& op)
+        {
+            std::ofstream out(cif);
+            out << "data_test\n_cell_length_a 10.0\n_cell_length_b 10.0\n_cell_length_c 10.0\n_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\n_cell_volume 1000\n"
+                << "loop_\n_space_group_symop_operation_xyz\n'x, y, z'\n'" << op << "'\n";
+        }
+    }
+
+    TEST(CrystalEnergyTests, RealSphericalHarmonicRotationIsOrthogonalAndMatchesTheFunctions)
+    {
+        const vec2 R = rotation(0.4, 1.1, -2.3);
+        vec2 S = R, I(3, vec(3, 0.0));
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++) S[i][j] = -R[i][j], I[i][j] = i == j ? -1.0 : 0.0;
+        double u[3] = { 0.3, -0.5, 0.81 };
+        const double norm = std::sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]);
+        for (int x = 0; x < 3; x++) u[x] /= norm;
+        for (int l = 0; l <= 5; l++) {
+            const int n = 2 * l + 1;
+            for (const vec2& M : { R, S }) {
+                const vec2 D = crystal_energies::real_sh_rotation(l, M);
+                ASSERT_EQ(D.size(), n);
+                for (int i = 0; i < n; i++)
+                    for (int j = 0; j < n; j++) {
+                        double dot = 0.0;
+                        for (int k = 0; k < n; k++) dot += D[k][i] * D[k][j];
+                        EXPECT_NEAR(dot, i == j ? 1.0 : 0.0, 1e-9) << l << " " << i << " " << j;
+                    }
+                double v[3];
+                for (int x = 0; x < 3; x++) v[x] = M[0][x] * u[0] + M[1][x] * u[1] + M[2][x] * u[2];
+                for (int m = 0; m < n; m++) {
+                    double sum = 0.0;
+                    for (int k = 0; k < n; k++) sum += D[k][m] * constants::spherical_harmonic(l, k - l, u);
+                    EXPECT_NEAR(sum, constants::spherical_harmonic(l, m - l, v), 1e-9) << l << " " << m;
+                }
+            }
+            const vec2 P = crystal_energies::real_sh_rotation(l, I);
+            for (int i = 0; i < n; i++)
+                for (int j = 0; j < n; j++) EXPECT_NEAR(P[i][j], i == j ? (l % 2 ? -1.0 : 1.0) : 0.0, 1e-9) << l << " " << i << " " << j;
+        }
+    }
+
+    TEST(CrystalEnergyTests, MovedMoleculesKeepTheirInteractionEnergy)
+    {
+        std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+        const WFN aux_A = generate_aux_wfn(oh_molecule(0.0), basis), aux_B = generate_aux_wfn(oh_molecule(5.0), basis);
+        vec c_A(aux_size(aux_A)), c_B(aux_size(aux_B));
+        for (int i = 0; i < (int)c_A.size(); i++) c_A[i] = 0.3 * std::sin(1.0 + i), c_B[i] = 0.3 * std::cos(0.5 + 2 * i);
+        const DensityFitting::INTERACTION E = DensityFitting::interaction_energy(c_A, aux_A, c_B, aux_B);
+        EXPECT_GT(std::abs(E.electrostatic()), 1e-4);
+        const vec2 R = rotation(0.4, 1.1, -2.3);
+        const vec t{ 0.7, -1.1, 2.3 };
+        for (int improper = 0; improper < 2; improper++) {
+            vec2 M = R;
+            if (improper)
+                for (int i = 0; i < 3; i++)
+                    for (int j = 0; j < 3; j++) M[i][j] = -R[i][j];
+            WFN a = aux_A, b = aux_B;
+            vec ca = c_A, cb = c_B;
+            crystal_energies::transform(a, ca, M, t);
+            crystal_energies::transform(b, cb, M, t);
+            for (int x = 0; x < 3; x++) EXPECT_NEAR(a.get_atom_coordinate(1, x), t[x] + 1.8 * M[x][0], 1e-12);
+            const DensityFitting::INTERACTION F = DensityFitting::interaction_energy(ca, a, cb, b);
+            EXPECT_NEAR(F.electrostatic(), E.electrostatic(), 1e-8) << improper;
+            EXPECT_NEAR(F.overlap, E.overlap, 1e-8) << improper;
+            EXPECT_NEAR(F.disp, E.disp, 1e-8) << improper;
+            EXPECT_NEAR(F.pol_A, E.pol_A, 1e-7) << improper;
+            EXPECT_NEAR(F.pol_B, E.pol_B, 1e-7) << improper;
+            //the repulsion is a grid quadrature and the grids do not turn with the atoms
+            EXPECT_NEAR(F.rep, E.rep, 1e-2 * std::abs(E.rep)) << improper;
+        }
+    }
+
+    TEST(CrystalEnergyTests, ContactsInPMinus1AreListedOnce)
+    {
+        const std::filesystem::path cif = geometry_aid_tmp("p1bar.cif"), cif3 = geometry_aid_tmp("p3.cif");
+        write_p1bar_cif(cif, "-x, -y, -z");
+        write_p1bar_cif(cif3, "-y, x-y, z");
+        cell c(cif, std::cout, false, true);
+        WFN mol(e_origin::NOT_YET_DEFINED);
+        mol.push_back_atom("O", constants::ang2bohr(1.0), constants::ang2bohr(2.0), constants::ang2bohr(3.0), 8);
+        const std::vector<crystal_energies::pair> pairs = crystal_energies::contacts(c, { mol }, 10.5);
+        ASSERT_EQ(pairs.size(), 8);
+        int identity = 0, inversion = 0;
+        std::set<std::string> ns;
+        for (const crystal_energies::pair& p : pairs) {
+            EXPECT_EQ(p.A, 0);
+            EXPECT_EQ(p.B, 0);
+            if (p.op == 0) {
+                identity++;
+                EXPECT_NEAR(p.distance, 10.0, 1e-9);
+            }
+            else {
+                inversion++;
+                ns.insert(std::to_string(p.n[0]) + std::to_string(p.n[1]) + std::to_string(p.n[2]));
+                if (p.n[0] == 0 && p.n[1] == 0 && p.n[2] == 1) {
+                    EXPECT_EQ(p.symop, "-x,-y,-z+1");
+                    EXPECT_NEAR(p.distance, 6.0, 1e-9);
+                    EXPECT_NEAR(p.centroid_B[0], -1.0, 1e-9);
+                    EXPECT_NEAR(p.centroid_B[1], -2.0, 1e-9);
+                    EXPECT_NEAR(p.centroid_B[2], 7.0, 1e-9);
+                }
+            }
+            for (int x = 0; x < 3; x++) EXPECT_NEAR(p.centroid_A[x], x + 1.0, 1e-9);
+        }
+        EXPECT_EQ(identity, 3);
+        EXPECT_EQ(inversion, 5);
+        EXPECT_EQ(ns, std::set<std::string>({ "000", "001", "010", "011", "101" }));
+        cell c3(cif3, std::cout, false, true);
+        const std::vector<crystal_energies::symop> ops = crystal_energies::symops(c3);
+        ASSERT_EQ(ops.size(), 2);
+        EXPECT_EQ(ops[1].rot, ivec2({ { 0, -1, 0 }, { 1, -1, 0 }, { 0, 0, 1 } }));
+        EXPECT_EQ(crystal_energies::symop_string(ops[1], { 0, 1, -1 }), "-y,x-y+1,z-1");
+        std::filesystem::remove(cif), std::filesystem::remove(cif3);
+    }
+
+    TEST(CrystalEnergyTests, RunAppWritesThePairTableWithInvertedCoefficients)
+    {
+        const std::filesystem::path dir = geometry_aid_tmp("crystal"), cif = dir / "p1bar.cif", xyz = dir / "o.xyz", npy = dir / "o.npy", job = dir / "job.txt", table = dir / "ie.txt";
+        std::filesystem::create_directories(dir);
+        write_p1bar_cif(cif, "-x, -y, -z");
+        { std::ofstream out(xyz); out << "1\ntest\nO 1.0 2.0 3.0\n"; }
+        std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+        const WFN aux_A = generate_aux_wfn(WFN(xyz), basis);
+        vec coef(aux_size(aux_A));
+        for (int i = 0; i < (int)coef.size(); i++) coef[i] = 0.2 * std::sin(1.0 + i);
+        const unsigned long shape[1] = { (unsigned long)coef.size() };
+        npy::SaveArrayAsNumpy(npy, false, 1, shape, coef);
+        { std::ofstream out(job); out << "# test job\ncif p1bar.cif\ncutoff 10.5\noutput ie.txt\nmolecule o.xyz o.npy\n"; }
+        ASSERT_EQ(run_nosphera2({ "-ri_fit", "combo_basis_fit", "-interaction_energies", job.string(), "-no_date" }), 0);
+        std::ifstream in(table);
+        ASSERT_TRUE(in.good());
+        std::string line;
+        int rows = 0;
+        double total = 0.0;
+        bool found = false;
+        while (std::getline(in, line)) {
+            if (line.empty() || line[0] == '#') continue;
+            rows++;
+            std::istringstream ss(line);
+            int A, B, n[3];
+            std::string symop;
+            double R, x[6], E[5];
+            ss >> A >> B >> symop >> n[0] >> n[1] >> n[2] >> R;
+            for (int i = 0; i < 6; i++) ss >> x[i];
+            for (int i = 0; i < 5; i++) ss >> E[i];
+            ASSERT_FALSE(ss.fail()) << line;
+            EXPECT_NEAR(E[0] + E[1] + E[2] + E[3], E[4], 3e-3) << line;
+            if (symop == "-x,-y,-z+1" && n[2] == 1) found = true, total = E[4];
+        }
+        in.close();
+        EXPECT_EQ(rows, 8);
+        ASSERT_TRUE(found);
+        WFN aux_B = aux_A;
+        std::vector<atom> atoms = aux_B.get_atoms();
+        atoms[0].set_coordinate(0, constants::ang2bohr(-1.0)), atoms[0].set_coordinate(1, constants::ang2bohr(-2.0)), atoms[0].set_coordinate(2, constants::ang2bohr(7.0));
+        aux_B.set_atoms(atoms);
+        vec coef_B = coef;
+        int prim = 0, offset = 0;
+        for (int shell = 0; shell < (int)atoms[0].get_shellcount_size(); shell++) {
+            const int l = atoms[0].get_basis_set_entry(prim).get_type();
+            for (int m = 0; m < 2 * l + 1; m++) coef_B[offset + m] *= l % 2 ? -1.0 : 1.0;
+            offset += 2 * l + 1, prim += atoms[0].get_shellcount(shell);
+        }
+        const DensityFitting::INTERACTION E = DensityFitting::interaction_energy(coef, aux_A, coef_B, aux_B);
+        EXPECT_NEAR(total, E.total() * constants::kcal_mol_per_hartree * 4.184, 2e-3);
+        std::filesystem::remove_all(dir);
     }
 } // namespace NoSpherA2UnitTests

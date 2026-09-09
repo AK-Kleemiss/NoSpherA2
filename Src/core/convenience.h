@@ -775,6 +775,7 @@ struct options
     pathvec featomic_structures;
     pathvec classify_structures;
     double geometry_aid_cutoff = 3.5;
+    std::filesystem::path interaction_energies_job;
 	std::filesystem::path xcw_settings_path;
     properties_options properties;
     bool debug = false;

@@ -12,6 +12,7 @@
 #include "fchk.h"
 #include "bondwise_analysis.h"
 #include "geometry_aid.h"
+#include "crystal_energies.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -389,6 +390,11 @@ std::string help_message =
  "                                    -ri_fit, or two .xyz with -SALTED. With\n"
  "                                    <A> <A.npy> <B> <B.npy> the coefficient\n"
  "                                    files are read instead; use -ri_fit.\n"
+ "  -interaction_energies <job>         Interaction energies of every molecule\n"
+ "                                    pair in contact in a crystal; the job file\n"
+ "                                    lists cif, cutoff, output and one\n"
+ "                                    molecule <xyz> [<coef.npy>] per line.\n"
+ "                                    Use -ri_fit or -SALTED first.\n"
  "  -repulsion_overlap <K>             Exchange-repulsion of -interaction_energy\n"
  "                                    as K * Int rhoA rhoB, K in Eh bohr^3/e^2,\n"
  "                                    instead of the Gordon-Kim default.\n"
@@ -3607,39 +3613,17 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         const bool from_files = i + 4 < argc && std::filesystem::path(arguments[i + 2]).extension() == ".npy";
         WFN wavy_A(arguments[i + 1]), wavy_B(arguments[from_files ? i + 3 : i + 2]);
         WFN aux_A(e_origin::NOT_YET_DEFINED), aux_B(e_origin::NOT_YET_DEFINED);
-        vec coef_A, coef_B;
-        if (from_files) {
-            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -ri_fit BEFORE -interaction_energy", std::cout);
-            aux_A = generate_aux_wfn(wavy_A, aux_basis), aux_B = generate_aux_wfn(wavy_B, aux_basis);
-            std::vector<unsigned long> shape; bool fortran_order;
-            npy::LoadArrayFromNumpy(arguments[i + 2], shape, fortran_order, coef_A);
-            npy::LoadArrayFromNumpy(arguments[i + 4], shape, fortran_order, coef_B);
-        }
-        else if (SALTED) {
-            err_checkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED <model-dir> BEFORE -interaction_energy", std::cout);
-            auto predict = [this](const WFN& wavy, WFN& aux) {
-                SALTEDPredictor SP(wavy, *this);
-                if (!SP.basis_set_loaded()) load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
-                vec coefs = SP.gen_SALTED_densities();
-                err_checkf(SP.wavy.get_ncen() == wavy.get_ncen(), "The SALTED model does not cover every atom of " + wavy.get_path().string(), std::cout);
-                aux = SP.wavy;
-                aux.set_origin(e_origin::NOT_YET_DEFINED);
-                return coefs;
-            };
-            std::cout << "Predicting both densities with the SALTED model in " << salted_model_dir << std::endl;
-            coef_A = predict(wavy_A, aux_A);
-            coef_B = predict(wavy_B, aux_B);
-        }
-        else {
-            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -ri_fit <basis> or -SALTED <model-dir> BEFORE -interaction_energy", std::cout);
-            err_checkf(wavy_A.get_nmo() > 0 && wavy_B.get_nmo() > 0, "-interaction_energy needs two wavefunctions to fit; structures alone need -SALTED <model-dir>", std::cout);
-            DensityFitting::CONFIG config = DensityFitting::config_from_options(*this);
-            aux_A = generate_aux_wfn(wavy_A, aux_basis), aux_B = generate_aux_wfn(wavy_B, aux_basis);
-            coef_A = DensityFitting::density_fit(wavy_A, aux_A, config);
-            coef_B = DensityFitting::density_fit(wavy_B, aux_B, config);
-        }
+        if (SALTED && !from_files) std::cout << "Predicting both densities with the SALTED model in " << salted_model_dir << std::endl;
+        const vec coef_A = crystal_energies::fitted_coefficients(wavy_A, from_files ? arguments[i + 2] : "", aux_A, *this);
+        const vec coef_B = crystal_energies::fitted_coefficients(wavy_B, from_files ? arguments[i + 4] : "", aux_B, *this);
         DensityFitting::print_interaction_energy(DensityFitting::interaction_energy(coef_A, aux_A, coef_B, aux_B, repulsion_overlap, repulsion_exchange), aux_A, aux_B, std::cout);
         exit(0);
+    }
+    else if (temp == "-interaction_energies") {
+        //-interaction_energies <job>: every molecule pair in contact in the crystal, run after the options are parsed
+        err_checkf(i + 1 < argc, "-interaction_energies needs a job file", std::cout);
+        interaction_energies_job = arguments[++i];
+        err_checkf(std::filesystem::exists(interaction_energies_job), "The job file does not exist: " + interaction_energies_job.string(), std::cout);
     }
     else if (temp == "-RI_CUBE" || temp == "-ri_cube")
     {
