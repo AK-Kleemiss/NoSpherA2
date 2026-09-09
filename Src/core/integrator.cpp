@@ -550,7 +550,7 @@ namespace {
     // Gordon-Kim exchange-repulsion of the fitted densities on a Becke grid over the dimer: gk[0] the Thomas-Fermi kinetic
     // energy, gk[1] 1/9 of the von Weizsaecker gradient correction and gk[2] the Dirac exchange of rhoA + rhoB minus the
     // monomers, gk[3], gk[4] the electron counts of A and B on the grid. Gradients by central differences of the aux density
-    void gordon_kim(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, double* gk)
+    void gordon_kim(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const int x_fun, double* gk)
     {
         const int wfn_type[6] = { 1, 2, 5, 11, 21, 36 };
         const WFN* mono[2] = { &aux_A, &aux_B };
@@ -572,7 +572,7 @@ namespace {
         gm.setup3DGridsForMolecule(dimer, all, bvec(dimer.get_ncen(), true), cell(), false, quiet);
         const std::vector<atom> at_A = aux_A.get_atoms(), at_B = aux_B.get_atoms();
         const GridData& GD = gm.getGridData();
-        const double C_TF = 0.3 * std::pow(3 * constants::PI * constants::PI, 2.0 / 3.0), C_X = -0.75 * std::pow(3 * constants::INV_PI, 1.0 / 3.0), h = 1e-4;
+        const double C_TF = 0.3 * std::pow(3 * constants::PI * constants::PI, 2.0 / 3.0), h = 1e-4;
         double tf = 0.0, vw = 0.0, x = 0.0, nA = 0.0, nB = 0.0;
         for (int a = 0; a < dimer.get_ncen(); a++) {
             const vec2& g = GD.atomic_grids[a];
@@ -595,7 +595,7 @@ namespace {
                     const double s = m == 2 ? 1.0 : -1.0;
                     tf += s * w * C_TF * std::pow(rho[m], 5.0 / 3.0);
                     vw += s * w * g2[m] / (72.0 * rho[m]);
-                    x += s * w * C_X * std::pow(rho[m], 4.0 / 3.0);
+                    x += s * w * DensityFitting::exchange_density(rho[m], g2[m], x_fun);
                 }
             }
         }
@@ -603,7 +603,22 @@ namespace {
     }
 }
 
-DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K)
+double DensityFitting::exchange_density(const double rho, const double g2, const int x_fun)
+{
+    const double C_X = -0.75 * std::pow(3 * constants::INV_PI, 1.0 / 3.0), r43 = std::pow(rho, 4.0 / 3.0);
+    if (x_fun == 1) {
+        const double kappa = 0.804, mu = 0.2195149727645171;
+        const double s2 = g2 / (4 * std::pow(3 * constants::PI * constants::PI, 2.0 / 3.0) * r43 * r43);
+        return C_X * r43 * (1 + kappa - kappa / (1 + mu * s2 / kappa));
+    }
+    if (x_fun == 2) {
+        const double beta = 0.0042, x = std::cbrt(2.0) * std::sqrt(g2) / r43;
+        return C_X * r43 - 2 * beta * std::pow(0.5 * rho, 4.0 / 3.0) * x * x / (1 + 6 * beta * x * std::asinh(x));
+    }
+    return C_X * r43;
+}
+
+DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K, const int x_fun)
 {
     const aux_index ixA = index_aux(aux_A), ixB = index_aux(aux_B);
     err_checkf(coef_A.size() == ixA.atom.size() && coef_B.size() == ixB.atom.size(), "Coefficient count does not match the auxiliary basis", std::cout);
@@ -661,8 +676,8 @@ DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A
     if (repulsion_K > 0.0) E.rep = repulsion_K * E.overlap;
     else {
         double gk[5];
-        gordon_kim(coef_A, aux_A, coef_B, aux_B, gk);
-        E.rep_kin = gk[0], E.rep_vw = gk[1], E.rep_x = gk[2], E.n_A = gk[3], E.n_B = gk[4];
+        gordon_kim(coef_A, aux_A, coef_B, aux_B, x_fun, gk);
+        E.rep_kin = gk[0], E.rep_vw = gk[1], E.rep_x = gk[2], E.n_A = gk[3], E.n_B = gk[4], E.x_fun = x_fun;
         E.rep = E.rep_kin + E.rep_x;
     }
     E.pol_A = polarization(aux_A, aux_B, ixB, coef_B);
@@ -677,8 +692,9 @@ DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A
 void DensityFitting::print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file)
 {
     const bool KS = E.n_A == 0.0 && E.n_B == 0.0;
+    const char* x_names[3] = { "rep. exch. Dirac ", "rep. exch. PBE   ", "rep. exch. B88   " };
     const char* names[13] = { "nucleus-nucleus  ", "nuclei A - rho B ", "nuclei B - rho A ", "rho A - rho B    ", "electrostatic    ",
-                              "pol. A in field B", "pol. B in field A", "dispersion D4    ", "rep. kin. TF     ", "rep. exch. Dirac ", KS ? "repulsion K*S    " : "repulsion GK     ", "total            ", "vW/9 not in total" };
+                              "pol. A in field B", "pol. B in field A", "dispersion D4    ", "rep. kin. TF     ", x_names[E.x_fun], KS ? "repulsion K*S    " : "repulsion GK     ", "total            ", "vW/9 not in total" };
     const double parts[13] = { E.nuc_nuc, E.nucA_rhoB, E.nucB_rhoA, E.rho_rho, E.electrostatic(), E.pol_A, E.pol_B, E.disp, E.rep_kin, E.rep_x, E.rep, E.total(), E.rep_vw };
     file << "\nElectrostatic interaction energy of the fitted densities\n";
     for (int i = 0; i < (KS ? 12 : 13); i++) {

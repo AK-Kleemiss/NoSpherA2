@@ -901,6 +901,8 @@ struct options
     double multipole_strength = 1.0;
     //-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
     double repulsion_overlap = 0.0;
+    //-repulsion_exchange: exchange functional of the Gordon-Kim repulsion, 0 Dirac, 1 PBE, 2 B88
+    int repulsion_exchange = 0;
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 

@@ -719,6 +719,8 @@ std::string help_message =
  "  -repulsion_overlap <K>             Exchange-repulsion of -interaction_energy\n"
  "                                    as K * Int rhoA rhoB, K in Eh bohr^3/e^2,\n"
  "                                    instead of the Gordon-Kim default.\n"
+ "  -repulsion_exchange <dirac|pbe|b88> Exchange functional of the Gordon-Kim\n"
+ "                                    repulsion, default dirac.\n"
  "  -combine_mos <wfn1> <wfn2>          Combine molecular orbitals.\n"
  "  -cmos1 <MO ...>  -cmos2 <MO ...>   MO selections for -combine_mos.\n"
  "  -QCT                               Enter the legacy QCT workflow.\n\n"
@@ -4044,6 +4046,11 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         repulsion_overlap = std::stod(arguments[++i]);
         err_checkf(repulsion_overlap >= 0.0, "-repulsion_overlap must not be negative", std::cout);
     }
+    else if (temp == "-repulsion_exchange") {
+        const std::string f = arguments[++i];
+        repulsion_exchange = f == "dirac" ? 0 : f == "pbe" ? 1 : f == "b88" ? 2 : -1;
+        err_checkf(repulsion_exchange >= 0, "-repulsion_exchange takes dirac, pbe or b88", std::cout);
+    }
     else if (temp == "-interaction_energy") {
         //-interaction_energy <A> <B>: electrostatics between two fitted densities. With -SALTED <model-dir> both are predicted
         //from the model, otherwise A and B are wavefunctions and each is RI-fitted with the -ri_fit basis.
@@ -4083,7 +4090,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
             coef_A = DensityFitting::density_fit(wavy_A, aux_A, config);
             coef_B = DensityFitting::density_fit(wavy_B, aux_B, config);
         }
-        DensityFitting::print_interaction_energy(DensityFitting::interaction_energy(coef_A, aux_A, coef_B, aux_B, repulsion_overlap), aux_A, aux_B, std::cout);
+        DensityFitting::print_interaction_energy(DensityFitting::interaction_energy(coef_A, aux_A, coef_B, aux_B, repulsion_overlap, repulsion_exchange), aux_A, aux_B, std::cout);
         exit(0);
     }
     else if (temp == "-RI_CUBE" || temp == "-ri_cube")

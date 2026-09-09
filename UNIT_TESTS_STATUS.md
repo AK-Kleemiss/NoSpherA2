@@ -1,8 +1,9 @@
 # Unit Test Status
-**Last updated: 2026-09-09** (`-interaction_energy` now computes the exchange-repulsion by the
-Gordon-Kim functionals of the fitted densities on a Becke grid over the dimer; `-repulsion_overlap <K>`
-keeps the K * S model. `XCW_Test` merged in (f-function phases, ELI basins). 283, 279 pass and the
-usual 4 `*_full` XCW cases skip on `release-windows`. 2026-09-08: Thakkar polarization in the
+**Last updated: 2026-09-09** (`-repulsion_exchange <dirac|pbe|b88>` picks the exchange functional of
+the Gordon-Kim repulsion, with an H-atom gtest for the three functionals; `-interaction_energy` computes
+the exchange-repulsion by the Gordon-Kim functionals of the fitted densities on a Becke grid over the
+dimer; `-repulsion_overlap <K>` keeps the K * S model. `XCW_Test` merged in (f-function phases, ELI
+basins). 284, 280 pass and the usual 4 `*_full` XCW cases skip on `release-windows`. 2026-09-08: Thakkar polarization in the
 partner's field, D4 dispersion and the density overlap S; `-salted_charge_constraint`
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
@@ -187,6 +188,17 @@ total -4.66 (CCSD(T)-like reference -5.5); Model V7 with charge constraint +10.5
 total -1.20, the shortfall being the electrostatics of the model density. Delta E_x / Delta T_TF is
 about -0.5 in both, as in the rare-gas Gordon-Kim literature. Scale factors on the two pieces
 (Waldman-Gordon style) are part of the WP3 calibration.
+
+`-repulsion_exchange <dirac|pbe|b88>` swaps the Dirac exchange for the PBE or B88 GGA exchange of the
+closed-shell density (`DensityFitting::exchange_density`, the gradient the one already computed for the
+von Weizsaecker term). `ExchangeFunctionalsReproduceTheHydrogenAtom` integrates the spin-scaled H 1s
+density, E_x[rho_up] = E_x[2 rho_up] / 2, and checks -0.2680 (LDA), -0.3059 (PBE) and -0.3098 (B88) Eh
+to 2e-4; the point-partner case checks that PBE and B88 leave `rep_kin` alone and change `rep_x`.
+Water-methanol, kcal/mol, Delta E_x with Dirac / PBE / B88: free fit -6.19 / -2.54 / -0.78, totals
+-4.66 / -1.01 / +0.75; Model V7 -5.60 / -2.22 / -0.46, totals -1.20 / +2.18 / +3.94. The GGA enhancement
+is largest in the low-density tails, where the monomers' reduced gradients exceed the dimer's, so the
+gradient correction cancels most of the exchange attraction and the repulsion grows; Dirac stays the
+default, as in the classical Gordon-Kim model.
 
 ## 2026-09-09 — f-function phases in the OCC-to-WFN constructor
 

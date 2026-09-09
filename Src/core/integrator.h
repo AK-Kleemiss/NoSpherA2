@@ -71,10 +71,12 @@ namespace DensityFitting
     // partner's field, disp the D4 energy of the dimer minus the monomers, overlap = Int rhoA rhoB. Exchange-repulsion
     // rep = K * overlap when K > 0, else Gordon-Kim rep_kin + rep_x: rep_kin = T[rhoA+rhoB] - T[rhoA] - T[rhoB] with the
     // Thomas-Fermi functional, rep_x the same difference of Dirac exchange, rep_vw the 1/9 von Weizsaecker correction to
-    // rep_kin reported but not added, on a Becke grid over the dimer that integrates the fitted densities to n_A, n_B
+    // rep_kin reported but not added, on a Becke grid over the dimer that integrates the fitted densities to n_A, n_B.
+    // x_fun picks the exchange functional: 0 Dirac, 1 PBE, 2 B88
     struct INTERACTION {
         double nuc_nuc = 0.0, nucA_rhoB = 0.0, nucB_rhoA = 0.0, rho_rho = 0.0;
         double pol_A = 0.0, pol_B = 0.0, disp = 0.0, overlap = 0.0, rep = 0.0, rep_kin = 0.0, rep_vw = 0.0, rep_x = 0.0, n_A = 0.0, n_B = 0.0;
+        int x_fun = 0;
         double electrostatic() const { return nuc_nuc + nucA_rhoB + nucB_rhoA + rho_rho; };
         double total() const { return electrostatic() + pol_A + pol_B + disp + rep; };
         vec2 pair, rank;
@@ -83,7 +85,9 @@ namespace DensityFitting
     double lower_gamma_half(const int l, const double x);
     // Coulomb potential Int chi(r)/|r-R| of one aux primitive centred at the origin, Y_lm(R^) included
     double aux_potential(const double exponent, const double coef, const int l, const int m, const double* R);
-    INTERACTION interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K = 0.0);
+    INTERACTION interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K = 0.0, const int x_fun = 0);
+    // Exchange energy density of the closed-shell rho with |grad rho|^2 = g2: x_fun 0 Dirac, 1 PBE, 2 B88
+    double exchange_density(const double rho, const double g2, const int x_fun);
     void print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file);
 
     // Demonstration function

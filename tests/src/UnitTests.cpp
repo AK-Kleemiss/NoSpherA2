@@ -2682,6 +2682,20 @@ namespace NoSpherA2UnitTests
     // point-like, so the energy cancels in both halves: the analytic aux potential of A at B's nucleus against
     // the libcint two-centre integrals, and A's nuclear repulsion against A's nuclei in B's density. This ties
     // the potential, the coefficient layout and the combined Int_Params block together
+    // Spin-scaled hydrogen atom, E_x[rho_up] = E_x[2 rho_up] / 2: LDA -0.2680, PBE -0.3059, B88 -0.3098 Eh
+    TEST(RiInteractionTests, ExchangeFunctionalsReproduceTheHydrogenAtom)
+    {
+        const double ref[3] = { -0.2680, -0.3059, -0.3098 }, dr = 1e-4;
+        for (int f = 0; f < 3; f++) {
+            double e = 0.0;
+            for (int i = 1; i < 300000; i++) {
+                const double r = i * dr, rho = 2 * std::exp(-2 * r) / constants::PI;
+                e += 4 * constants::PI * r * r * DensityFitting::exchange_density(rho, 4 * rho * rho, f) * dr;
+            }
+            EXPECT_NEAR(0.5 * e, ref[f], 2e-4) << f;
+        }
+    }
+
     TEST(RiInteractionTests, NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables)
     {
         WFN wavy(e_origin::NOT_YET_DEFINED);
@@ -2739,6 +2753,13 @@ namespace NoSpherA2UnitTests
         EXPECT_NEAR(G.rep_x, E.rep_x, 1e-6);
         EXPECT_NEAR(G.n_A, E.n_B, 1e-4);
         EXPECT_NEAR(G.n_B, E.n_A, 1e-4);
+        for (int f = 1; f < 3; f++) {
+            const DensityFitting::INTERACTION H = DensityFitting::interaction_energy(coef_A, aux_A, coef_B, wavy_B, 0.0, f);
+            EXPECT_EQ(H.x_fun, f);
+            EXPECT_NEAR(H.rep_kin, E.rep_kin, 1e-12);
+            EXPECT_LT(H.rep_x, 0.0);
+            EXPECT_GT(std::abs(H.rep_x - E.rep_x), 1e-8);
+        }
         EXPECT_NEAR(F.nucA_rhoB, E.nucB_rhoA, 1e-12);
         EXPECT_NEAR(F.rho_rho, E.rho_rho, 1e-10);
         for (int a = 0; a < 2; a++) EXPECT_NEAR(F.pair[0][a], E.pair[a][0], 1e-12);
