@@ -2797,7 +2797,7 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
         integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
         vec vol;
         double outside = 0.0;
-        const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr);
+        const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid);
         std::cout << "\n" << title << " (atomic quadrature grids):\n";
         std::cout << "  basin  label               electrons" << (eli ? "" : "     charge") << "      volume     maximum        x          y          z\n";
         double total = 0.0;

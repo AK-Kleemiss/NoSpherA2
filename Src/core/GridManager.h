@@ -32,6 +32,12 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
 
 struct GridConfiguration {
     int accuracy = 2;
+    //A grid pulled into the core: the tightest exponent, which sets the inner radius and the
+    //radial step, is sharpened by alpha_max_scale, the step divided by radial_step_scale and
+    //the Lebedev order stepped up angular_boost entries. The basin integration uses it.
+    double alpha_max_scale = 1.0;
+    double radial_step_scale = 1.0;
+    int angular_boost = 0;
     int pbc = 0;
     PartitionType partition_type = PartitionType::Hirshfeld;
     bool debug = false;

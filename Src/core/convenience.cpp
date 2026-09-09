@@ -729,6 +729,10 @@ std::string help_message =
  "                                    latter from 0.005 to 0.002 e. With -ECP\n"
  "                                    the core an ECP removed is filled from\n"
  "                                    Thakkar densities for the QTAIM basins.\n"
+ "  -basin_grid <n>                    Pull the basin quadrature into the core:\n"
+ "                                    tightest exponent sharpened n^2-fold, the\n"
+ "                                    radial step divided by n, the angular\n"
+ "                                    order up n-1 steps. For heavy atoms.\n"
  "  -ewal_sum <cube> [kmax] [accuracy] Ewald sum of a cube.\n"
  "  -atom_dens <wfn> [alpha-MOs beta-MOs]\n"
  "  -atom_dens_diff <gbw1> <gbw2>      Difference density from two GBW files.\n"
@@ -2840,6 +2844,8 @@ bool options::digest_run_options(const std::string &temp, int &i)
     const int argc = (int)arguments.size();
     if (temp == "-acc")
         accuracy = stoi(arguments[i + 1]);
+    else if (temp == "-basin_grid")
+        basin_grid = std::max(1, stoi(arguments[i + 1]));
     else if (temp == "-Anion")
     {
         int n = 1;

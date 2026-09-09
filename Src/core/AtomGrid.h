@@ -13,7 +13,8 @@ public:
         const double alpha_max,
         const int max_l_quantum_number,
         const double alpha_min[],
-        std::ostream &file);
+        std::ostream &file,
+        const double radial_step_scale = 1.0);
 
     ~AtomGrid();
 

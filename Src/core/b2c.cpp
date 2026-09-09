@@ -1347,7 +1347,7 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 //when every voxel within three of it agrees; otherwise it is sent up the analytic field
 //until it comes within two voxels of a maximum, so the boundary is the field's and not the
 //grid's.
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient)
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost)
 {
     //The filled core steers the trajectories only. An ECP atom's grid is built for its
     //valence basis and cannot integrate a 1s at Z = 80, so the core electrons are added to
@@ -1436,6 +1436,9 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
     //costs five times level 3
     GridConfiguration config;
     config.accuracy = std::max(accuracy, 3);
+    config.alpha_max_scale = static_cast<double>(grid_boost) * grid_boost;
+    config.radial_step_scale = grid_boost;
+    config.angular_boost = grid_boost - 1;
     config.partition_type = PartitionType::Becke;
     config.no_density_eval = true;
     GridManager grids(config);
