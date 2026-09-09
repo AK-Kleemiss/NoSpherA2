@@ -304,6 +304,7 @@ private:
 
 	// Takes the SCF object from occ and creates the tscb file
 	void create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda);
+	static void flip_high_m_phases(occ::qm::Wavefunction& w);
 
 	// Builds the density matrix to use for structure factor calculations
 	void build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMatrix2& dm_ref, const occ::Mat& dm_old);

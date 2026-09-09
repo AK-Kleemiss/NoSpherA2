@@ -40,6 +40,7 @@ set_tests_properties(
     TomlIntegrationTests.RGBI_Groups_NH3BH3_sym_ANO
     TomlIntegrationTests.RGBI_NH3Li
     TomlIntegrationTests.RGBI_NH3Li_ANO
+    TomlIntegrationTests.ELI_NH3Li
     PROPERTIES
         RESOURCE_LOCK integration_RGBI_groups
 )

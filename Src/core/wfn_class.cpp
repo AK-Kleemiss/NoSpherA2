@@ -184,6 +184,24 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
         nex += n_cart * shell.exponents.size();
     }
     auto mo_go = occ::io::conversion::orb::to_gaussian_order(occ_WF.basis, occ_WF.mo);
+    //OCC's reordering leaves the phases as libcint has them, while the matrices below are
+    //Gaussian's, whose f(+-3), g(+-3) and g(+-4) carry the opposite sign - the same
+    //difference write_nbo corrects for. Without this a def2-TZVP wavefunction integrates
+    //to 149.58 electrons of 150 and its orbitals lose up to 3% of their norm.
+    {
+        int row = 0;
+        for (const auto &shell : occ_WF.basis.shells()) {
+            const int nsph = 2 * shell.l + 1;
+            if (shell.l >= 3)
+                for (int spin = 0; spin < (occ_WF.mo.kind == occ::qm::Unrestricted ? 2 : 1); spin++) {
+                    const int base = spin * occ_WF.nbf + row;
+                    mo_go.C.row(base + 5) *= -1.0;
+                    mo_go.C.row(base + 6) *= -1.0;
+                    if (shell.l >= 4) { mo_go.C.row(base + 7) *= -1.0; mo_go.C.row(base + 8) *= -1.0; }
+                }
+            row += nsph;
+        }
+    }
     Vector<int, 10> d_orbital_corr{ 0, 1, 2, 6, 3, 4, 7, 8, 5, 9 };
     auto atom2shell = occ_WF.basis.atom_to_shell();
 
@@ -8120,7 +8138,7 @@ const void WFN::computeValues(
     {
         normGrad = constants::alpha_coef * sqrt(Grad[0] * Grad[0] + Grad[1] * Grad[1] + Grad[2] * Grad[2]) / pow(Rho, constants::c_43);
         Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
-        Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+        Eli = 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
     }
     Lap = Hess[0] + Hess[4] + Hess[8];
 };
@@ -8235,7 +8253,7 @@ const void WFN::computeELIELF(
     if (Rho > 0)
     {
         Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
-        Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+        Eli = 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
     }
 };
 
@@ -8344,7 +8362,7 @@ const double WFN::computeELI(
             tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
         }
     }
-    return Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    return 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
 };
 
 void WFN::computeRhoELI(
@@ -8485,7 +8503,10 @@ void WFN::computeRhoELI(
             tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
         }
     }
-    out_Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    //ELI-D of one spin channel of a closed shell, Kohout's definition and DGrid's alpha-alpha
+    //field: rho_s (12 / g_s)^(3/8) with g_s = rho_s tau_s - |grad rho_s|^2 / 4 and every
+    //sigma quantity half the total, which is where the 1/2 and the 48 come from
+    out_Eli = 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
     out_Rho = Rho;
 };
 
@@ -8847,7 +8868,7 @@ const void WFN::computeLapELIELF(
         }
     }
     Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
-    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    Eli = 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
     Lap = Hess[0] + Hess[1] + Hess[2];
 };
 
@@ -8980,7 +9001,7 @@ const void WFN::computeLapELI(
             tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
         }
     }
-    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    Eli = 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
     Lap = Hess[0] + Hess[1] + Hess[2];
 };
 

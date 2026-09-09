@@ -884,6 +884,8 @@ struct options
     bool gpu_cublas = true;
     //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
     bool fukui_analysis_run = false;
+    //Basin analysis (-eli_analysis), run from run_app_impl for the same reason
+    bool eli_analysis_run = false;
     bool profiling = false;
     bool promol_nci = false;
     bool get_g = false;

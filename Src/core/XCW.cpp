@@ -7,6 +7,7 @@
 #include "scattering_factors.h"
 #include "nos_math.h"
 #include "basis_set.h"
+#include "bondwise_analysis.h"
 #include <mutex>
 
 void XCW::construct(const options& opt_in) {
@@ -1424,17 +1425,28 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				const double gamma = 2 * (mu_min + nu_min) / (mu_min * nu_min);
 				const double cutoff = std::log(c / e_tol) * gamma;
 				//Newton method for finding correct cutoff
-				double newton_cutoff = cutoff;
-				for (int iter = 0; iter < 50; iter++) {
-					double upper_bound = 0.0, bound_derivative = 0.0;
-					for (const auto& [weight, gamma_kl] : pairs) {
-						const double upper_bound_temp = weight * std::exp(-gamma_kl * newton_cutoff);
-						upper_bound += upper_bound_temp;
-						bound_derivative -= gamma_kl * upper_bound_temp;
+				double newton_cutoff;
+				if (cutoff <= 0.0) {
+					newton_cutoff = 0.0;
+				}
+				else {
+					double lo = 0.0, hi = cutoff;
+					newton_cutoff = 0.5 * (lo + hi);
+					for (int iter = 0; iter < 50; iter++) {
+						double upper_bound = 0.0, bound_derivative = 0.0;
+						for (const auto& [weight, gamma_kl] : pairs) {
+							const double upper_bound_temp = weight * std::exp(-gamma_kl * newton_cutoff);
+							upper_bound += upper_bound_temp;
+							bound_derivative -= gamma_kl * upper_bound_temp;
+						}
+						const double delta = upper_bound - e_tol;
+						if (delta >= 0.0) lo = newton_cutoff; else hi = newton_cutoff;
+						double next = newton_cutoff - delta / bound_derivative;
+						if (!(next > lo) || !(next < hi)) next = 0.5 * (lo + hi);
+						const double step = std::abs(next - newton_cutoff);
+						newton_cutoff = next;
+						if (step < 1e-12 * hi) break;
 					}
-					const double delta = (upper_bound - e_tol) / bound_derivative;
-					newton_cutoff -= delta;
-					if (std::abs(delta) < 1e-12 * newton_cutoff) break;
 				}
 				if (dist > newton_cutoff) {
 					skip[mu][nu] = 1;
@@ -2877,6 +2889,30 @@ bool XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Ma
 	// closing function
 }
 
+//The sign of f(+-3), g(+-3) and g(+-4) in every orbital, in OCC's own m = -l..l order,
+//and the density matrix rebuilt from them. Applied once on the way out and once on the
+//way back in, it is its own inverse.
+void XCW::flip_high_m_phases(occ::qm::Wavefunction& w) {
+	int row = 0;
+	const int spins = w.mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
+	for (const auto& shell : w.basis.shells()) {
+		const int nsph = 2 * shell.l + 1;
+		if (shell.l >= 3)
+			for (int spin = 0; spin < spins; spin++) {
+				const int base = spin * w.nbf + row;
+				w.mo.C.row(base).array() *= -1.0;
+				w.mo.C.row(base + nsph - 1).array() *= -1.0;
+				if (shell.l >= 4) {
+					w.mo.C.row(base + 1).array() *= -1.0;
+					w.mo.C.row(base + nsph - 2).array() *= -1.0;
+				}
+			}
+		row += nsph;
+	}
+	w.mo.update_occupied_orbitals();
+	w.mo.update_density_matrix();
+}
+
 void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda) {
 	XCW_log << "Creating .tscb file from converged SCF calculation..." << std::endl;
 	std::vector<WFN> sf_wave_vec(1, { scf.wavefunction(), false });
@@ -2910,13 +2946,32 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	sf_wave_vec[0].write_wfn(oss2.str(), false, true);
 	std::ostringstream oss3;
 	oss3 << "NA2_" << value << ".fchk";
-	scf.wavefunction().save(oss3.str());
+	//OCC's fchk writer reorders to Gaussian's basis functions but keeps libcint's phases,
+	//and Gaussian's f(+-3), g(+-3), g(+-4) are the opposite sign; the file has to carry
+	//Gaussian's so that anything reading an fchk gets the density right
+	{
+		occ::qm::Wavefunction w = scf.wavefunction();
+		flip_high_m_phases(w);
+		w.save(oss3.str());
+	}
 	if (settings.nbo_output) {
 		std::ostringstream oss4;
 		oss4 << "NA2_" << value << ".47";
 		sf_wave_vec[0].write_nbo(oss4.str(), opt->debug, &XCW_log);
 	}
-	//Roby_information Roby(sf_wave_vec[0]);
+	//Neither file written above can carry this analysis - a .wfn has bare primitives and
+	//the fchk reader keeps no shells - so -rgbi runs it here, on the refined wavefunction,
+	//and its report goes to a file of its own per lambda
+	if (opt->rgbi) {
+		std::ostringstream oss5;
+		oss5 << "NA2_" << value << "_RGBI.txt";
+		std::ofstream rgbi_out(oss5.str());
+		std::streambuf* const cout_buf = std::cout.rdbuf(rgbi_out.rdbuf());
+		Roby_information Roby(sf_wave_vec[0], opt->rgbi_group_sets, !opt->rgbi_no_sym,
+			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs);
+		std::cout.rdbuf(cout_buf);
+		XCW_log << "RGBI analysis written to " << oss5.str() << std::endl;
+	}
 }
 
 occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
@@ -3047,6 +3102,8 @@ void XCW::run_XCW_fitting() {
 		}
 		oss2 << "NA2_" << start_value_str << ".fchk";
 		last_wfn = occ::qm::Wavefunction::load(oss2.str());
+		//Written in Gaussian's phases by create_tscb; OCC's loader does not undo that
+		flip_high_m_phases(last_wfn);
 		has_guess = true;
 	}
 

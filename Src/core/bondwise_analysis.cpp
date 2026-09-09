@@ -2700,17 +2700,52 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
         std::cout << "\n";
     }
 
-    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius);
+    //Every nucleus is a maximum of the density, whatever the grid says
+    std::vector<d3> nuclei;
+    for (const atom &a : atoms) nuclei.push_back(a.get_pos());
+    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius, 5e-3, &nuclei, &l_w);
     svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
 
+    //ELI-D is a ratio of quantities that both vanish in the density's tail and turns to noise
+    //there, so its basins are searched only where the density exceeds 1e-4, the crop DGrid is
+    //run with here; what lies beyond is reported as outside
+    for (int x = 0; x < eli_cube.get_size(0); x++)
+        for (int y = 0; y < eli_cube.get_size(1); y++)
+            for (int z = 0; z < eli_cube.get_size(2); z++)
+                if (rho.get_value(x, y, z) < 1e-4) eli_cube.set_value(x, y, z, 0.0);
     std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
     svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
 
-    std::cout << "QTAIM Analysis:\n";
-    integrate_values_in_basins(&rho, &(qtaim_results.first), labels, opt.debug);
-    std::cout << "\n\nELI Analysis:\n";
-    integrate_values_in_basins(&rho, &(eli_results.first), eli_labels, opt.debug);
-
+    //Two integrations of the density over each basin set: the voxel sum, which is what the cube
+    //resolution buys, and the atom-centred quadrature grids with the boundary decided by the
+    //field itself, which is the number to compare with AIMAll and DGrid
+    auto report = [&](const char *title, const std::pair<cubei, std::vector<d4>> &res, svec &lab, const bool eli) {
+        std::cout << "\n" << title << " (voxel sum):\n";
+        integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
+        vec vol;
+        double outside = 0.0;
+        const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside);
+        std::cout << "\n" << title << " (atomic quadrature grids):\n";
+        std::cout << "  basin  label               electrons" << (eli ? "" : "     charge") << "      volume     maximum        x          y          z\n";
+        double total = 0.0;
+        for (size_t b = 0; b < pop.size(); b++) {
+            total += pop[b];
+            std::cout << std::setw(7) << b + 1 << "  " << std::left << std::setw(18) << lab[b] << std::right << std::fixed
+                << std::setprecision(4) << std::setw(11) << pop[b];
+            if (!eli) {
+                //The label names the atom the maximum sits on
+                double Z = 0.0;
+                for (int a = 0; a < l_w.get_ncen(); a++)
+                    if (lab[b] == l_w.get_atom_label(a) + std::to_string(a)) Z = l_w.get_atom_charge(a);
+                std::cout << std::setw(11) << Z - pop[b];
+            }
+            std::cout << std::setw(12) << vol[b] << std::setw(12) << res.second[b][3]
+                << std::setprecision(3) << std::setw(11) << res.second[b][0] << std::setw(11) << res.second[b][1] << std::setw(11) << res.second[b][2] << "\n";
+        }
+        std::cout << "  total in basins: " << std::setprecision(4) << total << "   outside every basin: " << outside << "\n";
+    };
+    report("QTAIM Analysis", qtaim_results, labels, false);
+    report("ELI-D Analysis", eli_results, eli_labels, true);
 }
 
 // ---------------------------------------------------------------------------

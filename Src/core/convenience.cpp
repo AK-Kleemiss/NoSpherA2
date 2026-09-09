@@ -681,7 +681,11 @@ std::string help_message =
  "                                    Grid settings for property calculations.\n"
  "  -hirsh <atom-index>                Hirshfeld analysis for one atom.\n"
  "  -hirshfeld_surface <wfn1> <wfn2>  Hirshfeld-surface analysis.\n"
- "  -rgbi                              Roby-Gould bond-index analysis.\n"
+ "  -rgbi                              Roby-Gould bond-index analysis. With\n"
+ "                                    -do_XCW it runs on each refined\n"
+ "                                    wavefunction and writes\n"
+ "                                    NA2_<lambda>_RGBI.txt; the .wfn and\n"
+ "                                    .fchk written there cannot carry it.\n"
  "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization.\n"
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO [nao] or ANO.\n"
  "  -rgbi-groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
@@ -730,6 +734,13 @@ std::string help_message =
  "  -draw_orbits l,m[,resolution,radius]\n"
  "                                    Draw a spherical-harmonic orbital.\n"
  "  -eli_analysis <wfn> <resolution> <radius>\n"
+ "                                    QTAIM and ELI-D basins of the density and\n"
+ "                                    ELI-D cubes (resolution and radius in\n"
+ "                                    Angstrom), each basin's electrons by a\n"
+ "                                    voxel sum and on the atomic quadrature\n"
+ "                                    grids, the boundary followed along the\n"
+ "                                    field; -acc 4 before it tightens the\n"
+ "                                    latter from 0.005 to 0.002 e.\n"
  "  -ewal_sum <cube> [kmax] [accuracy] Ewald sum of a cube.\n"
  "  -atom_dens <wfn> [alpha-MOs beta-MOs]\n"
  "  -atom_dens_diff <gbw1> <gbw2>      Difference density from two GBW files.\n"
@@ -3404,8 +3415,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         wfn = arguments[i + 1];
         properties.resolution = stod(arguments[i + 2]);
         properties.radius = stod(arguments[i + 3]);
-        ELI_analysis(wfn, *this);
-        exit(0);
+        eli_analysis_run = true;
+        i += 3;
     }
     else if (temp == "-qtaim_eli") {
         // Cube-files mode:  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [<bg_value>]

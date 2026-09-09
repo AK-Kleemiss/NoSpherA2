@@ -428,7 +428,6 @@ void Calc_RhoEli(
     double radius)
 {
     using namespace std;
-    _time_point start = get_time();
     err_checkf(CubeRho.get_size(0) == CubeEli.get_size(0) && CubeRho.get_size(1) == CubeEli.get_size(1) && CubeRho.get_size(2) == CubeEli.get_size(2), "Cube sizes do not match", std::cout);
 
     const double radius_bohr = constants::ang2bohr(radius);
@@ -448,8 +447,6 @@ void Calc_RhoEli(
             return rho;
         });
 
-    _time_point end = get_time();
-    print_time(start, end, std::cout);
 };
 
 void Calc_Rho_spherical_harmonics(

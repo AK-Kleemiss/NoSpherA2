@@ -161,6 +161,36 @@ pol. B in field A -0.57, D4 -0.62 kcal/mol, S = 1.76e-3 e^2/bohr^3, total withou
 S = 1.32e-3. Reproducing a CCSD(T)-like -5.5 kcal/mol from the free fit would need K near 5 Eh
 bohr^3/e^2; the fit of K (and of per-term scale factors) against S66x8 is WP3 of the proposal.
 
+## 2026-09-09 — f-function phases in the OCC-to-WFN constructor
+
+`WFN::WFN(const occ::qm::Wavefunction&)` applied Gaussian-convention spherical-to-cartesian
+matrices to coefficients that OCC's `to_gaussian_order` had reordered but not rephased; Gaussian's
+f(±3), g(±3), g(±4) carry the opposite sign to libcint's. Every XCW `.wfn` and `.tscb` from a basis
+with f functions was affected (P1 def2-TZVP: 149.576 of 150 electrons, MO norms down to 0.97;
+AIMAll rejects such files). Fixed by flipping those rows after the reordering; the P1 TZVP file
+now integrates to 150.0000 with unit norms and AIMAll accepts it. No golden case has f functions on
+the OCC path, so none changed; the fix is covered by the AIMAll check documented in the handover.
+
+## 2026-09-08 — `-eli_analysis` basins against AIMAll and DGrid
+
+`TomlIntegrationTests.ELI_NH3Li` (`tests/RGBI/nh3li_eli.good`, input `../RGBI_groups/nh3li.gbw`,
+0.1 A cube, 3 A radius) pins the rewritten basin analysis: near-grid steepest ascent on the
+cube, persistence merging of grid-noise maxima, and populations integrated on the atomic
+quadrature grids with the basin boundary followed along the analytic field. The reference
+was generated with `-all_charges -no_date -no_gpu_grid`; the timing line the ELI cube builder
+used to print was removed so the file is deterministic. Validation behind it: NH3BH3 QTAIM
+populations within 0.004 e of AIMAll at `-acc 4` (0.013 at the default level 3), hexane within
+0.008 e; hexane ELI-D cores 2.094-2.095 against DGrid's 2.094-2.096 at a 0.08 bohr mesh, C-C
+bond basins 1.82-1.87 against 1.83-1.87, C-H 1.99-2.03 against 1.995-2.02.
+
+The ELI-D field itself changed definition: it is now the single-spin-channel ELI-D of a closed
+shell (DGrid's `ELI-D alpha-alpha`), 0.841 times the previous value everywhere. No golden
+file carried an ELI-D value before this case.
+
+`-eli_analysis` no longer calls `exit(0)` from the option parser; it records the request and
+`run_app_impl` runs it, which is what lets the in-process harness test it at all.
+
+
 ## 2026-09-02 — pTB cartesian f ordering, and GPU notes in golden files
 
 ### `WFN::read_ptb` transposed two cartesian f components
