@@ -1,8 +1,9 @@
 # Unit Test Status
-**Last updated: 2026-09-08** (`-interaction_energy` now adds Thakkar polarization in the partner's
-field, D4 dispersion and the density overlap S with an optional `-repulsion_overlap <K>`; the
-`RiInteractionTests` point-partner case checks the new terms: 282, 278 pass and the usual 4
-`*_full` XCW cases skip on `release-windows`. Earlier the same day: `-salted_charge_constraint`
+**Last updated: 2026-09-09** (`-interaction_energy` now computes the exchange-repulsion by the
+Gordon-Kim functionals of the fitted densities on a Becke grid over the dimer; `-repulsion_overlap <K>`
+keeps the K * S model. `XCW_Test` merged in (f-function phases, ELI basins). 283, 279 pass and the
+usual 4 `*_full` XCW cases skip on `release-windows`. 2026-09-08: Thakkar polarization in the
+partner's field, D4 dispersion and the density overlap S; `-salted_charge_constraint`
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
@@ -160,6 +161,32 @@ pol. B in field A -0.57, D4 -0.62 kcal/mol, S = 1.76e-3 e^2/bohr^3, total withou
 -10.84 kcal/mol. Model V7 with `-salted_charge_constraint`: electrostatic -4.71, pol -0.29/-0.49,
 S = 1.32e-3. Reproducing a CCSD(T)-like -5.5 kcal/mol from the free fit would need K near 5 Eh
 bohr^3/e^2; the fit of K (and of per-term scale factors) against S66x8 is WP3 of the proposal.
+
+### Gordon-Kim exchange-repulsion (2026-09-09)
+
+`rep` now defaults to the Gordon-Kim model from the fitted densities: `rep_kin` = T_TF[rho_A + rho_B]
+- T_TF[rho_A] - T_TF[rho_B] with the Thomas-Fermi functional and `rep_x` the same difference of Dirac
+exchange, `rep = rep_kin + rep_x`; `-repulsion_overlap <K>` with K > 0 still gives K * S. The grid is
+`GridManager` (Becke partition, `no_density_eval`) on a dummy `WFN` that holds the atoms of both
+molecules and their aux exponents through `add_exp`, because `setupPrototypeGrids` sizes the radial
+grids from the primitive list, not from the atoms' basis-set entries. Densities from `calc_density_ML`,
+gradients by central differences for the 1/9 von Weizsaecker term `rep_vw`, which is printed but not
+added: T_vW is subadditive, so the difference is always negative (-10 kcal/mol here) and would turn
+the repulsion into an attraction. `n_A`, `n_B` are the grid electron counts and are printed as the
+grid check (10.0004 / 17.9994 e for the free fit, 10.0000 / 18.0001 for Model V7).
+
+`NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables` additionally asserts `rep_x` < 0,
+`rep` = `rep_kin` + `rep_x` in the default call, `rep` = K * S and `n_A` = 0 in the K = 2 call, and
+that `rep_kin`, `rep_vw`, `rep_x` (1e-6 Eh) and the electron counts (1e-4 e) are symmetric under
+swapping the molecules; the swapped dimer builds its grid in the other atom order, which is where
+the noise comes from. The alpha = 2e5 partner is too tight for the grid (2.54 of 3 e), so the
+electron count is not compared to Z there.
+
+Water-methanol, kcal/mol: free fit rep. kin. TF +12.37, rep. exch. Dirac -6.19, repulsion GK +6.19,
+total -4.66 (CCSD(T)-like reference -5.5); Model V7 with charge constraint +10.51, -5.60, +4.91,
+total -1.20, the shortfall being the electrostatics of the model density. Delta E_x / Delta T_TF is
+about -0.5 in both, as in the rare-gas Gordon-Kim literature. Scale factors on the two pieces
+(Waldman-Gordon style) are part of the WP3 calibration.
 
 ## 2026-09-09 — f-function phases in the OCC-to-WFN constructor
 

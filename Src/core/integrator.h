@@ -68,10 +68,13 @@ namespace DensityFitting
     // coefficients and the aux basis, so RI-fitted and SALTED-predicted coefficients enter alike.
     // pair[a][b] over the atoms of A and B, rank[i][j] with 0 the nuclei and l+1 the aux functions of rank l.
     // Beyond electrostatics: pol_X = -1/2 sum alpha_a F_a^2 over the atoms of X with Thakkar polarizabilities in the
-    // partner's field, disp the D4 energy of the dimer minus the monomers, overlap = Int rhoA rhoB and rep = K * overlap
+    // partner's field, disp the D4 energy of the dimer minus the monomers, overlap = Int rhoA rhoB. Exchange-repulsion
+    // rep = K * overlap when K > 0, else Gordon-Kim rep_kin + rep_x: rep_kin = T[rhoA+rhoB] - T[rhoA] - T[rhoB] with the
+    // Thomas-Fermi functional, rep_x the same difference of Dirac exchange, rep_vw the 1/9 von Weizsaecker correction to
+    // rep_kin reported but not added, on a Becke grid over the dimer that integrates the fitted densities to n_A, n_B
     struct INTERACTION {
         double nuc_nuc = 0.0, nucA_rhoB = 0.0, nucB_rhoA = 0.0, rho_rho = 0.0;
-        double pol_A = 0.0, pol_B = 0.0, disp = 0.0, overlap = 0.0, rep = 0.0;
+        double pol_A = 0.0, pol_B = 0.0, disp = 0.0, overlap = 0.0, rep = 0.0, rep_kin = 0.0, rep_vw = 0.0, rep_x = 0.0, n_A = 0.0, n_B = 0.0;
         double electrostatic() const { return nuc_nuc + nucA_rhoB + nucB_rhoA + rho_rho; };
         double total() const { return electrostatic() + pol_A + pol_B + disp + rep; };
         vec2 pair, rank;

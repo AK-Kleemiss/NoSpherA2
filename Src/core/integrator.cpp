@@ -5,6 +5,7 @@
 #include "nos_math.h"
 #include "GridManager.h"
 #include "basis_set.h"
+#include "SALTED_utilities.h"
 #include <occ/disp/dftd4.h>
 #include <occ/interaction/polarization.h>
 
@@ -546,6 +547,60 @@ namespace {
         d4.set_charge(charge);
         return d4.energy();
     }
+    // Gordon-Kim exchange-repulsion of the fitted densities on a Becke grid over the dimer: gk[0] the Thomas-Fermi kinetic
+    // energy, gk[1] 1/9 of the von Weizsaecker gradient correction and gk[2] the Dirac exchange of rhoA + rhoB minus the
+    // monomers, gk[3], gk[4] the electron counts of A and B on the grid. Gradients by central differences of the aux density
+    void gordon_kim(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, double* gk)
+    {
+        const int wfn_type[6] = { 1, 2, 5, 11, 21, 36 };
+        const WFN* mono[2] = { &aux_A, &aux_B };
+        WFN dimer(e_origin::NOT_YET_DEFINED);
+        for (int m = 0; m < 2; m++)
+            for (int a = 0; a < mono[m]->get_ncen(); a++) {
+                const atom& A = mono[m]->get_atom(a);
+                dimer.push_back_atom(A);
+                for (int b = 0; b < (int)A.get_basis_set_size(); b++)
+                    dimer.add_exp(dimer.get_ncen(), wfn_type[std::min(A.get_basis_set_type(b), 5)], A.get_basis_set_exponent(b));
+            }
+        GridConfiguration config;
+        config.partition_type = PartitionType::Becke;
+        config.no_density_eval = true;
+        GridManager gm(config);
+        ivec all(dimer.get_ncen());
+        for (int a = 0; a < dimer.get_ncen(); a++) all[a] = a;
+        std::ostringstream quiet;
+        gm.setup3DGridsForMolecule(dimer, all, bvec(dimer.get_ncen(), true), cell(), false, quiet);
+        const std::vector<atom> at_A = aux_A.get_atoms(), at_B = aux_B.get_atoms();
+        const GridData& GD = gm.getGridData();
+        const double C_TF = 0.3 * std::pow(3 * constants::PI * constants::PI, 2.0 / 3.0), C_X = -0.75 * std::pow(3 * constants::INV_PI, 1.0 / 3.0), h = 1e-4;
+        double tf = 0.0, vw = 0.0, x = 0.0, nA = 0.0, nB = 0.0;
+        for (int a = 0; a < dimer.get_ncen(); a++) {
+            const vec2& g = GD.atomic_grids[a];
+            const int n = GD.num_points_per_atom[a];
+#pragma omp parallel for reduction(+:tf, vw, x, nA, nB)
+            for (int p = 0; p < n; p++) {
+                const double w = g[GridData::GridIndex::BECKE_WEIGHT][p], r[3] = { g[0][p], g[1][p], g[2][p] };
+                double rho[3] = { calc_density_ML(r[0], r[1], r[2], coef_A, at_A), calc_density_ML(r[0], r[1], r[2], coef_B, at_B), 0.0 }, g2[3] = { 0.0, 0.0, 0.0 };
+                rho[2] = rho[0] + rho[1];
+                nA += w * rho[0], nB += w * rho[1];
+                for (int c = 0; c < 3; c++) {
+                    double rp[3] = { r[0], r[1], r[2] }, rm[3] = { r[0], r[1], r[2] };
+                    rp[c] += h, rm[c] -= h;
+                    const double dA = (calc_density_ML(rp[0], rp[1], rp[2], coef_A, at_A) - calc_density_ML(rm[0], rm[1], rm[2], coef_A, at_A)) / (2 * h);
+                    const double dB = (calc_density_ML(rp[0], rp[1], rp[2], coef_B, at_B) - calc_density_ML(rm[0], rm[1], rm[2], coef_B, at_B)) / (2 * h);
+                    g2[0] += dA * dA, g2[1] += dB * dB, g2[2] += (dA + dB) * (dA + dB);
+                }
+                for (int m = 0; m < 3; m++) {
+                    if (rho[m] < 1e-12) continue;
+                    const double s = m == 2 ? 1.0 : -1.0;
+                    tf += s * w * C_TF * std::pow(rho[m], 5.0 / 3.0);
+                    vw += s * w * g2[m] / (72.0 * rho[m]);
+                    x += s * w * C_X * std::pow(rho[m], 4.0 / 3.0);
+                }
+            }
+        }
+        gk[0] = tf, gk[1] = vw, gk[2] = x, gk[3] = nA, gk[4] = nB;
+    }
 }
 
 DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K)
@@ -603,7 +658,13 @@ DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A
     compute2C<Overlap2C_SPH>(pAB, S);
     for (int i = 0; i < na; i++)
         for (int j = 0; j < nao - na; j++) E.overlap += coef_A[i] * S[i * nao + na + j] * coef_B[j];
-    E.rep = repulsion_K * E.overlap;
+    if (repulsion_K > 0.0) E.rep = repulsion_K * E.overlap;
+    else {
+        double gk[5];
+        gordon_kim(coef_A, aux_A, coef_B, aux_B, gk);
+        E.rep_kin = gk[0], E.rep_vw = gk[1], E.rep_x = gk[2], E.n_A = gk[3], E.n_B = gk[4];
+        E.rep = E.rep_kin + E.rep_x;
+    }
     E.pol_A = polarization(aux_A, aux_B, ixB, coef_B);
     E.pol_B = polarization(aux_B, aux_A, ixA, coef_A);
     std::vector<occ::core::Atom> atoms = occ_atoms(aux_A), atoms_B = occ_atoms(aux_B);
@@ -615,15 +676,19 @@ DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A
 
 void DensityFitting::print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file)
 {
-    const char* names[10] = { "nucleus-nucleus  ", "nuclei A - rho B ", "nuclei B - rho A ", "rho A - rho B    ", "electrostatic    ",
-                              "pol. A in field B", "pol. B in field A", "dispersion D4    ", "repulsion K*S    ", "total            " };
-    const double parts[10] = { E.nuc_nuc, E.nucA_rhoB, E.nucB_rhoA, E.rho_rho, E.electrostatic(), E.pol_A, E.pol_B, E.disp, E.rep, E.total() };
+    const bool KS = E.n_A == 0.0 && E.n_B == 0.0;
+    const char* names[13] = { "nucleus-nucleus  ", "nuclei A - rho B ", "nuclei B - rho A ", "rho A - rho B    ", "electrostatic    ",
+                              "pol. A in field B", "pol. B in field A", "dispersion D4    ", "rep. kin. TF     ", "rep. exch. Dirac ", KS ? "repulsion K*S    " : "repulsion GK     ", "total            ", "vW/9 not in total" };
+    const double parts[13] = { E.nuc_nuc, E.nucA_rhoB, E.nucB_rhoA, E.rho_rho, E.electrostatic(), E.pol_A, E.pol_B, E.disp, E.rep_kin, E.rep_x, E.rep, E.total(), E.rep_vw };
     file << "\nElectrostatic interaction energy of the fitted densities\n";
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < (KS ? 12 : 13); i++) {
         if (i == 5) {
             file << "\nBeyond electrostatics: Thakkar polarizabilities in the partner's field, D4 with PBE damping, density overlap S = Int rhoA rhoB\n";
-            file << "  S                " << std::scientific << std::setprecision(6) << std::setw(14) << E.overlap << " e^2/bohr^3" << std::fixed << (E.rep == 0.0 ? "  (repulsion needs -repulsion_overlap <K>)" : "") << "\n";
+            file << "  S                " << std::scientific << std::setprecision(6) << std::setw(14) << E.overlap << " e^2/bohr^3" << std::fixed;
+            if (KS) file << "  (repulsion K*S)\n";
+            else file << "  (repulsion Gordon-Kim on a Becke grid holding " << std::setprecision(4) << E.n_A << " / " << E.n_B << " e)\n";
         }
+        if (KS && (i == 8 || i == 9)) continue;
         file << "  " << names[i] << std::fixed << std::setprecision(6) << std::setw(14) << parts[i] << " Eh" << std::setprecision(4) << std::setw(12) << parts[i] * constants::kcal_mol_per_hartree << " kcal/mol\n";
     }
     file << "\nBy atom pair, kcal/mol, rows A columns B\n      ";
