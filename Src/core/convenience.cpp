@@ -450,6 +450,42 @@ namespace {
         lap("write_npy");
     }
 
+    // One loop for -calc_featomic_descriptor and -calc_featomic_descriptors: (structure, output) pairs,
+    // one unreadable structure must not abort the rest. Returns the exit code.
+    int write_featomic_descriptors(const std::vector<std::pair<std::filesystem::path, std::filesystem::path>>& jobs)
+    {
+        const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
+        const auto started = std::chrono::steady_clock::now();
+        size_t done = 0, failed = 0;
+        for (const auto& [structure, out_path] : jobs)
+        {
+            if (!std::filesystem::exists(structure))
+            {
+                std::cout << "MISSING " << structure.string() << std::endl;
+                ++failed;
+                continue;
+            }
+            try
+            {
+                const auto one = std::chrono::steady_clock::now();
+                write_featomic_descriptor(structure, out_path, hyperparams);
+                std::cout << "DESCRIPTOR " << out_path.string() << " seconds="
+                          << std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count() << std::endl;
+                ++done;
+            }
+            catch (const std::exception& e)
+            {
+                std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
+                ++failed;
+            }
+        }
+        const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+        std::cout << "BATCH done=" << done << " failed=" << failed
+                  << " seconds=" << total
+                  << " per_structure=" << (done ? total / done : 0.0) << std::endl;
+        return failed && !done ? 1 : 0;
+    }
+
     // The same descriptor, classified here and written as (n_atoms, n_classes)
     // instead of (n_atoms, 42042). For a 40-atom structure that is 3.5 kB out
     // rather than 13.5 MB.
@@ -3872,6 +3908,11 @@ bool options::digest_ri_options(const std::string &temp, int &i)
                   << " per_structure=" << (done ? total / done : 0.0) << std::endl;
         exit(failed && !done ? 1 : 0);
     }
+    else if (temp == "-calc_featomic_descriptor") {
+        // Olex2 calls exactly this and reads descriptor.npy from the working directory.
+        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
+        exit(write_featomic_descriptors({ { wfn, "descriptor.npy" } }));
+    }
     else if (temp == "-calc_featomic_descriptors") {
         // Many structures in one process: a descriptor call carries a fixed
         // setup cost of roughly 0.7 s against about 0.0009 s per atom, and
@@ -3885,7 +3926,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         const std::filesystem::path list_file = arguments[i + 1];
         err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
 
-        std::vector<std::filesystem::path> jobs;
+        std::vector<std::pair<std::filesystem::path, std::filesystem::path>> jobs;
         {
             std::ifstream list(list_file);
             std::string line;
@@ -3894,44 +3935,11 @@ bool options::digest_ri_options(const std::string &temp, int &i)
                 const std::string entry = trim(line);
                 if (entry.empty() || entry[0] == '#')
                     continue;
-                jobs.push_back(std::filesystem::path(entry));
+                jobs.emplace_back(entry, entry + ".npy");
             }
         }
         err_chkf(!jobs.empty(), "The structure list is empty: " + list_file.string(), std::cout);
-
-        const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
-        const auto started = std::chrono::steady_clock::now();
-        size_t done = 0, failed = 0;
-        for (const std::filesystem::path& structure : jobs)
-        {
-            // One unreadable structure must not abort the rest of the batch.
-            if (!std::filesystem::exists(structure))
-            {
-                std::cout << "MISSING " << structure.string() << std::endl;
-                ++failed;
-                continue;
-            }
-            try
-            {
-                const auto one = std::chrono::steady_clock::now();
-                std::filesystem::path out_path = structure;
-                out_path += ".npy";
-                write_featomic_descriptor(structure, out_path, hyperparams);
-                const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count();
-                std::cout << "DESCRIPTOR " << out_path.string() << " seconds=" << seconds << std::endl;
-                ++done;
-            }
-            catch (const std::exception& e)
-            {
-                std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
-                ++failed;
-            }
-        }
-        const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-        std::cout << "BATCH done=" << done << " failed=" << failed
-                  << " seconds=" << total
-                  << " per_structure=" << (done ? total / done : 0.0) << std::endl;
-        exit(failed && !done ? 1 : 0);
+        exit(write_featomic_descriptors(jobs));
     }
     else if (temp == "-rgbi")
         rgbi = true;
