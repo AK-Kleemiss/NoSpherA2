@@ -1425,17 +1425,28 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				const double gamma = 2 * (mu_min + nu_min) / (mu_min * nu_min);
 				const double cutoff = std::log(c / e_tol) * gamma;
 				//Newton method for finding correct cutoff
-				double newton_cutoff = cutoff;
-				for (int iter = 0; iter < 50; iter++) {
-					double upper_bound = 0.0, bound_derivative = 0.0;
-					for (const auto& [weight, gamma_kl] : pairs) {
-						const double upper_bound_temp = weight * std::exp(-gamma_kl * newton_cutoff);
-						upper_bound += upper_bound_temp;
-						bound_derivative -= gamma_kl * upper_bound_temp;
+				double newton_cutoff;
+				if (cutoff <= 0.0) {
+					newton_cutoff = 0.0;
+				}
+				else {
+					double lo = 0.0, hi = cutoff;
+					newton_cutoff = 0.5 * (lo + hi);
+					for (int iter = 0; iter < 50; iter++) {
+						double upper_bound = 0.0, bound_derivative = 0.0;
+						for (const auto& [weight, gamma_kl] : pairs) {
+							const double upper_bound_temp = weight * std::exp(-gamma_kl * newton_cutoff);
+							upper_bound += upper_bound_temp;
+							bound_derivative -= gamma_kl * upper_bound_temp;
+						}
+						const double delta = upper_bound - e_tol;
+						if (delta >= 0.0) lo = newton_cutoff; else hi = newton_cutoff;
+						double next = newton_cutoff - delta / bound_derivative;
+						if (!(next > lo) || !(next < hi)) next = 0.5 * (lo + hi);
+						const double step = std::abs(next - newton_cutoff);
+						newton_cutoff = next;
+						if (step < 1e-12 * hi) break;
 					}
-					const double delta = (upper_bound - e_tol) / bound_derivative;
-					newton_cutoff -= delta;
-					if (std::abs(delta) < 1e-12 * newton_cutoff) break;
 				}
 				if (dist > newton_cutoff) {
 					skip[mu][nu] = 1;
