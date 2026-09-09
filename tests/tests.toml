@@ -309,6 +309,7 @@ directory = "ELI_heavy"
 good = "hgh2_ecp_eli.good"
 
 [ELI_HgH2_ECP.args]
+ECP = 1
 eli_analysis = ["hgh2_ecp.gbw", 0.05, 3.0]
 
 [ELI_UH6]

@@ -944,8 +944,13 @@ std::vector<critical_point> analyze_cube_critical_points(
 //the start and are never merged: a hydroxyl hydrogen's basin is two voxels across at 0.1 A
 //and has no grid maximum of its own. With field_wfn the ascent takes the analytic density
 //gradient instead of grid differences, which is what lets it climb into such a basin.
-std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp, double value_floor, double grad_epsilon, double assignment_radius, double merge_persistence, const std::vector<d3> *seeds, const WFN *field_wfn)
+std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp, double value_floor, double grad_epsilon, double assignment_radius, double merge_persistence, const std::vector<d3> *seeds, const WFN *field_wfn, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient)
 {
+    auto field_dens = [&](const d3 &p) { return field_wfn->compute_dens(p) + (core_density ? (*core_density)(p) : 0.0); };
+    auto field_grad = [&](const d3 &p, d3 &g) {
+        field_wfn->computeGrad(p, g);
+        if (core_gradient) { d3 c; (*core_gradient)(p, c); for (int k = 0; k < 3; k++) g[k] += c[k]; }
+    };
     const int nx = cub->get_size(0), ny = cub->get_size(1), nz = cub->get_size(2);
     cubei basin_cube({ nx, ny, nz }, 0, true);
     d3 h;
@@ -1027,7 +1032,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
             //sides exist and one-sided at the rim; in index units either way
             d3 s;
             if (field_wfn) {
-                field_wfn->computeGrad(cub->get_pos(cx, cy, cz), s);
+                field_grad(cub->get_pos(cx, cy, cz), s);
                 for (int d = 0; d < 3; d++) s[d] /= h[d];
             }
             else for (int d = 0; d < 3; d++) {
@@ -1139,15 +1144,15 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                     const double sl = (near2 < 1.0 ? 0.3 : 0.6) * hmin;
                     //A nucleus an ECP hollowed out has a sphere of maxima around it instead
                     //of a cusp; a trajectory that stops climbing has reached such a top
-                    const double rho_here = field_wfn->compute_dens(r);
+                    const double rho_here = field_dens(r);
                     if (rho_here <= last_rho) break;
                     last_rho = rho_here;
-                    field_wfn->computeGrad(r, g);
+                    field_grad(r, g);
                     double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
                     if (gn < 1e-14) break;
                     d3 mid;
                     for (int k = 0; k < 3; k++) mid[k] = r[k] + 0.5 * sl * g[k] / gn;
-                    field_wfn->computeGrad(mid, g);
+                    field_grad(mid, g);
                     gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
                     if (gn < 1e-14) break;
                     for (int k = 0; k < 3; k++) r[k] += sl * g[k] / gn;
@@ -1342,8 +1347,13 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 //when every voxel within three of it agrees; otherwise it is sent up the analytic field
 //until it comes within two voxels of a maximum, so the boundary is the field's and not the
 //grid's.
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside)
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient)
 {
+    //The filled core steers the trajectories only. An ECP atom's grid is built for its
+    //valence basis and cannot integrate a 1s at Z = 80, so the core electrons are added to
+    //the nucleus's basin by count once the valence density is integrated; a Thakkar core
+    //lies whole inside its atom's basin
+    auto density = [&](const d3 &p) { return wavy.compute_dens(p) + (core_density ? (*core_density)(p) : 0.0); };
     const int nb = basin_cube->max_value();
     vec pop(nb, 0.0);
     volumes.assign(nb, 0.0);
@@ -1406,7 +1416,11 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
         return 0;
     };
     auto gradient = [&](const d3 &p, d3 &g) {
-        if (!eli_field) { wavy.computeGrad(p, g); return; }
+        if (!eli_field) {
+            wavy.computeGrad(p, g);
+            if (core_gradient) { d3 c; (*core_gradient)(p, c); for (int k = 0; k < 3; k++) g[k] += c[k]; }
+            return;
+        }
         const double d = 0.25 * step;
         for (int k = 0; k < 3; k++) {
             d3 a = p, b = p;
@@ -1449,7 +1463,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
             if (!eli_field) {
                 //Stopped climbing: the sphere of maxima around an ECP nucleus; that nucleus
                 //owns it when it is the seed within a bohr
-                const double rho_here = wavy.compute_dens(r);
+                const double rho_here = density(r);
                 if (rho_here <= last_rho) {
                     for (size_t q = 0; q < maxima.size(); q++)
                         if (std::pow(r[0] - maxima[q][0], 2) + std::pow(r[1] - maxima[q][1], 2) + std::pow(r[2] - maxima[q][2], 2) < 1.0) return static_cast<int>(q) + 1;
@@ -1548,6 +1562,15 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
             }
         }
     }
+    if (core_density)
+        for (int a = 0; a < wavy.get_ncen(); a++) {
+            const int ncore = wavy.get_atom_ECP_electrons(a);
+            if (ncore <= 0) continue;
+            bool settled;
+            const int b = lookup(wavy.get_atom_pos(a), settled);
+            if (b > 0) pop[b - 1] += ncore;
+            else outside += ncore;
+        }
     std::cout << "Quadrature points sent along the field: " << boundary_points << ", left the grid: " << lost << endl;
     return pop;
 }

@@ -3,6 +3,20 @@
 `TomlIntegrationTests.ELI_NH3Li`. 267/267 non-XCW cases pass on `release-linux`, the nine
 XCW cases on a V100 node, a CPU node and the M2 Mac.)
 
+## 2026-09-09 — ECP cores filled for QTAIM, and the Flawfinder check
+
+`ELI_HgH2_ECP` now runs with `-ECP 1`: the 60 electrons the def2 ECP removed from mercury are
+put back from Thakkar's spherical core density for the QTAIM basins (the topology is followed on
+the filled density, the count added analytically since the valence grid cannot integrate a 1s at
+Z = 80). Hg comes out at 79.431 e against 79.431 for the all-electron DKH2 calculation and 79.454
+from AIMAll. ELI-D stays on the valence density.
+
+The code-scanning check `Flawfinder` failed the pull request on six level-4/5 hits: a `readlink`
+of `/proc/self/exe`, two `system("which ...")` calls, two `popen` calls for the zenity/kdialog
+file dialogs, and a false positive on a variable named `system`. The `which` calls now search
+PATH directly, the variable is renamed, and the three remaining calls carry reviewed
+`Flawfinder: ignore` markers with their reason. `flawfinder --minlevel=4 Src` reports nothing.
+
 ## 2026-09-09 — heavy-element basin cases: `ELI_HgH2_ECP` and `ELI_UH6`
 
 Two golden cases in the new `tests/ELI_heavy` directory (one resource lock, they share the log):
