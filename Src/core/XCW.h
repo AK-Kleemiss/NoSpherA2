@@ -92,8 +92,10 @@ private:
 		bool conv_MaxP_diff = false;
 		double diis_stop_damping;
 		bool apply_shift = true;
+		bool method_apply_shift = true;
 		double diis_stop_shift;
 		bool apply_damping = true;
+		bool method_apply_damping = true;
 		std::string basis_set_name;
 		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
 		std::string df_basis_name;
@@ -138,8 +140,8 @@ private:
 			conv_gradient = false;
 			conv_RMSP_diff = false;
 			conv_MaxP_diff = false;
-			apply_shift = true;
-			apply_damping = true;
+			apply_shift = method_apply_shift;
+			apply_damping = method_apply_damping;
 		}
 
 		// Performs the convergence check and sets flags accordingly
