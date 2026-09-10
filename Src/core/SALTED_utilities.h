@@ -112,6 +112,17 @@ namespace SALTED_Utils
     metatensor::TensorMap calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
 }
 
+//Flat copy of an aux basis for evaluating the fitted density on many points, see aux_density.h
+struct aux_density_table
+{
+    int n_at = 0, n_sh = 0, n_pr = 0, n_coef = 0;
+    vec cx, cy, cz, r2_max, pr_exp, pr_norm;
+    ivec sh_start, sh_l, pr_start, coef_off;
+    aux_density_table(const std::vector<atom>& atoms);
+    double operator()(const double x, const double y, const double z, const double* coefs) const;
+};
+//rho on np points, OpenMP on the host or on the device when the set is large enough
+void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho);
 //Calc density from RI fit coefficients
 const double calc_density_ML(const double& x,
                             const double& y,

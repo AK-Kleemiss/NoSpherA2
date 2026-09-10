@@ -549,7 +549,9 @@ namespace {
     }
     // Gordon-Kim exchange-repulsion of the fitted densities on a Becke grid over the dimer: gk[0] the Thomas-Fermi kinetic
     // energy, gk[1] 1/9 of the von Weizsaecker gradient correction and gk[2] the Dirac exchange of rhoA + rhoB minus the
-    // monomers, gk[3], gk[4] the electron counts of A and B on the grid. Gradients by central differences of the aux density
+    // monomers, gk[3], gk[4] the electron counts of A and B on the grid. Gradients by central differences of the aux density,
+    // evaluated only for the GGA functionals, so gk[1] is 0 with Dirac. The densities come from calc_density_ML on the
+    // flattened aux basis, which is where the OpenMP loop or the GPU kernel sits
     void gordon_kim(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const int x_fun, double* gk)
     {
         const int wfn_type[6] = { 1, 2, 5, 11, 21, 36 };
@@ -566,37 +568,59 @@ namespace {
         config.partition_type = PartitionType::Becke;
         config.no_density_eval = true;
         GridManager gm(config);
-        ivec all(dimer.get_ncen());
-        for (int a = 0; a < dimer.get_ncen(); a++) all[a] = a;
+        //grids only for atoms within reach of the partner, the integrand vanishes where one density does
+        const int nA_at = aux_A.get_ncen(), n_at = dimer.get_ncen();
+        const double reach = constants::ang2bohr(8.0);
+        ivec close;
+        for (int a = 0; a < n_at; a++) {
+            const int lo = a < nA_at ? nA_at : 0, hi = a < nA_at ? n_at : nA_at;
+            for (int b = lo; b < hi; b++) {
+                double d2 = 0.0;
+                for (int c = 0; c < 3; c++) d2 += std::pow(dimer.get_atom_coordinate(a, c) - dimer.get_atom_coordinate(b, c), 2);
+                if (d2 < reach * reach) { close.push_back(a); break; }
+            }
+        }
         std::ostringstream quiet;
-        gm.setup3DGridsForMolecule(dimer, all, bvec(dimer.get_ncen(), true), cell(), false, quiet);
-        const std::vector<atom> at_A = aux_A.get_atoms(), at_B = aux_B.get_atoms();
+        gm.setup3DGridsForMolecule(dimer, close, bvec(close.size(), true), cell(), false, quiet);
         const GridData& GD = gm.getGridData();
-        const double C_TF = 0.3 * std::pow(3 * constants::PI * constants::PI, 2.0 / 3.0), h = 1e-4;
-        double tf = 0.0, vw = 0.0, x = 0.0, nA = 0.0, nB = 0.0;
-        for (int a = 0; a < dimer.get_ncen(); a++) {
+        int np = 0;
+        for (int a = 0; a < (int)close.size(); a++) np += GD.num_points_per_atom[a];
+        //the points, followed for the GGA functionals by the six shifted copies the central differences need
+        const int sets = x_fun != 0 ? 7 : 1;
+        const double C_TF = 0.3 * std::pow(3 * constants::PI * constants::PI, 2.0 / 3.0), h = 1e-4, eps = 1e-10;
+        vec X(sets * np), Y(sets * np), Z(sets * np), W(np), rhoA(sets * np), rhoB(sets * np);
+        for (int a = 0, p0 = 0; a < (int)close.size(); p0 += GD.num_points_per_atom[a], a++) {
             const vec2& g = GD.atomic_grids[a];
-            const int n = GD.num_points_per_atom[a];
+            for (int p = 0; p < GD.num_points_per_atom[a]; p++)
+                X[p0 + p] = g[0][p], Y[p0 + p] = g[1][p], Z[p0 + p] = g[2][p], W[p0 + p] = g[GridData::GridIndex::BECKE_WEIGHT][p];
+        }
+        for (int o = np; o < sets * np; o += np) {
+            const int c = (o / np - 1) / 2;
+            const double d = (o / np) % 2 ? h : -h;
+            for (int p = 0; p < np; p++)
+                X[o + p] = X[p] + (c == 0 ? d : 0.0), Y[o + p] = Y[p] + (c == 1 ? d : 0.0), Z[o + p] = Z[p] + (c == 2 ? d : 0.0);
+        }
+        calc_density_ML(aux_density_table(aux_A.get_atoms()), coef_A, sets * np, X.data(), Y.data(), Z.data(), rhoA.data());
+        calc_density_ML(aux_density_table(aux_B.get_atoms()), coef_B, sets * np, X.data(), Y.data(), Z.data(), rhoB.data());
+        double tf = 0.0, vw = 0.0, x = 0.0, nA = 0.0, nB = 0.0;
 #pragma omp parallel for reduction(+:tf, vw, x, nA, nB)
-            for (int p = 0; p < n; p++) {
-                const double w = g[GridData::GridIndex::BECKE_WEIGHT][p], r[3] = { g[0][p], g[1][p], g[2][p] };
-                double rho[3] = { calc_density_ML(r[0], r[1], r[2], coef_A, at_A), calc_density_ML(r[0], r[1], r[2], coef_B, at_B), 0.0 }, g2[3] = { 0.0, 0.0, 0.0 };
-                rho[2] = rho[0] + rho[1];
-                nA += w * rho[0], nB += w * rho[1];
-                for (int c = 0; c < 3; c++) {
-                    double rp[3] = { r[0], r[1], r[2] }, rm[3] = { r[0], r[1], r[2] };
-                    rp[c] += h, rm[c] -= h;
-                    const double dA = (calc_density_ML(rp[0], rp[1], rp[2], coef_A, at_A) - calc_density_ML(rm[0], rm[1], rm[2], coef_A, at_A)) / (2 * h);
-                    const double dB = (calc_density_ML(rp[0], rp[1], rp[2], coef_B, at_B) - calc_density_ML(rm[0], rm[1], rm[2], coef_B, at_B)) / (2 * h);
-                    g2[0] += dA * dA, g2[1] += dB * dB, g2[2] += (dA + dB) * (dA + dB);
-                }
-                for (int m = 0; m < 3; m++) {
-                    if (rho[m] < 1e-12) continue;
-                    const double s = m == 2 ? 1.0 : -1.0;
-                    tf += s * w * C_TF * std::pow(rho[m], 5.0 / 3.0);
-                    vw += s * w * g2[m] / (72.0 * rho[m]);
-                    x += s * w * DensityFitting::exchange_density(rho[m], g2[m], x_fun);
-                }
+        for (int p = 0; p < np; p++) {
+            const double w = W[p], rho[3] = { rhoA[p], rhoB[p], rhoA[p] + rhoB[p] };
+            double g2[3] = { 0.0, 0.0, 0.0 };
+            nA += w * rho[0], nB += w * rho[1];
+            if (rho[0] < eps || rho[1] < eps) continue;
+            //Dirac needs no gradients, the vW term is only reported for the GGA runs
+            if (x_fun != 0) for (int c = 0; c < 3; c++) {
+                const int op = (1 + 2 * c) * np + p, om = op + np;
+                const double dA = (rhoA[op] - rhoA[om]) / (2 * h), dB = (rhoB[op] - rhoB[om]) / (2 * h);
+                g2[0] += dA * dA, g2[1] += dB * dB, g2[2] += (dA + dB) * (dA + dB);
+            }
+            for (int m = 0; m < 3; m++) {
+                if (rho[m] < 1e-12) continue;
+                const double s = m == 2 ? 1.0 : -1.0;
+                tf += s * w * C_TF * std::pow(rho[m], 5.0 / 3.0);
+                vw += s * w * g2[m] / (72.0 * rho[m]);
+                x += s * w * DensityFitting::exchange_density(rho[m], g2[m], x_fun);
             }
         }
         gk[0] = tf, gk[1] = vw, gk[2] = x, gk[3] = nA, gk[4] = nB;

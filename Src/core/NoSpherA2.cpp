@@ -15,6 +15,7 @@
 #include "crystal_energies.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
+#include "aux_density_gpu.h"
 #include "sf_gpu.h"
 #include "blas_gpu.h"
 #include "cublas_dynamic.h"
@@ -105,6 +106,7 @@ static int run_app_impl(int argc, char **argv)
     //only inside the scattering-factor entry points, so a run reaching XCW instead inherited
     //whatever the previous run in the process had left on. Olex2 calls run_app repeatedly.
     grid_gpu_set_enabled(opt.use_gpu && opt.gpu_grid);
+    aux_density_gpu_set_enabled(opt.use_gpu && opt.gpu_density);
     blas_gpu_set_enabled(opt.gpu_blas);
     equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
     cublas_dynamic_set_enabled(opt.gpu_cublas);

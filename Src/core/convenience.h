@@ -881,6 +881,8 @@ struct options
     bool salted_charge_constraint = false;
     //-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
     bool gpu_grid = true;
+    //-no_gpu_density keeps the fitted density of the Gordon-Kim repulsion grid on the CPU
+    bool gpu_density = true;
     //-gpu_blas offers large dense GEMMs in nos_math to the device
     bool gpu_blas = false;
     //The I tensor GEMM goes through cuBLAS when the machine has it, and through the

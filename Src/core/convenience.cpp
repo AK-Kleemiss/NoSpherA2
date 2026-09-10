@@ -267,6 +267,8 @@ std::string help_message =
  "                                    and TFVC). It falls back to the CPU when\n"
  "                                    the grid is incompatible or does not fit\n"
  "                                    on the device.\n"
+ "  -gpu_density / -no_gpu_density      The fitted density on the Gordon-Kim\n"
+ "                                    repulsion grid of -interaction_energy.\n"
  "\n"
  "  Off unless asked:\n"
  "  -gpu_blas                          Offer large dense matrix products to the\n"
@@ -3213,6 +3215,10 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_grid = true;
     else if (temp == "-no_gpu_grid")
         gpu_grid = false;
+    else if (temp == "-gpu_density")
+        gpu_density = true;
+    else if (temp == "-no_gpu_density")
+        gpu_density = false;
     else if (temp == "-gpu_blas")
         gpu_blas = true;
     else if (temp == "-fukui" || temp == "-Fukui")

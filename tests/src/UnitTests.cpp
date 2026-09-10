@@ -22,6 +22,7 @@
 #include "core/npy.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "core/blas_gpu.h"
+#include "core/aux_density_gpu.h"
 #endif
 
 static constexpr double PI_VAL = 3.14159265358979323846;
@@ -3133,6 +3134,10 @@ namespace NoSpherA2UnitTests
         const WFN aux_A = generate_aux_wfn(oh_molecule(0.0), basis), aux_B = generate_aux_wfn(oh_molecule(5.0), basis);
         vec c_A(aux_size(aux_A)), c_B(aux_size(aux_B));
         for (int i = 0; i < (int)c_A.size(); i++) c_A[i] = 0.3 * std::sin(1.0 + i), c_B[i] = 0.3 * std::cos(0.5 + 2 * i);
+        //a positive s part keeps the densities positive, as fitted ones are; the repulsion needs rho^(5/3)
+        const aux_density_table tA(aux_A.get_atoms()), tB(aux_B.get_atoms());
+        for (int s = 0; s < tA.n_sh; s++) if (tA.sh_l[s] == 0) c_A[tA.coef_off[s]] += 1.0;
+        for (int s = 0; s < tB.n_sh; s++) if (tB.sh_l[s] == 0) c_B[tB.coef_off[s]] += 1.0;
         const DensityFitting::INTERACTION E = DensityFitting::interaction_energy(c_A, aux_A, c_B, aux_B);
         EXPECT_GT(std::abs(E.electrostatic()), 1e-4);
         const vec2 R = rotation(0.4, 1.1, -2.3);
@@ -3156,6 +3161,42 @@ namespace NoSpherA2UnitTests
             //the repulsion is a grid quadrature and the grids do not turn with the atoms
             EXPECT_NEAR(F.rep, E.rep, 1e-2 * std::abs(E.rep)) << improper;
         }
+    }
+
+    // The flattened aux basis must give the density calc_density_ML gives atom by atom, on the
+    // host and on the device; the point set is sized past the kernel's minimum work so that the
+    // GPU branch is the one being tested when a device is present
+    TEST(CrystalEnergyTests, FlattenedAuxDensityMatchesTheAtomWalk)
+    {
+        std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+        const WFN aux = generate_aux_wfn(oh_molecule(0.0), basis);
+        vec c(aux_size(aux));
+        for (int i = 0; i < (int)c.size(); i++) c[i] = 0.3 * std::sin(1.0 + i);
+        const aux_density_table t(aux.get_atoms());
+        EXPECT_EQ(t.n_coef, (int)c.size());
+        const int np = 200000;
+        vec x(np), y(np), z(np), rho(np);
+        for (int p = 0; p < np; p++) x[p] = 6.0 * std::sin(0.37 * p) - 1.0, y[p] = 5.0 * std::cos(0.53 * p), z[p] = 7.0 * std::sin(0.11 * p + 1.0) + 0.5;
+#ifdef NOSPHERA2_USE_GPU
+        aux_density_gpu_set_enabled(false);
+#endif
+        calc_density_ML(t, c, np, x.data(), y.data(), z.data(), rho.data());
+        double n = 0.0;
+        for (int p = 0; p < np; p += 97) {
+            const double ref = calc_density_ML(x[p], y[p], z[p], c, aux.get_atoms());
+            EXPECT_NEAR(rho[p], ref, 1e-12 * std::abs(ref) + 1e-14) << p;
+            n += std::abs(ref);
+        }
+        EXPECT_GT(n, 1e-3);
+#ifdef NOSPHERA2_USE_GPU
+        if (!aux_density_gpu_available()) GTEST_SKIP() << "No GPU device present; the aux density kernel cannot run here";
+        aux_density_gpu_set_enabled(true);
+        vec rho_gpu(np);
+        const bool ran = aux_density_gpu_eval(t.n_at, t.cx.data(), t.cy.data(), t.cz.data(), t.r2_max.data(), t.n_sh, t.sh_start.data(), t.sh_l.data(), t.pr_start.data(), t.coef_off.data(), t.n_pr, t.pr_exp.data(), t.pr_norm.data(), t.n_coef, c.data(), np, x.data(), y.data(), z.data(), rho_gpu.data());
+        aux_density_gpu_set_enabled(false);
+        ASSERT_TRUE(ran);
+        for (int p = 0; p < np; p++) EXPECT_NEAR(rho_gpu[p], rho[p], 1e-11 * std::abs(rho[p]) + 1e-14) << p;
+#endif
     }
 
     TEST(CrystalEnergyTests, ContactsInPMinus1AreListedOnce)
