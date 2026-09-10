@@ -549,8 +549,8 @@ namespace {
     }
     // Gordon-Kim exchange-repulsion of the fitted densities on a Becke grid over the dimer: gk[0] the Thomas-Fermi kinetic
     // energy, gk[1] 1/9 of the von Weizsaecker gradient correction and gk[2] the Dirac exchange of rhoA + rhoB minus the
-    // monomers, gk[3], gk[4] the electron counts of A and B on the grid. Gradients by central differences of the aux density,
-    // evaluated only for the GGA functionals, so gk[1] is 0 with Dirac. The densities come from calc_density_ML on the
+    // monomers, gk[3], gk[4] the electron counts of A and B on the grid. Gradients are analytic (aux_density::at_grad) and
+    // asked for only by the GGA functionals, so gk[1] is 0 with Dirac. The densities come from calc_density_ML on the
     // flattened aux basis, which is where the OpenMP loop or the GPU kernel sits
     void gordon_kim(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const int x_fun, double* gk)
     {
@@ -585,23 +585,18 @@ namespace {
         const GridData& GD = gm.getGridData();
         int np = 0;
         for (int a = 0; a < (int)close.size(); a++) np += GD.num_points_per_atom[a];
-        //the points, followed for the GGA functionals by the six shifted copies the central differences need
-        const int sets = x_fun != 0 ? 7 : 1;
-        const double C_TF = 0.3 * std::pow(3 * constants::PI * constants::PI, 2.0 / 3.0), h = 1e-4, eps = 1e-10;
-        vec X(sets * np), Y(sets * np), Z(sets * np), W(np), rhoA(sets * np), rhoB(sets * np);
+        const double C_TF = 0.3 * std::pow(3 * constants::PI * constants::PI, 2.0 / 3.0), eps = 1e-10;
+        const int ng = x_fun != 0 ? np : 0;
+        vec X(np), Y(np), Z(np), W(np), rhoA(np), rhoB(np), gA[3] = { vec(ng), vec(ng), vec(ng) }, gB[3] = { vec(ng), vec(ng), vec(ng) };
         for (int a = 0, p0 = 0; a < (int)close.size(); p0 += GD.num_points_per_atom[a], a++) {
             const vec2& g = GD.atomic_grids[a];
             for (int p = 0; p < GD.num_points_per_atom[a]; p++)
                 X[p0 + p] = g[0][p], Y[p0 + p] = g[1][p], Z[p0 + p] = g[2][p], W[p0 + p] = g[GridData::GridIndex::BECKE_WEIGHT][p];
         }
-        for (int o = np; o < sets * np; o += np) {
-            const int c = (o / np - 1) / 2;
-            const double d = (o / np) % 2 ? h : -h;
-            for (int p = 0; p < np; p++)
-                X[o + p] = X[p] + (c == 0 ? d : 0.0), Y[o + p] = Y[p] + (c == 1 ? d : 0.0), Z[o + p] = Z[p] + (c == 2 ? d : 0.0);
-        }
-        calc_density_ML(aux_density_table(aux_A.get_atoms()), coef_A, sets * np, X.data(), Y.data(), Z.data(), rhoA.data());
-        calc_density_ML(aux_density_table(aux_B.get_atoms()), coef_B, sets * np, X.data(), Y.data(), Z.data(), rhoB.data());
+        double* pA[3] = { nullptr, nullptr, nullptr }, * pB[3] = { nullptr, nullptr, nullptr };
+        if (x_fun != 0) for (int c = 0; c < 3; c++) pA[c] = gA[c].data(), pB[c] = gB[c].data();
+        calc_density_ML(aux_density_table(aux_A.get_atoms()), coef_A, np, X.data(), Y.data(), Z.data(), rhoA.data(), pA[0], pA[1], pA[2]);
+        calc_density_ML(aux_density_table(aux_B.get_atoms()), coef_B, np, X.data(), Y.data(), Z.data(), rhoB.data(), pB[0], pB[1], pB[2]);
         double tf = 0.0, vw = 0.0, x = 0.0, nA = 0.0, nB = 0.0;
 #pragma omp parallel for reduction(+:tf, vw, x, nA, nB)
         for (int p = 0; p < np; p++) {
@@ -611,8 +606,7 @@ namespace {
             if (rho[0] < eps || rho[1] < eps) continue;
             //Dirac needs no gradients, the vW term is only reported for the GGA runs
             if (x_fun != 0) for (int c = 0; c < 3; c++) {
-                const int op = (1 + 2 * c) * np + p, om = op + np;
-                const double dA = (rhoA[op] - rhoA[om]) / (2 * h), dB = (rhoB[op] - rhoB[om]) / (2 * h);
+                const double dA = gA[c][p], dB = gB[c][p];
                 g2[0] += dA * dA, g2[1] += dB * dB, g2[2] += (dA + dB) * (dA + dB);
             }
             for (int m = 0; m < 3; m++) {

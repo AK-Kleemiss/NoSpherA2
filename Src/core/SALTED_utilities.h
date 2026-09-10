@@ -120,9 +120,10 @@ struct aux_density_table
     ivec sh_start, sh_l, pr_start, coef_off;
     aux_density_table(const std::vector<atom>& atoms);
     double operator()(const double x, const double y, const double z, const double* coefs) const;
+    double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz) const;
 };
-//rho on np points, OpenMP on the host or on the device when the set is large enough
-void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho);
+//rho on np points, OpenMP on the host or on the device when the set is large enough; with gx, gy, gz its gradient too
+void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx = nullptr, double* gy = nullptr, double* gz = nullptr);
 //Calc density from RI fit coefficients
 const double calc_density_ML(const double& x,
                             const double& y,

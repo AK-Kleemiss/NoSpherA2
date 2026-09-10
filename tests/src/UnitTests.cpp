@@ -3199,6 +3199,50 @@ namespace NoSpherA2UnitTests
 #endif
     }
 
+    TEST(CrystalEnergyTests, AnalyticAuxGradientMatchesCentralDifferences)
+    {
+        std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+        const WFN aux = generate_aux_wfn(oh_molecule(0.0), basis);
+        vec c(aux_size(aux));
+        for (int i = 0; i < (int)c.size(); i++) c[i] = 0.3 * std::sin(1.0 + i);
+        const aux_density_table t(aux.get_atoms());
+        const int np = 200000;
+        const double h = 1e-5;
+        vec x(np), y(np), z(np), rho(np), gx(np), gy(np), gz(np);
+        for (int p = 0; p < np; p++) x[p] = 6.0 * std::sin(0.37 * p) - 1.0, y[p] = 5.0 * std::cos(0.53 * p), z[p] = 7.0 * std::sin(0.11 * p + 1.0) + 0.5;
+#ifdef NOSPHERA2_USE_GPU
+        aux_density_gpu_set_enabled(false);
+#endif
+        calc_density_ML(t, c, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data());
+        double n = 0.0;
+        for (int p = 0; p < np; p += 97) {
+            EXPECT_NEAR(rho[p], t(x[p], y[p], z[p], c.data()), 1e-12 * std::abs(rho[p]) + 1e-14) << p;
+            const double ref[3] = {
+                (t(x[p] + h, y[p], z[p], c.data()) - t(x[p] - h, y[p], z[p], c.data())) / (2 * h),
+                (t(x[p], y[p] + h, z[p], c.data()) - t(x[p], y[p] - h, z[p], c.data())) / (2 * h),
+                (t(x[p], y[p], z[p] + h, c.data()) - t(x[p], y[p], z[p] - h, c.data())) / (2 * h) };
+            EXPECT_NEAR(gx[p], ref[0], 1e-6 * std::abs(ref[0]) + 1e-9) << p;
+            EXPECT_NEAR(gy[p], ref[1], 1e-6 * std::abs(ref[1]) + 1e-9) << p;
+            EXPECT_NEAR(gz[p], ref[2], 1e-6 * std::abs(ref[2]) + 1e-9) << p;
+            n += std::abs(ref[0]) + std::abs(ref[1]) + std::abs(ref[2]);
+        }
+        EXPECT_GT(n, 1e-3);
+#ifdef NOSPHERA2_USE_GPU
+        if (!aux_density_gpu_available()) GTEST_SKIP() << "No GPU device present; the aux density kernel cannot run here";
+        aux_density_gpu_set_enabled(true);
+        vec rho_gpu(np), gx_gpu(np), gy_gpu(np), gz_gpu(np);
+        const bool ran = aux_density_gpu_eval(t.n_at, t.cx.data(), t.cy.data(), t.cz.data(), t.r2_max.data(), t.n_sh, t.sh_start.data(), t.sh_l.data(), t.pr_start.data(), t.coef_off.data(), t.n_pr, t.pr_exp.data(), t.pr_norm.data(), t.n_coef, c.data(), np, x.data(), y.data(), z.data(), rho_gpu.data(), gx_gpu.data(), gy_gpu.data(), gz_gpu.data());
+        aux_density_gpu_set_enabled(false);
+        ASSERT_TRUE(ran);
+        for (int p = 0; p < np; p++) {
+            EXPECT_NEAR(rho_gpu[p], rho[p], 1e-11 * std::abs(rho[p]) + 1e-14) << p;
+            EXPECT_NEAR(gx_gpu[p], gx[p], 1e-11 * std::abs(gx[p]) + 1e-13) << p;
+            EXPECT_NEAR(gy_gpu[p], gy[p], 1e-11 * std::abs(gy[p]) + 1e-13) << p;
+            EXPECT_NEAR(gz_gpu[p], gz[p], 1e-11 * std::abs(gz[p]) + 1e-13) << p;
+        }
+#endif
+    }
+
     TEST(CrystalEnergyTests, ContactsInPMinus1AreListedOnce)
     {
         const std::filesystem::path cif = geometry_aid_tmp("p1bar.cif"), cif3 = geometry_aid_tmp("p3.cif");

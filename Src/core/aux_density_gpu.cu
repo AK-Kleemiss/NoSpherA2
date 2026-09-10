@@ -31,6 +31,15 @@ __global__ void aux_density_kernel(const int np, const double* x, const double* 
 	if (p >= np) return;
 	rho[p] = aux_density::at(x[p], y[p], z[p], n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs);
 }
+__global__ void aux_density_grad_kernel(const int np, const double* x, const double* y, const double* z, const int n_at,
+	const double* cx, const double* cy, const double* cz, const double* r2_max,
+	const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
+	const double* pr_exp, const double* pr_norm, const double* coefs, double* rho, double* gx, double* gy, double* gz)
+{
+	const int p = blockIdx.x * blockDim.x + threadIdx.x;
+	if (p >= np) return;
+	rho[p] = aux_density::at_grad(x[p], y[p], z[p], n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx[p], gy[p], gz[p]);
+}
 }
 
 bool aux_density_gpu_eval(
@@ -38,8 +47,9 @@ bool aux_density_gpu_eval(
 	const int n_sh, const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
 	const int n_pr, const double* pr_exp, const double* pr_norm,
 	const int n_coef, const double* coefs,
-	const int np, const double* x, const double* y, const double* z, double* rho)
+	const int np, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz)
 {
+	const bool grad = gx != nullptr;
 	if (np <= 0 || n_at <= 0 || n_sh <= 0) return false;
 	if (!g_aux_use_gpu || !aux_density_gpu_available()) return false;
 	if ((long long)np * n_sh < AUX_MIN_WORK) return false;
@@ -47,9 +57,9 @@ bool aux_density_gpu_eval(
 	const size_t sh = sizeof(int) * (size_t)n_sh, pr = sizeof(double) * (size_t)n_pr;
 	size_t freeb = 0, totalb = 0;
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
-	if (4 * pts + 4 * at + 5 * sh + 2 * pr + sizeof(double) * (size_t)n_coef + (1u << 26) > freeb) return false;
+	if ((grad ? 7 : 4) * pts + 4 * at + 5 * sh + 2 * pr + sizeof(double) * (size_t)n_coef + (1u << 26) > freeb) return false;
 
-	double *dx = nullptr, *dy = nullptr, *dz = nullptr, *drho = nullptr;
+	double *dx = nullptr, *dy = nullptr, *dz = nullptr, *drho = nullptr, *dgx = nullptr, *dgy = nullptr, *dgz = nullptr;
 	double *dcx = nullptr, *dcy = nullptr, *dcz = nullptr, *dr2 = nullptr, *dexp = nullptr, *dnorm = nullptr, *dcoef = nullptr;
 	int *dss = nullptr, *dsl = nullptr, *dps = nullptr, *dco = nullptr;
 	GPU_TRY(gpuMalloc(&dx, pts)); GPU_TRY(gpuMalloc(&dy, pts)); GPU_TRY(gpuMalloc(&dz, pts)); GPU_TRY(gpuMalloc(&drho, pts));
@@ -57,6 +67,7 @@ bool aux_density_gpu_eval(
 	GPU_TRY(gpuMalloc(&dss, sh + sizeof(int))); GPU_TRY(gpuMalloc(&dsl, sh)); GPU_TRY(gpuMalloc(&dps, sh + sizeof(int))); GPU_TRY(gpuMalloc(&dco, sh));
 	GPU_TRY(gpuMalloc(&dexp, pr)); GPU_TRY(gpuMalloc(&dnorm, pr));
 	GPU_TRY(gpuMalloc(&dcoef, sizeof(double) * (size_t)n_coef));
+	if (grad) { GPU_TRY(gpuMalloc(&dgx, pts)); GPU_TRY(gpuMalloc(&dgy, pts)); GPU_TRY(gpuMalloc(&dgz, pts)); }
 
 	GPU_TRY(gpuMemcpy(dx, x, pts, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dy, y, pts, gpuMemcpyHostToDevice));
@@ -73,10 +84,17 @@ bool aux_density_gpu_eval(
 	GPU_TRY(gpuMemcpy(dnorm, pr_norm, pr, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dcoef, coefs, sizeof(double) * (size_t)n_coef, gpuMemcpyHostToDevice));
 
-	aux_density_kernel<<<(np + AUX_BLOCK - 1) / AUX_BLOCK, AUX_BLOCK>>>(np, dx, dy, dz, n_at, dcx, dcy, dcz, dr2, dss, dsl, dps, dco, dexp, dnorm, dcoef, drho);
+	if (grad) aux_density_grad_kernel<<<(np + AUX_BLOCK - 1) / AUX_BLOCK, AUX_BLOCK>>>(np, dx, dy, dz, n_at, dcx, dcy, dcz, dr2, dss, dsl, dps, dco, dexp, dnorm, dcoef, drho, dgx, dgy, dgz);
+	else aux_density_kernel<<<(np + AUX_BLOCK - 1) / AUX_BLOCK, AUX_BLOCK>>>(np, dx, dy, dz, n_at, dcx, dcy, dcz, dr2, dss, dsl, dps, dco, dexp, dnorm, dcoef, drho);
 	GPU_TRY(gpuGetLastError());
 	GPU_TRY(gpuDeviceSynchronize());
 	GPU_TRY(gpuMemcpy(rho, drho, pts, gpuMemcpyDeviceToHost));
+	if (grad) {
+		GPU_TRY(gpuMemcpy(gx, dgx, pts, gpuMemcpyDeviceToHost));
+		GPU_TRY(gpuMemcpy(gy, dgy, pts, gpuMemcpyDeviceToHost));
+		GPU_TRY(gpuMemcpy(gz, dgz, pts, gpuMemcpyDeviceToHost));
+		gpuFree(dgx); gpuFree(dgy); gpuFree(dgz);
+	}
 
 	gpuFree(dx); gpuFree(dy); gpuFree(dz); gpuFree(drho);
 	gpuFree(dcx); gpuFree(dcy); gpuFree(dcz); gpuFree(dr2);

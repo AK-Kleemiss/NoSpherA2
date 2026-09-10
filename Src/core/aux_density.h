@@ -14,9 +14,21 @@
 namespace aux_density
 {
     constexpr double PI = 3.1415926535897932384626433832795028;
+    //Value with its three derivatives, so the harmonic text below differentiates itself:
+    //instantiated on double for the density, on dual for its gradient
+    struct dual
+    {
+        double v, x, y, z;
+        AUX_HD dual(const double v_ = 0.0, const double x_ = 0.0, const double y_ = 0.0, const double z_ = 0.0) : v(v_), x(x_), y(y_), z(z_) {}
+    };
+    AUX_HD inline dual operator+(const dual& a, const dual& b) { return dual(a.v + b.v, a.x + b.x, a.y + b.y, a.z + b.z); }
+    AUX_HD inline dual operator-(const dual& a, const dual& b) { return dual(a.v - b.v, a.x - b.x, a.y - b.y, a.z - b.z); }
+    AUX_HD inline dual operator-(const dual& a) { return dual(-a.v, -a.x, -a.y, -a.z); }
+    AUX_HD inline dual operator*(const dual& a, const dual& b) { return dual(a.v * b.v, a.v * b.x + a.x * b.v, a.v * b.y + a.y * b.v, a.v * b.z + a.z * b.v); }
     //The real spherical harmonics of one l contracted with their coefficients, the switch of
     //constants::spherical_harmonic(l, d, coefs) up to l = 8 with x, y, z already normalised
-    AUX_HD inline double harmonic(const int l, const double x, const double y, const double z, const double* coefs)
+    template <class T>
+    AUX_HD inline T harmonic(const int l, const T x, const T y, const T z, const double* coefs)
     {
         switch (l)
         {
@@ -28,7 +40,7 @@ namespace aux_density
             return sqrt(15.0 / (4 * PI)) * (y * x * coefs[0] + y * z * coefs[1] + x * z * coefs[3]) + sqrt(5.0 / (16.0 * PI)) * (3 * z * z - 1.0) * coefs[2] + sqrt(15.0 / (16.0 * PI)) * (x * x - y * y) * coefs[4];
         case 3:
         {
-            const double y2 = y * y, x2 = x * x, z2 = z * z;
+            const T y2 = y * y, x2 = x * x, z2 = z * z;
             return sqrt(35.0 / (32.0 * PI)) * (y * (3 * x2 - y2) * coefs[0] + x * (x2 - 3 * y2) * coefs[6]) +
                 sqrt(105.0 / (4 * PI)) * x * y * z * coefs[1] +
                 sqrt(21.0 / (32.0 * PI)) * (y * (5 * z2 - 1.0) * coefs[2] + x * (5 * z2 - 1.0) * coefs[4]) +
@@ -37,7 +49,7 @@ namespace aux_density
         }
         case 4:
         {
-            const double x2 = x * x, y2 = y * y, z2 = z * z;
+            const T x2 = x * x, y2 = y * y, z2 = z * z;
             return sqrt(315.0 / (16.0 * PI)) * x * y * (x2 - y2) * coefs[0] +
                 sqrt(315.0 / (32.0 * PI)) * (y * (3 * x2 - y2) * z * coefs[1] + x * (x2 - 3 * y2) * z * coefs[7]) +
                 sqrt(45.0 / (16.0 * PI)) * x * y * (7 * z2 - 1.0) * coefs[2] +
@@ -48,7 +60,7 @@ namespace aux_density
         }
         case 5:
         {
-            const double x2 = x * x, y2 = y * y, z2 = z * z;
+            const T x2 = x * x, y2 = y * y, z2 = z * z;
             return sqrt(693.0 / (2048.0 * PI)) * (2 * y2 * y2 * y - 20 * x2 * y2 * y + 10 * y * x2 * x2) * coefs[0] +
                 -sqrt(3465.0 / (256.0 * PI)) * z * ((4 * x * y2 * y - 4 * x2 * x * y) * coefs[1] - (x2 * x2 - 6 * x2 * y2 + y2 * y2) * coefs[9]) +
                 sqrt(385.0 / (512.0 * PI)) * (9 * z2 - 1.0) * (y * (3 * x2 - y2) * coefs[2] + x * (x2 - 3 * y2) * coefs[8]) +
@@ -59,8 +71,8 @@ namespace aux_density
         }
         case 6:
         {
-            const double x2 = x * x, y2 = y * y, z2 = z * z;
-            const double x4 = x2 * x2, y4 = y2 * y2, z4 = z2 * z2;
+            const T x2 = x * x, y2 = y * y, z2 = z * z;
+            const T x4 = x2 * x2, y4 = y2 * y2, z4 = z2 * z2;
             return (1.0 / 32.0) * sqrt(13.0 / PI) * (z2 * (z2 * (231.0 * z2 - 315.0) + 105.0) - 5.0) * coefs[6] +
                 (1.0 / 16.0) * sqrt(273.0 / (PI)) * (33 * z4 - 30 * z2 + 5) * (x * z * coefs[7] + y * z * coefs[5]) +
                 (1.0 / 32.0) * sqrt(1365.0 / (2 * PI)) * (33 * z4 - 18 * z2 + 1) * ((x2 - y2) * coefs[8] + 2 * x * y * coefs[4]) +
@@ -72,8 +84,8 @@ namespace aux_density
         }
         case 7:
         {
-            const double x2 = x * x, y2 = y * y, z2 = z * z;
-            const double x4 = x2 * x2, y4 = y2 * y2;
+            const T x2 = x * x, y2 = y * y, z2 = z * z;
+            const T x4 = x2 * x2, y4 = y2 * y2;
             return (1.0 / 32.0) * sqrt(15.0 / PI) * z * (z2 * (z2 * (429.0 * z2 - 693.0) + 315.0) - 35.0) * coefs[7] +
                 (1.0 / 64.0) * sqrt(105.0 / PI) * (z2 * (z2 * (429.0 * z2 - 495.0) + 135.0) - 5.0) * (x * coefs[8] + y * coefs[6]) +
                 (3.0 / 32.0) * sqrt(35.0 / (2 * PI)) * z * (z2 * (143.0 * z2 - 110.0) + 15.0) * ((x2 - y2) * coefs[9] + 2 * x * y * coefs[5]) +
@@ -86,8 +98,8 @@ namespace aux_density
         }
         case 8:
         {
-            const double x2 = x * x, y2 = y * y, z2 = z * z;
-            const double x4 = x2 * x2, y4 = y2 * y2, z4 = z2 * z2;
+            const T x2 = x * x, y2 = y * y, z2 = z * z;
+            const T x4 = x2 * x2, y4 = y2 * y2, z4 = z2 * z2;
             return (1.0 / 256.0) * sqrt(17.0 / PI) * (z2 * (z2 * (z2 * (6435.0 * z2 - 12012.0) + 6930.0) - 1260.0) + 35.0) * coefs[8] +
                 (3.0 / 64.0) * sqrt(17.0 / PI) * z * (715.0 * z4 * z2 - 1001.0 * z4 + 385.0 * z2 - 35.0) * (x * coefs[9] + y * coefs[7]) +
                 (3.0 / 64.0) * sqrt(595.0 / (2 * PI)) * (143 * z4 * z2 - 143 * z4 + 33 * z2 - 1) * ((x2 - y2) * coefs[10] + 2 * x * y * coefs[6]) +
@@ -100,7 +112,7 @@ namespace aux_density
                 (3.0 / 256.0) * sqrt(12155.0 / PI) * y * x * (y2 * (y2 * (-8 * y2 + 56 * x2) - 56 * x4) + 8 * x4 * x2) * coefs[0];
         }
         }
-        return 0.0;
+        return T(0.0);
     }
     //rho at (x, y, z). Atoms carry their centre, the squared distance beyond which their most
     //diffuse primitive is below 1e-20 and their shell range; shells carry l, the primitive range
@@ -123,6 +135,40 @@ namespace aux_density
                 radial *= rl;
                 if (radial < 1E-10) continue;
                 dens += radial * harmonic(sh_l[s], ux, uy, uz, coefs + coef_off[s]);
+            }
+        }
+        return dens;
+    }
+    //rho and its gradient at (x, y, z). Each shell is R(r^2) r^l Y(u) with R the contraction of
+    //Gaussians, so d/dr of the radial part is analytic and dY/du comes from the dual harmonic,
+    //projected onto the sphere: grad = d (-2 sum(a n e) r^l + l R r^(l-2)) Y + R r^(l-1) (1 - u u^T) dY/du
+    AUX_HD inline double at_grad(const double x, const double y, const double z, const int n_at,
+        const double* cx, const double* cy, const double* cz, const double* r2_max,
+        const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
+        const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz)
+    {
+        double dens = 0.0;
+        gx = gy = gz = 0.0;
+        for (int a = 0; a < n_at; a++) {
+            const double dx = x - cx[a], dy = y - cy[a], dz = z - cz[a], r2 = dx * dx + dy * dy + dz * dz;
+            if (r2 > r2_max[a]) continue;
+            const double r = sqrt(r2), ux = dx / r, uy = dy / r, uz = dz / r;
+            for (int s = sh_start[a]; s < sh_start[a + 1]; s++) {
+                const int l = sh_l[s];
+                double radial = 0.0, dradial = 0.0, rl = 1.0;
+                for (int p = pr_start[s]; p < pr_start[s + 1]; p++) {
+                    const double e = exp(-pr_exp[p] * r2) * pr_norm[p];
+                    radial += e, dradial += pr_exp[p] * e;
+                }
+                for (int i = 0; i < l; i++) rl *= r;
+                radial *= rl;
+                if (radial < 1E-10) continue;
+                const dual Y = harmonic(l, dual(ux, 1.0, 0.0, 0.0), dual(uy, 0.0, 1.0, 0.0), dual(uz, 0.0, 0.0, 1.0), coefs + coef_off[s]);
+                const double fr = (l * radial / r2 - 2.0 * dradial * rl) * Y.v, fa = radial / r, ud = ux * Y.x + uy * Y.y + uz * Y.z;
+                dens += radial * Y.v;
+                gx += fr * dx + fa * (Y.x - ux * ud);
+                gy += fr * dy + fa * (Y.y - uy * ud);
+                gz += fr * dz + fa * (Y.z - uz * ud);
             }
         }
         return dens;
