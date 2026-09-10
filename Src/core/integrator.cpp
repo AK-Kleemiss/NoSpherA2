@@ -586,8 +586,8 @@ namespace {
         int np = 0;
         for (int a = 0; a < (int)close.size(); a++) np += GD.num_points_per_atom[a];
         const double C_TF = 0.3 * std::pow(3 * constants::PI * constants::PI, 2.0 / 3.0), eps = 1e-10;
-        const int ng = x_fun != 0 ? np : 0;
-        vec X(np), Y(np), Z(np), W(np), rhoA(np), rhoB(np), gA[3] = { vec(ng), vec(ng), vec(ng) }, gB[3] = { vec(ng), vec(ng), vec(ng) };
+        const int ng = x_fun != 0 ? np : 0, nl = x_fun == 3 ? np : 0;
+        vec X(np), Y(np), Z(np), W(np), rhoA(np), rhoB(np), gA[3] = { vec(ng), vec(ng), vec(ng) }, gB[3] = { vec(ng), vec(ng), vec(ng) }, lA(nl), lB(nl);
         for (int a = 0, p0 = 0; a < (int)close.size(); p0 += GD.num_points_per_atom[a], a++) {
             const vec2& g = GD.atomic_grids[a];
             for (int p = 0; p < GD.num_points_per_atom[a]; p++)
@@ -595,13 +595,13 @@ namespace {
         }
         double* pA[3] = { nullptr, nullptr, nullptr }, * pB[3] = { nullptr, nullptr, nullptr };
         if (x_fun != 0) for (int c = 0; c < 3; c++) pA[c] = gA[c].data(), pB[c] = gB[c].data();
-        calc_density_ML(aux_density_table(aux_A.get_atoms()), coef_A, np, X.data(), Y.data(), Z.data(), rhoA.data(), pA[0], pA[1], pA[2]);
-        calc_density_ML(aux_density_table(aux_B.get_atoms()), coef_B, np, X.data(), Y.data(), Z.data(), rhoB.data(), pB[0], pB[1], pB[2]);
+        calc_density_ML(aux_density_table(aux_A.get_atoms()), coef_A, np, X.data(), Y.data(), Z.data(), rhoA.data(), pA[0], pA[1], pA[2], nl ? lA.data() : nullptr);
+        calc_density_ML(aux_density_table(aux_B.get_atoms()), coef_B, np, X.data(), Y.data(), Z.data(), rhoB.data(), pB[0], pB[1], pB[2], nl ? lB.data() : nullptr);
         double tf = 0.0, vw = 0.0, x = 0.0, nA = 0.0, nB = 0.0;
 #pragma omp parallel for reduction(+:tf, vw, x, nA, nB)
         for (int p = 0; p < np; p++) {
             const double w = W[p], rho[3] = { rhoA[p], rhoB[p], rhoA[p] + rhoB[p] };
-            double g2[3] = { 0.0, 0.0, 0.0 };
+            double g2[3] = { 0.0, 0.0, 0.0 }, lap[3] = { 0.0, 0.0, 0.0 };
             nA += w * rho[0], nB += w * rho[1];
             if (rho[0] < eps || rho[1] < eps) continue;
             //Dirac needs no gradients, the vW term is only reported for the GGA runs
@@ -609,19 +609,20 @@ namespace {
                 const double dA = gA[c][p], dB = gB[c][p];
                 g2[0] += dA * dA, g2[1] += dB * dB, g2[2] += (dA + dB) * (dA + dB);
             }
+            if (nl) lap[0] = lA[p], lap[1] = lB[p], lap[2] = lA[p] + lB[p];
             for (int m = 0; m < 3; m++) {
                 if (rho[m] < 1e-12) continue;
                 const double s = m == 2 ? 1.0 : -1.0;
                 tf += s * w * C_TF * std::pow(rho[m], 5.0 / 3.0);
                 vw += s * w * g2[m] / (72.0 * rho[m]);
-                x += s * w * DensityFitting::exchange_density(rho[m], g2[m], x_fun);
+                x += s * w * DensityFitting::exchange_density(rho[m], g2[m], x_fun, lap[m]);
             }
         }
         gk[0] = tf, gk[1] = vw, gk[2] = x, gk[3] = nA, gk[4] = nB;
     }
 }
 
-double DensityFitting::exchange_density(const double rho, const double g2, const int x_fun)
+double DensityFitting::exchange_density(const double rho, const double g2, const int x_fun, const double lap)
 {
     const double C_X = -0.75 * std::pow(3 * constants::INV_PI, 1.0 / 3.0), r43 = std::pow(rho, 4.0 / 3.0);
     if (x_fun == 1) {
@@ -632,6 +633,29 @@ double DensityFitting::exchange_density(const double rho, const double g2, const
     if (x_fun == 2) {
         const double beta = 0.0042, x = std::cbrt(2.0) * std::sqrt(g2) / r43;
         return C_X * r43 - 2 * beta * std::pow(0.5 * rho, 4.0 / 3.0) * x * x / (1 + 6 * beta * x * std::asinh(x));
+    }
+    if (x_fun == 3) {
+        //r2SCAN, Furness et al. J. Phys. Chem. Lett. 11, 8208 (2020), as the deorbitalised r2SCAN-L of Mejia-Rodriguez
+        //and Trickey, Phys. Rev. B 102, 121109 (2020): the iso-orbital indicator alpha comes from the PC07 kinetic energy
+        //density with their reoptimised a, b instead of the orbital tau. p = s^2 and q are the reduced gradient and
+        //Laplacian, z = GE4M - F_W the part of PC07 beyond von Weizsaecker, alpha = z f_ab(z) / (1 + eta 5p/3)
+        const double kf2 = std::pow(3 * constants::PI * constants::PI * rho, 2.0 / 3.0), p = g2 / (4 * kf2 * rho * rho), q = lap / (4 * kf2 * rho);
+        const double a = 1.784720, b = 0.258304, c2 = 0.8, d = 1.24, k1 = 0.065, eta = 0.001, dp2 = 0.361, mu = 10.0 / 81.0, h0 = 1.174, a1 = 4.9479;
+        const double D = 8 * q * q / 81 - p * q / 9 + 8 * p * p / 243, fW = 5 * p / 3, GE4 = 1 + 5 * p / 27 + 20 * q / 9 + D;
+        const double z = GE4 / std::sqrt(1 + D * D / ((1 + fW) * (1 + fW))) - fW;
+        double fab = 0.0;
+        if (z >= 0.975 * a) fab = 1.0;
+        else if (z > 0.025 * a) fab = std::exp(-a * b / z) * std::pow(1 + std::exp(-a / (a - z)), b) / std::pow(std::exp(-a / z) + std::exp(-a / (a - z)), b);
+        const double alpha = z * fab / (1 + eta * fW);
+        //f(alpha) is the rSCAN polynomial up to 2.5 and the SCAN tail beyond; its slope at alpha = 1 sets C2 of the gradient expansion
+        const double c[8] = { 1.0, -0.667, -0.4445555, -0.663086601049, 1.451297044490, -0.887998041597, 0.234528941479, -0.023185843322 };
+        double f = 0.0, df1 = 0.0;
+        for (int i = 7; i > 0; i--) df1 += i * c[i];
+        if (alpha <= 2.5) for (int i = 7; i >= 0; i--) f = f * alpha + c[i];
+        else f = -d * std::exp(c2 / (1 - alpha));
+        const double x = ((20.0 / 27 + 5 * eta / 3) * df1 * (h0 - 1) * std::exp(-p * p / (dp2 * dp2 * dp2 * dp2)) + mu) * p;
+        const double h1 = 1 + k1 * x / (k1 + x), g = 1 - std::exp(-a1 / std::pow(p, 0.25));
+        return C_X * r43 * (h1 + f * (h0 - h1)) * g;
     }
     return C_X * r43;
 }
@@ -710,7 +734,7 @@ DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A
 void DensityFitting::print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file)
 {
     const bool KS = E.n_A == 0.0 && E.n_B == 0.0;
-    const char* x_names[3] = { "rep. exch. Dirac ", "rep. exch. PBE   ", "rep. exch. B88   " };
+    const char* x_names[4] = { "rep. exch. Dirac ", "rep. exch. PBE   ", "rep. exch. B88   ", "rep. exch. r2SCAN" };
     const char* names[13] = { "nucleus-nucleus  ", "nuclei A - rho B ", "nuclei B - rho A ", "rho A - rho B    ", "electrostatic    ",
                               "pol. A in field B", "pol. B in field A", "dispersion D4    ", "rep. kin. TF     ", x_names[E.x_fun], KS ? "repulsion K*S    " : "repulsion GK     ", "total            ", "vW/9 not in total" };
     const double parts[13] = { E.nuc_nuc, E.nucA_rhoB, E.nucB_rhoA, E.rho_rho, E.electrostatic(), E.pol_A, E.pol_B, E.disp, E.rep_kin, E.rep_x, E.rep, E.total(), E.rep_vw };

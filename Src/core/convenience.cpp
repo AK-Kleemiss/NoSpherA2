@@ -400,8 +400,9 @@ std::string help_message =
  "  -repulsion_overlap <K>             Exchange-repulsion of -interaction_energy\n"
  "                                    as K * Int rhoA rhoB, K in Eh bohr^3/e^2,\n"
  "                                    instead of the Gordon-Kim default.\n"
- "  -repulsion_exchange <dirac|pbe|b88> Exchange functional of the Gordon-Kim\n"
- "                                    repulsion, default dirac.\n"
+ "  -repulsion_exchange <dirac|pbe|b88|r2scan> Exchange functional of the\n"
+ "                                    Gordon-Kim repulsion, default dirac;\n"
+ "                                    r2scan is the deorbitalised r2SCAN-L.\n"
  "  -combine_mos <wfn1> <wfn2>          Combine molecular orbitals.\n"
  "  -cmos1 <MO ...>  -cmos2 <MO ...>   MO selections for -combine_mos.\n"
  "  -QCT                               Enter the legacy QCT workflow.\n\n"
@@ -3608,8 +3609,8 @@ bool options::digest_ri_options(const std::string &temp, int &i)
     }
     else if (temp == "-repulsion_exchange") {
         const std::string f = arguments[++i];
-        repulsion_exchange = f == "dirac" ? 0 : f == "pbe" ? 1 : f == "b88" ? 2 : -1;
-        err_checkf(repulsion_exchange >= 0, "-repulsion_exchange takes dirac, pbe or b88", std::cout);
+        repulsion_exchange = f == "dirac" ? 0 : f == "pbe" ? 1 : f == "b88" ? 2 : f == "r2scan" ? 3 : -1;
+        err_checkf(repulsion_exchange >= 0, "-repulsion_exchange takes dirac, pbe, b88 or r2scan", std::cout);
     }
     else if (temp == "-interaction_energy") {
         //-interaction_energy <A> <B>: electrostatics between two fitted densities. With -SALTED <model-dir> both are predicted

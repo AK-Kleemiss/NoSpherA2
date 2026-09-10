@@ -231,6 +231,17 @@ is largest in the low-density tails, where the monomers' reduced gradients excee
 gradient correction cancels most of the exchange attraction and the repulsion grows; Dirac stays the
 default, as in the classical Gordon-Kim model.
 
+`-repulsion_exchange r2scan` adds the meta-GGA r2SCAN exchange (Furness et al. 2020) in its deorbitalised
+r2SCAN-L form (Mejia-Rodriguez and Trickey): the fitted density has no orbitals, so the kinetic energy
+density behind the iso-orbital indicator alpha comes from the PC07opt formula in rho, |grad rho|^2 and
+lap rho. The Laplacian of an aux shell is analytic (`aux_density::at_lap`, a template flag on the gradient
+walk, and a third GPU kernel); `AnalyticAuxLaplacianMatchesCentralDifferences` checks it against central
+differences of the analytic gradient on 200000 points and the GPU kernel against the CPU walk to 1e-11.
+`ExchangeFunctionalsReproduceTheHydrogenAtom` now also checks r2SCAN-L at -0.3108 Eh (orbital r2SCAN is
+exact, -0.3125; PC07opt shifts it) and one point value against the Python transcription of the libxc maple
+sources to 1e-12. Water-methanol Delta E_x -2.03 (free fit, total -0.47) and -2.28 kcal/mol (Model V7,
+total +2.13), between PBE and B88; GPU and CPU agree to all printed digits, cost equals the PBE run.
+
 ## 2026-09-09 — f-function phases in the OCC-to-WFN constructor
 
 `WFN::WFN(const occ::qm::Wavefunction&)` applied Gaussian-convention spherical-to-cartesian

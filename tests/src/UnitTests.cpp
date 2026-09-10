@@ -2687,18 +2687,23 @@ namespace NoSpherA2UnitTests
     // point-like, so the energy cancels in both halves: the analytic aux potential of A at B's nucleus against
     // the libcint two-centre integrals, and A's nuclear repulsion against A's nuclei in B's density. This ties
     // the potential, the coefficient layout and the combined Int_Params block together
-    // Spin-scaled hydrogen atom, E_x[rho_up] = E_x[2 rho_up] / 2: LDA -0.2680, PBE -0.3059, B88 -0.3098 Eh
+    // Spin-scaled hydrogen atom, E_x[rho_up] = E_x[2 rho_up] / 2: LDA -0.2680, PBE -0.3059, B88 -0.3098 Eh. r2SCAN with
+    // the orbital tau gives the exact -0.3125 by construction; the PC07opt tau of r2SCAN-L moves it to -0.3108, integrated
+    // in Python from the libxc maple definitions. lap rho = (4 - 4/r) rho for the exponential density
     TEST(RiInteractionTests, ExchangeFunctionalsReproduceTheHydrogenAtom)
     {
-        const double ref[3] = { -0.2680, -0.3059, -0.3098 }, dr = 1e-4;
-        for (int f = 0; f < 3; f++) {
+        const double ref[4] = { -0.2680, -0.3059, -0.3098, -0.3108 }, dr = 1e-4;
+        for (int f = 0; f < 4; f++) {
             double e = 0.0;
             for (int i = 1; i < 300000; i++) {
                 const double r = i * dr, rho = 2 * std::exp(-2 * r) / constants::PI;
-                e += 4 * constants::PI * r * r * DensityFitting::exchange_density(rho, 4 * rho * rho, f) * dr;
+                e += 4 * constants::PI * r * r * DensityFitting::exchange_density(rho, 4 * rho * rho, f, (4 - 4 / r) * rho) * dr;
             }
             EXPECT_NEAR(0.5 * e, ref[f], 2e-4) << f;
         }
+        //r2SCAN-L at r = 0.5 of the same density, from the Python transcription of the libxc maple sources
+        const double rho = 2 * std::exp(-1.0) / constants::PI;
+        EXPECT_NEAR(DensityFitting::exchange_density(rho, 4 * rho * rho, 3, -4 * rho), -0.12503518792909296, 1e-12);
     }
 
     TEST(RiInteractionTests, NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables)
@@ -3239,6 +3244,50 @@ namespace NoSpherA2UnitTests
             EXPECT_NEAR(gx_gpu[p], gx[p], 1e-11 * std::abs(gx[p]) + 1e-13) << p;
             EXPECT_NEAR(gy_gpu[p], gy[p], 1e-11 * std::abs(gy[p]) + 1e-13) << p;
             EXPECT_NEAR(gz_gpu[p], gz[p], 1e-11 * std::abs(gz[p]) + 1e-13) << p;
+        }
+#endif
+    }
+
+    TEST(CrystalEnergyTests, AnalyticAuxLaplacianMatchesCentralDifferences)
+    {
+        std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+        const WFN aux = generate_aux_wfn(oh_molecule(0.0), basis);
+        vec c(aux_size(aux));
+        for (int i = 0; i < (int)c.size(); i++) c[i] = 0.3 * std::sin(1.0 + i);
+        const aux_density_table t(aux.get_atoms());
+        const int np = 200000;
+        const double h = 1e-5;
+        vec x(np), y(np), z(np), rho(np), gx(np), gy(np), gz(np), lap(np);
+        for (int p = 0; p < np; p++) x[p] = 6.0 * std::sin(0.37 * p) - 1.0, y[p] = 5.0 * std::cos(0.53 * p), z[p] = 7.0 * std::sin(0.11 * p + 1.0) + 0.5;
+#ifdef NOSPHERA2_USE_GPU
+        aux_density_gpu_set_enabled(false);
+#endif
+        calc_density_ML(t, c, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data(), lap.data());
+        double n = 0.0;
+        for (int p = 0; p < np; p += 97) {
+            double g[3], d[3], ref = 0.0;
+            EXPECT_NEAR(rho[p], t(x[p], y[p], z[p], c.data(), g[0], g[1], g[2]), 1e-12 * std::abs(rho[p]) + 1e-14) << p;
+            EXPECT_NEAR(gx[p], g[0], 1e-12 * std::abs(g[0]) + 1e-14) << p;
+            EXPECT_NEAR(gy[p], g[1], 1e-12 * std::abs(g[1]) + 1e-14) << p;
+            EXPECT_NEAR(gz[p], g[2], 1e-12 * std::abs(g[2]) + 1e-14) << p;
+            t(x[p] + h, y[p], z[p], c.data(), g[0], g[1], g[2]), t(x[p] - h, y[p], z[p], c.data(), d[0], d[1], d[2]), ref += (g[0] - d[0]) / (2 * h);
+            t(x[p], y[p] + h, z[p], c.data(), g[0], g[1], g[2]), t(x[p], y[p] - h, z[p], c.data(), d[0], d[1], d[2]), ref += (g[1] - d[1]) / (2 * h);
+            t(x[p], y[p], z[p] + h, c.data(), g[0], g[1], g[2]), t(x[p], y[p], z[p] - h, c.data(), d[0], d[1], d[2]), ref += (g[2] - d[2]) / (2 * h);
+            EXPECT_NEAR(lap[p], ref, 1e-6 * std::abs(ref) + 1e-9) << p;
+            n += std::abs(ref);
+        }
+        EXPECT_GT(n, 1e-3);
+#ifdef NOSPHERA2_USE_GPU
+        if (!aux_density_gpu_available()) GTEST_SKIP() << "No GPU device present; the aux density kernel cannot run here";
+        aux_density_gpu_set_enabled(true);
+        vec rho_gpu(np), gx_gpu(np), gy_gpu(np), gz_gpu(np), lap_gpu(np);
+        const bool ran = aux_density_gpu_eval(t.n_at, t.cx.data(), t.cy.data(), t.cz.data(), t.r2_max.data(), t.n_sh, t.sh_start.data(), t.sh_l.data(), t.pr_start.data(), t.coef_off.data(), t.n_pr, t.pr_exp.data(), t.pr_norm.data(), t.n_coef, c.data(), np, x.data(), y.data(), z.data(), rho_gpu.data(), gx_gpu.data(), gy_gpu.data(), gz_gpu.data(), lap_gpu.data());
+        aux_density_gpu_set_enabled(false);
+        ASSERT_TRUE(ran);
+        for (int p = 0; p < np; p++) {
+            EXPECT_NEAR(rho_gpu[p], rho[p], 1e-11 * std::abs(rho[p]) + 1e-14) << p;
+            EXPECT_NEAR(gx_gpu[p], gx[p], 1e-11 * std::abs(gx[p]) + 1e-13) << p;
+            EXPECT_NEAR(lap_gpu[p], lap[p], 1e-11 * std::abs(lap[p]) + 1e-13) << p;
         }
 #endif
     }
