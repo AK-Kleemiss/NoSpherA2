@@ -18,6 +18,10 @@ bool itensor_gpu_available();
 //last digits, so a run says which one produced its numbers.
 const char* itensor_gpu_gemm_name();
 
+//Flops of the GEMMs the device path issues for one reflection and one symmetry operation,
+//padding included, so the throughput row counts what ran. Valid after init.
+double itensor_gpu_issued_flops();
+
 struct itensor_gpu_layout {
 	int nmo = 0;
 	int packed = 0;              //stored pairs per reflection

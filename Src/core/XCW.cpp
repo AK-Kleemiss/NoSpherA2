@@ -2053,18 +2053,17 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		L.compact = compact_flat.data(); L.grid_point_off = goff.data();
 		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
 		L.n_points = static_cast<long long>(fd1.size());
-		//What the device path actually issues: one dense na x 2na GEMM per block, the real
-		//and imaginary halves together. Counted the way the path runs, or the GFLOP/s row
-		//is fiction.
-		for (int b = 0; b < L.n_blocks; b++)
-			itensor_gpu_dense_flops += throughput::flops_gemm(L.blk_n_active[b],
-				2.0 * L.blk_n_active[b], L.blk_point_count[b]);
-		itensor_gpu_dense_flops *= static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
 		//-gpu_fp64 raises the whole device path to double. It is worth asking for on a card
 		//with real double-precision units and expensive on one without, which is why it is
 		//asked for rather than detected.
 		const sf_precision iprec = opt->gpu_fp64 ? sf_precision::FP64 : sf_precision::FP32;
 		itensor_on_gpu = itensor_gpu_init(L, iprec, opt->gpu_itensor_tensor);
+		//What the device path actually issues, the blocks padded to their batch shapes,
+		//real and imaginary halves together. Counted the way the path runs, or the GFLOP/s
+		//row is fiction.
+		if (itensor_on_gpu)
+			itensor_gpu_dense_flops = itensor_gpu_issued_flops()
+				* static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
 		//Say which processor produced the numbers, and which GEMM: the three do not agree
 		//in the last digits, so a log that does not name one cannot be compared with
 		//another. Gated like the other timing lines so the golden-file tests, which run

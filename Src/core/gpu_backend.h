@@ -20,6 +20,7 @@
 #define gpuMemcpy hipMemcpy
 #define gpuMemcpyHostToDevice hipMemcpyHostToDevice
 #define gpuMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define gpuMemcpyDeviceToDevice hipMemcpyDeviceToDevice
 #define gpuGetLastError hipGetLastError
 #define gpuDeviceSynchronize hipDeviceSynchronize
 #define gpuStream_t hipStream_t
@@ -51,6 +52,7 @@
 #define gpuMemcpy cudaMemcpy
 #define gpuMemcpyHostToDevice cudaMemcpyHostToDevice
 #define gpuMemcpyDeviceToHost cudaMemcpyDeviceToHost
+#define gpuMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
 #define gpuGetLastError cudaGetLastError
 #define gpuDeviceSynchronize cudaDeviceSynchronize
 #define gpuStream_t cudaStream_t
