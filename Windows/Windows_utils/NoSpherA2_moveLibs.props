@@ -9,7 +9,7 @@
     <deps_install_dir>$(NosMainFolder)deps-install-debug</deps_install_dir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Profile'">
-    <deps_install_dir>$(NosMainFolder)deps-install-debug</deps_install_dir>
+    <deps_install_dir>$(NosMainFolder)deps-install-release</deps_install_dir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <deps_install_dir>$(NosMainFolder)deps-install-release</deps_install_dir>
