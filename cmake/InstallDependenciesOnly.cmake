@@ -100,6 +100,13 @@ install(
 )
 
 install(
+    DIRECTORY "${CMAKE_BINARY_DIR}/_deps/dftd4_cpp-src/include/"
+    DESTINATION include
+    FILES_MATCHING
+        PATTERN "*.h"
+)
+
+install(
     DIRECTORY "${CMAKE_BINARY_DIR}/_deps/gemmi-src/include/"
     DESTINATION include
     FILES_MATCHING
