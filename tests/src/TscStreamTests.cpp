@@ -4,8 +4,8 @@
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "tsc_block.h"
-#include "tsc_stream.h"
+#include "core/tsc_block.h"
+#include "core/tsc_stream.h"
 
 #include <filesystem>
 #include <fstream>
