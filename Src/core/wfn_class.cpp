@@ -518,6 +518,7 @@ bool WFN::push_back_MO(const int &nr, const double &occ, const double &ener)
     nmo++;
     err_checkf(nr <= nmo, "unreasonable MO number", std::cout);
     MOs.push_back(MO(nr, occ, ener));
+    invalidate_coef_cache();
     return true;
 };
 
@@ -525,6 +526,7 @@ bool WFN::push_back_MO(const int &nr, const double &occ, const double &ener, con
 {
     nmo++;
     MOs.push_back(MO(nr, occ, ener, oper));
+    invalidate_coef_cache();
     return true;
 };
 
@@ -532,6 +534,7 @@ bool WFN::push_back_MO(const MO &given)
 {
     nmo++;
     MOs.push_back(given);
+    invalidate_coef_cache();
     return true;
 };
 
@@ -539,12 +542,14 @@ void WFN::push_back_MO_coef(const int &nr, const double &value)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs[nr].push_back_coef(value);
+    invalidate_coef_cache();
 };
 
 void WFN::assign_MO_coefs(const int &nr, vec &values)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs[nr].assign_coefs(values);
+    invalidate_coef_cache();
 };
 
 const double &WFN::get_MO_energy(const int &mo) const
@@ -558,6 +563,7 @@ const void WFN::clear_MOs()
     MOs.clear();
     MOs.shrink_to_fit();
     nmo = 0;
+    invalidate_coef_cache();
 }
 
 bool WFN::push_back_center(const int &cent)
@@ -636,6 +642,7 @@ void WFN::delete_MO(const int &nr)
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs.erase(MOs.begin() + nr);
     nmo--;
+    invalidate_coef_cache();
 };
 
 bool WFN::push_back_type(const int &type)
@@ -668,6 +675,7 @@ bool WFN::erase_exponent(const int &nr)
 bool WFN::remove_primitive(const int &nr)
 {
     nex--;
+    invalidate_coef_cache();
     if (erase_center(nr) && erase_exponent(nr) && erase_type(nr))
     {
         for (int n = 0; n < nmo; n++)
@@ -681,6 +689,7 @@ bool WFN::remove_primitive(const int &nr)
 bool WFN::add_primitive(const int &cent, const int &type, const double &e, double *values)
 {
     nex++;
+    invalidate_coef_cache();
     if (push_back_center(cent) && push_back_type(type) && push_back_exponent(e))
         for (int n = 0; n < nmo; n++)
             MOs[n].push_back_coef(values[n]);
@@ -751,6 +760,7 @@ void WFN::change_center(const int &nr)
 bool WFN::set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value)
 {
     err_checkf(nr_mo <= MOs.size(), "MO doesn't exist!", std::cout);
+    invalidate_coef_cache();
     return MOs[nr_mo].set_coefficient(nr_primitive, value);
 };
 
@@ -6691,6 +6701,7 @@ void WFN::delete_unoccupied_MOs()
             nmo--;
         }
     }
+    invalidate_coef_cache();
 };
 void WFN::delete_Qs() {
     for (int i = static_cast<int>(atoms.size()) - 1; i >= 0; i--) {
@@ -7972,6 +7983,7 @@ void WFN::pop_back_MO()
 {
     MOs.pop_back();
     nmo--;
+    invalidate_coef_cache();
 }
 
 //Transposed MO coefficients, [primitive * nmo + mo], built once and reused by every point.
@@ -7993,6 +8005,7 @@ const double* WFN::get_coef_primitive_major() const
 	if (valid.load(std::memory_order_acquire)
 	    && coef_primitive_major.size() == (size_t)nex * (size_t)_nmo)
 		return coef_primitive_major.data();
+	valid.store(false, std::memory_order_release);
 	coef_primitive_major.assign((size_t)nex * (size_t)_nmo, 0.0);
 	for (int mo = 0; mo < _nmo; mo++) {
 		const double* src = MOs[mo].get_coefficient_ptr();
