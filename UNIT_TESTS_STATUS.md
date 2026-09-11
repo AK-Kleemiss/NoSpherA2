@@ -1,7 +1,452 @@
 # Unit Test Status
-**Last updated: 2026-08-15** (added `AtomTest.ID_IsRebuiltWhenCIFPartChanges`, made the
+**Last updated: 2026-09-09** (geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
+four flags through `run_app`; `-repulsion_exchange <dirac|pbe|b88>` picks the exchange functional of
+the Gordon-Kim repulsion, with an H-atom gtest for the three functionals; `-interaction_energy` computes
+the exchange-repulsion by the Gordon-Kim functionals of the fitted densities on a Becke grid over the
+dimer; `-repulsion_overlap <K>` keeps the K * S model. `XCW_Test` merged in (f-function phases, ELI
+basins). 292, 288 pass and the usual 4 `*_full` XCW cases skip on `release-windows`. 2026-09-08: Thakkar polarization in the
+partner's field, D4 dispersion and the density overlap S; `-salted_charge_constraint`
+with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
+`WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
+RI fit, `computeRho` screening fix.)
+
+## 2026-09-09 — Geometry-aid pipeline tests (`GeometryAidTests`, `GeometryAidDeathTest`)
+
+The structure-solution flags Olex2 drives (`-calc_featomic_descriptor`, `-calc_featomic_descriptors`,
+`-classify_atoms`, `-classify_atoms_list`, `-geometry_aid_cutoff`) used to run and `exit()` inside the
+option parser, so nothing could be tested through the in-process `run_app`. The pipeline now lives in
+`Src/core/geometry_aid.h/.cpp` (namespace `geometry_aid`): the flags only queue jobs in `options`
+(`calc_featomic_descriptor`, `featomic_structures`, `classify_atoms_out`, `geometry_aid_model`,
+`classify_structures`, `geometry_aid_cutoff`) and `run_app_impl` runs `geometry_aid::run(opt)` and
+returns its code. Side effect: flag order no longer matters, `-geometry_aid_cutoff` after the
+descriptor flag applies (it was silently ignored before); the help text lost its "give it BEFORE" note.
+
+No `geometry_aid_model.bin` and no `make_geometry_aid_bin.py` ship with the repository, so the tests
+write their own GEOAID01 models: a 2-feature one small enough to classify by hand and a 42,042-feature
+one for the end-to-end run. Eight tests, ~5 s on `../Lukas_Test/thpp_p1.xyz` (32 atoms, 18 SOAP centres
+because H is no species):
+
+| Test | Checks |
+|---|---|
+| `HyperparametersMatchTheTrainedModels` | every field of `hyperparameters()` (species, 6/12, 0.2, 1.0, Gto 1e-6, ShiftedCosine 0.7), 66·7²·13 = 42042, the 3.0 variant differs only in the cutoff |
+| `DescriptorHasARowPerHeavyAtomAnd42042Features` | shape (18, 42042) at both cutoffs, finite, per row between 1 and 6 species-pair blocks of 637 nonzeros, the two cutoffs differ |
+| `BatchSkipsAMissingStructureAndFailsOnlyWhenNothingWasWritten` | MISSING is skipped, exit 0 with one success, 1 with none; `read_structure_list` drops `#` lines, blanks, CRLF and padding |
+| `ModelRoundTripsThroughTheBinaryFormatAndClassifiesByHand` | GEOAID01 header, classes, `mean_projection`, layer shapes; softmax probabilities against hand-computed logits with and without whitening, to 1e-12; `cached_model` returns the same object |
+| `RejectsAForeignFileAndAMismatchedDescriptor` | death test: wrong magic and a 3-feature descriptor on a 2-feature model both hit `err_checkf` |
+| `FlagsQueueTheirJobsInAnyOrder` | all five flags through `options::digest_options`, including the optional output name of `-classify_atoms` and flags on either side of `-wfn` |
+| `RunAppWritesDescriptorNpyTheWayOlex2CallsIt` | `run_app` with the Olex2 command line writes `descriptor.npy` (18, 42042); the list flag with `-geometry_aid_cutoff 3.0` given afterwards writes `<path>.npy` bit-identical to a direct 3.0 call |
+| `ClassifierWritesOneProbabilityRowPerAtomThroughBothFlags` | `-classify_atoms` writes (18, 2), rows sum to 1, equal to `classify_descriptor` on the descriptor to 1e-12; `-classify_atoms_list` writes the identical `<path>.probs.npy` |
+
+Note for the helper `load_npy`: `npy::LoadArrayFromNumpy` appends to the target vector, it does not
+replace it. The helper clears first.
+
+## 2026-09-08 — Multipole restraints on the RI fit (`-multipole_moments`)
+
+Branch `ri_multipole_restraints`. The RI fit can now be restrained to the atomic charges
+and multipole moments of a grid partitioning (Hirshfeld, TFVC, MBIS, EMBIS) up to order
+N. `GridManager::calculatePartitionedMultipoles` integrates `rho w_A r^l Y_lm` about each
+nucleus, `DensityFitting::add_multipole_restraint` appends one row per atom and (l, m)
+whose only non-zero entries sit on that atom's l-shells, because the moment of an
+atom-centred aux function about its own centre is the one-line integral
+`N c Gamma(l+3/2) / (2 alpha^(l+3/2))` (`radial_moment`). The rows are scaled by
+`1 / r_cov^l` so every order enters with the magnitude of the population row, and in
+this mode all restraint rows carry `-multipole_strength` (default 1) instead of Seifert's
+adaptive `5e-5` weights, which only nudge: on epoxide with strength 1 the fitted moments
+sit within 0.008 e (l=0), 0.004 (l=1) and 0.0003 e bohr^2 (l=2) of the Hirshfeld targets
+and the O charge is -0.207 against the target -0.199; the adaptive weights left it at
+-0.684. The default path (no flag) is untouched and `ri_fit.good` is byte-identical.
+
+Later the same day the restrained solve was changed from a stacked least-squares
+(`dgels` on `[J; R]`, which minimises `|J c - rho|^2` instead of the Coulomb functional
+and let near-dependent diffuse aux functions run to coefficients of 100 on acetic acid)
+to the penalised normal equations `(J + R^T R) c = rho + R^T t` with `dgesv`. The log now
+prints `Restraint residual:` instead of `Error:`, the epoxide O charge moves from -0.207
+to -0.217 and `ri_fit_multipoles.good` was regenerated. The legacy charge-restraint path
+(`-charge_constraint` without `-multipole_moments`) still uses the stacked solve.
+
+A benchmark of the fitted densities against exact ORCA monomer electrostatics on 12
+dimers then exposed a bug in `computeRho`'s atom-pair screening
+(`calc_screend_functions_and_max_ij` in `libCintMain.cpp`): the criterion used the sum of
+the two most diffuse exponents against half of `exp_cutoff`, so pairs beyond about 2.2 A
+were dropped from the three-centre integrals and larger molecules lost up to 0.6 fitted
+electrons (epoxide: 6 pairs, 24.159 analytic electrons). It now uses the Gaussian product
+exponent `a b / (a + b)` against the full cutoff. `ri_fit.good` and
+`ri_fit_multipoles.good` were regenerated (0 pairs screened, 24.0005 electrons, restraint
+residual 0.036 -> 0.0012); no other golden file moved. Every RI fit made before this,
+SALTED training data included, carries the old error.
+
+### New cases
+
+- `RiMultipoleTests.RadialMomentMatchesQuadratureAndTheChargeRow`: `radial_moment`
+  against the trapezoid rule for l = 0..4 and three exponents, and for l = 0 against the
+  `pi / (2 alpha^(3/2)) N c` row that `add_electron_restraint` has always used (the
+  `sqrt(4 pi)` of Y_00 is the difference).
+- `RiMultipoleTests.RestraintRowsReproduceTheGridMomentsOfTheAtomicDensity`: closure
+  of the whole restraint on one oxygen with the `combo_basis_fit` aux basis. Arbitrary
+  coefficients, the density from `calc_density_ML` integrated on an `AtomGrid` for the
+  moments up to l = 2, and the restraint rows applied to the same coefficients must give
+  those moments back, the targets must land in the matching rows, and `fitted_multipoles`
+  must agree. This pins the row placement, the l/m ordering of the coefficients against
+  `constants::spherical_harmonic`, and the normalisation in one go.
+- `TomlIntegrationTests.RiFitMultipoles` (`tests/epoxide_gbw/ri_fit_multipoles.good`):
+  the `ri_fit` case with `multipole_moments = ["Hirshfeld", 2]`, which also prints the
+  target/fitted/deviation table of every moment.
+
+### A trap found on the way
+
+`WFN::get_atoms()` returns the vector by value. `const atom& A = wavy.get_atoms()[a]`
+binds a reference to an element of a temporary that dies at the end of the statement,
+and the closure test then saw an atom with no shells and an `AtomGrid` with a negative
+radial count (`vector too long`). `const atom A = wavy.get_atom(a)` is the pattern the
+rest of `integrator.cpp` uses.
+
+### Interaction energy of two fitted densities (`-interaction_energy`)
+
+`DensityFitting::interaction_energy` takes only the two coefficient vectors and the two
+aux-basis WFNs, so it runs on RI-fitted and SALTED-predicted coefficients alike and never
+touches an orbital wavefunction. Nuclear repulsion is a double loop, the nucleus-density
+halves use the analytic potential of an aux function (`aux_potential`, a lower incomplete
+gamma of half-integer order times `Y_lm`), and the density-density term is `c_A^T J_AB c_B`
+with the off-diagonal block of libcint's `Coulomb2C_SPH` on the combined `Int_Params`.
+The printout gives the four components in Eh and kcal/mol, an atom-pair table and a
+rank-pair table (nuclei plus l = 0..lmax). Water-methanol with free fits of both monomers
+gives -8.167 kcal/mol against -8.171 from the exact ORCA monomer densities.
+
+The combining constructor `Int_Params(first, second)` offset the coordinate pointers of
+the second object's atoms in a loop over the *first* object's atom count. Every earlier
+caller combines two bases of the same molecule, so it never showed; with two different
+molecules the surplus atoms of the second kept stale pointers (or, with fewer, the loop
+read past the vector). It now loops over the second object's atoms.
+
+- `RiInteractionTests.LowerIncompleteGammaMatchesQuadrature`: `lower_gamma_half` against
+  the trapezoid rule for l = 0..4 in the series and the recurrence regime.
+- `RiInteractionTests.AuxPotentialIsTheGaussianChargeAndThePointMultipoleLimit`: the s
+  potential is `erf(sqrt(a) R) / R` times the charge, and at five times the sample
+  distance every rank up to 4 is the point multipole `4 pi / (2l+1) Q_lm Y_lm / R^(l+1)`
+  with the `Q_lm` of `radial_moment`.
+- `RiInteractionTests.NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables`: water-
+  like OH with arbitrary `combo_basis_fit` coefficients against a partner whose density is
+  one very tight s Gaussian holding exactly its nuclear charge. Both halves of the energy
+  must cancel (nuclei-nuclei against nuclei-density, analytic potential against the
+  libcint block), the two tables must sum to the total, and swapping the two molecules
+  must give the same numbers. The swap is what caught the constructor bug.
+
+### Input modes of `-interaction_energy`, and the bohr flag of the wavefunction readers
+
+`-interaction_energy <A> <B>` takes three kinds of input. Two wavefunctions are each
+RI-fitted internally with the `-ri_fit` basis (`config_from_options`, the same free fit
+`-write_ri_coefs` writes); two structures with `-SALTED <model-dir>` are both predicted
+with the model and its own aux basis (the predictor's `wavy` carries it, origin reset to
+`NOT_YET_DEFINED` so `Int_Params` reads the shell types unshifted); `<A> <A.npy> <B> <B.npy>`
+reads coefficient files as before. On water-methanol the internal fit reproduces the
+-8.1673 kcal/mol of the coefficient files exactly and the prediction from `E:\Model_V6`
+gives -22.36, identical from `.gbw` and from `.xyz` input.
+
+That identity is a fix: `WFN::isBohr` was set only by the wfn, wfx and xyz readers,
+although every reader stores bohr. `write_xyz` writes the coordinates unconverted when the
+flag is off, so the descriptor file `temp_rascaline.xyz` of a gbw, molden, fchk, tonto or
+ptb input held bohr values labelled as angstrom, a molecule stretched by 1.89, and the
+predictor's neighbour cutoff was compared in the wrong unit as well. `-SALTED_COEFS` on
+`A.gbw` predicted a water of 10.50 e where the same model on `A.xyz` gives 9.63 e (RI cube
+grid). The five readers set the flag now and the two predictions agree to 3e-9.
+
+The remaining gap to the fit is the model: its water holds 9.63 e against 9.92 for the
+free fit on the same grid, and Model V6 was trained on coefficients from before the
+screening fix above. Not covered by a test case: the handler exits and the predictor needs
+the 782 MB model.
+
+### `-salted_charge_constraint`, and what it does to the predicted interaction energy
+
+`apply_charge_constraint` (the global rescaling of the l=0 coefficients to the electron count,
+5 % refusal guard) ran only when a VERSION 3 model file carries a NORMC block with MODE 1.
+`-salted_charge_constraint` forces it after every prediction, in `gen_SALTED_densities`, so
+`-SALTED` refinements, `-SALTED_COEFS` and the SALTED mode of `-interaction_energy` all see it.
+New golden case `SALTED_charge_constraint`: the cysteine SALTED case with the flag, whose
+63.9897 e become 64.0000 (factor 1.00016) and whose ML charges move by 0.001-0.002 e.
+
+On water-methanol the constraint moves both models most of the way to the free fit
+(-8.17 kcal/mol, exact -8.171): Model V6 -22.36 -> -8.76 (water 9.71 -> 10 e, methanol
+18.23 -> 18 e), Model V7 -1.11 -> -4.71 (water 9.70 -> 10 e, methanol 17.87 -> 18 e). Both models
+are 0.3 e short on water, so a total-charge rescaling helps but does not replace retraining on
+charge-conserving coefficients.
+
+### Beyond electrostatics: polarization, dispersion and the density overlap
+
+`DensityFitting::interaction_energy` now returns, next to the four electrostatic parts, `pol_A`,
+`pol_B`, `disp`, `overlap` and `rep`. `electrostatic()` is the old sum, `total()` adds the new
+terms; the atom-pair and rank tables stay electrostatic. Polarization is the CrystalExplorer form
+-1/2 sum alpha_a |F_a|^2 with Thakkar polarizabilities (`occ::interaction::ce_model_polarization_energy`,
+the charged set for a charged molecule) in the field of the partner's nuclei and fitted density,
+the density part by central differences (h = 1e-4 bohr) of the analytic aux-function potential.
+Dispersion is `occ::disp::D4Dispersion` with the PBE damping defaults, dimer minus monomers.
+S = c_A^T S_AB c_B from `compute2C<Overlap2C_SPH>` on the combined `Int_Params`, and
+`-repulsion_overlap <K>` reports K * S as the exchange-repulsion; K defaults to 0 and is
+uncalibrated, the report says so. Everything uses only the fitted coefficients.
+
+`NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables` now also asserts that the point-like
+neutral partner produces no field on A (`pol_A` = 0 to 1e-12, which pins the finite-difference
+field against the analytic nuclear term), that `pol_B` is negative, that pol/disp/overlap are
+symmetric under swapping the molecules, and that `rep` = K * `overlap`.
+
+Water-methanol, free fit on def2-universal-jkfit: electrostatic -8.55, pol. A in field B -1.11,
+pol. B in field A -0.57, D4 -0.62 kcal/mol, S = 1.76e-3 e^2/bohr^3, total without repulsion
+-10.84 kcal/mol. Model V7 with `-salted_charge_constraint`: electrostatic -4.71, pol -0.29/-0.49,
+S = 1.32e-3. Reproducing a CCSD(T)-like -5.5 kcal/mol from the free fit would need K near 5 Eh
+bohr^3/e^2; the fit of K (and of per-term scale factors) against S66x8 is WP3 of the proposal.
+
+### Gordon-Kim exchange-repulsion (2026-09-09)
+
+`rep` now defaults to the Gordon-Kim model from the fitted densities: `rep_kin` = T_TF[rho_A + rho_B]
+- T_TF[rho_A] - T_TF[rho_B] with the Thomas-Fermi functional and `rep_x` the same difference of Dirac
+exchange, `rep = rep_kin + rep_x`; `-repulsion_overlap <K>` with K > 0 still gives K * S. The grid is
+`GridManager` (Becke partition, `no_density_eval`) on a dummy `WFN` that holds the atoms of both
+molecules and their aux exponents through `add_exp`, because `setupPrototypeGrids` sizes the radial
+grids from the primitive list, not from the atoms' basis-set entries. Densities from `calc_density_ML`,
+gradients by central differences for the 1/9 von Weizsaecker term `rep_vw`, which is printed but not
+added: T_vW is subadditive, so the difference is always negative (-10 kcal/mol here) and would turn
+the repulsion into an attraction. `n_A`, `n_B` are the grid electron counts and are printed as the
+grid check (10.0004 / 17.9994 e for the free fit, 10.0000 / 18.0001 for Model V7).
+
+`NeutralPointLikePartnerGivesZeroEnergyAndConsistentTables` additionally asserts `rep_x` < 0,
+`rep` = `rep_kin` + `rep_x` in the default call, `rep` = K * S and `n_A` = 0 in the K = 2 call, and
+that `rep_kin`, `rep_vw`, `rep_x` (1e-6 Eh) and the electron counts (1e-4 e) are symmetric under
+swapping the molecules; the swapped dimer builds its grid in the other atom order, which is where
+the noise comes from. The alpha = 2e5 partner is too tight for the grid (2.54 of 3 e), so the
+electron count is not compared to Z there.
+
+Water-methanol, kcal/mol: free fit rep. kin. TF +12.37, rep. exch. Dirac -6.19, repulsion GK +6.19,
+total -4.66 (CCSD(T)-like reference -5.5); Model V7 with charge constraint +10.51, -5.60, +4.91,
+total -1.20, the shortfall being the electrostatics of the model density. Delta E_x / Delta T_TF is
+about -0.5 in both, as in the rare-gas Gordon-Kim literature. Scale factors on the two pieces
+(Waldman-Gordon style) are part of the WP3 calibration.
+
+`-repulsion_exchange <dirac|pbe|b88>` swaps the Dirac exchange for the PBE or B88 GGA exchange of the
+closed-shell density (`DensityFitting::exchange_density`, the gradient the one already computed for the
+von Weizsaecker term). `ExchangeFunctionalsReproduceTheHydrogenAtom` integrates the spin-scaled H 1s
+density, E_x[rho_up] = E_x[2 rho_up] / 2, and checks -0.2680 (LDA), -0.3059 (PBE) and -0.3098 (B88) Eh
+to 2e-4; the point-partner case checks that PBE and B88 leave `rep_kin` alone and change `rep_x`.
+Water-methanol, kcal/mol, Delta E_x with Dirac / PBE / B88: free fit -6.19 / -2.54 / -0.78, totals
+-4.66 / -1.01 / +0.75; Model V7 -5.60 / -2.22 / -0.46, totals -1.20 / +2.18 / +3.94. The GGA enhancement
+is largest in the low-density tails, where the monomers' reduced gradients exceed the dimer's, so the
+gradient correction cancels most of the exchange attraction and the repulsion grows; Dirac stays the
+default, as in the classical Gordon-Kim model.
+
+`-repulsion_exchange r2scan` adds the meta-GGA r2SCAN exchange (Furness et al. 2020) in its deorbitalised
+r2SCAN-L form (Mejia-Rodriguez and Trickey): the fitted density has no orbitals, so the kinetic energy
+density behind the iso-orbital indicator alpha comes from the PC07opt formula in rho, |grad rho|^2 and
+lap rho. The Laplacian of an aux shell is analytic (`aux_density::at_lap`, a template flag on the gradient
+walk, and a third GPU kernel); `AnalyticAuxLaplacianMatchesCentralDifferences` checks it against central
+differences of the analytic gradient on 200000 points and the GPU kernel against the CPU walk to 1e-11.
+`ExchangeFunctionalsReproduceTheHydrogenAtom` now also checks r2SCAN-L at -0.3108 Eh (orbital r2SCAN is
+exact, -0.3125; PC07opt shifts it) and one point value against the Python transcription of the libxc maple
+sources to 1e-12. Water-methanol Delta E_x -2.03 (free fit, total -0.47) and -2.28 kcal/mol (Model V7,
+total +2.13), between PBE and B88; GPU and CPU agree to all printed digits, cost equals the PBE run.
+
+## 2026-09-09 — f-function phases in the OCC-to-WFN constructor
+
+`WFN::WFN(const occ::qm::Wavefunction&)` applied Gaussian-convention spherical-to-cartesian
+matrices to coefficients that OCC's `to_gaussian_order` had reordered but not rephased; Gaussian's
+f(±3), g(±3), g(±4) carry the opposite sign to libcint's. Every XCW `.wfn` and `.tscb` from a basis
+with f functions was affected (P1 def2-TZVP: 149.576 of 150 electrons, MO norms down to 0.97;
+AIMAll rejects such files). Fixed by flipping those rows after the reordering; the P1 TZVP file
+now integrates to 150.0000 with unit norms and AIMAll accepts it. No golden case has f functions on
+the OCC path, so none changed; the fix is covered by the AIMAll check documented in the handover.
+
+## 2026-09-08 — `-eli_analysis` basins against AIMAll and DGrid
+
+`TomlIntegrationTests.ELI_NH3Li` (`tests/RGBI/nh3li_eli.good`, input `../RGBI_groups/nh3li.gbw`,
+0.1 A cube, 3 A radius) pins the rewritten basin analysis: near-grid steepest ascent on the
+cube, persistence merging of grid-noise maxima, and populations integrated on the atomic
+quadrature grids with the basin boundary followed along the analytic field. The reference
+was generated with `-all_charges -no_date -no_gpu_grid`; the timing line the ELI cube builder
+used to print was removed so the file is deterministic. Validation behind it: NH3BH3 QTAIM
+populations within 0.004 e of AIMAll at `-acc 4` (0.013 at the default level 3), hexane within
+0.008 e; hexane ELI-D cores 2.094-2.095 against DGrid's 2.094-2.096 at a 0.08 bohr mesh, C-C
+bond basins 1.82-1.87 against 1.83-1.87, C-H 1.99-2.03 against 1.995-2.02.
+
+The ELI-D field itself changed definition: it is now the single-spin-channel ELI-D of a closed
+shell (DGrid's `ELI-D alpha-alpha`), 0.841 times the previous value everywhere. No golden
+file carried an ELI-D value before this case.
+
+`-eli_analysis` no longer calls `exit(0)` from the option parser; it records the request and
+`run_app_impl` runs it, which is what lets the in-process harness test it at all.
+
+
+## 2026-09-02 — pTB cartesian f ordering, and GPU notes in golden files
+
+### `WFN::read_ptb` transposed two cartesian f components
+
+pTB writes cartesian f functions in Turbomole order, stated in its own
+`source/dtrf2.f:7`: `xxx,yyy,zzz,xxy,xxz,xyy,yyz,xzz,yzz,xyz`. So type 16 is `xyy` and
+type 17 is `yyz`. `constants::type_vector` uses the AIM/`.wfn` order, where 16 is `yyz`
+(0,2,1) and 17 is `xyy` (1,2,0). `read_ptb` passed `lao[i]` straight into
+`add_primitive`, so two of the ten cartesian f components were swapped for every
+f-containing pTB wavefunction — the lanthanides Ce-Lu, and anything else pTB gives f
+functions to. La has no f shell in the pTB valence basis and was never affected.
+
+The error was large. Integrating a neutral-atom density cube gave 15.64 e for Nd against
+the 14 its ECP demands, 12.30 for Ce against 12. Building the cartesian AO overlap from
+the `wfn.xtb` file's own exponents and contraction coefficients and contracting it with
+the MO coefficients reproduces the wrong totals exactly under the `type_vector` ordering
+and gives exactly Z-46 under pTB's — which is what identified the swap. pTB's file was
+correct throughout: every occupied MO normalises to 1.000000.
+
+After the fix all 15 lanthanides integrate to Z-46 on a 10 A box at 0.025 A. Yb is the
+one exception at 19.58 of 24, and is not a NoSpherA2 defect: its vDZP second d shell
+carries an exponent of 0.002065 against 0.067 for Tm and 0.0389 for Lu, so its density
+needs a 30 A box to reach 23.999. That exponent is the same in the ptb repo and in
+`ptb-vdzp` in `Src/basis_data.cpp`, and `.basis_vDZP` has not changed since 2022-04-27.
+
+`read_ptb` also never recorded `path`, so cubes from a `.xtb` input were written as a
+stem-less `_rho.cube` — the same omission fixed in `read_fchk` on 2026-08-25. And
+`-rho_cube` ignored `-radius`/`-resolution` and used a hardcoded 3 A box, which truncates
+a lanthanide valence density badly enough to make the integral unconvergeable.
+
+### GPU notes made golden files machine-dependent
+
+On a machine with a CUDA device, 16 golden-file cases failed. Every one was a line-offset
+cascade from a note the references do not carry, most of them
+`GPU in use: atomic grid weights (Becke and TFVC) on CUDA` from `AtomGrid.cpp`. All 16
+failed identically with the pTB changes stashed, so they were pre-existing.
+
+`XCW.cpp` and `scattering_factors.cpp` already gated their notes on `no_date`;
+`AtomGrid.cpp` and `SALTED_equicomb.cpp` had no access to the flag and were missed. They
+now consult `constants::hide_gpu_notes`, set by `-no-date` and following the
+`constants::exp_cutoff` precedent for a runtime-settable global.
+
+That alone breaks `sucrose_SF_gpu_grid`, whose reference deliberately contains the note:
+a silent CPU fallback produces exactly the CPU reference, so the note is the only evidence
+the device did the work. The harness hardcodes `no_date` for every test
+(`IntegrationTests.cpp:319`) with no opt-out, so `-no_date_but_gpu` suppresses dates while
+keeping the notes, and that one case carries it. Defaults are emitted before per-test
+args, so it is parsed second and wins.
+
+`P1_test_XCW_gpu_itensor` failed on a different line, the sibling warning
+`-gpu_grid asked for but not used: chi is N entries...`, which is equally
+machine-dependent and is now gated the same way. Its reference contains no GPU note at
+all: XCW writes that one to stderr, which never reaches the log.
+
+**Last updated: 2026-08-25** (added the Fukui-function feature and its tests: 7 new
+`FukuiTests` unit cases covering `find_frontier_orbitals`, plus one new
+`TomlIntegrationTests.Fukui` golden-file case. Net +8 cases.)
+
+## 2026-08-25 — Fukui functions (`-fukui`)
+
+New `-fukui` flag computes f+, f-, f0 and the dual descriptor in the frontier-orbital
+approximation and writes four cubes plus a `<stem>_fukui.dat` summary.
+
+It also computes the **condensed (atom-summed) Fukui functions under all five atomic
+partitions** — Hirshfeld, Becke, TFVC, MBIS, EMBIS — in one pass. This required **no
+change to GridManager at all**: `calculatePartitionedCharges` integrates whatever is in
+the `WFN_DENSITY` column against all five weight columns and does not recompute it, so
+substituting a frontier-orbital density for the total density turns the existing
+five-way charge accumulation into a five-way condensed-Fukui accumulation.
+`getGridData()` already returns a mutable reference.
+
+There is also a **standalone `-fukui_analysis <wfn>`** that does the reactivity analysis
+with no cube machinery at all — no grid, radius or CIF. It is dispatched from
+`run_app_impl`, **not** from `options::digest_options()`, and that placement is load
+bearing: `run_app_impl` redirects `std::cout` into `NoSpherA2.log` before
+`digest_options()` runs, so a flag handled at parse time prints into the log and nothing
+onto the terminal. Verified on the existing `-dipole_moments`, which uses the parse-time
+pattern: 0 bytes to stdout, 2.9 kB to `NoSpherA2.log`. Fine for a side-effect command,
+useless for one whose whole output is meant to be read, so this one restores the console
+buffer first.
+
+Two correctness points that are easy to get wrong here:
+
+- The grid and the weights are built from a copy with `delete_unoccupied_MOs()` applied,
+  but the frontier orbitals are evaluated from the **original** wavefunction. Both parts
+  matter: `compute_dens` sizes its scratch by `get_nmo(true)`, so leaving several hundred
+  virtuals in place overruns it — and the partition weights must come from the
+  ground-state density anyway, since MBIS and EMBIS are refined self-consistently
+  against it. Only the integrand changes.
+- `calculatePartitionedCharges` adds ECP core electrons to the populations. Correct for a
+  charge, wrong for a Fukui function, so it is subtracted back out.
+
+The sum over atoms of each column is exactly 1 for f+ and f-, and 0 for the dual
+descriptor, which makes every run self-checking. Measured on ethylene oxide:
+0.99991–1.00000 across the five partitions. Verified byte-identical across
+`OMP_NUM_THREADS` of 4, 8 and 16, including the iterative MBIS/EMBIS refinement, which
+is what makes it safe as golden-file output. Costs ~0.9 s for 7 atoms and ~2.9 s for
+sucrose's 45.
+
+| Test | Kind | Covers |
+|------|------|--------|
+| `FukuiTests.FrontierOrbitalsRestrictedWithEnergies` | unit | HOMO/LUMO by orbital energy |
+| `FukuiTests.FrontierOrbitalsFallsBackToOrderWithoutEnergies` | unit | `.wfn`-style files with no stored energies |
+| `FukuiTests.FrontierOrbitalsPreferEnergyOverIndexOrder` | unit | energy-unsorted MO sets |
+| `FukuiTests.FrontierOrbitalsFailWhenNoVirtualsExist` | unit | occupied-only files must fail loudly |
+| `FukuiTests.FrontierOrbitalsFailWhenNoOccupiedExist` | unit | mirror case |
+| `FukuiTests.FrontierOrbitalsFailOnEmptyWavefunction` | unit | empty WFN |
+| `FukuiTests.FrontierOrbitalsTreatFractionalOccupationAsOccupied` | unit | natural-orbital occupations |
+| `TomlIntegrationTests.Fukui` | integration | end-to-end run, pins frontier pair and integrated norms |
+| `TomlIntegrationTests.FukuiPBC` | integration | the same through the periodic (`-cif`) path |
+
+Both integration tests were added to the `integration_sucrose_fchk_SF` `RESOURCE_LOCK`
+group in `tests/src/SetIntegrationTestLocks.cmake`. They share that directory with
+`Fractal`, `Properties`, `SucroseSF` and `SucroseTwin`, and both write
+`sucrose_fukui.dat`, so without the lock a parallel `ctest` run would have them
+clobbering each other.
+
+`FukuiPBC` exists because `-cif` is a genuinely different code path in
+`cube::evaluate_on_grid` — it sweeps each index over `[-size, 2*size)` and wraps,
+costing ~27x — and it is the path Olex2 actually drives, since
+`cubes_maps.calculate_cubes` always passes `-cif`. The non-periodic test never touches
+it. It runs in ~0.2 s at resolution 1.5.
+
+Four things worth recording, because each is a trap rather than a preference:
+
+1. **The integration test uses `sucrose.fchk`, NOT the `sucrose.wfx`** that the
+   neighbouring `[properties]` test uses. That wfx stores only the 91 occupied
+   orbitals, so it has no LUMO and cannot produce a Fukui function at all. The fchk
+   carries all 432 orbitals (91 occupied, 341 virtual).
+2. **The golden file is `sucrose_fukui.dat`, not a log.** Property runs write to
+   `NoSpherA2_cube.log`, which contains wall-clock timings; at the harness's 1%
+   tolerance a `0 s` → `1 s` drift would fail the comparison. The `.dat` summary is
+   deterministic and carries the numbers actually worth asserting.
+3. **`Calc_Fukui` must run before `delete_unoccupied_MOs()`** in
+   `properties_calculation` (`properties.cpp`). The LUMO is an unoccupied orbital;
+   calling it after would yield an all-zero f+ cube with no error.
+4. **`Calc_Fukui` uses two grid passes on purpose, not one.** Filling all four cubes
+   from a single functor means a non-atomic read-modify-write on three of them from
+   inside a parallel region; in the wrapped path several raw indices map onto the same
+   voxel, so that is a data race. Only the functor's *return* value is protected, by
+   the `#pragma omp atomic` inside `evaluate_on_grid`. Two passes cost the same (one
+   `computeMO` per point either way) and leave every voxel with a single writer.
+   Verified empirically as well: the periodic run is byte-identical across 5 repeats at
+   `OMP_NUM_THREADS=16`. Note the same single-functor pattern still exists in
+   `Calc_Prop`/`accumulate_prop_values` for ELF/ELI/Lap/RDG and was left alone here.
+
+**Validation on 2026-08-25 (`release-windows`): `ctest --preset release-windows` reports
+258/258 passing, 0 failed, in 569 s** (5 skipped, all pre-existing: the four
+`full = true` XCW cases and the optional `Nbo47.EpoxideGennboMatchesReferenceWhenAvailable`
+fixture). That includes the 9 new cases here, and confirms the `read_fchk` path fix
+below regressed nothing — it was the one change with reach outside this feature.
+
+Correctness was additionally checked by grid convergence rather than by a golden file
+alone — the integrated norms approach the exact value of 1.0 as the grid is refined:
+
+| resolution (A) | integral f+ | integral f- |
+|---|---|---|
+| 0.8 | 1.0045 | 0.9327 |
+| 0.4 | 1.0004 | 1.0088 |
+| 0.2 | 0.9966 | 0.9994 |
+
+and the cube contents satisfy f+ >= 0, f- >= 0, f0 == (f+ + f-)/2 and
+df == f+ - f- to within cube-file write precision (~1e-7).
+
+**Also fixed here:** `WFN::read_fchk` never recorded `path`, unlike every other reader.
+Cube filenames are built from that path, so any fchk-driven property run wrote
+`_rho.cube`, `_lap.cube` etc. with an empty stem, which silently collide when more than
+one structure is processed in one directory. Pre-existing, unrelated to Fukui, and no
+test or `.good` file depended on the stem-less names.
+
+## Earlier history
+
+The previous 2026-08-15 update added `AtomTest.ID_IsRebuiltWhenCIFPartChanges`, made the
 CIF reader store and immediately rebuild its PART-aware `SCATTERER_ID`, and moved PART filtering ahead of WFN matching
-to prevent another PART from overwriting atom IDs during `-mtc`; validation pending.)
+to prevent another PART from overwriting atom IDs during `-mtc`; validation pending.
 
 The previous 2026-08-02 update
 `TscBlockTests.BinaryFileRoundTripsWith32BitSizes` so `SCATTERER_IDS` is inferred from
@@ -87,7 +532,7 @@ Added: 2026-06-14.
 | RGBI_NH3Li | RGBI | nh3li_nao.good | no | ✅ passing (macOS arm64, regenerated with `-rgbi` 2026-07-03) |
 | RGBI_NH3Li_ANO | RGBI | nh3li_ano.good | no | ✅ passing (macOS arm64, regenerated with `-rgbi` 2026-07-03) |
 | rubredoxin_cmtc | rubredoxin_cmtc | rubredoxin_cmtc.good | no | ✅ passing |
-| SALTED | SALTED | SALTED.good | no | ✅ passing |
+| SALTED | SALTED | SALTED.good | no | ✅ passing (CPU-pinned with `-no_gpu_salted` for hardware-independent golden output) |
 | sucrose_IAM | sucrose_IAM_SF | sucrose_IAM.good | no | ✅ passing |
 | sucrose_ptb | sucrose_IAM_SF | sucrose_ptb.good | no | ✅ passing |
 | sucrose_SF | sucrose_fchk_SF | sucrose_SF.good | no | ✅ passing |
@@ -134,6 +579,13 @@ files generated before they can be registered.
 ---
 
 ## Known Issues
+
+- **Focused P1 XCW validation pending after the 2026-09-01 `XCW_Test` merge**: both the CPU-pinned
+  `TomlIntegrationTests.P1_test_XCW` and GPU `TomlIntegrationTests.P1_test_XCW_gpu_itensor` complete
+  their XCW calculations locally, but the golden comparator stops at the shared screening lines:
+  expected 1798 pairs / 64,013,865 grids and actual 1473 / 74,067,170. The CPU failure proves this
+  is not caused by the asynchronous GPU read-back path. The current P1 numerical outputs need a clean
+  merged-baseline review before this focused pair can be reported passing again.
 
 - **XCW test output race condition (RESOURCE_LOCK), found and fixed 2026-07-20**: after the
   `-b sto-3g` fix below was pushed, CI failed again on **all three platforms** (Linux, Windows,

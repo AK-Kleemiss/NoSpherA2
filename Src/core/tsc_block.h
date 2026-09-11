@@ -307,7 +307,7 @@ private:
         // The scatterer encoding is a property of the data, rather than a
         // caller-supplied header detail. Remove any stale marker; the
         // matching marker, when needed, was written as the first line above.
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             if (line == "SCATTERER_IDS")
                 continue;
@@ -736,13 +736,9 @@ public:
     }
 
     // --- streaming write -------------------------------------------------
-    // The payload is reflection-major, so a table can be emitted in blocks of
-    // reflections without ever holding all of it. These two entry points are
-    // what tsc_stream_writer drives; they reuse the serialisation above so the
-    // streamed file and the one-shot file cannot drift apart.
-    // Static so a streamed table needs only the scatterer list, never a fully
-    // populated block - constructing one just to emit a prologue would
-    // allocate the very array the streaming exists to avoid.
+    // The payload is reflection-major, so a table can be emitted a block of reflections
+    // at a time; reuses the serialisation above so streamed and one-shot files match.
+    // Static because a streamed table has only the scatterer list, never a populated block.
     static void write_tscb_prologue(std::ostream& out,
                                     const ScattererLabels& scatterers,
                                     const std::string& header,
@@ -922,7 +918,7 @@ namespace tsc_merge_detail
         std::string line;
         bool found_data = false;
 
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             const bool is_ids = line.find("SCATTERER_IDS:") != std::string::npos;
             const bool is_names = line.find("SCATTERERS:") != std::string::npos;
@@ -1059,7 +1055,7 @@ namespace tsc_merge_detail
         ReflectionKey key;
         std::vector<std::complex<double>> values;
 
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             if (!parse_data_row(line, key, values) || is_zero(key))
                 continue;
@@ -1102,7 +1098,7 @@ namespace tsc_merge_detail
         std::vector<std::complex<double>> values;
         std::size_t reflection = 0;
 
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             if (!parse_data_row(line, key, values))
                 continue;

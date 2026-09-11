@@ -5,6 +5,7 @@
 namespace constants
 {
     extern double exp_cutoff;
+    extern bool hide_gpu_notes;
     static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
     constexpr int grid_max_no_flip = 50;
     double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
@@ -74,6 +75,7 @@ namespace constants
     constexpr double PI_2 = PI / 2.0;
     constexpr double TWO_PI = 2 * PI;
     constexpr double FOUR_PI = 4 * PI;
+	constexpr double INV_FOUR_PI = 1.0 / FOUR_PI;
     constexpr double EIGHT_PI = 8 * PI;
     constexpr double INV_EIGHT_PI = 1.0 / EIGHT_PI;
     constexpr double C0 = SQRT2 * FOUR_PI;
@@ -118,6 +120,7 @@ namespace constants
     constexpr double fine_pi = inv_fine_struct / TWO_PI / PI;
     constexpr double inv_fine_mod = inv_fine_struct / FOUR_PI;
     constexpr double keV_per_hartree = 0.027211386245988;
+    constexpr double kcal_mol_per_hartree = 627.5094740631;
     constexpr double angstrom2eV = 1.23984193 * 10000;
     constexpr double angstrom2keV = 12.3984193;
     constexpr double f_to_mu = 4208.031548;

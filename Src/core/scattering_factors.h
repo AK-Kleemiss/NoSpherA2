@@ -73,15 +73,11 @@ void make_k_pts(const bool& read_k_pts,
     std::ostream& file,
     bool debug = false);
 
-// Streams a combined (-mtc) SALTED table in reflection blocks. Returns false if
-// the job is not eligible, in which case nothing has been written and the
-// caller should take the ordinary path.
+//streams a combined (-mtc) SALTED table in reflection blocks; false means nothing was written, take the ordinary path
 bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file, vec2* known_kpts);
 
-// Everything a disorder part needs for the transform, gathered once. All of it
-// is reflection-independent, so with -mtc the parts can be prepared up front
-// and the reflection loop moved outside them - which is what lets a combined
-// table be streamed instead of assembled whole.
+//everything a disorder part needs for the transform, gathered once; all of it is reflection-independent,
+//which is what lets the -mtc reflection loop be moved outside the parts
 struct salted_part_prep
 {
     vec coefs;
@@ -90,14 +86,11 @@ struct salted_part_prep
     const std::vector<atom>* atoms = nullptr;  // owned by the predictor, which outlives this
     vec2 k_pt;
     std::vector<i3> hkl_v;
-    // spherical remainder only: the Thakkar form factor of an atom depends on
-    // its element and the reflection, nothing else, so it chunks trivially
+    //spherical remainder only
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     vec k_of_reflection;
-    // stl of the same reflections. Only the electron-diffraction form of the
-    // spherical rows needs it, and recovering it from k would mean undoing a
-    // 4*pi and a unit conversion, so it is carried rather than inverted.
+    //stl of the same reflections, carried rather than inverted out of k (which would undo a 4*pi and a unit conversion)
     vec stl_of_reflection;
 };
 
@@ -182,6 +175,15 @@ void generate_fractional_hkl(
  * @param file The output stream to write the results to.
  * @param debug Flag indicating whether to enable debug mode.
  */
+/**
+ * @brief The magnitude below which a contribution is negligible at a given -acc level.
+ *
+ * 1e-10 up to -acc 2, 1e-14 at 3, 1e-30 above: the ladder the scattering-factor code has
+ * always used, shared so that the XCW I tensor drops AO contributions on the same terms
+ * rather than on a constant of its own.
+ */
+double cutoff(const int& accuracy);
+
 svec read_atoms_from_CIF(
     std::ifstream& cif_input,
     const ivec& input_groups,
@@ -194,8 +196,7 @@ svec read_atoms_from_CIF(
     bvec& needs_grid,
     std::ostream& file,
     const bool debug = false,
-    // A spherical fill of a disorder part that has nothing left to fill
-    // legitimately finds no atoms. Everywhere else zero means a broken CIF.
+    //a spherical fill of an already covered part finds no atoms; everywhere else zero means a broken CIF
     const bool allow_empty = false);
 
 
@@ -270,7 +271,10 @@ void calc_SF(const int& points,
     _time_point& end1,
     bool debug,
     bool no_date = false,
-    bool do_XCW = false);
+    bool do_XCW = false,
+    bool use_gpu = true,
+    bool gpu_fp64 = false,
+    bool gpu_fp32 = false);
 
 double fourier_bessel_integral(
     const primitive& p,

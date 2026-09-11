@@ -8,6 +8,7 @@
 #include "xcw_halting.h"
 #include <occ/qm/hf.h>
 #include "i_tensor_stream.h"
+#include <thread>
 
 class XCW {
 public:
@@ -75,20 +76,27 @@ private:
 	   Also keeps track of the current state of convergence */
 	struct SCF_settings {
 		double quant_diff;
+		double current_quant_diff;
 		bool conv_quant_diff = false;
 		double max_diis_error;
+		double current_max_diis_error;
 		bool conv_max_diis_error = false;
 		double gradient;
+		double current_gradient;
 		bool conv_gradient = false;
 		double RMSP_diff;
+		double current_RMSP_diff;
 		bool conv_RMSP_diff = false;
 		double MaxP_diff;
+		double current_MaxP_diff;
 		bool conv_MaxP_diff = false;
 		double diis_stop_damping;
 		bool apply_shift = true;
 		double diis_stop_shift;
 		bool apply_damping = true;
 		std::string basis_set_name;
+		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
+		std::string df_basis_name;
 		bool grown;
 		int n_params;
 		int refine_against;
@@ -102,13 +110,26 @@ private:
 		int max_scf_iterations;
 		int charge;
 		int multiplicity;
-		bool safe_tensor;
 		bool read_tensor;
+		bool read_first_guess;
+		bool nbo_output = false;
 		// Largest I tensor held resident, in MB. Above it the tensor goes to disk
 		// and is read back a window of reflections at a time; 0 means no limit,
 		// which is the original behaviour. Set with `i_tensor_mb <n>` in the XCW
 		// settings, or `stream` for the default budget.
 		size_t i_tensor_max_mb;
+		// `i_float` in the settings file: hold the I tensor in single precision. The device
+		// computes it in single anyway, so this stores what was computed rather than a
+		// widened copy of it.
+		bool i_tensor_single = false;
+		bool i_tensor_double = false;
+		// `I_tensor <path>` in the settings file: where the streamed tensor lives. Written
+		// there, and reused from there when it is already the right size for this problem,
+		// so that trying another refinement setting does not rebuild it.
+		std::filesystem::path i_tensor_file_path;
+		// `save <path>`: write the tensor there for a later `read <path>`, on a thread, so
+		// the refinement starts at once instead of waiting for 100 GB to reach the disk.
+		std::filesystem::path i_tensor_save_path;
 
 		// Clears the convergence flags
 		void clear() {
@@ -132,13 +153,12 @@ private:
 		}
 
 		// Updates the SCF routine in regards to damping and level shift
-		void update(const double& diis_error, std::ostream& file, double& alpha) {
-			if (diis_error < diis_stop_damping && apply_damping == true) {
+		void update(std::ostream& file, double& alpha) {
+			if (current_max_diis_error < diis_stop_damping && apply_damping == true) {
 				apply_damping = false;
 				print_centered_message("***Turned off damping***", 84, file);
-				alpha = 0;
 			}
-			if (diis_error < diis_stop_shift && apply_shift == true) {
+			if (current_max_diis_error < diis_stop_shift && apply_shift == true) {
 				apply_shift = false;
 				print_centered_message("***Turned off level shift***", 84, file);
 			}
@@ -161,7 +181,6 @@ private:
 	// Helper function for flattening the I tensor
 	size_t tri_index(int mu, int nu) const noexcept;
 	// Helper function for flattening the I tensor
-	size_t flattened_idx(int r, int mu, int nu) const noexcept;
 
 	// Converts the ADP matrix (just U) from cif format into reciprocal space
 	void U_cif2U_star();
@@ -197,7 +216,7 @@ private:
 	void create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set);
 
 	// Combined function that sets up the XCW procedure, evaluates I tensor (or loads it from file), sets up the Hartree-Fock object and evaluates anomalous dispersion correction
-	occ::qm::HartreeFock setup_XCW_procedure(bool read_tensor, bool save_tensor);
+	occ::qm::HartreeFock setup_XCW_procedure(bool read_tensor);
 
 	// I tensor storage: held resident, or written to disk and read back a window
 	// of reflections at a time. See decide_i_storage.
@@ -269,7 +288,7 @@ private:
 	bool SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& e_diff_mem, double& quant, double& last_quant, occ::Mat& dm_last);
 
 	// Checks convergence for SCF cycle
-	bool SCF_convergence_check(const double& e_diff, const double& gradient, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last);
+	bool SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last);
 
 	// Computes the orbital gradient for usage as a convergence criterion
 	double compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf);
@@ -285,6 +304,7 @@ private:
 
 	// Takes the SCF object from occ and creates the tscb file
 	void create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda);
+	static void flip_high_m_phases(occ::qm::Wavefunction& w);
 
 	// Builds the density matrix to use for structure factor calculations
 	void build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMatrix2& dm_ref, const occ::Mat& dm_old);
@@ -298,9 +318,41 @@ private:
 	// Held resident only while it fits settings.i_tensor_max_mb; otherwise empty
 	// and i_file_ carries the tensor. Read through i_block(r) either way.
 	cvec I;
+	//A tensor built in single precision is held, streamed and saved in single: half the
+	//memory and half the traffic of the two walks per iteration, and the values are the
+	//ones the GEMM produced either way. i_float / i_double in the settings override the
+	//choice the build precision makes.
+	std::vector<std::complex<float>> I32;
+	bool i_float_ = false;
+	// The background writer for `save <path>`. Joined, never detached: a thread still
+	// running at exit is how the GPU warm-up bug of 939268f happened, and this one holds a
+	// FILE* and reads the resident tensor.
+	std::thread i_writer_;
+	//Incremental Fock build: the two-electron part and the density it was built from
+	occ::Mat G_last_, D_last_build_;
+	int last_full_build_ = 0;
+	double next_full_build_error_ = 0.0;
+	std::string i_writer_error_;
+	void start_i_save();
+	void finish_i_save();
+	size_t i_budget(const char*& source, bool& automatic) const;
+	static constexpr const char* i_tensor_default = "I_tensor_stream.bin";
 	i_tensor_file i_file_;
 	bool i_streamed_ = false;
 	int i_window_ = 0;
+	// The packed (mu, nu) run of reflection r, from the loaded window or from the resident tensor
+	const cdouble* i_block(const int r) const
+	{
+		return i_streamed_ ? i_file_.block(r) : I.data() + static_cast<size_t>(r) * i_compact_;
+	}
+	const std::complex<float>* i_block32(const int r) const
+	{
+		return i_streamed_ ? i_file_.block32(r) : I32.data() + static_cast<size_t>(r) * i_compact_;
+	}
+	//Only the (mu, nu) pairs the overlap screening kept are stored, i_compact_ of the
+	//nmo (nmo + 1) / 2, in the order these two lists give
+	ivec i_pair_mu_, i_pair_nu_;
+	size_t i_compact_ = 0;
 	std::vector<asym_atom> asym_atoms;
 	std::vector<scattering_data> obs;
 	hkl_list hkl;

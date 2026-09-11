@@ -1,5 +1,9 @@
 #pragma once
 #include "convenience.h"
+//atomID's string_view constructor calls std::from_chars. MSVC provides it transitively, so
+//Windows builds without this; libstdc++ does not, and the test targets - which include this
+//header outside the core precompiled header - fail to compile on Linux without it.
+#include <charconv>
 
 //-----------------Definition of atoms and basis sets--------------------
 

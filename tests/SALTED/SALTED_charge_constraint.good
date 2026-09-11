@@ -1,0 +1,59 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                          "test_cysteine.xyz" done!
+Number of atoms in Wavefunction file: 14 Number of MOs: 0
+Using "model.salted" for the prediction
+Reading:                          "test_cysteine.cif" done!
+Generating hkl indices up to d=:              0.73... done!
+Nr of reflections generated:                 11385
+Number of symmetry operations:                   4
+Nr of reflections to be used:                 5692
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 5692
+
+Generating densities... 
+Descriptor sets identical: sharing one copy
+[              Calculating descriptors for l = 0              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 1              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 2              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 3              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 4              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 5              ]
+[#############################################################] 100% 
+Charge constraint applied: 63.9897 -> 64.0000 electrons over 14 atoms (factor 1.00016086)
+                                           ... done!
+Table of Charges in electrons
+       Atom      ML
+         S    -0.554
+         O    -0.694
+        O1    -0.657
+         N    -0.303
+        C1     0.254
+        C2     0.461
+        C3     0.302
+        H1    -0.003
+       H3a     0.031
+       H3b     0.018
+         H     0.191
+        Ha     0.316
+        Hb     0.315
+        Hc     0.322
+Total number of analytical Electrons: 64.0000
+Streaming tsc in blocks of 1000 reflections
+[               Generating scattering factors...              ]
+[#############################################################] 100% 
+                                          ... done!
+Writing tsc file...  ... done!
+  (written block by block while the factors were computed)

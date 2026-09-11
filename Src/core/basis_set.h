@@ -67,6 +67,9 @@ public:
     }
 
     occ::qm::AOBasis to_AOBasis(const std::vector<occ::core::Atom>& atoms) const;
+    //The elements given, in the JSON layout OCC's basis reader takes, so OCC can load a
+    //set from this library by file name
+    void write_occ_json(const std::filesystem::path& path, const ivec& atomic_numbers) const;
 private:
     std::vector<SimplePrimitive> _ownedPrimitives;
     SimplePrimitive* _primitives = nullptr;

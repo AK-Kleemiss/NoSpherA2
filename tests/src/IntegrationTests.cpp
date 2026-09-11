@@ -1,3 +1,6 @@
+#ifdef NOSPHERA2_USE_GPU
+#include "sf_gpu.h"
+#endif
 #include "pch.h"
 
 #include "core/NoSpherA2.h"
@@ -312,9 +315,15 @@ static std::optional<TomlTestDef> load_test_def_from_toml(const std::filesystem:
     Mode mode = Mode::None;
 
     TomlTestDef def;
-    // Defaults from [defaults] in tests/tests.toml are currently two flags.
+    // Defaults from [defaults] in tests/tests.toml, mirrored here.
     def.args.emplace_back("all_charges", std::vector<std::string>{"true"});
     def.args.emplace_back("no_date", std::vector<std::string>{"true"});
+    // The integration grid weights went to the GPU by default, which adds a line to
+    // the log on a machine with a card and none on a machine without, so every
+    // reference log here matched on one kind of machine and failed on the other.
+    // Pin the CPU path the way the fp32/fp64 tests pin theirs; the tests that want
+    // the device pass -gpu_grid themselves and, coming after this one, win.
+    def.args.emplace_back("no_gpu_grid", std::vector<std::string>{"true"});
     std::string line;
     while (std::getline(in, line)) {
         line = strip_comment(line);
@@ -498,6 +507,63 @@ TEST(TomlIntegrationTests, P1_test_XCW)
 // several minutes (a fresh SCF plus ~10 warm-started XCW steps), so it only
 // runs when RUN_FULL_TEST is set, matching the python harness's convention
 // documented in UNIT_TESTS_STATUS.md.
+// GPU variants. They ask the runtime whether a device is present rather than being gated
+// on an environment variable, so the suite stays green on a CPU-only machine and actually
+// exercises the device on one that has it - a path nothing selects is a path nothing tests.
+static bool gpu_device_present()
+{
+#ifdef NOSPHERA2_USE_GPU
+    return sf_gpu_available();
+#else
+    return false;
+#endif
+}
+
+// The grid-weight kernel is a verbatim transcription and measured bit-identical, so it is
+// held to the CPU reference rather than a reference of its own.
+TEST(TomlIntegrationTests, sucrose_SF_gpu_grid)
+{
+    if (!gpu_device_present()) {
+        GTEST_SKIP() << "No GPU device present; the -gpu_grid path cannot run here";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_grid");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+// The I tensor path contracts in single precision, which moves the total energy in the
+// ninth decimal, so it carries its own reference.
+TEST(TomlIntegrationTests, P1_test_XCW_gpu_itensor)
+{
+    if (!gpu_device_present()) {
+        GTEST_SKIP() << "No GPU device present; the -gpu_itensor path cannot run here";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_gpu_itensor");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+// The two sincos kernels, each pinned by flag. Left on Auto the card decides, so on this
+// machine both of these would run the f32 kernel and on a datacentre part both would run
+// the f64 one - two green tests covering one path between them. Holding both to the same
+// CPU reference is the check that matters: it is the numerical-agreement contract in
+// AGENTS.md, not just a smoke test that the kernel launches.
+TEST(TomlIntegrationTests, sucrose_SF_gpu_fp64)
+{
+    if (!gpu_device_present()) {
+        GTEST_SKIP() << "No GPU device present; the -gpu_fp64 path cannot run here";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_fp64");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, sucrose_SF_gpu_fp32)
+{
+    if (!gpu_device_present()) {
+        GTEST_SKIP() << "No GPU device present; the -gpu_fp32 path cannot run here";
+    }
+    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_fp32");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, P1_test_XCW_full)
 {
     if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
@@ -594,9 +660,27 @@ TEST(TomlIntegrationTests, IntermolecularNCI)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, Fukui)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "fukui");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, FukuiPBC)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "fukui_pbc");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, RiFit)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, RiFitMultipoles)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit_multipoles");
     EXPECT_TRUE(result.success) << result.message;
 }
 
@@ -609,6 +693,12 @@ TEST(TomlIntegrationTests, RubredoxinCmtc)
 TEST(TomlIntegrationTests, SALTED)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, SALTEDChargeConstraint)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_charge_constraint");
     EXPECT_TRUE(result.success) << result.message;
 }
 
@@ -675,6 +765,12 @@ TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_sym_ANO)
 TEST(TomlIntegrationTests, RGBI_NH3Li)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, ELI_NH3Li)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_NH3Li");
     EXPECT_TRUE(result.success) << result.message;
 }
 

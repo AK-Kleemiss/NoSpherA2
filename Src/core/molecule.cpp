@@ -27,7 +27,7 @@ bool molecule::read_molecule(std::string path)
         return false;
     }
     file.seekg(0);
-    getline(file, line);
+    getline_universal(file, line);
     size_t length;
     char tempchar[200];
     int count = 0;
