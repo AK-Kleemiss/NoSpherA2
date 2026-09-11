@@ -115,6 +115,11 @@ target_compile_definitions(
     NoSpherA2Core
     PRIVATE
         NOSPHERA2_BASIS_DATA_SEPARATE
+    # occ is built without OpenMP and parallelises with TBB; its header templates
+    # instantiated in these OpenMP-compiled units would otherwise run Eigen's
+    # OpenMP gemm inside every TBB worker. PUBLIC so the app and the tests match.
+    PUBLIC
+        EIGEN_DONT_PARALLELIZE
 )
 
 if(NOSPHERA2_USE_CUDA)
