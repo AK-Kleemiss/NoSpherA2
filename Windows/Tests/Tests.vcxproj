@@ -19,10 +19,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\tests\src\DeltaSeriesTests.cpp" />
+    <ClCompile Include="..\..\tests\src\Nbo47Tests.cpp" />
     <ClCompile Include="..\..\tests\src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\tests\src\main.cpp" />
+    <ClCompile Include="..\..\tests\src\TscStreamTests.cpp" />
     <ClCompile Include="..\..\tests\src\UnitTests.cpp" />
     <ClCompile Include="..\..\tests\src\IntegrationTests.cpp" />
   </ItemGroup>

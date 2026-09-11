@@ -86,22 +86,33 @@
   <ItemGroup>
     <ClInclude Include="..\..\Src\core\AtomGrid.h" />
     <ClInclude Include="..\..\Src\core\atoms.h" />
+    <ClInclude Include="..\..\Src\core\aux_density.h" />
+    <ClInclude Include="..\..\Src\core\aux_density_gpu.h" />
     <ClInclude Include="..\..\Src\core\b2c.h" />
     <ClInclude Include="..\..\Src\core\basis_set.h" />
+    <ClInclude Include="..\..\Src\core\blas_gpu.h" />
     <ClInclude Include="..\..\Src\core\bondwise_analysis.h" />
     <ClInclude Include="..\..\Src\core\cell.h" />
     <ClInclude Include="..\..\Src\core\cif.h" />
     <ClInclude Include="..\..\Src\core\constants.h" />
     <ClInclude Include="..\..\Src\core\convenience.h" />
+    <ClInclude Include="..\..\Src\core\crystal_energies.h" />
     <ClInclude Include="..\..\Src\core\cube.h" />
+    <ClInclude Include="..\..\Src\core\cublas_dynamic.h" />
     <ClInclude Include="..\..\Src\core\CUDA_utilities.h" />
     <ClInclude Include="..\..\Src\core\def2-ECPs_GA.h" />
+    <ClInclude Include="..\..\Src\core\early_exit.h" />
     <ClInclude Include="..\..\Src\core\ECPs_corrections.h" />
     <ClInclude Include="..\..\Src\core\fchk.h" />
+    <ClInclude Include="..\..\Src\core\geometry_aid.h" />
+    <ClInclude Include="..\..\Src\core\gpu_backend.h" />
+    <ClInclude Include="..\..\Src\core\grid_gpu.h" />
     <ClInclude Include="..\..\Src\core\GridManager.h" />
+    <ClInclude Include="..\..\Src\core\i_tensor_stream.h" />
     <ClInclude Include="..\..\Src\core\integration_params.h" />
     <ClInclude Include="..\..\Src\core\integrator.h" />
     <ClInclude Include="..\..\Src\core\isosurface.h" />
+    <ClInclude Include="..\..\Src\core\itensor_gpu.h" />
     <ClInclude Include="..\..\Src\core\libCintKernels.h" />
     <ClInclude Include="..\..\Src\core\libCintMain.h" />
     <ClInclude Include="..\..\Src\core\molecule.h" />
@@ -112,11 +123,15 @@
     <ClInclude Include="..\..\Src\core\pch.h" />
     <ClInclude Include="..\..\Src\core\properties.h" />
     <ClInclude Include="..\..\Src\core\SALTED_equicomb.h" />
+    <ClInclude Include="..\..\Src\core\salted_gpu.h" />
     <ClInclude Include="..\..\Src\core\SALTED_io.h" />
     <ClInclude Include="..\..\Src\core\SALTED_predictor.h" />
     <ClInclude Include="..\..\Src\core\SALTED_utilities.h" />
     <ClInclude Include="..\..\Src\core\scatterer_id.h" />
     <ClInclude Include="..\..\Src\core\scattering_factors.h" />
+    <ClInclude Include="..\..\Src\core\sf_gpu.h" />
+    <ClInclude Include="..\..\Src\core\Slater_delta_coefs.h" />
+    <ClInclude Include="..\..\Src\core\Slater_ion_coefs.h" />
     <ClInclude Include="..\..\Src\core\sphere_lebedev_rule.h" />
     <ClInclude Include="..\..\Src\core\spherical_density.h" />
     <ClInclude Include="..\..\Src\core\test_functions.h" />
@@ -124,11 +139,15 @@
     <ClInclude Include="..\..\Src\core\throughput.h" />
     <ClInclude Include="..\..\Src\core\tsc_block.h" />
     <ClInclude Include="..\..\Src\core\tsc_label_converter.h" />
+    <ClInclude Include="..\..\Src\core\tsc_stream.h" />
     <ClInclude Include="..\..\Src\core\wfn_class.h" />
     <ClInclude Include="..\..\Src\core\XCW.h" />
     <ClInclude Include="..\..\Src\core\xcw_halting.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Src\core\crystal_energies.cpp" />
+    <ClCompile Include="..\..\Src\core\cublas_dynamic.cpp" />
+    <ClCompile Include="..\..\Src\core\geometry_aid.cpp" />
     <ClCompile Include="..\..\Src\core\pch.cpp">
       <BuildStlModules>true</BuildStlModules>
       <PrecompiledHeader>Create</PrecompiledHeader>
