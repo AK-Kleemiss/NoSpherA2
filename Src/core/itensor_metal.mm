@@ -214,6 +214,7 @@ struct Block {
 struct State {
 	bool ready = false;
 	int nmo = 0, packed = 0, n_grids = 0;
+	double issued_flops = 0.0;
 	long long n_points = 0;
 	id<MTLBuffer> ao = nil, aos = nil, compact = nil;
 	id<MTLBuffer> d1 = nil, d2 = nil, d3 = nil, w = nil;
@@ -259,6 +260,7 @@ bool init_impl(const itensor_gpu_layout& L)
 		max_ld = std::max(max_ld, ld);
 		max_ldc = std::max(max_ldc, padded(na));
 		ao_len += (uint64_t)na * ld;
+		s.issued_flops += throughput::flops_gemm(na, 2.0 * na, L.blk_point_count[b]);
 	}
 	if (throughput::enabled()) {
 		int min_na = L.n_blocks ? L.blk_n_active[0] : 0;
@@ -463,6 +465,8 @@ bool collect_impl(const int slot, std::complex<double>* I_r)
 bool itensor_gpu_available() { return open_device(); }
 
 const char* itensor_gpu_gemm_name() { return "Metal Performance Shaders"; }
+
+double itensor_gpu_issued_flops() { return state().issued_flops; }
 
 bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec, const bool)
 {
