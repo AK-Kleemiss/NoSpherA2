@@ -36,7 +36,9 @@ public:
     bool operator -= (const cube& right);
     bool operator *= (const cube& right);
     bool operator /= (const cube& right);
-    void operator = (const cube& right);
+    cube& operator=(const cube& right);
+    cube(cube&&) = default;
+    cube& operator=(cube&&) = default;
     bool mask(const cube& right);
     bool thresh(const cube& right, const double& thresh = -1234);
     bool thresh(const double& thresh);
@@ -132,6 +134,7 @@ public:
     void adaptive_refine(std::function<const double(const std::array<double, 3>)> const func, double target_error, int max_depth = 4, const int subfactor = 2);
 
 private:
+    void reset();
     double dv;
     int na;
     bool loaded;

@@ -20,50 +20,86 @@ basis_set_entry::basis_set_entry(double g_coefficient, double g_exponent, unsign
 };
 
 atom::atom() {
+    reset();
+};
+
+atom::atom(const std::string& l,
+    const atomID& id,
+    const int& n,
+    const double& c1,
+    const double& c2,
+    const double& c3,
+    const int& ch) {
+    reset();
+    label = l;
+    ID = id;
+    nr = n;
+    x = c1;
+    y = c2;
+    z = c3;
+    charge = ch;
+};
+
+atom::atom(const std::string& l,
+    const atomID& id,
+    const int& n,
+    const double& c1,
+    const double& c2,
+    const double& c3,
+    const int& ch,
+    const int& ECP_els) {
+    reset();
+    label = l;
+    ID = id;
+    nr = n;
+    x = c1;
+    y = c2;
+    z = c3;
+    charge = ch;
+    ECP_electrons = ECP_els;
+};
+
+atom::atom(const atom& rhs) {
+    reset();
+    *this = rhs;
+};
+
+void atom::reset() {
     label = '?';
     ID = atomID();
     nr = 0;
+    charge = 0;
+    ECP_electrons = 0;
     x = 0.0;
     y = 0.0;
     z = 0.0;
-    charge = 0;
-    basis_set_id = 0;
-    ECP_electrons = 0;
     frac_coords = { 0.,0.,0. };
+    basis_set.clear();
+    basis_set_id = 0;
+    shellcount.clear();
+    ADPs.clear();
     is_asym = false;
+    group_nr = 0;
 };
 
-atom::atom(const std::string& l, 
-    const atomID& id, 
-    const int& n, 
-    const double& c1, 
-    const double& c2, 
-    const double& c3, 
-    const int& ch) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(0), basis_set_id(0), frac_coords({ 0,0,0 }), is_asym(false)
-{};
-
-atom::atom(const std::string& l, 
-    const atomID& id,
-    const int& n, 
-    const double& c1, 
-    const double& c2, 
-    const double& c3, 
-    const int& ch, 
-    const int& ECP_els) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(ECP_els), basis_set_id(0), frac_coords({ 0,0,0 }), is_asym(false)
-{};
-
 atom& atom::operator= (const atom& rhs) {
+    if (this == &rhs)
+        return *this;
+    reset();
     label = rhs.label;
     ID = rhs.ID;
     nr = rhs.nr;
+    charge = rhs.charge;
+    ECP_electrons = rhs.ECP_electrons;
     x = rhs.x;
     y = rhs.y;
     z = rhs.z;
-    charge = rhs.charge;
-    basis_set = rhs.basis_set;
-    shellcount = rhs.shellcount;
-    ECP_electrons = rhs.ECP_electrons;
     frac_coords = rhs.frac_coords;
+    basis_set = rhs.basis_set;
+    basis_set_id = rhs.basis_set_id;
+    shellcount = rhs.shellcount;
+    ADPs = rhs.ADPs;
+    is_asym = rhs.is_asym;
     group_nr = rhs.group_nr;
     return *this;
 };

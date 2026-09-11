@@ -35,89 +35,70 @@ constexpr void WFN::fill_Afac_pre()
                 Afac_pre[l][r][s] = constants::ft[r] * constants::ft[s] * constants::ft[l - 2 * r - 2 * s];
 }
 
-WFN::WFN()
+void WFN::reset()
 {
     ncen = 0;
     nfunc = 0;
     nmo = 0;
     nex = 0;
     charge = 0;
+    ECP_m = 0;
     multi = 0;
     origin = e_origin::NOT_YET_DEFINED;
-    ECP_m = 0;
     total_energy = 0.0;
     virial_ratio = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
     basis_set_name = " ";
-    has_ECPs = false;
     comment = "Test";
+    path.clear();
+    method.clear();
+    MOs.clear();
+    coef_primitive_major.clear();
+    coef_primitive_major_valid = false;
+    centers.clear();
+    types.clear();
+    exponents.clear();
+    UT_DensityMatrix.clear();
+    UT_SpinDensityMatrix.clear();
+    DM = dMatrix2();
+    MO_sph = dMatrix2();
     basis_set = NULL;
+    cub.clear();
+    atoms.clear();
+    modified = false;
+    d_f_switch = false;
+    distance_switch = false;
+    has_ECPs = false;
+    isBohr = false;
+    is_unrestricted = false;
+};
+
+WFN::WFN()
+{
+    reset();
     fill_pre();
     fill_Afac_pre();
 };
 
 WFN::WFN(e_origin given_origin)
 {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
-    charge = 0;
-    multi = 0;
-    ECP_m = 0;
-    total_energy = 0.0;
+    reset();
     origin = given_origin;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
     fill_pre();
     fill_Afac_pre();
 };
 
 WFN::WFN(const std::filesystem::path &filename, const bool &debug)
 {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
-    charge = 0;
-    multi = 0;
-    ECP_m = 0;
-    total_energy = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
+    reset();
     fill_pre();
     fill_Afac_pre();
     read_known_wavefunction_format(filename, std::cout, debug);
 };
 
 WFN::WFN(const std::filesystem::path &filename, const int g_charge, const int g_mult, const bool &debug) {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
+    reset();
     charge = g_charge;
     multi = g_mult;
-    ECP_m = 0;
-    total_energy = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
     fill_pre();
     fill_Afac_pre();
     read_known_wavefunction_format(filename, std::cout, debug);
@@ -6532,50 +6513,51 @@ void WFN::set_ECPs(ivec &nr, ivec &elcount)
     }
 };
 
-void WFN::operator=(const WFN &right)
+WFN::WFN(const WFN &right)
 {
+    reset();
+    *this = right;
+};
+
+WFN &WFN::operator=(const WFN &right)
+{
+    if (this == &right)
+        return *this;
+    reset();
+    ncen = right.ncen;
+    nfunc = right.nfunc;
+    nmo = right.nmo;
+    nex = right.nex;
+    charge = right.charge;
+    ECP_m = right.ECP_m;
+    multi = right.multi;
+    origin = right.origin;
+    total_energy = right.total_energy;
+    virial_ratio = right.virial_ratio;
+    basis_set_name = right.basis_set_name;
+    comment = right.comment;
+    path = right.path;
+    method = right.method;
+    MOs = right.MOs;
+    centers = right.centers;
+    types = right.types;
+    exponents = right.exponents;
+    UT_DensityMatrix = right.UT_DensityMatrix;
+    UT_SpinDensityMatrix = right.UT_SpinDensityMatrix;
+    DM = right.DM;
+    MO_sph = right.MO_sph;
+    basis_set = right.basis_set;
+    cub = right.cub;
+    atoms = right.atoms;
+    modified = right.modified;
+    d_f_switch = right.d_f_switch;
+    distance_switch = right.distance_switch;
+    has_ECPs = right.has_ECPs;
     isBohr = right.isBohr;
-    ncen = right.get_ncen();
-    origin = right.get_origin();
-    nex = right.get_nex();
-    multi = right.get_multi();
-    charge = right.get_charge();
-    nfunc = right.get_nfunc();
-    has_ECPs = right.get_has_ECPs();
-    basis_set = right.get_basis_set_ptr();
-    method = right.get_method();
-    ECP_m = right.get_ECP_mode();
-    comment = right.get_comment();
-    basis_set_name = right.get_basis_set_name();
-    path = right.get_path();
-    multi = right.get_multi();
-    total_energy = right.get_total_energy();
-    virial_ratio = right.get_virial_ratio();
-    UT_DensityMatrix = right.get_DensityMatrix();
-    UT_SpinDensityMatrix = right.get_SpinDensityMatrix();
-    for (int i = 0; i < nex; i++)
-    {
-        push_back_center(right.get_center(i));
-        push_back_type(right.get_type(i));
-        push_back_exponent(right.get_exponent(i));
-    }
-    for (int i = 0; i < right.get_nmo(); i++)
-    {
-        push_back_MO(i, right.get_MO_primitive_count(i), right.get_MO_energy(i));
-        for (int j = 0; j < right.get_MO_primitive_count(i); j++)
-            push_back_MO_coef(i, right.get_MO_coef(i, j));
-    }
-    for (int c = 0; c < right.cub.size(); c++)
-    {
-        cub.push_back(right.cub[c]);
-    }
-    for (int a = 0; a < right.atoms.size(); a++)
-    {
-        atoms.push_back(right.atoms[a]);
-    }
+    is_unrestricted = right.is_unrestricted;
     fill_pre();
     fill_Afac_pre();
-
+    return *this;
 };
 
 int WFN::calculate_charge()

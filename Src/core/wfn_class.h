@@ -165,6 +165,8 @@ private:
     const double compute_dens_cartesian(const d3& Pos, vec2& d, vec& phi) const;
     const double compute_spin_dens_cartesian(const d3& Pos, vec2& d, vec& phi) const;
     const double compute_dens_spherical(const d3& Pos, vec2& d, vec& phi) const;
+    // Empties every container and puts every scalar back to its default; ctors and operator= start here
+    void reset();
 
 public:
     /** Primitive-major MO coefficients, [primitive * nmo + mo], built on first use.
@@ -187,6 +189,7 @@ public:
     ///@}
     /** Construct from an OCC Wavefunction Struct. If from_file=true, it will use OCC to read any wfn format supported by it*/
     WFN(const occ::qm::Wavefunction& occ_WF, bool from_file=false);
+    WFN(const WFN& right);
 	// virtual ~WFN() {};
     //-------------------- OCC additional things--------------------------------------------
     // friend class WfnAdapter;
@@ -380,7 +383,9 @@ public:
     /** Query whether ECPs are active. */
     const bool& get_has_ECPs() const { return has_ECPs; };
     /** Copy assignment (deep copy except shared basis definition pointer). */
-    void operator=(const WFN& right);
+    WFN& operator=(const WFN& right);
+    WFN(WFN&&) = default;
+    WFN& operator=(WFN&&) = default;
     /** Compute formal charge from atom charges - electron count (ignores stored charge). */
     int calculate_charge();
     /** Same as calculate_charge() with logging. */
