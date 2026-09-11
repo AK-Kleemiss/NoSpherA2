@@ -332,6 +332,12 @@ private:
 	occ::Mat G_last_, D_last_build_;
 	int last_full_build_ = 0;
 	double next_full_build_error_ = 0.0;
+	//Two-electron integrals packed over the 8-fold symmetry, built once per run when they fit in
+	//memory: the Fock build then contracts them instead of recomputing every quartet per iteration
+	vec eri_;
+	void store_ERIs(const occ::qm::HartreeFock& hf);
+	void eri_JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K) const;
+	occ::Mat eri_fock(const occ::qm::MolecularOrbitals& mo) const;
 	std::string i_writer_error_;
 	void start_i_save();
 	void finish_i_save();

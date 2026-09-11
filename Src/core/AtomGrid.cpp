@@ -1038,6 +1038,9 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
             gx = grid[i][0].data();
             gy = grid[i][1].data();
             gz = grid[i][2].data();
+            //per-thread partial sums as flat arrays, merged in thread order after the region
+            const int nthr = omp_get_max_threads();
+            vec2 si_part(nthr), pop_part(nthr);
 
 #pragma omp parallel
             {
@@ -1045,11 +1048,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                 double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq, bw, _x, _y, _z;
                 int j, shell, nshell, *ECP_els_j;
                 double dx[3], *dist_j, *pop, *si;
-                sp_vec local = sig_pop_vector;
-                for (j = 0; j < ncen; j++) {
-                    std::fill(local[j].first.begin(), local[j].first.end(), 0.0);
-                    std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
-                }
+                vec si_local(ncen * 6, 0.0), pop_local(ncen * 6, 0.0);
                 std::pair<vec, vec> *coi;
 
 #pragma omp for schedule(dynamic, 1) nowait
@@ -1086,7 +1085,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 
                         for (shell = 0; shell < nshell; shell++) {
                             sigval = 1.0 / si[shell];
-                            tmp = pop[shell] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-*dist_j * sigval);
+                            tmp = pop[shell] * constants::INV_EIGHT_PI * sigval * sigval * sigval * exp(-*dist_j * sigval);
                             if (abs(tmp) < 1e-20)
                                 continue;
                             rho0shell[j * 6 + shell] = tmp;
@@ -1098,8 +1097,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                     for (j = 0; j < ncen; j++) {
                         nshell = nshell_cache[j];
                         dist_j = &dists[j];
-                        pop = local[j].second.data();
-                        si = local[j].first.data();
+                        pop = pop_local.data() + j * 6;
+                        si = si_local.data() + j * 6;
                         for (shell = 0; shell < nshell; shell++) {
                             r0s = rho0shell[j * 6 + shell];
                             if (r0s == 0)
@@ -1110,16 +1109,16 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                         }
                     }
                 }
-
-                for (j = 0; j < ncen; j++) {
-                    nshell = nshell_cache[j];
-                    for (shell = 0; shell < nshell; shell++) {
-#pragma omp atomic
-                        sig_pop_vector[j].first[shell] += local[j].first[shell];
-#pragma omp atomic
-                        sig_pop_vector[j].second[shell] += local[j].second[shell];
+                si_part[omp_get_thread_num()].swap(si_local);
+                pop_part[omp_get_thread_num()].swap(pop_local);
+            }
+            for (int t = 0; t < nthr; t++) {
+                if (si_part[t].empty()) continue;
+                for (int j = 0; j < ncen; j++)
+                    for (int shell = 0; shell < nshell_cache[j]; shell++) {
+                        sig_pop_vector[j].first[shell] += si_part[t][j * 6 + shell];
+                        sig_pop_vector[j].second[shell] += pop_part[t][j * 6 + shell];
                     }
-                }
             }
         }
         //back to the cycle main loop, we updated sig and pop based on information loss :)
@@ -1264,6 +1263,10 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
             gx = grid[i][0].data();
             gy = grid[i][1].data();
             gz = grid[i][2].data();
+            //per-thread partial sums, merged in thread order after the region: no critical
+            //section for 48 threads to queue at, and the merge order is fixed
+            const int nthr = omp_get_max_threads();
+            vec2 alpha_part(nthr), pop_part(nthr);
 
 #pragma omp parallel
             {
@@ -1384,27 +1387,24 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         }
                     }
                 }
-
-                // Use critical section for batch updates instead of individual atomic operations
-#pragma omp critical
-                {
-                    for (j = 0; j < ncen; j++) {
-                        nshell = nshell_cache[j];
-                        const int alpha_base = j * 36;
-                        const int pop_base = j * 6;
-                        for (shell = 0; shell < nshell; shell++) {
-                            const int alpha_offset = alpha_base + shell * 6;
-                            // Batch update all values in critical section
-                            double *sig_alpha = sig_pop_vector[j].first[shell].data();
-
-                            sig_alpha[0] += alpha_local[alpha_offset + 0];
-                            sig_alpha[1] += alpha_local[alpha_offset + 1];
-                            sig_alpha[2] += alpha_local[alpha_offset + 2];
-                            sig_alpha[3] += alpha_local[alpha_offset + 3];
-                            sig_alpha[4] += alpha_local[alpha_offset + 4];
-                            sig_alpha[5] += alpha_local[alpha_offset + 5];
-                            sig_pop_vector[j].second[shell] += pop_local[pop_base + shell];
-                        }
+                alpha_part[omp_get_thread_num()].swap(alpha_local);
+                pop_part[omp_get_thread_num()].swap(pop_local);
+            }
+            for (int t = 0; t < nthr; t++) {
+                if (alpha_part[t].empty()) continue;
+                const double *alpha_local = alpha_part[t].data(), *pop_local = pop_part[t].data();
+                for (int j = 0; j < ncen; j++) {
+                    const int nshell = nshell_cache[j];
+                    for (int shell = 0; shell < nshell; shell++) {
+                        const int alpha_offset = j * 36 + shell * 6;
+                        double *sig_alpha = sig_pop_vector[j].first[shell].data();
+                        sig_alpha[0] += alpha_local[alpha_offset + 0];
+                        sig_alpha[1] += alpha_local[alpha_offset + 1];
+                        sig_alpha[2] += alpha_local[alpha_offset + 2];
+                        sig_alpha[3] += alpha_local[alpha_offset + 3];
+                        sig_alpha[4] += alpha_local[alpha_offset + 4];
+                        sig_alpha[5] += alpha_local[alpha_offset + 5];
+                        sig_pop_vector[j].second[shell] += pop_local[j * 6 + shell];
                     }
                 }
             }

@@ -7975,17 +7975,22 @@ void WFN::pop_back_MO()
 }
 
 //Transposed MO coefficients, [primitive * nmo + mo], built once and reused by every point.
-//Locked because the first caller is usually several threads at once: make_chi parallelises
-//over atom pairs, and compute_dens underneath it is what asks for this. Unlocked, two
-//threads both find it cold and one reallocates under the other. A plain bool cannot be
-//double-checked and an atomic member would make WFN non-copyable.
+//The first caller is usually several threads at once: make_chi parallelises over atom
+//pairs, and compute_dens underneath it is what asks for this. Unlocked, two threads both
+//find it cold and one reallocates under the other. The valid flag is read through an
+//atomic_ref so the warm path takes no lock (it is called per grid point from every
+//density evaluator); the member stays a plain bool so WFN stays copyable.
 const double* WFN::get_coef_primitive_major() const
 {
 	const int _nmo = get_nmo(false);
 	if (_nmo <= 0 || nex <= 0) return nullptr;
+	std::atomic_ref<bool> valid(coef_primitive_major_valid);
+	if (valid.load(std::memory_order_acquire)
+	    && coef_primitive_major.size() == (size_t)nex * (size_t)_nmo)
+		return coef_primitive_major.data();
 	static std::mutex coef_cache_mutex;
 	std::lock_guard<std::mutex> lock(coef_cache_mutex);
-	if (coef_primitive_major_valid
+	if (valid.load(std::memory_order_acquire)
 	    && coef_primitive_major.size() == (size_t)nex * (size_t)_nmo)
 		return coef_primitive_major.data();
 	coef_primitive_major.assign((size_t)nex * (size_t)_nmo, 0.0);
@@ -7995,7 +8000,7 @@ const double* WFN::get_coef_primitive_major() const
 		for (int j = 0; j < nex; j++)
 			coef_primitive_major[(size_t)j * _nmo + mo] = src[j];
 	}
-	coef_primitive_major_valid = true;
+	valid.store(true, std::memory_order_release);
 	return coef_primitive_major.data();
 }
 
@@ -9138,38 +9143,39 @@ const double WFN::computeMO(
     const int &mo) const
 {
     double result = 0.0;
-    int iat = 0;
     int l[3]{ 0, 0, 0 };
-    double ex = 0;
-    double temp = 0;
-
-    // x, y, z and dsqd
-    vec2 d(ncen);
-    for (int i = 0; i < ncen; i++)
-        d[i].resize(4);
-
-    for (iat = 0; iat < ncen; iat++)
+    double ex = 0, *d_;
+    // x, y, z, r^2 and the powers 2..5 laid out as in compute_dens_cartesian; per-thread scratch
+    // because this is called per grid point per orbital from parallel loops
+    thread_local vec d;
+    if (d.size() < (size_t)16 * ncen) d.resize((size_t)16 * ncen);
+    for (int iat = 0; iat < ncen; iat++)
     {
-        d[iat][0] = PosGrid[0] - atoms[iat].get_coordinate(0);
-        d[iat][1] = PosGrid[1] - atoms[iat].get_coordinate(1);
-        d[iat][2] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        d[iat][3] = pow(std::hypot(d[iat][0], d[iat][1], d[iat][2]), 2);
+        d_ = d.data() + (size_t)16 * iat;
+        d_[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d_[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d_[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
+        d_[4] = d_[0] * d_[0];
+        d_[5] = d_[1] * d_[1];
+        d_[6] = d_[2] * d_[2];
+        d_[3] = d_[4] + d_[5] + d_[6];
+        for (int k = 7; k < 16; k++)
+            d_[k] = d_[k - 3] * d_[(k - 7) % 3];
     }
-
+    const double *c = MOs[mo].get_coefficient_ptr();
     for (int j = 0; j < nex; j++)
     {
-        iat = get_center(j) - 1;
-        // if (iat != atom) continue;
-        constants::type2vector(get_type(j), l);
-        temp = -get_exponent(j) * d[iat][3];
-        if (temp < constants::exp_cutoff)
+        d_ = d.data() + (size_t)16 * (get_center(j) - 1);
+        ex = -get_exponent(j) * d_[3];
+        if (ex < constants::exp_cutoff)
             continue;
-        ex = exp(temp);
+        ex = exp(ex);
+        constants::type2vector(get_type(j), l);
+        // power p of coordinate k sits at k for p = 1 and at 3p - 2 + k above
         for (int k = 0; k < 3; k++)
-            ex *= pow(d[iat][k], l[k]);
-        result += MOs[mo].get_coefficient_f(j) * ex; // build MO values at this point
+            if (l[k]) ex *= d_[(l[k] == 1 ? 0 : 3 * l[k] - 2) + k];
+        result += c[j] * ex;
     }
-    shrink_vector<vec>(d);
     return result;
 }
 
