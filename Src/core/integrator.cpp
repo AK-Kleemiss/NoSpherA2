@@ -139,6 +139,9 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
         if (config.restrain_type == RESTRAINT_TYPE::SIMPLE) {
             std::cout << "Using simple restraints with charges from: " << charge_scheme << std::endl;
         }
+        else if (config.restrain_type == RESTRAINT_TYPE::PARTITION) {
+            std::cout << "Using partition restraints on every auxiliary function with moments from: " << charge_scheme << std::endl;
+        }
         //Hybrid applies Tikhonov regularization
         else if (config.restrain_type == RESTRAINT_TYPE::SIMPLE_AND_TIK) {
             std::cout << "Using simple restraints and Tikhonov regularization with charges from: " << charge_scheme << std::endl;
@@ -150,10 +153,13 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
         }
 
         // Calculate expected charges based on chosen scheme
-        vec2 targets;
+        vec2 targets, rows;
         if (config.multipole_lmax >= 0) {
             //One grid for populations and moments; its l=0 term is the electron count without ECP electrons
-            targets = calculate_expected_multipoles(wavy, config.charge_scheme, config.multipole_lmax);
+            if (config.restrain_type == RESTRAINT_TYPE::PARTITION)
+                rows = partition_multipole_rows(wavy, wavy_aux, config.charge_scheme, config.multipole_lmax, targets);
+            else
+                targets = calculate_expected_multipoles(wavy, config.charge_scheme, config.multipole_lmax);
             expected_populations.resize(wavy.get_ncen());
             for (int i = 0; i < wavy.get_ncen(); i++)
                 expected_populations[i] = std::sqrt(constants::FOUR_PI) * targets[i][0];
@@ -171,9 +177,13 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
         const vec weights = config.multipole_lmax >= 0 ? vec(wavy.get_ncen(), config.multipole_strength)
             : restraint_weights(wavy_aux, aux_basis.get_nao(), config.restraint_strength, config.adaptive_restraint);
         // Apply enhanced electron restraints
-        add_electron_restraint(eri2c, rho, wavy_aux, weights, expected_populations);
-        if (config.multipole_lmax > 0)
-            add_multipole_restraint(eri2c, rho, wavy_aux, targets, weights, config.multipole_lmax);
+        if (config.restrain_type == RESTRAINT_TYPE::PARTITION)
+            add_partition_restraint(eri2c, rho, wavy_aux, rows, targets, weights, config.multipole_lmax);
+        else {
+            add_electron_restraint(eri2c, rho, wavy_aux, weights, expected_populations);
+            if (config.multipole_lmax > 0)
+                add_multipole_restraint(eri2c, rho, wavy_aux, targets, weights, config.multipole_lmax);
+        }
         // Solve the regularized 
         std::cout << "Solving regularized linear system..." << std::endl;
         if (config.multipole_lmax >= 0) {
@@ -206,9 +216,9 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
             rho.resize(aux_basis.get_nao());
         }
         if (config.multipole_lmax >= 0) {
-            const vec2 fitted = fitted_multipoles(rho, wavy_aux, config.multipole_lmax);
+            const vec2 fitted = rows.empty() ? fitted_multipoles(rho, wavy_aux, config.multipole_lmax) : grid_multipoles(rows, rho, config.multipole_lmax);
             const double stone = std::sqrt(constants::FOUR_PI);
-            std::cout << "\nAtomic multipoles of the fitted density, Racah normalisation, e bohr^l\n"
+            std::cout << "\nAtomic multipoles of the fitted density" << (rows.empty() ? "" : " partitioned on the grid") << ", Racah normalisation, e bohr^l\n"
                 << "  Atom  l  m       target       fitted    deviation" << std::endl;
             for (int a = 0; a < wavy_aux.get_ncen(); a++)
                 for (int l = 0; l <= config.multipole_lmax; l++)
@@ -246,7 +256,7 @@ DensityFitting::CONFIG DensityFitting::config_from_options(const options& opt)
     config.analyze_quality = opt.debug;
     if (opt.multipole_lmax < 0)
         return config;
-    config.restrain_type = RESTRAINT_TYPE::SIMPLE;
+    config.restrain_type = opt.multipole_partition ? RESTRAINT_TYPE::PARTITION : RESTRAINT_TYPE::SIMPLE;
     config.multipole_lmax = opt.multipole_lmax;
     config.multipole_strength = opt.multipole_strength;
     switch (opt.multipole_scheme) {
@@ -814,6 +824,116 @@ vec2 DensityFitting::calculate_expected_multipoles(const WFN& wavy, const CHARGE
     temp.delete_unoccupied_MOs();
     grid_manager.setup3DGridsForMolecule(temp, atom_list);
     return grid_manager.calculatePartitionedMultipoles(temp, lmax);
+}
+
+void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0)
+{
+    const int n_mom = (lmax + 1) * (lmax + 1);
+    vec Y(n_mom), val(t.n_coef);
+    ivec idx(t.n_coef);
+    for (int p = 0; p < np; p++) {
+        if (w[p] == 0.0) continue;
+        double d[3] = { x[p] - centre[0], y[p] - centre[1], z[p] - centre[2] };
+        const double r = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        if (r > 0.0)
+            for (int i = 0; i < 3; i++) d[i] /= r;
+        double rl = w[p];
+        for (int l = 0; l <= lmax; l++) {
+            for (int m = -l; m <= l; m++) Y[l * l + l + m] = rl * constants::spherical_harmonic(l, m, d);
+            rl *= r;
+        }
+        int n = 0;
+        for (int b = 0; b < t.n_at; b++) {
+            const double dx = x[p] - t.cx[b], dy = y[p] - t.cy[b], dz = z[p] - t.cz[b], r2 = dx * dx + dy * dy + dz * dz;
+            if (r2 > t.r2_max[b]) continue;
+            const double rb = std::sqrt(r2);
+            const double u[3] = { rb > 0.0 ? dx / rb : 0.0, rb > 0.0 ? dy / rb : 0.0, rb > 0.0 ? dz / rb : 0.0 };
+            for (int s = t.sh_start[b]; s < t.sh_start[b + 1]; s++) {
+                const int l = t.sh_l[s];
+                double radial = 0.0, rbl = 1.0;
+                for (int q = t.pr_start[s]; q < t.pr_start[s + 1]; q++) radial += std::exp(-t.pr_exp[q] * r2) * t.pr_norm[q];
+                for (int i = 0; i < l; i++) rbl *= rb;
+                radial *= rbl;
+                if (radial < 1E-10) continue;
+                for (int m = -l; m <= l; m++) {
+                    idx[n] = t.coef_off[s] + l + m;
+                    val[n++] = radial * constants::spherical_harmonic(l, m, u);
+                }
+            }
+        }
+        for (int k = 0; k < n_mom; k++) {
+            double* row = rows[row0 + k].data();
+            const double yk = Y[k];
+            for (int i = 0; i < n; i++) row[idx[i]] += yk * val[i];
+        }
+    }
+}
+
+vec2 DensityFitting::partition_multipole_rows(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME& scheme, const int lmax, vec2& targets)
+{
+    err_checkf(lmax >= 0 && lmax <= 8, "Partition restraints are implemented for 0 <= l <= 8", std::cout);
+    GridConfiguration config;
+    config.partition_type = scheme_partition(scheme);
+    config.pbc = 0;
+    config.debug = false;
+    ivec atom_list(wavy.get_ncen());
+    for (int i = 0; i < wavy.get_ncen(); i++) atom_list[i] = i;
+    GridManager grid_manager(config);
+    WFN temp = wavy;
+    temp.delete_unoccupied_MOs();
+    grid_manager.setup3DGridsForMolecule(temp, atom_list);
+    targets = grid_manager.calculatePartitionedMultipoles(temp, lmax);
+    const aux_density_table t(wavy_aux.get_atoms());
+    const int n_atoms = wavy.get_ncen(), n_mom = (lmax + 1) * (lmax + 1);
+    const GridData& g = grid_manager.getGridData();
+    const bool helper = grid_manager.getNeedsHelper();
+    const vec3& grid = helper ? g.helper_grids : g.atomic_grids;
+    const GridData::GridIndex wi = grid_manager.partitionWeightIndex();
+    vec2 rows(n_atoms * n_mom, vec(t.n_coef, 0.0));
+#pragma omp parallel for schedule(dynamic)
+    for (int a = 0; a < n_atoms; a++) {
+        const vec2& ag = grid[a];
+        const int np = helper ? g.helper_num_points_per_atom[a] : g.num_points_per_atom[a];
+        const double centre[3] = { wavy.get_atom_coordinate(a, 0), wavy.get_atom_coordinate(a, 1), wavy.get_atom_coordinate(a, 2) };
+        partition_rows_on_grid(t, np, ag[GridData::X].data(), ag[GridData::Y].data(), ag[GridData::Z].data(), ag[wi].data(), centre, lmax, rows, a * n_mom);
+    }
+    return rows;
+}
+
+void DensityFitting::add_partition_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux, const vec2& rows, const vec2& targets, const vec& atom_weights, const int lmax)
+{
+    const int n_atoms = wavy_aux.get_ncen(), n_old = (int)rho.size(), n_aux = (int)(eri2c.size() / rho.size());
+    const int n_mom = (lmax + 1) * (lmax + 1), n_rows = n_atoms * n_mom;
+    err_checkf((int)rows.size() == n_rows && (int)rows[0].size() == n_aux, "Partition restraint rows do not match the auxiliary basis", std::cout);
+    eri2c.resize((size_t)(n_old + n_rows) * n_aux, 0.0);
+    rho.resize(n_old + n_rows, 0.0);
+    for (int a = 0; a < n_atoms; a++) {
+        const double r_cov = constants::ang2bohr(constants::covalent_radii[wavy_aux.get_atom_charge(a)]);
+        for (int l = 0; l <= lmax; l++) {
+            const double w = atom_weights[a] * (l == 0 ? std::sqrt(constants::FOUR_PI) : std::pow(r_cov, -l));
+            for (int m = -l; m <= l; m++) {
+                const int k = a * n_mom + l * l + l + m;
+                double* r = eri2c.data() + (size_t)(n_old + k) * n_aux;
+                for (int i = 0; i < n_aux; i++) r[i] = rows[k][i] * w;
+                rho[n_old + k] = targets[a][l * l + l + m] * w;
+            }
+        }
+    }
+    std::cout << "Added partition restraints up to l=" << lmax << " for " << n_atoms << " atoms over " << n_aux << " auxiliary functions." << std::endl;
+}
+
+vec2 DensityFitting::grid_multipoles(const vec2& rows, const vec& coefficients, const int lmax)
+{
+    const int n_mom = (lmax + 1) * (lmax + 1), n_atoms = (int)rows.size() / n_mom;
+    vec2 moments(n_atoms, vec(n_mom, 0.0));
+    for (int a = 0; a < n_atoms; a++)
+        for (int k = 0; k < n_mom; k++) {
+            const vec& r = rows[a * n_mom + k];
+            double q = 0.0;
+            for (int i = 0; i < (int)r.size(); i++) q += r[i] * coefficients[i];
+            moments[a][k] = q;
+        }
+    return moments;
 }
 
 // Calculate expected atomic populations based on different partitioning schemes

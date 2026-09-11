@@ -223,6 +223,9 @@ std::string help_message =
  "                                    up to order N (implies -ri_fit).\n"
  "  -multipole_strength <x>            Weight of the restraint rows against the\n"
  "                                    density-fit metric, default 1.\n"
+ "  -multipole_partition               Restrain the partition-weighted moments of\n"
+ "                                    the whole fitted density instead of the\n"
+ "                                    moments of each atom's own functions.\n"
  "  -cpus <n>                          Maximum worker threads [all available].\n"
  "  -mem <MB>                          Memory budget for everything sliceable\n"
  "                                    [unset]. When given, the tsc block size\n"
@@ -3585,6 +3588,8 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         RI_FIT = true;
         partition_type = PartitionType::RI;
     }
+    else if (temp == "-multipole_partition")
+        multipole_partition = true;
     else if (temp == "-multipole_strength") {
         multipole_strength = std::stod(arguments[++i]);
         err_checkf(multipole_strength > 0.0, "-multipole_strength must be positive", std::cout);

@@ -3168,6 +3168,80 @@ namespace NoSpherA2UnitTests
         }
     }
 
+    // Same partition on both sides: the rows partition_rows_on_grid builds for the oxygen of an O-H pair, applied to
+    // arbitrary coefficients on both atoms, must give the Becke-weighted grid moments of the density calc_density_ML
+    // evaluates from those coefficients, and add_partition_restraint must place them with the sqrt(4pi) / r_cov^-l
+    // scaling of the older rows. The hydrogen's functions contribute to the oxygen's rows, which is the point.
+    TEST(RiMultipoleTests, PartitionRowsReproduceTheGridMomentsOfTheFittedDensity)
+    {
+        const int lmax = 3, n_moments = (lmax + 1) * (lmax + 1);
+        const WFN mol = oh_molecule(0.4);
+        std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+        const WFN aux = generate_aux_wfn(mol, basis);
+        const aux_density_table t(aux.get_atoms());
+        const int n_aux = t.n_coef;
+        const atom A = aux.get_atom(0);
+        double alpha_min[9] = { 0.0 }, alpha_max = 0.0;
+        int max_l = 0, prim = 0;
+        for (int shell = 0; shell < (int)A.get_shellcount_size(); shell++) {
+            const int l = A.get_basis_set_entry(prim).get_type();
+            for (int e = 0; e < (int)A.get_shellcount(shell); e++) {
+                const double a = A.get_basis_set_entry(prim + e).get_exponent();
+                alpha_max = std::max(alpha_max, a);
+                if (alpha_min[l] == 0.0 || a < alpha_min[l]) alpha_min[l] = a;
+            }
+            max_l = std::max(max_l, l);
+            prim += A.get_shellcount(shell);
+        }
+        const double xs[2] = { mol.get_atom_coordinate(0, 0), mol.get_atom_coordinate(1, 0) }, ys[2] = { mol.get_atom_coordinate(0, 1), mol.get_atom_coordinate(1, 1) }, zs[2] = { mol.get_atom_coordinate(0, 2), mol.get_atom_coordinate(1, 2) };
+        const int Zs[2] = { 8, 1 };
+        AtomGrid grid(1e-12, 350, 5000, 8, alpha_max, max_l, alpha_min, std::cout);
+        const int n_points = grid.get_num_grid_points();
+        vec gx(n_points), gy(n_points), gz(n_points), aw(n_points), bw(n_points), tw(n_points), chi(1, 0.0);
+        grid.get_grid(2, 0, xs, ys, zs, Zs, gx.data(), gy.data(), gz.data(), aw.data(), bw.data(), tw.data(), WFN(), chi);
+        vec coefs(n_aux);
+        for (int i = 0; i < n_aux; i++) coefs[i] = std::sin(1.0 + i);
+        vec2 Q(1, vec(n_moments, 0.0));
+        double n_becke = 0.0;
+        for (int p = 0; p < n_points; p++) {
+            const double f = calc_density_ML(gx[p], gy[p], gz[p], coefs, aux.get_atoms()) * bw[p];
+            double d[3] = { gx[p] - xs[0], gy[p] - ys[0], gz[p] - zs[0] };
+            const double r = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+            for (int i = 0; i < 3; i++) d[i] /= r;
+            double rl = 1.0;
+            for (int l = 0; l <= lmax; l++) {
+                for (int m = -l; m <= l; m++)
+                    Q[0][l * l + l + m] += f * rl * constants::spherical_harmonic(l, m, d);
+                rl *= r;
+            }
+            n_becke += bw[p];
+        }
+        EXPECT_GT(n_becke, 1.0);
+        vec2 rows(n_moments, vec(n_aux, 0.0));
+        const double centre[3] = { xs[0], ys[0], zs[0] };
+        DensityFitting::partition_rows_on_grid(t, n_points, gx.data(), gy.data(), gz.data(), bw.data(), centre, lmax, rows, 0);
+        int on_H = 0;
+        for (int i = t.coef_off[t.sh_start[1]]; i < n_aux; i++) on_H += std::abs(rows[0][i]) > 1e-6;
+        EXPECT_GT(on_H, 0);
+        vec eri2c(n_aux * n_aux, 0.0), rho(n_aux, 0.0);
+        WFN aux_O(e_origin::NOT_YET_DEFINED);
+        aux_O.push_back_atom("O", xs[0], ys[0], zs[0], 8);
+        DensityFitting::add_partition_restraint(eri2c, rho, aux_O, rows, Q, vec(1, 1.0), lmax);
+        ASSERT_EQ(eri2c.size(), (size_t)(n_aux + n_moments) * n_aux);
+        ASSERT_EQ(rho.size(), (size_t)(n_aux + n_moments));
+        const vec2 fitted = DensityFitting::grid_multipoles(rows, coefs, lmax);
+        const double r_cov = constants::ang2bohr(constants::covalent_radii[8]);
+        for (int row = 0; row < n_moments; row++) {
+            const int l = (int)std::floor(std::sqrt(row + 1e-9));
+            const double scale = row == 0 ? std::sqrt(4.0 * PI_VAL) : std::pow(r_cov, -l);
+            double lhs = 0.0;
+            for (int i = 0; i < n_aux; i++) lhs += eri2c[(n_aux + row) * n_aux + i] * coefs[i];
+            EXPECT_NEAR(lhs, scale * Q[0][row], 1e-8 * std::max(1.0, std::abs(scale * Q[0][row]))) << "row " << row;
+            EXPECT_NEAR(rho[n_aux + row], scale * Q[0][row], 1e-12) << "row " << row;
+            EXPECT_NEAR(fitted[0][row], Q[0][row], 1e-8 * std::max(1.0, std::abs(Q[0][row]))) << "row " << row;
+        }
+    }
+
     // The flattened aux basis must give the density calc_density_ML gives atom by atom, on the
     // host and on the device; the point set is sized past the kernel's minimum work so that the
     // GPU branch is the one being tested when a device is present

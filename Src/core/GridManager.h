@@ -77,7 +77,6 @@ private:
     std::vector<std::tuple<std::string, _time_point>> timing_points_;
     bool non_spherical_densities_calculated_ = false;
     bool needs_helper_grids_ = false;
-    GridData::GridIndex partitionWeightIndex() const;
 
     // Internal helper methods
     void setupPrototypeGrids(const WFN &wave, const ivec &atom_types, std::ostream& file = std::cout);
@@ -121,6 +120,7 @@ public:
     const GridData &getGridData() const { return grid_data_; }
 	GridData& getGridData() { return grid_data_; }  //Access to a mutable reference if deeper access is needed
 	const bool& getNeedsHelper() const { return needs_helper_grids_; }
+    GridData::GridIndex partitionWeightIndex() const;
     int getTotalGridPoints() const { return grid_data_.total_points; }
     int getNumPointsForAtom(const int &atom_index) const { return grid_data_.num_points_per_atom[atom_index]; }
 

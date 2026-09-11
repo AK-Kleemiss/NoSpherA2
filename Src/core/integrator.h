@@ -1,5 +1,6 @@
 #pragma once
 #include "convenience.h"
+struct aux_density_table;
 
 
 namespace DensityFitting
@@ -8,7 +9,8 @@ namespace DensityFitting
     enum class RESTRAINT_TYPE {
         NONE,
         SIMPLE,
-        SIMPLE_AND_TIK
+        SIMPLE_AND_TIK,
+        PARTITION
     };
 
     enum class METRIC_TYPE {
@@ -63,6 +65,15 @@ namespace DensityFitting
         const vec2& targets, const vec& atom_weights, const int lmax);
     // Moments of the fitted density, same layout as the targets, from the coefficients alone
     vec2 fitted_multipoles(const vec& coefficients, const WFN& wavy_aux, const int lmax);
+    // Same partition on both sides: rows[a*(lmax+1)^2 + l*l+l+m][p] = Int w_a chi_p |r-R_a|^l Y_lm(r-R_a) over every aux
+    // function p on the grid that also gives the targets, so the exact density satisfies the restraint and the l = 0
+    // rows are the partition populations. Unscaled; add_partition_restraint applies sqrt(4pi) (l = 0) or r_cov^-l
+    vec2 partition_multipole_rows(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME& scheme, const int lmax, vec2& targets);
+    // The rows of one atom from np grid points with the partition weights w, added into rows[row0 + l*l+l+m]
+    void partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0);
+    void add_partition_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux, const vec2& rows, const vec2& targets, const vec& atom_weights, const int lmax);
+    // Partition-weighted moments of the fitted density, rows applied to the coefficients, same layout as the targets
+    vec2 grid_multipoles(const vec2& rows, const vec& coefficients, const int lmax);
 
     // First-order electrostatics between two fitted densities and their nuclei, Hartree; needs only the
     // coefficients and the aux basis, so RI-fitted and SALTED-predicted coefficients enter alike.
