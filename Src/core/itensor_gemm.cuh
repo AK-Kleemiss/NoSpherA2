@@ -136,4 +136,23 @@ inline bool run(const int m, const int n, const int k,
 
 #endif
 
+//count matrices of one shape, strideA/B/C elements apart. cuBLAS takes the whole batch in
+//one call; the fallbacks have no batched form and take them one at a time.
+template <typename T>
+inline bool run_batched(const int m, const int n, const int k,
+	const T* A, const int lda, const long long strideA,
+	const T* B, const int ldb, const long long strideB,
+	T* C, const int ldc, const long long strideC, const int count, void* ws)
+{
+	if constexpr (std::is_same<T, float>::value)
+		if (tensor_mode() && cublas_dynamic_gemm_fast_16f_batched(true, false, m, n, k,
+			T(1), A, lda, strideA, B, ldb, strideB, T(0), C, ldc, strideC, count)) return true;
+	if (cublas_dynamic_gemm_batched(true, false, m, n, k,
+		T(1), A, lda, strideA, B, ldb, strideB, T(0), C, ldc, strideC, count)) return true;
+	for (int i = 0; i < count; i++)
+		if (!run<T>(m, n, k, A + i * strideA, lda, B + i * strideB, ldb, C + i * strideC, ldc, ws))
+			return false;
+	return true;
+}
+
 } //namespace itensor_gemm
