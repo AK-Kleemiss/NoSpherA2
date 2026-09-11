@@ -1028,30 +1028,22 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         }
         it == 0 ? file << "Starting MBIS iterations..." << std::endl : file << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
-        for (int i = 0; i < ncen; i++) {
-            const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
-            const int end = num_grid_points[i];
-            //Assuming 3 is the quadrature weight and 7 is the electron density 
-            b_weight = grid[i][5].data();
-            dens = grid[i][7].data();
-            //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-            gx = grid[i][0].data();
-            gy = grid[i][1].data();
-            gz = grid[i][2].data();
-            //per-thread partial sums as flat arrays, merged in thread order after the region
-            const int nthr = omp_get_max_threads();
-            vec2 si_part(nthr), pop_part(nthr);
-
+        //one parallel region per iteration: per-thread partial sums over all grids, merged in thread order after it
+        const int nthr = omp_get_max_threads();
+        vec2 si_part(nthr), pop_part(nthr);
 #pragma omp parallel
-            {
-                vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0);
-                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq, bw, _x, _y, _z;
-                int j, shell, nshell, *ECP_els_j;
-                double dx[3], *dist_j, *pop, *si;
-                vec si_local(ncen * 6, 0.0), pop_local(ncen * 6, 0.0);
-                std::pair<vec, vec> *coi;
-
-#pragma omp for schedule(dynamic, 1) nowait
+        {
+            vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0);
+            double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq, bw, _x, _y, _z;
+            int j, shell, nshell, *ECP_els_j;
+            double dx[3], *dist_j, *pop, *si;
+            vec si_local(ncen * 6, 0.0), pop_local(ncen * 6, 0.0);
+            std::pair<vec, vec> *coi;
+            for (int i = 0; i < ncen; i++) {
+                const int end = num_grid_points[i];
+                //5 is the becke weight, 7 the electron density, GridIndex X = 0, Y = 1, Z = 2
+                const double *b_weight = grid[i][5].data(), *dens = grid[i][7].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+#pragma omp for schedule(dynamic, 16) nowait
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(dists.begin(), dists.end(), 0.0);
@@ -1109,17 +1101,17 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                         }
                     }
                 }
-                si_part[omp_get_thread_num()].swap(si_local);
-                pop_part[omp_get_thread_num()].swap(pop_local);
             }
-            for (int t = 0; t < nthr; t++) {
-                if (si_part[t].empty()) continue;
-                for (int j = 0; j < ncen; j++)
-                    for (int shell = 0; shell < nshell_cache[j]; shell++) {
-                        sig_pop_vector[j].first[shell] += si_part[t][j * 6 + shell];
-                        sig_pop_vector[j].second[shell] += pop_part[t][j * 6 + shell];
-                    }
-            }
+            si_part[omp_get_thread_num()].swap(si_local);
+            pop_part[omp_get_thread_num()].swap(pop_local);
+        }
+        for (int t = 0; t < nthr; t++) {
+            if (si_part[t].empty()) continue;
+            for (int j = 0; j < ncen; j++)
+                for (int shell = 0; shell < nshell_cache[j]; shell++) {
+                    sig_pop_vector[j].first[shell] += si_part[t][j * 6 + shell];
+                    sig_pop_vector[j].second[shell] += pop_part[t][j * 6 + shell];
+                }
         }
         //back to the cycle main loop, we updated sig and pop based on information loss :)
 
@@ -1253,51 +1245,41 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         }
         it == 0 ? file << "Starting EMBIS iterations..." << std::endl : file << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
-        for (int i = 0; i < ncen; i++) {
-            const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
-            const int end = num_grid_points[i];
-            //Assuming 3 is the quadrature weight and 7 is the electron density 
-            b_weight = grid[i][5].data();
-            dens = corrected_dens[i].data();
-            //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-            gx = grid[i][0].data();
-            gy = grid[i][1].data();
-            gz = grid[i][2].data();
-            //per-thread partial sums, merged in thread order after the region: no critical
-            //section for 48 threads to queue at, and the merge order is fixed
-            const int nthr = omp_get_max_threads();
-            vec2 alpha_part(nthr), pop_part(nthr);
-
+        //one parallel region per iteration: per-thread partial sums over all grids, merged in thread order after it
+        const int nthr = omp_get_max_threads();
+        vec2 alpha_part(nthr), pop_part(nthr);
 #pragma omp parallel
-            {
-                vec rho0shell(ncen * 6, 0.0);
-                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
-                int j, shell, nshell, ind;
-                double *alpha, *d_local, *pop_p;
-                vec dx(ncen * 3);
-                vec alpha_local(ncen * 36, 0.0);
-                vec pop_local(ncen * 6, 0.0);
-                vec g_cache(6 * ncen, 0.0);
-                double d_cache[6] = { 0.0 };
-                std::pair<vec2, vec> *coi;
-
-                // Precompute determinants for all atoms and shells - they don't change per point
-                vec det_pop_cache(ncen * 6, 0.0);
-                for (int k = 0; k < ncen; k++) {
-                    nshell = nshell_cache[k];
-                    coi = &copy_of_input[k];
-                    for (shell = 0; shell < nshell; shell++) {
-                        alpha = coi->first[shell].data();
-                        det = sqrt(alpha[0] * alpha[3] * alpha[5] -
-                            alpha[0] * alpha[4] * alpha[4] -
-                            alpha[3] * alpha[2] * alpha[2] -
-                            alpha[5] * alpha[1] * alpha[1] +
-                            2 * alpha[1] * alpha[2] * alpha[4]);
-                        det_pop_cache[k * 6 + shell] = coi->second[shell] * constants::INV_EIGHT_PI * det;
-                    }
+        {
+            vec rho0shell(ncen * 6, 0.0);
+            double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
+            int j, shell, nshell, ind;
+            double *alpha, *d_local, *pop_p;
+            vec dx(ncen * 3);
+            vec alpha_local(ncen * 36, 0.0);
+            vec pop_local(ncen * 6, 0.0);
+            vec g_cache(6 * ncen, 0.0);
+            double d_cache[6] = { 0.0 };
+            std::pair<vec2, vec> *coi;
+            // Precompute determinants for all atoms and shells - they don't change per point
+            vec det_pop_cache(ncen * 6, 0.0);
+            for (int k = 0; k < ncen; k++) {
+                nshell = nshell_cache[k];
+                coi = &copy_of_input[k];
+                for (shell = 0; shell < nshell; shell++) {
+                    alpha = coi->first[shell].data();
+                    det = sqrt(alpha[0] * alpha[3] * alpha[5] -
+                        alpha[0] * alpha[4] * alpha[4] -
+                        alpha[3] * alpha[2] * alpha[2] -
+                        alpha[5] * alpha[1] * alpha[1] +
+                        2 * alpha[1] * alpha[2] * alpha[4]);
+                    det_pop_cache[k * 6 + shell] = coi->second[shell] * constants::INV_EIGHT_PI * det;
                 }
-
-#pragma omp for schedule(dynamic,4) nowait
+            }
+            for (int i = 0; i < ncen; i++) {
+                const int end = num_grid_points[i];
+                //5 is the becke weight, corrected_dens the ECP-corrected electron density, GridIndex X = 0, Y = 1, Z = 2
+                const double *b_weight = grid[i][5].data(), *dens = corrected_dens[i].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+#pragma omp for schedule(dynamic, 16) nowait
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
@@ -1387,25 +1369,25 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         }
                     }
                 }
-                alpha_part[omp_get_thread_num()].swap(alpha_local);
-                pop_part[omp_get_thread_num()].swap(pop_local);
             }
-            for (int t = 0; t < nthr; t++) {
-                if (alpha_part[t].empty()) continue;
-                const double *alpha_local = alpha_part[t].data(), *pop_local = pop_part[t].data();
-                for (int j = 0; j < ncen; j++) {
-                    const int nshell = nshell_cache[j];
-                    for (int shell = 0; shell < nshell; shell++) {
-                        const int alpha_offset = j * 36 + shell * 6;
-                        double *sig_alpha = sig_pop_vector[j].first[shell].data();
-                        sig_alpha[0] += alpha_local[alpha_offset + 0];
-                        sig_alpha[1] += alpha_local[alpha_offset + 1];
-                        sig_alpha[2] += alpha_local[alpha_offset + 2];
-                        sig_alpha[3] += alpha_local[alpha_offset + 3];
-                        sig_alpha[4] += alpha_local[alpha_offset + 4];
-                        sig_alpha[5] += alpha_local[alpha_offset + 5];
-                        sig_pop_vector[j].second[shell] += pop_local[j * 6 + shell];
-                    }
+            alpha_part[omp_get_thread_num()].swap(alpha_local);
+            pop_part[omp_get_thread_num()].swap(pop_local);
+        }
+        for (int t = 0; t < nthr; t++) {
+            if (alpha_part[t].empty()) continue;
+            const double *alpha_local = alpha_part[t].data(), *pop_local = pop_part[t].data();
+            for (int j = 0; j < ncen; j++) {
+                const int nshell = nshell_cache[j];
+                for (int shell = 0; shell < nshell; shell++) {
+                    const int alpha_offset = j * 36 + shell * 6;
+                    double *sig_alpha = sig_pop_vector[j].first[shell].data();
+                    sig_alpha[0] += alpha_local[alpha_offset + 0];
+                    sig_alpha[1] += alpha_local[alpha_offset + 1];
+                    sig_alpha[2] += alpha_local[alpha_offset + 2];
+                    sig_alpha[3] += alpha_local[alpha_offset + 3];
+                    sig_alpha[4] += alpha_local[alpha_offset + 4];
+                    sig_alpha[5] += alpha_local[alpha_offset + 5];
+                    sig_pop_vector[j].second[shell] += pop_local[j * 6 + shell];
                 }
             }
         }
