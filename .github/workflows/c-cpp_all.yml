@@ -441,7 +441,9 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          flawfinder --minlevel=3 --sarif Src > flawfinder-results.sarif
+          flawfinder --minlevel=3 --sarif Src > flawfinder-all.sarif
+          # the SARIF writer ignores --minlevel; rank is level / 5, so 0.6 is level 3
+          jq '.runs[0].results |= map(select(.rank >= 0.6))' flawfinder-all.sarif > flawfinder-results.sarif
 
       - name: Upload Flawfinder SARIF artifact
         if: always()
