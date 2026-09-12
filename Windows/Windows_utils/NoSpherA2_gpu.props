@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    GPU paths for the Visual Studio build, picked from what the machine has, the way
+    the CMake build does with NOSPHERA2_GPU_AUTO:
+      CUDA: $(CUDA_PATH) names a toolkit whose MSBuild integration
+            ($(VCTargetsPath)\BuildCustomizations\CUDA <ver>.props) is installed.
+      HIP:  otherwise $(HIP_PATH) names a ROCm/HIP SDK with bin\clang++.exe.
+    NOS_GPU=OFF in the environment builds for the CPU only. NOS_CUDA_ARCH overrides the
+    device architectures with a CodeGeneration string ('compute_86,sm_86;...', 'all' =
+    the portable list); without it the cards in the machine decide, with the portable
+    list as the fallback. CUTLASS_DIR (or a CMake tree under build\) adds the CUTLASS
+    I tensor GEMM. Only the project compiling Src\core sets NosGpuCompile=true and
+    builds the .cu files; the executables and the DLL pick up the link inputs.
+  -->
+  <PropertyGroup Condition="'$(Platform)' == 'x64' and '$(NOS_GPU)' != 'OFF'">
+    <NosCudaVersion>$([System.Text.RegularExpressions.Regex]::Match('$(CUDA_PATH)', 'v(\d+\.\d+)\\?$').Groups[1].Value)</NosCudaVersion>
+    <NosUseCuda Condition="'$(NosCudaVersion)' != '' and exists('$(VCTargetsPath)\BuildCustomizations\CUDA $(NosCudaVersion).props') and exists('$(CUDA_PATH)\bin\nvcc.exe')">true</NosUseCuda>
+    <NosCudaMajor Condition="'$(NosUseCuda)' == 'true'">$(NosCudaVersion.Split('.')[0])</NosCudaMajor>
+    <NosUseHip Condition="'$(NosUseCuda)' != 'true' and '$(HIP_PATH)' != '' and exists('$(HIP_PATH)\bin\clang++.exe')">true</NosUseHip>
+    <NosHipMajor Condition="'$(NosUseHip)' == 'true'">$([System.Text.RegularExpressions.Regex]::Match('$(HIP_PATH)', '(\d+)\.\d+').Groups[1].Value)</NosHipMajor>
+    <NosHipMajor Condition="'$(NosUseHip)' == 'true' and '$(NosHipMajor)' == ''">6</NosHipMajor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NosUseCuda)' == 'true'">
+    <NosCutlassDir Condition="'$(CUTLASS_DIR)' != '' and exists('$(CUTLASS_DIR)\include\cutlass\cutlass.h')">$(CUTLASS_DIR)</NosCutlassDir>
+    <NosCutlassDir Condition="'$(NosCutlassDir)' == '' and exists('$(NosMainFolder)build\release-windows\_deps\cutlass-src\include\cutlass\cutlass.h')">$(NosMainFolder)build\release-windows\_deps\cutlass-src</NosCutlassDir>
+    <NosCutlassDir Condition="'$(NosCutlassDir)' == '' and exists('$(NosMainFolder)build\deps-release\_deps\cutlass-src\include\cutlass\cutlass.h')">$(NosMainFolder)build\deps-release\_deps\cutlass-src</NosCutlassDir>
+    <NosCutlassDir Condition="'$(NosCutlassDir)' == '' and exists('$(NosMainFolder)build\debug-windows\_deps\cutlass-src\include\cutlass\cutlass.h')">$(NosMainFolder)build\debug-windows\_deps\cutlass-src</NosCutlassDir>
+    <NosCudaPortable Condition="'$(NosCudaMajor)' &gt;= '13'">compute_75,sm_75;compute_80,sm_80;compute_86,sm_86;compute_89,sm_89;compute_90,sm_90;compute_100,sm_100;compute_120,sm_120</NosCudaPortable>
+    <NosCudaPortable Condition="'$(NosCudaPortable)' == ''">compute_70,sm_70;compute_75,sm_75;compute_80,sm_80;compute_86,sm_86;compute_89,sm_89;compute_90,sm_90</NosCudaPortable>
+    <NosCudaOptions>-std=c++17 -allow-unsupported-compiler</NosCudaOptions>
+    <NosCudaOptions Condition="'$(NosCutlassDir)' != ''">$(NosCudaOptions) --expt-relaxed-constexpr -diag-suppress=20013,20015 -Xcompiler=/Zc:preprocessor</NosCudaOptions>
+    <NosGpuDefines>NOSPHERA2_USE_GPU;NOSPHERA2_USE_CUDA;NOSPHERA2_CUDART_MAJOR=$(NosCudaMajor)</NosGpuDefines>
+    <NosGpuDefines Condition="'$(NosCutlassDir)' != ''">$(NosGpuDefines);NOSPHERA2_HAVE_CUTLASS</NosGpuDefines>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(NosUseHip)' == 'true'">
+    <NosGpuDefines>NOSPHERA2_USE_GPU;NOSPHERA2_USE_HIP</NosGpuDefines>
+    <NosHipFlags Condition="'$(Configuration)' == 'Debug'">-O0 -g -fms-runtime-lib=dll_dbg</NosHipFlags>
+    <NosHipFlags Condition="'$(Configuration)' != 'Debug'">-O3 -fms-runtime-lib=dll</NosHipFlags>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA $(NosCudaVersion).props" Condition="'$(NosUseCuda)' == 'true' and '$(NosGpuCompile)' == 'true'" />
+  <ItemDefinitionGroup Condition="'$(NosGpuDefines)' != '' and '$(NosGpuCompile)' == 'true'">
+    <ClCompile>
+      <PreprocessorDefinitions>$(NosGpuDefines);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(NosUseCuda)' == 'true' and '$(NosGpuCompile)' == 'true'">
+    <CudaCompile>
+      <CodeGeneration>$(NosCudaPortable)</CodeGeneration>
+      <CudaRuntime>Static</CudaRuntime>
+      <Include Condition="'$(NosCutlassDir)' != ''">$(NosCutlassDir)\include;%(Include)</Include>
+      <Defines>$(NosGpuDefines);%(Defines)</Defines>
+      <AdditionalOptions>$(NosCudaOptions) %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(NosUseCuda)' == 'true'">
+    <Link>
+      <AdditionalLibraryDirectories>$(CUDA_PATH)\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cudart_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(NosUseHip)' == 'true' and '$(NosGpuCompile)' == 'true'">
+    <CustomBuild>
+      <Command>"$(HIP_PATH)\bin\clang++.exe" -x hip --offload-arch=gfx90a --offload-arch=gfx942 --offload-arch=gfx1100 -std=c++17 $(NosHipFlags) -DNOSPHERA2_USE_GPU -DNOSPHERA2_USE_HIP -c "%(FullPath)" -o "$(IntDir)%(Filename).obj"</Command>
+      <Outputs>$(IntDir)%(Filename).obj</Outputs>
+      <Message>hip %(Filename)%(Extension)</Message>
+      <LinkObjects>true</LinkObjects>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(NosUseHip)' == 'true'">
+    <Link>
+      <AdditionalLibraryDirectories>$(HIP_PATH)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>amdhip64.lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <DelayLoadDLLs>amdhip64_$(NosHipMajor).dll;%(DelayLoadDLLs)</DelayLoadDLLs>
+    </Link>
+  </ItemDefinitionGroup>
+  <Target Name="NosSelectCudaArch" BeforeTargets="AddCudaCompileMetadata" Condition="'$(NosUseCuda)' == 'true' and '$(NosGpuCompile)' == 'true'">
+    <PropertyGroup>
+      <NosCudaArch Condition="'$(NOS_CUDA_ARCH)' != '' and '$(NOS_CUDA_ARCH)' != 'all'">$(NOS_CUDA_ARCH)</NosCudaArch>
+    </PropertyGroup>
+    <Exec Condition="'$(NOS_CUDA_ARCH)' == ''" Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)detect_cuda_arch.ps1&quot;" ConsoleToMSBuild="true" StandardOutputImportance="low" EchoOff="true" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="NosCudaArch" />
+    </Exec>
+    <PropertyGroup>
+      <NosCudaArch Condition="'$(NosCudaArch)' == ''">$(NosCudaPortable)</NosCudaArch>
+    </PropertyGroup>
+    <ItemGroup>
+      <CudaCompile>
+        <CodeGeneration>$(NosCudaArch)</CodeGeneration>
+      </CudaCompile>
+    </ItemGroup>
+    <Message Importance="high" Text="NoSpherA2 CUDA $(NosCudaVersion): $(NosCudaArch), CUTLASS $(NosCutlassDir)" Condition="'$(NosCutlassDir)' != ''" />
+    <Message Importance="high" Text="NoSpherA2 CUDA $(NosCudaVersion): $(NosCudaArch), no CUTLASS (built-in I tensor GEMM)" Condition="'$(NosCutlassDir)' == ''" />
+  </Target>
+  <Target Name="NosGpuReport" BeforeTargets="ClCompile" Condition="'$(NosGpuCompile)' == 'true' and '$(NosUseCuda)' != 'true'">
+    <Message Importance="high" Text="NoSpherA2 GPU: HIP $(HIP_PATH)" Condition="'$(NosUseHip)' == 'true'" />
+    <Message Importance="high" Text="NoSpherA2 GPU: none (CPU build)" Condition="'$(NosUseHip)' != 'true'" />
+  </Target>
+</Project>

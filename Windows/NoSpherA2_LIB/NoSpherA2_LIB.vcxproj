@@ -20,6 +20,7 @@
     <ProjectGuid>{498a123c-c78a-4f9b-8b02-2b473c8cabe5}</ProjectGuid>
     <RootNamespace>NoSpherA2LIB</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <NosGpuCompile>true</NosGpuCompile>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -53,6 +54,7 @@
     <Import Project="..\Windows_utils\NoSpherA2_universal.props" />
     <Import Project="..\Windows_utils\NoSpherA2_moveLibs.props" />
     <Import Project="..\Windows_utils\NoSpherA2_detect_AVX.props" />
+    <Import Project="..\Windows_utils\NoSpherA2_gpu.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -83,6 +85,7 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA $(NosCudaVersion).targets" Condition="'$(NosUseCuda)' == 'true'" />
   </ImportGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Src\core\AtomGrid.h" />
@@ -106,6 +109,7 @@
     <ClInclude Include="..\..\Src\core\ECPs_corrections.h" />
     <ClInclude Include="..\..\Src\core\fchk.h" />
     <ClInclude Include="..\..\Src\core\geometry_aid.h" />
+    <ClInclude Include="..\..\Src\core\gemm_gpu.cuh" />
     <ClInclude Include="..\..\Src\core\gpu_backend.h" />
     <ClInclude Include="..\..\Src\core\grid_gpu.h" />
     <ClInclude Include="..\..\Src\core\GridManager.h" />
@@ -113,6 +117,7 @@
     <ClInclude Include="..\..\Src\core\integration_params.h" />
     <ClInclude Include="..\..\Src\core\integrator.h" />
     <ClInclude Include="..\..\Src\core\isosurface.h" />
+    <ClInclude Include="..\..\Src\core\itensor_gemm.cuh" />
     <ClInclude Include="..\..\Src\core\itensor_gpu.h" />
     <ClInclude Include="..\..\Src\core\libCintKernels.h" />
     <ClInclude Include="..\..\Src\core\libCintMain.h" />
@@ -189,5 +194,21 @@
     <ClCompile Include="..\..\Src\core\wfn_class.cpp" />
     <ClCompile Include="..\..\Src\core\XCW.cpp" />
     <ClCompile Include="..\..\Src\core\xcw_halting.cpp" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(NosUseCuda)' == 'true'">
+    <CudaCompile Include="..\..\Src\core\aux_density_gpu.cu" />
+    <CudaCompile Include="..\..\Src\core\blas_gpu.cu" />
+    <CudaCompile Include="..\..\Src\core\grid_gpu.cu" />
+    <CudaCompile Include="..\..\Src\core\itensor_gpu.cu" />
+    <CudaCompile Include="..\..\Src\core\salted_gpu.cu" />
+    <CudaCompile Include="..\..\Src\core\sf_gpu.cu" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(NosUseHip)' == 'true'">
+    <CustomBuild Include="..\..\Src\core\aux_density_gpu.cu" />
+    <CustomBuild Include="..\..\Src\core\blas_gpu.cu" />
+    <CustomBuild Include="..\..\Src\core\grid_gpu.cu" />
+    <CustomBuild Include="..\..\Src\core\itensor_gpu.cu" />
+    <CustomBuild Include="..\..\Src\core\salted_gpu.cu" />
+    <CustomBuild Include="..\..\Src\core\sf_gpu.cu" />
   </ItemGroup>
 </Project>
