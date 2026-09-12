@@ -1575,6 +1575,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	const bool morton_applied = (std::getenv("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr)
 		&& ao_block_threshold >= 1e-20;
 	if (morton_applied) {
+#pragma omp parallel for schedule(dynamic)
 		for (int g = 0; g < n_atom_grids; g++) {
 			const int npts = points[g];
 			if (npts < 2) continue;
@@ -1716,6 +1717,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	i_compact_ = i_pair_mu_.size();
 	ivec2 grid_active_aos(n_atom_grids);
 	vec2 grid_ao_values(n_atom_grids);
+#pragma omp parallel for schedule(dynamic)
 	for (int g = 0; g < n_atom_grids; g++) {
 		ivec& active_aos = grid_active_aos[g];
 		vec& values = grid_ao_values[g];
@@ -1848,6 +1850,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//ao_block_threshold is defined above, with the reordering it enables. What counts as
 	//nothing is the run's -acc setting, not a number invented here: cutoff() is the same
 	//ladder the scattering-factor code screens on, 1e-10 up to -acc 2 and 1e-14 at 3.
+#pragma omp parallel for schedule(dynamic) reduction(+:ao_slots_carrying, ao_slots_kept)
 	for (int g = 0; g < n_atom_grids; g++) {
 		const ivec& active_aos = grid_active_aos[g];
 		const vec& full_ao_values = grid_ao_values[g];
@@ -1958,9 +1961,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		//reads as a thousandth of the truth.
 		const double runs = static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
 		if (work_done > 0.0)
-			std::cout << std::fixed << std::setprecision(1)
-				<< "I tensor work after all screening: " << (work_done * runs / 1e15)
-				<< " of " << (work_unscreened * runs / 1e15) << " Pflop-equivalents ("
+			std::cout << std::fixed << std::setprecision(2)
+				<< "I tensor work after all screening: " << (work_done * runs / 1e12)
+				<< " of " << (work_unscreened * runs / 1e12) << " Tflop-equivalents ("
 				<< std::setprecision(2) << 100.0 * work_done / work_unscreened << "%, "
 				<< (work_unscreened / work_done) << "x less than unscreened)\n";
 	}
