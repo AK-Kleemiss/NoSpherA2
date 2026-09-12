@@ -39,20 +39,3 @@ bool cublas_dynamic_gemm(bool transA, bool transB, int m, int n, int k,
 bool cublas_dynamic_gemm_fast_16f(bool transA, bool transB, int m, int n, int k,
 	float alpha, const float* A, int lda, const float* B, int ldb,
 	float beta, float* C, int ldc);
-
-//Strided batches of one shape, the I tensor's blocks padded to a common size: matrix i of
-//the batch starts strideA, strideB, strideC elements after matrix i-1.
-bool cublas_dynamic_gemm_batched(bool transA, bool transB, int m, int n, int k,
-	float alpha, const float* A, int lda, long long strideA,
-	const float* B, int ldb, long long strideB,
-	float beta, float* C, int ldc, long long strideC, int count);
-
-bool cublas_dynamic_gemm_batched(bool transA, bool transB, int m, int n, int k,
-	double alpha, const double* A, int lda, long long strideA,
-	const double* B, int ldb, long long strideB,
-	double beta, double* C, int ldc, long long strideC, int count);
-
-bool cublas_dynamic_gemm_fast_16f_batched(bool transA, bool transB, int m, int n, int k,
-	float alpha, const float* A, int lda, long long strideA,
-	const float* B, int ldb, long long strideB,
-	float beta, float* C, int ldc, long long strideC, int count);

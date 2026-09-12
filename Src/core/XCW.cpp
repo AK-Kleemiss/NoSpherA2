@@ -2057,7 +2057,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		//with real double-precision units and expensive on one without, which is why it is
 		//asked for rather than detected.
 		const sf_precision iprec = opt->gpu_fp64 ? sf_precision::FP64 : sf_precision::FP32;
+		const auto init_start = std::chrono::high_resolution_clock::now();
 		itensor_on_gpu = itensor_gpu_init(L, iprec, opt->gpu_itensor_tensor);
+		if (itensor_on_gpu && throughput::enabled())
+			std::fprintf(stderr, "I tensor GPU: %.3f s upload and plan\n",
+				std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - init_start).count());
 		//What the device path actually issues, the blocks padded to their batch shapes,
 		//real and imaginary halves together. Counted the way the path runs, or the GFLOP/s
 		//row is fiction.
@@ -2111,59 +2115,68 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	if (itensor_on_gpu) gpu_thread = std::thread([&]() {
 		const auto gpu_start = std::chrono::high_resolution_clock::now();
+		//The device takes reflections in batches; the CPU threads keep taking them one at
+		//a time from the same counter
+		const int gpu_batch = itensor_gpu_batch(static_cast<int>(num_syms));
 		cvec blk_gpu;
-		if (i_streamed_ || i_float_) blk_gpu.assign(i_compact_, cdouble{});
-		vec kxs(num_syms), kys(num_syms), kzs(num_syms);
-		cvec facs(static_cast<size_t>(num_syms) * n_atom_grids);
+		if (i_streamed_ || i_float_) blk_gpu.assign(static_cast<size_t>(gpu_batch) * i_compact_, cdouble{});
+		vec kxs(static_cast<size_t>(gpu_batch) * num_syms), kys(kxs.size()), kzs(kxs.size());
+		cvec facs(kxs.size() * n_atom_grids);
 		int done = 0;
-		auto collect_gpu = [&](const int rr, const int slot) {
+		auto collect_gpu = [&](const int rr0, const int n, const int slot) {
 			if (i_streamed_ || i_float_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
 			cdouble* const I_rr = (i_streamed_ || i_float_) ? blk_gpu.data()
-									  : I.data() + static_cast<size_t>(rr) * i_compact_;
-			if (!itensor_gpu_collect(slot, I_rr))
+									  : I.data() + static_cast<size_t>(rr0) * i_compact_;
+			if (!itensor_gpu_collect(slot, I_rr, static_cast<long long>(i_compact_)))
 				err_checkf(false, "I tensor GPU read-back failed", std::cout);
-			if (i_streamed_) {
-				std::lock_guard<std::mutex> lock(i_write_mutex);
-				i_file_.write_block(rr, blk_gpu.data());
+			for (int r = 0; r < n && (i_streamed_ || i_float_); r++) {
+				const cdouble* const row = blk_gpu.data() + static_cast<size_t>(r) * i_compact_;
+				if (i_streamed_) {
+					std::lock_guard<std::mutex> lock(i_write_mutex);
+					i_file_.write_block(rr0 + r, row);
+				}
+				else if (i_float_) {
+					std::complex<float>* const dst = I32.data() + static_cast<size_t>(rr0 + r) * i_compact_;
+					for (size_t i = 0; i < i_compact_; i++)
+						dst[i] = std::complex<float>(static_cast<float>(row[i].real()),
+													 static_cast<float>(row[i].imag()));
+				}
 			}
-			else if (i_float_) {
-				std::complex<float>* const dst = I32.data() + static_cast<size_t>(rr) * i_compact_;
-				for (size_t i = 0; i < i_compact_; i++)
-					dst[i] = std::complex<float>(static_cast<float>(blk_gpu[i].real()),
-												 static_cast<float>(blk_gpu[i].imag()));
-			}
-			done++;
+			done += n;
 			gpu_ns_per_refl = std::chrono::duration_cast<std::chrono::nanoseconds>(
 				std::chrono::high_resolution_clock::now() - gpu_start).count() / done;
-			if (!(opt->no_date) && pb) pb->update();
+			if (!(opt->no_date) && pb) for (int r = 0; r < n; r++) pb->update();
 		};
-		//Two result slots: a reflection is collected after the next one has been
-		//submitted, so the read-back overlaps that calculation
-		int prev = -1, slot = 0;
+		//Two result slots: a batch is collected after the next one has been submitted, so
+		//the read-back overlaps that calculation
+		int prev = -1, prev_n = 0, slot = 0;
 		for (;;) {
-			const int rr = next_refl.fetch_add(1);
-			if (rr >= cryst.nr_small) break;
-			for (int sy = 0; sy < static_cast<int>(num_syms); sy++) {
-				kxs[sy] = k_pt[0][asym_lookup[rr][sy]];
-				kys[sy] = k_pt[1][asym_lookup[rr][sy]];
-				kzs[sy] = k_pt[2][asym_lookup[rr][sy]];
-				for (int gg = 0; gg < n_atom_grids; gg++)
-					facs[static_cast<size_t>(sy) * n_atom_grids + gg] =
-					asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
-					* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
-			}
-			if (!itensor_gpu_submit(slot, static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data()))
+			const int rr0 = next_refl.fetch_add(gpu_batch);
+			if (rr0 >= cryst.nr_small) break;
+			const int n = std::min(gpu_batch, cryst.nr_small - rr0);
+			for (int r = 0; r < n; r++)
+				for (int sy = 0; sy < static_cast<int>(num_syms); sy++) {
+					const int rr = rr0 + r, c = r * static_cast<int>(num_syms) + sy;
+					kxs[c] = k_pt[0][asym_lookup[rr][sy]];
+					kys[c] = k_pt[1][asym_lookup[rr][sy]];
+					kzs[c] = k_pt[2][asym_lookup[rr][sy]];
+					for (int gg = 0; gg < n_atom_grids; gg++)
+						facs[static_cast<size_t>(c) * n_atom_grids + gg] =
+						asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
+						* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
+				}
+			if (!itensor_gpu_submit(slot, n, static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data()))
 				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
-			if (prev >= 0) collect_gpu(prev, slot ^ 1);
-			prev = rr;
+			if (prev >= 0) collect_gpu(prev, prev_n, slot ^ 1);
+			prev = rr0; prev_n = n;
 			slot ^= 1;
 		}
-		if (prev >= 0) collect_gpu(prev, slot ^ 1);
-		itensor_gpu_free();
+		if (prev >= 0) collect_gpu(prev, prev_n, slot ^ 1);
 		if (throughput::enabled())
 			std::fprintf(stderr, "I tensor GPU: %.3f s wall time, %d of %d reflections\n",
 				std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - gpu_start).count(),
 				done, cryst.nr_small);
+		itensor_gpu_free();
 		//No bookkeeping here: the loop above runs for both paths and eval_I multiplies the
 		//total by nr_small on the way out, so anything added here counts twice.
 	});

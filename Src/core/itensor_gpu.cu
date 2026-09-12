@@ -3,13 +3,11 @@
 #include "itensor_gemm.cuh"
 #include "throughput.h"
 #include <cstdio>
-#include <iostream>
+#include <cstdlib>
 #include <vector>
 #include <algorithm>
-#include <numeric>
 #include <climits>
 
-#define SF_TWO_PI 6.283185307179586476925286766559
 #define SF_INV_TWO_PI 0.15915494309189533576888376337251
 
 #define GPU_TRY(call) do { const gpuError_t e_ = (call); if (e_ != gpuSuccess) { \
@@ -21,49 +19,63 @@ namespace {
 //One set of device buffers per scalar type. Only one is ever live, and which one is a
 //run-time choice, so both instantiations exist and g_fp64 says which to talk to.
 //
-//The blocks are not visited one at a time. A block's GEMM is a hundred by two hundred by a
-//thousand, far too small to occupy a device on its own, and a reflection has a few hundred
-//of them: issued singly they cost more in launches than in arithmetic. So the blocks are
-//sorted into groups of like n_active, every block in a group padded with zeros to the
-//group's row count and to the largest point count, and one strided-batched GEMM covers a
-//group. The zero padding contributes nothing to the sums, only to the flop count, which
-//is why the groups are as narrow as the batch call allows.
+//The contraction is arranged with the reflections as the wide dimension. For a block, the
+//products of two of its AOs at every grid point form a table with a row per stored pair
+//and a column per point that does not depend on the reflection, and a reflection is one
+//column of weighted phases over the same points. So a batch of reflections is one GEMM per
+//block, the block's table against the batch's phase columns: a shape wide enough to occupy
+//the device, with the point count as the depth, and no padding beyond a few points. Only
+//the pairs the caller stores are tabulated, each once, the symmetric half being enough.
+//
+//The tables can outgrow the device, so the rows of a block are cut into pieces, the pieces
+//gathered into chunks that fit, and a chunk's tables rebuilt from the AO values for every
+//batch. When everything fits in one chunk the tables are built once.
 template <typename T>
 struct Dev {
-	bool ready = false;
-	int nmo = 0, packed = 0, n_grids = 0, n_blocks = 0, np_max = 0, na_max = 0, n_groups = 0;
-	int fac_cap = 0;
-	long long n_points = 0;
+	bool ready = false, table_ready = false;
+	int nmo = 0, packed = 0, n_grids = 0, n_blocks = 0, n_pieces = 0, n_chunks = 0;
+	int np8_total = 0, np8_max = 0, ncol_cap = 0, batch_max = 0;
+	int n_refl[2] = { 0, 0 };
+	long long n_entries = 0;
 	double issued_flops = 0.0;
-	//Uploaded once: AO values padded to na_pad x np_max per block, in group order
-	T* ao = nullptr;
-	//Per block (in group order): owning grid, first point, points, n_active, padded rows,
-	//offsets into ao (the weighted copy sits at twice that) and into the GEMM results
-	int *q_grid = nullptr, *q_base = nullptr, *q_np = nullptr, *q_napad = nullptr;
-	long long *q_ao = nullptr, *q_c = nullptr;
-	//Per stored pair, the GEMM result elements that feed it, in block order: a CSR whose
-	//cursor is advanced as the blocks are consumed in chunks
-	int *acc_ptr = nullptr, *acc_q = nullptr, *acc_pos = nullptr, *acc_cur = nullptr;
+	//Points in block order, each block padded to a multiple of eight: the coordinates and
+	//weights, and the AO values row-major n_active x np8 per block. The padding points
+	//carry zero weight and zero AOs, so nothing reads past a block's end.
 	double *d1 = nullptr, *d2 = nullptr, *d3 = nullptr, *w = nullptr;
-	//Per reflection scratch
-	T *phase_re = nullptr, *phase_im = nullptr;
-	//The real and imaginary weighted copies of a block sit back to back as one column-major
-	//np_max x 2na_pad matrix, so one GEMM of width 2na_pad produces both results.
-	T* wri = nullptr;
-	T* cri = nullptr;
-	long long w_cap = 0, c_cap = 0;
-	void* gemm_ws = nullptr;   //split-k partials, whichever GEMM is compiled in
+	T* ao = nullptr;
+	//Per block: first padded point, padded points, first row of ao
+	int *q_pp = nullptr, *q_np8 = nullptr;
+	long long* q_ao = nullptr;
+	//Per table row, in block order: the two AO rows, the owning grid and the piece
+	int *ent_i = nullptr, *ent_j = nullptr, *ent_grid = nullptr, *ent_piece = nullptr;
+	//Per piece: block, first row, first table element within its chunk
+	int *pc_blk = nullptr, *pc_e0 = nullptr;
+	long long* pc_tab = nullptr;
+	//Per stored pair the rows that feed it, in row order, and where each chunk's part of
+	//that list begins: acc_ptr[c * packed + t] .. acc_ptr[(c + 1) * packed + t]
+	int *acc_ptr = nullptr, *acc_e = nullptr;
+	//Per batch: phases column-major np8_total x ncol, the tables of one chunk, the GEMM
+	//results column-major ncol x rows
+	T *phase = nullptr, *tab = nullptr, *cres = nullptr;
+	long long tab_cap = 0, rows_cap = 0;
+	void* gemm_ws = nullptr;
+	//Two slots so a batch is read back while the next one runs
+	double* kvec[2] = { nullptr, nullptr };
 	double* fac[2] = { nullptr, nullptr };
-	double* host_fac[2] = { nullptr, nullptr };
+	double* host_kf[2] = { nullptr, nullptr };
 	double* I_re[2] = { nullptr, nullptr };
 	double* I_im[2] = { nullptr, nullptr };
 	double* host_re[2] = { nullptr, nullptr };
 	double* host_im[2] = { nullptr, nullptr };
 	gpuEvent_t done[2] = {};
 	gpuStream_t copy_stream = nullptr;
-	//Host copies of the layout, so the chunking stays on the host
-	std::vector<int> grp_first, grp_count, grp_na;
-	std::vector<long long> h_q_ao, h_q_c;
+	//The host side of the plan
+	struct Piece { int blk, e0, rows; long long tab; };
+	struct Chunk { int p0, p1, e0, e1; long long tab0; };
+	std::vector<Piece> pieces;
+	std::vector<Chunk> chunks;
+	std::vector<long long> h_pp;
+	std::vector<int> h_np8;
 };
 
 template <typename T> Dev<T> g;
@@ -88,90 +100,96 @@ __device__ inline void phase_sincos<double>(const double frac, double* s, double
 	sincospi(2.0 * frac, s, c);
 }
 
-//The weight is folded in here so the GEMM operand is exactly what the CPU path multiplies.
+//One column pair per reflection and symmetry operation, the weight folded in so the GEMM
+//operand is exactly what the CPU path multiplies. A thread holds one point and walks a
+//run of columns, so the coordinates are read once a run and not once a column, and the
+//runs are short enough that the double-precision latency has other threads to hide
+//behind. Columns past the batch are zeroed so the padding to a multiple of eight holds
+//nothing.
+constexpr int phase_run = 32;
+
 template <typename T>
-__global__ void phase_kernel(const long long n, const double kx, const double ky, const double kz,
+__global__ void phase_kernel(const int np8_total, const int ncomb, const int ncol8, const double* __restrict__ kvec,
 	const double* __restrict__ d1, const double* __restrict__ d2, const double* __restrict__ d3,
-	const double* __restrict__ w, T* __restrict__ pre, T* __restrict__ pim)
+	const double* __restrict__ w, T* __restrict__ phase)
 {
-	const long long p = (long long)blockIdx.x * blockDim.x + threadIdx.x;
-	if (p >= n) return;
-	//kx..kz arrive already divided by 2pi, so t is in turns and sincospi wants 2*frac
-	const double t = kx * d1[p] + ky * d2[p] + kz * d3[p];
-	const double frac = t - rint(t);
-	T s, c;
-	phase_sincos<T>(frac, &s, &c);
-	const double wp = w[p];
-	pre[p] = (T)(wp * (double)c);
-	pim[p] = (T)(wp * (double)s);
-}
-
-//Phase-weighted copies of the blocks q0.. of this chunk: blockIdx.z is the block, blockIdx.y
-//the AO row. The padding rows hold zeros in ao and so write zeros here; the padding points
-//are given a zero phase so nothing is read past a grid's end.
-template <typename T>
-__global__ void weight_kernel(const int q0, const int np_max, const long long w_base,
-	const int* __restrict__ q_napad, const int* __restrict__ q_np, const int* __restrict__ q_base,
-	const long long* __restrict__ q_ao, const T* __restrict__ ao,
-	const T* __restrict__ pre, const T* __restrict__ pim, T* __restrict__ wri)
-{
-	const int q = q0 + blockIdx.z;
-	const int row = blockIdx.y;
-	const int napad = q_napad[q];
-	if (row >= napad) return;
 	const int p = blockIdx.x * blockDim.x + threadIdx.x;
-	if (p >= np_max) return;
-	const long long a_off = q_ao[q];
-	const T a = ao[a_off + (long long)row * np_max + p];
-	T re = T(0), im = T(0);
-	if (p < q_np[q]) {
-		const int pp = q_base[q] + p;
-		re = pre[pp];
-		im = pim[pp];
+	if (p >= np8_total) return;
+	const double x = d1[p], y = d2[p], z = d3[p], wp = w[p];
+	const int c0 = blockIdx.y * phase_run, c1 = min(c0 + phase_run, ncol8 / 2);
+	for (int c = c0; c < c1; c++) {
+		T re = T(0), im = T(0);
+		if (c < ncomb) {
+			//kx..kz arrive already divided by 2pi, so t is in turns and sincospi wants 2*frac
+			const double t = kvec[3 * c] * x + kvec[3 * c + 1] * y + kvec[3 * c + 2] * z;
+			const double frac = t - rint(t);
+			T s, co;
+			phase_sincos<T>(frac, &s, &co);
+			re = (T)(wp * (double)co);
+			im = (T)(wp * (double)s);
+		}
+		phase[(long long)(2 * c) * np8_total + p] = re;
+		phase[(long long)(2 * c + 1) * np8_total + p] = im;
 	}
-	T* w = wri + 2 * a_off - w_base;
-	w[(long long)row * np_max + p] = a * re;
-	w[(long long)(napad + row) * np_max + p] = a * im;
 }
 
-//One thread per stored pair walks its entries for the blocks of this chunk, in block order,
-//and adds their contribution. Fixed order and no atomics, so the result does not depend on
-//how the device scheduled the blocks.
+//The tables of the rows e0.. of a chunk: blockIdx.y strides over the rows, the threads
+//over a block's padded points
 template <typename T>
-__global__ void gather_kernel(const int packed, const int q_end, const long long c_base,
-	const int* __restrict__ acc_ptr, int* __restrict__ acc_cur,
-	const int* __restrict__ acc_q, const int* __restrict__ acc_pos,
-	const long long* __restrict__ q_c, const int* __restrict__ q_napad, const int* __restrict__ q_grid,
-	const T* __restrict__ cri, const double* __restrict__ fre, const double* __restrict__ fim,
+__global__ void table_kernel(const int e0, const int n_rows, const long long tab0,
+	const int* __restrict__ ent_i, const int* __restrict__ ent_j, const int* __restrict__ ent_piece,
+	const int* __restrict__ pc_blk, const int* __restrict__ pc_e0, const long long* __restrict__ pc_tab,
+	const int* __restrict__ q_np8, const long long* __restrict__ q_ao,
+	const T* __restrict__ ao, T* __restrict__ tab)
+{
+	const int p = blockIdx.x * blockDim.x + threadIdx.x;
+	for (int r = blockIdx.y; r < n_rows; r += gridDim.y) {
+		const int e = e0 + r;
+		const int pc = ent_piece[e];
+		const int b = pc_blk[pc];
+		const int np8 = q_np8[b];
+		if (p >= np8) continue;
+		const T* a = ao + q_ao[b];
+		tab[pc_tab[pc] - tab0 + (long long)(e - pc_e0[pc]) * np8 + p] =
+			a[(long long)ent_i[e] * np8 + p] * a[(long long)ent_j[e] * np8 + p];
+	}
+}
+
+//One thread per stored pair and reflection adds up the pair's rows of this chunk, over the
+//symmetry operations, with the per-grid factors. Fixed order and no atomics, so the result
+//does not depend on how the device scheduled the blocks. Neighbouring threads take
+//neighbouring reflections, whose results sit side by side in a row of cres.
+template <typename T>
+__global__ void gather_kernel(const int packed, const int n_refl, const int ns, const int n_grids,
+	const int ncol8, const int e_base, const int* __restrict__ acc_ptr, const int* __restrict__ acc_e,
+	const int* __restrict__ ent_grid, const T* __restrict__ cres,
+	const double* __restrict__ fre, const double* __restrict__ fim,
 	double* __restrict__ I_re, double* __restrict__ I_im)
 {
-	const int t = blockIdx.x * blockDim.x + threadIdx.x;
+	const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	const int r = idx % n_refl, t = idx / n_refl;
 	if (t >= packed) return;
-	int e = acc_cur[t];
-	const int end = acc_ptr[t + 1];
+	const int start = acc_ptr[t], end = acc_ptr[packed + t];
 	double sre = 0.0, sim = 0.0;
-	for (; e < end; e++) {
-		const int q = acc_q[e];
-		if (q >= q_end) break;
-		const T* c = cri + q_c[q] - c_base;
-		const long long napad = q_napad[q];
-		const int pos = acc_pos[e];
-		//The GEMM wrote column-major na_pad x 2na_pad, the imaginary half after the real
-		const double re = (double)c[pos];
-		const double im = (double)c[napad * napad + pos];
-		const int gi = q_grid[q];
-		const double a = fre[gi], b = fim[gi];
-		sre += re * a - im * b;
-		sim += re * b + im * a;
+	for (int k = start; k < end; k++) {
+		const int e = acc_e[k];
+		const T* c = cres + (long long)(e - e_base) * ncol8;
+		const int gi = ent_grid[e];
+		for (int s = 0; s < ns; s++) {
+			const int j = r * ns + s;
+			const double re = (double)c[2 * j], im = (double)c[2 * j + 1];
+			const double a = fre[j * n_grids + gi], b = fim[j * n_grids + gi];
+			sre += re * a - im * b;
+			sim += re * b + im * a;
+		}
 	}
-	acc_cur[t] = e;
-	I_re[t] += sre;
-	I_im[t] += sim;
+	I_re[(long long)r * packed + t] += sre;
+	I_im[(long long)r * packed + t] += sim;
 }
 
-__global__ void zero_kernel(const int n, double* a, double* b)
+__global__ void zero_kernel(const long long n, double* a, double* b)
 {
-	const int i = blockIdx.x * blockDim.x + threadIdx.x;
+	const long long i = (long long)blockIdx.x * blockDim.x + threadIdx.x;
 	if (i < n) { a[i] = 0.0; b[i] = 0.0; }
 }
 
@@ -179,18 +197,17 @@ template <typename T>
 void free_impl()
 {
 	Dev<T>& d = g<T>;
-	gpuFree(d.ao);
-	gpuFree(d.q_grid); gpuFree(d.q_base); gpuFree(d.q_np); gpuFree(d.q_napad);
-	gpuFree(d.q_ao); gpuFree(d.q_c);
-	gpuFree(d.acc_ptr); gpuFree(d.acc_q); gpuFree(d.acc_pos); gpuFree(d.acc_cur);
-	gpuFree(d.d1); gpuFree(d.d2); gpuFree(d.d3); gpuFree(d.w);
-	gpuFree(d.phase_re); gpuFree(d.phase_im);
-	gpuFree(d.wri); gpuFree(d.cri); gpuFree(d.gemm_ws);
+	gpuFree(d.d1); gpuFree(d.d2); gpuFree(d.d3); gpuFree(d.w); gpuFree(d.ao);
+	gpuFree(d.q_pp); gpuFree(d.q_np8); gpuFree(d.q_ao);
+	gpuFree(d.ent_i); gpuFree(d.ent_j); gpuFree(d.ent_grid); gpuFree(d.ent_piece);
+	gpuFree(d.pc_blk); gpuFree(d.pc_e0); gpuFree(d.pc_tab);
+	gpuFree(d.acc_ptr); gpuFree(d.acc_e);
+	gpuFree(d.phase); gpuFree(d.tab); gpuFree(d.cres); gpuFree(d.gemm_ws);
 	for (int i = 0; i < 2; i++) {
-		gpuFree(d.I_re[i]); gpuFree(d.I_im[i]); gpuFree(d.fac[i]);
+		gpuFree(d.kvec[i]); gpuFree(d.fac[i]); gpuFree(d.I_re[i]); gpuFree(d.I_im[i]);
+		if (d.host_kf[i]) gpuFreeHost(d.host_kf[i]);
 		if (d.host_re[i]) gpuFreeHost(d.host_re[i]);
 		if (d.host_im[i]) gpuFreeHost(d.host_im[i]);
-		if (d.host_fac[i]) gpuFreeHost(d.host_fac[i]);
 		if (d.done[i]) gpuEventDestroy(d.done[i]);
 	}
 	if (d.copy_stream) gpuStreamDestroy(d.copy_stream);
@@ -211,238 +228,256 @@ bool init_impl(const itensor_gpu_layout& L)
 {
 	Dev<T>& d = g<T>;
 	const int nb = L.n_blocks;
-	//Rows padded to a multiple of eight: what the Tensor Core path wants of its leading
-	//dimensions, and narrow enough that the padding stays a few per cent of the work
-	auto pad8 = [](const int n) { return (n + 7) & ~7; };
-	std::vector<int> order(nb);
-	std::iota(order.begin(), order.end(), 0);
-	std::stable_sort(order.begin(), order.end(), [&](const int a, const int b) {
-		return pad8(L.blk_n_active[a]) < pad8(L.blk_n_active[b]); });
-	d.np_max = 0; d.na_max = 0;
+	//Points padded to a multiple of eight per block: the leading dimension of both GEMM
+	//operands, which the Tensor Core kernels want that way or cuBLAS quietly runs the plain
+	//ones
+	std::vector<int> h_pp(nb), h_np8(nb);
+	std::vector<long long> h_ao(nb);
+	d.np8_total = 0; d.np8_max = 0;
+	long long ao_total = 0;
 	for (int b = 0; b < nb; b++) {
-		d.np_max = std::max(d.np_max, L.blk_point_count[b]);
-		d.na_max = std::max(d.na_max, pad8(L.blk_n_active[b]));
+		const int np8 = (L.blk_point_count[b] + 7) & ~7;
+		h_pp[b] = d.np8_total; h_np8[b] = np8; h_ao[b] = ao_total;
+		d.np8_total += np8;
+		d.np8_max = std::max(d.np8_max, np8);
+		ao_total += (long long)L.blk_n_active[b] * np8;
 	}
-	std::vector<int> h_grid(nb), h_base(nb), h_np(nb), h_napad(nb);
-	d.h_q_ao.assign(nb + 1, 0); d.h_q_c.assign(nb + 1, 0);
-	d.grp_first.clear(); d.grp_count.clear(); d.grp_na.clear();
-	long long max_blk_ao = 0, max_blk_c = 0;
-	size_t max_ws = 0;
-	d.issued_flops = 0.0;
-	for (int q = 0; q < nb; q++) {
-		const int b = order[q];
-		const int napad = pad8(L.blk_n_active[b]);
-		h_grid[q] = L.blk_grid[b];
-		h_base[q] = L.grid_point_off[L.blk_grid[b]] + L.blk_point_start[b];
-		h_np[q] = L.blk_point_count[b];
-		h_napad[q] = napad;
-		d.h_q_ao[q + 1] = d.h_q_ao[q] + (long long)napad * d.np_max;
-		d.h_q_c[q + 1] = d.h_q_c[q] + 2LL * napad * napad;
-		max_blk_ao = std::max(max_blk_ao, (long long)napad * d.np_max);
-		max_blk_c = std::max(max_blk_c, 2LL * napad * napad);
-		if (d.grp_na.empty() || d.grp_na.back() != napad) {
-			d.grp_first.push_back(q); d.grp_count.push_back(0); d.grp_na.push_back(napad);
-			max_ws = std::max(max_ws, itensor_gemm::workspace_bytes<T>(napad, 2 * napad, d.np_max));
-		}
-		d.grp_count.back()++;
-		d.issued_flops += throughput::flops_gemm(napad, 2.0 * napad, d.np_max);
-	}
-	d.n_groups = (int)d.grp_na.size();
-	//Which result elements feed each stored pair, in block order
-	std::vector<int> cnt(L.packed + 1, 0);
-	long long n_entries = 0;
-	for (int q = 0; q < nb; q++) {
-		const int b = order[q];
+	//The stored pairs of every block, one table row each
+	std::vector<int> ent_i, ent_j, ent_t, ent_grid, blk_e0(nb + 1, 0);
+	for (int b = 0; b < nb; b++) {
 		const int na = L.blk_n_active[b];
-		const int* aos = L.aos_all + L.blk_aos_off[b];
-		for (int i = 0; i < na; i++)
-			for (int j = i; j < na; j++) {
-				const int t = L.compact[(long long)aos[i] * L.nmo + aos[j]];
-				if (t >= 0) { cnt[t]++; n_entries++; }
-			}
-	}
-	if (n_entries > INT_MAX) return false;
-	std::vector<int> ptr(L.packed + 1, 0);
-	for (int t = 0; t < L.packed; t++) ptr[t + 1] = ptr[t] + cnt[t];
-	std::vector<int> acc_q((size_t)n_entries), acc_pos((size_t)n_entries), fill(ptr.begin(), ptr.end() - 1);
-	for (int q = 0; q < nb; q++) {
-		const int b = order[q];
-		const int na = L.blk_n_active[b];
-		const int napad = h_napad[q];
 		const int* aos = L.aos_all + L.blk_aos_off[b];
 		for (int i = 0; i < na; i++)
 			for (int j = i; j < na; j++) {
 				const int t = L.compact[(long long)aos[i] * L.nmo + aos[j]];
 				if (t < 0) continue;
-				acc_q[fill[t]] = q;
-				acc_pos[fill[t]] = j * napad + i;
-				fill[t]++;
+				ent_i.push_back(i); ent_j.push_back(j); ent_t.push_back(t); ent_grid.push_back(L.blk_grid[b]);
 			}
+		blk_e0[b + 1] = (int)ent_i.size();
 	}
-	//The weighted copies and the results are consumed a chunk of blocks at a time, so
-	//neither has to hold every block at once; a chunk is as many whole blocks as fit.
-	const long long ao_total = d.h_q_ao[nb], c_total = d.h_q_c[nb];
-	d.w_cap = std::min(2 * ao_total, std::max(2 * max_blk_ao, (long long)((256u << 20) / sizeof(T))));
-	d.c_cap = std::min(c_total, std::max(max_blk_c, (long long)((64u << 20) / sizeof(T))));
-	if (throughput::enabled()) {
-		double dense = 0.0;
-		for (int b = 0; b < nb; b++)
-			dense += throughput::flops_gemm(L.blk_n_active[b], 2.0 * L.blk_n_active[b], L.blk_point_count[b]);
-		//stderr because cout is redirected to the log and moved again mid-run
-		std::fprintf(stderr, "I tensor GPU: %d blocks in %d groups of like n_active, padded to %d rows x %d points"
-			" at most, %.1f%% of the issued GEMM work is padding\n",
-			nb, d.n_groups, d.na_max, d.np_max, d.issued_flops > 0.0 ? 100.0 * (1.0 - dense / d.issued_flops) : 0.0);
-	}
-	const size_t need =
-		sizeof(T) * (size_t)ao_total +
-		sizeof(T) * (size_t)(d.w_cap + d.c_cap) +
-		max_ws +
-		sizeof(int) * 4 * (size_t)nb + sizeof(long long) * 2 * (size_t)nb +
-		sizeof(int) * (2 * (size_t)n_entries + 2 * (size_t)L.packed + 2) +
-		sizeof(double) * 4 * (size_t)L.n_points +
-		sizeof(T) * 2 * (size_t)L.n_points +
-		sizeof(double) * 4 * (size_t)L.packed;
+	d.n_entries = (long long)ent_i.size();
+	if (d.n_entries > INT_MAX) return false;
+	d.issued_flops = 0.0;
+	for (int b = 0; b < nb; b++)
+		d.issued_flops += throughput::flops_gemm(2, blk_e0[b + 1] - blk_e0[b], h_np8[b]);
+	//Columns per batch: two per reflection and symmetry operation, as many as the phase
+	//buffer and the result rows allow
+	const long long budget = 512LL << 20;
+	d.ncol_cap = (int)std::min<long long>(512, budget / (sizeof(T) * d.np8_total)) & ~7;
+	d.batch_max = (int)std::min<long long>(d.ncol_cap / 2, (256LL << 20) / (16 * L.packed));
+	if (d.batch_max < 1) return false;
+	d.ncol_cap = std::max(8, std::min(d.ncol_cap, (2 * d.batch_max + 7) & ~7));
+	//Pieces of at most piece_cap table elements, chunks of at most tab_cap: the whole table
+	//when the device holds it, so it is built once, else the cap halves until the plan fits
+	//and the tables are rebuilt every batch
+	const long long piece_cap = (128LL << 20) / sizeof(T);
 	size_t freeb = 0, totalb = 0;
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
-	if (need + (1u << 26) > freeb) return false;
-
-	GPU_TRY(gpuMalloc(&d.ao, sizeof(T) * (size_t)ao_total));
-	GPU_TRY(gpuMemset(d.ao, 0, sizeof(T) * (size_t)ao_total));
-	{
-		//Staged a block at a time: the padded rows and points stay zero from the memset
-		std::vector<T> stage((size_t)max_blk_ao);
-		for (int q = 0; q < nb; q++) {
-			const int b = order[q];
-			const int na = L.blk_n_active[b], np = L.blk_point_count[b];
-			const double* src = L.ao_all + L.blk_ao_off[b];
-			for (int i = 0; i < na; i++)
-				for (int p = 0; p < np; p++) stage[(size_t)i * d.np_max + p] = (T)src[(size_t)i * np + p];
-			for (int i = 0; i < na; i++)
-				for (int p = np; p < d.np_max; p++) stage[(size_t)i * d.np_max + p] = T(0);
-			GPU_TRY(gpuMemcpy(d.ao + d.h_q_ao[q], stage.data(), sizeof(T) * (size_t)na * d.np_max,
-				gpuMemcpyHostToDevice));
+	long long tab_total = 0, max_piece = 0;
+	for (int b = 0; b < nb; b++) tab_total += (long long)(blk_e0[b + 1] - blk_e0[b]) * h_np8[b];
+	d.pieces.clear();
+	for (int b = 0; b < nb; b++) {
+		const int rows_cap = (int)std::max<long long>(1, piece_cap / h_np8[b]);
+		for (int e = blk_e0[b]; e < blk_e0[b + 1]; e += rows_cap) {
+			typename Dev<T>::Piece pc;
+			pc.blk = b; pc.e0 = e; pc.rows = std::min(rows_cap, blk_e0[b + 1] - e); pc.tab = 0;
+			d.pieces.push_back(pc);
+			max_piece = std::max(max_piece, (long long)pc.rows * h_np8[b]);
 		}
 	}
-	if (!upload_vec(&d.q_grid, h_grid) || !upload_vec(&d.q_base, h_base) || !upload_vec(&d.q_np, h_np)
-		|| !upload_vec(&d.q_napad, h_napad)) return false;
-	if (!upload_vec(&d.q_ao, std::vector<long long>(d.h_q_ao.begin(), d.h_q_ao.end() - 1))) return false;
-	if (!upload_vec(&d.q_c, std::vector<long long>(d.h_q_c.begin(), d.h_q_c.end() - 1))) return false;
-	if (!upload_vec(&d.acc_ptr, ptr) || !upload_vec(&d.acc_q, acc_q) || !upload_vec(&d.acc_pos, acc_pos)) return false;
-	GPU_TRY(gpuMalloc(&d.acc_cur, sizeof(int) * (size_t)(L.packed + 1)));
-	GPU_TRY(gpuMalloc(&d.d1, sizeof(double) * (size_t)L.n_points));
-	GPU_TRY(gpuMalloc(&d.d2, sizeof(double) * (size_t)L.n_points));
-	GPU_TRY(gpuMalloc(&d.d3, sizeof(double) * (size_t)L.n_points));
-	GPU_TRY(gpuMalloc(&d.w, sizeof(double) * (size_t)L.n_points));
-	GPU_TRY(gpuMalloc(&d.phase_re, sizeof(T) * (size_t)L.n_points));
-	GPU_TRY(gpuMalloc(&d.phase_im, sizeof(T) * (size_t)L.n_points));
-	GPU_TRY(gpuMalloc(&d.wri, sizeof(T) * (size_t)d.w_cap));
-	GPU_TRY(gpuMalloc(&d.cri, sizeof(T) * (size_t)d.c_cap));
+	d.n_pieces = (int)d.pieces.size();
+	size_t max_ws = 0, need = 0;
+	d.tab_cap = tab_total;
+	for (;;) {
+		d.chunks.clear();
+		d.rows_cap = 0;
+		long long tab = 0;
+		for (int p = 0; p < d.n_pieces;) {
+			typename Dev<T>::Chunk ch;
+			ch.p0 = p; ch.tab0 = tab; ch.e0 = d.pieces[p].e0;
+			long long used = 0;
+			while (p < d.n_pieces && used + (long long)d.pieces[p].rows * h_np8[d.pieces[p].blk] <= d.tab_cap) {
+				d.pieces[p].tab = tab;
+				const long long sz = (long long)d.pieces[p].rows * h_np8[d.pieces[p].blk];
+				used += sz; tab += sz; p++;
+			}
+			ch.p1 = p; ch.e1 = d.pieces[p - 1].e0 + d.pieces[p - 1].rows;
+			d.rows_cap = std::max(d.rows_cap, (long long)(ch.e1 - ch.e0));
+			d.chunks.push_back(ch);
+		}
+		d.n_chunks = (int)d.chunks.size();
+		max_ws = 0;
+		for (int p = 0; p < d.n_pieces; p++)
+			max_ws = std::max(max_ws, itensor_gemm::workspace_bytes<T>(d.ncol_cap, d.pieces[p].rows, h_np8[d.pieces[p].blk]));
+		need = sizeof(double) * 4 * (size_t)d.np8_total + sizeof(T) * (size_t)ao_total
+			+ sizeof(T) * (size_t)d.np8_total * d.ncol_cap
+			+ sizeof(T) * (size_t)d.tab_cap + sizeof(T) * (size_t)d.rows_cap * d.ncol_cap + max_ws
+			+ sizeof(int) * (5 * (size_t)d.n_entries + (size_t)(d.n_chunks + 1) * L.packed + 2 * (size_t)nb + 2 * (size_t)d.n_pieces)
+			+ sizeof(long long) * ((size_t)nb + d.n_pieces)
+			+ 2 * sizeof(double) * ((size_t)d.ncol_cap / 2 * (3 + 2 * (size_t)L.n_grids) + 2 * (size_t)d.batch_max * L.packed);
+		if (need + (1u << 28) <= freeb || d.tab_cap <= max_piece) break;
+		d.tab_cap = std::max(max_piece, d.tab_cap / 2);
+	}
+	if (need + (1u << 28) > freeb) return false;
+	if (throughput::enabled())
+		std::fprintf(stderr, "I tensor GPU: %d blocks, %lld table rows in %d pieces and %d chunks, %d columns a batch, %.0f MB\n",
+			nb, d.n_entries, d.n_pieces, d.n_chunks, d.ncol_cap, need / 1048576.0);
+	//Which rows feed each stored pair, and where each chunk's share of them starts
+	std::vector<int> ent_piece(d.n_entries);
+	for (int p = 0; p < d.n_pieces; p++)
+		for (int e = d.pieces[p].e0; e < d.pieces[p].e0 + d.pieces[p].rows; e++) ent_piece[e] = p;
+	std::vector<int> cnt(L.packed + 1, 0), acc_e(d.n_entries), acc_ptr((size_t)(d.n_chunks + 1) * L.packed);
+	for (long long e = 0; e < d.n_entries; e++) cnt[ent_t[e] + 1]++;
+	for (int t = 0; t < L.packed; t++) cnt[t + 1] += cnt[t];
+	{
+		std::vector<int> fill(cnt.begin(), cnt.end() - 1);
+		for (int e = 0; e < (int)d.n_entries; e++) acc_e[fill[ent_t[e]]++] = e;
+	}
+	for (int c = 0; c <= d.n_chunks; c++) {
+		const int e_lim = c < d.n_chunks ? d.chunks[c].e0 : (int)d.n_entries;
+		for (int t = 0; t < L.packed; t++) {
+			int k = c == 0 ? cnt[t] : acc_ptr[(size_t)(c - 1) * L.packed + t];
+			while (k < cnt[t + 1] && acc_e[k] < e_lim) k++;
+			acc_ptr[(size_t)c * L.packed + t] = k;
+		}
+	}
+	std::vector<int> pc_blk(d.n_pieces), pc_e0(d.n_pieces);
+	std::vector<long long> pc_tab(d.n_pieces);
+	for (int p = 0; p < d.n_pieces; p++) {
+		pc_blk[p] = d.pieces[p].blk; pc_e0[p] = d.pieces[p].e0; pc_tab[p] = d.pieces[p].tab;
+	}
+	//Points and AO values in the padded layout
+	{
+		std::vector<double> pd1(d.np8_total, 0.0), pd2(d.np8_total, 0.0), pd3(d.np8_total, 0.0), pw(d.np8_total, 0.0);
+		for (int b = 0; b < nb; b++) {
+			const int src = L.grid_point_off[L.blk_grid[b]] + L.blk_point_start[b];
+			for (int p = 0; p < L.blk_point_count[b]; p++) {
+				pd1[h_pp[b] + p] = L.d1[src + p]; pd2[h_pp[b] + p] = L.d2[src + p];
+				pd3[h_pp[b] + p] = L.d3[src + p]; pw[h_pp[b] + p] = L.weights[src + p];
+			}
+		}
+		if (!upload_vec(&d.d1, pd1) || !upload_vec(&d.d2, pd2) || !upload_vec(&d.d3, pd3) || !upload_vec(&d.w, pw))
+			return false;
+	}
+	GPU_TRY(gpuMalloc(&d.ao, sizeof(T) * (size_t)std::max<long long>(ao_total, 1)));
+	{
+		std::vector<T> stage;
+		for (int b = 0; b < nb; b++) {
+			const int na = L.blk_n_active[b], np = L.blk_point_count[b], np8 = h_np8[b];
+			const double* src = L.ao_all + L.blk_ao_off[b];
+			stage.assign((size_t)na * np8, T(0));
+			for (int i = 0; i < na; i++)
+				for (int p = 0; p < np; p++) stage[(size_t)i * np8 + p] = (T)src[(size_t)i * np + p];
+			GPU_TRY(gpuMemcpy(d.ao + h_ao[b], stage.data(), sizeof(T) * stage.size(), gpuMemcpyHostToDevice));
+		}
+	}
+	if (!upload_vec(&d.q_pp, h_pp) || !upload_vec(&d.q_np8, h_np8) || !upload_vec(&d.q_ao, h_ao)) return false;
+	if (!upload_vec(&d.ent_i, ent_i) || !upload_vec(&d.ent_j, ent_j) || !upload_vec(&d.ent_grid, ent_grid)
+		|| !upload_vec(&d.ent_piece, ent_piece)) return false;
+	if (!upload_vec(&d.pc_blk, pc_blk) || !upload_vec(&d.pc_e0, pc_e0) || !upload_vec(&d.pc_tab, pc_tab)) return false;
+	if (!upload_vec(&d.acc_ptr, acc_ptr) || !upload_vec(&d.acc_e, acc_e)) return false;
+	GPU_TRY(gpuMalloc(&d.phase, sizeof(T) * (size_t)d.np8_total * d.ncol_cap));
+	GPU_TRY(gpuMalloc(&d.tab, sizeof(T) * (size_t)d.tab_cap));
+	GPU_TRY(gpuMalloc(&d.cres, sizeof(T) * (size_t)d.rows_cap * d.ncol_cap));
 	GPU_TRY(gpuMalloc(&d.gemm_ws, max_ws ? max_ws : 1));
+	const size_t ncomb = (size_t)d.ncol_cap / 2, nI = (size_t)d.batch_max * L.packed;
 	for (int i = 0; i < 2; i++) {
-		GPU_TRY(gpuMalloc(&d.I_re[i], sizeof(double) * (size_t)L.packed));
-		GPU_TRY(gpuMalloc(&d.I_im[i], sizeof(double) * (size_t)L.packed));
-		GPU_TRY(gpuHostAlloc((void**)&d.host_re[i], sizeof(double) * (size_t)L.packed));
-		GPU_TRY(gpuHostAlloc((void**)&d.host_im[i], sizeof(double) * (size_t)L.packed));
+		GPU_TRY(gpuMalloc(&d.kvec[i], sizeof(double) * 3 * ncomb));
+		GPU_TRY(gpuMalloc(&d.fac[i], sizeof(double) * 2 * ncomb * L.n_grids));
+		GPU_TRY(gpuHostAlloc((void**)&d.host_kf[i], sizeof(double) * ncomb * (3 + 2 * (size_t)L.n_grids)));
+		GPU_TRY(gpuMalloc(&d.I_re[i], sizeof(double) * nI));
+		GPU_TRY(gpuMalloc(&d.I_im[i], sizeof(double) * nI));
+		GPU_TRY(gpuHostAlloc((void**)&d.host_re[i], sizeof(double) * nI));
+		GPU_TRY(gpuHostAlloc((void**)&d.host_im[i], sizeof(double) * nI));
 		GPU_TRY(gpuEventCreate(&d.done[i]));
 	}
 	GPU_TRY(gpuStreamCreateNonBlocking(&d.copy_stream));
-	GPU_TRY(gpuMemcpy(d.d1, L.d1, sizeof(double) * (size_t)L.n_points, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMemcpy(d.d2, L.d2, sizeof(double) * (size_t)L.n_points, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMemcpy(d.d3, L.d3, sizeof(double) * (size_t)L.n_points, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMemcpy(d.w, L.weights, sizeof(double) * (size_t)L.n_points, gpuMemcpyHostToDevice));
-
+	d.h_pp.assign(h_pp.begin(), h_pp.end());
+	d.h_np8 = h_np8;
 	d.nmo = L.nmo; d.packed = L.packed; d.n_grids = L.n_grids; d.n_blocks = nb;
-	d.n_points = L.n_points;
+	d.table_ready = false;
 	d.ready = true;
 	return true;
 }
 
-//The per-grid factors travel with the reflection; sized on first use since the symmetry
-//count is the caller's
 template <typename T>
-bool ensure_factors(Dev<T>& d, const int n)
+int batch_impl(const int num_syms)
 {
-	if (n <= d.fac_cap) return true;
-	GPU_TRY(gpuDeviceSynchronize());
-	for (int i = 0; i < 2; i++) {
-		gpuFree(d.fac[i]);
-		if (d.host_fac[i]) gpuFreeHost(d.host_fac[i]);
-		GPU_TRY(gpuMalloc(&d.fac[i], sizeof(double) * 2 * (size_t)n));
-		GPU_TRY(gpuHostAlloc((void**)&d.host_fac[i], sizeof(double) * 2 * (size_t)n));
-	}
-	d.fac_cap = n;
-	return true;
+	const Dev<T>& d = g<T>;
+	if (!d.ready) return 0;
+	return std::max(1, std::min(d.batch_max, d.ncol_cap / (2 * num_syms)));
 }
 
 template <typename T>
-bool submit_impl(const int slot, const int num_syms,
+bool submit_impl(const int slot, const int n_refl, const int num_syms,
 	const double* kx, const double* ky, const double* kz,
 	const std::complex<double>* factors)
 {
 	Dev<T>& d = g<T>;
-	if (!d.ready || slot < 0 || slot > 1) return false;
-	const int nf = num_syms * d.n_grids;
-	if (!ensure_factors(d, nf)) return false;
-	for (int i = 0; i < nf; i++) {
-		d.host_fac[slot][i] = factors[i].real();
-		d.host_fac[slot][nf + i] = factors[i].imag();
-	}
-	GPU_TRY(gpuMemcpyAsync(d.fac[slot], d.host_fac[slot], sizeof(double) * 2 * (size_t)nf, gpuMemcpyHostToDevice, 0));
-	zero_kernel<<<(d.packed + 255) / 256, 256>>>(d.packed, d.I_re[slot], d.I_im[slot]);
-	for (int s = 0; s < num_syms; s++) {
+	if (!d.ready || slot < 0 || slot > 1 || n_refl < 1 || n_refl > d.batch_max) return false;
+	const int ncomb = n_refl * num_syms, ncol8 = (2 * ncomb + 7) & ~7;
+	if (ncol8 > d.ncol_cap) return false;
+	const size_t nf = (size_t)ncomb * d.n_grids;
+	double* const hk = d.host_kf[slot];
+	double* const hf = hk + 3 * (size_t)ncomb;
+	for (int c = 0; c < ncomb; c++) {
 		//The CPU path takes sin/cos of k.d directly; scaling k to turns here is what lets
 		//the reduction be a rint and the transcendental be sincospi
-		phase_kernel<T><<<(unsigned int)((d.n_points + 255) / 256), 256>>>(
-			d.n_points, kx[s] * SF_INV_TWO_PI, ky[s] * SF_INV_TWO_PI, kz[s] * SF_INV_TWO_PI,
-			d.d1, d.d2, d.d3, d.w, d.phase_re, d.phase_im);
-		GPU_TRY(gpuMemcpyAsync(d.acc_cur, d.acc_ptr, sizeof(int) * (size_t)d.packed, gpuMemcpyDeviceToDevice, 0));
-		int q0 = 0;
-		while (q0 < d.n_blocks) {
-			int q1 = q0;
-			while (q1 < d.n_blocks && q1 - q0 < 65535 && 2 * (d.h_q_ao[q1 + 1] - d.h_q_ao[q0]) <= d.w_cap
-				&& d.h_q_c[q1 + 1] - d.h_q_c[q0] <= d.c_cap) q1++;
-			const long long w_base = 2 * d.h_q_ao[q0], c_base = d.h_q_c[q0];
-			weight_kernel<T><<<dim3((d.np_max + 255) / 256, d.na_max, q1 - q0), 256>>>(
-				q0, d.np_max, w_base, d.q_napad, d.q_np, d.q_base, d.q_ao, d.ao,
-				d.phase_re, d.phase_im, d.wri);
-			//C = A * W^T per block, A row-major na_pad x np_max, i.e. column-major np_max x
-			//na_pad, W column-major np_max x 2na_pad; a group is one call
-			for (int gr = 0; gr < d.n_groups; gr++) {
-				const int qs = std::max(d.grp_first[gr], q0);
-				const int qe = std::min(d.grp_first[gr] + d.grp_count[gr], q1);
-				if (qe <= qs) continue;
-				const int napad = d.grp_na[gr];
-				if (!itensor_gemm::run_batched<T>(napad, 2 * napad, d.np_max,
-					d.ao + d.h_q_ao[qs], d.np_max, (long long)napad * d.np_max,
-					d.wri + 2 * d.h_q_ao[qs] - w_base, d.np_max, 2LL * napad * d.np_max,
-					d.cri + d.h_q_c[qs] - c_base, napad, 2LL * napad * napad, qe - qs, d.gemm_ws))
-					return false;
-			}
-			gather_kernel<T><<<(d.packed + 255) / 256, 256>>>(d.packed, q1, c_base,
-				d.acc_ptr, d.acc_cur, d.acc_q, d.acc_pos, d.q_c, d.q_napad, d.q_grid, d.cri,
-				d.fac[slot] + (size_t)s * d.n_grids, d.fac[slot] + nf + (size_t)s * d.n_grids,
-				d.I_re[slot], d.I_im[slot]);
-			q0 = q1;
-		}
+		hk[3 * c] = kx[c] * SF_INV_TWO_PI; hk[3 * c + 1] = ky[c] * SF_INV_TWO_PI; hk[3 * c + 2] = kz[c] * SF_INV_TWO_PI;
 	}
+	for (size_t i = 0; i < nf; i++) {
+		hf[i] = factors[i].real();
+		hf[nf + i] = factors[i].imag();
+	}
+	GPU_TRY(gpuMemcpyAsync(d.kvec[slot], hk, sizeof(double) * 3 * (size_t)ncomb, gpuMemcpyHostToDevice, 0));
+	GPU_TRY(gpuMemcpyAsync(d.fac[slot], hf, sizeof(double) * 2 * nf, gpuMemcpyHostToDevice, 0));
+	const long long nI = (long long)n_refl * d.packed;
+	zero_kernel<<<(unsigned int)((nI + 255) / 256), 256>>>(nI, d.I_re[slot], d.I_im[slot]);
+	phase_kernel<T><<<dim3((d.np8_total + 255) / 256, (ncol8 / 2 + phase_run - 1) / phase_run), 256>>>(
+		d.np8_total, ncomb, ncol8, d.kvec[slot], d.d1, d.d2, d.d3, d.w, d.phase);
+	for (int c = 0; c < d.n_chunks; c++) {
+		const typename Dev<T>::Chunk& ch = d.chunks[c];
+		const int rows = ch.e1 - ch.e0;
+		if (d.n_chunks > 1 || !d.table_ready)
+			table_kernel<T><<<dim3((d.np8_max + 255) / 256, std::min(rows, 65535)), 256>>>(ch.e0, rows, ch.tab0,
+				d.ent_i, d.ent_j, d.ent_piece, d.pc_blk, d.pc_e0, d.pc_tab, d.q_np8, d.q_ao, d.ao, d.tab);
+		//C = P^T * table per piece: P column-major np8 x ncol8 from the block's first point,
+		//the table column-major np8 x rows, C column-major ncol8 x rows
+		for (int p = ch.p0; p < ch.p1; p++) {
+			const typename Dev<T>::Piece& pc = d.pieces[p];
+			const int np8 = d.h_np8[pc.blk];
+			if (!itensor_gemm::run<T>(ncol8, pc.rows, np8,
+				d.phase + d.h_pp[pc.blk], d.np8_total,
+				d.tab + pc.tab - ch.tab0, np8,
+				d.cres + (long long)(pc.e0 - ch.e0) * ncol8, ncol8, d.gemm_ws))
+				return false;
+		}
+		gather_kernel<T><<<(unsigned int)((nI + 255) / 256), 256>>>(d.packed, n_refl, num_syms, d.n_grids,
+			ncol8, ch.e0, d.acc_ptr + (size_t)c * d.packed, d.acc_e, d.ent_grid, d.cres,
+			d.fac[slot], d.fac[slot] + nf, d.I_re[slot], d.I_im[slot]);
+	}
+	d.table_ready = true;
+	d.n_refl[slot] = n_refl;
 	GPU_TRY(gpuGetLastError());
 	GPU_TRY(gpuEventRecord(d.done[slot], 0));
 	return true;
 }
 
 template <typename T>
-bool collect_impl(const int slot, std::complex<double>* I_r)
+bool collect_impl(const int slot, std::complex<double>* I_r, const long long row_stride)
 {
 	Dev<T>& d = g<T>;
-	if (!d.ready || slot < 0 || slot > 1) return false;
+	if (!d.ready || slot < 0 || slot > 1 || d.n_refl[slot] < 1) return false;
+	const size_t nI = (size_t)d.n_refl[slot] * d.packed;
 	GPU_TRY(gpuStreamWaitEvent(d.copy_stream, d.done[slot], 0));
-	GPU_TRY(gpuMemcpyAsync(d.host_re[slot], d.I_re[slot], sizeof(double) * (size_t)d.packed,
-		gpuMemcpyDeviceToHost, d.copy_stream));
-	GPU_TRY(gpuMemcpyAsync(d.host_im[slot], d.I_im[slot], sizeof(double) * (size_t)d.packed,
-		gpuMemcpyDeviceToHost, d.copy_stream));
+	GPU_TRY(gpuMemcpyAsync(d.host_re[slot], d.I_re[slot], sizeof(double) * nI, gpuMemcpyDeviceToHost, d.copy_stream));
+	GPU_TRY(gpuMemcpyAsync(d.host_im[slot], d.I_im[slot], sizeof(double) * nI, gpuMemcpyDeviceToHost, d.copy_stream));
 	GPU_TRY(gpuStreamSynchronize(d.copy_stream));
-	for (int i = 0; i < d.packed; i++)
-		I_r[i] += std::complex<double>(d.host_re[slot][i], d.host_im[slot][i]);
+	for (int r = 0; r < d.n_refl[slot]; r++)
+		for (int i = 0; i < d.packed; i++)
+			I_r[r * row_stride + i] += std::complex<double>(d.host_re[slot][(size_t)r * d.packed + i],
+				d.host_im[slot][(size_t)r * d.packed + i]);
+	d.n_refl[slot] = 0;
 	return true;
 }
 
@@ -486,17 +521,22 @@ bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec, cons
 	return ok;
 }
 
-bool itensor_gpu_submit(const int slot, const int num_syms,
+int itensor_gpu_batch(const int num_syms)
+{
+	return g_fp64 ? batch_impl<double>(num_syms) : batch_impl<float>(num_syms);
+}
+
+bool itensor_gpu_submit(const int slot, const int n_refl, const int num_syms,
 	const double* kx, const double* ky, const double* kz,
 	const std::complex<double>* factors)
 {
-	return g_fp64 ? submit_impl<double>(slot, num_syms, kx, ky, kz, factors)
-	              : submit_impl<float>(slot, num_syms, kx, ky, kz, factors);
+	return g_fp64 ? submit_impl<double>(slot, n_refl, num_syms, kx, ky, kz, factors)
+	              : submit_impl<float>(slot, n_refl, num_syms, kx, ky, kz, factors);
 }
 
-bool itensor_gpu_collect(const int slot, std::complex<double>* I_r)
+bool itensor_gpu_collect(const int slot, std::complex<double>* I_r, const long long row_stride)
 {
-	return g_fp64 ? collect_impl<double>(slot, I_r) : collect_impl<float>(slot, I_r);
+	return g_fp64 ? collect_impl<double>(slot, I_r, row_stride) : collect_impl<float>(slot, I_r, row_stride);
 }
 
 void itensor_gpu_free()

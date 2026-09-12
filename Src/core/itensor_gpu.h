@@ -7,7 +7,8 @@
 //GPU path for the XCW I tensor. eval_I spends 99.4% of its time in cblas_dgemm at
 //m = n = active AOs, k = the block's grid points, and that shape runs an order of
 //magnitude faster in single precision on the device. The AO values do not change with
-//the reflection, so they are uploaded once and every reflection reuses them.
+//the reflection, so they are uploaded once, and the device contracts a batch of
+//reflections at a time against tables of AO pair products built from them.
 //
 //Returns false if no device is present or the problem will not fit, and the caller keeps
 //the CPU loop. Init must succeed before evaluate is called.
@@ -21,6 +22,10 @@ const char* itensor_gpu_gemm_name();
 //Flops of the GEMMs the device path issues for one reflection and one symmetry operation,
 //padding included, so the throughput row counts what ran. Valid after init.
 double itensor_gpu_issued_flops();
+
+//How many reflections one submit may carry, at this many symmetry operations. Valid
+//after init.
+int itensor_gpu_batch(int num_syms);
 
 struct itensor_gpu_layout {
 	int nmo = 0;
@@ -53,11 +58,13 @@ struct itensor_gpu_layout {
 bool itensor_gpu_init(const itensor_gpu_layout& L, sf_precision prec = sf_precision::FP32,
 	bool tensor = false);
 
-//Submit one reflection to one of two result slots. collect() returns it after a later
-//reflection has started, so the device-to-host copy overlaps that calculation.
-bool itensor_gpu_submit(int slot, int num_syms,
+//Submit a batch of reflections to one of two result slots: kx..kz hold n_refl * num_syms
+//scattering vectors, factors n_refl * num_syms * n_grids per-grid prefactors, reflection
+//major. collect() adds the batch into n_refl rows of I_r, row_stride apart, after a later
+//batch has started, so the device-to-host copy overlaps that calculation.
+bool itensor_gpu_submit(int slot, int n_refl, int num_syms,
 	const double* kx, const double* ky, const double* kz,
 	const std::complex<double>* factors);
-bool itensor_gpu_collect(int slot, std::complex<double>* I_r);
+bool itensor_gpu_collect(int slot, std::complex<double>* I_r, long long row_stride);
 
 void itensor_gpu_free();

@@ -34,12 +34,6 @@ typedef cublas_status(*fn_dgemm)(cublas_handle, int, int, int, int, int,
 	const double*, const double*, int, const double*, int, const double*, double*, int);
 typedef cublas_status(*fn_gemmex)(cublas_handle, int, int, int, int, int,
 	const void*, const void*, int, int, const void*, int, int, const void*, void*, int, int, int, int);
-typedef cublas_status(*fn_sgemm_sb)(cublas_handle, int, int, int, int, int,
-	const float*, const float*, int, long long, const float*, int, long long, const float*, float*, int, long long, int);
-typedef cublas_status(*fn_dgemm_sb)(cublas_handle, int, int, int, int, int,
-	const double*, const double*, int, long long, const double*, int, long long, const double*, double*, int, long long, int);
-typedef cublas_status(*fn_gemmex_sb)(cublas_handle, int, int, int, int, int,
-	const void*, const void*, int, int, long long, const void*, int, int, long long, const void*, void*, int, int, long long, int, int, int);
 
 struct Lib {
 	bool tried = false;
@@ -49,9 +43,6 @@ struct Lib {
 	fn_sgemm sgemm = nullptr;
 	fn_dgemm dgemm = nullptr;
 	fn_gemmex gemmex = nullptr;
-	fn_sgemm_sb sgemm_sb = nullptr;
-	fn_dgemm_sb dgemm_sb = nullptr;
-	fn_gemmex_sb gemmex_sb = nullptr;
 	cublas_handle handle = nullptr;
 };
 
@@ -101,9 +92,6 @@ bool load_locked()
 	g_lib.sgemm = (fn_sgemm)symbol(lib, "cublasSgemm_v2");
 	g_lib.dgemm = (fn_dgemm)symbol(lib, "cublasDgemm_v2");
 	g_lib.gemmex = (fn_gemmex)symbol(lib, "cublasGemmEx");
-	g_lib.sgemm_sb = (fn_sgemm_sb)symbol(lib, "cublasSgemmStridedBatched");
-	g_lib.dgemm_sb = (fn_dgemm_sb)symbol(lib, "cublasDgemmStridedBatched");
-	g_lib.gemmex_sb = (fn_gemmex_sb)symbol(lib, "cublasGemmStridedBatchedEx");
 	if (!g_lib.create || !g_lib.destroy || !g_lib.sgemm || !g_lib.dgemm) return false;
 	if (g_lib.create(&g_lib.handle) != 0) return false;
 	g_lib.ok = true;
@@ -164,44 +152,4 @@ bool cublas_dynamic_gemm(const bool transA, const bool transB,
 	if (!load_locked()) return false;
 	return g_lib.dgemm(g_lib.handle, transA ? OP_T : OP_N, transB ? OP_T : OP_N,
 		m, n, k, &alpha, A, lda, B, ldb, &beta, C, ldc) == 0;
-}
-
-bool cublas_dynamic_gemm_batched(const bool transA, const bool transB,
-	const int m, const int n, const int k,
-	const float alpha, const float* A, const int lda, const long long strideA,
-	const float* B, const int ldb, const long long strideB,
-	const float beta, float* C, const int ldc, const long long strideC, const int count)
-{
-	if (!g_enabled) return false;
-	std::lock_guard<std::mutex> lock(g_mutex);
-	if (!load_locked() || !g_lib.sgemm_sb) return false;
-	return g_lib.sgemm_sb(g_lib.handle, transA ? OP_T : OP_N, transB ? OP_T : OP_N,
-		m, n, k, &alpha, A, lda, strideA, B, ldb, strideB, &beta, C, ldc, strideC, count) == 0;
-}
-
-bool cublas_dynamic_gemm_batched(const bool transA, const bool transB,
-	const int m, const int n, const int k,
-	const double alpha, const double* A, const int lda, const long long strideA,
-	const double* B, const int ldb, const long long strideB,
-	const double beta, double* C, const int ldc, const long long strideC, const int count)
-{
-	if (!g_enabled) return false;
-	std::lock_guard<std::mutex> lock(g_mutex);
-	if (!load_locked() || !g_lib.dgemm_sb) return false;
-	return g_lib.dgemm_sb(g_lib.handle, transA ? OP_T : OP_N, transB ? OP_T : OP_N,
-		m, n, k, &alpha, A, lda, strideA, B, ldb, strideB, &beta, C, ldc, strideC, count) == 0;
-}
-
-bool cublas_dynamic_gemm_fast_16f_batched(const bool transA, const bool transB,
-	const int m, const int n, const int k,
-	const float alpha, const float* A, const int lda, const long long strideA,
-	const float* B, const int ldb, const long long strideB,
-	const float beta, float* C, const int ldc, const long long strideC, const int count)
-{
-	if (!g_enabled) return false;
-	std::lock_guard<std::mutex> lock(g_mutex);
-	if (!load_locked() || !g_lib.gemmex_sb) return false;
-	return g_lib.gemmex_sb(g_lib.handle, transA ? OP_T : OP_N, transB ? OP_T : OP_N,
-		m, n, k, &alpha, A, CUDA_R_32F, lda, strideA, B, CUDA_R_32F, ldb, strideB, &beta, C,
-		CUDA_R_32F, ldc, strideC, count, COMPUTE_32F_FAST_16F, GEMM_DEFAULT_TENSOR_OP) == 0;
 }
