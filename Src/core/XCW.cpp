@@ -2941,6 +2941,7 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	vec2 known_kpts_;
 	options* opt_ = const_cast<options*>(opt);
 	opt_->m_hkl_list = hkl_enlarged;
+	opt_->grid_cache = &tsc_grids;
 	result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
 		*opt_,
 		sf_wave_vec,

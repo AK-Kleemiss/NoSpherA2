@@ -8,6 +8,7 @@
 class WFN;
 class cell;
 class atom;
+class GridManager;
 class BasisSet;
 struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
@@ -881,6 +882,9 @@ struct options
     bool salted_charge_constraint = false;
     //-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
     bool gpu_grid = true;
+    //Owned by the caller; the scattering-factor grid is built in it instead of a local, so
+    //a second table for the same geometry reuses the points and weights
+    GridManager* grid_cache = nullptr;
     //-no_gpu_density keeps the fitted density of the Gordon-Kim repulsion grid on the CPU
     bool gpu_density = true;
     //-gpu_blas offers large dense GEMMs in nos_math to the device

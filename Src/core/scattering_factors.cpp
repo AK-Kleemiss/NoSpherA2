@@ -2556,7 +2556,10 @@ int make_atomic_grids_wrapper(
 	config.debug = opt.debug;
 	config.all_charges = opt.all_charges;
 
-	GridManager grid_manager(config);
+	GridManager local_manager(config);
+	GridManager& grid_manager = opt.grid_cache ? *opt.grid_cache : local_manager;
+	if (opt.grid_cache)
+		grid_manager.setConfiguration(config);
 
 	WFN temp = wave;
 	temp.delete_unoccupied_MOs();

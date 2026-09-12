@@ -238,6 +238,24 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
     else
         ng_local = needs_grid;
 
+    timing_points_.clear();
+    //Same atoms, coordinates, basis and settings as the last call on this manager: only the
+    //density changes, so the grid and its weights are kept. XCW writes a table per lambda.
+    const vec key = gridKey(wave, atom_list, ng_local);
+    if (!key.empty() && key == grid_key_) {
+        non_spherical_densities_calculated_ = false;
+        if (!config_.no_density_eval) {
+            calculateNonSphericalDensities(wave, unit_cell);
+            addTimingPoint("WFN evaluation on grid");
+        }
+        if (get_g) {
+            calculateNonSphericalg(wave, unit_cell);
+            addTimingPoint("g(r) calculation");
+        }
+        return;
+    }
+    grid_key_ = key;
+
     // Clear previous data
     grid_data_.clear();
     prototype_grids_.clear();
@@ -312,6 +330,38 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
         std::cout << "GridManager: Setup complete. Total grid points: "
             << grid_data_.total_points << std::endl;
     }
+}
+
+vec GridManager::gridKey(const WFN &wave, const ivec &atom_list, const bvec &needs_grid) const {
+    vec key;
+    if (config_.partition_type == PartitionType::MBIS || config_.partition_type == PartitionType::EMBIS)
+        return key;
+    if ((config_.debug || config_.all_charges) && !config_.no_density_eval)
+        return key;
+    const int ncen = wave.get_ncen(), nex = wave.get_nex();
+    key.reserve(8 + atom_list.size() + needs_grid.size() + 4 * ncen + 3 * nex);
+    key.push_back(config_.accuracy);
+    key.push_back(config_.pbc);
+    key.push_back((double)config_.partition_type);
+    key.push_back(config_.debug);
+    key.push_back(config_.all_charges);
+    key.push_back(config_.no_density_eval);
+    key.push_back(ncen);
+    key.push_back(nex);
+    for (int i = 0; i < atom_list.size(); i++) key.push_back(atom_list[i]);
+    for (int i = 0; i < needs_grid.size(); i++) key.push_back(needs_grid[i]);
+    for (int i = 0; i < ncen; i++) {
+        key.push_back(wave.get_atom_charge(i));
+        key.push_back(wave.get_atom_coordinate(i, 0));
+        key.push_back(wave.get_atom_coordinate(i, 1));
+        key.push_back(wave.get_atom_coordinate(i, 2));
+    }
+    for (int b = 0; b < nex; b++) {
+        key.push_back(wave.get_center(b));
+        key.push_back(wave.get_type(b));
+        key.push_back(wave.get_exponent(b));
+    }
+    return key;
 }
 
 void GridManager::setup1DGridsForMolecule(const WFN &wave, const int atom_1, const int atom_2, const int gridpoints, const double padding) {
