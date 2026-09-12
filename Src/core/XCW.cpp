@@ -1324,6 +1324,15 @@ static void tile_gemm(const int m, const int n, const int k, const float* a, con
 	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0f, a, k, b, k, 0.0f, c, n);
 }
 
+//C = op(A) op(B) for column-major occ matrices through MKL, Src/core's Eigen being serial
+static occ::Mat gemm(const occ::Mat& A, const occ::Mat& B, const bool ta = false, const bool tb = false)
+{
+	const int m = static_cast<int>(ta ? A.cols() : A.rows()), k = static_cast<int>(ta ? A.rows() : A.cols()), n = static_cast<int>(tb ? B.rows() : B.cols());
+	occ::Mat C(m, n);
+	cblas_dgemm(CblasColMajor, ta ? CblasTrans : CblasNoTrans, tb ? CblasTrans : CblasNoTrans, m, n, k, 1.0, A.data(), static_cast<int>(A.rows()), B.data(), static_cast<int>(B.rows()), 0.0, C.data(), m);
+	return C;
+}
+
 void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids_) {
 	long long skipped_grids = 0;
 	const int packed_size = (cryst.nmo * (cryst.nmo + 1)) / 2;
@@ -2642,6 +2651,9 @@ void XCW::build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMat
 void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess) {
 
 	settings.clear();
+	cdiis_.reset();
+	adiis_.reset();
+	ediis_.reset();
 
 	XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
 	XCW_log << "____________________________________________________________________________________\n";
@@ -2768,11 +2780,10 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 
 double XCW::compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	if (settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
-		occ::Mat C = scf.molecular_orbitals().C;
-		occ::Mat Cocc = scf.molecular_orbitals().Cocc;
-		occ::Mat Cvir = C.rightCols(C.cols() - Cocc.cols());
-		occ::Mat G = 2.0 * Cvir.transpose() * scf.ctx.F * Cocc;
-		return G.norm();
+		const occ::Mat& C = scf.molecular_orbitals().C;
+		const occ::Mat& Cocc = scf.molecular_orbitals().Cocc;
+		const occ::Mat Cvir = C.rightCols(C.cols() - Cocc.cols());
+		return 2.0 * gemm(Cvir, gemm(scf.ctx.F, Cocc), true).norm();
 	}
 	else if (settings.hf_type == occ::qm::SpinorbitalKind::Unrestricted) {
 		occ::Mat C_alpha = scf.molecular_orbitals().C.topRows(cryst.nmo);
@@ -2787,6 +2798,49 @@ double XCW::compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& s
 	}
 	err_not_impl_f("Orbital gradient for a general spinorbital kind", std::cout);
 	return 0.0;
+}
+
+//F C = e S C through the orthogonaliser's X, one spin block at a time: X^T F X diagonalised
+//by MKL, C = X C'. occ's MolecularOrbitals::update does the same with Eigen, which occ
+//compiles serial; the occupation, smearing and density steps stay occ's.
+void XCW::solve_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat& F) const {
+	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+	const occ::Mat& X = scf.ctx.orthogonalizer.transformation_matrix();
+	const int n = static_cast<int>(X.rows()), m = static_cast<int>(X.cols()), nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1, ldf = static_cast<int>(F.rows());
+	occ::Mat FX(n, m), Fp(m, m);
+	mo.C.resize(nb * n, m);
+	mo.energies.resize(nb * m);
+	for (int b = 0; b < nb; b++) {
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, m, n, 1.0, F.data() + b * n, ldf, X.data(), n, 0.0, FX.data(), n);
+		cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, m, m, n, 1.0, X.data(), n, FX.data(), n, 0.0, Fp.data(), m);
+		err_checkf(LAPACKE_dsyevd(LAPACK_COL_MAJOR, 'V', 'L', m, Fp.data(), m, mo.energies.data() + b * m) == 0, "Fock diagonalisation failed", std::cout);
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, m, m, 1.0, X.data(), n, Fp.data(), m, 0.0, mo.C.data() + b * n, nb * n);
+	}
+	mo.update_occupied_orbitals();
+	mo.smearing.smear_orbitals(mo);
+	mo.update_density_matrix();
+}
+
+//occ's ConvergenceAccelerator::update with the CDIIS commutator S D F - F D S from MKL; with
+//the three matrices symmetric it is T - T^T for T = S D F. The extrapolations are occ's.
+occ::Mat XCW::diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
+	const occ::Mat& S = scf.ctx.S;
+	const occ::Mat& D = scf.ctx.mo.D;
+	const occ::Mat& F = scf.ctx.F;
+	const int n = static_cast<int>(D.cols()), nb = static_cast<int>(D.rows()) / n;
+	occ::Mat comm(nb * n, n), T(n, n), SD(n, n);
+	for (int b = 0; b < nb; b++) {
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, S.data() + b * n, nb * n, D.data() + b * n, nb * n, 0.0, SD.data(), n);
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, SD.data(), n, F.data() + b * n, nb * n, 0.0, T.data(), n);
+		comm.middleRows(b * n, n) = T - T.transpose();
+	}
+	scf.diis_error = comm.array().abs().maxCoeff();
+	occ::Mat F_cdiis = F;
+	cdiis_.extrapolate(F_cdiis, comm);
+	const occ::qm::DiisStrategy strategy = scf.convergence_settings.diis_strategy;
+	if (strategy == occ::qm::DiisStrategy::CDIIS || scf.diis_error <= scf.convergence_settings.diis_switch_threshold) return F_cdiis;
+	if (strategy == occ::qm::DiisStrategy::ADIIS_CDIIS) return adiis_.update(scf.ctx.mo.kind, D, F);
+	return ediis_.update(scf.ctx.mo.kind, D, F, scf.ctx.energy["electronic"]);
 }
 
 void XCW::get_density_criteria(double& RMSP_diff, double& maxP_diff, const occ::Mat& dm, const occ::Mat& dm_last) {
@@ -2825,9 +2879,9 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	//shell-block norms, and the difference shrinks as the SCF converges. Rebuilt in full
 	//every 8 iterations or once the DIIS error has fallen tenfold since the last full build,
 	//as OCC's own loop does, so the screening error does not accumulate.
-	const bool incremental = eri_.empty() && opt->xcw_incremental && scf.m_procedure.supports_incremental_fock_build() && G_last_.size() > 0
+	const bool incremental = !eri_ && opt->xcw_incremental && scf.m_procedure.supports_incremental_fock_build() && G_last_.size() > 0
 		&& scf.iter - last_full_build_ < 8 && scf.diis_error > next_full_build_error_;
-	if (!eri_.empty()) {
+	if (eri_) {
 		G_last_ = eri_fock(scf.ctx.mo);
 		last_full_build_ = scf.iter;
 	}
@@ -2875,8 +2929,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 	// DIIS extrapolation
-	occ::Mat F_diis = scf.convergence_accelerator.update(scf.ctx.mo.kind, scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
-	scf.diis_error = scf.convergence_accelerator.max_error();
+	occ::Mat F_diis = diis_update(scf);
 	settings.current_max_diis_error = scf.diis_error;
 	settings.update(XCW_log, alpha);
 
@@ -2895,7 +2948,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	}
 
 	// Solves central eigenvalue problem
-	scf.ctx.orthogonalizer.orthogonalize_molecular_orbitals(scf.ctx.mo, F_diis);
+	solve_orbitals(scf, F_diis);
 
 	// Apply damping
 	if (settings.apply_damping) {
@@ -3032,7 +3085,7 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 //them carries at least what OCC's direct build keeps. Slot of ab >= cd is ab(ab+1)/2 + cd with
 //ab = a(a+1)/2 + b, a >= b; each slot is written by the one shell quartet that holds it.
 void XCW::store_ERIs(const occ::qm::HartreeFock& hf) {
-	eri_.clear();
+	eri_.reset();
 	if (!hf.supports_incremental_fock_build() || settings.hf_type == occ::qm::SpinorbitalKind::General) return;
 	occ::qm::IntegralEngine engine(hf.aobasis());
 	const int nbf = static_cast<int>(engine.nbf()), nsh = static_cast<int>(engine.nsh()), npq = nsh * (nsh + 1) / 2;
@@ -3043,7 +3096,7 @@ void XCW::store_ERIs(const occ::qm::HartreeFock& hf) {
 		return;
 	}
 	const _time_point t0 = get_time();
-	eri_.assign(nint, 0.0);
+	eri_.reset(new double[nint]);
 	const auto& shellpairs = engine.shellpairs();
 	const auto& first_bf = engine.first_bf();
 	const bool sph = engine.is_spherical();
@@ -3051,7 +3104,9 @@ void XCW::store_ERIs(const occ::qm::HartreeFock& hf) {
 #pragma omp parallel
 	{
 		occ::qm::cint::Optimizer opt(env, occ::qm::cint::Operator::coulomb, 4);
-		vec buffer(env.buffer_size_2e());
+		vec buffer(env.buffer_size_2e()), cache;
+#pragma omp for schedule(static)
+		for (long long i = 0; i < static_cast<long long>(nint); i++) eri_[i] = 0.0;
 #pragma omp for schedule(dynamic)
 		for (int pq = 0; pq < npq; pq++) {
 			const int p = static_cast<int>((std::sqrt(8.0 * pq + 1.0) - 1.0) / 2.0), q = pq - p * (p + 1) / 2;
@@ -3061,9 +3116,14 @@ void XCW::store_ERIs(const occ::qm::HartreeFock& hf) {
 				for (const size_t s : shellpairs[r]) {
 					if (static_cast<int>(s) > s_max) break;
 					std::array<int, 4> sh{ p, q, r, static_cast<int>(s) };
+					//libcint mallocs its scratch per quartet unless handed one; the size query is the same call without an output
+					const size_t need = sph
+						? libcint::int2e_sph(nullptr, nullptr, sh.data(), env.atom_data_ptr(), env.num_atoms(), env.basis_data_ptr(), env.num_basis(), env.env_data_ptr(), nullptr, nullptr)
+						: libcint::int2e_cart(nullptr, nullptr, sh.data(), env.atom_data_ptr(), env.num_atoms(), env.basis_data_ptr(), env.num_basis(), env.env_data_ptr(), nullptr, nullptr);
+					if (need > cache.size()) cache.resize(need);
 					const std::array<int, 4> dims = sph
-						? env.four_center_helper<occ::qm::cint::Operator::coulomb, occ::qm::Shell::Kind::Spherical>(sh, opt.optimizer_ptr(), buffer.data(), nullptr)
-						: env.four_center_helper<occ::qm::cint::Operator::coulomb, occ::qm::Shell::Kind::Cartesian>(sh, opt.optimizer_ptr(), buffer.data(), nullptr);
+						? env.four_center_helper<occ::qm::cint::Operator::coulomb, occ::qm::Shell::Kind::Spherical>(sh, opt.optimizer_ptr(), buffer.data(), cache.data())
+						: env.four_center_helper<occ::qm::cint::Operator::coulomb, occ::qm::Shell::Kind::Cartesian>(sh, opt.optimizer_ptr(), buffer.data(), cache.data());
 					if (dims[0] < 0) continue;
 					const double* v = buffer.data();
 					for (int f3 = 0; f3 < dims[3]; f3++) {
@@ -3119,7 +3179,7 @@ void XCW::eri_JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K) const {
 #pragma omp for schedule(dynamic, 16)
 		for (int ab = 0; ab < npair; ab++) {
 			const int a = static_cast<int>((std::sqrt(8.0 * ab + 1.0) - 1.0) / 2.0), b = ab - a * (a + 1) / 2;
-			const double* v = eri_.data() + (size_t)ab * (ab + 1) / 2;
+			const double* v = eri_.get() + (size_t)ab * (ab + 1) / 2;
 			const double fab = 2.0 * fp[ab], dab = fp[ab] * Dd[a + b * n];
 			const Eigen::Map<const Eigen::VectorXd> vr(v, ab + 1);
 			Eigen::Map<Eigen::VectorXd>(Jl.data(), ab) += dab * vr.head(ab);
@@ -3304,8 +3364,8 @@ void XCW::run_XCW_fitting() {
 #endif
 	store_ERIs(hf);
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	if (!eri_.empty() && opt->gpu_itensor && opt->use_gpu) {
-		eri_on_device_ = eri_gpu_hold(eri_.data(), static_cast<int>(hf.aobasis().nbf()));
+	if (eri_ && opt->gpu_itensor && opt->use_gpu) {
+		eri_on_device_ = eri_gpu_hold(eri_.get(), static_cast<int>(hf.aobasis().nbf()));
 		if (!(opt->no_date))
 			std::cerr << "GPU in use: XCW Fock build from the stored integrals on "
 			<< (eri_on_device_ ? "the device" : "the CPU - device unavailable or the integrals too large") << std::endl;
@@ -3358,8 +3418,6 @@ void XCW::run_XCW_fitting() {
 		scf.convergence_settings.level_shift = settings.level_shift;
 		scf.convergence_settings.level_shift_threshold = 0;
 		scf.update_occupied_orbital_count();
-		scf.convergence_accelerator.set_strategy(scf.convergence_settings.diis_strategy);
-		scf.convergence_accelerator.set_switch_threshold(scf.convergence_settings.diis_switch_threshold);
 		if (opt->xcw_extrapolate && step >= 2 && settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
 			//The density extrapolated through the two previous steps, pulled back to
 			//idempotency by two McWeeny steps D <- 3DSD - 2DSDSD; the orbitals stay those of
