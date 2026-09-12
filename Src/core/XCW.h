@@ -365,6 +365,7 @@ private:
 	std::vector<scattering_data> obs;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
+	GridManager tsc_grids;
 	// Ordered snapshot of `hkl` (see ensure_hkl_ordered), i.e. hkl_ordered_[r]
 	// is the Miller index of reflection r as used for obs[r]/F_calc[0][r].
 	std::vector<i3> hkl_ordered_;

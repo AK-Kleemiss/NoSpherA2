@@ -83,6 +83,11 @@ private:
     std::vector<std::tuple<std::string, _time_point>> timing_points_;
     bool non_spherical_densities_calculated_ = false;
     bool needs_helper_grids_ = false;
+    vec grid_key_;
+
+    //Everything the points, the weights and the pruning depend on when the partition is
+    //geometric; empty when it is not, so such a grid is never reused
+    vec gridKey(const WFN &wave, const ivec &atom_list, const bvec &needs_grid) const;
 
     // Internal helper methods
     void setupPrototypeGrids(const WFN &wave, const ivec &atom_types, std::ostream& file = std::cout);
