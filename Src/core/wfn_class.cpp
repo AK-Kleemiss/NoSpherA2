@@ -4105,6 +4105,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     }
     if (debug)
         std::cout << "types assignements written, now for the exponents..\n";
+    char buf[32];
     run = 0;
     exnum = 0;
     for (int i = 0; i < nex / 5; i++)
@@ -4112,11 +4113,8 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         rf << "EXPONENTS ";
         for (int j = 0; j < 5; j++)
         {
-            stringstream stream;
-            string temp;
-            stream << uppercase << scientific << setw(14) << setprecision(7) << exponents[exnum];
-            temp = stream.str();
-            rf << temp;
+            snprintf(buf, sizeof(buf), "%14.7E", exponents[exnum]);
+            rf << buf;
             if (exnum > nex)
             {
                 std::cout << "run is too big in exponents writing";
@@ -4132,11 +4130,8 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         rf << "EXPONENTS ";
         for (int j = 0; j < nex % 5; j++)
         {
-            stringstream stream;
-            string temp;
-            stream << uppercase << scientific << setw(14) << setprecision(7) << exponents[exnum];
-            temp = stream.str();
-            rf << temp;
+            snprintf(buf, sizeof(buf), "%14.7E", exponents[exnum]);
+            rf << buf;
             if (run > nex)
             {
                 std::cout << "run is too big in exponents writing";
@@ -4168,11 +4163,8 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         {
             for (int j = 0; j < 5; j++)
             {
-                stringstream stream;
-                string temp;
-                stream << uppercase << scientific << showpoint << setprecision(8) << setw(16) << MOs[mo_counter].get_coefficient(run);
-                temp = stream.str();
-                rf << temp;
+                snprintf(buf, sizeof(buf), "%16.8E", MOs[mo_counter].get_coefficient(run));
+                rf << buf;
                 if (run > nex)
                 {
                     std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
@@ -4188,11 +4180,8 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
                 std::cout << "Still some left to write... going in % for loop...." << endl;
             for (int j = 0; j < nex % 5; j++)
             {
-                stringstream stream;
-                string temp;
-                stream << uppercase << scientific << showpoint << setprecision(8) << setw(16) << MOs[mo_counter].get_coefficient(run);
-                temp = stream.str();
-                rf << temp;
+                snprintf(buf, sizeof(buf), "%16.8E", MOs[mo_counter].get_coefficient(run));
+                rf << buf;
                 if (run > nex)
                 {
                     std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
