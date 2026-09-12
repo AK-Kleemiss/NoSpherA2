@@ -2662,6 +2662,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	XCW_log << "____________________________________________________________________________________\n";
 
 	// Compute first guess and update the energy according to this guess
+	const _time_point guess_t0 = get_time();
 	if (has_guess) {
 		scf.set_initial_guess_from_wfn(last_wfn);
 	}
@@ -2676,6 +2677,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	next_full_build_error_ = 0.0;
 
 	scf.ctx.H = scf.ctx.T + scf.ctx.V;
+	throughput::record_time("XCW initial guess", false, get_msec(guess_t0, get_time()));
 	bool converged;
 	double quant;
 	double last_quant = 0;
@@ -2683,8 +2685,9 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	occ::Mat dm_last = scf.ctx.mo.D;
 
 	do {
+		const _time_point scf_t0 = get_time();
 		converged = SCF_iteration(scf, lambda, alpha, quant_diff_mem, quant, last_quant, dm_last);
-
+		throughput::record_time("XCW SCF iteration", false, get_msec(scf_t0, get_time()));
 	} while (!converged && scf.iter < scf.maxiter);
 
 	if (converged) {
@@ -2724,7 +2727,9 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		}
 		std::cout << std::endl;
 
+		const _time_point tscb_t0 = get_time();
 		create_tscb(scf, lambda);
+		throughput::record_time("XCW tscb", false, get_msec(tscb_t0, get_time()));
 	}
 	else {
 		XCW_log << "____________________________________________________________________________________\n";
