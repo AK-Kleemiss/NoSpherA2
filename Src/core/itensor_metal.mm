@@ -482,14 +482,18 @@ bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec, cons
 	return ok;
 }
 
-bool itensor_gpu_submit(const int slot, const int num_syms,
+//The Metal engine contracts one reflection at a time, so a batch is one reflection here
+int itensor_gpu_batch(const int) { return 1; }
+
+bool itensor_gpu_submit(const int slot, const int n_refl, const int num_syms,
 	const double* kx, const double* ky, const double* kz,
 	const std::complex<double>* factors)
 {
+	if (n_refl != 1) return false;
 	return submit_impl(slot, num_syms, kx, ky, kz, factors);
 }
 
-bool itensor_gpu_collect(const int slot, std::complex<double>* I_r)
+bool itensor_gpu_collect(const int slot, std::complex<double>* I_r, const long long)
 {
 	return collect_impl(slot, I_r);
 }
