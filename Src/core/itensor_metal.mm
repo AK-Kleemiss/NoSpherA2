@@ -498,6 +498,14 @@ bool itensor_gpu_collect(const int slot, std::complex<double>* I_r, const long l
 	return collect_impl(slot, I_r);
 }
 
+//The SCF walks stay on the host here
+bool itensor_gpu_hold(const std::complex<float>*, int, int) { return false; }
+bool itensor_gpu_hold(const std::complex<double>*, int, int) { return false; }
+bool itensor_gpu_held() { return false; }
+bool itensor_gpu_rows(const double*, const std::complex<double>*, std::complex<double>*) { return false; }
+bool itensor_gpu_cols(const std::complex<double>*, double*) { return false; }
+void itensor_gpu_release() {}
+
 void itensor_gpu_free()
 {
 	State& s = state();

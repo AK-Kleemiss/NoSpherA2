@@ -82,6 +82,23 @@ template <typename T> Dev<T> g;
 bool g_fp64 = false;
 bool g_tensor = false;
 
+//The resident tensor and the per-iteration operands. Row-major as on the host, so the
+//upload is one copy; the column walk is cut into row chunks whose partial sums are added
+//in a fixed order, so a run repeats itself.
+constexpr int hold_chunks = 64;
+struct Held {
+	void* I = nullptr;
+	bool fp64 = false;
+	int nr = 0, packed = 0;
+	double* w = nullptr;
+	double* pre = nullptr;
+	double* F0 = nullptr;
+	double* F = nullptr;
+	double* part = nullptr;
+	double* out = nullptr;
+};
+Held g_held;
+
 //The single-precision path keeps the reduced-argument trick the transform uses: the phase
 //and its reduction stay in double and only the transcendental drops. In double there is
 //nothing to trade, so it takes the argument as it stands.
@@ -483,8 +500,117 @@ bool collect_impl(const int slot, std::complex<double>* I_r, const long long row
 
 } //namespace
 
+template <typename T>
+__global__ void hold_rows_kernel(const T* I, const double* w, const double* F0, double* F, const int packed)
+{
+	const size_t base = (size_t)blockIdx.x * packed * 2;
+	double sr = 0.0, si = 0.0;
+	for (int k = threadIdx.x; k < packed; k += blockDim.x) {
+		sr += (double)I[base + 2 * k] * w[k];
+		si += (double)I[base + 2 * k + 1] * w[k];
+	}
+	for (int o = 16; o > 0; o >>= 1) {
+		sr += __shfl_down_sync(0xffffffffu, sr, o);
+		si += __shfl_down_sync(0xffffffffu, si, o);
+	}
+	__shared__ double red[2][8];
+	if ((threadIdx.x & 31) == 0) { red[0][threadIdx.x >> 5] = sr; red[1][threadIdx.x >> 5] = si; }
+	__syncthreads();
+	if (threadIdx.x == 0) {
+		sr = F0[2 * blockIdx.x]; si = F0[2 * blockIdx.x + 1];
+		for (int i = 0; i < blockDim.x / 32; i++) { sr += red[0][i]; si += red[1][i]; }
+		F[2 * blockIdx.x] = sr; F[2 * blockIdx.x + 1] = si;
+	}
+}
+
+template <typename T>
+__global__ void hold_cols_kernel(const T* I, const double* pre, double* part, const int nr, const int packed, const int rchunk)
+{
+	const int k = blockIdx.x * blockDim.x + threadIdx.x;
+	if (k >= packed) return;
+	const int r1 = min(nr, (int)(blockIdx.y + 1) * rchunk);
+	double sum = 0.0;
+	for (int r = blockIdx.y * rchunk; r < r1; r++) {
+		const size_t e = ((size_t)r * packed + k) * 2;
+		sum += pre[2 * r] * (double)I[e] - pre[2 * r + 1] * (double)I[e + 1];
+	}
+	part[(size_t)blockIdx.y * packed + k] = sum;
+}
+
+__global__ void hold_sum_kernel(const double* part, double* out, const int chunks, const int packed)
+{
+	const int k = blockIdx.x * blockDim.x + threadIdx.x;
+	if (k >= packed) return;
+	double sum = 0.0;
+	for (int c = 0; c < chunks; c++) sum += part[(size_t)c * packed + k];
+	out[k] = sum;
+}
+
+template <typename T>
+bool hold_impl(const std::complex<T>* I, const int nr, const int packed)
+{
+	itensor_gpu_release();
+	if (!itensor_gpu_available() || nr <= 0 || packed <= 0) return false;
+	Held& h = g_held;
+	const size_t bytes = sizeof(std::complex<T>) * (size_t)nr * packed;
+	size_t free_b = 0, total_b = 0;
+	if (gpuMemGetInfo(&free_b, &total_b) != gpuSuccess || bytes + (size_t)64 * 1048576 > free_b) return false;
+	if (gpuMalloc(&h.I, bytes) != gpuSuccess) { gpuGetLastError(); return false; }
+	h.fp64 = sizeof(T) == sizeof(double);
+	h.nr = nr; h.packed = packed;
+	const bool ok = gpuMemcpy(h.I, I, bytes, gpuMemcpyHostToDevice) == gpuSuccess
+		&& gpuMalloc(&h.w, sizeof(double) * packed) == gpuSuccess
+		&& gpuMalloc(&h.pre, sizeof(double) * 2 * nr) == gpuSuccess
+		&& gpuMalloc(&h.F0, sizeof(double) * 2 * nr) == gpuSuccess
+		&& gpuMalloc(&h.F, sizeof(double) * 2 * nr) == gpuSuccess
+		&& gpuMalloc(&h.part, sizeof(double) * (size_t)hold_chunks * packed) == gpuSuccess
+		&& gpuMalloc(&h.out, sizeof(double) * packed) == gpuSuccess;
+	if (!ok) { gpuGetLastError(); itensor_gpu_release(); }
+	return ok;
+}
+
 //Shared with the transform so the "no code for this card" case is diagnosed in one place.
 bool itensor_gpu_available() { return sf_gpu_available(); }
+
+bool itensor_gpu_hold(const std::complex<float>* I, const int nr, const int packed) { return hold_impl(I, nr, packed); }
+bool itensor_gpu_hold(const std::complex<double>* I, const int nr, const int packed) { return hold_impl(I, nr, packed); }
+bool itensor_gpu_held() { return g_held.I != nullptr; }
+
+bool itensor_gpu_rows(const double* w, const std::complex<double>* F0, std::complex<double>* F)
+{
+	Held& h = g_held;
+	if (!h.I) return false;
+	GPU_TRY(gpuMemcpy(h.w, w, sizeof(double) * h.packed, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(h.F0, F0, sizeof(double) * 2 * h.nr, gpuMemcpyHostToDevice));
+	if (h.fp64) hold_rows_kernel<double><<<h.nr, 256>>>((const double*)h.I, h.w, h.F0, h.F, h.packed);
+	else hold_rows_kernel<float><<<h.nr, 256>>>((const float*)h.I, h.w, h.F0, h.F, h.packed);
+	GPU_TRY(gpuGetLastError());
+	GPU_TRY(gpuMemcpy(F, h.F, sizeof(double) * 2 * h.nr, gpuMemcpyDeviceToHost));
+	return true;
+}
+
+bool itensor_gpu_cols(const std::complex<double>* pre, double* out)
+{
+	Held& h = g_held;
+	if (!h.I) return false;
+	GPU_TRY(gpuMemcpy(h.pre, pre, sizeof(double) * 2 * h.nr, gpuMemcpyHostToDevice));
+	const int rchunk = (h.nr + hold_chunks - 1) / hold_chunks;
+	const dim3 grid((h.packed + 255) / 256, hold_chunks);
+	if (h.fp64) hold_cols_kernel<double><<<grid, 256>>>((const double*)h.I, h.pre, h.part, h.nr, h.packed, rchunk);
+	else hold_cols_kernel<float><<<grid, 256>>>((const float*)h.I, h.pre, h.part, h.nr, h.packed, rchunk);
+	GPU_TRY(gpuGetLastError());
+	hold_sum_kernel<<<(h.packed + 255) / 256, 256>>>(h.part, h.out, hold_chunks, h.packed);
+	GPU_TRY(gpuGetLastError());
+	GPU_TRY(gpuMemcpy(out, h.out, sizeof(double) * h.packed, gpuMemcpyDeviceToHost));
+	return true;
+}
+
+void itensor_gpu_release()
+{
+	Held& h = g_held;
+	gpuFree(h.I); gpuFree(h.w); gpuFree(h.pre); gpuFree(h.F0); gpuFree(h.F); gpuFree(h.part); gpuFree(h.out);
+	h = Held{};
+}
 
 const char* itensor_gpu_gemm_name()
 {
