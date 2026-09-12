@@ -98,6 +98,19 @@ struct Held {
 	double* out = nullptr;
 };
 Held g_held;
+struct HeldEri {
+	double* V = nullptr;
+	double* dp = nullptr;
+	double* D = nullptr;
+	double* J1 = nullptr;
+	double* J2 = nullptr;
+	double* part = nullptr;
+	double* Ka = nullptr;
+	double* Kb = nullptr;
+	double* K = nullptr;
+	int n = 0, npair = 0;
+};
+HeldEri g_eri;
 
 //The single-precision path keeps the reduced-argument trick the transform uses: the phase
 //and its reduction stay in double and only the transcendental drops. In double there is
@@ -603,6 +616,164 @@ bool itensor_gpu_cols(const std::complex<double>* pre, double* out)
 	GPU_TRY(gpuGetLastError());
 	GPU_TRY(gpuMemcpy(out, h.out, sizeof(double) * h.packed, gpuMemcpyDeviceToHost));
 	return true;
+}
+
+//One block per row ab of the packed integrals, as XCW::eri_JK walks them: J1 is the row's
+//half of the symmetric matvec, the four scatters of every integral go into the row's two K
+//columns, each warp taking segments c of the row with the lanes over d and its own copy of
+//the columns in shared memory, so nothing is atomic. The multiplicities of the pairs are
+//folded into four copies of the two density columns. The partials of a row leave as K(:, a)
+//and K(:, b); the diagonal cd == ab was counted with the doubled weight and is taken back by
+//thread 0.
+__global__ void eri_jk_kernel(const double* V, const double* dp, const double* D, double* J1, double* Ka, double* Kb, const int n)
+{
+	extern __shared__ double sh[];
+	__shared__ double red[32];
+	const int ab = blockIdx.x, a = (int)((sqrt(8.0 * ab + 1.0) - 1.0) / 2.0), b = ab - a * (a + 1) / 2;
+	const int lane = threadIdx.x & 31, warp = threadIdx.x >> 5, nwarp = blockDim.x >> 5;
+	double* Da1 = sh;
+	double* Db1 = sh + n;
+	double* Da2 = sh + 2 * n;
+	double* Db2 = sh + 3 * n;
+	double* sKa = sh + (4 + 2 * warp) * n;
+	double* sKb = sKa + n;
+	const double* v = V + (size_t)ab * (ab + 1) / 2;
+	const double fab = a == b ? 2.0 : 4.0;
+	for (int d = threadIdx.x; d < n; d += blockDim.x) {
+		Da1[d] = fab * D[d + a * n];
+		Db1[d] = fab * D[d + b * n];
+		Da2[d] = 2.0 * Da1[d];
+		Db2[d] = 2.0 * Db1[d];
+	}
+	for (int d = threadIdx.x; d < 2 * nwarp * n; d += blockDim.x) sh[4 * n + d] = 0.0;
+	__syncthreads();
+	double j = 0.0;
+	for (int c = warp; c <= a; c += nwarp) {
+		const int m = c < a ? c + 1 : b + 1, off = c * (c + 1) / 2;
+		double sa = 0.0, sb = 0.0;
+		for (int d = lane; d < m; d += 32) {
+			const double t = v[off + d];
+			const double* Daw = d < c ? Da2 : Da1;
+			const double* Dbw = d < c ? Db2 : Db1;
+			j += t * dp[off + d];
+			sa += t * Dbw[d];
+			sb += t * Daw[d];
+			sKa[d] += t * Dbw[c];
+			sKb[d] += t * Daw[c];
+		}
+		for (int o = 16; o > 0; o >>= 1) {
+			sa += __shfl_down_sync(0xffffffffu, sa, o);
+			sb += __shfl_down_sync(0xffffffffu, sb, o);
+		}
+		if (lane == 0) {
+			sKa[c] += sa;
+			sKb[c] += sb;
+		}
+	}
+	for (int o = 16; o > 0; o >>= 1) j += __shfl_down_sync(0xffffffffu, j, o);
+	if (lane == 0) red[warp] = j;
+	__syncthreads();
+	if (threadIdx.x == 0) {
+		for (int w = 1; w < nwarp; w++) j += red[w];
+		J1[ab] = j;
+		const double h = (a == b ? 1.0 : 4.0) * v[ab];
+		sh[4 * n + a] -= h * D[b + b * n];
+		sh[5 * n + a] -= h * D[b + a * n];
+		sh[4 * n + b] -= h * D[b + a * n];
+		sh[5 * n + b] -= h * D[a + a * n];
+	}
+	__syncthreads();
+	for (int d = threadIdx.x; d < 2 * n; d += blockDim.x) {
+		double sum = 0.0;
+		for (int w = 0; w < nwarp; w++) sum += sh[(4 + 2 * w) * n + d];
+		if (d < n) Ka[(size_t)ab * n + d] = sum;
+		else Kb[(size_t)ab * n + d - n] = sum;
+	}
+}
+
+//K(d, a) is the sum of the row partials over the rows of a, K(:, a) from the rows ab with
+//b <= a and K(:, b) from the rows a'b with a' >= a
+__global__ void eri_kred_kernel(const double* Ka, const double* Kb, double* K, const int n)
+{
+	const int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= n * n) return;
+	const int d = i % n, a = i / n;
+	double sum = 0.0;
+	for (int b = 0; b <= a; b++) sum += Ka[(size_t)(a * (a + 1) / 2 + b) * n + d];
+	for (int a2 = a; a2 < n; a2++) sum += Kb[(size_t)(a2 * (a2 + 1) / 2 + a) * n + d];
+	K[i] = sum;
+}
+
+//The other half of the symmetric matvec, J2[cd] = sum_{ab > cd} V[ab][cd] dp[ab]: consecutive
+//threads read consecutive elements of a row, the rows cut into chunks for parallelism
+__global__ void eri_jt_kernel(const double* V, const double* dp, double* part, const int npair, const int chunk)
+{
+	const int cd = blockIdx.x * blockDim.x + threadIdx.x;
+	if (cd >= npair) return;
+	const int ab0 = max(cd + 1, (int)blockIdx.y * chunk), ab1 = min(npair, (int)(blockIdx.y + 1) * chunk);
+	double sum = 0.0;
+	for (int ab = ab0; ab < ab1; ab++) sum += V[(size_t)ab * (ab + 1) / 2 + cd] * dp[ab];
+	part[(size_t)blockIdx.y * npair + cd] = sum;
+}
+
+bool eri_gpu_hold(const double* eri, const int n)
+{
+	eri_gpu_release();
+	if (!itensor_gpu_available() || n <= 0 || 12 * n * sizeof(double) > 48 * 1024) return false;
+	HeldEri& h = g_eri;
+	const int npair = n * (n + 1) / 2;
+	const size_t bytes = sizeof(double) * (size_t)npair * (npair + 1) / 2, kbytes = sizeof(double) * (size_t)npair * n;
+	size_t free_b = 0, total_b = 0;
+	if (gpuMemGetInfo(&free_b, &total_b) != gpuSuccess || bytes + 2 * kbytes + (size_t)64 * 1048576 > free_b) return false;
+	if (gpuMalloc(&h.V, bytes) != gpuSuccess) { gpuGetLastError(); return false; }
+	h.n = n; h.npair = npair;
+	const bool ok = gpuMemcpy(h.V, eri, bytes, gpuMemcpyHostToDevice) == gpuSuccess
+		&& gpuMalloc(&h.dp, sizeof(double) * npair) == gpuSuccess
+		&& gpuMalloc(&h.D, sizeof(double) * n * n) == gpuSuccess
+		&& gpuMalloc(&h.J1, sizeof(double) * npair) == gpuSuccess
+		&& gpuMalloc(&h.J2, sizeof(double) * npair) == gpuSuccess
+		&& gpuMalloc(&h.part, sizeof(double) * (size_t)hold_chunks * npair) == gpuSuccess
+		&& gpuMalloc(&h.Ka, kbytes) == gpuSuccess
+		&& gpuMalloc(&h.Kb, kbytes) == gpuSuccess
+		&& gpuMalloc(&h.K, sizeof(double) * n * n) == gpuSuccess;
+	if (!ok) { gpuGetLastError(); eri_gpu_release(); }
+	return ok;
+}
+
+bool eri_gpu_JK(const double* D, double* J, double* K)
+{
+	HeldEri& h = g_eri;
+	if (!h.V) return false;
+	const int n = h.n, npair = h.npair;
+	std::vector<double> dp(npair), j1(npair), j2(npair);
+	for (int a = 0, ab = 0; a < n; a++)
+		for (int b = 0; b <= a; b++, ab++) dp[ab] = (a == b ? 1.0 : 2.0) * D[a + b * n];
+	GPU_TRY(gpuMemcpy(h.dp, dp.data(), sizeof(double) * npair, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(h.D, D, sizeof(double) * n * n, gpuMemcpyHostToDevice));
+	eri_jk_kernel<<<npair, 128, sizeof(double) * 12 * n>>>(h.V, h.dp, h.D, h.J1, h.Ka, h.Kb, n);
+	GPU_TRY(gpuGetLastError());
+	eri_kred_kernel<<<(n * n + 255) / 256, 256>>>(h.Ka, h.Kb, h.K, n);
+	GPU_TRY(gpuGetLastError());
+	const int chunk = (npair + hold_chunks - 1) / hold_chunks;
+	eri_jt_kernel<<<dim3((npair + 255) / 256, hold_chunks), 256>>>(h.V, h.dp, h.part, npair, chunk);
+	GPU_TRY(gpuGetLastError());
+	hold_sum_kernel<<<(npair + 255) / 256, 256>>>(h.part, h.J2, hold_chunks, npair);
+	GPU_TRY(gpuGetLastError());
+	GPU_TRY(gpuMemcpy(j1.data(), h.J1, sizeof(double) * npair, gpuMemcpyDeviceToHost));
+	GPU_TRY(gpuMemcpy(j2.data(), h.J2, sizeof(double) * npair, gpuMemcpyDeviceToHost));
+	GPU_TRY(gpuMemcpy(K, h.K, sizeof(double) * n * n, gpuMemcpyDeviceToHost));
+	for (int a = 0, ab = 0; a < n; a++)
+		for (int b = 0; b <= a; b++, ab++) J[a + b * n] = J[b + a * n] = j1[ab] + j2[ab];
+	for (int a = 0; a < n; a++)
+		for (int b = 0; b <= a; b++) K[a + b * n] = K[b + a * n] = 0.125 * (K[a + b * n] + K[b + a * n]);
+	return true;
+}
+
+void eri_gpu_release()
+{
+	HeldEri& h = g_eri;
+	gpuFree(h.V); gpuFree(h.dp); gpuFree(h.D); gpuFree(h.J1); gpuFree(h.J2); gpuFree(h.part); gpuFree(h.Ka); gpuFree(h.Kb); gpuFree(h.K);
+	h = HeldEri{};
 }
 
 void itensor_gpu_release()

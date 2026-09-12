@@ -505,6 +505,9 @@ bool itensor_gpu_held() { return false; }
 bool itensor_gpu_rows(const double*, const std::complex<double>*, std::complex<double>*) { return false; }
 bool itensor_gpu_cols(const std::complex<double>*, double*) { return false; }
 void itensor_gpu_release() {}
+bool eri_gpu_hold(const double*, int) { return false; }
+bool eri_gpu_JK(const double*, double*, double*) { return false; }
+void eri_gpu_release() {}
 
 void itensor_gpu_free()
 {
