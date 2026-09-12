@@ -292,6 +292,13 @@ private:
 	// Checks convergence for SCF cycle
 	bool SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last);
 
+	// The Roothaan step and the DIIS of occ's SCF with their matrix products on MKL
+	void solve_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat& F) const;
+	occ::Mat diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf);
+	occ::core::diis::DIIS cdiis_;
+	occ::qm::ADIIS adiis_;
+	occ::qm::EDIIS ediis_;
+
 	// Computes the orbital gradient for usage as a convergence criterion
 	double compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf);
 
@@ -338,7 +345,7 @@ private:
 	double next_full_build_error_ = 0.0;
 	//Two-electron integrals packed over the 8-fold symmetry, built once per run when they fit in
 	//memory: the Fock build then contracts them instead of recomputing every quartet per iteration
-	vec eri_;
+	std::unique_ptr<double[]> eri_;
 	bool eri_on_device_ = false;
 	void store_ERIs(const occ::qm::HartreeFock& hf);
 	void eri_JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K) const;
