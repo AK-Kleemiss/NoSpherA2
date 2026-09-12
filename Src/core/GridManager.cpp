@@ -2,6 +2,7 @@
 #include "GridManager.h"
 #include "spherical_density.h"
 #include "cube.h"
+#include "grid_gpu.h"
 
 template<typename AtomType>
 double make_sphericals(
@@ -535,40 +536,82 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
     }
 
     // Generate grids for each atom
-    vec chi_matrix;  // For TFVC partitioning
+    vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids;
+    ivec *num_points = needs_helper_grids_ ? &grid_data_.helper_num_points_per_atom : &grid_data_.num_points_per_atom;
+    ivec atom_of(num_atoms_with_grids), proto_of(num_atoms_with_grids);
     for (int i = 0; i < num_atoms_with_grids; i++) {
-        int atom_idx = needs_helper_grids_ ? i : atom_list[i];
-        const int atom_type = wave.get_atom_charge(atom_idx);
-
-        // Find corresponding prototype grid
-        int prototype_idx = 0;
-        for (int j = 0; j < atom_type_list_.size(); j++) {
-            if (atom_type_list_[j] == atom_type) {
-                prototype_idx = j;
-                break;
+        atom_of[i] = needs_helper_grids_ ? i : atom_list[i];
+        const int atom_type = wave.get_atom_charge(atom_of[i]);
+        for (int j = 0; j < atom_type_list_.size(); j++)
+            if (atom_type_list_[j] == atom_type) { proto_of[i] = j; break; }
+        (*num_points)[i] = prototype_grids_[proto_of[i]].get_num_grid_points();
+        for (int coord = 0; coord < 10; coord++)
+            (*grid)[i][coord].resize((*num_points)[i], 0.0);
+    }
+    //The TFVC weights are only read for that partitioning and for the every-scheme
+    //output, and chi is a line-density extremum search over every atom pair
+    vec chi_matrix;
+    if (total_atoms > 1 && (config_.partition_type == PartitionType::TFVC || config_.debug || config_.all_charges))
+        chi_matrix = make_chi(wave, 40, true, config_.debug);
+    int first = 0;
+#ifdef NOSPHERA2_USE_GPU
+    //The whole molecule in one launch, in chunks of a few million points so the flat
+    //copies stay bounded. make_chi lays chi out with a stride of ncen, so with periodic
+    //images it does not fit the kernel and the weights stay on the CPU.
+    const bool chi_fits = chi_matrix.empty() || chi_matrix.size() == (size_t)total_atoms * total_atoms;
+    if (grid_gpu_enabled() && total_atoms > 1 && chi_fits) {
+        const int chunk = 1 << 21;
+        vec R_v(total_atoms);
+        for (int a = 0; a < total_atoms; a++) R_v[a] = constants::bragg_angstrom[charges[a]];
+        ivec pcen;
+        vec flat[10];
+        while (first < num_atoms_with_grids) {
+            int last = first, np = 0;
+            while (last < num_atoms_with_grids && (np == 0 || np + (*num_points)[last] <= chunk)) np += (*num_points)[last++];
+            pcen.resize(np);
+            for (int k = 0; k < 10; k++) flat[k].resize(np);
+            for (int i = first, off = 0; i < last; off += (*num_points)[i++]) {
+                AtomGrid &proto = prototype_grids_[proto_of[i]];
+                const int n = (*num_points)[i];
+                std::fill_n(pcen.data() + off, n, atom_of[i]);
+                std::copy_n(proto.get_gridx_ptr(), n, flat[0].data() + off);
+                std::copy_n(proto.get_gridy_ptr(), n, flat[1].data() + off);
+                std::copy_n(proto.get_gridz_ptr(), n, flat[2].data() + off);
+                std::copy_n(proto.get_gridw_ptr(), n, flat[3].data() + off);
             }
+            if (!grid_gpu_becke_weights(np, total_atoms, pcen.data(),
+                    flat[0].data(), flat[1].data(), flat[2].data(), flat[3].data(),
+                    x_coords.data(), y_coords.data(), z_coords.data(), R_v.data(),
+                    chi_matrix.empty() ? nullptr : chi_matrix.data(),
+                    constants::far_away, constants::cutoff,
+                    flat[4].data(), flat[5].data(), flat[6].data(), flat[7].data(), flat[8].data(), flat[9].data()))
+                break;
+            static const GridData::GridIndex out_idx[6] = { GridData::X, GridData::Y, GridData::Z, GridData::WEIGHT, GridData::BECKE_WEIGHT, GridData::TFVC_WEIGHT };
+            for (int i = first, off = 0; i < last; off += (*num_points)[i++])
+                for (int k = 0; k < 6; k++)
+                    std::copy_n(flat[4 + k].data() + off, (*num_points)[i], (*grid)[i][out_idx[k]].data());
+            first = last;
         }
-
-        const int num_points = prototype_grids_[prototype_idx].get_num_grid_points();
-        vec3 *grid;
-        if (needs_helper_grids_) {
-            grid_data_.helper_num_points_per_atom[i] = num_points;
-            grid = &grid_data_.helper_grids;
-        }
-        else {
-            grid_data_.num_points_per_atom[i] = num_points;
-            grid = &grid_data_.atomic_grids;
-        }
-
-        // Resize grid arrays for this atom
-        for (int coord = 0; coord < 10; coord++) {
-            (*grid)[i][coord].resize(num_points, 0.0);
-        }
-
-        // Generate the actual grid
-        prototype_grids_[prototype_idx].get_grid(
+        //Once per run. Every other GPU path announces itself; this one did not, which
+        //is how it fell back to the CPU for a session with its test still passing.
+        static std::atomic<bool> announced{false};
+        if (first == num_atoms_with_grids && !announced.exchange(true) && !constants::hide_gpu_notes)
+            std::cout << "GPU in use: atomic grid weights (Becke and TFVC) on " << grid_gpu_backend() << std::endl;
+    }
+    else if (grid_gpu_enabled() && total_atoms > 1) {
+        static std::atomic<bool> warned{false};
+        if (!warned.exchange(true) && !constants::hide_gpu_notes)
+            std::cout << "-gpu_grid asked for but not used: chi is " << chi_matrix.size()
+                      << " entries, the kernel needs " << (size_t)total_atoms * total_atoms
+                      << ". Weights stay on the CPU." << std::endl;
+    }
+#endif
+    //On the CPU an atom at a time; a device failure part way lands here with first at the
+    //first grid still to do
+    for (int i = first; i < num_atoms_with_grids; i++) {
+        prototype_grids_[proto_of[i]].get_grid(
             total_atoms,
-            atom_idx,
+            atom_of[i],
             x_coords.data(),
             y_coords.data(),
             z_coords.data(),
@@ -579,12 +622,10 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
             (*grid)[i][GridData::GridIndex::WEIGHT].data(),
             (*grid)[i][GridData::GridIndex::BECKE_WEIGHT].data(),
             (*grid)[i][GridData::GridIndex::TFVC_WEIGHT].data(),
-            wave,
-            chi_matrix,
-            config_.debug
+            chi_matrix
         );
         if (config_.debug) file << "Generated grid for atom " << i + 1 << "/" << num_atoms_with_grids
-            << " (Type " << atom_type << ") with " << num_points << " points." << std::endl;
+            << " (Type " << wave.get_atom_charge(atom_of[i]) << ") with " << (*num_points)[i] << " points." << std::endl;
     }
     if (needs_helper_grids_)
         grid_data_.total_points = std::accumulate(grid_data_.helper_num_points_per_atom.begin(), grid_data_.helper_num_points_per_atom.end(), 0);

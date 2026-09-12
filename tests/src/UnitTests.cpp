@@ -64,7 +64,7 @@ namespace {
         }
 
         vec empty(1, 0.0);
-        griddy.get_grid(1, 0, pos, pos, pos, &charge, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data(), grid[5].data(), grid[6].data(), WFN(), empty);
+        griddy.get_grid(1, 0, pos, pos, pos, &charge, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data(), grid[5].data(), grid[6].data(), empty);
 
         // Initialize the vectors sf_A and sf_N
         cvec2 sf_A, sf_N;
@@ -2614,7 +2614,7 @@ namespace NoSpherA2UnitTests
         AtomGrid grid(1e-12, 350, 5000, Z, alpha_max, max_l, alpha_min, std::cout);
         const int n_points = grid.get_num_grid_points();
         vec gx(n_points), gy(n_points), gz(n_points), aw(n_points), bw(n_points), tw(n_points), chi(1, 0.0);
-        grid.get_grid(1, 0, &pos[0], &pos[1], &pos[2], &Z, gx.data(), gy.data(), gz.data(), aw.data(), bw.data(), tw.data(), WFN(), chi);
+        grid.get_grid(1, 0, &pos[0], &pos[1], &pos[2], &Z, gx.data(), gy.data(), gz.data(), aw.data(), bw.data(), tw.data(), chi);
         vec coefs(n_aux);
         for (int i = 0; i < n_aux; i++) coefs[i] = std::sin(1.0 + i);
         vec2 Q(1, vec(n_moments, 0.0));
@@ -3197,8 +3197,8 @@ namespace NoSpherA2UnitTests
         const int Zs[2] = { 8, 1 };
         AtomGrid grid(1e-12, 350, 5000, 8, alpha_max, max_l, alpha_min, std::cout);
         const int n_points = grid.get_num_grid_points();
-        vec gx(n_points), gy(n_points), gz(n_points), aw(n_points), bw(n_points), tw(n_points), chi(1, 0.0);
-        grid.get_grid(2, 0, xs, ys, zs, Zs, gx.data(), gy.data(), gz.data(), aw.data(), bw.data(), tw.data(), WFN(), chi);
+        vec gx(n_points), gy(n_points), gz(n_points), aw(n_points), bw(n_points), tw(n_points), chi;
+        grid.get_grid(2, 0, xs, ys, zs, Zs, gx.data(), gy.data(), gz.data(), aw.data(), bw.data(), tw.data(), chi);
         vec coefs(n_aux);
         for (int i = 0; i < n_aux; i++) coefs[i] = std::sin(1.0 + i);
         vec2 Q(1, vec(n_moments, 0.0));
