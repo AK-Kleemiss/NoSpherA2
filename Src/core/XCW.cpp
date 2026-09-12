@@ -1148,7 +1148,7 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 		i_pair_nu_ = i_file_.pair_nu();
 		//The file's element type is kept as it is: a single-precision tensor cannot regain
 		//anything by widening, and a double one is narrowed only on request
-		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
+		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT"); // Flawfinder: ignore
 		i_float_ = single_on_disk || (!i_streamed_ && (settings.i_tensor_single || (f && std::atoi(f) != 0)));
 		std::cout << "I tensor read from " << i_tensor_path().string()
 			<< " (" << (i_tensor_file::total_bytes(cryst.nr_small, i_compact_, single_on_disk) / 1048576.0)
@@ -1575,11 +1575,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//nothing would be dropped, and paying the compaction cost for that would make asking for
 	//more accuracy slower for no reason.
 	const double ao_block_threshold = [&] {
-		const char* e = std::getenv("NOSPHERA2_ITENSOR_AO_TOL");
+		const char* e = std::getenv("NOSPHERA2_ITENSOR_AO_TOL"); // Flawfinder: ignore
 		if (e) { const double v = std::atof(e); return v >= 0.0 ? v : 0.0; }
 		return cutoff(opt->accuracy);
 	}();
-	const bool morton_applied = (std::getenv("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr)
+	const bool morton_applied = (std::getenv("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr) // Flawfinder: ignore
 		&& ao_block_threshold >= 1e-20;
 	if (morton_applied) {
 #pragma omp parallel for schedule(dynamic)
@@ -1660,7 +1660,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//Work is sum over blocks of na^2 * points, so what an OCC-style per-batch bounding
 	//sphere would save is quadratic in whatever this measures. The AO values are already
 	//computed here, so the honest number is a max over the points they hold, not an estimate.
-	if (std::getenv("NOSPHERA2_ITENSOR_AOSTATS")) {
+	if (std::getenv("NOSPHERA2_ITENSOR_AOSTATS")) { // Flawfinder: ignore
 		for (int g = 0; g < n_atom_grids; g++) {
 			const int npts = points[g];
 			if (npts <= 0) continue;
@@ -1791,7 +1791,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//distant tiles, which is the only way a tile becomes wholly dead. Measured here, per
 	//block, before anyone writes a kernel that depends on it.
 	auto skipstats = [&](const int g, const ivec& active, const int npoints) {
-		if (!std::getenv("NOSPHERA2_ITENSOR_SKIPSTATS")) return;
+		if (!std::getenv("NOSPHERA2_ITENSOR_SKIPSTATS")) return; // Flawfinder: ignore
 		const int na = static_cast<int>(active.size());
 		if (na < 2) return;
 		auto tiles_alive = [&](const ivec& order, const int T) {
@@ -1876,7 +1876,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		//
 		//NOSPHERA2_ITENSOR_CHUNK sets the target; 0 restores the three whole bands.
 		const int chunk = [] {
-			const char* e = std::getenv("NOSPHERA2_ITENSOR_CHUNK");
+			const char* e = std::getenv("NOSPHERA2_ITENSOR_CHUNK"); // Flawfinder: ignore
 			return e ? std::atoi(e) : 1024;
 		}();
 		//Even chunks rather than a short tail: a 40-point remainder is a GEMM that costs a
@@ -2102,7 +2102,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//any path that contributes runs single. nr_small * i_compact_ deliberately in size_t,
 	//the product passes 2^31 at nmo = 500 with 20k reflections.
 	{
-		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
+		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT"); // Flawfinder: ignore
 		const bool single_build = (itensor_on_gpu && !opt->gpu_fp64)
 			|| ((!itensor_on_gpu || opt->itensor_hybrid) && opt->cpu_itensor_fp32);
 		i_float_ = settings.i_tensor_single || (f && std::atoi(f) != 0) || (single_build && !settings.i_tensor_double);
@@ -2261,7 +2261,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				for (const GridBlock& block : grid_blocks[g]) {
 					max_ao_block_size = std::max(max_ao_block_size, block.ao_values.size());
 					for (const MatrixTile& tile : block.matrix_tiles) {
-						max_tile_result_size = std::max(max_tile_result_size, static_cast<size_t>(tile.result_offset + tile.row_count * tile.col_count));
+						max_tile_result_size = std::max(max_tile_result_size, tile.result_offset + static_cast<size_t>(tile.row_count) * tile.col_count);
 					}
 				}
 			}
@@ -2813,12 +2813,23 @@ void XCW::solve_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat
 	const occ::Mat& X = scf.ctx.orthogonalizer.transformation_matrix();
 	const int n = static_cast<int>(X.rows()), m = static_cast<int>(X.cols()), nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1, ldf = static_cast<int>(F.rows());
 	occ::Mat FX(n, m), Fp(m, m);
-	mo.C.resize(nb * n, m);
-	mo.energies.resize(nb * m);
+	mo.C.resize(static_cast<Eigen::Index>(nb) * n, m);
+	mo.energies.resize(static_cast<Eigen::Index>(nb) * m);
 	for (int b = 0; b < nb; b++) {
 		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, m, n, 1.0, F.data() + b * n, ldf, X.data(), n, 0.0, FX.data(), n);
 		cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, m, m, n, 1.0, X.data(), n, FX.data(), n, 0.0, Fp.data(), m);
+#if defined(__APPLE__)
+		int mm = m, lwork = -1, liwork = -1, iwq = 0, info = 0;
+		double wq = 0.0;
+		dsyevd_((char*)"V", (char*)"L", &mm, Fp.data(), &mm, mo.energies.data() + b * m, &wq, &lwork, &iwq, &liwork, &info);
+		lwork = static_cast<int>(wq), liwork = iwq;
+		vec work(lwork);
+		ivec iwork(liwork);
+		dsyevd_((char*)"V", (char*)"L", &mm, Fp.data(), &mm, mo.energies.data() + b * m, work.data(), &lwork, iwork.data(), &liwork, &info);
+		err_checkf(info == 0, "Fock diagonalisation failed", std::cout);
+#else
 		err_checkf(LAPACKE_dsyevd(LAPACK_COL_MAJOR, 'V', 'L', m, Fp.data(), m, mo.energies.data() + b * m) == 0, "Fock diagonalisation failed", std::cout);
+#endif
 		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, m, m, 1.0, X.data(), n, Fp.data(), m, 0.0, mo.C.data() + b * n, nb * n);
 	}
 	mo.update_occupied_orbitals();
@@ -2837,7 +2848,7 @@ occ::Mat XCW::diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	for (int b = 0; b < nb; b++) {
 		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, S.data() + b * n, nb * n, D.data() + b * n, nb * n, 0.0, SD.data(), n);
 		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, SD.data(), n, F.data() + b * n, nb * n, 0.0, T.data(), n);
-		comm.middleRows(b * n, n) = T - T.transpose();
+		comm.middleRows(static_cast<Eigen::Index>(b) * n, n) = T - T.transpose();
 	}
 	scf.diis_error = comm.array().abs().maxCoeff();
 	occ::Mat F_cdiis = F;

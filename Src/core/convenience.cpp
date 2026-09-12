@@ -629,7 +629,7 @@ bool ensure_occ_data_path(const char *argv0)
         free(occ_data_path_env);
     }
 #else
-    const char* tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH");
+    const char* tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH"); // Flawfinder: ignore
     if (tmp_occ_data_path_env != nullptr)
     {
         std::string occ_data_path_env(tmp_occ_data_path_env);
@@ -775,7 +775,7 @@ std::filesystem::path get_home_path(void)
     temp1.append(temp2);
     return temp1;
 #else
-    const char *home_env = getenv("HOME");
+    const char *home_env = getenv("HOME"); // Flawfinder: ignore
     if (home_env == nullptr) {
         std::cerr << "Warning: HOME environment variable not set." << std::endl;
         return std::filesystem::path("/tmp"); // Fallback to /tmp

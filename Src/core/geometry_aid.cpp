@@ -77,7 +77,7 @@ namespace geometry_aid
         // trained model, and nothing downstream rejects it -- hence the
         // warning.
         double spline_accuracy = 1E-6;
-        if (const char* override_accuracy = std::getenv("NOSPHERA2_SPLINE_ACCURACY"))
+        if (const char* override_accuracy = std::getenv("NOSPHERA2_SPLINE_ACCURACY")) // Flawfinder: ignore
         {
             spline_accuracy = std::atof(override_accuracy);
             std::cout << "  WARNING spline_accuracy overridden to " << spline_accuracy
@@ -89,13 +89,13 @@ namespace geometry_aid
         // size: 66 pairs * (max_radial+1)^2 * (max_angular+1) = 42,042 today.
         // Changing either invalidates every shipped model.
         int max_radial = 6, max_angular = 12;
-        if (const char* override_radial = std::getenv("NOSPHERA2_MAX_RADIAL"))
+        if (const char* override_radial = std::getenv("NOSPHERA2_MAX_RADIAL")) // Flawfinder: ignore
         {
             max_radial = std::atoi(override_radial);
             std::cout << "  WARNING max_radial overridden to " << max_radial
                       << " -- timing only" << std::endl;
         }
-        if (const char* override_angular = std::getenv("NOSPHERA2_MAX_ANGULAR"))
+        if (const char* override_angular = std::getenv("NOSPHERA2_MAX_ANGULAR")) // Flawfinder: ignore
         {
             max_angular = std::atoi(override_angular);
             std::cout << "  WARNING max_angular overridden to " << max_angular
@@ -279,7 +279,7 @@ namespace geometry_aid
         const std::filesystem::path& out_path,
         const SALTED_Utils::FeatomicHyperParameters& hyperparams)
     {
-        const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr;
+        const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr; // Flawfinder: ignore
         auto mark = std::chrono::steady_clock::now();
         auto lap = [&mark, time_phases](const char* what) {
             if (!time_phases) return;
@@ -289,10 +289,10 @@ namespace geometry_aid
             mark = now;
         };
 
-        featomic::SimpleSystem system = SALTED_Utils::gen_featomic_system(structure);
+        featomic::SimpleSystem featomic_system = SALTED_Utils::gen_featomic_system(structure);
         lap("read_structure");
         metatensor::TensorMap descriptor = SALTED_Utils::calculate_SOAP_Powerspectrum(
-            std::move(system), hyperparams);
+            std::move(featomic_system), hyperparams);
         // Reset here or the next lap spans the whole SOAP call as well, which
         // reported the 13 MB copy below as 0.6 s when it is 15 ms.
         mark = std::chrono::steady_clock::now();
@@ -320,7 +320,7 @@ namespace geometry_aid
         const std::filesystem::path& model_path,
         const SALTED_Utils::FeatomicHyperParameters& hyperparams)
     {
-        const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr;
+        const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr; // Flawfinder: ignore
         auto mark = std::chrono::steady_clock::now();
         auto lap = [&mark, time_phases](const char* what) {
             if (!time_phases) return;

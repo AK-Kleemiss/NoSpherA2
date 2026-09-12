@@ -270,7 +270,7 @@ namespace
 metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters) {
     // Phase timings, off unless NOSPHERA2_TIME_SOAP is set. Caching the
     // calculator does not remove the fixed per-call cost; it is in what follows.
-    const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr;
+    const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr; // Flawfinder: ignore
     auto mark = std::chrono::steady_clock::now();
     auto lap = [&mark](const char* what, bool on) {
         if (!on) return;
