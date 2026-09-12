@@ -141,7 +141,8 @@ AtomGrid::AtomGrid(const double radial_precision,
     const double alpha_max,
     const int max_l_quantum_number,
     const double alpha_min[],
-    std::ostream &file)
+    std::ostream &file,
+    const double radial_step_scale)
 {
     using namespace std;
     const int min_num_angular_points_closest =
@@ -182,6 +183,7 @@ AtomGrid::AtomGrid(const double radial_precision,
             h = (((h) < (get_h(radial_precision, l, 0.1 * (r_outer - r_inner)))) ? (h) : (get_h(radial_precision, l, 0.1 * (r_outer - r_inner))));
         }
     }
+    h /= radial_step_scale;
 
     //if (debug)
     //  file << "ATOM GRID: "

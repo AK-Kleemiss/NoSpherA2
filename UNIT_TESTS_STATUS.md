@@ -242,6 +242,32 @@ exact, -0.3125; PC07opt shifts it) and one point value against the Python transc
 sources to 1e-12. Water-methanol Delta E_x -2.03 (free fit, total -0.47) and -2.28 kcal/mol (Model V7,
 total +2.13), between PBE and B88; GPU and CPU agree to all printed digits, cost equals the PBE run.
 
+## 2026-09-09 — ECP cores filled for QTAIM, and the Flawfinder check
+
+`ELI_HgH2_ECP` now runs with `-ECP 1`: the 60 electrons the def2 ECP removed from mercury are
+put back from Thakkar's spherical core density for the QTAIM basins (the topology is followed on
+the filled density, the count added analytically since the valence grid cannot integrate a 1s at
+Z = 80). Hg comes out at 79.431 e against 79.431 for the all-electron DKH2 calculation and 79.454
+from AIMAll. ELI-D stays on the valence density.
+
+The code-scanning check `Flawfinder` failed the pull request on six level-4/5 hits: a `readlink`
+of `/proc/self/exe`, two `system("which ...")` calls, two `popen` calls for the zenity/kdialog
+file dialogs, and a false positive on a variable named `system`. The `which` calls now search
+PATH directly, the variable is renamed, and the three remaining calls carry reviewed
+`Flawfinder: ignore` markers with their reason. `flawfinder --minlevel=4 Src` reports nothing.
+
+## 2026-09-09 — heavy-element basin cases: `ELI_HgH2_ECP` and `ELI_UH6`
+
+Two golden cases in the new `tests/ELI_heavy` directory (one resource lock, they share the log):
+HgH2 with the def2 ECP on mercury (RHF/def2-TZVP, 10 s) and UH6 all-electron (RHF/DKH2 with
+SARC-DKH-TZVP, 34 s), both from ORCA 6.1.1 inputs kept in the handover. They pin the ECP
+handling (a nucleus without core density wears a sphere of valence maxima, which the trajectory
+code folds into it) and the core-shell unification for Z = 92. Reference values: HgH2-ECP QTAIM
+Hg 19.431 (AIMAll 19.454), ELI-D Hg core 18.17 (the 5s5p5d semicore); UH6 QTAIM U 89.115 / H
+1.4807 (AIMAll 89.020 / 1.4967; `-acc 4` gives 89.075 / 1.4874), ELI-D U core 85.7, six hydride
+basins of 1.71-1.75 e plus U-H fragments of 0.31. DGrid is no reference here: its voxel
+integration of a Z = 80 cusp gives 478 electrons for the mercury core.
+
 ## 2026-09-09 — f-function phases in the OCC-to-WFN constructor
 
 `WFN::WFN(const occ::qm::Wavefunction&)` applied Gaussian-convention spherical-to-cartesian

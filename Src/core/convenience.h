@@ -905,6 +905,9 @@ struct options
     bool promol_nci = false;
     bool get_g = false;
     int accuracy = 2;
+    //-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
+    //exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
+    int basin_grid = 1;
     int threads = -1;
     int pbc = 0;
     int charge = 0;

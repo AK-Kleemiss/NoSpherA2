@@ -512,17 +512,23 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types, s
         err_checkf(config_.accuracy >= 0, "Negative accuracy is not defined!", std::cout);
         // Get Lebedev grid parameters using the constexpr function
         const auto grid_params = getLebedevGridParams(config_.accuracy, atom_type, max_l_temp);
+        auto boosted = [&](const int n) {
+            int k = 0;
+            while (k + 1 < 33 && constants::lebedev_table[k] < n) k++;
+            return constants::lebedev_table[std::min(32, k + config_.angular_boost)];
+        };
 
         // Create the prototype grid with the determined parameters
         prototype_grids_.emplace_back(
             grid_params.radial_accuracy,
-            grid_params.lebedev_low,
-            grid_params.lebedev_high,
+            boosted(grid_params.lebedev_low),
+            boosted(grid_params.lebedev_high),
             atom_type,
-            alpha_max,
+            alpha_max * config_.alpha_max_scale,
             max_l_temp,
             alpha_min.data(),
-            std::cout
+            std::cout,
+            config_.radial_step_scale
         );
         if (config_.debug) {
             file << std::setw(9) << atom_type << " | "

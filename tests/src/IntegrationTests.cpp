@@ -774,6 +774,18 @@ TEST(TomlIntegrationTests, ELI_NH3Li)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, ELI_HgH2_ECP)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_HgH2_ECP");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, ELI_UH6)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_UH6");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, RGBI_NH3Li_ANO)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_ANO");

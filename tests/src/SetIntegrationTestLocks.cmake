@@ -47,6 +47,12 @@ set_tests_properties(
 
 # Tests using tests/SALTED
 set_tests_properties(
+    TomlIntegrationTests.ELI_HgH2_ECP
+    TomlIntegrationTests.ELI_UH6
+    PROPERTIES
+        RESOURCE_LOCK integration_ELI_heavy
+)
+set_tests_properties(
     TomlIntegrationTests.SALTED
     SALTEDTests.ReadingSALTEDBinaryFile
     BesselTests.AnalyticFourier

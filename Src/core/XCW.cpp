@@ -407,6 +407,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		settings.diis_stop_shift = 1e-2;
 	}
 	else if (speed_preset == "fast_conv") {
+		settings.method_apply_damping = false;
+		settings.method_apply_shift = false;
 	}
 
 	if (basis_set_name == "Undefined") {

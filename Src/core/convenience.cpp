@@ -70,7 +70,7 @@ namespace {
         }
 #else
         char exe_path[4096];
-        ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+        ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1); /* Flawfinder: ignore - fixed path, bounded, terminated below */
         if (len > 0)
         {
             exe_path[len] = '\0';
@@ -432,7 +432,13 @@ std::string help_message =
  "                                    voxel sum and on the atomic quadrature\n"
  "                                    grids, the boundary followed along the\n"
  "                                    field; -acc 4 before it tightens the\n"
- "                                    latter from 0.005 to 0.002 e.\n"
+ "                                    latter from 0.005 to 0.002 e. With -ECP\n"
+ "                                    the core an ECP removed is filled from\n"
+ "                                    Thakkar densities for the QTAIM basins.\n"
+ "  -basin_grid <n>                    Pull the basin quadrature into the core:\n"
+ "                                    tightest exponent sharpened n^2-fold, the\n"
+ "                                    radial step divided by n, the angular\n"
+ "                                    order up n-1 steps. For heavy atoms.\n"
  "  -ewal_sum <cube> [kmax] [accuracy] Ewald sum of a cube.\n"
  "  -atom_dens <wfn> [alpha-MOs beta-MOs]\n"
  "  -atom_dens_diff <gbw1> <gbw2>      Difference density from two GBW files.\n"
@@ -2543,6 +2549,8 @@ bool options::digest_run_options(const std::string &temp, int &i)
     const int argc = (int)arguments.size();
     if (temp == "-acc")
         accuracy = stoi(arguments[i + 1]);
+    else if (temp == "-basin_grid")
+        basin_grid = std::max(1, stoi(arguments[i + 1]));
     else if (temp == "-Anion")
     {
         int n = 1;
@@ -4261,7 +4269,17 @@ bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std:
     return false;
 #else
     std::string command;
-    bool use_zenity = (system("which zenity > /dev/null 2>&1") == 0);
+    //Looked up on PATH rather than asked of a shell
+    auto on_path = [](const char* name) {
+        const char* path = std::getenv("PATH"); /* Flawfinder: ignore - only split on ':' and joined to a directory */
+        if (!path) return false;
+        std::stringstream dirs(path);
+        std::string dir;
+        while (std::getline(dirs, dir, ':'))
+            if (!dir.empty() && std::filesystem::exists(std::filesystem::path(dir) / name)) return true;
+        return false;
+    };
+    bool use_zenity = on_path("zenity");
     bool use_kdialog = false;
 
     if (use_zenity) {
@@ -4276,7 +4294,7 @@ bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std:
         command += " 2> /dev/null";
     }
     else {
-        use_kdialog = (system("which kdialog > /dev/null 2>&1") == 0);
+        use_kdialog = on_path("kdialog");
         if (use_kdialog) {
             command = "kdialog --getopenfilename \"";
             command += current_path;
@@ -4319,7 +4337,7 @@ bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std:
         std::cout << "Executing command: " << command << std::endl;
     }
 
-    FILE *f = popen(command.c_str(), "r");
+    FILE *f = popen(command.c_str(), "r"); /* Flawfinder: ignore - a fixed dialog program and its quoted arguments */
     if (!f) {
         std::cerr << "Error: Failed to execute file dialog command." << std::endl;
         return false;
@@ -4429,7 +4447,7 @@ bool save_file_dialog(std::filesystem::path &path, bool debug, const std::vector
     command += "/\" --save --confirm-overwrite 2> /dev/null";
     bool end = false;
     while (!end) {
-        FILE *f = popen(command.c_str(), "r");
+        FILE *f = popen(command.c_str(), "r"); /* Flawfinder: ignore - a fixed dialog program and its quoted arguments */
         if (!f) {
             std::cout << "ERROR" << std::endl;
             return false;

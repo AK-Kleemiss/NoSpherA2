@@ -177,7 +177,9 @@ static int run_app_impl(int argc, char **argv)
     //Basin analysis and quit; the tables stay in the log, which is what the golden test reads
     if (opt.eli_analysis_run)
     {
-        ELI_analysis(WFN(opt.wfn), opt);
+        WFN basins(opt.wfn);
+        if (opt.ECP) basins.set_has_ECPs(true, true, opt.ECP_mode);
+        ELI_analysis(basins, opt);
         return 0;
     }
     // Perform fractal dimensional analysis and quit
