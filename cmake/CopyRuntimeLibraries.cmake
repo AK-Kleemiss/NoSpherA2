@@ -110,4 +110,7 @@ function(nosphera2_copy_runtime_libraries target)
 
         VERBATIM
     )
+
+    # No CUDA or ROCm runtime is copied. cuBLAS was the only one that ever needed to be, and
+    # shipping it cost half a gigabyte for two GEMM calls; gemm_gpu.cuh replaced it.
 endfunction()

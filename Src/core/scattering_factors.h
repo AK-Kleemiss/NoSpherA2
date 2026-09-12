@@ -35,8 +35,10 @@ class cell;
 struct options;
 struct scattering_data {
     double F_obs;
+    double abs_F_obs;
+    double F_obs2;
     double sigma_obs;
-    int positive;
+    double sigma_obs2;
 };
 
 enum GridIndex
@@ -71,6 +73,27 @@ void make_k_pts(const bool& read_k_pts,
     std::ostream& file,
     bool debug = false);
 
+//streams a combined (-mtc) SALTED table in reflection blocks; false means nothing was written, take the ordinary path
+bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file, vec2* known_kpts);
+
+//everything a disorder part needs for the transform, gathered once; all of it is reflection-independent,
+//which is what lets the -mtc reflection loop be moved outside the parts
+struct salted_part_prep
+{
+    vec coefs;
+    ivec asym_atom_list;
+    svec labels;
+    const std::vector<atom>* atoms = nullptr;  // owned by the predictor, which outlives this
+    vec2 k_pt;
+    std::vector<i3> hkl_v;
+    //spherical remainder only
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    vec k_of_reflection;
+    //stl of the same reflections, carried rather than inverted out of k (which would undo a 4*pi and a unit conversion)
+    vec stl_of_reflection;
+};
+
 /**
  * @brief Calculates the scattering factors based on calculator_type and opt.partitioning_type.
  * @param opt The options for scattering factors calculations.
@@ -88,7 +111,8 @@ tsc_block_type calculate_scattering_factors(
     std::ostream& file,
     svec& known_atoms,
     const int& nr,
-    vec2* kpts = NULL
+    vec2* kpts = NULL,
+    salted_part_prep* prep_out = NULL  // set: stop after the prediction and hand it back
 );
 
 /**
@@ -151,6 +175,15 @@ void generate_fractional_hkl(
  * @param file The output stream to write the results to.
  * @param debug Flag indicating whether to enable debug mode.
  */
+/**
+ * @brief The magnitude below which a contribution is negligible at a given -acc level.
+ *
+ * 1e-10 up to -acc 2, 1e-14 at 3, 1e-30 above: the ladder the scattering-factor code has
+ * always used, shared so that the XCW I tensor drops AO contributions on the same terms
+ * rather than on a constant of its own.
+ */
+double cutoff(const int& accuracy);
+
 svec read_atoms_from_CIF(
     std::ifstream& cif_input,
     const ivec& input_groups,
@@ -162,7 +195,9 @@ svec read_atoms_from_CIF(
     ivec& asym_atom_list,
     bvec& needs_grid,
     std::ostream& file,
-    const bool debug = false);
+    const bool debug = false,
+    //a spherical fill of an already covered part finds no atoms; everywhere else zero means a broken CIF
+    const bool allow_empty = false);
 
 
 /**
@@ -225,18 +260,21 @@ static void add_ECP_contribution(
  * @param debug Flag indicating whether to enable debug mode.
  */
 void calc_SF(const int& points,
-    vec2& k_pt,
-    vec2& d1,
-    vec2& d2,
-    vec2& d3,
-    vec2& dens,
+    const vec2& k_pt,
+    const vec2& d1,
+    const vec2& d2,
+    const vec2& d3,
+    const vec2& dens,
     cvec2& sf,
     std::ostream& file,
     _time_point& start,
     _time_point& end1,
     bool debug,
     bool no_date = false,
-    bool do_XCW = false);
+    bool do_XCW = false,
+    bool use_gpu = true,
+    bool gpu_fp64 = false,
+    bool gpu_fp32 = false);
 
 double fourier_bessel_integral(
     const primitive& p,

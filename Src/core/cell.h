@@ -12,6 +12,7 @@ struct asym_atom {
     d3 frac_pos;
     double asym_fact;
     cdouble anom;
+    bool grown = false;
 };
 
 /**
@@ -33,7 +34,13 @@ private:
     std::vector<ivec2> sym;
     std::vector<vec> trans;
 
-    bool check_special(const vec& pos1, const vec& pos2);
+    void convert_to_fracs(std::vector<asym_atom>& atoms, const std::string input_unit);
+    vec apply_symmetry(const vec& pos, const int sym_op);
+    bool check_special(const vec& pos1, const vec& pos2, const double& tolerance = 1e-10);
+	ivec confirm_applied_symmetry(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
+	void delete_symmetry(const ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl);
+    void link_symmetry_atoms(std::vector<asym_atom>& asym_atoms, ivec3& linking_list, const int& asymmetric_atoms);
+	bool check_identity(const int& sym_op);
 
 public:
     /**
@@ -56,7 +63,9 @@ public:
         std::ostream& file);
 
     //void get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
-    void eval_symm(std::vector<asym_atom>& asym_atoms);
+	void grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_atom>& xyz_atoms);
+    void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list, const bool& grown = false);
+    void apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
 
     cell()
     {
@@ -386,7 +395,7 @@ public:
             file << "\nStarting while !.eof()" << std::endl;
         while (!cif_input.eof())
         {
-            getline(cif_input, line);
+            getline_universal(cif_input, line);
             for (int k = 0; k < cell_keywords.size(); k++)
             {
                 if (line.find(cell_keywords[k]) != std::string::npos)
@@ -537,16 +546,19 @@ public:
         int count_fields = 0;
         while (!cif_input.eof() && !symm_found)
         {
-            getline(cif_input, line);
+            getline_universal(cif_input, line);
             if (line.find("loop_") != std::string::npos)
             {
                 // if(debug) file << "found loop!" << endl;
                 while (line.find("_") != std::string::npos)
                 {
-                    getline(cif_input, line);
+                    getline_universal(cif_input, line);
                     if (debug)
                         file << "line in loop field definition: " << line << std::endl;
-                    if (line.find("space_group_symop_operation_xyz") != std::string::npos)
+                    // Both spellings occur: the current tag and the deprecated one,
+                    // which PDB-derived and older CIFs still use.
+                    if (line.find("space_group_symop_operation_xyz") != std::string::npos ||
+                        line.find("symmetry_equiv_pos_as_xyz") != std::string::npos)
                         operation_field = count_fields;
                     else if (count_fields > 2 || (operation_field == 200 && count_fields != 0))
                     {
@@ -562,12 +574,31 @@ public:
                     if (debug)
                         file << "Reading operation!" << line << std::endl;
                     symm_found = true;
-                    std::stringstream s(line);
+                    // Operations are commonly quoted AND spaced - 'x, y, z' - which a
+                    // plain whitespace split turns into three separate fields, so the
+                    // parser then sees "'x," and rejects the file. Honour the quotes.
                     svec fields;
                     fields.resize(count_fields);
                     int rot_from_cif[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-                    for (int i = 0; i < count_fields; i++)
-                        s >> fields[i];
+                    {
+                        size_t p = 0;
+                        for (int i = 0; i < count_fields && p < line.size(); i++)
+                        {
+                            while (p < line.size() && std::isspace(static_cast<unsigned char>(line[p]))) p++;
+                            if (p >= line.size()) break;
+                            if (line[p] == 0x27 || line[p] == '"')
+                            {
+                                const char quote = line[p++];
+                                while (p < line.size() && line[p] != quote) fields[i].push_back(line[p++]);
+                                if (p < line.size()) p++;
+                            }
+                            else
+                            {
+                                while (p < line.size() && !std::isspace(static_cast<unsigned char>(line[p])))
+                                    fields[i].push_back(line[p++]);
+                            }
+                        }
+                    }
                     err_checkf(operation_field < count_fields,
                         "Could not find the _space_group_symop_operation_xyz column in the symmetry loop of " + filename.string() + "!", file);
                     double trans_from_cif[3]{ 0.0, 0.0, 0.0 };
@@ -613,7 +644,7 @@ public:
                             for (int y = 0; y < 3; y++)
                                 sym[y][x].push_back(rot_from_cif[x][y]);
                     }
-                    getline(cif_input, line);
+                    getline_universal(cif_input, line);
                 }
             }
         }

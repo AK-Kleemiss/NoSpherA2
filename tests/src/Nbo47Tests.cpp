@@ -212,7 +212,7 @@ TEST(Nbo47, WriteNboReportsProgressWhenRequested)
 
     const std::string log_text = progress_log.str();
     EXPECT_NE(log_text.find("[FILE47] Starting .47 conversion"), std::string::npos);
-    EXPECT_NE(log_text.find("[FILE47] Computing Cartesian AO overlap integrals"), std::string::npos);
+    EXPECT_NE(log_text.find("[FILE47] Computing spherical AO overlap integrals"), std::string::npos);
     EXPECT_NE(log_text.find("[FILE47] Writing FILE47 sections"), std::string::npos);
     EXPECT_NE(log_text.find("[FILE47] Finished .47 conversion"), std::string::npos);
 }

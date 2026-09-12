@@ -307,7 +307,7 @@ private:
         // The scatterer encoding is a property of the data, rather than a
         // caller-supplied header detail. Remove any stale marker; the
         // matching marker, when needed, was written as the first line above.
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             if (line == "SCATTERER_IDS")
                 continue;
@@ -735,6 +735,56 @@ public:
         return result.str();
     }
 
+    // --- streaming write -------------------------------------------------
+    // The payload is reflection-major, so a table can be emitted a block of reflections
+    // at a time; reuses the serialisation above so streamed and one-shot files match.
+    // Static because a streamed table has only the scatterer list, never a populated block.
+    static void write_tscb_prologue(std::ostream& out,
+                                    const ScattererLabels& scatterers,
+                                    const std::string& header,
+                                    const std::size_t reflection_count)
+    {
+        tsc_block prototype;
+        prototype.scatterers_ = scatterers;
+        prototype.header_ = header;
+        prototype.validate_uniform_scatterer_type();
+        const std::string binary_file_header = prototype.binary_header();
+        write_scalar(out, checked_binary_size(binary_file_header.size(), "Header size"));
+        write_bytes(out, binary_file_header.data(), binary_file_header.size());
+        prototype.write_binary_scatterers(out);
+        write_scalar(out, checked_binary_size(reflection_count, "Reflection count"));
+    }
+
+    void write_tscb_prologue(std::ostream& out, const std::size_t reflection_count) const
+    {
+        write_tscb_prologue(out, scatterers_, header_, reflection_count);
+    }
+
+    // sf_block is [scatterer][reflection within the block], idx is [dimension][same]
+    static void write_tscb_reflection_block(
+        std::ostream& out,
+        const std::vector<std::vector<numtype_index>>& idx,
+        const cvec2& sf_block)
+    {
+        const std::size_t n = idx.empty() ? 0 : idx[0].size();
+        std::vector<char> buffer;
+        buffer.reserve(n * (3 * sizeof(numtype_index) + sf_block.size() * sizeof(numtype)) + 64);
+        auto append = [&buffer]<typename T>(const T& value)
+        {
+            static_assert(std::is_trivially_copyable_v<T>);
+            const char *const bytes = reinterpret_cast<const char *>(&value);
+            buffer.insert(buffer.end(), bytes, bytes + sizeof(T));
+        };
+        for (std::size_t r = 0; r < n; ++r)
+        {
+            for (std::size_t dimension = 0; dimension < 3; ++dimension)
+                append(idx[dimension][r]);
+            for (const auto& row : sf_block)
+                append(row[r]);
+        }
+        write_bytes(out, buffer.data(), buffer.size());
+    }
+
     void write_tscb_file(
         const std::filesystem::path & /*cif_name*/ = "test.cif",
         const std::filesystem::path& name = "experimental.tscb") const
@@ -772,9 +822,8 @@ public:
             static_assert(std::is_trivially_copyable_v<T>);
             if (buffer.size() + sizeof(T) > buffer_capacity)
                 flush_buffer();
-            const std::size_t offset = buffer.size();
-            buffer.resize(offset + sizeof(T));
-            std::memcpy(buffer.data() + offset, &value, sizeof(T));
+            const char *const bytes = reinterpret_cast<const char *>(&value);
+            buffer.insert(buffer.end(), bytes, bytes + sizeof(T));
         };
 
         for (std::size_t reflection = 0; reflection < reflection_count; ++reflection)
@@ -869,7 +918,7 @@ namespace tsc_merge_detail
         std::string line;
         bool found_data = false;
 
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             const bool is_ids = line.find("SCATTERER_IDS:") != std::string::npos;
             const bool is_names = line.find("SCATTERERS:") != std::string::npos;
@@ -1006,7 +1055,7 @@ namespace tsc_merge_detail
         ReflectionKey key;
         std::vector<std::complex<double>> values;
 
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             if (!parse_data_row(line, key, values) || is_zero(key))
                 continue;
@@ -1049,7 +1098,7 @@ namespace tsc_merge_detail
         std::vector<std::complex<double>> values;
         std::size_t reflection = 0;
 
-        while (std::getline(input, line))
+        while (getline_universal(input, line))
         {
             if (!parse_data_row(line, key, values))
                 continue;

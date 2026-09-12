@@ -42,5 +42,5 @@ if(LINUX)
 endif()
 
 if(WIN32 AND NOS_USE_AVX)
-    add_compile_options(/arch:AVX)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/arch:AVX>)
 endif()

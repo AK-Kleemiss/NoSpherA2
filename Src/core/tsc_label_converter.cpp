@@ -42,10 +42,10 @@ std::vector<cif_atom> read_cif_atoms(const std::filesystem::path& cif_file)
     std::ifstream input(cif_file);
     if (!input) throw std::runtime_error("Failed to open CIF file: " + cif_file.string());
     std::string line;
-    while (std::getline(input, line)) {
+    while (getline_universal(input, line)) {
         if (trim(line) != "loop_") continue;
         std::vector<std::string> columns;
-        while (std::getline(input, line) && trim(line).starts_with('_'))
+        while (getline_universal(input, line) && trim(line).starts_with('_'))
             columns.push_back(uppercase(trim(line)));
         const auto column = [&columns](const std::string& name) {
             const auto found = std::find(columns.begin(), columns.end(), name);
@@ -64,7 +64,7 @@ std::vector<cif_atom> read_cif_atoms(const std::filesystem::path& cif_file)
             if (atomic_number <= 0) throw std::runtime_error("Unknown atom type in CIF: " + fields[type]);
             result.push_back({ atomID(std::stod(without_esd(fields[x])), std::stod(without_esd(fields[y])),
                 std::stod(without_esd(fields[z])), part, atomic_number), fields[label] });
-        } while (std::getline(input, line) && !trim(line).empty());
+        } while (getline_universal(input, line) && !trim(line).empty());
         if (!result.empty()) return result;
     }
     throw std::runtime_error("CIF contains no usable _atom_site loop");

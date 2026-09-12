@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <iosfwd>
 
 class AtomGrid
 {
@@ -12,7 +13,8 @@ public:
         const double alpha_max,
         const int max_l_quantum_number,
         const double alpha_min[],
-        std::ostream &file);
+        std::ostream &file,
+        const double radial_step_scale = 1.0);
 
     ~AtomGrid();
 
@@ -32,9 +34,7 @@ public:
         double grid_aw[],
         double grid_becke_w[],
         double grid_TFVC_w[],
-        const WFN &wfn,
-        vec &chi,
-        bool debug = false) const;
+        const vec &chi) const;
 
     void get_radial_grid(double grid_r_bohr[], double grid_w[]) const;
     void get_radial_distances(double grid_r_bohr[]) const;
@@ -91,11 +91,13 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
     const WFN &wavy,
     const vec3 &grid,
     const ivec &num_grid_points,
-    const bool debug = false);
+    const bool debug = false,
+    std::ostream &file = std::cout);
 
 std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     const WFN &wavy,
     const vec3 &grid,
     const ivec &num_grid_points,
     const bool debug = false,
-    const std::vector<std::pair<vec, vec>> MBIS_vectors = {});
+    const std::vector<std::pair<vec, vec>> MBIS_vectors = {},
+    std::ostream &file = std::cout);

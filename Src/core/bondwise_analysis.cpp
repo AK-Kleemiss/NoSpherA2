@@ -7,6 +7,7 @@
 #include "nos_math.h"
 #include "integration_params.h"
 #include "b2c.h"
+#include "spherical_density.h"
 #include <occ/qm/hf.h>
 
 namespace {
@@ -883,9 +884,9 @@ int autobonds(bool debug, WFN &wavy, const std::filesystem::path &inputfile, con
     }
     input.seekg(0);
     std::string line("");
-    getline(input, line);
+    getline_universal(input, line);
     std::string comment("!");
-    while (line.compare(0, 1, comment) == 0) getline(input, line);
+    while (line.compare(0, 1, comment) == 0) getline_universal(input, line);
     int rho, rdg, eli, lap;
     if (line.length() < 10) return 0;
     else
@@ -898,7 +899,7 @@ int autobonds(bool debug, WFN &wavy, const std::filesystem::path &inputfile, con
     }
     int errorcount = 0, runnumber = 0;
     do {
-        getline(input, line);
+        getline_universal(input, line);
         if (line.length() < 10) continue;
         runnumber++;
         int sel = 0, leng = 0, cube = 0, mres = 0, a1 = 0, a2 = 0, a3 = 0;
@@ -963,8 +964,8 @@ std::vector<std::pair<int, int>> get_bonded_atom_pairs(const WFN &wavy) {
 vec change_basis_sq(const vec &in, const vec &transformation, int size) {
 
     // new = transform^T * in * tranform
-    vec result(size * size);
-    vec temp(size * size);
+    vec result(static_cast<size_t>(size) * size);
+    vec temp(static_cast<size_t>(size) * size);
     // first we do temp = t^T * i
     cblas_dgemm(CblasRowMajor,
         CblasTrans, CblasNoTrans,
@@ -1037,8 +1038,8 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 
     // 1. Memory Allocation for Submatrices
     // Using flat std::vectors to ensure contiguous memory for MKL
-    vec D_sub(n * n, 0.0); // called P in tonto
-    vec S_sub(n * n, 0.0); // called S in tonto
+    vec D_sub(static_cast<size_t>(n) * n, 0.0); // called P in tonto
+    vec S_sub(static_cast<size_t>(n) * n, 0.0); // called S in tonto
     get_submatrices(D_full, S_full, D_sub, S_sub, atom_indices);
 
     // Tonto's atomic spherical averaging applies the local point group to the
@@ -1049,7 +1050,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
         symmetrize_atomic_matrix_oh(atomic_density, shell_angular_momenta, spherical);
         D_sub = atomic_density.container();
     }
-    vec Rho(n * n);        // To store target density
+    vec Rho(static_cast<size_t>(n) * n);        // To store target density
 
     vec V = S_sub;
     vec W(n);
@@ -1082,7 +1083,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     for (int i = 0; i < n; i++)
         W[i] = abs(W[i]) < 1E-10 ? 0.0 : 1.0 / W[i];
 
-    vec Temp2(n * n, 0.0);
+    vec Temp2(static_cast<size_t>(n) * n, 0.0);
     double *T;
     int in, jn;
     for (int i = 0; i < n; i++) {
@@ -1135,8 +1136,8 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
     vec sorted_evecs;
     vec omitted_evals;
     vec omitted_evecs;
-    sorted_evecs.reserve(n * n);
-    omitted_evecs.reserve(n * n);
+    sorted_evecs.reserve(static_cast<size_t>(n) * n);
+    omitted_evecs.reserve(static_cast<size_t>(n) * n);
 
     if (EVs) {
         std::cout << "Eigenvalues of projected density P (unsorted):\n";
@@ -1256,7 +1257,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 double Roby_information::projection_matrix_and_expectation(const ivec &indices, const ivec &eigvals, const ivec &eigvecs, dMatrix2 *given_NAO, dMatrix2 *proj_out) {
     const int n = indices.size();
     //vec D_Sub(n * n, 0.0);
-    vec S_Sub(n * n, 0.0);
+    vec S_Sub(static_cast<size_t>(n) * n, 0.0);
     get_submatrix(overlap_matrix, S_Sub, indices);
     dMatrix2 S = reshape<dMatrix2>(S_Sub, Shape2D(n, n));
     int atom = -1;
@@ -1282,7 +1283,7 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
     if (given_NAO != nullptr && !eigvals.empty() && !eigvecs.empty()) {
         const int n1 = eigvals.size();
         const int n2 = eigvecs.size();
-        vec NAO_sub(n1 * n2);
+        vec NAO_sub(static_cast<size_t>(n1) * n2);
         get_submatrix(*given_NAO, NAO_sub, eigvals, eigvecs);
         NAOs = reshape<dMatrix2>(NAO_sub, Shape2D(n1, n2));
     }
@@ -1314,7 +1315,7 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
         const int n2 = eigvecs.size();
         if (n1 == 0 || n2 == 0)
             return zero_projection();
-        vec NAO_sub(n1 * n2);
+        vec NAO_sub(static_cast<size_t>(n1) * n2);
         if (given_NAO == nullptr)
             given_NAO = &total_NAOs;
         get_submatrix(*given_NAO, NAO_sub, eigvals, eigvecs);
@@ -1476,7 +1477,7 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
                 }
                 ivec local_indices(indices[a.get_nr() - 1].size());
                 std::iota(local_indices.begin(), local_indices.end(), 0);
-                vec S_sub(n_local * n_local, 0.0);
+                vec S_sub(static_cast<size_t>(n_local) * n_local, 0.0);
                 get_submatrix(overlap_matrix, S_sub, indices[a.get_nr() - 1]);
                 const dMatrix2 atomic_overlap = reshape<dMatrix2>(S_sub, Shape2D(n_local, n_local));
                 auto ano = calculateAtomicNAO(atomic_density, atomic_overlap,
@@ -1570,11 +1571,11 @@ void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(
     err_checkf(indices_a != nullptr, "No NAO data found for atom " + std::to_string(index_a), std::cout);
     err_checkf(indices_b != nullptr, "No NAO data found for atom " + std::to_string(index_b), std::cout);
 
-    vec Sub_overlap(n_a * n_ab);
+    vec Sub_overlap(static_cast<size_t>(n_a) * n_ab);
     get_submatrix(overlap_matrix, Sub_overlap, *indices_a, pair_matrix_indices);
     dMatrix2 Sa = reshape<dMatrix2>(Sub_overlap, Shape2D(n_a, n_ab));
     PAS = dot<dMatrix2>(projection_matrices[index_a], Sa, false, false);
-    Sub_overlap.clear(); Sub_overlap.resize(n_b * n_ab);
+    Sub_overlap.clear(); Sub_overlap.resize(static_cast<size_t>(n_b) * n_ab);
     get_submatrix(overlap_matrix, Sub_overlap, *indices_b, pair_matrix_indices);
     dMatrix2 Sb = reshape<dMatrix2>(Sub_overlap, Shape2D(n_b, n_ab));
     PBS = dot<dMatrix2>(projection_matrices[index_b], Sb, false, false);
@@ -1707,7 +1708,7 @@ dMatrix2 Roby_information::build_group_PAS(const ivec &group_atom_indices, const
     const int n_G = static_cast<int>(group_bf.size());
     err_checkf(n_G > 0, "RGBI group PAS has no basis functions for the requested atom group.", std::cout);
     err_checkf(n_ab > 0, "RGBI group PAS has no pair basis functions.", std::cout);
-    vec sub_S(n_G * n_ab, 0.0);
+    vec sub_S(static_cast<size_t>(n_G) * n_ab, 0.0);
     get_submatrix(overlap_matrix, sub_S, group_bf, bond_bf_indices);
     dMatrix2 S_G = reshape<dMatrix2>(sub_S, Shape2D(n_G, n_ab));
     // PAS = P_G (n_G × n_G) × S_G (n_G × n_ab) → (n_G × n_ab)
@@ -1931,7 +1932,7 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
                     Ionic_Operator(n_a + r, n_a + c) = -P_GB(r, c);
 
             // Sub-overlap → sqrt → solve eigenproblem
-            vec S_Sub(n_ab * n_ab, 0.0);
+            vec S_Sub(static_cast<size_t>(n_ab) * n_ab, 0.0);
             get_submatrix(overlap_matrix, S_Sub, bond_bf);
             vec V = S_Sub;
             vec W(n_ab);
@@ -2262,7 +2263,7 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 #endif
         // get matching suboverlap matrix
         const int n = bond_indices.size();
-        vec S_Sub(n * n, 0.0);
+        vec S_Sub(static_cast<size_t>(n) * n, 0.0);
         get_submatrix(overlap_matrix, S_Sub, bond_indices);
         //dMatrix2 S = reshape<dMatrix2>(S_Sub, Shape2D(n, n));
 
@@ -2598,13 +2599,77 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     eli_cube.calc_dv();
 
     Calc_RhoEli(rho, eli_cube, l_w, radius);
+    //An ECP took the core electrons out of the density. The QTAIM basins get them back from
+    //Thakkar's spherical core densities, the fill the Hirshfeld grids and the scattering
+    //factors apply: the nucleus is a cusp again and its basin holds the atom's full count.
+    //ELI-D stays on the valence density the wavefunction has.
+    ivec ecp_atoms;
+    std::vector<Thakkar> ecp_cores;
+    double ecp_electrons = 0.0;
+    for (int a = 0; a < l_w.get_ncen(); a++)
+        if (l_w.get_atom_ECP_electrons(a) > 0) {
+            const int mode = l_w.get_ECP_mode() > 0 ? l_w.get_ECP_mode() : 1;
+            ecp_atoms.push_back(a);
+            ecp_cores.emplace_back(l_w.get_atom_charge(a), mode);
+            ecp_electrons += l_w.get_atom_ECP_electrons(a);
+        }
+    std::function<double(const d3&)> core_density = [&](const d3 &p) {
+        double s = 0.0;
+        for (size_t k = 0; k < ecp_atoms.size(); k++) {
+            const d3 ap = l_w.get_atom_pos(ecp_atoms[k]);
+            const double d = std::sqrt(std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2));
+            s += ecp_cores[k].get_core_density(d, l_w.get_atom_ECP_electrons(ecp_atoms[k]));
+        }
+        return s;
+    };
+    std::function<void(const d3&, d3&)> core_gradient = [&](const d3 &p, d3 &g) {
+        const double h = 1e-4;
+        for (int k = 0; k < 3; k++) {
+            d3 a = p, b = p;
+            a[k] += h; b[k] -= h;
+            g[k] = (core_density(a) - core_density(b)) / (2.0 * h);
+        }
+    };
+    const bool fill_cores = !ecp_atoms.empty();
+    if (fill_cores) {
+        std::cout << "ECP cores of " << ecp_atoms.size() << " atoms filled with Thakkar densities: " << std::fixed << std::setprecision(1) << ecp_electrons << " electrons added for the QTAIM basins" << std::endl;
+        for (int x = 0; x < rho.get_size(0); x++)
+            for (int y = 0; y < rho.get_size(1); y++)
+                for (int z = 0; z < rho.get_size(2); z++)
+                    if (rho.get_value(x, y, z) > 0.0) rho.set_value(x, y, z, rho.get_value(x, y, z) + core_density(rho.get_pos(x, y, z)));
+    }
     rho.set_path("rho.cube");
     eli_cube.set_path("eli.cube");
     //rho.write_file(true);
     //eli_cube.write_file(true);
 
     const double density_floor = std::max(1e-8, rho.max_value() * 1e-6);
-    const std::vector<critical_point> density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+    std::vector<critical_point> density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+    //Core shells make critical points of their own and an ECP atom a whole sphere of them,
+    //none of which says anything about bonding and none of which any two machines find at
+    //the same spots; only the nuclear attractor survives inside an atom's core radius. Sorted
+    //by type, density and position so the listing reads the same everywhere.
+    {
+        std::vector<critical_point> kept;
+        for (const critical_point &cp : density_critical_points) {
+            bool core = false, nuclear = false;
+            for (int a = 0; a < l_w.get_ncen(); a++) {
+                const d3 apos = l_w.get_atom_pos(a);
+                const double d2 = std::pow(cp.position[0] - apos[0], 2) + std::pow(cp.position[1] - apos[1], 2) + std::pow(cp.position[2] - apos[2], 2);
+                if (d2 < 0.01) nuclear = true;
+                else if (d2 < std::pow(core_shell_radius(l_w.get_atom_charge(a)), 2)) core = true;
+            }
+            if (!core || nuclear) kept.push_back(cp);
+        }
+        std::sort(kept.begin(), kept.end(), [](const critical_point &a, const critical_point &b) {
+            if (a.type != b.type) return a.type < b.type;
+            if (std::abs(a.density - b.density) > 1e-6 * std::max(1.0, std::abs(a.density))) return a.density > b.density;
+            for (int k = 0; k < 3; k++)
+                if (std::abs(a.position[k] - b.position[k]) > 1e-4) return a.position[k] < b.position[k];
+            return false;
+        });
+        density_critical_points.swap(kept);
+    }
     std::cout << "Density Critical Points";
     if (!density_critical_points.empty())
         std::cout << " (" << density_critical_points.size() << " found)";
@@ -2674,18 +2739,22 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
                 << std::setw(nw) << cp.hessian_eigenvalues[1]
                 << std::setw(nw) << cp.hessian_eigenvalues[2]
                 << std::fixed << std::setprecision(4) << "\n";
-            std::cout << "    HessRho_EigVecs v1:"
-                << std::setw(nw) << cp.hessian_eigenvectors[0][0]
-                << std::setw(nw) << cp.hessian_eigenvectors[0][1]
-                << std::setw(nw) << cp.hessian_eigenvectors[0][2] << "\n";
-            std::cout << "                    v2:"
-                << std::setw(nw) << cp.hessian_eigenvectors[1][0]
-                << std::setw(nw) << cp.hessian_eigenvectors[1][1]
-                << std::setw(nw) << cp.hessian_eigenvectors[1][2] << "\n";
-            std::cout << "                    v3:"
-                << std::setw(nw) << cp.hessian_eigenvectors[2][0]
-                << std::setw(nw) << cp.hessian_eigenvectors[2][1]
-                << std::setw(nw) << cp.hessian_eigenvectors[2][2] << "\n";
+            //The eigenvectors of a degenerate pair are any two in their plane and their signs
+            //are free; both differ from machine to machine, so they are for -debug
+            if (opt.debug) {
+                std::cout << "    HessRho_EigVecs v1:"
+                    << std::setw(nw) << cp.hessian_eigenvectors[0][0]
+                    << std::setw(nw) << cp.hessian_eigenvectors[0][1]
+                    << std::setw(nw) << cp.hessian_eigenvectors[0][2] << "\n";
+                std::cout << "                    v2:"
+                    << std::setw(nw) << cp.hessian_eigenvectors[1][0]
+                    << std::setw(nw) << cp.hessian_eigenvectors[1][1]
+                    << std::setw(nw) << cp.hessian_eigenvectors[1][2] << "\n";
+                std::cout << "                    v3:"
+                    << std::setw(nw) << cp.hessian_eigenvectors[2][0]
+                    << std::setw(nw) << cp.hessian_eigenvectors[2][1]
+                    << std::setw(nw) << cp.hessian_eigenvectors[2][2] << "\n";
+            }
             std::cout << "    DelSqRho  :" << std::setw(nw) << cp.laplacian << "\n";
             if (std::isfinite(cp.ellipticity))
                 std::cout << "    Bond Ellipticity:" << std::setw(nw) << cp.ellipticity << "\n";
@@ -2700,17 +2769,56 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
         std::cout << "\n";
     }
 
-    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius);
+    //Every nucleus is a maximum of the density, whatever the grid says
+    std::vector<d3> nuclei;
+    for (const atom &a : atoms) nuclei.push_back(a.get_pos());
+    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius, 5e-3, &nuclei, &l_w, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr);
     svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
 
+    //ELI-D is a ratio of quantities that both vanish in the density's tail and turns to noise
+    //there, so its basins are searched only where the density exceeds 1e-4, the crop DGrid is
+    //run with here; what lies beyond is reported as outside
+    for (int x = 0; x < eli_cube.get_size(0); x++)
+        for (int y = 0; y < eli_cube.get_size(1); y++)
+            for (int z = 0; z < eli_cube.get_size(2); z++)
+                if (rho.get_value(x, y, z) < 1e-4) eli_cube.set_value(x, y, z, 0.0);
     std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+    //The shells of a heavy atom's core structure ELI-D into several basins each; one core
+    //basin per atom is what a bonding analysis wants, and what DGrid's ELIDcore gives
+    const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms);
+    if (core_merged) std::cout << "Unified " << core_merged << " core-shell basins into their atoms' cores, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
     svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
 
-    std::cout << "QTAIM Analysis:\n";
-    integrate_values_in_basins(&rho, &(qtaim_results.first), labels, opt.debug);
-    std::cout << "\n\nELI Analysis:\n";
-    integrate_values_in_basins(&rho, &(eli_results.first), eli_labels, opt.debug);
-
+    //Two integrations of the density over each basin set: the voxel sum, which is what the cube
+    //resolution buys, and the atom-centred quadrature grids with the boundary decided by the
+    //field itself, which is the number to compare with AIMAll and DGrid
+    auto report = [&](const char *title, const std::pair<cubei, std::vector<d4>> &res, svec &lab, const bool eli) {
+        std::cout << "\n" << title << " (voxel sum):\n";
+        integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
+        vec vol;
+        double outside = 0.0;
+        const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid);
+        std::cout << "\n" << title << " (atomic quadrature grids):\n";
+        std::cout << "  basin  label               electrons" << (eli ? "" : "     charge") << "      volume     maximum        x          y          z\n";
+        double total = 0.0;
+        for (size_t b = 0; b < pop.size(); b++) {
+            total += pop[b];
+            std::cout << std::setw(7) << b + 1 << "  " << std::left << std::setw(18) << lab[b] << std::right << std::fixed
+                << std::setprecision(4) << std::setw(11) << pop[b];
+            if (!eli) {
+                //The label names the atom the maximum sits on
+                double Z = 0.0;
+                for (int a = 0; a < l_w.get_ncen(); a++)
+                    if (lab[b] == l_w.get_atom_label(a) + std::to_string(a)) Z = l_w.get_atom_charge(a);
+                std::cout << std::setw(11) << Z - pop[b];
+            }
+            std::cout << std::setw(12) << vol[b] << std::setw(12) << res.second[b][3]
+                << std::setprecision(3) << std::setw(11) << res.second[b][0] << std::setw(11) << res.second[b][1] << std::setw(11) << res.second[b][2] << "\n";
+        }
+        std::cout << "  total in basins: " << std::setprecision(4) << total << "   outside every basin: " << outside << "\n";
+    };
+    report("QTAIM Analysis", qtaim_results, labels, false);
+    report("ELI-D Analysis", eli_results, eli_labels, true);
 }
 
 // ---------------------------------------------------------------------------
