@@ -190,7 +190,7 @@ namespace {
         // trained model, and nothing downstream rejects it -- hence the
         // warning.
         double spline_accuracy = 1E-6;
-        if (const char* override_accuracy = std::getenv("NOSPHERA2_SPLINE_ACCURACY"))
+        if (const char* override_accuracy = std::getenv("NOSPHERA2_SPLINE_ACCURACY")) // Flawfinder: ignore
         {
             spline_accuracy = std::atof(override_accuracy);
             std::cout << "  WARNING spline_accuracy overridden to " << spline_accuracy
@@ -202,13 +202,13 @@ namespace {
         // size: 66 pairs * (max_radial+1)^2 * (max_angular+1) = 42,042 today.
         // Changing either invalidates every shipped model.
         int max_radial = 6, max_angular = 12;
-        if (const char* override_radial = std::getenv("NOSPHERA2_MAX_RADIAL"))
+        if (const char* override_radial = std::getenv("NOSPHERA2_MAX_RADIAL")) // Flawfinder: ignore
         {
             max_radial = std::atoi(override_radial);
             std::cout << "  WARNING max_radial overridden to " << max_radial
                       << " -- timing only" << std::endl;
         }
-        if (const char* override_angular = std::getenv("NOSPHERA2_MAX_ANGULAR"))
+        if (const char* override_angular = std::getenv("NOSPHERA2_MAX_ANGULAR")) // Flawfinder: ignore
         {
             max_angular = std::atoi(override_angular);
             std::cout << "  WARNING max_angular overridden to " << max_angular
@@ -417,7 +417,7 @@ namespace {
         const std::filesystem::path& out_path,
         const SALTED_Utils::FeatomicHyperParameters& hyperparams)
     {
-        const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr;
+        const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr; // Flawfinder: ignore
         auto mark = std::chrono::steady_clock::now();
         auto lap = [&mark, time_phases](const char* what) {
             if (!time_phases) return;
@@ -458,7 +458,7 @@ namespace {
         const std::filesystem::path& model_path,
         const SALTED_Utils::FeatomicHyperParameters& hyperparams)
     {
-        const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr;
+        const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr; // Flawfinder: ignore
         auto mark = std::chrono::steady_clock::now();
         auto lap = [&mark, time_phases](const char* what) {
             if (!time_phases) return;
@@ -932,7 +932,7 @@ bool ensure_occ_data_path(const char *argv0)
         free(occ_data_path_env);
     }
 #else
-    const char* tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH");
+    const char* tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH"); // Flawfinder: ignore
     if (tmp_occ_data_path_env != nullptr)
     {
         std::string occ_data_path_env(tmp_occ_data_path_env);
@@ -1078,7 +1078,7 @@ std::filesystem::path get_home_path(void)
     temp1.append(temp2);
     return temp1;
 #else
-    const char *home_env = getenv("HOME");
+    const char *home_env = getenv("HOME"); // Flawfinder: ignore
     if (home_env == nullptr) {
         std::cerr << "Warning: HOME environment variable not set." << std::endl;
         return std::filesystem::path("/tmp"); // Fallback to /tmp

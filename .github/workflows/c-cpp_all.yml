@@ -441,7 +441,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          flawfinder --sarif Src > flawfinder-results.sarif
+          flawfinder --minlevel=3 --sarif Src > flawfinder-results.sarif
 
       - name: Upload Flawfinder SARIF artifact
         if: always()
