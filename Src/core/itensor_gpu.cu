@@ -620,54 +620,82 @@ bool itensor_gpu_cols(const std::complex<double>* pre, double* out)
 
 //One block per row ab of the packed integrals, as XCW::eri_JK walks them: J1 is the row's
 //half of the symmetric matvec, the four scatters of every integral go into the row's two K
-//columns, each warp taking segments c of the row with the lanes over d and its own copy of
-//the columns in shared memory, so nothing is atomic. The multiplicities of the pairs are
-//folded into four copies of the two density columns. The partials of a row leave as K(:, a)
-//and K(:, b); the diagonal cd == ab was counted with the doubled weight and is taken back by
-//thread 0.
-__global__ void eri_jk_kernel(const double* V, const double* dp, const double* D, double* J1, double* Ka, double* Kb, const int n)
+//columns. Each warp takes groups of R rows c, the lanes over d, the row sums of a group kept
+//in registers until they are reduced across the lanes with a transposed butterfly (one add
+//per row instead of five) and the column sums of a segment added to the warp's own copy of
+//the K columns once per group, so nothing is atomic. The multiplicities of the pairs are
+//folded into the two doubled density columns, the diagonal c == d taken back per row and
+//the diagonal cd == ab by thread 0. The partials of a row leave as K(:, a) and K(:, b).
+template <int R>
+__global__ void eri_jk_kernel(const double* __restrict__ V, const double* __restrict__ dp, const double* __restrict__ D, double* J1, double* Ka, double* Kb, const int n)
 {
 	extern __shared__ double sh[];
 	__shared__ double red[32];
 	const int ab = blockIdx.x, a = (int)((sqrt(8.0 * ab + 1.0) - 1.0) / 2.0), b = ab - a * (a + 1) / 2;
 	const int lane = threadIdx.x & 31, warp = threadIdx.x >> 5, nwarp = blockDim.x >> 5;
-	double* Da1 = sh;
-	double* Db1 = sh + n;
-	double* Da2 = sh + 2 * n;
-	double* Db2 = sh + 3 * n;
-	double* sKa = sh + (4 + 2 * warp) * n;
+	double* Da = sh;
+	double* Db = sh + n;
+	double* sKa = sh + (2 + 2 * warp) * n;
 	double* sKb = sKa + n;
 	const double* v = V + (size_t)ab * (ab + 1) / 2;
-	const double fab = a == b ? 2.0 : 4.0;
+	const double fab = a == b ? 4.0 : 8.0;
 	for (int d = threadIdx.x; d < n; d += blockDim.x) {
-		Da1[d] = fab * D[d + a * n];
-		Db1[d] = fab * D[d + b * n];
-		Da2[d] = 2.0 * Da1[d];
-		Db2[d] = 2.0 * Db1[d];
+		Da[d] = fab * D[d + a * n];
+		Db[d] = fab * D[d + b * n];
 	}
-	for (int d = threadIdx.x; d < 2 * nwarp * n; d += blockDim.x) sh[4 * n + d] = 0.0;
+	for (int d = threadIdx.x; d < 2 * nwarp * n; d += blockDim.x) sh[2 * n + d] = 0.0;
 	__syncthreads();
 	double j = 0.0;
-	for (int c = warp; c <= a; c += nwarp) {
-		const int m = c < a ? c + 1 : b + 1, off = c * (c + 1) / 2;
-		double sa = 0.0, sb = 0.0;
-		for (int d = lane; d < m; d += 32) {
-			const double t = v[off + d];
-			const double* Daw = d < c ? Da2 : Da1;
-			const double* Dbw = d < c ? Db2 : Db1;
-			j += t * dp[off + d];
-			sa += t * Dbw[d];
-			sb += t * Daw[d];
-			sKa[d] += t * Dbw[c];
-			sKb[d] += t * Daw[c];
+	for (int c0 = warp * R; c0 <= a; c0 += nwarp * R) {
+		double sa[R], sb[R], Dar[R], Dbr[R];
+		int m[R], off[R], mmax = 0;
+#pragma unroll
+		for (int r = 0; r < R; r++) {
+			const int c = c0 + r;
+			m[r] = c > a ? 0 : (c < a ? c + 1 : b + 1);
+			off[r] = c * (c + 1) / 2;
+			Dar[r] = m[r] > 0 ? Da[c] : 0.0;
+			Dbr[r] = m[r] > 0 ? Db[c] : 0.0;
+			sa[r] = sb[r] = 0.0;
+			mmax = m[r] > mmax ? m[r] : mmax;
 		}
-		for (int o = 16; o > 0; o >>= 1) {
-			sa += __shfl_down_sync(0xffffffffu, sa, o);
-			sb += __shfl_down_sync(0xffffffffu, sb, o);
+		for (int d = lane; d < mmax; d += 32) {
+			const double Dad = Da[d], Dbd = Db[d];
+			double t[R], ka = 0.0, kb = 0.0;
+#pragma unroll
+			for (int r = 0; r < R; r++) t[r] = d < m[r] ? __ldcs(v + off[r] + d) : 0.0;
+#pragma unroll
+			for (int r = 0; r < R; r++) {
+				j += t[r] * (d < m[r] ? dp[off[r] + d] : 0.0);
+				sa[r] += t[r] * Dbd;
+				sb[r] += t[r] * Dad;
+				ka += t[r] * Dbr[r];
+				kb += t[r] * Dar[r];
+			}
+			sKa[d] += ka;
+			sKb[d] += kb;
 		}
-		if (lane == 0) {
-			sKa[c] += sa;
-			sKb[c] += sb;
+#pragma unroll
+		for (int w = 16, k = R / 2; k >= 1; w >>= 1, k >>= 1) {
+			const bool hi = lane & w;
+#pragma unroll
+			for (int r = 0; r < k; r++) {
+				const double xa = hi ? sa[r] : sa[r + k], xb = hi ? sb[r] : sb[r + k];
+				sa[r] = (hi ? sa[r + k] : sa[r]) + __shfl_xor_sync(0xffffffffu, xa, w);
+				sb[r] = (hi ? sb[r + k] : sb[r]) + __shfl_xor_sync(0xffffffffu, xb, w);
+			}
+		}
+#pragma unroll
+		for (int w = 32 / R / 2; w >= 1; w >>= 1) {
+			sa[0] += __shfl_xor_sync(0xffffffffu, sa[0], w);
+			sb[0] += __shfl_xor_sync(0xffffffffu, sb[0], w);
+		}
+		const int c = c0 + lane / (32 / R);
+		if (lane % (32 / R) == 0 && c <= a) {
+			const int mc = c < a ? c + 1 : b + 1;
+			const double t = mc > c ? v[c * (c + 1) / 2 + c] : 0.0;
+			sKa[c] += sa[0] - t * Db[c];
+			sKb[c] += sb[0] - t * Da[c];
 		}
 	}
 	for (int o = 16; o > 0; o >>= 1) j += __shfl_down_sync(0xffffffffu, j, o);
@@ -677,15 +705,15 @@ __global__ void eri_jk_kernel(const double* V, const double* dp, const double* D
 		for (int w = 1; w < nwarp; w++) j += red[w];
 		J1[ab] = j;
 		const double h = (a == b ? 1.0 : 4.0) * v[ab];
-		sh[4 * n + a] -= h * D[b + b * n];
-		sh[5 * n + a] -= h * D[b + a * n];
-		sh[4 * n + b] -= h * D[b + a * n];
-		sh[5 * n + b] -= h * D[a + a * n];
+		sh[2 * n + a] -= h * D[b + b * n];
+		sh[3 * n + a] -= h * D[b + a * n];
+		sh[2 * n + b] -= h * D[b + a * n];
+		sh[3 * n + b] -= h * D[a + a * n];
 	}
 	__syncthreads();
 	for (int d = threadIdx.x; d < 2 * n; d += blockDim.x) {
 		double sum = 0.0;
-		for (int w = 0; w < nwarp; w++) sum += sh[(4 + 2 * w) * n + d];
+		for (int w = 0; w < nwarp; w++) sum += sh[(2 + 2 * w) * n + d];
 		if (d < n) Ka[(size_t)ab * n + d] = sum;
 		else Kb[(size_t)ab * n + d - n] = sum;
 	}
@@ -719,7 +747,7 @@ __global__ void eri_jt_kernel(const double* V, const double* dp, double* part, c
 bool eri_gpu_hold(const double* eri, const int n)
 {
 	eri_gpu_release();
-	if (!itensor_gpu_available() || n <= 0 || 12 * n * sizeof(double) > 48 * 1024) return false;
+	if (!itensor_gpu_available() || n <= 0 || 6 * n * sizeof(double) > 48 * 1024) return false;
 	HeldEri& h = g_eri;
 	const int npair = n * (n + 1) / 2;
 	const size_t bytes = sizeof(double) * (size_t)npair * (npair + 1) / 2, kbytes = sizeof(double) * (size_t)npair * n;
@@ -750,7 +778,7 @@ bool eri_gpu_JK(const double* D, double* J, double* K)
 		for (int b = 0; b <= a; b++, ab++) dp[ab] = (a == b ? 1.0 : 2.0) * D[a + b * n];
 	GPU_TRY(gpuMemcpy(h.dp, dp.data(), sizeof(double) * npair, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(h.D, D, sizeof(double) * n * n, gpuMemcpyHostToDevice));
-	eri_jk_kernel<<<npair, 128, sizeof(double) * 12 * n>>>(h.V, h.dp, h.D, h.J1, h.Ka, h.Kb, n);
+	eri_jk_kernel<8><<<npair, 64, 6 * n * sizeof(double)>>>(h.V, h.dp, h.D, h.J1, h.Ka, h.Kb, n);
 	GPU_TRY(gpuGetLastError());
 	eri_kred_kernel<<<(n * n + 255) / 256, 256>>>(h.Ka, h.Kb, h.K, n);
 	GPU_TRY(gpuGetLastError());
