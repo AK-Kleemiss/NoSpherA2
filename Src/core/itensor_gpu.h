@@ -68,3 +68,16 @@ bool itensor_gpu_submit(int slot, int n_refl, int num_syms,
 bool itensor_gpu_collect(int slot, std::complex<double>* I_r, long long row_stride);
 
 void itensor_gpu_free();
+
+//The finished tensor held on the device for the SCF: the two walks of every iteration read
+//it once each and the CPU is bound by its memory bandwidth doing so. Row-major nr x packed
+//in the precision it is held in; false when it does not fit, and the caller keeps walking
+//it on the host. Both contractions accumulate in double whatever the tensor is stored as.
+bool itensor_gpu_hold(const std::complex<float>* I, int nr, int packed);
+bool itensor_gpu_hold(const std::complex<double>* I, int nr, int packed);
+bool itensor_gpu_held();
+//F[r] = F0[r] + sum_k I[r][k] w[k]
+bool itensor_gpu_rows(const double* w, const std::complex<double>* F0, std::complex<double>* F);
+//out[k] = Re sum_r pre[r] I[r][k]
+bool itensor_gpu_cols(const std::complex<double>* pre, double* out);
+void itensor_gpu_release();

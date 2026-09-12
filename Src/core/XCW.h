@@ -326,6 +326,8 @@ private:
 	//choice the build precision makes.
 	std::vector<std::complex<float>> I32;
 	bool i_float_ = false;
+	//A copy of the resident tensor on the device does both SCF walks there
+	bool i_on_device_ = false;
 	// The background writer for `save <path>`. Joined, never detached: a thread still
 	// running at exit is how the GPU warm-up bug of 939268f happened, and this one holds a
 	// FILE* and reads the resident tensor.

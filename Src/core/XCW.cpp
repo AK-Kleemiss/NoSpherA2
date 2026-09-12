@@ -2406,6 +2406,15 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 	//load() can throw and an exception must not leave an OpenMP structured block,
 	//so it is recorded and rethrown after the region.
 	std::string io_error;
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	if (i_on_device_) {
+		vec w(i_compact_);
+		for (size_t k = 0; k < i_compact_; k++)
+			w[k] = (i_pair_mu_[k] == i_pair_nu_[k] ? 2.0 : 4.0) * D(i_pair_mu_[k], i_pair_nu_[k]);
+		err_checkf(itensor_gpu_rows(w.data(), F_calc[1].data(), F_calc[0].data()), "I tensor walk on the device failed", std::cout);
+		return;
+	}
+#endif
 #pragma omp parallel
 	{
 		for (int r0 = 0; r0 < cryst.nr_small; r0 += step) {
@@ -2455,6 +2464,31 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 		: 2.0 * cryst.F_scale / (cryst.nr_small - settings.n_params);
 
 	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
+	auto precompute_of = [&](const int r) {
+		cdouble precompute;
+		if (against_F2) {
+			const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
+			precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
+		}
+		else {
+			const double F_calc_abs = std::abs(F_calc[0][r]);
+			precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
+		}
+		if (weighted) precompute *= inv_H2_[r];
+		return precompute;
+	};
+	bool on_device = false;
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	if (i_on_device_ && valid) {
+		cvec pre(cryst.nr_small);
+#pragma omp parallel for
+		for (int r = 0; r < cryst.nr_small; r++) pre[r] = precompute_of(r);
+		vec out(i_compact_);
+		err_checkf(itensor_gpu_cols(pre.data(), out.data()), "I tensor walk on the device failed", std::cout);
+		for (size_t k = 0; k < i_compact_; k++) perturb(i_pair_mu_[k], i_pair_nu_[k]) = out[k];
+		on_device = true;
+	}
+#endif
 	// See calc_F_calc: an exception must not leave an OpenMP structured block.
 	std::string io_error;
 	//One region, one accumulator per thread, one reduction, however many windows the
@@ -2463,7 +2497,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	{
 		occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
 		double* local_ptr = local.data();
-		for (int r0 = 0; valid && r0 < cryst.nr_small; r0 += step) {
+		for (int r0 = 0; valid && !on_device && r0 < cryst.nr_small; r0 += step) {
 			const int r1 = std::min(r0 + step, cryst.nr_small);
 			if (i_streamed_) {
 #pragma omp single
@@ -2476,17 +2510,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 #pragma omp for
 			for (int r = r0; r < r1; r++) {
 				if (!io_error.empty()) continue;
-				cdouble precompute;
-				if (against_F2) {
-					const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
-					precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
-				}
-				else {
-					const double F_calc_abs = std::abs(F_calc[0][r]);
-					precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
-				}
-				if (weighted) precompute *= inv_H2_[r];
-
+				const cdouble precompute = precompute_of(r);
 				//As in calc_F_calc: one walk over whichever element type is resident, with
 				//the accumulation in double either way.
 				auto accumulate = [&](const auto* I_r) {
@@ -2781,7 +2805,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	occ::Mat perturbation;
 	calc_perturb(perturbation, scf);
 	const _time_point it_t1 = get_time();
-	throughput::record_time("XCW structure factors + perturbation", false, get_msec(it_t0, it_t1));
+	throughput::record_time("XCW structure factors + perturbation", i_on_device_, get_msec(it_t0, it_t1));
 
 	// Build perturbed Fock matrix
 	// Maybe necessary to update the Hamiltoian if a potential changes depending on the density, but that does not happen in normal HF
@@ -3227,6 +3251,18 @@ void XCW::run_XCW_fitting() {
 	//already used every core - but it makes -cpus bind the 82% of a run that OCC owns.
 	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
 	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor);
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	//The two walks of an iteration read the whole tensor and the host is bound by its memory
+	//bandwidth doing so; the device reads it several times faster. The host copy stays for
+	//the background writer.
+	if (opt->gpu_itensor && opt->use_gpu && !i_streamed_) {
+		i_on_device_ = i_float_ ? itensor_gpu_hold(I32.data(), cryst.nr_small, static_cast<int>(i_compact_))
+			: itensor_gpu_hold(I.data(), cryst.nr_small, static_cast<int>(i_compact_));
+		if (!(opt->no_date))
+			std::cerr << "GPU in use: XCW structure factors and perturbation on "
+			<< (i_on_device_ ? "the device" : "the CPU - device unavailable or the tensor too large") << std::endl;
+	}
+#endif
 	store_ERIs(hf);
 	occ::qm::SCF scf(hf, settings.hf_type);
 	bool has_guess = false;
@@ -3310,6 +3346,10 @@ void XCW::run_XCW_fitting() {
 	//by now it has usually been finished for a long while - the refinement takes far longer
 	//than the write. Joining is what keeps it from outliving the process.
 	finish_i_save();
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	itensor_gpu_release();
+	i_on_device_ = false;
+#endif
 
 	std::cout << "Finished XCW fitting procedure." << std::endl;
 }
