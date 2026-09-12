@@ -301,6 +301,7 @@ bool grid_gpu_becke_weights(const int np, const int nc, const int* pcen,
 	if (local_mode)
 		block = (int)(GRID_SHARED_BYTES / (2 * sizeof(double) * (size_t)GRID_MAX_NEAR));
 	if (block < GRID_MIN_BLOCK) return false;
+	if (block > 1024) block = 1024;
 
 	const size_t pts = sizeof(double) * (size_t)np;
 	const size_t cen = sizeof(double) * (size_t)nc;
