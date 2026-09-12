@@ -917,8 +917,8 @@ struct options
     int multipole_lmax = -1;
     PartitionType multipole_scheme = PartitionType::Hirshfeld;
     double multipole_strength = 1.0;
-    //-multipole_partition: the restraint rows are partition-weighted grid moments of every aux function instead of centre moments
-    bool multipole_partition = false;
+    //-multipole_centre switches the restraint rows from partition-weighted grid moments of every aux function to centre moments
+    bool multipole_partition = true;
     //-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
     double repulsion_overlap = 0.0;
     //-repulsion_exchange: exchange functional of the Gordon-Kim repulsion, 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L
