@@ -2,7 +2,6 @@
 #include "convenience.h"
 #include "AtomGrid.h"
 #ifdef NOSPHERA2_USE_GPU
-#include "grid_gpu.h"
 #endif
 #include "sphere_lebedev_rule.h"
 #include "constants.h"
@@ -427,50 +426,11 @@ void AtomGrid::get_grid(const int num_centers,
     double grid_aw[],
     double grid_becke_w[],
     double grid_TFVC_w[],
-    const WFN &wfn,
-    vec &chi,
-    bool debug) const
+    const vec &chi) const
 {
 
     if (num_centers > 1) {
-        if (chi.size() == 0)
-            chi = make_chi(wfn, 40, true, debug);
         const int np = get_num_grid_points();
-#ifdef NOSPHERA2_USE_GPU
-        //Same walk on the device. Bragg radii are looked up here so the kernel takes
-        //plain doubles and needs no constants table of its own.
-        //The kernel transcribes the chi-present branch and indexes chi with a stride of
-        //num_centers. make_chi returns empty without MOs and uses a stride of ncen, so
-        //neither is guaranteed; a wrongly sized chi would copy and come back wrong.
-        const bool chi_fits = chi.size() == (size_t)num_centers * (size_t)num_centers;
-        if (grid_gpu_enabled() && chi_fits) {
-            vec R_v(num_centers);
-            for (int a = 0; a < num_centers; a++)
-                R_v[a] = constants::bragg_angstrom[proton_charges[a]];
-            if (grid_gpu_becke_weights(np, num_centers, center_index,
-                    atom_grid_x_bohr_.data(), atom_grid_y_bohr_.data(),
-                    atom_grid_z_bohr_.data(), atom_grid_w_.data(),
-                    x_coordinates_bohr, y_coordinates_bohr, z_coordinates_bohr,
-                    R_v.data(), chi.data(), constants::far_away, constants::cutoff,
-                    grid_x_bohr, grid_y_bohr, grid_z_bohr,
-                    grid_aw, grid_becke_w, grid_TFVC_w)) {
-                //Once per run. Every other GPU path announces itself; this one did not, which
-                //is how it fell back to the CPU for a session with its test still passing.
-                static std::atomic<bool> announced{false};
-                if (!announced.exchange(true) && !constants::hide_gpu_notes)
-                    std::cout << "GPU in use: atomic grid weights (Becke and TFVC) on "
-                              << grid_gpu_backend() << std::endl;
-                return;
-            }
-        }
-        else if (grid_gpu_enabled() && !chi_fits) {
-            static std::atomic<bool> warned{false};
-            if (!warned.exchange(true) && !constants::hide_gpu_notes)
-                std::cout << "-gpu_grid asked for but not used: chi is " << chi.size()
-                          << " entries, the kernel needs " << (size_t)num_centers * num_centers
-                          << ". Weights stay on the CPU." << std::endl;
-        }
-#endif
 #pragma omp parallel
         {
             vec pa_b(num_centers);

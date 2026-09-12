@@ -6,14 +6,16 @@
 //O(centers^2) of plain arithmetic per point, which is the shape a device wants.
 //
 //This is partitioning physics, not a contraction: a slip changes every partitioned charge.
-//The device code is a verbatim transcription of the chi-present branch of
-//get_integration_weights.
+//The device code is a verbatim transcription of get_integration_weights.
 //
-//That branch is not the only one get_grid can reach: make_chi returns empty when the
-//wavefunction carries no MOs, and the CPU has a chi-absent branch this kernel does not
-//implement. The caller checks chi is exactly num_centers^2 first - make_chi lays its rows
-//out with a stride of wfn.get_ncen(), which is not num_centers in general, and a wrongly
-//sized chi copies without complaint and comes back wrong.
+//One call covers every atom of the molecule at once: the prototype points of all grids
+//concatenated, pcen naming the owning centre of each point, and the outputs laid out the
+//same way. A call per atom cost more in allocation and synchronisation than the kernel
+//itself on a small molecule. chi may be null when TFVC weights are not wanted; the
+//kernel then takes the chi-absent branch. When it is given, it must be exactly
+//num_centers^2 - make_chi lays its rows out with a stride of wfn.get_ncen(), which is
+//not num_centers in general, and a wrongly sized chi copies without complaint and comes
+//back wrong.
 //
 //Returns false if there is no device, if the scratch will not fit, or if num_centers is
 //too large for the per-thread arrays, and the caller keeps the CPU loop.
@@ -27,11 +29,12 @@ void grid_gpu_set_enabled(bool on);
 bool grid_gpu_enabled();
 
 bool grid_gpu_becke_weights(
-	int np, int num_centers, int center_index,
+	int np, int num_centers,
+	const int* pcen,            //[np] owning centre of each point
 	const double* proto_x, const double* proto_y, const double* proto_z, const double* proto_w,
 	const double* cx, const double* cy, const double* cz,
 	const double* R_v,          //[num_centers] Bragg radii, already looked up by Z
-	const double* chi,          //[num_centers * num_centers]
+	const double* chi,          //[num_centers * num_centers] or null
 	double far_away, double cutoff,
 	double* out_x, double* out_y, double* out_z,
 	double* out_aw, double* out_becke, double* out_tfvc);

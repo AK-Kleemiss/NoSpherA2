@@ -57,7 +57,7 @@ namespace {
         }
 
         vec empty(1, 0.0);
-        griddy.get_grid(1, 0, pos, pos, pos, &charge, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data(), grid[5].data(), grid[6].data(), WFN(), empty);
+        griddy.get_grid(1, 0, pos, pos, pos, &charge, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data(), grid[5].data(), grid[6].data(), empty);
 
         // Initialize the vectors sf_A and sf_N
         cvec2 sf_A, sf_N;
