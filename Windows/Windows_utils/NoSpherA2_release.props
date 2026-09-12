@@ -18,6 +18,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>false</GenerateDebugInformation>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     <AdditionalLibraryDirectories>$(NosMainFolder)deps-install-release/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     <AdditionalDependencies>fmt.lib;spdlog.lib;tbb12.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>

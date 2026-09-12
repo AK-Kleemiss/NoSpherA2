@@ -20,6 +20,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <Profile>true</Profile>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(NosMainFolder)deps-install-release/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
