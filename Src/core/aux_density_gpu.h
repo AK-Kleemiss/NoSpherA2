@@ -1,18 +1,8 @@
 #pragma once
 
-//GPU path for the fitted density on a point set. The Gordon-Kim repulsion in
-//interaction_energy evaluates rho_A and rho_B of the RI or SALTED coefficients on a Becke
-//grid over the dimer, and that walk dominated a crystal energy job: every point visits
-//every shell of the molecule, the points are independent, and the work per point is a
-//few thousand exponentials and polynomials with no data shared between threads.
-//
-//The device runs aux_density::at, at_grad when gradients are asked for or at_lap when the
-//Laplacian is too, from aux_density.h, the same inline text the CPU loop in calc_density_ML
-//runs, on the flattened basis it is handed. Small point sets stay on the host, the launch and the
-//copies cost more than the work there.
-//
-//Returns false if no device is present, the set is too small to pay, or the arrays will
-//not fit, and the caller keeps the OpenMP loop.
+//Fitted density (and gradient, Laplacian) of a flattened aux basis on a point set, one thread per point running
+//the same aux_density::at / at_grad / at_lap text as the CPU loop in calc_density_ML. Returns false when no device
+//is present, the set is too small to pay for the copies or the arrays do not fit, and the caller keeps the OpenMP loop.
 
 bool aux_density_gpu_available();
 //On by default; -no_gpu_density turns this off

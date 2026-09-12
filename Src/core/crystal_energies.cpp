@@ -197,41 +197,50 @@ namespace crystal_energies {
         //interplanar spacing along axis x is 1/|row x of M^-1|
         for (int x = 0; x < 3; x++) spacing[x] = 1.0 / std::sqrt(Mi[x][0] * Mi[x][0] + Mi[x][1] * Mi[x][1] + Mi[x][2] * Mi[x][2]);
         std::vector<pair> out;
-        for (int i = 0; i < nm; i++)
+        for (int i = 0; i < nm; i++) {
+            const int na = mol[i].get_ncen();
+            vec2 PA(na, vec(3));
+            for (int a = 0; a < na; a++)
+                for (int x = 0; x < 3; x++) PA[a][x] = mol[i].get_atom_coordinate(a, x);
             for (int j = i; j < nm; j++) {
                 std::set<std::string> seen;
                 const vec cA = mul(Mi, cen[i]);
+                const int nb = mol[j].get_ncen();
                 for (int s = 0; s < (int)ops.size(); s++) {
                     vec2 Rf(3, vec(3));
                     for (int x = 0; x < 3; x++)
                         for (int y = 0; y < 3; y++) Rf[x][y] = ops[s].rot[x][y];
                     const vec2 R = mul(M, mul(Rf, Mi));
+                    //rotated atoms and centroid of B, the lattice translation is added per image
+                    vec2 XB(nb, vec(3));
+                    for (int b = 0; b < nb; b++) {
+                        vec p(3);
+                        for (int x = 0; x < 3; x++) p[x] = mol[j].get_atom_coordinate(b, x);
+                        XB[b] = mul(R, p);
+                    }
+                    const vec cR = mul(R, cen[j]);
                     vec cB0 = mul(Rf, mul(Mi, cen[j]));
                     ivec base(3), range(3), n(3);
                     for (int x = 0; x < 3; x++) cB0[x] += ops[s].trans[x], base[x] = (int)std::lround(cA[x] - cB0[x]), range[x] = (int)std::ceil((rad[i] + rad[j] + cut) / spacing[x]) + 1;
                     for (n[0] = base[0] - range[0]; n[0] <= base[0] + range[0]; n[0]++)
                         for (n[1] = base[1] - range[1]; n[1] <= base[1] + range[1]; n[1]++)
                             for (n[2] = base[2] - range[2]; n[2] <= base[2] + range[2]; n[2]++) {
-                                vec t(3);
+                                vec t(3), cX(3);
                                 for (int x = 0; x < 3; x++) t[x] = ops[s].trans[x] + n[x];
                                 const vec tc = mul(M, t);
-                                const int nb = mol[j].get_ncen();
-                                double dmin2 = DBL_MAX;
-                                vec cX(3, 0.0);
-                                for (int b = 0; b < nb; b++) {
-                                    vec p(3);
-                                    for (int x = 0; x < 3; x++) p[x] = mol[j].get_atom_coordinate(b, x);
-                                    const vec X = mul(R, p);
-                                    for (int x = 0; x < 3; x++) cX[x] += (X[x] + tc[x]) / nb;
-                                    for (int a = 0; a < mol[i].get_ncen(); a++) {
-                                        double d2 = 0.0;
-                                        for (int x = 0; x < 3; x++) d2 += std::pow(X[x] + tc[x] - mol[i].get_atom_coordinate(a, x), 2);
-                                        dmin2 = std::min(dmin2, d2);
-                                    }
-                                }
-                                if (dmin2 >= cut2) continue;
+                                for (int x = 0; x < 3; x++) cX[x] = cR[x] + tc[x];
                                 double dc2 = 0.0;
                                 for (int x = 0; x < 3; x++) dc2 += std::pow(cX[x] - cen[i][x], 2);
+                                //no atom pair can be closer than the centroids minus both extents
+                                if (std::sqrt(dc2) - rad[i] - rad[j] >= cut) continue;
+                                double dmin2 = DBL_MAX;
+                                for (int b = 0; b < nb; b++)
+                                    for (int a = 0; a < na; a++) {
+                                        double d2 = 0.0;
+                                        for (int x = 0; x < 3; x++) d2 += std::pow(XB[b][x] + tc[x] - PA[a][x], 2);
+                                        dmin2 = std::min(dmin2, d2);
+                                    }
+                                if (dmin2 >= cut2) continue;
                                 if (i == j && dc2 < 1e-6) continue;
                                 if (!seen.insert(key(cX)).second) continue;
                                 if (i == j) {
@@ -251,6 +260,7 @@ namespace crystal_energies {
                             }
                 }
             }
+        }
         std::sort(out.begin(), out.end(), [](const pair& a, const pair& b) { return a.A != b.A ? a.A < b.A : a.B != b.B ? a.B < b.B : a.distance < b.distance; });
         return out;
     }

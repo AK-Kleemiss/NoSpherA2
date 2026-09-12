@@ -29,15 +29,7 @@ atom::atom(const std::string& l,
     const double& c1,
     const double& c2,
     const double& c3,
-    const int& ch) {
-    reset();
-    label = l;
-    ID = id;
-    nr = n;
-    x = c1;
-    y = c2;
-    z = c3;
-    charge = ch;
+    const int& ch) : atom(l, id, n, c1, c2, c3, ch, 0) {
 };
 
 atom::atom(const std::string& l,

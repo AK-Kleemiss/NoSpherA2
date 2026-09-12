@@ -367,6 +367,25 @@ double DensityFitting::radial_moment(const double exponent, const double coef, c
     return p.normalization_constant() * p.get_coef() * std::tgamma(l + 1.5) / (2.0 * std::pow(exponent, l + 1.5));
 }
 
+void DensityFitting::shell_moments(const atom& A, const int lmax, int& coef_idx, ivec& shell_l, ivec& shell_idx, vec& shell_I)
+{
+    shell_l.clear(); shell_idx.clear(); shell_I.clear();
+    int prim = 0;
+    for (int shell = 0; shell < (int)A.get_shellcount_size(); shell++) {
+        const int l = A.get_basis_set_entry(prim).get_type();
+        if (l <= lmax) {
+            double I_l = 0.0;
+            for (int e = 0; e < (int)A.get_shellcount(shell); e++) {
+                const basis_set_entry& bf = A.get_basis_set_entry(prim + e);
+                I_l += radial_moment(bf.get_exponent(), bf.get_coefficient(), l);
+            }
+            shell_l.push_back(l); shell_idx.push_back(coef_idx); shell_I.push_back(I_l);
+        }
+        coef_idx += 2 * l + 1;
+        prim += A.get_shellcount(shell);
+    }
+}
+
 // One row per atom and (l, m) for 1 <= l <= lmax, non-zero only on the l-shells of that atom, since
 // Q_lm of an atom-centred function about its own centre vanishes for every other l.
 // Rows are scaled by 1 / r_cov^l so every order enters with the magnitude of the population row.
@@ -379,29 +398,22 @@ void DensityFitting::add_multipole_restraint(vec& eri2c, vec& rho, const WFN& wa
     eri2c.resize((size_t)(n_old + n_rows) * n_aux, 0.0);
     rho.resize(n_old + n_rows, 0.0);
     dMatrixRef2 rows(eri2c.data() + (size_t)n_old * n_aux, n_rows, n_aux);
-    ivec skipped(lmax + 1, 0);
+    ivec skipped(lmax + 1, 0), sl, si;
+    vec sI;
     int coef_idx = 0;
     for (int a = 0; a < n_atoms; a++) {
         const atom A = wavy_aux.get_atom(a);
         const double r_cov = constants::ang2bohr(constants::covalent_radii[A.get_charge()]);
         const int row0 = a * per_atom;
         bvec has_l(lmax + 1, false);
-        int prim = 0;
-        for (int shell = 0; shell < (int)A.get_shellcount_size(); shell++) {
-            const int l = A.get_basis_set_entry(prim).get_type();
-            if (l >= 1 && l <= lmax) {
-                double I_l = 0.0;
-                for (int e = 0; e < (int)A.get_shellcount(shell); e++) {
-                    const basis_set_entry& bf = A.get_basis_set_entry(prim + e);
-                    I_l += radial_moment(bf.get_exponent(), bf.get_coefficient(), l);
-                }
-                const double w = atom_weights[a] / std::pow(r_cov, l);
-                for (int m = -l; m <= l; m++)
-                    rows(row0 + l * l - 1 + l + m, coef_idx + l + m) += I_l * w;
-                has_l[l] = true;
-            }
-            coef_idx += 2 * l + 1;
-            prim += A.get_shellcount(shell);
+        shell_moments(A, lmax, coef_idx, sl, si, sI);
+        for (int s = 0; s < (int)sl.size(); s++) {
+            const int l = sl[s];
+            if (l == 0) continue;
+            const double w = atom_weights[a] / std::pow(r_cov, l);
+            for (int m = -l; m <= l; m++)
+                rows(row0 + l * l - 1 + l + m, si[s] + l + m) += sI[s] * w;
+            has_l[l] = true;
         }
         for (int l = 1; l <= lmax; l++) {
             if (!has_l[l]) {
@@ -423,23 +435,15 @@ vec2 DensityFitting::fitted_multipoles(const vec& coefficients, const WFN& wavy_
 {
     const int n_atoms = wavy_aux.get_ncen();
     vec2 moments(n_atoms, vec((lmax + 1) * (lmax + 1), 0.0));
+    ivec sl, si;
+    vec sI;
     int coef_idx = 0;
     for (int a = 0; a < n_atoms; a++) {
-        const atom A = wavy_aux.get_atom(a);
-        int prim = 0;
-        for (int shell = 0; shell < (int)A.get_shellcount_size(); shell++) {
-            const int l = A.get_basis_set_entry(prim).get_type();
-            if (l <= lmax) {
-                double I_l = 0.0;
-                for (int e = 0; e < (int)A.get_shellcount(shell); e++) {
-                    const basis_set_entry& bf = A.get_basis_set_entry(prim + e);
-                    I_l += radial_moment(bf.get_exponent(), bf.get_coefficient(), l);
-                }
-                for (int m = -l; m <= l; m++)
-                    moments[a][l * l + l + m] += I_l * coefficients[coef_idx + l + m];
-            }
-            coef_idx += 2 * l + 1;
-            prim += A.get_shellcount(shell);
+        shell_moments(wavy_aux.get_atom(a), lmax, coef_idx, sl, si, sI);
+        for (int s = 0; s < (int)sl.size(); s++) {
+            const int l = sl[s];
+            for (int m = -l; m <= l; m++)
+                moments[a][l * l + l + m] += sI[s] * coefficients[si[s] + l + m];
         }
     }
     return moments;
@@ -809,20 +813,26 @@ static int charge_order(const PartitionType type)
     }
 }
 
-vec2 DensityFitting::calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax)
+//Grids of every atom partitioned by scheme, set up on the returned copy of wavy without its virtual orbitals
+static WFN partition_grids(const WFN& wavy, const DensityFitting::CHARGE_SCHEME& scheme, GridManager& grid_manager)
 {
     GridConfiguration config;
     config.partition_type = scheme_partition(scheme);
     config.pbc = 0;
     config.debug = false;
-    const int ncen = wavy.get_ncen();
-    ivec atom_list(ncen);
-    for (int a = 0; a < ncen; a++)
-        atom_list[a] = a;
-    GridManager grid_manager(config);
+    grid_manager.setConfiguration(config);
+    ivec atom_list(wavy.get_ncen());
+    for (int a = 0; a < wavy.get_ncen(); a++) atom_list[a] = a;
     WFN temp = wavy;
     temp.delete_unoccupied_MOs();
     grid_manager.setup3DGridsForMolecule(temp, atom_list);
+    return temp;
+}
+
+vec2 DensityFitting::calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax)
+{
+    GridManager grid_manager;
+    const WFN temp = partition_grids(wavy, scheme, grid_manager);
     return grid_manager.calculatePartitionedMultipoles(temp, lmax);
 }
 
@@ -872,16 +882,8 @@ void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const in
 vec2 DensityFitting::partition_multipole_rows(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME& scheme, const int lmax, vec2& targets)
 {
     err_checkf(lmax >= 0 && lmax <= 8, "Partition restraints are implemented for 0 <= l <= 8", std::cout);
-    GridConfiguration config;
-    config.partition_type = scheme_partition(scheme);
-    config.pbc = 0;
-    config.debug = false;
-    ivec atom_list(wavy.get_ncen());
-    for (int i = 0; i < wavy.get_ncen(); i++) atom_list[i] = i;
-    GridManager grid_manager(config);
-    WFN temp = wavy;
-    temp.delete_unoccupied_MOs();
-    grid_manager.setup3DGridsForMolecule(temp, atom_list);
+    GridManager grid_manager;
+    const WFN temp = partition_grids(wavy, scheme, grid_manager);
     targets = grid_manager.calculatePartitionedMultipoles(temp, lmax);
     const aux_density_table t(wavy_aux.get_atoms());
     const int n_atoms = wavy.get_ncen(), n_mom = (lmax + 1) * (lmax + 1);

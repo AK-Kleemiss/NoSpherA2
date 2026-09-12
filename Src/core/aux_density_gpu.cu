@@ -67,7 +67,6 @@ bool aux_density_gpu_eval(
 	size_t freeb = 0, totalb = 0;
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
 	if ((lp ? 8 : grad ? 7 : 4) * pts + 4 * at + 5 * sh + 2 * pr + sizeof(double) * (size_t)n_coef + (1u << 26) > freeb) return false;
-
 	double *dx = nullptr, *dy = nullptr, *dz = nullptr, *drho = nullptr, *dgx = nullptr, *dgy = nullptr, *dgz = nullptr, *dlap = nullptr;
 	double *dcx = nullptr, *dcy = nullptr, *dcz = nullptr, *dr2 = nullptr, *dexp = nullptr, *dnorm = nullptr, *dcoef = nullptr;
 	int *dss = nullptr, *dsl = nullptr, *dps = nullptr, *dco = nullptr;
@@ -78,7 +77,6 @@ bool aux_density_gpu_eval(
 	GPU_TRY(gpuMalloc(&dcoef, sizeof(double) * (size_t)n_coef));
 	if (grad) { GPU_TRY(gpuMalloc(&dgx, pts)); GPU_TRY(gpuMalloc(&dgy, pts)); GPU_TRY(gpuMalloc(&dgz, pts)); }
 	if (lp) GPU_TRY(gpuMalloc(&dlap, pts));
-
 	GPU_TRY(gpuMemcpy(dx, x, pts, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dy, y, pts, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dz, z, pts, gpuMemcpyHostToDevice));
@@ -93,7 +91,6 @@ bool aux_density_gpu_eval(
 	GPU_TRY(gpuMemcpy(dexp, pr_exp, pr, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dnorm, pr_norm, pr, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dcoef, coefs, sizeof(double) * (size_t)n_coef, gpuMemcpyHostToDevice));
-
 	if (lp) aux_density_lap_kernel<<<(np + AUX_BLOCK - 1) / AUX_BLOCK, AUX_BLOCK>>>(np, dx, dy, dz, n_at, dcx, dcy, dcz, dr2, dss, dsl, dps, dco, dexp, dnorm, dcoef, drho, dgx, dgy, dgz, dlap);
 	else if (grad) aux_density_grad_kernel<<<(np + AUX_BLOCK - 1) / AUX_BLOCK, AUX_BLOCK>>>(np, dx, dy, dz, n_at, dcx, dcy, dcz, dr2, dss, dsl, dps, dco, dexp, dnorm, dcoef, drho, dgx, dgy, dgz);
 	else aux_density_kernel<<<(np + AUX_BLOCK - 1) / AUX_BLOCK, AUX_BLOCK>>>(np, dx, dy, dz, n_at, dcx, dcy, dcz, dr2, dss, dsl, dps, dco, dexp, dnorm, dcoef, drho);
@@ -107,7 +104,6 @@ bool aux_density_gpu_eval(
 		gpuFree(dgx); gpuFree(dgy); gpuFree(dgz);
 	}
 	if (lp) { GPU_TRY(gpuMemcpy(lap, dlap, pts, gpuMemcpyDeviceToHost)); gpuFree(dlap); }
-
 	gpuFree(dx); gpuFree(dy); gpuFree(dz); gpuFree(drho);
 	gpuFree(dcx); gpuFree(dcy); gpuFree(dcz); gpuFree(dr2);
 	gpuFree(dss); gpuFree(dsl); gpuFree(dps); gpuFree(dco);

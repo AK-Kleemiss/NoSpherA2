@@ -61,6 +61,8 @@ namespace DensityFitting
         const vec& atom_weights, const vec& expected_charges = vec());
     // Moment of one aux primitive about its own centre, Int r^l Y_lm chi = N c Gamma(l+3/2) / (2 alpha^(l+3/2))
     double radial_moment(const double exponent, const double coef, const int l);
+    // Every shell of A with l <= lmax: its rank, the coefficient index of its m = -l function and its summed radial moment
+    void shell_moments(const atom& A, const int lmax, int& coef_idx, ivec& shell_l, ivec& shell_idx, vec& shell_I);
     void add_multipole_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
         const vec2& targets, const vec& atom_weights, const int lmax);
     // Moments of the fitted density, same layout as the targets, from the coefficients alone
@@ -75,15 +77,12 @@ namespace DensityFitting
     // Partition-weighted moments of the fitted density, rows applied to the coefficients, same layout as the targets
     vec2 grid_multipoles(const vec2& rows, const vec& coefficients, const int lmax);
 
-    // First-order electrostatics between two fitted densities and their nuclei, Hartree; needs only the
-    // coefficients and the aux basis, so RI-fitted and SALTED-predicted coefficients enter alike.
-    // pair[a][b] over the atoms of A and B, rank[i][j] with 0 the nuclei and l+1 the aux functions of rank l.
-    // Beyond electrostatics: pol_X = -1/2 sum alpha_a F_a^2 over the atoms of X with Thakkar polarizabilities in the
-    // partner's field, disp the D4 energy of the dimer minus the monomers, overlap = Int rhoA rhoB. Exchange-repulsion
-    // rep = K * overlap when K > 0, else Gordon-Kim rep_kin + rep_x: rep_kin = T[rhoA+rhoB] - T[rhoA] - T[rhoB] with the
-    // Thomas-Fermi functional, rep_x the same difference of Dirac exchange, rep_vw the 1/9 von Weizsaecker correction to
-    // rep_kin reported but not added, on a Becke grid over the dimer that integrates the fitted densities to n_A, n_B.
-    // x_fun picks the exchange functional: 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L
+    // Interaction energy of two fitted densities and their nuclei in Hartree, from the coefficients and the aux basis
+    // alone (RI or SALTED). pair[a][b] over the atoms, rank[i][j] with 0 the nuclei and l+1 the aux functions of rank l.
+    // pol_X = -1/2 sum alpha_a F_a^2 with Thakkar polarizabilities in the partner's field, disp the D4 dimer minus
+    // monomer energy, overlap = Int rhoA rhoB; rep = K * overlap when K > 0, else Gordon-Kim rep_kin + rep_x, the
+    // Thomas-Fermi kinetic and the exchange (x_fun: 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L) energy of the dimer minus the
+    // monomers on a Becke grid that integrates the densities to n_A, n_B; rep_vw is the 1/9 von Weizsaecker term, reported only.
     struct INTERACTION {
         double nuc_nuc = 0.0, nucA_rhoB = 0.0, nucB_rhoA = 0.0, rho_rho = 0.0;
         double pol_A = 0.0, pol_B = 0.0, disp = 0.0, overlap = 0.0, rep = 0.0, rep_kin = 0.0, rep_vw = 0.0, rep_x = 0.0, n_A = 0.0, n_B = 0.0;
