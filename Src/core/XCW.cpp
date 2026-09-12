@@ -2493,7 +2493,8 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	std::string io_error;
 	//One region, one accumulator per thread, one reduction, however many windows the
 	//budget implies: an nmo x nmo matrix per window is what made narrow windows dear
-#pragma omp parallel
+	std::vector<occ::Mat> parts(omp_get_max_threads());
+#pragma omp parallel if (!on_device)
 	{
 		occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
 		double* local_ptr = local.data();
@@ -2525,12 +2526,21 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 				if (i_float_) accumulate(i_block32(r)); else accumulate(i_block(r));
 			}
 		}
-#pragma omp critical
-		{
-			perturb += local;
-		}
+		parts[omp_get_thread_num()].swap(local);
 	}
 	if (!io_error.empty()) throw std::runtime_error(io_error);
+	//The partials outweigh the matrix many times over, so their sum is parallel too
+	if (!on_device) {
+#pragma omp parallel for schedule(static)
+		for (int mu = 0; mu < cryst.nmo; mu++) {
+			for (int nu = mu; nu < cryst.nmo; nu++) {
+				double sum = 0.0;
+				for (int t = 0; t < static_cast<int>(parts.size()); t++)
+					if (parts[t].size() != 0) sum += parts[t](mu, nu);
+				perturb(mu, nu) = sum;
+			}
+		}
+	}
 	perturb *= prefactor;
 	for (int mu = 0; mu < cryst.nmo; mu++) {
 		for (int nu = mu + 1; nu < cryst.nmo; nu++) {
@@ -2836,7 +2846,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	}
 	D_last_build_ = scf.ctx.mo.D;
 	scf.ctx.F += G_last_;
-	throughput::record_time("XCW Fock build (OCC)", false, get_msec(fock_t0, get_time()));
+	throughput::record_time("XCW Fock build (OCC)", eri_on_device_, get_msec(fock_t0, get_time()));
 	scf.update_scf_energy(false);
 
 	double current_criterion = 0;
@@ -3081,46 +3091,77 @@ void XCW::store_ERIs(const occ::qm::HartreeFock& hf) {
 	throughput::record_time("XCW two-electron integrals", false, get_msec(t0, get_time()));
 }
 
-//J_ab = sum_cd (ab|cd) D_cd and K_ab = sum_cd (ac|bd) D_cd from the packed integrals: every
-//unique quartet carries its multiplicity, the six scatters mirror OCC's kernel, and the
-//symmetrisation at the end halves the double counting. Per-thread partials merged in thread order.
+//J_ab = sum_cd (ab|cd) D_cd and K_ab = sum_cd (ac|bd) D_cd from the packed integrals. With the
+//off-diagonal pairs of D doubled J is the symmetric packed matrix times that vector, one dot
+//and one axpy per row. K's four scatters per integral run along the segment c of a row, where
+//d is contiguous: two dots against columns of the symmetric D and two axpys into columns of
+//the (symmetrised) K. The diagonal cd == ab carries half the weight and is corrected after.
+//Per-thread partials merged in thread order.
 void XCW::eri_JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K) const {
 	const int n = static_cast<int>(D.rows()), npair = n * (n + 1) / 2, nthr = omp_get_max_threads();
-	ivec pa(npair), pb(npair);
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	if (eri_on_device_) {
+		J.resize(n, n);
+		K.resize(n, n);
+		err_checkf(eri_gpu_JK(D.data(), J.data(), K.data()), "Fock build on the device failed", std::cout);
+		return;
+	}
+#endif
+	vec dp(npair), fp(npair);
 	for (int a = 0, ab = 0; a < n; a++)
-		for (int b = 0; b <= a; b++, ab++) pa[ab] = a, pb[ab] = b;
-	std::vector<occ::Mat> Jp(nthr), Kp(nthr);
+		for (int b = 0; b <= a; b++, ab++) fp[ab] = a == b ? 1.0 : 2.0, dp[ab] = fp[ab] * D(a, b);
+	const double* Dd = D.data();
+	std::vector<vec> Jp(nthr);
+	std::vector<occ::Mat> Kp(nthr);
 #pragma omp parallel
 	{
-		occ::Mat Jl = occ::Mat::Zero(n, n), Kl = occ::Mat::Zero(n, n);
+		vec Jl(npair, 0.0), t(n);
+		occ::Mat Kl = occ::Mat::Zero(n, n);
+		double* Kd = Kl.data();
 #pragma omp for schedule(dynamic, 16)
 		for (int ab = 0; ab < npair; ab++) {
-			const int a = pa[ab], b = pb[ab];
-			const double* v = eri_.data() + (size_t)ab * (ab + 1) / 2, fab = a == b ? 1.0 : 2.0;
-			for (int cd = 0; cd <= ab; cd++) {
-				if (v[cd] == 0.0) continue;
-				const int c = pa[cd], d = pb[cd];
-				const double val = v[cd] * fab * (c == d ? 1.0 : 2.0) * (ab == cd ? 1.0 : 2.0);
-				Jl(a, b) += D(c, d) * val;
-				Jl(c, d) += D(a, b) * val;
-				Kl(a, c) += D(b, d) * val;
-				Kl(b, d) += D(a, c) * val;
-				Kl(a, d) += D(b, c) * val;
-				Kl(b, c) += D(a, d) * val;
+			const int a = static_cast<int>((std::sqrt(8.0 * ab + 1.0) - 1.0) / 2.0), b = ab - a * (a + 1) / 2;
+			const double* v = eri_.data() + (size_t)ab * (ab + 1) / 2;
+			const double fab = 2.0 * fp[ab], dab = fp[ab] * Dd[a + b * n];
+			const Eigen::Map<const Eigen::VectorXd> vr(v, ab + 1);
+			Eigen::Map<Eigen::VectorXd>(Jl.data(), ab) += dab * vr.head(ab);
+			Jl[ab] += vr.dot(Eigen::Map<const Eigen::VectorXd>(dp.data(), ab + 1));
+			const double *Da = Dd + a * n, *Db = Dd + b * n;
+			double *Ka = Kd + a * n, *Kb = Kd + b * n;
+			for (int c = 0; c <= a; c++) {
+				const int m = c < a ? c + 1 : b + 1;
+				const double* vc = v + c * (c + 1) / 2;
+				const double kca = fab * Da[c], kcb = fab * Db[c];
+				Eigen::Map<Eigen::VectorXd> tm(t.data(), m);
+				tm = Eigen::Map<const Eigen::VectorXd>(vc, m).cwiseProduct(Eigen::Map<const Eigen::VectorXd>(fp.data() + c * (c + 1) / 2, m));
+				Kd[c + a * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Db, m));
+				Kd[c + b * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Da, m));
+				Eigen::Map<Eigen::VectorXd>(Ka, m) += kcb * tm;
+				Eigen::Map<Eigen::VectorXd>(Kb, m) += kca * tm;
 			}
+			const double h = fp[ab] * fp[ab] * v[ab];
+			Kd[a + a * n] -= h * Db[b], Kd[a + b * n] -= h * Da[b];
+			Ka[b] -= h * Da[b], Kb[b] -= h * Da[a];
 		}
 		Jp[omp_get_thread_num()].swap(Jl);
 		Kp[omp_get_thread_num()].swap(Kl);
 	}
-	J = occ::Mat::Zero(n, n);
-	K = occ::Mat::Zero(n, n);
-	for (int t = 0; t < nthr; t++) {
-		if (Jp[t].size() == 0) continue;
-		J += Jp[t];
-		K += Kp[t];
+	J.resize(n, n);
+	K.resize(n, n);
+	//The partials outweigh the matrices many times over, so their sum is parallel too
+#pragma omp parallel for schedule(static)
+	for (int a = 0; a < n; a++) {
+		for (int b = 0; b <= a; b++) {
+			double sj = 0.0, sk = 0.0;
+			for (int t = 0; t < nthr; t++) {
+				if (Jp[t].empty()) continue;
+				sj += Jp[t][a * (a + 1) / 2 + b];
+				sk += Kp[t](a, b) + Kp[t](b, a);
+			}
+			J(a, b) = J(b, a) = sj;
+			K(a, b) = K(b, a) = 0.125 * sk;
+		}
 	}
-	J = 0.25 * (J + J.transpose()).eval();
-	K = 0.125 * (K + K.transpose()).eval();
 }
 
 //OCC's two-electron part for its half-scaled densities: 2J(D) - K(D) restricted, and per spin
@@ -3264,6 +3305,14 @@ void XCW::run_XCW_fitting() {
 	}
 #endif
 	store_ERIs(hf);
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	if (!eri_.empty() && opt->gpu_itensor && opt->use_gpu) {
+		eri_on_device_ = eri_gpu_hold(eri_.data(), static_cast<int>(hf.aobasis().nbf()));
+		if (!(opt->no_date))
+			std::cerr << "GPU in use: XCW Fock build from the stored integrals on "
+			<< (eri_on_device_ ? "the device" : "the CPU - device unavailable or the integrals too large") << std::endl;
+	}
+#endif
 	occ::qm::SCF scf(hf, settings.hf_type);
 	bool has_guess = false;
 	occ::qm::Wavefunction last_wfn, prev_wfn;
@@ -3348,7 +3397,8 @@ void XCW::run_XCW_fitting() {
 	finish_i_save();
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	itensor_gpu_release();
-	i_on_device_ = false;
+	eri_gpu_release();
+	i_on_device_ = eri_on_device_ = false;
 #endif
 
 	std::cout << "Finished XCW fitting procedure." << std::endl;
