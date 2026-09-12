@@ -3365,7 +3365,9 @@ void XCW::run_XCW_fitting() {
 	store_ERIs(hf);
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	if (eri_ && opt->gpu_itensor && opt->use_gpu) {
+		const auto up_t0 = get_time();
 		eri_on_device_ = eri_gpu_hold(eri_.get(), static_cast<int>(hf.aobasis().nbf()));
+		if (eri_on_device_) throughput::record_time("XCW two-electron integrals upload", true, get_msec(up_t0, get_time()));
 		if (!(opt->no_date))
 			std::cerr << "GPU in use: XCW Fock build from the stored integrals on "
 			<< (eri_on_device_ ? "the device" : "the CPU - device unavailable or the integrals too large") << std::endl;
