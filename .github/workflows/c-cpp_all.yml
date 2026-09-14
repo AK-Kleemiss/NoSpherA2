@@ -94,6 +94,10 @@ jobs:
           # CUDA comes from conda-forge, pinned to 12.9 so the artifact keeps
           # covering Volta to Blackwell from one week to the next, and links
           # the runtime statically: the artifact needs no CUDA installation.
+          # nvcc is not wrapped in sccache: with eight architectures sccache's
+          # nvcc mode lost the per-architecture PTX between its own steps
+          # ("fatbinary fatal: Could not open input file 'sf_gpu.compute_70.ptx'")
+          # and the three .cu files are cheap next to the rest of the build.
           - name: Linux CUDA Release
             os: ubuntu-24.04
             configure-preset: release-linux
@@ -110,7 +114,6 @@ jobs:
               -DNOSPHERA2_GPU_AUTO=OFF
               -DNOSPHERA2_USE_CUDA=ON
               -DNOSPHERA2_CUDA_PORTABLE=ON
-              -DCMAKE_CUDA_COMPILER_LAUNCHER=sccache
             artifact-path: artifacts/NoSpherA2-linux-x86_64-cuda.tar.gz
             artifact-name: NoSpherA2-linux-x86_64-cuda
 
@@ -130,7 +133,6 @@ jobs:
               -DNOSPHERA2_GPU_AUTO=OFF
               -DNOSPHERA2_USE_CUDA=ON
               -DNOSPHERA2_CUDA_PORTABLE=ON
-              -DCMAKE_CUDA_COMPILER_LAUNCHER=sccache
             artifact-path: artifacts/NoSpherA2-windows-x64-cuda.zip
             artifact-name: NoSpherA2-windows-x64-cuda
 
