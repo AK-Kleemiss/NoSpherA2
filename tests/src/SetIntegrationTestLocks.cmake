@@ -76,6 +76,9 @@ set_tests_properties(
     TomlIntegrationTests.P1_F2_test_XCW_full
     TomlIntegrationTests.P1_F2_test_XCW_h2_full
     TomlIntegrationTests.P1_test_XCW_gpu_itensor
+    TomlIntegrationTests.P1_test_XCW_incremental
+    TomlIntegrationTests.P1_test_XCW_h2_incremental
+    TomlIntegrationTests.P1_F2_test_XCW_incremental
     PROPERTIES
         RESOURCE_LOCK integration_P1_test
 )

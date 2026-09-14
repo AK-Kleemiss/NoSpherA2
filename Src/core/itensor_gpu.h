@@ -85,6 +85,6 @@ void itensor_gpu_release();
 //The packed two-electron integrals held the same way for the Fock build, laid out as
 //XCW::store_ERIs does over n basis functions. J and K come back n x n column-major, scaled
 //as XCW::eri_JK scales them, from D in the same layout.
-bool eri_gpu_hold(const double* eri, int n);
+bool eri_gpu_hold(const double* eri, int n, int npair, const int* pa, const int* pb, const int* first, const int* idx);
 bool eri_gpu_JK(const double* D, double* J, double* K);
 void eri_gpu_release();

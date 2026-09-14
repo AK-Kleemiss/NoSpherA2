@@ -8,6 +8,7 @@
 #include "xcw_halting.h"
 #include <occ/qm/hf.h>
 #include "i_tensor_stream.h"
+#include "stored_eri.h"
 #include <thread>
 
 class XCW {
@@ -343,13 +344,11 @@ private:
 	occ::Mat G_last_, D_last_build_;
 	int last_full_build_ = 0;
 	double next_full_build_error_ = 0.0;
-	//Two-electron integrals packed over the 8-fold symmetry, built once per run when they fit in
+	//Two-electron integrals over the screened-in pairs, built once per run when they fit in
 	//memory: the Fock build then contracts them instead of recomputing every quartet per iteration
-	std::unique_ptr<double[]> eri_;
+	stored_eri eri_;
 	bool eri_on_device_ = false;
-	void store_ERIs(const occ::qm::HartreeFock& hf);
-	void eri_JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K) const;
-	occ::Mat eri_fock(const occ::qm::MolecularOrbitals& mo) const;
+	occ::Mat eri_fock(const occ::qm::MolecularOrbitals& mo, bool screen) const;
 	std::string i_writer_error_;
 	void start_i_save();
 	void finish_i_save();

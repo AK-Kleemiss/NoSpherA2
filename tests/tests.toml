@@ -438,6 +438,57 @@ anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings.txt"
 no_date = ""
 
+# The same three fits with -xcw_incremental: the two-electron Fock part comes from the
+# change of the density between iterations, contracted from the stored integrals with
+# the segments the difference cannot reach skipped, and rebuilt in full every eighth
+# iteration or when the DIIS error has fallen tenfold. -xcw_int_precision 1e-12 as the
+# flag's help asks, since the direct build (no memory for the integrals) needs it.
+
+[P1_test_XCW_incremental]
+directory = "P1_test"
+good = "P1_test_XCW_incremental.good"
+
+[P1_test_XCW_incremental.args]
+do_XCW = ""
+no_gpu = ""
+xcw_incremental = ""
+xcw_int_precision = "1e-12"
+cif = "P1_test_NA2.cif"
+hkl = "P1_test.hkl"
+anom_disp = "anom_disp.txt"
+XCW_settings = "test_settings.txt"
+no_date = ""
+
+[P1_test_XCW_h2_incremental]
+directory = "P1_test"
+good = "P1_test_XCW_h2_incremental.good"
+
+[P1_test_XCW_h2_incremental.args]
+do_XCW = ""
+no_gpu = ""
+xcw_incremental = ""
+xcw_int_precision = "1e-12"
+cif = "P1_test_NA2.cif"
+hkl = "P1_test.hkl"
+anom_disp = "anom_disp.txt"
+XCW_settings = "h2_test_settings.txt"
+no_date = ""
+
+[P1_F2_test_XCW_incremental]
+directory = "P1_test"
+good = "P1_F2_test_XCW_incremental.good"
+
+[P1_F2_test_XCW_incremental.args]
+do_XCW = ""
+no_gpu = ""
+xcw_incremental = ""
+xcw_int_precision = "1e-12"
+cif = "P1_test_NA2.cif"
+hkl = "P1_test.hkl"
+anom_disp = "anom_disp.txt"
+XCW_settings = "test_settings_f2.txt"
+no_date = ""
+
 # P1_test_XCW against the F^2 criterion
 
 [P1_F2_test_XCW]

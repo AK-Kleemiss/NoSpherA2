@@ -853,10 +853,11 @@ struct options
     //rather than the last one alone; the step is small and the trajectory smooth.
     bool xcw_extrapolate = true;
     //Build the two-electron Fock matrix from the change of the density between iterations,
-    //which the integral kernel screens on, rather than from the whole density every time.
-    //Only with xcw_int_precision 1e-12: at 1e-10 the increments' screening error accumulates
-    //to a gradient floor of 3e-5 and the SCF never meets its 1e-5, and the full build at
-    //1e-10 is the faster of the two anyway.
+    //rather than from the whole density every time: the stored integrals skip the segments
+    //the difference cannot reach (stored_eri::JK), the direct kernel skips shell quartets.
+    //The direct build only with xcw_int_precision 1e-12: at 1e-10 the increments' screening
+    //error accumulates to a gradient floor of 3e-5 and the SCF never meets its 1e-5, and the
+    //full build at 1e-10 is the faster of the two anyway.
     bool xcw_incremental = false;
     //Integral screening threshold of the XCW Fock build; OCC's own default is 1e-12.
     double xcw_int_precision = 1e-10;

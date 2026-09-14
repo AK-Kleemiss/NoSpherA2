@@ -2893,24 +2893,22 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H);
 	scf.ctx.F = scf.ctx.H;
 	const _time_point fock_t0 = get_time();
-	//G(D) = G(D_last) + G(D - D_last): the kernel screens shell quartets on the density's
-	//shell-block norms, and the difference shrinks as the SCF converges. Rebuilt in full
-	//every 8 iterations or once the DIIS error has fallen tenfold since the last full build,
-	//as OCC's own loop does, so the screening error does not accumulate.
-	const bool incremental = !eri_ && opt->xcw_incremental && scf.m_procedure.fock_build_properties().density_screened && G_last_.size() > 0
+	//G(D) = G(D_last) + G(D - D_last): the direct kernel screens shell quartets on the density's
+	//shell-block norms and the stored one skips integral segments on the difference's elements,
+	//and the difference shrinks as the SCF converges. Rebuilt in full every 8 iterations or once
+	//the DIIS error has fallen tenfold since the last full build, as OCC's own loop does, so the
+	//screening error does not accumulate. A device that holds the integrals contracts the whole
+	//density each time, nothing to skip.
+	const bool incremental = opt->xcw_incremental && !eri_on_device_ && scf.m_procedure.fock_build_properties().density_screened && G_last_.size() > 0
 		&& scf.iter - last_full_build_ < 8 && scf.diis_error > next_full_build_error_;
-	if (eri_) {
-		G_last_ = eri_fock(scf.ctx.mo);
-		last_full_build_ = scf.iter;
-	}
-	else if (incremental) {
+	if (incremental) {
 		occ::Mat D_diff = scf.ctx.mo.D - D_last_build_;
 		std::swap(scf.ctx.mo.D, D_diff);
-		G_last_ += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
+		G_last_ += eri_ ? eri_fock(scf.ctx.mo, true) : scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
 		std::swap(scf.ctx.mo.D, D_diff);
 	}
 	else {
-		G_last_ = scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
+		G_last_ = eri_ ? eri_fock(scf.ctx.mo, false) : scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
 		last_full_build_ = scf.iter;
 		next_full_build_error_ = scf.diis_error / 10.0;
 	}
@@ -3099,161 +3097,19 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	}
 }
 
-//Every unique (ab|cd) of the significant shell pairs, no density screening, so a Fock built from
-//them carries at least what OCC's direct build keeps. Slot of ab >= cd is ab(ab+1)/2 + cd with
-//ab = a(a+1)/2 + b, a >= b; each slot is written by the one shell quartet that holds it.
-void XCW::store_ERIs(const occ::qm::HartreeFock& hf) {
-	eri_.reset();
-	if (!hf.fock_build_properties().density_screened || settings.hf_type == occ::qm::SpinorbitalKind::General) return;
-	occ::qm::IntegralEngine engine(hf.aobasis());
-	const int nbf = static_cast<int>(engine.nbf()), nsh = static_cast<int>(engine.nsh()), npq = nsh * (nsh + 1) / 2;
-	const size_t npair = (size_t)nbf * (nbf + 1) / 2, nint = npair * (npair + 1) / 2;
-	const size_t avail = available_memory_bytes();
-	if (avail != 0 && nint * sizeof(double) > avail / 2) {
-		XCW_log << "XCW: " << nint * sizeof(double) / 1048576.0 << " MB of two-electron integrals do not fit in memory, direct Fock builds" << std::endl;
-		return;
-	}
-	const _time_point t0 = get_time();
-	eri_.reset(new double[nint]);
-	const auto& shellpairs = engine.shellpairs();
-	const auto& first_bf = engine.first_bf();
-	const bool sph = engine.is_spherical();
-	auto& env = engine.env();
-#pragma omp parallel
-	{
-		occ::qm::cint::Optimizer opt(env, occ::qm::cint::Operator::coulomb, 4);
-		vec buffer(env.buffer_size_2e()), cache;
-#pragma omp for schedule(static)
-		for (long long i = 0; i < static_cast<long long>(nint); i++) eri_[i] = 0.0;
-#pragma omp for schedule(dynamic)
-		for (int pq = 0; pq < npq; pq++) {
-			const int p = static_cast<int>((std::sqrt(8.0 * pq + 1.0) - 1.0) / 2.0), q = pq - p * (p + 1) / 2;
-			if (!std::binary_search(shellpairs[p].begin(), shellpairs[p].end(), (size_t)q)) continue;
-			for (int r = 0; r <= p; r++) {
-				const int s_max = p == r ? q : r;
-				for (const size_t s : shellpairs[r]) {
-					if (static_cast<int>(s) > s_max) break;
-					std::array<int, 4> sh{ p, q, r, static_cast<int>(s) };
-					//libcint mallocs its scratch per quartet unless handed one; the size query is the same call without an output
-					const size_t need = sph
-						? libcint::int2e_sph(nullptr, nullptr, sh.data(), env.atom_data_ptr(), env.num_atoms(), env.basis_data_ptr(), env.num_basis(), env.env_data_ptr(), nullptr, nullptr)
-						: libcint::int2e_cart(nullptr, nullptr, sh.data(), env.atom_data_ptr(), env.num_atoms(), env.basis_data_ptr(), env.num_basis(), env.env_data_ptr(), nullptr, nullptr);
-					if (need > cache.size()) cache.resize(need);
-					const std::array<int, 4> dims = sph
-						? env.four_center_helper<occ::qm::cint::Operator::coulomb, occ::qm::Shell::Kind::Spherical>(sh, opt.optimizer_ptr(), buffer.data(), cache.data())
-						: env.four_center_helper<occ::qm::cint::Operator::coulomb, occ::qm::Shell::Kind::Cartesian>(sh, opt.optimizer_ptr(), buffer.data(), cache.data());
-					if (dims[0] < 0) continue;
-					const double* v = buffer.data();
-					for (int f3 = 0; f3 < dims[3]; f3++) {
-						const int d = first_bf[s] + f3;
-						for (int f2 = 0; f2 < dims[2]; f2++) {
-							const int c = first_bf[r] + f2;
-							const size_t cd = c >= d ? (size_t)c * (c + 1) / 2 + d : (size_t)d * (d + 1) / 2 + c;
-							for (int f1 = 0; f1 < dims[1]; f1++) {
-								const int b = first_bf[q] + f1;
-								for (int f0 = 0; f0 < dims[0]; f0++, v++) {
-									const int a = first_bf[p] + f0;
-									const size_t ab = a >= b ? (size_t)a * (a + 1) / 2 + b : (size_t)b * (b + 1) / 2 + a;
-									eri_[ab >= cd ? ab * (ab + 1) / 2 + cd : cd * (cd + 1) / 2 + ab] = *v;
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	XCW_log << "XCW: " << nint * sizeof(double) / 1048576.0 << " MB of two-electron integrals held in memory" << std::endl;
-	throughput::record_time("XCW two-electron integrals", false, get_msec(t0, get_time()));
-}
-
-//J_ab = sum_cd (ab|cd) D_cd and K_ab = sum_cd (ac|bd) D_cd from the packed integrals. With the
-//off-diagonal pairs of D doubled J is the symmetric packed matrix times that vector, one dot
-//and one axpy per row. K's four scatters per integral run along the segment c of a row, where
-//d is contiguous: two dots against columns of the symmetric D and two axpys into columns of
-//the (symmetrised) K. The diagonal cd == ab carries half the weight and is corrected after.
-//Per-thread partials merged in thread order.
-void XCW::eri_JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K) const {
-	const int n = static_cast<int>(D.rows()), npair = n * (n + 1) / 2, nthr = omp_get_max_threads();
+//The stored integrals' two-electron Fock part, contracted on the device when it holds them
+occ::Mat XCW::eri_fock(const occ::qm::MolecularOrbitals& mo, bool screen) const {
+	stored_eri::jk_fn jk;
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	if (eri_on_device_) {
-		J.resize(n, n);
-		K.resize(n, n);
-		err_checkf(eri_gpu_JK(D.data(), J.data(), K.data()), "Fock build on the device failed", std::cout);
-		return;
+		jk = [](const occ::Mat& D, occ::Mat& J, occ::Mat& K) {
+			J.resize(D.rows(), D.cols());
+			K.resize(D.rows(), D.cols());
+			err_checkf(eri_gpu_JK(D.data(), J.data(), K.data()), "Fock build on the device failed", std::cout);
+		};
 	}
 #endif
-	vec dp(npair), fp(npair);
-	for (int a = 0, ab = 0; a < n; a++)
-		for (int b = 0; b <= a; b++, ab++) fp[ab] = a == b ? 1.0 : 2.0, dp[ab] = fp[ab] * D(a, b);
-	const double* Dd = D.data();
-	std::vector<vec> Jp(nthr);
-	std::vector<occ::Mat> Kp(nthr);
-#pragma omp parallel
-	{
-		vec Jl(npair, 0.0), t(n);
-		occ::Mat Kl = occ::Mat::Zero(n, n);
-		double* Kd = Kl.data();
-#pragma omp for schedule(dynamic, 16)
-		for (int ab = 0; ab < npair; ab++) {
-			const int a = static_cast<int>((std::sqrt(8.0 * ab + 1.0) - 1.0) / 2.0), b = ab - a * (a + 1) / 2;
-			const double* v = eri_.get() + (size_t)ab * (ab + 1) / 2;
-			const double fab = 2.0 * fp[ab], dab = fp[ab] * Dd[a + b * n];
-			const Eigen::Map<const Eigen::VectorXd> vr(v, ab + 1);
-			Eigen::Map<Eigen::VectorXd>(Jl.data(), ab) += dab * vr.head(ab);
-			Jl[ab] += vr.dot(Eigen::Map<const Eigen::VectorXd>(dp.data(), ab + 1));
-			const double *Da = Dd + a * n, *Db = Dd + b * n;
-			double *Ka = Kd + a * n, *Kb = Kd + b * n;
-			for (int c = 0; c <= a; c++) {
-				const int m = c < a ? c + 1 : b + 1;
-				const double* vc = v + c * (c + 1) / 2;
-				const double kca = fab * Da[c], kcb = fab * Db[c];
-				Eigen::Map<Eigen::VectorXd> tm(t.data(), m);
-				tm = Eigen::Map<const Eigen::VectorXd>(vc, m).cwiseProduct(Eigen::Map<const Eigen::VectorXd>(fp.data() + c * (c + 1) / 2, m));
-				Kd[c + a * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Db, m));
-				Kd[c + b * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Da, m));
-				Eigen::Map<Eigen::VectorXd>(Ka, m) += kcb * tm;
-				Eigen::Map<Eigen::VectorXd>(Kb, m) += kca * tm;
-			}
-			const double h = fp[ab] * fp[ab] * v[ab];
-			Kd[a + a * n] -= h * Db[b], Kd[a + b * n] -= h * Da[b];
-			Ka[b] -= h * Da[b], Kb[b] -= h * Da[a];
-		}
-		Jp[omp_get_thread_num()].swap(Jl);
-		Kp[omp_get_thread_num()].swap(Kl);
-	}
-	J.resize(n, n);
-	K.resize(n, n);
-	//The partials outweigh the matrices many times over, so their sum is parallel too
-#pragma omp parallel for schedule(static)
-	for (int a = 0; a < n; a++) {
-		for (int b = 0; b <= a; b++) {
-			double sj = 0.0, sk = 0.0;
-			for (int t = 0; t < nthr; t++) {
-				if (Jp[t].empty()) continue;
-				sj += Jp[t][a * (a + 1) / 2 + b];
-				sk += Kp[t](a, b) + Kp[t](b, a);
-			}
-			J(a, b) = J(b, a) = sj;
-			K(a, b) = K(b, a) = 0.125 * sk;
-		}
-	}
-}
-
-//OCC's two-electron part for its half-scaled densities: 2J(D) - K(D) restricted, and per spin
-//2J(Da + Db) - 2K(Ds) unrestricted
-occ::Mat XCW::eri_fock(const occ::qm::MolecularOrbitals& mo) const {
-	occ::Mat J, K;
-	if (mo.kind == occ::qm::SpinorbitalKind::Restricted) {
-		eri_JK(mo.D, J, K);
-		return 2.0 * J - K;
-	}
-	occ::Mat F = occ::Mat::Zero(mo.D.rows(), mo.D.cols()), Jb, Kb;
-	eri_JK(occ::qm::block::a(mo.D), J, K);
-	eri_JK(occ::qm::block::b(mo.D), Jb, Kb);
-	occ::qm::block::a(F) = 2.0 * (J + Jb) - 2.0 * K;
-	occ::qm::block::b(F) = 2.0 * (J + Jb) - 2.0 * Kb;
-	return F;
+	return eri_.fock(mo, screen, jk);
 }
 
 occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
@@ -3380,11 +3236,19 @@ void XCW::run_XCW_fitting() {
 			<< (i_on_device_ ? "the device" : "the CPU - device unavailable or the tensor too large") << std::endl;
 	}
 #endif
-	store_ERIs(hf);
+	//Four fifths of the free memory, the I tensor's budget, for the stored integrals
+	eri_.clear();
+	if (settings.hf_type != occ::qm::SpinorbitalKind::General) {
+		const _time_point eri_t0 = get_time();
+		const size_t avail = available_memory_bytes();
+		if (eri_.build(hf, avail ? avail / 5 * 4 : 0, XCW_log))
+			throughput::record_time("XCW two-electron integrals", false, get_msec(eri_t0, get_time()));
+	}
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	if (eri_ && opt->gpu_itensor && opt->use_gpu) {
 		const auto up_t0 = get_time();
-		eri_on_device_ = eri_gpu_hold(eri_.get(), static_cast<int>(hf.aobasis().nbf()));
+		eri_on_device_ = eri_gpu_hold(eri_.data(), eri_.nbf(), eri_.npairs(), eri_.pair_a().data(), eri_.pair_b().data(),
+			eri_.first_pair().data(), eri_.pair_index().data());
 		if (eri_on_device_) throughput::record_time("XCW two-electron integrals upload", true, get_msec(up_t0, get_time()));
 		if (!(opt->no_date))
 			std::cerr << "GPU in use: XCW Fock build from the stored integrals on "

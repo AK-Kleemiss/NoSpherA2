@@ -108,7 +108,15 @@ struct HeldEri {
 	double* Ka = nullptr;
 	double* Kb = nullptr;
 	double* K = nullptr;
+	//The kept pairs: first and second index of each, the first pair of every first index and
+	//the pair number of every packed pair (-1 when dropped); the two index tables on the host too
+	int* pa = nullptr;
+	int* pb = nullptr;
+	int* first = nullptr;
+	int* idx = nullptr;
+	std::vector<int> hpa, hpb;
 	int n = 0, npair = 0;
+	bool dense = true;
 };
 HeldEri g_eri;
 
@@ -618,7 +626,7 @@ bool itensor_gpu_cols(const std::complex<double>* pre, double* out)
 	return true;
 }
 
-//One block per row ab of the packed integrals, as XCW::eri_JK walks them: J1 is the row's
+//One block per row ab of the packed integrals, as stored_eri::JK walks them: J1 is the row's
 //half of the symmetric matvec, the four scatters of every integral go into the row's two K
 //columns. Each warp takes groups of R rows c, the lanes over d, the row sums of a group kept
 //in registers until they are reduced across the lanes with a transposed butterfly (one add
@@ -626,12 +634,18 @@ bool itensor_gpu_cols(const std::complex<double>* pre, double* out)
 //the K columns once per group, so nothing is atomic. The multiplicities of the pairs are
 //folded into the two doubled density columns, the diagonal c == d taken back per row and
 //the diagonal cd == ab by thread 0. The partials of a row leave as K(:, a) and K(:, b).
-template <int R>
-__global__ void eri_jk_kernel(const double* __restrict__ V, const double* __restrict__ dp, const double* __restrict__ D, double* J1, double* Ka, double* Kb, const int n)
+//With SPARSE the rows are the kept pairs: the segment of a first index c runs from first[c]
+//and its second indices are pb, so the density reads and the K column scatters go through
+//that table, one per row of the group instead of one per group. The lanes of a group step
+//through distinct pb, so the scatters of a row never collide within the warp.
+template <int R, bool SPARSE>
+__global__ void eri_jk_kernel(const double* __restrict__ V, const double* __restrict__ dp, const double* __restrict__ D, double* J1, double* Ka, double* Kb, const int n,
+	const int* __restrict__ pa, const int* __restrict__ pb, const int* __restrict__ first, const int* __restrict__ idx)
 {
 	extern __shared__ double sh[];
 	__shared__ double red[32];
-	const int ab = blockIdx.x, a = (int)((sqrt(8.0 * ab + 1.0) - 1.0) / 2.0), b = ab - a * (a + 1) / 2;
+	const int ab = blockIdx.x;
+	const int a = SPARSE ? pa[ab] : (int)((sqrt(8.0 * ab + 1.0) - 1.0) / 2.0), b = SPARSE ? pb[ab] : ab - a * (a + 1) / 2;
 	const int lane = threadIdx.x & 31, warp = threadIdx.x >> 5, nwarp = blockDim.x >> 5;
 	double* Da = sh;
 	double* Db = sh + n;
@@ -652,28 +666,50 @@ __global__ void eri_jk_kernel(const double* __restrict__ V, const double* __rest
 #pragma unroll
 		for (int r = 0; r < R; r++) {
 			const int c = c0 + r;
-			m[r] = c > a ? 0 : (c < a ? c + 1 : b + 1);
-			off[r] = c * (c + 1) / 2;
+			if (SPARSE) {
+				off[r] = c > a ? 0 : first[c];
+				m[r] = c > a ? 0 : (c < a ? first[c + 1] : ab + 1) - off[r];
+			}
+			else {
+				m[r] = c > a ? 0 : (c < a ? c + 1 : b + 1);
+				off[r] = c * (c + 1) / 2;
+			}
 			Dar[r] = m[r] > 0 ? Da[c] : 0.0;
 			Dbr[r] = m[r] > 0 ? Db[c] : 0.0;
 			sa[r] = sb[r] = 0.0;
 			mmax = m[r] > mmax ? m[r] : mmax;
 		}
 		for (int d = lane; d < mmax; d += 32) {
-			const double Dad = Da[d], Dbd = Db[d];
-			double t[R], ka = 0.0, kb = 0.0;
+			double t[R];
 #pragma unroll
 			for (int r = 0; r < R; r++) t[r] = d < m[r] ? __ldcs(v + off[r] + d) : 0.0;
+			if (SPARSE) {
 #pragma unroll
-			for (int r = 0; r < R; r++) {
-				j += t[r] * (d < m[r] ? dp[off[r] + d] : 0.0);
-				sa[r] += t[r] * Dbd;
-				sb[r] += t[r] * Dad;
-				ka += t[r] * Dbr[r];
-				kb += t[r] * Dar[r];
+				for (int r = 0; r < R; r++) {
+					if (d < m[r]) {
+						const int e = pb[off[r] + d];
+						j += t[r] * dp[off[r] + d];
+						sa[r] += t[r] * Db[e];
+						sb[r] += t[r] * Da[e];
+						sKa[e] += t[r] * Dbr[r];
+						sKb[e] += t[r] * Dar[r];
+					}
+				}
 			}
-			sKa[d] += ka;
-			sKb[d] += kb;
+			else {
+				const double Dad = Da[d], Dbd = Db[d];
+				double ka = 0.0, kb = 0.0;
+#pragma unroll
+				for (int r = 0; r < R; r++) {
+					j += t[r] * (d < m[r] ? dp[off[r] + d] : 0.0);
+					sa[r] += t[r] * Dbd;
+					sb[r] += t[r] * Dad;
+					ka += t[r] * Dbr[r];
+					kb += t[r] * Dar[r];
+				}
+				sKa[d] += ka;
+				sKb[d] += kb;
+			}
 		}
 #pragma unroll
 		for (int w = 16, k = R / 2; k >= 1; w >>= 1, k >>= 1) {
@@ -692,8 +728,16 @@ __global__ void eri_jk_kernel(const double* __restrict__ V, const double* __rest
 		}
 		const int c = c0 + lane / (32 / R);
 		if (lane % (32 / R) == 0 && c <= a) {
-			const int mc = c < a ? c + 1 : b + 1;
-			const double t = mc > c ? v[c * (c + 1) / 2 + c] : 0.0;
+			double t;
+			if (SPARSE) {
+				//The pair cc of the segment, when it is kept and lies in the row
+				const int kd = idx[c * (c + 1) / 2 + c], mc = (c < a ? first[c + 1] : ab + 1);
+				t = kd >= 0 && kd < mc ? v[kd] : 0.0;
+			}
+			else {
+				const int mc = c < a ? c + 1 : b + 1;
+				t = mc > c ? v[c * (c + 1) / 2 + c] : 0.0;
+			}
 			sKa[c] += sa[0] - t * Db[c];
 			sKb[c] += sb[0] - t * Da[c];
 		}
@@ -719,16 +763,19 @@ __global__ void eri_jk_kernel(const double* __restrict__ V, const double* __rest
 	}
 }
 
-//K(d, a) is the sum of the row partials over the rows of a, K(:, a) from the rows ab with
-//b <= a and K(:, b) from the rows a'b with a' >= a
-__global__ void eri_kred_kernel(const double* Ka, const double* Kb, double* K, const int n)
+//K(d, a) is the sum of the row partials over the rows of a, K(:, a) from the kept rows ab
+//with b <= a and K(:, b) from the kept rows a'b with a' >= a
+__global__ void eri_kred_kernel(const double* Ka, const double* Kb, double* K, const int n, const int* __restrict__ first, const int* __restrict__ idx)
 {
 	const int i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i >= n * n) return;
 	const int d = i % n, a = i / n;
 	double sum = 0.0;
-	for (int b = 0; b <= a; b++) sum += Ka[(size_t)(a * (a + 1) / 2 + b) * n + d];
-	for (int a2 = a; a2 < n; a2++) sum += Kb[(size_t)(a2 * (a2 + 1) / 2 + a) * n + d];
+	for (int k = first[a]; k < first[a + 1]; k++) sum += Ka[(size_t)k * n + d];
+	for (int a2 = a; a2 < n; a2++) {
+		const int k = idx[a2 * (a2 + 1) / 2 + a];
+		if (k >= 0) sum += Kb[(size_t)k * n + d];
+	}
 	K[i] = sum;
 }
 
@@ -744,18 +791,28 @@ __global__ void eri_jt_kernel(const double* V, const double* dp, double* part, c
 	part[(size_t)blockIdx.y * npair + cd] = sum;
 }
 
-bool eri_gpu_hold(const double* eri, const int n)
+bool eri_gpu_hold(const double* eri, const int n, const int npair, const int* pa, const int* pb, const int* first, const int* idx)
 {
 	eri_gpu_release();
-	if (!itensor_gpu_available() || n <= 0 || 6 * n * sizeof(double) > 48 * 1024) return false;
+	if (!itensor_gpu_available() || n <= 0 || npair <= 0 || 6 * n * sizeof(double) > 48 * 1024) return false;
 	HeldEri& h = g_eri;
-	const int npair = n * (n + 1) / 2;
+	const int npacked = n * (n + 1) / 2;
 	const size_t bytes = sizeof(double) * (size_t)npair * (npair + 1) / 2, kbytes = sizeof(double) * (size_t)npair * n;
 	size_t free_b = 0, total_b = 0;
 	if (gpuMemGetInfo(&free_b, &total_b) != gpuSuccess || bytes + 2 * kbytes + (size_t)64 * 1048576 > free_b) return false;
 	if (gpuMalloc(&h.V, bytes) != gpuSuccess) { gpuGetLastError(); return false; }
-	h.n = n; h.npair = npair;
+	h.n = n; h.npair = npair; h.dense = npair == npacked;
+	h.hpa.assign(pa, pa + npair);
+	h.hpb.assign(pb, pb + npair);
 	const bool ok = gpuMemcpy(h.V, eri, bytes, gpuMemcpyHostToDevice) == gpuSuccess
+		&& gpuMalloc(&h.pa, sizeof(int) * npair) == gpuSuccess
+		&& gpuMalloc(&h.pb, sizeof(int) * npair) == gpuSuccess
+		&& gpuMalloc(&h.first, sizeof(int) * (n + 1)) == gpuSuccess
+		&& gpuMalloc(&h.idx, sizeof(int) * npacked) == gpuSuccess
+		&& gpuMemcpy(h.pa, pa, sizeof(int) * npair, gpuMemcpyHostToDevice) == gpuSuccess
+		&& gpuMemcpy(h.pb, pb, sizeof(int) * npair, gpuMemcpyHostToDevice) == gpuSuccess
+		&& gpuMemcpy(h.first, first, sizeof(int) * (n + 1), gpuMemcpyHostToDevice) == gpuSuccess
+		&& gpuMemcpy(h.idx, idx, sizeof(int) * npacked, gpuMemcpyHostToDevice) == gpuSuccess
 		&& gpuMalloc(&h.dp, sizeof(double) * npair) == gpuSuccess
 		&& gpuMalloc(&h.D, sizeof(double) * n * n) == gpuSuccess
 		&& gpuMalloc(&h.J1, sizeof(double) * npair) == gpuSuccess
@@ -773,14 +830,15 @@ bool eri_gpu_JK(const double* D, double* J, double* K)
 	HeldEri& h = g_eri;
 	if (!h.V) return false;
 	const int n = h.n, npair = h.npair;
+	const int *pa = h.hpa.data(), *pb = h.hpb.data();
 	std::vector<double> dp(npair), j1(npair), j2(npair);
-	for (int a = 0, ab = 0; a < n; a++)
-		for (int b = 0; b <= a; b++, ab++) dp[ab] = (a == b ? 1.0 : 2.0) * D[a + b * n];
+	for (int k = 0; k < npair; k++) dp[k] = (pa[k] == pb[k] ? 1.0 : 2.0) * D[pa[k] + pb[k] * n];
 	GPU_TRY(gpuMemcpy(h.dp, dp.data(), sizeof(double) * npair, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(h.D, D, sizeof(double) * n * n, gpuMemcpyHostToDevice));
-	eri_jk_kernel<8><<<npair, 64, 6 * n * sizeof(double)>>>(h.V, h.dp, h.D, h.J1, h.Ka, h.Kb, n);
+	if (h.dense) eri_jk_kernel<8, false><<<npair, 64, 6 * n * sizeof(double)>>>(h.V, h.dp, h.D, h.J1, h.Ka, h.Kb, n, h.pa, h.pb, h.first, h.idx);
+	else eri_jk_kernel<8, true><<<npair, 64, 6 * n * sizeof(double)>>>(h.V, h.dp, h.D, h.J1, h.Ka, h.Kb, n, h.pa, h.pb, h.first, h.idx);
 	GPU_TRY(gpuGetLastError());
-	eri_kred_kernel<<<(n * n + 255) / 256, 256>>>(h.Ka, h.Kb, h.K, n);
+	eri_kred_kernel<<<(n * n + 255) / 256, 256>>>(h.Ka, h.Kb, h.K, n, h.first, h.idx);
 	GPU_TRY(gpuGetLastError());
 	const int chunk = (npair + hold_chunks - 1) / hold_chunks;
 	eri_jt_kernel<<<dim3((npair + 255) / 256, hold_chunks), 256>>>(h.V, h.dp, h.part, npair, chunk);
@@ -790,8 +848,8 @@ bool eri_gpu_JK(const double* D, double* J, double* K)
 	GPU_TRY(gpuMemcpy(j1.data(), h.J1, sizeof(double) * npair, gpuMemcpyDeviceToHost));
 	GPU_TRY(gpuMemcpy(j2.data(), h.J2, sizeof(double) * npair, gpuMemcpyDeviceToHost));
 	GPU_TRY(gpuMemcpy(K, h.K, sizeof(double) * n * n, gpuMemcpyDeviceToHost));
-	for (int a = 0, ab = 0; a < n; a++)
-		for (int b = 0; b <= a; b++, ab++) J[a + b * n] = J[b + a * n] = j1[ab] + j2[ab];
+	std::fill(J, J + (size_t)n * n, 0.0);
+	for (int k = 0; k < npair; k++) J[pa[k] + pb[k] * n] = J[pb[k] + pa[k] * n] = j1[k] + j2[k];
 	for (int a = 0; a < n; a++)
 		for (int b = 0; b <= a; b++) K[a + b * n] = K[b + a * n] = 0.125 * (K[a + b * n] + K[b + a * n]);
 	return true;
@@ -801,6 +859,7 @@ void eri_gpu_release()
 {
 	HeldEri& h = g_eri;
 	gpuFree(h.V); gpuFree(h.dp); gpuFree(h.D); gpuFree(h.J1); gpuFree(h.J2); gpuFree(h.part); gpuFree(h.Ka); gpuFree(h.Kb); gpuFree(h.K);
+	gpuFree(h.pa); gpuFree(h.pb); gpuFree(h.first); gpuFree(h.idx);
 	h = HeldEri{};
 }
 

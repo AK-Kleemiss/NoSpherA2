@@ -148,6 +148,7 @@
     <ClInclude Include="..\..\Src\core\tsc_stream.h" />
     <ClInclude Include="..\..\Src\core\wfn_class.h" />
     <ClInclude Include="..\..\Src\core\XCW.h" />
+    <ClInclude Include="..\..\Src\core\stored_eri.h" />
     <ClInclude Include="..\..\Src\core\xcw_halting.h" />
   </ItemGroup>
   <ItemGroup>
@@ -193,6 +194,7 @@
     <ClCompile Include="..\..\Src\core\spherical_density.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_class.cpp" />
     <ClCompile Include="..\..\Src\core\XCW.cpp" />
+    <ClCompile Include="..\..\Src\core\stored_eri.cpp" />
     <ClCompile Include="..\..\Src\core\xcw_halting.cpp" />
   </ItemGroup>
   <ItemGroup Condition="'$(NosUseCuda)' == 'true'">

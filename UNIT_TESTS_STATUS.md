@@ -1,6 +1,7 @@
 # Unit Test Status
-**Last updated: 2026-09-14** (occ submodule moved to upstream 0.9.4, `e9ebbdb13`; 302/302 pass on
-`release-windows`, 107 s, the 4 `*_full` XCW cases skip and 2 `DeltaSeriesTests` stay disabled. 2026-09-09: geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
+**Last updated: 2026-09-14** (stored XCW two-electron integrals over the screened-in pairs, `StoredEriTests`
+and three `-xcw_incremental` golden cases; 307/307 pass on `release-windows`, 110 s, the 4 `*_full` XCW cases skip
+and 2 `DeltaSeriesTests` stay disabled. Same day: occ submodule moved to upstream 0.9.4, `e9ebbdb13`, 302/302. 2026-09-09: geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
 four flags through `run_app`; `-repulsion_exchange <dirac|pbe|b88>` picks the exchange functional of
 the Gordon-Kim repulsion, with an H-atom gtest for the three functionals; `-interaction_energy` computes
 the exchange-repulsion by the Gordon-Kim functionals of the fitted densities on a Becke grid over the
@@ -10,6 +11,27 @@ partner's field, D4 dispersion and the density overlap S; `-salted_charge_constr
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
+
+## 2026-09-14 — Stored two-electron integrals over the screened-in pairs (`StoredEriTests`)
+
+`XCW::store_ERIs` / `eri_JK` / `eri_fock` became the class `stored_eri` (`Src/core/stored_eri.cpp`).
+It keeps only the basis-function pairs a >= b that survive OCC's shell-pair screen and a Schwarz
+screen (`sqrt((ab|ab)) * max_cd sqrt((cd|cd)) >= 1e-12`, OCC's own quartet threshold), packed over
+the kept-pair numbering so the contraction keeps its shape (row k holds kept pairs 0..k, the pairs
+of one first index c are one contiguous segment). The budget is four fifths of the free memory, the
+I tensor's. `-xcw_incremental` now applies to the stored path too: the difference density is
+contracted with every segment skipped whose Schwarz bound times the largest difference element it
+touches falls below 1e-12; the device contraction (`eri_jk_kernel<R, SPARSE>` in
+`itensor_gpu.cu`) takes the whole density and is excluded from the incremental step. Accuracy,
+all against `HartreeFock::compute_fock` with Schwarz screening (`tests/src/StoredEriTests.cpp`):
+water def2-SVP RHF (all 300 pairs kept) max |dF| 1.1e-14; two waters 14 A apart def2-SVP RHF
+(600 of 1176 pairs kept) 6.2e-15; methyl radical def2-SVP UHF 5.3e-15; the incremental
+G(D0) + G_screened(D1 - D0) against G(D1) for |D1 - D0| up to 0.06: 3.6e-15 to 8.9e-15; the CUDA
+kernel against the CPU contraction, dense and sparse: |dJ| <= 4.4e-15, |dK| <= 8.9e-16. P1 sto-3g
+keeps 4445 of 5356 pairs (75 MB instead of 115 MB); the three new golden cases
+`P1_test_XCW_incremental`, `P1_test_XCW_h2_incremental`, `P1_F2_test_XCW_incremental` agree with
+their full-build counterparts to 4e-7 Eh, the SCF convergence. `ctest --preset release-windows`:
+307/307 passing, 0 failed, 110 s.
 
 ## 2026-09-14 — occ submodule on upstream 0.9.4
 
