@@ -2892,7 +2892,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	//shell-block norms, and the difference shrinks as the SCF converges. Rebuilt in full
 	//every 8 iterations or once the DIIS error has fallen tenfold since the last full build,
 	//as OCC's own loop does, so the screening error does not accumulate.
-	const bool incremental = !eri_ && opt->xcw_incremental && scf.m_procedure.supports_incremental_fock_build() && G_last_.size() > 0
+	const bool incremental = !eri_ && opt->xcw_incremental && scf.m_procedure.fock_build_properties().density_screened && G_last_.size() > 0
 		&& scf.iter - last_full_build_ < 8 && scf.diis_error > next_full_build_error_;
 	if (eri_) {
 		G_last_ = eri_fock(scf.ctx.mo);
@@ -3099,7 +3099,7 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 //ab = a(a+1)/2 + b, a >= b; each slot is written by the one shell quartet that holds it.
 void XCW::store_ERIs(const occ::qm::HartreeFock& hf) {
 	eri_.reset();
-	if (!hf.supports_incremental_fock_build() || settings.hf_type == occ::qm::SpinorbitalKind::General) return;
+	if (!hf.fock_build_properties().density_screened || settings.hf_type == occ::qm::SpinorbitalKind::General) return;
 	occ::qm::IntegralEngine engine(hf.aobasis());
 	const int nbf = static_cast<int>(engine.nbf()), nsh = static_cast<int>(engine.nsh()), npq = nsh * (nsh + 1) / 2;
 	const size_t npair = (size_t)nbf * (nbf + 1) / 2, nint = npair * (npair + 1) / 2;

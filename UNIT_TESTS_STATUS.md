@@ -1,5 +1,5 @@
 # Unit Test Status
-**Last updated: 2026-09-08** (ELI-D/QTAIM basin analysis rewritten; one golden case added,
+**Last updated: 2026-09-14** (occ submodule moved to upstream 0.9.4, `dc303f087`; see the section below. 2026-09-08: ELI-D/QTAIM basin analysis rewritten; one golden case added,
 `TomlIntegrationTests.ELI_NH3Li`. 267/267 non-XCW cases pass on `release-linux`, the nine
 XCW cases on a V100 node, a CPU node and the M2 Mac.)
 
@@ -675,3 +675,18 @@ See also the rule in `CLAUDE.md` → *Agent / AI coding-assistant rules*.
    with matching args (always append `-all_charges` and `-no_date`)
 4. **Validate** in all four configurations: pytest Release, pytest Debug, VS Debug, VS Release
 5. **Update this file** — mark the test as passing or note blockers
+## 2026-09-14 — occ submodule on upstream 0.9.4
+
+The `occ` submodule now tracks `peterspackman/occ` main at 0.9.4 (`d17f1d6af`) with the NoSpherA2
+patches cherry-picked on top (branch `nosphera2-upstream-0.9.4`, head `dc303f087`). Florian's Ca
+initial-guess fix (`Z <= 20` in `guess_density.cpp`) is subsumed by the upstream Madelung guess.
+On this branch: `supports_incremental_fock_build()` became `fock_build_properties().density_screened`
+in `Src/core/XCW.cpp`; the VS lib lists and `cmake/InstallDependenciesOnly.cmake` gain `occ_cc`,
+`occ_correlation`, `occ_mults` and lose `dftd4` (the cpp-d4 library is gone; the branch has no D4 user).
+MSVC fixes inside occ: `Eigen::Index` casts in the 4c/DF tensor code, `MULTS_RESTRICT` macro for
+`__restrict__`, explicit `get<std::string>()` for a json → `fs::path` conversion, and `occ_cc_obj` built
+with `/Od /Ob0` on MSVC because `ccsd.cpp` at `/O2` did not finish in 26 min. Reconfiguring an existing
+build tree needs `cmake -U CPM_DIRECTORY -U CPM_DRY_RUN -U CPM_VERSION <build dir>` first, the stale
+`CPM_DIRECTORY` cache entry makes the new CPM return before `CPMAddPackage` is defined.
+`ctest --preset release-windows` on this branch: RESULT_PLACEHOLDER.
+

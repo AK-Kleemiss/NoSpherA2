@@ -21,7 +21,6 @@ install(
         spdlog
         gau2grid_static
         fmt
-        dftd4
         xc
         scn
         _subprocess
@@ -34,8 +33,10 @@ install(
 
 install(
     TARGETS
+    occ_cc
     occ_cg
     occ_core
+    occ_correlation
     occ_crystal
     occ_descriptors
     occ_dft
@@ -50,6 +51,7 @@ install(
     occ_io
     occ_isosurface
     occ_main
+    occ_mults
     occ_numint
     occ_opt
     occ_qm
