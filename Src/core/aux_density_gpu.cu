@@ -3,6 +3,8 @@
 #include "gpu_backend.h"
 #include <cstdio>
 
+NOSPHERA2_GPU_API_BEGIN
+
 #define GPU_TRY(call) do { const gpuError_t e_ = (call); if (e_ != gpuSuccess) { \
 	std::fprintf(stderr, "NoSpherA2 aux density GPU: %s at %s:%d\n", gpuGetErrorString(e_), __FILE__, __LINE__); \
 	return false; } } while (0)
@@ -110,3 +112,5 @@ bool aux_density_gpu_eval(
 	gpuFree(dexp); gpuFree(dnorm); gpuFree(dcoef);
 	return true;
 }
+
+NOSPHERA2_GPU_API_END

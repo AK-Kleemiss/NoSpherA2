@@ -12,6 +12,17 @@ list(
     REGEX "[/\\\\](vec_nos_math|mat_nos_math)\\.cpp$"
 )
 
+#The two GPU host files are for particular builds only. The shim stands in for the HIP
+#runtime wherever HIP kernels are compiled in; the dispatcher exists only when both backends
+#are, since it defines the global entry points that a single backend's objects define
+#themselves.
+if(NOT NOSPHERA2_USE_HIP)
+    list(FILTER NOSPHERA2_CORE_SOURCES EXCLUDE REGEX "[/\\\\]hip_runtime_shim\\.cpp$")
+endif()
+if(NOT (NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP))
+    list(FILTER NOSPHERA2_CORE_SOURCES EXCLUDE REGEX "[/\\\\]gpu_dispatch\\.cpp$")
+endif()
+
 file(
     GLOB_RECURSE NOSPHERA2_CORE_HEADERS
     CONFIGURE_DEPENDS
@@ -22,6 +33,11 @@ file(
 #One source, two languages: nvcc takes it as CUDA, hipcc as HIP. On an MSVC host the HIP
 #route compiles them by hand further down (NOSPHERA2_HIP_CLANG, see the top-level HIP block),
 #so they are kept out of the target's own sources there.
+#
+#A fat build (both backends) has to compile each of them twice within one target, and a
+#source file has one LANGUAGE. So the HIP compile of a fat build goes through a one-line
+#.hip file in the build tree that includes the .cu: the extension makes it HIP to CMake, the
+#include makes it the same text, and the depfile keeps a kernel edit rebuilding both halves.
 set(NOSPHERA2_CORE_GPU_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu"
     "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu"
@@ -31,9 +47,19 @@ set(NOSPHERA2_CORE_GPU_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/aux_density_gpu.cu")
 if(NOSPHERA2_USE_CUDA)
     list(APPEND NOSPHERA2_CORE_SOURCES ${NOSPHERA2_CORE_GPU_SOURCES})
-elseif(NOSPHERA2_USE_HIP AND NOT NOSPHERA2_HIP_CLANG)
-    list(APPEND NOSPHERA2_CORE_SOURCES ${NOSPHERA2_CORE_GPU_SOURCES})
-    set_source_files_properties(${NOSPHERA2_CORE_GPU_SOURCES} PROPERTIES LANGUAGE HIP)
+endif()
+if(NOSPHERA2_USE_HIP AND NOT NOSPHERA2_HIP_CLANG)
+    if(NOSPHERA2_USE_CUDA)
+        foreach(_src ${NOSPHERA2_CORE_GPU_SOURCES})
+            get_filename_component(_name "${_src}" NAME_WE)
+            set(_hip "${CMAKE_CURRENT_BINARY_DIR}/hip/${_name}.hip")
+            file(CONFIGURE OUTPUT "${_hip}" CONTENT "#include \"${_src}\"\n" @ONLY)
+            list(APPEND NOSPHERA2_CORE_SOURCES "${_hip}")
+        endforeach()
+    else()
+        list(APPEND NOSPHERA2_CORE_SOURCES ${NOSPHERA2_CORE_GPU_SOURCES})
+        set_source_files_properties(${NOSPHERA2_CORE_GPU_SOURCES} PROPERTIES LANGUAGE HIP)
+    endif()
 endif()
 
 #Basis Set Generator:
@@ -127,8 +153,21 @@ target_compile_definitions(
         EIGEN_DONT_PARALLELIZE
 )
 
+#Host code sees NOSPHERA2_USE_GPU and nothing else; which backend a kernel object is built
+#for is told to that compile alone, by language, so that a fat build can hand the CUDA
+#compiles one namespace and the HIP compiles the other (gpu_api.h).
+if(NOSPHERA2_USE_CUDA OR NOSPHERA2_USE_HIP)
+    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU)
+endif()
+if(NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP)
+    target_compile_definitions(NoSpherA2Core PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:NOSPHERA2_GPU_BACKEND_NS=nosphera2_cuda>
+        $<$<COMPILE_LANGUAGE:HIP>:NOSPHERA2_GPU_BACKEND_NS=nosphera2_hip>)
+    message(STATUS "Fat GPU build: CUDA and HIP kernels in one binary")
+endif()
+
 if(NOSPHERA2_USE_CUDA)
-    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_CUDA)
+    target_compile_definitions(NoSpherA2Core PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:NOSPHERA2_USE_CUDA>)
     set_target_properties(NoSpherA2Core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     #No cuBLAS to link, delay-load or ship: the GEMMs are ours. cudart is static. cuBLAS can
     #still be opened by name at run time under -gpu_cublas, which needs no more from the
@@ -136,8 +175,9 @@ if(NOSPHERA2_USE_CUDA)
     target_compile_definitions(NoSpherA2Core PRIVATE
         NOSPHERA2_CUDART_MAJOR=${CUDAToolkit_VERSION_MAJOR})
     if(NOSPHERA2_CUTLASS_INCLUDE)
-        target_include_directories(NoSpherA2Core SYSTEM PRIVATE "${NOSPHERA2_CUTLASS_INCLUDE}")
-        target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_HAVE_CUTLASS)
+        target_include_directories(NoSpherA2Core SYSTEM PRIVATE
+            $<$<COMPILE_LANGUAGE:CUDA>:${NOSPHERA2_CUTLASS_INCLUDE}>)
+        target_compile_definitions(NoSpherA2Core PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:NOSPHERA2_HAVE_CUTLASS>)
         #CUTLASS pulls in cuda/std, which refuses to compile under MSVC's traditional
         #preprocessor, and calls constexpr host functions from host-device ones.
         target_compile_options(NoSpherA2Core PRIVATE
@@ -152,7 +192,16 @@ endif()
 
 if(NOSPHERA2_USE_HIP)
     find_package(hip REQUIRED)
-    target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_HIP)
+    target_compile_definitions(NoSpherA2Core PRIVATE $<$<COMPILE_LANGUAGE:HIP>:NOSPHERA2_USE_HIP>)
+    #The runtime shim is ordinary C++ that needs the HIP headers for the prototypes it
+    #defines - the headers only, not hip::host, whose link interface is the runtime library
+    #this file exists to avoid.
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/hip_runtime_shim.cpp" PROPERTIES
+        INCLUDE_DIRECTORIES "${hip_INCLUDE_DIR}"
+        COMPILE_DEFINITIONS "__HIP_PLATFORM_AMD__=1")
+    if(NOT WIN32)
+        target_link_libraries(NoSpherA2Core PRIVATE ${CMAKE_DL_LIBS})
+    endif()
     if(NOSPHERA2_HIP_CLANG)
         #MSVC host: each .cu becomes an object through ROCm's clang, with the same runtime
         #library as the rest of the build (-fms-runtime-lib is clang's /MD), and the object
@@ -162,6 +211,10 @@ if(NOSPHERA2_USE_HIP)
         foreach(_arch ${CMAKE_HIP_ARCHITECTURES})
             list(APPEND _hip_arch_flags "--offload-arch=${_arch}")
         endforeach()
+        set(_hip_ns_flags "")
+        if(NOSPHERA2_USE_CUDA)
+            set(_hip_ns_flags "-DNOSPHERA2_GPU_BACKEND_NS=nosphera2_hip")
+        endif()
         foreach(_src ${NOSPHERA2_CORE_GPU_SOURCES})
             get_filename_component(_name "${_src}" NAME_WE)
             set(_obj "${CMAKE_CURRENT_BINARY_DIR}/hip/${_name}.obj")
@@ -171,7 +224,7 @@ if(NOSPHERA2_USE_HIP)
                     -x hip ${_hip_arch_flags} -std=c++17
                     "$<IF:$<CONFIG:Debug>,-O0,-O3>" "$<$<CONFIG:Debug>:-g>"
                     "-fms-runtime-lib=$<IF:$<CONFIG:Debug>,dll_dbg,dll>"
-                    -DNOSPHERA2_USE_GPU -DNOSPHERA2_USE_HIP -D__HIP_PLATFORM_AMD__=1
+                    -DNOSPHERA2_USE_GPU -DNOSPHERA2_USE_HIP -D__HIP_PLATFORM_AMD__=1 ${_hip_ns_flags}
                     -I "${CMAKE_CURRENT_SOURCE_DIR}" -I "${PROJECT_SOURCE_DIR}/Src"
                     -isystem "${hip_INCLUDE_DIR}"
                     -MD -MF "${_obj}.d" -c "${_src}" -o "${_obj}"
@@ -181,14 +234,14 @@ if(NOSPHERA2_USE_HIP)
                 VERBATIM COMMAND_EXPAND_LISTS)
             target_sources(NoSpherA2Core PRIVATE "${_obj}")
         endforeach()
-        target_link_libraries(NoSpherA2Core PRIVATE hip::host)
-    else()
-        #The HIP language owns the device side here: CMake compiles the .cu files with the
-        #HIP compiler and runs the device link itself (hip-lang). hip::device is the target
-        #for a build whose C++ compiler is hipcc - it hands -x hip to every CXX source, which
-        #a gcc host answers with "language hip not recognized".
-        target_link_libraries(NoSpherA2Core PRIVATE hip::host)
+        #No hip::host: its link interface is amdhip64.lib, and the point of the shim is that
+        #nothing imports that DLL.
     endif()
+    #On the CMake HIP language route the compiler finds the HIP headers next to itself and
+    #defines the platform macro; hip::device would hand -x hip to every C++ source (which a
+    #gcc host answers with "language hip not recognized") and hip::host would link the
+    #runtime, so neither is used. CMAKE_HIP_RUNTIME_LIBRARY NONE in the top-level file keeps
+    #the language itself from linking it.
 endif()
 
 target_compile_features(

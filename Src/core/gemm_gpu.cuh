@@ -16,6 +16,7 @@
 //Templated on the scalar type because the I tensor wants to choose its precision, not
 //because two kernels were wanted.
 
+NOSPHERA2_GPU_API_BEGIN
 namespace gemm_gpu {
 
 //Tile shape. The narrow alternative spends four shared-memory loads on four FMAs where
@@ -206,3 +207,4 @@ inline bool launch(const bool transA, const bool transB,
 }
 
 } //namespace gemm_gpu
+NOSPHERA2_GPU_API_END

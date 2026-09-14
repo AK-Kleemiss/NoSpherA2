@@ -6,46 +6,15 @@
 
 #ifdef NOSPHERA2_USE_HIP
 #include <hip/hip_runtime.h>
+//Nothing here links the HIP runtime. Every call below lands in hip_runtime_shim.cpp, which
+//opens libamdhip64 / amdhip64_<major>.dll by name the first time it is asked and answers
+//hipErrorNoDevice (or a null handle, or nothing) when there is none. So a binary carrying
+//AMD kernels starts on a machine without ROCm, on Linux as on Windows, and the kernel
+//registration clang runs before main() comes and goes without a runtime.
 #define gpuError_t hipError_t
 #define gpuSuccess hipSuccess
 #define gpuGetErrorString hipGetErrorString
-#if defined(_WIN32)
-//On Windows the HIP runtime is delay-loaded (NOSPHERA2_HIP_DELAYLOAD in CMakeLists.txt), so
-//that a build carrying AMD kernels still starts on a machine without ROCm. Delay-loading
-//only postpones the failure, though: the first call into amdhip64 on such a machine raises
-//the loader's exception instead of returning an error. Every GPU path begins by counting
-//devices, so that one call is answered here, without the runtime, when the DLL is absent.
-//(The kernel registration clang runs before main() is the other call that happens without
-//being asked for; Src/hip_delayload_hook.cpp takes care of that one.)
-//The name is derived from HIP_VERSION_MAJOR exactly as the delay-load flag is, so the two
-//cannot disagree. LoadLibraryA is declared by hand rather than through windows.h, whose
-//min/max macros this header's includers do not want; the device pass of the compiler sees
-//the declaration too and knows no dllimport.
-#if defined(__HIP_DEVICE_COMPILE__)
-extern "C" void* __stdcall LoadLibraryA(const char*);
-#else
-extern "C" __declspec(dllimport) void* __stdcall LoadLibraryA(const char*);
-#endif
-#define NOSPHERA2_GPU_STR_(x) #x
-#define NOSPHERA2_GPU_STR(x) NOSPHERA2_GPU_STR_(x)
-inline bool nosphera2_hip_runtime_present()
-{
-	static const bool present =
-		LoadLibraryA("amdhip64_" NOSPHERA2_GPU_STR(HIP_VERSION_MAJOR) ".dll") != nullptr;
-	return present;
-}
-inline hipError_t nosphera2_hip_device_count(int* n)
-{
-	if (!nosphera2_hip_runtime_present()) {
-		if (n) *n = 0;
-		return hipErrorNoDevice;
-	}
-	return hipGetDeviceCount(n);
-}
-#define gpuGetDeviceCount nosphera2_hip_device_count
-#else
 #define gpuGetDeviceCount hipGetDeviceCount
-#endif
 #define gpuGetDevice hipGetDevice
 #define gpuGetDeviceProperties hipGetDeviceProperties
 #define gpuDeviceProp_t hipDeviceProp_t

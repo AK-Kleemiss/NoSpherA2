@@ -1,8 +1,12 @@
 #pragma once
 
+#include "gpu_api.h"
+
 //Fitted density (and gradient, Laplacian) of a flattened aux basis on a point set, one thread per point running
 //the same aux_density::at / at_grad / at_lap text as the CPU loop in calc_density_ML. Returns false when no device
 //is present, the set is too small to pay for the copies or the arrays do not fit, and the caller keeps the OpenMP loop.
+
+NOSPHERA2_GPU_API_BEGIN
 
 bool aux_density_gpu_available();
 //On by default; -no_gpu_density turns this off
@@ -16,3 +20,5 @@ bool aux_density_gpu_eval(
 	int n_coef, const double* coefs,
 	int np, const double* x, const double* y, const double* z, double* rho,
 	double* gx = nullptr, double* gy = nullptr, double* gz = nullptr, double* lap = nullptr);
+
+NOSPHERA2_GPU_API_END

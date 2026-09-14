@@ -98,9 +98,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\Src\dll\api.cpp" />
     <ClCompile Include="..\..\Src\dll\dllmain.cpp" />
-    <ClCompile Include="..\..\Src\hip_delayload_hook.cpp">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="..\..\Src\dll\hirshfeld_api.cpp" />
     <ClCompile Include="..\..\Src\dll\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>

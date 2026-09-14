@@ -110,6 +110,7 @@
     <ClInclude Include="..\..\Src\core\fchk.h" />
     <ClInclude Include="..\..\Src\core\geometry_aid.h" />
     <ClInclude Include="..\..\Src\core\gemm_gpu.cuh" />
+    <ClInclude Include="..\..\Src\core\gpu_api.h" />
     <ClInclude Include="..\..\Src\core\gpu_backend.h" />
     <ClInclude Include="..\..\Src\core\grid_gpu.h" />
     <ClInclude Include="..\..\Src\core\GridManager.h" />
@@ -205,7 +206,17 @@
     <CudaCompile Include="..\..\Src\core\salted_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\sf_gpu.cu" />
   </ItemGroup>
+  <ItemGroup Condition="'$(NosFatGpu)' == 'true'">
+    <ClCompile Include="..\..\Src\core\gpu_dispatch.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
   <ItemGroup Condition="'$(NosUseHip)' == 'true'">
+    <ClCompile Include="..\..\Src\core\hip_runtime_shim.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalIncludeDirectories>$(HIP_PATH)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__HIP_PLATFORM_AMD__=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <CustomBuild Include="..\..\Src\core\aux_density_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\blas_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\grid_gpu.cu" />

@@ -1,6 +1,8 @@
 # Unit Test Status
-**Last updated: 2026-09-14** (GPU CI: CUDA and HIP builds for Linux and Windows on GPU-less runners, the
-Windows HIP delay-load hook, occ `9bde072f7` compiles `ccsd.cpp` at `/O2` again. Earlier the same day:
+**Last updated: 2026-09-14** (one GPU binary per OS: the CUDA and HIP kernels compiled side by side into
+their own namespaces, dispatched at run time, neither runtime linked; `Linux GPU Release` and `Windows GPU
+Release` replace the four single-backend CI jobs. Earlier the same day: GPU CI: CUDA and HIP builds for
+Linux and Windows on GPU-less runners, occ `9bde072f7` compiles `ccsd.cpp` at `/O2` again;
 `-dmin` and `-hkl_min_max` together keep only the symmetry images of the
 measured index box from the resolution sphere, `HklGenerationTests`; 300 pass, 5 fail on `release-windows`
 (the five P1 XCW goldens broken by the `5b6eb296` "Symmetry & Bugfix (WIP)" commit, see below), the 4
@@ -17,6 +19,41 @@ partner's field, D4 dispersion and the density overlap S; `-salted_charge_constr
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
+
+## 2026-09-14 — One GPU binary: CUDA and HIP kernels in the same executable
+
+The four single-backend GPU jobs become `Linux GPU Release` and `Windows GPU Release`, each configured
+with `-DNOSPHERA2_USE_CUDA=ON -DNOSPHERA2_USE_HIP=ON` and both `*_PORTABLE` options (artifacts
+`NoSpherA2-linux-x86_64-gpu.tar.gz`, `NoSpherA2-windows-x64-gpu.zip`). Every kernel source is
+compiled twice, once per backend, with `NOSPHERA2_GPU_BACKEND_NS` naming a namespace
+(`nosphera2_cuda` / `nosphera2_hip`, `Src/core/gpu_api.h`); `Src/core/gpu_dispatch.cpp` defines the
+global entry points of the six GPU headers by forwarding to the backend that has a device (CUDA probed
+first, `NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). Host code sees `NOSPHERA2_USE_GPU` only; the
+backend macros reach the device compilers alone. On the CMake HIP-language route a source has one
+LANGUAGE, so the HIP compiles of a fat build go through generated `hip/<name>.hip` wrappers that
+`#include` the `.cu`. Neither runtime is a load-time import: cudart stays static, and the HIP runtime
+is no longer linked at all - `Src/core/hip_runtime_shim.cpp` defines the 27 `hip*` entries the kernel
+objects import and opens `libamdhip64.so.<major>` / `amdhip64_<major>.dll` on the first call
+(`NOSPHERA2_HIP_RUNTIME`, `ROCM_PATH`, `HIP_PATH`, `/opt/rocm`), answering `hipErrorNoDevice` when
+none is found. That replaces the Windows delay-load hook of the previous entry (`Src/hip_delayload_hook.cpp`
+deleted) and, on Linux, the `libamdhip64.so` NEEDED entry: `readelf -d` of the fat Linux binary lists
+only libiomp5, libquadmath, libtbb, libgcc_s, libm, libstdc++, libc; `dumpbin /DEPENDENTS` of the
+Windows one lists no amdhip64 and no cudart. `CMAKE_HIP_RUNTIME_LIBRARY NONE` keeps CMake's HIP
+language from linking the runtime behind the shim's back; the Visual Studio props do the same fat
+build when `CUDA_PATH` and `HIP_PATH` are both set, HIP objects now named `<name>.hip.obj` so they no
+longer collide with the CUDA objects of the same source.
+
+Checked on the CUDA machine (RTX 2080 Ti, CUDA 13.3 + ROCm 10 wheel, MSVC 14.44) and in its WSL
+(CUDA 12.9 from the bootstrap + the same wheel, gcc host): both fat binaries start without ROCm on the
+path (`-h` exit 0, also with `NOSPHERA2_GPU_BACKEND=hip`), the GPU gtests run on the NVIDIA card
+through the CUDA side of the fat binary (`BlasGpuTests` 3/3, `sucrose_SF_gpu_{grid,fp64,fp32}` pass;
+`P1_test_XCW_gpu_itensor` fails on the same 93098-vs-102932 grid-point golden as the four CPU P1 XCW
+cases since `5b6eb296`; the whole suite on the Windows fat tree is 304/309 with the 4 `*_full` skips, `ctest -j 6` also trips `SALTED` and `SALTEDChargeConstraint` over their shared `tests/SALTED` log, both pass alone), and with `NOSPHERA2_GPU_BACKEND=hip` they skip both without the runtime and
+with it on the path (`LD_DEBUG=libs` shows the shim opening `libamdhip64.so.7` from the wheel, then
+no AMD device). A plain `cmake --build <dir>` of the Windows tree from a `VsDevCmd` shell fails in
+featomic's cargo step with `Could not create named generator Visual Studio 18 2026`: the
+`CMAKE_GENERATOR=Ninja` the preset sets for cargo is only exported by `cmake --build --preset`, so
+set it by hand when building a tree by directory.
 
 ## 2026-09-14 — GPU builds in CI, and occ CCSD back at `/O2`
 

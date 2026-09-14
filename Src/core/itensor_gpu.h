@@ -13,20 +13,6 @@
 //Returns false if no device is present or the problem will not fit, and the caller keeps
 //the CPU loop. Init must succeed before evaluate is called.
 
-bool itensor_gpu_available();
-
-//Which GEMM the device path will actually use, for the log: the three do not agree in the
-//last digits, so a run says which one produced its numbers.
-const char* itensor_gpu_gemm_name();
-
-//Flops of the GEMMs the device path issues for one reflection and one symmetry operation,
-//padding included, so the throughput row counts what ran. Valid after init.
-double itensor_gpu_issued_flops();
-
-//How many reflections one submit may carry, at this many symmetry operations. Valid
-//after init.
-int itensor_gpu_batch(int num_syms);
-
 struct itensor_gpu_layout {
 	int nmo = 0;
 	int packed = 0;              //stored pairs per reflection
@@ -52,6 +38,22 @@ struct itensor_gpu_layout {
 	const double* weights = nullptr;
 	long long n_points = 0;
 };
+
+NOSPHERA2_GPU_API_BEGIN
+
+bool itensor_gpu_available();
+
+//Which GEMM the device path will actually use, for the log: the three do not agree in the
+//last digits, so a run says which one produced its numbers.
+const char* itensor_gpu_gemm_name();
+
+//Flops of the GEMMs the device path issues for one reflection and one symmetry operation,
+//padding included, so the throughput row counts what ran. Valid after init.
+double itensor_gpu_issued_flops();
+
+//How many reflections one submit may carry, at this many symmetry operations. Valid
+//after init.
+int itensor_gpu_batch(int num_syms);
 
 //FP64 runs the whole device path in double, phase and GEMM alike; anything else runs it in
 //single. sf_precision::Auto is deliberately not honoured - see the definition.
@@ -88,3 +90,5 @@ void itensor_gpu_release();
 bool eri_gpu_hold(const double* eri, int n, int npair, const int* pa, const int* pb, const int* first, const int* idx);
 bool eri_gpu_JK(const double* D, double* J, double* K);
 void eri_gpu_release();
+
+NOSPHERA2_GPU_API_END

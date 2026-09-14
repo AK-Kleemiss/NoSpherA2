@@ -118,9 +118,12 @@ if(NOSPHERA2_USE_CUDA)
     endif()
 endif()
 
-if(NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP)
-    message(FATAL_ERROR "NOSPHERA2_USE_CUDA and NOSPHERA2_USE_HIP are mutually exclusive")
-endif()
+#Both backends at once is a fat binary: each kernel source is compiled twice, once per
+#backend, into its own namespace (Src/core/gpu_api.h), and Src/core/gpu_dispatch.cpp forwards
+#the global entry points to whichever backend has a device. Neither runtime is linked - CUDA's
+#is static, HIP's is opened by name (Src/core/hip_runtime_shim.cpp) - so the one binary runs
+#on an NVIDIA machine, an AMD machine and a machine with no GPU at all. That is what the CI
+#ships (.github/workflows/c-cpp_all.yml).
 
 #Whether this file may choose CMAKE_<LANG>_ARCHITECTURES. A list given on the command line is
 #the user's and is left alone. The trap is that enable_language() creates the cache entry
@@ -144,11 +147,13 @@ macro(nosphera2_set_arch lang)
     set(NOSPHERA2_${lang}_ARCH_MANAGED "${ARGN}" CACHE INTERNAL "The list this project chose")
 endmacro()
 
-#Nothing delay-loads a CUDA library any more, cuBLAS having been the only one. Deleting the
-#code that set this was not enough to stop it being used: it was cached, so a build directory
-#configured before that change kept handing the flag and delayimp to every link. Cleared
-#rather than left to rot, the same way an unusable cached compiler is above.
+#Nothing delay-loads a GPU library any more: cuBLAS was the last CUDA one, and the HIP
+#runtime is opened by name (Src/core/hip_runtime_shim.cpp) rather than delay-loaded. Deleting
+#the code that set these was not enough to stop them being used: they were cached, so a build
+#directory configured before that change kept handing the flag and delayimp to every link.
+#Cleared rather than left to rot, the same way an unusable cached compiler is above.
 unset(NOSPHERA2_CUDA_DELAYLOAD CACHE)
+unset(NOSPHERA2_HIP_DELAYLOAD CACHE)
 
 if(NOSPHERA2_USE_CUDA)
     #nvcc takes its host compiler from PATH unless told, and on a machine whose PATH carries
@@ -303,6 +308,13 @@ if(NOSPHERA2_USE_HIP)
             set(CMAKE_HIP_STANDARD 17)
             set(CMAKE_HIP_STANDARD_REQUIRED ON)
             set(_nosphera2_hip_version "${CMAKE_HIP_COMPILER_VERSION}")
+            #The HIP language would otherwise link libamdhip64 into every target that
+            #carries a HIP object, directly or through a static library (hip-lang::device,
+            #CMakeHIPInformation.cmake), and a binary that needs libamdhip64.so to start is
+            #a binary that does not start without ROCm. NONE names no runtime library at
+            #all; Src/core/hip_runtime_shim.cpp supplies the entry points and opens the real
+            #library by name when there is one.
+            set(CMAKE_HIP_RUNTIME_LIBRARY NONE)
         endif()
         set(_nosphera2_hip_ready ${CMAKE_HIP_COMPILER})
     endif()
@@ -335,32 +347,21 @@ if(NOSPHERA2_USE_HIP)
             endif()
             nosphera2_set_arch(HIP ${_arch_list})
         endif()
-        #ROCm's bin directory is not on PATH by default, so a HIP build fails to start with
-        #STATUS_DLL_NOT_FOUND on a machine that has the GPU but not the SDK. Measured on the
-        #AMD node: without this the process is rejected before main(). hipBLAS is no longer
-        #among these, which is what lets every kernel build on a conda-forge ROCm - it
-        #packages hipcc without hipBLAS, and that used to strand the I tensor on the CPU.
-        #
-        #The DLL carries the HIP runtime's major version, which is neither the ROCm release
-        #nor the clang version: ROCm 6.x ships amdhip64_6.dll and ROCm 7 to 10 ship
-        #amdhip64_7.dll. The hip package knows, so it is asked here; gpu_backend.h derives the
-        #same name from HIP_VERSION_MAJOR to decide whether the runtime is present before the
-        #first delay-loaded call, and Src/hip_delayload_hook.cpp catches the registration
-        #calls clang makes before main().
+        #Nothing links the HIP runtime, on either route. ROCm's lib/bin directory is not on
+        #the path of a machine that has the card but not the SDK, and a binary whose loader
+        #wants libamdhip64.so / amdhip64_7.dll is rejected before main() (measured on the
+        #AMD node as STATUS_DLL_NOT_FOUND). Src/core/hip_runtime_shim.cpp defines the entry
+        #points the kernel objects import and opens the library by name on the first call,
+        #answering "no device" when it is absent. The name carries the HIP runtime's major
+        #version, which is neither the ROCm release nor the clang version (ROCm 6.x ships
+        #amdhip64_6.dll, ROCm 7 to 10 amdhip64_7.dll); the shim takes it from HIP_VERSION_MAJOR
+        #in the headers it was compiled against. hipBLAS is not needed at all, which is what
+        #lets every kernel build on a ROCm that packages the compiler without it.
         if(MSVC)
             #hip-config runs this to name the compiler-rt builtins clang's host code may
             #need; left to itself it would ask cl.exe and get nothing.
             set(HIP_CXX_COMPILER "${NOSPHERA2_HIP_CLANG}")
             find_package(hip REQUIRED)
-            if(hip_VERSION_MAJOR)
-                set(NOSPHERA2_HIP_MAJOR ${hip_VERSION_MAJOR})
-            else()
-                set(NOSPHERA2_HIP_MAJOR 6)
-            endif()
-            set(NOSPHERA2_HIP_DELAYLOAD
-                "/DELAYLOAD:amdhip64_${NOSPHERA2_HIP_MAJOR}.dll"
-                CACHE INTERNAL "ROCm DLLs to delay-load")
-            message(STATUS "HIP runtime amdhip64_${NOSPHERA2_HIP_MAJOR}.dll is delay-loaded")
         endif()
         message(STATUS "HIP enabled, arch ${CMAKE_HIP_ARCHITECTURES}")
     elseif(_nosphera2_gpu_auto_enabled)

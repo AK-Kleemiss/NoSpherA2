@@ -59,20 +59,29 @@ vendor still supports (the lists live in `CMakeLists.txt`) instead of the local 
 bootstrap script takes `-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9`
 to fetch a conda-forge CUDA toolkit without a GPU, and `-DNOSPHERA2_BOOTSTRAP_GPU=OFF` to fetch none.
 
-CI builds four GPU variants on GPU-less runners (`Linux CUDA`, `Windows CUDA`, `Linux HIP`,
-`Windows HIP` in `.github/workflows/c-cpp_all.yml`) and runs the test suite on them, which checks that
-the binaries start and fall back to the CPU without a device. CUDA links its runtime statically;
-the artifact needs only a driver. ROCm comes from AMD's pip wheels
+Both backends at once make a fat binary: every kernel source is compiled twice, once per backend,
+into its own namespace (`Src/core/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
+`Src/core/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
+device (CUDA probed first; `NOSPHERA2_GPU_BACKEND=cuda|hip` in the environment overrides). A function
+added to one of the six GPU headers has to be added to the X-macro in `gpu_dispatch.cpp` too, or the
+fat link fails on it. Neither runtime is linked: cudart is static, and the HIP runtime is opened by
+name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
+`dlopen`s / `LoadLibrary`s `libamdhip64.so.<major>` / `amdhip64_<major>.dll` on the first call
+(`NOSPHERA2_HIP_RUNTIME=<file>` names one explicitly) and answers `hipErrorNoDevice` when there is
+none - the shim rather than delay-loading because clang registers the kernels with the runtime from
+static initialisers before `main()`, where nothing else can intercept. The CMake HIP language would
+link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it. The
+Visual Studio solution does the same through `Windows/Windows_utils/NoSpherA2_gpu.props`: a machine
+with `CUDA_PATH` and `HIP_PATH` gets the fat build.
+
+CI builds that fat binary for Linux and Windows on GPU-less runners (`Linux GPU Release`, `Windows
+GPU Release` in `.github/workflows/c-cpp_all.yml`, artifacts `NoSpherA2-linux-x86_64-gpu` and
+`NoSpherA2-windows-x64-gpu`) and runs the test suite on them, which checks that the binaries start
+and fall back to the CPU without a device. ROCm comes from AMD's pip wheels
 (`pip install --index-url https://stable.repo.amd.com/rocm/whl-next/ "rocm[devel]==10.0.0"`,
 `rocm-sdk init`, `rocm-sdk path --root`), the only ROCm that installs without root on Linux and
-exists at all on Windows. The Linux HIP artifact links `libamdhip64.so` and needs a ROCm runtime
-where it runs; the Windows HIP artifact delay-loads `amdhip64_<major>.dll` and runs on the CPU when
-the DLL is absent. That delay-load only works because `Src/hip_delayload_hook.cpp` is compiled into
-every executable and the DLL: clang registers the kernels with the HIP runtime from static
-initialisers before `main()`, so without the failure hook a machine without ROCm dies with
-`0xC06D007E` before the presence check in `gpu_backend.h` gets a chance. On Windows the ROCm 10
-clang headers do not compile against the MSVC 14.5x standard library; use toolset 14.4x
-(`vcvars64.bat -vcvars_ver=14.44`). On macOS `NOSPHERA2_USE_METAL` defaults to ON when the build is
+exists at all on Windows. On Windows the ROCm 10 clang headers do not compile against the MSVC 14.5x
+standard library; use toolset 14.4x (`vcvars64.bat -vcvars_ver=14.44`). On macOS `NOSPHERA2_USE_METAL` defaults to ON when the build is
 arm64 and the SDK carries the Metal and MetalPerformanceShaders frameworks (configure prints
 `Metal I tensor path: ON/OFF (...)`), so the arm64 slice of the universal binary has the Metal I tensor
 path and falls back to the CPU at run time when `MTLCreateSystemDefaultDevice()` returns nothing.

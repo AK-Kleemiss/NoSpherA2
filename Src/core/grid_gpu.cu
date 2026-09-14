@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cstdlib>
 
+NOSPHERA2_GPU_API_BEGIN
+
 #define GPU_TRY(call) do { const gpuError_t e_ = (call); if (e_ != gpuSuccess) { \
 	std::fprintf(stderr, "NoSpherA2 grid GPU: %s at %s:%d\n", gpuGetErrorString(e_), __FILE__, __LINE__); \
 	release(); return false; } } while (0)
@@ -355,3 +357,5 @@ bool grid_gpu_becke_weights(const int np, const int nc, const int* pcen,
 	release();
 	return true;
 }
+
+NOSPHERA2_GPU_API_END

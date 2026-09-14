@@ -35,6 +35,7 @@
 #define NOSPHERA2_ITENSOR_GEMM_NAME "built-in"
 #endif
 
+NOSPHERA2_GPU_API_BEGIN
 namespace itensor_gemm {
 
 inline bool& tensor_mode()
@@ -137,3 +138,4 @@ inline bool run(const int m, const int n, const int k,
 #endif
 
 } //namespace itensor_gemm
+NOSPHERA2_GPU_API_END

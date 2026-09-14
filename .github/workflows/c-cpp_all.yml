@@ -83,66 +83,31 @@ jobs:
             artifact-path: artifacts/NoSpherA2-macos-x86_64.tar.gz
             artifact-name: NoSpherA2-macos-x86_64
 
-          # GPU builds. None of the runners has a GPU, so the toolkits are
-          # named rather than detected (bootstrap-flags) and every kernel is
-          # built for every card the vendor still supports (the *_PORTABLE
-          # options; the lists are in CMakeLists.txt). The tests run on the
-          # same GPU-less runners, which exercises the other half of the
-          # promise: the binaries start and fall back to the CPU when there
-          # is no device or no driver.
+          # GPU builds: one binary per OS carrying the CUDA kernels, the HIP
+          # kernels and the CPU paths (a "fat" build, NOSPHERA2_USE_CUDA and
+          # NOSPHERA2_USE_HIP together; how the two backends share one binary
+          # is in Src/core/gpu_api.h). None of the runners has a GPU, so the
+          # toolkits are named rather than detected and every kernel is built
+          # for every card the vendor still supports (the *_PORTABLE options;
+          # the lists are in CMakeLists.txt). The tests run on the same
+          # GPU-less runners, which exercises the other half of the promise:
+          # the binary starts and falls back to the CPU when there is no
+          # device or no driver. Neither runtime is a load-time dependency:
+          # cudart is linked statically and the HIP runtime is opened by name
+          # (Src/core/hip_runtime_shim.cpp), so the artifact needs no CUDA
+          # and no ROCm installation, only a driver for whichever card it
+          # finds.
           #
           # CUDA comes from conda-forge, pinned to 12.9 so the artifact keeps
-          # covering Volta to Blackwell from one week to the next, and links
-          # the runtime statically: the artifact needs no CUDA installation.
-          # nvcc is not wrapped in sccache: with eight architectures sccache's
-          # nvcc mode lost the per-architecture PTX between its own steps
+          # covering Volta to Blackwell from one week to the next. nvcc is
+          # not wrapped in sccache: with eight architectures sccache's nvcc
+          # mode lost the per-architecture PTX between its own steps
           # ("fatbinary fatal: Could not open input file 'sf_gpu.compute_70.ptx'")
-          # and the three .cu files are cheap next to the rest of the build.
-          - name: Linux CUDA Release
-            os: ubuntu-24.04
-            configure-preset: release-linux
-            build-preset: release-linux
-            test-preset: release-linux
-            build-directory: build/release-linux
-            architecture: x86_64
-            shell: bash
-            gpu: cuda
-            bootstrap-flags: >-
-              -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA
-              -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9
-            configure-flags: >-
-              -DNOSPHERA2_GPU_AUTO=OFF
-              -DNOSPHERA2_USE_CUDA=ON
-              -DNOSPHERA2_CUDA_PORTABLE=ON
-            artifact-path: artifacts/NoSpherA2-linux-x86_64-cuda.tar.gz
-            artifact-name: NoSpherA2-linux-x86_64-cuda
-
-          - name: Windows CUDA Release
-            os: windows-2022
-            configure-preset: release-windows
-            build-preset: release-windows
-            test-preset: release-windows
-            build-directory: build/release-windows
-            architecture: x86_64
-            shell: pwsh
-            gpu: cuda
-            bootstrap-flags: >-
-              -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA
-              -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9
-            configure-flags: >-
-              -DNOSPHERA2_GPU_AUTO=OFF
-              -DNOSPHERA2_USE_CUDA=ON
-              -DNOSPHERA2_CUDA_PORTABLE=ON
-            artifact-path: artifacts/NoSpherA2-windows-x64-cuda.zip
-            artifact-name: NoSpherA2-windows-x64-cuda
-
+          # and the six .cu files are cheap next to the rest of the build.
           # ROCm comes from AMD's pip wheels (the "Install ROCm SDK" step),
           # the only distribution of it that needs neither root nor an
-          # installer and exists for both Linux and Windows. The Linux
-          # artifact links libamdhip64.so and needs a ROCm runtime on the
-          # machine that runs it; the Windows one delay-loads amdhip64_7.dll
-          # and runs on the CPU where the DLL is absent.
-          - name: Linux HIP Release
+          # installer and exists for both Linux and Windows.
+          - name: Linux GPU Release
             os: ubuntu-24.04
             configure-preset: release-linux
             build-preset: release-linux
@@ -150,21 +115,25 @@ jobs:
             build-directory: build/release-linux
             architecture: x86_64
             shell: bash
-            gpu: hip
-            bootstrap-flags: -DNOSPHERA2_BOOTSTRAP_GPU=OFF
+            gpu: cuda+hip
+            bootstrap-flags: >-
+              -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA
+              -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9
             configure-flags: >-
               -DNOSPHERA2_GPU_AUTO=OFF
+              -DNOSPHERA2_USE_CUDA=ON
               -DNOSPHERA2_USE_HIP=ON
+              -DNOSPHERA2_CUDA_PORTABLE=ON
               -DNOSPHERA2_HIP_PORTABLE=ON
               -DCMAKE_HIP_COMPILER_LAUNCHER=sccache
-            artifact-path: artifacts/NoSpherA2-linux-x86_64-hip.tar.gz
-            artifact-name: NoSpherA2-linux-x86_64-hip
+            artifact-path: artifacts/NoSpherA2-linux-x86_64-gpu.tar.gz
+            artifact-name: NoSpherA2-linux-x86_64-gpu
 
           # The ROCm 10 clang's headers do not get along with the MSVC 14.5x
           # standard library, so this stays on windows-2022 (VS 2022, MSVC
           # 14.4x). Moving it to a VS 2026 image means asking msvc-dev-cmd for
           # toolset 14.44.
-          - name: Windows HIP Release
+          - name: Windows GPU Release
             os: windows-2022
             configure-preset: release-windows
             build-preset: release-windows
@@ -172,14 +141,18 @@ jobs:
             build-directory: build/release-windows
             architecture: x86_64
             shell: pwsh
-            gpu: hip
-            bootstrap-flags: -DNOSPHERA2_BOOTSTRAP_GPU=OFF
+            gpu: cuda+hip
+            bootstrap-flags: >-
+              -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA
+              -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9
             configure-flags: >-
               -DNOSPHERA2_GPU_AUTO=OFF
+              -DNOSPHERA2_USE_CUDA=ON
               -DNOSPHERA2_USE_HIP=ON
+              -DNOSPHERA2_CUDA_PORTABLE=ON
               -DNOSPHERA2_HIP_PORTABLE=ON
-            artifact-path: artifacts/NoSpherA2-windows-x64-hip.zip
-            artifact-name: NoSpherA2-windows-x64-hip
+            artifact-path: artifacts/NoSpherA2-windows-x64-gpu.zip
+            artifact-name: NoSpherA2-windows-x64-gpu
 
     runs-on: ${{ matrix.os }}
 
@@ -269,13 +242,13 @@ jobs:
       # tests need are handed on through the job environment, the configure
       # flags among them, since they are only known once the wheel is in.
       - name: Set up Python for the ROCm wheels
-        if: matrix.gpu == 'hip'
+        if: contains(matrix.gpu, 'hip')
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
 
       - name: Install ROCm SDK
-        if: matrix.gpu == 'hip'
+        if: contains(matrix.gpu, 'hip')
         shell: bash
         run: |
           set -euo pipefail
@@ -296,6 +269,11 @@ jobs:
             echo "HIP_DEVICE_LIB_PATH=${root}/lib/llvm/amdgcn/bitcode"
             echo "NOSPHERA2_HIP_CONFIGURE_FLAGS=-DCMAKE_HIP_COMPILER=${root}/lib/llvm/bin/clang++${exe} -DCMAKE_PREFIX_PATH=${root}"
           } >> "${GITHUB_ENV}"
+          # The binary does not need this to start (the HIP runtime is opened
+          # by name, and only if it is there). Putting it on the path makes the
+          # Linux tests exercise the other case, a runtime present with no
+          # device behind it; the Windows job leaves the DLL off PATH and
+          # exercises the absent one.
           if [[ "${RUNNER_OS}" == "Linux" ]]; then
             echo "LD_LIBRARY_PATH=${root}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> "${GITHUB_ENV}"
           fi

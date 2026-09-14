@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <climits>
 
+NOSPHERA2_GPU_API_BEGIN
+
 #define SF_INV_TWO_PI 0.15915494309189533576888376337251
 
 #define GPU_TRY(call) do { const gpuError_t e_ = (call); if (e_ != gpuSuccess) { \
@@ -930,3 +932,5 @@ void itensor_gpu_free()
 	free_impl<float>();
 	free_impl<double>();
 }
+
+NOSPHERA2_GPU_API_END

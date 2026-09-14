@@ -89,7 +89,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\app\main.cpp" />
-    <ClCompile Include="..\..\Src\hip_delayload_hook.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

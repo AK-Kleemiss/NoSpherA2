@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cstdlib>
 
+NOSPHERA2_GPU_API_BEGIN
+
 //Each block owns a tile of k-points for one atom and streams that atom's grid points
 //through shared memory. F32 keeps the phase and its reduction in double and drops only
 //the transcendental and the running sum to single, which consumer parts run 32-64x
@@ -141,8 +143,6 @@ static std::future<void> g_warmup;
 
 void sf_gpu_warmup_start()
 {
-	//Counted first because this is the one HIP call that does not go through a probe, and
-	//on Windows the count is what stands in for the runtime being there at all.
 	int n = 0;
 	if (gpuGetDeviceCount(&n) != gpuSuccess || n <= 0) return;
 	if (!g_warmup.valid())
@@ -284,3 +284,5 @@ bool sf_gpu_run(const int imax, const long long smax,
 	gpuFree(dof); gpuFree(dout);
 	return true;
 }
+
+NOSPHERA2_GPU_API_END

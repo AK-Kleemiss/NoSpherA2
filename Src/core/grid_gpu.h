@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gpu_api.h"
+
 //GPU path for the atomic integration grid weights. generateIntegrationGrids is 46% of a
 //production tsc run and 98.8% of it is AtomGrid::get_grid, which evaluates the Becke and
 //TFVC partitioning weights at every grid point. Each point is independent and the work is
@@ -20,6 +22,8 @@
 //Returns false if there is no device, if the scratch will not fit, or if num_centers is
 //too large for the per-thread arrays, and the caller keeps the CPU loop.
 
+NOSPHERA2_GPU_API_BEGIN
+
 bool grid_gpu_available();
 //"CUDA" or "HIP", for the log line
 const char* grid_gpu_backend();
@@ -38,3 +42,5 @@ bool grid_gpu_becke_weights(
 	double far_away, double cutoff,
 	double* out_x, double* out_y, double* out_z,
 	double* out_aw, double* out_becke, double* out_tfvc);
+
+NOSPHERA2_GPU_API_END
