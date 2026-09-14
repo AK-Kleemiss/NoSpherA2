@@ -469,56 +469,41 @@ void generate_hkl(const double& dmin,
 {
 	using namespace std;
 	file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
-	i3 hkl_;
-	string line, temp;
-	/* A reflection with spacing d has |h| <= a/d, and likewise for k and l with
-	b and c, in any cell: the bound is the real-space axis length times the
-	reciprocal radius. It is tight, so the loops have to reach it. They used to
-	stop one short and lean on a 0.01 A widening of dmin to make the difference
-	up, which is not the same thing - the slack that buys scales with the axis
-	length, so it covers the shortfall on a long axis and not on a short one.
-	For a dynamical calculation the list has to be complete rather than nearly
-	so: a single index the table misses is a failed refinement, not a slightly
-	worse number.
-	*/
+	//The sphere d*^2 <= 1/d_keep^2 (cctbx index_generator, smtbx n_beam.h) is closed under
+	//the point group, so the Friedel half l > 0 | l = 0, k > 0 | k = l = 0, h > 0 is the list.
+	//d_keep sits 1e-3 inside dmin so a reflection at dmin from a rounded cell is never lost.
+	const double d_keep = dmin * (1.0 - 1e-3);
+	const double s_max = 1.0 / (d_keep * d_keep);
+	const array<double, 6> G = unit_cell.get_reciprocal_metric();
 	const ivec extreme = {
-		int(std::floor(unit_cell.get_a() / dmin)),
-		int(std::floor(unit_cell.get_b() / dmin)),
-		int(std::floor(unit_cell.get_c() / dmin)) };
+		int(unit_cell.get_a() / d_keep + 1e-4),
+		int(unit_cell.get_b() / d_keep + 1e-4),
+		int(unit_cell.get_c() / d_keep + 1e-4) };
 	if (debug)
 		file << "extreme: " << extreme[0] << " " << extreme[1] << " " << extreme[2] << endl;
 	for (int h = -extreme[0]; h <= extreme[0]; h++)
 	{
 		for (int k = -extreme[1]; k <= extreme[1]; k++)
 		{
-			for (int l = -extreme[2]; l <= extreme[2]; l++)
-			{
-				hkl_ = { h, k, l };
-				hkl.emplace(hkl_);
-			}
+			//d*^2 = A l^2 + B l + C; the loops run in the order i3 compares, hence the hint
+			const double A = G[2];
+			const double B = 2.0 * (h * G[4] + k * G[5]);
+			const double C = h * h * G[0] + k * k * G[1] + 2.0 * h * k * G[3] - s_max;
+			const double disc = B * B - 4.0 * A * C;
+			if (disc < 0.0)
+				continue;
+			const double root = sqrt(disc);
+			const int l_lo = max(int(ceil((-B - root) / (2.0 * A))), (k > 0 || (k == 0 && h > 0)) ? 0 : 1);
+			const int l_hi = min(int(floor((-B + root) / (2.0 * A))), extreme[2]);
+			for (int l = l_lo; l <= l_hi; l++)
+				hkl.emplace_hint(hkl.end(), i3{ h, k, l });
 		}
 	}
 	file << "... done!\nNr of reflections generated: " << setw(21) << hkl.size() << endl;
-
-	if (debug)
-		file << "Number of reflections before twin: " << hkl.size() << endl;
-	if (twin_law.size() > 0)
-	{
-		for (const i3& hkl__ : hkl)
-			for (int i = 0; i < twin_law.size(); i++)
-				hkl.emplace(i3{
-					int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
-	}
-	if (debug)
-		file << "Number of reflections after twin: " << hkl.size() << endl;
-
 	vector<vector<ivec>> sym(3);
 	for (int i = 0; i < 3; i++)
 		sym[i].resize(3);
 	sym = unit_cell.get_sym();
-
 	if (debug)
 	{
 		file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
@@ -536,47 +521,57 @@ void generate_hkl(const double& dmin,
 	else
 		file << "Number of symmetry operations: " << setw(19) << sym[0][0].size() << endl;
 
-	i3 tempv;
-	hkl_list hkl_enlarged = hkl;
-	for (int s = 0; s < sym[0][0].size(); s++)
+	//A twin law is no point-group operation, so its images leave the sphere: expand and reduce
+	if (twin_law.size() > 0)
 	{
-		if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
-			sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
-			sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0)
-		{
-			continue;
-		}
+		if (debug)
+			file << "Number of reflections before twin: " << hkl.size() << endl;
+		hkl_list twinned = hkl;
 		for (const i3& hkl__ : hkl)
+			for (int i = 0; i < twin_law.size(); i++)
+				twinned.emplace(i3{
+					int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
+					int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
+					int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+		if (debug)
+			file << "Number of reflections after twin: " << twinned.size() << endl;
+		i3 tempv;
+		hkl_list hkl_enlarged = twinned;
+		for (int s = 0; s < sym[0][0].size(); s++)
 		{
-			tempv = { 0, 0, 0 };
-			for (int h = 0; h < 3; h++)
+			if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
+				sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
+				sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0)
 			{
-				for (int j = 0; j < 3; j++)
-					tempv[j] += hkl__[h] * sym[j][h][s];
+				continue;
 			}
-			hkl_enlarged.emplace(tempv);
+			for (const i3& hkl__ : twinned)
+			{
+				tempv = { 0, 0, 0 };
+				for (int h = 0; h < 3; h++)
+				{
+					for (int j = 0; j < 3; j++)
+						tempv[j] += hkl__[h] * sym[j][h][s];
+				}
+				hkl_enlarged.emplace(tempv);
+			}
 		}
-	}
-	hkl.clear();
-	if (debug)
-		file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
-
-	for (const i3& hkl__ : hkl_enlarged)
-	{
-		if (hkl.find(hkl__) != hkl.end())
-			continue;
-		tempv = hkl__;
-		tempv[0] *= -1;
-		tempv[1] *= -1;
-		tempv[2] *= -1;
-		if (hkl.find(tempv) == hkl.end())
+		hkl.clear();
+		if (debug)
+			file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
+		for (const i3& hkl__ : hkl_enlarged)
 		{
-			hkl.emplace(hkl__);
+			if (hkl.find(hkl__) != hkl.end())
+				continue;
+			tempv = hkl__;
+			tempv[0] *= -1;
+			tempv[1] *= -1;
+			tempv[2] *= -1;
+			if (hkl.find(tempv) == hkl.end())
+				hkl.emplace(hkl__);
 		}
-	}
-	// Remove 0 0 0 if it exists
-	if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
 		hkl.erase(i3{ 0, 0, 0 });
+	}
 	file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
@@ -2637,7 +2632,7 @@ itsc_block calculate_scattering_factors_from_cube(
 		if (opt.dmin != 99.0)
 		{
 			if (opt.electron_diffraction)
-				generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+				generate_hkl(opt.dmin / 2.0 - 0.001, hkl, opt.twin_law, unit_cell, file, opt.debug);
 			else
 				generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
 		}
@@ -2869,7 +2864,7 @@ tsc_block_type calculate_scattering_factors(
 	{
 		if (opt.dmin != 99.0)
 			if (opt.electron_diffraction)
-				generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+				generate_hkl(opt.dmin / 2.0 - 0.001, hkl, opt.twin_law, unit_cell, file, opt.debug);
 			else
 				generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
 		else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)

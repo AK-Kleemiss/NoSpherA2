@@ -287,6 +287,23 @@ public:
     }
 
     /**
+     * The reciprocal metric as the six coefficients of
+     * d*^2 = G0 h^2 + G1 k^2 + G2 l^2 + 2 G3 h k + 2 G4 h l + 2 G5 k l,
+     * the same expression get_d_of_hkl evaluates, so the two agree to rounding.
+     */
+    std::array<double, 6> get_reciprocal_metric() const
+    {
+        const double V2 = V * V;
+        return {
+            b * b * c * c * sa * sa / V2,
+            a * a * c * c * sb * sb / V2,
+            a * a * b * b * sg * sg / V2,
+            a * b * c * c * (ca * cb - cg) / V2,
+            a * b * b * c * (cg * ca - cb) / V2,
+            a * a * b * c * (cb * cg - ca) / V2 };
+    }
+
+    /**
      * Calculates the d-spacing of a crystal lattice plane specified by the Miller indices (hkl).
      *
      * @tparam numtype The type of the Miller indices (e.g., int, double)

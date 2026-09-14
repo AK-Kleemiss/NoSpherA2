@@ -1,7 +1,9 @@
 # Unit Test Status
-**Last updated: 2026-09-14** (stored XCW two-electron integrals over the screened-in pairs, `StoredEriTests`
-and three `-xcw_incremental` golden cases; 307/307 pass on `release-windows`, 110 s, the 4 `*_full` XCW cases skip
-and 2 `DeltaSeriesTests` stay disabled. Same day: occ submodule moved to upstream 0.9.4, `e9ebbdb13`, 302/302. 2026-09-09: geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
+**Last updated: 2026-09-14** (`-dmin` generates the resolution sphere, the ten `-dmin` goldens regenerated with
+their new reflection counts; 307/307 pass on `release-windows`, 110 s, the 4 `*_full` XCW cases skip and 2
+`DeltaSeriesTests` stay disabled. Same day: stored XCW two-electron integrals over the screened-in pairs,
+`StoredEriTests` and three `-xcw_incremental` golden cases, 307/307; occ submodule moved to upstream 0.9.4,
+`e9ebbdb13`, 302/302. 2026-09-09: geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
 four flags through `run_app`; `-repulsion_exchange <dirac|pbe|b88>` picks the exchange functional of
 the Gordon-Kim repulsion, with an H-atom gtest for the three functionals; `-interaction_energy` computes
 the exchange-repulsion by the Gordon-Kim functionals of the fitted densities on a Becke grid over the
@@ -11,6 +13,26 @@ partner's field, D4 dispersion and the density overlap S; `-salted_charge_constr
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
+
+## 2026-09-14 — `-dmin` generates the resolution sphere
+
+`generate_hkl(dmin)` (`Src/core/scattering_factors.cpp`) used to keep the whole index box
+|h| <= a/dmin, |k| <= b/dmin, |l| <= c/dmin, expand it by the symmetry operations into further
+`std::set` copies and reduce it by Friedel pairs, which is 1.9 times the sphere for an orthogonal
+cell (8 x 1.9 for the ED half spacing) and why `-dmin 0.1` took 20 s and `-dmin 0.05` three
+minutes on sucrose. It now generates the sphere d*^2 <= 1/d_keep^2 from the reciprocal metric
+(`cell::get_reciprocal_metric`), the Friedel-unique half directly and the l range per (h, k) from
+the quadratic, with d_keep = dmin (1 - 1e-3) so the table never ends above the dmin Olex2 or cctbx
+asked for. The ED callers pass dmin/2 - 0.001, the resolution `smtbx/ED/n_beam.h` generates to.
+Checked against an independent numpy build of cctbx's set (d*^2 <= 1/d^2, one of each Friedel
+pair) on sucrose at 0.8, 0.5, 0.31 and ED 0.8, 0.5: nothing missing, the only extra reflections
+sit in the 1e-3 margin band, everything inside the old box, no duplicates, IAM form factors
+bit-identical to the old table (up to the Friedel conjugate where the old code kept -hkl).
+Sucrose IAM: 0.8 A 5386 -> 2957 reflections, 0.1 A 20.5 -> 7.5 s, 0.05 A 178 -> 54 s. The ten
+golden cases with `-dmin` (`alanine_occ`, `alanine_integrated_occ`, `Hybrid_mode`, `ri_fit`,
+`ri_fit_multipoles`, `SALTED`, `SALTED_charge_constraint`, `sucrose_ptb`, `TFVC`, `TFVC_ECP`) were
+regenerated; only their three reflection-count lines changed. `ctest --preset release-windows`:
+307/307 passing, 0 failed, 110 s.
 
 ## 2026-09-14 — Stored two-electron integrals over the screened-in pairs (`StoredEriTests`)
 

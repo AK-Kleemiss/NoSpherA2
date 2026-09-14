@@ -15,11 +15,11 @@ Number of protons: 106
 Number of electrons: 106.000000
 Reading:                                    "ZP2.cif" done!
 Generating hkl indices up to d=:              0.90... done!
-Nr of reflections generated:                 19965
+Nr of reflections generated:                  5408
 Number of symmetry operations:                   4
-Nr of reflections to be used:                 9982
+Nr of reflections to be used:                 5408
 Generating k-points...                            ... done!
-Number of k-points to evaluate: 9982
+Number of k-points to evaluate: 5408
 There are:
   25 atoms read from the wavefunction, of which 
   25 are identified as asymmetric unit atoms!
