@@ -21,7 +21,6 @@ install(
         spdlog
         gau2grid_static
         fmt
-        dftd4
         xc
         scn
         _subprocess
@@ -34,8 +33,10 @@ install(
 
 install(
     TARGETS
+    occ_cc
     occ_cg
     occ_core
+    occ_correlation
     occ_crystal
     occ_descriptors
     occ_dft
@@ -50,6 +51,7 @@ install(
     occ_io
     occ_isosurface
     occ_main
+    occ_mults
     occ_numint
     occ_opt
     occ_qm
@@ -97,13 +99,6 @@ install(
     FILES_MATCHING
         PATTERN "*.h"
         PATTERN "*.hpp"
-)
-
-install(
-    DIRECTORY "${CMAKE_BINARY_DIR}/_deps/dftd4_cpp-src/include/"
-    DESTINATION include
-    FILES_MATCHING
-        PATTERN "*.h"
 )
 
 install(

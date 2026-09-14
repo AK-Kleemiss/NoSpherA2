@@ -6,7 +6,7 @@
 #include "GridManager.h"
 #include "basis_set.h"
 #include "SALTED_utilities.h"
-#include <occ/disp/dftd4.h>
+#include <occ/disp/d4.h>
 #include <occ/interaction/polarization.h>
 
 
@@ -555,10 +555,13 @@ namespace {
             atoms[a] = { aux.get_atom_charge(a), aux.get_atom_coordinate(a, 0), aux.get_atom_coordinate(a, 1), aux.get_atom_coordinate(a, 2) };
         return atoms;
     }
+    //PBE-D4 with EEQ charges, as the cpp-d4 library did; occ's native D4 reads its reference data from OCC_DATA_PATH/dftd4
     double d4_energy(const std::vector<occ::core::Atom>& atoms, const int charge)
     {
-        occ::disp::D4Dispersion d4(atoms);
-        d4.set_charge(charge);
+        err_checkf(ensure_occ_data_path(nullptr), "OCC_DATA_PATH not set and no occ/share directory found next to the executable; the D4 reference data lives there", std::cout);
+        occ::disp::D4Dispersion d4(atoms, occ::disp::RefqMode::DFT);
+        d4.set_functional("pbe");
+        d4.set_charges_eeq(charge);
         return d4.energy();
     }
     // Gordon-Kim exchange-repulsion of the fitted densities on a Becke grid over the dimer: gk[0] the Thomas-Fermi kinetic

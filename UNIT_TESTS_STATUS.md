@@ -1,5 +1,6 @@
 # Unit Test Status
-**Last updated: 2026-09-09** (geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
+**Last updated: 2026-09-14** (occ submodule moved to upstream 0.9.4, `dc303f087`; 302/302 pass on
+`release-windows`, 107 s, the 4 `*_full` XCW cases skip and 2 `DeltaSeriesTests` stay disabled. 2026-09-09: geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
 four flags through `run_app`; `-repulsion_exchange <dirac|pbe|b88>` picks the exchange functional of
 the Gordon-Kim repulsion, with an H-atom gtest for the three functionals; `-interaction_energy` computes
 the exchange-repulsion by the Gordon-Kim functionals of the fitted densities on a Becke grid over the
@@ -9,6 +10,24 @@ partner's field, D4 dispersion and the density overlap S; `-salted_charge_constr
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
+
+## 2026-09-14 — occ submodule on upstream 0.9.4
+
+The `occ` submodule now tracks `peterspackman/occ` main at 0.9.4 (`d17f1d6af`) with the NoSpherA2
+patches cherry-picked on top (branch `nosphera2-upstream-0.9.4`, head `dc303f087`). Florian's Ca
+initial-guess fix (`Z <= 20` in `guess_density.cpp`) is subsumed by the upstream Madelung guess.
+What changed on our side: `occ/disp/dftd4.h` (cpp-d4) is gone, `d4_energy` in `Src/core/integrator.cpp`
+uses the native `occ::disp::D4Dispersion` with `RefqMode::DFT`, `set_functional("pbe")` and EEQ charges
+(same PBE parameters as before), which reads `OCC_DATA_PATH/dftd4/{refdata,functionals}.json` at run
+time, so a deployment needs `occ/share/dftd4/` next to `basis/`; `supports_incremental_fock_build()` became
+`fock_build_properties().density_screened` in `Src/core/XCW.cpp`; the VS lib lists and
+`cmake/InstallDependenciesOnly.cmake` gain `occ_cc`, `occ_correlation`, `occ_mults` and lose `dftd4`.
+MSVC fixes inside occ: `Eigen::Index` casts in the 4c/DF tensor code, `MULTS_RESTRICT` macro for
+`__restrict__`, explicit `get<std::string>()` for a json → `fs::path` conversion, and `occ_cc_obj` built
+with `/Od /Ob0` on MSVC because `ccsd.cpp` at `/O2` did not finish in 26 min. Reconfiguring an existing
+build tree needs `cmake -U CPM_DIRECTORY -U CPM_DRY_RUN -U CPM_VERSION <build dir>` first, the stale
+`CPM_DIRECTORY` cache entry makes the new CPM return before `CPMAddPackage` is defined.
+`ctest --preset release-windows`: 302/302 passing, 0 failed, 107 s.
 
 ## 2026-09-09 — Geometry-aid pipeline tests (`GeometryAidTests`, `GeometryAidDeathTest`)
 
