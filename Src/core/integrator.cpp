@@ -555,10 +555,9 @@ namespace {
             atoms[a] = { aux.get_atom_charge(a), aux.get_atom_coordinate(a, 0), aux.get_atom_coordinate(a, 1), aux.get_atom_coordinate(a, 2) };
         return atoms;
     }
-    //PBE-D4 with EEQ charges, as the cpp-d4 library did; occ's native D4 reads its reference data from OCC_DATA_PATH/dftd4
+    //PBE-D4 with EEQ charges, as the cpp-d4 library did; occ carries the D4 reference data compiled in, so no OCC_DATA_PATH is needed
     double d4_energy(const std::vector<occ::core::Atom>& atoms, const int charge)
     {
-        err_checkf(ensure_occ_data_path(nullptr), "OCC_DATA_PATH not set and no occ/share directory found next to the executable; the D4 reference data lives there", std::cout);
         occ::disp::D4Dispersion d4(atoms, occ::disp::RefqMode::DFT);
         d4.set_functional("pbe");
         d4.set_charges_eeq(charge);
