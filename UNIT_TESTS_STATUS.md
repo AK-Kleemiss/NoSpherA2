@@ -1,7 +1,9 @@
 # Unit Test Status
-**Last updated: 2026-09-14** (`-dmin` generates the resolution sphere, the ten `-dmin` goldens regenerated with
-their new reflection counts; 307/307 pass on `release-windows`, 110 s, the 4 `*_full` XCW cases skip and 2
-`DeltaSeriesTests` stay disabled. Same day: stored XCW two-electron integrals over the screened-in pairs,
+**Last updated: 2026-09-14** (`-dmin` and `-hkl_min_max` together keep only the symmetry images of the
+measured index box from the resolution sphere, `HklGenerationTests`; 300 pass, 5 fail on `release-windows`
+(the five P1 XCW goldens broken by the `5b6eb296` "Symmetry & Bugfix (WIP)" commit, see below), the 4
+`*_full` XCW cases skip and 2 `DeltaSeriesTests` stay disabled. Earlier the same day: `-dmin` generates
+the resolution sphere, the ten `-dmin` goldens regenerated with their new reflection counts, 307/307; stored XCW two-electron integrals over the screened-in pairs,
 `StoredEriTests` and three `-xcw_incremental` golden cases, 307/307; occ submodule moved to upstream 0.9.4,
 `e9ebbdb13`, 302/302. 2026-09-09: geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
 four flags through `run_app`; `-repulsion_exchange <dirac|pbe|b88>` picks the exchange functional of
@@ -13,6 +15,31 @@ partner's field, D4 dispersion and the density overlap S; `-salted_charge_constr
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
+
+## 2026-09-14 — `-dmin` with `-hkl_min_max` keeps the orbit of the measured box
+
+Olex2 sends the measured index box (`-hkl_min_max`) and now also the hkl file's d_min (`-dmin`,
+`_file_d_min()` in `util/pyUtil/NoSpherA2/utilities.py`, the HKLF-transformed file without the
+SHEL/OMIT/sigma filter). `generate_hkl_from_options` (`Src/core/scattering_factors.cpp`) dispatches:
+both given, the sphere is walked as before but an index is kept only when one of its images h.R
+(or the Friedel mate of one) lies in the box; `-dmin` alone gives the sphere, `-hkl_min_max` alone
+the box with its symmetry images, neither reads `-hkl`, and `-ED` takes the sphere at dmin/2 - 0.001
+and ignores the box (the dynamical calculation in `smtbx/ED/n_beam.h` needs every beam). The kept set
+is exactly what cctbx's tsc reader (`smtbx/structure_factors/direct/table_based.h`, h.R over the
+rotations with the -h.R fallback) resolves for a measured list, and since rotations preserve d every
+image of a box index is inside the sphere, so nothing the reader asks for is dropped.
+`cell::get_sym()` stores R^T, so the products in the generator form h.R, the cctbx convention.
+Checked with cctbx's own reader (`direct.f_calc_modulus_squared(..., table_file_name=)` then
+`evaluate(h)` over every measured index, the merged ASU and the mask completion set) on sucrose
+P2_1, Fe P2_12_12_1 (partial dataset), epoxide P2_1/n, Au2Br2 I2/a, malbac P-1 and a synthetic
+P6_3 cell with an asymmetric wedge and a random 30 % subset: 0 unresolved indices in every case;
+rows both <= sphere <= box (Fe: 286998 sphere, 42262 box, 308 both). `HklGenerationTests`
+(`tests/src/UnitTests.cpp`) build a P6_3 cell where R^T != R^-1, compare the boxed set with the
+hand-worked h.R orbit of the box (equal) and with the R.h orbit (different), and check that the
+options dispatch combines the two and that `-ED` ignores the box. `ctest --preset release-windows`:
+300 passed, 5 failed (`P1_test_XCW`, `P1_test_XCW_gpu_itensor`, `P1_test_XCW_h2`, `P1_F2_test_XCW`,
+`P1_F2_test_XCW_h2`: grid points 102932 -> 93098 and a new XCW criterion line from Johannes
+Bartusel's `5b6eb296` WIP, present before this change and not touched by it).
 
 ## 2026-09-14 — `-dmin` generates the resolution sphere
 

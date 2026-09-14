@@ -3461,4 +3461,79 @@ namespace NoSpherA2UnitTests
         EXPECT_NEAR(total, E.total() * constants::kcal_mol_per_hartree * 4.184, 2e-3);
         std::filesystem::remove_all(dir);
     }
+
+    namespace {
+        //A P6_3 cell: the 3-fold R = (-y, x-y, z) has R^T != R^-1, so an index box that is not
+        //symmetric tells h.R (the cctbx convention) from R.h.
+        void write_p63_cif(const std::filesystem::path& cif)
+        {
+            std::ofstream out(cif);
+            out << "data_test\n_cell_length_a 8.0\n_cell_length_b 8.0\n_cell_length_c 6.0\n_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 120\n_cell_volume 332.554\n"
+                << "loop_\n_space_group_symop_operation_xyz\n'x, y, z'\n'-y, x-y, z'\n'-x+y, -x, z'\n'-x, -y, z+1/2'\n'y, -x+y, z+1/2'\n'x-y, x, z+1/2'\n";
+        }
+        //h.R for the six rotations above, worked by hand from the operation strings
+        std::array<i3, 6> p63_images(const i3& v)
+        {
+            const int h = v[0], k = v[1], l = v[2];
+            return { i3{ h, k, l }, i3{ k, -h - k, l }, i3{ -h - k, h, l }, i3{ -h, -k, l }, i3{ -k, h + k, l }, i3{ h + k, -h, l } };
+        }
+        bool friedel_half(const i3& v)
+        {
+            return v[2] > 0 || (v[2] == 0 && (v[1] > 0 || (v[1] == 0 && v[0] > 0)));
+        }
+    }
+
+    TEST(HklGenerationTests, DminWithBoxKeepsExactlyTheOrbitOfTheBox)
+    {
+        const std::filesystem::path cif = geometry_aid_tmp("p63.cif");
+        write_p63_cif(cif);
+        cell c(cif, std::cout, false, true);
+        std::filesystem::remove(cif);
+        const double dmin = 1.0;
+        const ivec2 box = { { 0, 5 }, { 0, 4 }, { -3, 3 } };
+        std::ostringstream sink;
+        hkl_list sphere, boxed;
+        generate_hkl(dmin, sphere, {}, c, sink, false);
+        generate_hkl(dmin, boxed, {}, c, sink, false, box);
+        EXPECT_LT(boxed.size(), sphere.size());
+        //The reference: every box index inside the sphere, its images and their Friedel mates,
+        //reduced to the half the generator writes
+        hkl_list expected;
+        for (int h = box[0][0]; h <= box[0][1]; h++)
+            for (int k = box[1][0]; k <= box[1][1]; k++)
+                for (int l = box[2][0]; l <= box[2][1]; l++) {
+                    if ((h == 0 && k == 0 && l == 0) || c.get_d_of_hkl(i3{ h, k, l }) < dmin * (1.0 - 1e-3)) continue;
+                    for (const i3& g : p63_images({ h, k, l }))
+                        expected.insert(friedel_half(g) ? g : i3{ -g[0], -g[1], -g[2] });
+                }
+        EXPECT_EQ(boxed, expected);
+        for (const i3& v : boxed) EXPECT_TRUE(sphere.count(v)) << v[0] << " " << v[1] << " " << v[2];
+        //R.h in place of h.R would keep a different set for this box
+        hkl_list transposed;
+        for (int h = box[0][0]; h <= box[0][1]; h++)
+            for (int k = box[1][0]; k <= box[1][1]; k++)
+                for (int l = box[2][0]; l <= box[2][1]; l++) {
+                    if ((h == 0 && k == 0 && l == 0) || c.get_d_of_hkl(i3{ h, k, l }) < dmin * (1.0 - 1e-3)) continue;
+                    for (const i3& g : { i3{ h, k, l }, i3{ -k, h - k, l }, i3{ -h + k, -h, l }, i3{ -h, -k, l }, i3{ k, -h + k, l }, i3{ h - k, h, l } })
+                        transposed.insert(friedel_half(g) ? g : i3{ -g[0], -g[1], -g[2] });
+                }
+        EXPECT_NE(transposed, expected);
+    }
+
+    TEST(HklGenerationTests, OptionsCombineDminAndBoxExceptForED)
+    {
+        const std::filesystem::path cif = geometry_aid_tmp("p63.cif");
+        write_p63_cif(cif);
+        cell c(cif, std::cout, false, true);
+        std::filesystem::remove(cif);
+        std::ostringstream sink;
+        hkl_list sphere, both, ed, ed_box;
+        generate_hkl_from_options(parse_options({ "-dmin", "1.0" }), sphere, c, sink);
+        generate_hkl_from_options(parse_options({ "-dmin", "1.0", "-hkl_min_max", "0", "5", "0", "4", "-3", "3" }), both, c, sink);
+        generate_hkl_from_options(parse_options({ "-dmin", "1.0", "-ED" }), ed, c, sink);
+        generate_hkl_from_options(parse_options({ "-dmin", "1.0", "-ED", "-hkl_min_max", "0", "5", "0", "4", "-3", "3" }), ed_box, c, sink);
+        EXPECT_LT(both.size(), sphere.size());
+        EXPECT_GT(ed.size(), 4 * sphere.size());
+        EXPECT_EQ(ed_box, ed);
+    }
 } // namespace NoSpherA2UnitTests

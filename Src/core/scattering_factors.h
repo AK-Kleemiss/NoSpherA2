@@ -123,6 +123,8 @@ tsc_block_type calculate_scattering_factors(
  * @param unit_cell The unit cell.
  * @param file The output stream to write the results to.
  * @param debug Flag indicating whether to enable debug mode.
+ * @param hkl_min_max Optional index box {{hmin,hmax},{kmin,kmax},{lmin,lmax}}; when given,
+ *        only the point-group orbit (with Friedel mates) of the box is kept from the sphere.
  */
 void generate_hkl(
     const double& dmin,
@@ -130,7 +132,20 @@ void generate_hkl(
     const vec2& twin_law,
     cell& unit_cell,
     std::ostream& file,
-    bool debug = false);
+    bool debug = false,
+    const ivec2& hkl_min_max = ivec2());
+
+/**
+ * @brief Fills the hkl list from the options: -dmin and -hkl_min_max together give the
+ * orbit of the measured box inside the resolution sphere, either alone gives that set, and
+ * without both the -hkl file is read. ED callers get the sphere at dmin/2 - 0.001 and the
+ * box is ignored, since the dynamical calculation needs every beam to that resolution.
+ */
+void generate_hkl_from_options(
+    const options& opt,
+    hkl_list& hkl,
+    cell& unit_cell,
+    std::ostream& file);
 
 void generate_hkl(
     const ivec2& hkl_min_max,

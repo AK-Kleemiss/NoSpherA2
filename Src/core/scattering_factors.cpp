@@ -465,9 +465,45 @@ void generate_hkl(const double& dmin,
 	const vec2& twin_law,
 	cell& unit_cell,
 	std::ostream& file,
-	bool debug)
+	bool debug,
+	const ivec2& hkl_min_max)
 {
 	using namespace std;
+	vector<vector<ivec>> sym(3);
+	for (int i = 0; i < 3; i++)
+		sym[i].resize(3);
+	sym = unit_cell.get_sym();
+	const size_t n_sym = sym[0][0].size();
+	//An index box narrows the sphere to the orbit of the measured indices: h is kept when one
+	//of its images h.R, or the Friedel mate of one, lies in the box. That is the set cctbx's
+	//table reader resolves for a measured list (smtbx table_based.h walks h.R over the
+	//rotations and falls back to -h.R), and since a rotation preserves d every image of a
+	//box index is inside the sphere already, so nothing the reader asks for is dropped.
+	//sym[j][h][s] holds R^T, so the products below form h.R, the cctbx convention.
+	const bool boxed = hkl_min_max.size() == 3;
+	if (boxed)
+		file << "Keeping only the symmetry images of the index box ["
+			<< setw(2) << hkl_min_max[0][0] << "," << setw(2) << hkl_min_max[0][1] << "] ; ["
+			<< setw(2) << hkl_min_max[1][0] << "," << setw(2) << hkl_min_max[1][1] << "] ; ["
+			<< setw(2) << hkl_min_max[2][0] << "," << setw(2) << hkl_min_max[2][1] << "]\n";
+	auto in_box = [&hkl_min_max](const int h, const int k, const int l) {
+		return h >= hkl_min_max[0][0] && h <= hkl_min_max[0][1] &&
+			k >= hkl_min_max[1][0] && k <= hkl_min_max[1][1] &&
+			l >= hkl_min_max[2][0] && l <= hkl_min_max[2][1];
+	};
+	auto wanted = [&](const int h, const int k, const int l) {
+		if (!boxed || in_box(h, k, l) || in_box(-h, -k, -l))
+			return true;
+		for (size_t s = 0; s < n_sym; s++)
+		{
+			const int h_ = h * sym[0][0][s] + k * sym[0][1][s] + l * sym[0][2][s];
+			const int k_ = h * sym[1][0][s] + k * sym[1][1][s] + l * sym[1][2][s];
+			const int l_ = h * sym[2][0][s] + k * sym[2][1][s] + l * sym[2][2][s];
+			if (in_box(h_, k_, l_) || in_box(-h_, -k_, -l_))
+				return true;
+		}
+		return false;
+	};
 	file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
 	//The sphere d*^2 <= 1/d_keep^2 (cctbx index_generator, smtbx n_beam.h) is closed under
 	//the point group, so the Friedel half l > 0 | l = 0, k > 0 | k = l = 0, h > 0 is the list.
@@ -496,14 +532,11 @@ void generate_hkl(const double& dmin,
 			const int l_lo = max(int(ceil((-B - root) / (2.0 * A))), (k > 0 || (k == 0 && h > 0)) ? 0 : 1);
 			const int l_hi = min(int(floor((-B + root) / (2.0 * A))), extreme[2]);
 			for (int l = l_lo; l <= l_hi; l++)
-				hkl.emplace_hint(hkl.end(), i3{ h, k, l });
+				if (wanted(h, k, l))
+					hkl.emplace_hint(hkl.end(), i3{ h, k, l });
 		}
 	}
 	file << "... done!\nNr of reflections generated: " << setw(21) << hkl.size() << endl;
-	vector<vector<ivec>> sym(3);
-	for (int i = 0; i < 3; i++)
-		sym[i].resize(3);
-	sym = unit_cell.get_sym();
 	if (debug)
 	{
 		file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
@@ -593,9 +626,9 @@ void generate_hkl(const ivec2& hkl_min_max,
 	reflections out to half the measured spacing, and it is the latter a
 	dynamical calculation asks for. A box and a resolution shell are different
 	shapes: the shell reaches further along the shorter axes, so this leaves a
-	gap there. Olex2 sends -dmin for ED, which takes precedence over the box
-	and generates the right set; this stays for callers that pass only a box,
-	and says so rather than looking complete.
+	gap there. Olex2 sends -dmin for ED, which generates the sphere and ignores
+	the box; this stays for callers that pass only a box, and says so rather
+	than looking complete.
 	*/
 	if (ED) {
 		h_max *= 2, k_max *= 2, l_max *= 2;
@@ -699,6 +732,25 @@ void generate_hkl(const ivec2& hkl_min_max,
 	if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
 		hkl.erase(i3{ 0, 0, 0 });
 	file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
+}
+
+void generate_hkl_from_options(const options& opt,
+	hkl_list& hkl,
+	cell& unit_cell,
+	std::ostream& file)
+{
+	const bool have_dmin = opt.dmin != 99.0;
+	const bool have_box = opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100;
+	if (have_dmin && opt.electron_diffraction)
+		generate_hkl(opt.dmin / 2.0 - 0.001, hkl, opt.twin_law, unit_cell, file, opt.debug);
+	else if (have_dmin && have_box)
+		generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.hkl_min_max);
+	else if (have_dmin)
+		generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+	else if (have_box)
+		generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
+	else
+		read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
 }
 
 /**
@@ -2629,21 +2681,7 @@ itsc_block calculate_scattering_factors_from_cube(
 	}
 	else if (opt.read_k_pts == false)
 	{
-		if (opt.dmin != 99.0)
-		{
-			if (opt.electron_diffraction)
-				generate_hkl(opt.dmin / 2.0 - 0.001, hkl, opt.twin_law, unit_cell, file, opt.debug);
-			else
-				generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
-		}
-		else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-		{
-			generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-		}
-		else
-		{
-			read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
-		}
+		generate_hkl_from_options(opt, hkl, unit_cell, file);
 		opt.m_hkl_list = hkl;
 	}
 
@@ -2862,15 +2900,7 @@ tsc_block_type calculate_scattering_factors(
 	}
 	else if (nr == 0 && opt.read_k_pts == false)
 	{
-		if (opt.dmin != 99.0)
-			if (opt.electron_diffraction)
-				generate_hkl(opt.dmin / 2.0 - 0.001, hkl, opt.twin_law, unit_cell, file, opt.debug);
-			else
-				generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
-		else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-			generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-		else
-			read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+		generate_hkl_from_options(opt, hkl, unit_cell, file);
 		opt.m_hkl_list = hkl;
 	}
 	if (kpts == NULL || kpts->size() == 0)

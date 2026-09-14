@@ -269,13 +269,22 @@ cases (`-E XCW`), including the new `TomlIntegrationTests.ELI_NH3Li` golden case
 rewritten `-eli_analysis` basin analysis; the nine XCW cases pass on a V100 node, a CPU node
 and the M2 Mac. See `UNIT_TESTS_STATUS.md`.
 
-As of 2026-09-14, `ctest --preset release-windows` reports **307/307 passing, 0 failed**
-(110 s; 6 not run: the four `full = true` XCW cases and two disabled `DeltaSeriesTests`)
+As of 2026-09-14, `ctest --preset release-windows` reports **300 passing, 5 failed**
+(6 not run: the four `full = true` XCW cases and two disabled `DeltaSeriesTests`)
 against occ 0.9.4 (submodule `e9ebbdb13`): upstream `peterspackman/occ` main plus the
-NoSpherA2 patches and MSVC fixes. This baseline has `-dmin` generate the resolution
-sphere directly (`generate_hkl(dmin)`, the set cctbx's `index_generator` produces, with a
-1e-3 relative margin inside dmin); the ten golden cases that use `-dmin` were regenerated
-and differ only in their reflection counts. Earlier that day: 307/307 with the stored
+NoSpherA2 patches and MSVC fixes. The five failures are the P1 XCW goldens
+(`P1_test_XCW`, `P1_test_XCW_gpu_itensor`, `P1_test_XCW_h2`, `P1_F2_test_XCW`,
+`P1_F2_test_XCW_h2`) that Johannes Bartusel's `5b6eb296` "Symmetry & Bugfix (WIP)"
+changed (grid points 102932 -> 93098, new XCW criterion line); they are his to
+regenerate. This baseline has `-dmin` generate the resolution sphere directly
+(`generate_hkl(dmin)`, the set cctbx's `index_generator` produces, with a 1e-3 relative
+margin inside dmin); the ten golden cases that use `-dmin` were regenerated and differ
+only in their reflection counts. With `-hkl_min_max` as well, `generate_hkl_from_options`
+keeps from the sphere only the symmetry images h.R (and Friedel mates) of the measured
+box - the set cctbx's tsc reader resolves for a measured list, verified with that reader
+on seven cases with 0 unresolved indices - and `-ED` ignores the box
+(`HklGenerationTests`). Olex2's `utilities.py` sends both the file box and the file's
+d_min. Earlier that day: 307/307 with the stored
 two-electron integrals over the Schwarz-screened pairs (`Src/core/stored_eri.cpp`,
 `StoredEriTests`, three `-xcw_incremental` golden cases), 302/302 (107 s) before that. Earlier baseline, 2026-09-02: 275/275 passing (253 s).
 This baseline covers the pTB cartesian-f fix in `WFN::read_ptb` and the new
