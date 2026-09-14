@@ -1,5 +1,5 @@
 # Unit Test Status
-**Last updated: 2026-09-14** (occ submodule moved to upstream 0.9.4, `dc303f087`; see the section below. 2026-09-08: ELI-D/QTAIM basin analysis rewritten; one golden case added,
+**Last updated: 2026-09-14** (occ submodule moved to upstream 0.9.4, `e9ebbdb13`; see the section below. 2026-09-08: ELI-D/QTAIM basin analysis rewritten; one golden case added,
 `TomlIntegrationTests.ELI_NH3Li`. 267/267 non-XCW cases pass on `release-linux`, the nine
 XCW cases on a V100 node, a CPU node and the M2 Mac.)
 
@@ -688,5 +688,7 @@ MSVC fixes inside occ: `Eigen::Index` casts in the 4c/DF tensor code, `MULTS_RES
 with `/Od /Ob0` on MSVC because `ccsd.cpp` at `/O2` did not finish in 26 min. Reconfiguring an existing
 build tree needs `cmake -U CPM_DIRECTORY -U CPM_DRY_RUN -U CPM_VERSION <build dir>` first, the stale
 `CPM_DIRECTORY` cache entry makes the new CPM return before `CPMAddPackage` is defined.
-`ctest --preset release-windows` on this branch: RESULT_PLACEHOLDER.
+occ `e9ebbdb13` then compiles `share/dftd4/{refdata,functionals}.json` into `occ_disp`, so no data directory
+is needed for D4 (a file under `OCC_DATA_PATH` still wins).
+`ctest --preset release-windows` on this branch: **278/278 passing, 0 failed** (118 s; 280 registered, the two `DeltaSeriesTests` disabled).
 
