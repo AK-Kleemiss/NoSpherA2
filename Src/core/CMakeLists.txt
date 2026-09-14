@@ -19,17 +19,21 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
 )
 
-#One source, two languages: nvcc takes it as CUDA, hipcc as HIP
-if(NOSPHERA2_USE_CUDA OR NOSPHERA2_USE_HIP)
-    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu")
-    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu")
-    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu")
-    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu")
-    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu")
-    list(APPEND NOSPHERA2_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/aux_density_gpu.cu")
-    if(NOSPHERA2_USE_HIP)
-        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu" "${CMAKE_CURRENT_SOURCE_DIR}/aux_density_gpu.cu" PROPERTIES LANGUAGE HIP)
-    endif()
+#One source, two languages: nvcc takes it as CUDA, hipcc as HIP. On an MSVC host the HIP
+#route compiles them by hand further down (NOSPHERA2_HIP_CLANG, see the top-level HIP block),
+#so they are kept out of the target's own sources there.
+set(NOSPHERA2_CORE_GPU_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/aux_density_gpu.cu")
+if(NOSPHERA2_USE_CUDA)
+    list(APPEND NOSPHERA2_CORE_SOURCES ${NOSPHERA2_CORE_GPU_SOURCES})
+elseif(NOSPHERA2_USE_HIP AND NOT NOSPHERA2_HIP_CLANG)
+    list(APPEND NOSPHERA2_CORE_SOURCES ${NOSPHERA2_CORE_GPU_SOURCES})
+    set_source_files_properties(${NOSPHERA2_CORE_GPU_SOURCES} PROPERTIES LANGUAGE HIP)
 endif()
 
 #Basis Set Generator:
@@ -149,7 +153,42 @@ endif()
 if(NOSPHERA2_USE_HIP)
     find_package(hip REQUIRED)
     target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_GPU NOSPHERA2_USE_HIP)
-    target_link_libraries(NoSpherA2Core PRIVATE hip::device)
+    if(NOSPHERA2_HIP_CLANG)
+        #MSVC host: each .cu becomes an object through ROCm's clang, with the same runtime
+        #library as the rest of the build (-fms-runtime-lib is clang's /MD), and the object
+        #joins the archive like one cl.exe produced. The depfile keeps a header edit
+        #rebuilding the kernels under Ninja; the launcher is sccache when the CI sets it.
+        set(_hip_arch_flags "")
+        foreach(_arch ${CMAKE_HIP_ARCHITECTURES})
+            list(APPEND _hip_arch_flags "--offload-arch=${_arch}")
+        endforeach()
+        foreach(_src ${NOSPHERA2_CORE_GPU_SOURCES})
+            get_filename_component(_name "${_src}" NAME_WE)
+            set(_obj "${CMAKE_CURRENT_BINARY_DIR}/hip/${_name}.obj")
+            add_custom_command(
+                OUTPUT "${_obj}"
+                COMMAND ${CMAKE_HIP_COMPILER_LAUNCHER} "${NOSPHERA2_HIP_CLANG}"
+                    -x hip ${_hip_arch_flags} -std=c++17
+                    "$<IF:$<CONFIG:Debug>,-O0,-O3>" "$<$<CONFIG:Debug>:-g>"
+                    "-fms-runtime-lib=$<IF:$<CONFIG:Debug>,dll_dbg,dll>"
+                    -DNOSPHERA2_USE_GPU -DNOSPHERA2_USE_HIP -D__HIP_PLATFORM_AMD__=1
+                    -I "${CMAKE_CURRENT_SOURCE_DIR}" -I "${PROJECT_SOURCE_DIR}/Src"
+                    -isystem "${hip_INCLUDE_DIR}"
+                    -MD -MF "${_obj}.d" -c "${_src}" -o "${_obj}"
+                DEPFILE "${_obj}.d"
+                DEPENDS "${_src}"
+                COMMENT "hip ${_name}.cu"
+                VERBATIM COMMAND_EXPAND_LISTS)
+            target_sources(NoSpherA2Core PRIVATE "${_obj}")
+        endforeach()
+        target_link_libraries(NoSpherA2Core PRIVATE hip::host)
+    else()
+        #The HIP language owns the device side here: CMake compiles the .cu files with the
+        #HIP compiler and runs the device link itself (hip-lang). hip::device is the target
+        #for a build whose C++ compiler is hipcc - it hands -x hip to every CXX source, which
+        #a gcc host answers with "language hip not recognized".
+        target_link_libraries(NoSpherA2Core PRIVATE hip::host)
+    endif()
 endif()
 
 target_compile_features(

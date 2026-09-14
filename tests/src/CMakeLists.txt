@@ -87,7 +87,17 @@ if(NOSPHERA2_CUDA_DELAYLOAD)
     target_link_libraries(NoSpherA2_Tests PRIVATE delayimp)
 endif()
 
+if(NOSPHERA2_USE_HIP)
+    #A static library with HIP objects makes CMake link this with the HIP compiler and
+    #the --offload-arch list, and clang then unbundles every object on the line - a plain
+    #host object comes out empty, so main() goes missing. The kernels carry their own
+    #fat binaries (no separable compilation), so the C++ linker is all that is needed.
+    set_target_properties(NoSpherA2_Tests PROPERTIES LINKER_LANGUAGE CXX)
+endif()
+
 if(NOSPHERA2_HIP_DELAYLOAD)
     target_link_options(NoSpherA2_Tests PRIVATE ${NOSPHERA2_HIP_DELAYLOAD})
     target_link_libraries(NoSpherA2_Tests PRIVATE delayimp)
+    #The failure hook has to be an object of this link, not of the core library - see the file.
+    target_sources(NoSpherA2_Tests PRIVATE "${PROJECT_SOURCE_DIR}/Src/hip_delayload_hook.cpp")
 endif()

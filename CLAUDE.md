@@ -50,6 +50,33 @@ Important CMake options:
 
 CI configures with `NOSPHERA2_BUILD_TESTS=ON` and `NOSPHERA2_DEPENDENCIES_ONLY=OFF` after restoring or creating a dependency-only cache.
 
+### GPU builds
+
+`NOSPHERA2_GPU_AUTO` (default ON) picks `NOSPHERA2_USE_CUDA` or `NOSPHERA2_USE_HIP` from the card
+that is present; set it OFF and name the backend to build for a machine other than the build host.
+`NOSPHERA2_CUDA_PORTABLE` / `NOSPHERA2_HIP_PORTABLE` compile the kernels for every architecture the
+vendor still supports (the lists live in `CMakeLists.txt`) instead of the local card only. The
+bootstrap script takes `-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9`
+to fetch a conda-forge CUDA toolkit without a GPU, and `-DNOSPHERA2_BOOTSTRAP_GPU=OFF` to fetch none.
+
+CI builds four GPU variants on GPU-less runners (`Linux CUDA`, `Windows CUDA`, `Linux HIP`,
+`Windows HIP` in `.github/workflows/c-cpp_all.yml`) and runs the test suite on them, which checks that
+the binaries start and fall back to the CPU without a device. CUDA links its runtime statically;
+the artifact needs only a driver. ROCm comes from AMD's pip wheels
+(`pip install --index-url https://stable.repo.amd.com/rocm/whl-next/ "rocm[devel]==10.0.0"`,
+`rocm-sdk init`, `rocm-sdk path --root`), the only ROCm that installs without root on Linux and
+exists at all on Windows. The Linux HIP artifact links `libamdhip64.so` and needs a ROCm runtime
+where it runs; the Windows HIP artifact delay-loads `amdhip64_<major>.dll` and runs on the CPU when
+the DLL is absent. That delay-load only works because `Src/hip_delayload_hook.cpp` is compiled into
+every executable and the DLL: clang registers the kernels with the HIP runtime from static
+initialisers before `main()`, so without the failure hook a machine without ROCm dies with
+`0xC06D007E` before the presence check in `gpu_backend.h` gets a chance. On Windows the ROCm 10
+clang headers do not compile against the MSVC 14.5x standard library; use toolset 14.4x
+(`vcvars64.bat -vcvars_ver=14.44`). On macOS `NOSPHERA2_USE_METAL` defaults to ON when the build is
+arm64 and the SDK carries the Metal and MetalPerformanceShaders frameworks (configure prints
+`Metal I tensor path: ON/OFF (...)`), so the arm64 slice of the universal binary has the Metal I tensor
+path and falls back to the CPU at run time when `MTLCreateSystemDefaultDevice()` returns nothing.
+
 ### Windows Agent/CLI Notes
 
 For CMake preset builds, run from an x64 Visual Studio Developer PowerShell or initialize the MSVC environment before invoking CMake/Ninja. If Ninja can find `cl.exe` but compilation fails on missing standard headers such as `stdlib.h`, the shell/toolchain environment is incomplete.

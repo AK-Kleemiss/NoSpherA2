@@ -29,6 +29,9 @@
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\tests\src\main.cpp" />
+    <ClCompile Include="..\..\Src\hip_delayload_hook.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\..\tests\src\TscStreamTests.cpp" />
     <ClCompile Include="..\..\tests\src\UnitTests.cpp" />
     <ClCompile Include="..\..\tests\src\IntegrationTests.cpp" />

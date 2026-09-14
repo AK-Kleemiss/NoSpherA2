@@ -1,5 +1,7 @@
 # Unit Test Status
-**Last updated: 2026-09-14** (`-dmin` and `-hkl_min_max` together keep only the symmetry images of the
+**Last updated: 2026-09-14** (GPU CI: CUDA and HIP builds for Linux and Windows on GPU-less runners, the
+Windows HIP delay-load hook, occ `9bde072f7` compiles `ccsd.cpp` at `/O2` again. Earlier the same day:
+`-dmin` and `-hkl_min_max` together keep only the symmetry images of the
 measured index box from the resolution sphere, `HklGenerationTests`; 300 pass, 5 fail on `release-windows`
 (the five P1 XCW goldens broken by the `5b6eb296` "Symmetry & Bugfix (WIP)" commit, see below), the 4
 `*_full` XCW cases skip and 2 `DeltaSeriesTests` stay disabled. Earlier the same day: `-dmin` generates
@@ -15,6 +17,41 @@ partner's field, D4 dispersion and the density overlap S; `-salted_charge_constr
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
+
+## 2026-09-14 — GPU builds in CI, and occ CCSD back at `/O2`
+
+`.github/workflows/c-cpp_all.yml` gains `Linux CUDA Release`, `Windows CUDA Release`, `Linux HIP
+Release` and `Windows HIP Release`. None of the GitHub runners has a GPU, so the toolkits are named
+rather than detected (`-DNOSPHERA2_GPU_AUTO=OFF -DNOSPHERA2_USE_{CUDA,HIP}=ON`) and the kernels are
+built for every supported architecture (`NOSPHERA2_CUDA_PORTABLE`, `NOSPHERA2_HIP_PORTABLE`); the
+test suite then runs on the same GPU-less runner, so what the four jobs prove is that the binaries
+start and fall back to the CPU when there is no device. CUDA 12.9 comes from conda-forge through the
+bootstrap (`-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9`) and is
+linked statically. ROCm 10.0.0 comes from AMD's pip wheels (`rocm[devel]`, `rocm-sdk init`), the
+same on Linux and Windows; the Linux HIP artifact needs a ROCm runtime where it runs, the Windows one
+delay-loads `amdhip64_7.dll`. The delay-load alone was not enough: `NoSpherA2_Tests.exe` built with
+HIP exited with `0xC06D007E` on a machine without ROCm, because clang's HIP module constructors call
+`__hipRegisterFatBinary`/`__hipRegisterFunction` before `main()` (dumpbin `/IMPORTS:amdhip64_7.dll`
+lists them among the delay-loaded entries). `Src/hip_delayload_hook.cpp` installs a
+`__pfnDliFailureHook2` that answers those calls with a stub returning `hipErrorNoDevice`; it has to be
+an object of each executable and of the DLL, not of the core library, because the linker takes the
+first definition it meets. With it the HIP build of the test suite passes on the CUDA machine (GPU
+tests skip) and `NoSpherA2.exe -h` exits 0. Kernel sources use `gpuShflDown32`/`gpuShflXor32`/
+`gpuLoadStreaming` from `gpu_backend.h` instead of the `_sync`/`__ldcs` CUDA spellings, and the
+`LoadLibraryA` presence check is hidden from the HIP device pass (`__HIP_DEVICE_COMPILE__`). On
+Windows the ROCm clang headers need MSVC 14.4x; the workflow keeps that job on `windows-2022`.
+macOS needs no new job: `NOSPHERA2_USE_METAL` now defaults from the SDK (ON for an arm64 build whose
+SDK has Metal and MetalPerformanceShaders, OFF otherwise, the reason printed at configure time), so the
+arm64 slice of the universal artifact carries the Metal I tensor path and the run-time device check in
+`itensor_metal.mm` hands a machine without a Metal device to the CPU code.
+
+occ `9bde072f7` (`nosphera2-upstream-0.9.4`) restructures `CCSD::update_amps` in `src/qm/cc/ccsd.cpp`
+into staged helpers (`f_and_l_intermediates`, `w_intermediates`, `t1_residual`, `t2_residual`) with
+the four-index permutation as an out-of-line parallel `perm4` rather than one expression MSVC's
+optimiser spent hours on; the file compiles in 52 s at `/O2` and the `/Od /Ob0` exception in
+`src/qm/cc/CMakeLists.txt` is gone. Checked with a temporary gtest: water and HF in STO-3G through
+occ's SCF and CCSD from the `/O2` build reproduce the PySCF reference energies to 1e-7 (HF: e_hf
+-98.5711004441, e_corr -0.0260730845).
 
 ## 2026-09-14 — `-dmin` with `-hkl_min_max` keeps the orbit of the measured box
 
@@ -96,7 +133,8 @@ D4 gtests pass with `OCC_DATA_PATH` unset; `supports_incremental_fock_build()` b
 `cmake/InstallDependenciesOnly.cmake` gain `occ_cc`, `occ_correlation`, `occ_mults` and lose `dftd4`.
 MSVC fixes inside occ: `Eigen::Index` casts in the 4c/DF tensor code, `MULTS_RESTRICT` macro for
 `__restrict__`, explicit `get<std::string>()` for a json → `fs::path` conversion, and `occ_cc_obj` built
-with `/Od /Ob0` on MSVC because `ccsd.cpp` at `/O2` did not finish in 26 min. Reconfiguring an existing
+with `/Od /Ob0` on MSVC because `ccsd.cpp` at `/O2` did not finish in 26 min (lifted again by occ
+`9bde072f7`, see the entry above). Reconfiguring an existing
 build tree needs `cmake -U CPM_DIRECTORY -U CPM_DRY_RUN -U CPM_VERSION <build dir>` first, the stale
 `CPM_DIRECTORY` cache entry makes the new CPM return before `CPMAddPackage` is defined.
 `ctest --preset release-windows`: 302/302 passing, 0 failed, 107 s.

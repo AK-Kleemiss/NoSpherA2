@@ -141,6 +141,10 @@ static std::future<void> g_warmup;
 
 void sf_gpu_warmup_start()
 {
+	//Counted first because this is the one HIP call that does not go through a probe, and
+	//on Windows the count is what stands in for the runtime being there at all.
+	int n = 0;
+	if (gpuGetDeviceCount(&n) != gpuSuccess || n <= 0) return;
 	if (!g_warmup.valid())
 		g_warmup = std::async(std::launch::async, []() { gpuFree(0); });
 }

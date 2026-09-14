@@ -83,6 +83,102 @@ jobs:
             artifact-path: artifacts/NoSpherA2-macos-x86_64.tar.gz
             artifact-name: NoSpherA2-macos-x86_64
 
+          # GPU builds. None of the runners has a GPU, so the toolkits are
+          # named rather than detected (bootstrap-flags) and every kernel is
+          # built for every card the vendor still supports (the *_PORTABLE
+          # options; the lists are in CMakeLists.txt). The tests run on the
+          # same GPU-less runners, which exercises the other half of the
+          # promise: the binaries start and fall back to the CPU when there
+          # is no device or no driver.
+          #
+          # CUDA comes from conda-forge, pinned to 12.9 so the artifact keeps
+          # covering Volta to Blackwell from one week to the next, and links
+          # the runtime statically: the artifact needs no CUDA installation.
+          - name: Linux CUDA Release
+            os: ubuntu-24.04
+            configure-preset: release-linux
+            build-preset: release-linux
+            test-preset: release-linux
+            build-directory: build/release-linux
+            architecture: x86_64
+            shell: bash
+            gpu: cuda
+            bootstrap-flags: >-
+              -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA
+              -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9
+            configure-flags: >-
+              -DNOSPHERA2_GPU_AUTO=OFF
+              -DNOSPHERA2_USE_CUDA=ON
+              -DNOSPHERA2_CUDA_PORTABLE=ON
+              -DCMAKE_CUDA_COMPILER_LAUNCHER=sccache
+            artifact-path: artifacts/NoSpherA2-linux-x86_64-cuda.tar.gz
+            artifact-name: NoSpherA2-linux-x86_64-cuda
+
+          - name: Windows CUDA Release
+            os: windows-2022
+            configure-preset: release-windows
+            build-preset: release-windows
+            test-preset: release-windows
+            build-directory: build/release-windows
+            architecture: x86_64
+            shell: pwsh
+            gpu: cuda
+            bootstrap-flags: >-
+              -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA
+              -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9
+            configure-flags: >-
+              -DNOSPHERA2_GPU_AUTO=OFF
+              -DNOSPHERA2_USE_CUDA=ON
+              -DNOSPHERA2_CUDA_PORTABLE=ON
+              -DCMAKE_CUDA_COMPILER_LAUNCHER=sccache
+            artifact-path: artifacts/NoSpherA2-windows-x64-cuda.zip
+            artifact-name: NoSpherA2-windows-x64-cuda
+
+          # ROCm comes from AMD's pip wheels (the "Install ROCm SDK" step),
+          # the only distribution of it that needs neither root nor an
+          # installer and exists for both Linux and Windows. The Linux
+          # artifact links libamdhip64.so and needs a ROCm runtime on the
+          # machine that runs it; the Windows one delay-loads amdhip64_7.dll
+          # and runs on the CPU where the DLL is absent.
+          - name: Linux HIP Release
+            os: ubuntu-24.04
+            configure-preset: release-linux
+            build-preset: release-linux
+            test-preset: release-linux
+            build-directory: build/release-linux
+            architecture: x86_64
+            shell: bash
+            gpu: hip
+            bootstrap-flags: -DNOSPHERA2_BOOTSTRAP_GPU=OFF
+            configure-flags: >-
+              -DNOSPHERA2_GPU_AUTO=OFF
+              -DNOSPHERA2_USE_HIP=ON
+              -DNOSPHERA2_HIP_PORTABLE=ON
+              -DCMAKE_HIP_COMPILER_LAUNCHER=sccache
+            artifact-path: artifacts/NoSpherA2-linux-x86_64-hip.tar.gz
+            artifact-name: NoSpherA2-linux-x86_64-hip
+
+          # The ROCm 10 clang's headers do not get along with the MSVC 14.5x
+          # standard library, so this stays on windows-2022 (VS 2022, MSVC
+          # 14.4x). Moving it to a VS 2026 image means asking msvc-dev-cmd for
+          # toolset 14.44.
+          - name: Windows HIP Release
+            os: windows-2022
+            configure-preset: release-windows
+            build-preset: release-windows
+            test-preset: release-windows
+            build-directory: build/release-windows
+            architecture: x86_64
+            shell: pwsh
+            gpu: hip
+            bootstrap-flags: -DNOSPHERA2_BOOTSTRAP_GPU=OFF
+            configure-flags: >-
+              -DNOSPHERA2_GPU_AUTO=OFF
+              -DNOSPHERA2_USE_HIP=ON
+              -DNOSPHERA2_HIP_PORTABLE=ON
+            artifact-path: artifacts/NoSpherA2-windows-x64-hip.zip
+            artifact-name: NoSpherA2-windows-x64-hip
+
     runs-on: ${{ matrix.os }}
 
     defaults:
@@ -165,8 +261,45 @@ jobs:
           cl
         continue-on-error: true
 
+      # Kept out of the micromamba environment: conda-forge has no ROCm for
+      # Windows and no hipBLAS anywhere. The wheels unpack to a tree that
+      # hip-config.cmake accepts as a prefix; the paths the compiler and the
+      # tests need are handed on through the job environment, the configure
+      # flags among them, since they are only known once the wheel is in.
+      - name: Set up Python for the ROCm wheels
+        if: matrix.gpu == 'hip'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install ROCm SDK
+        if: matrix.gpu == 'hip'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-cache-dir \
+            --index-url https://stable.repo.amd.com/rocm/whl-next/ "rocm[devel]==10.0.0"
+          rocm-sdk init
+          root="$(rocm-sdk path --root)"
+          exe=""
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            root="$(cygpath -m "${root}")"
+            exe=".exe"
+          fi
+          echo "ROCm root: ${root}"
+          "${root}/lib/llvm/bin/clang++${exe}" --version | head -n 1
+          {
+            echo "HIP_PATH=${root}"
+            echo "HIP_PLATFORM=amd"
+            echo "HIP_DEVICE_LIB_PATH=${root}/lib/llvm/amdgcn/bitcode"
+            echo "NOSPHERA2_HIP_CONFIGURE_FLAGS=-DCMAKE_HIP_COMPILER=${root}/lib/llvm/bin/clang++${exe} -DCMAKE_PREFIX_PATH=${root}"
+          } >> "${GITHUB_ENV}"
+          if [[ "${RUNNER_OS}" == "Linux" ]]; then
+            echo "LD_LIBRARY_PATH=${root}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> "${GITHUB_ENV}"
+          fi
+
       - name: Bootstrap micromamba environments
-        run: cmake -P scripts/BootstrapMicromamba.cmake
+        run: cmake ${{ matrix.bootstrap-flags }} -P scripts/BootstrapMicromamba.cmake
 
       # Cargo's registry and Git checkout caches contain downloaded sources,
       # not compiler outputs. Rust compiler outputs are handled by sccache.
@@ -191,11 +324,10 @@ jobs:
         with:
           path: ${{ env.SCCACHE_DIR }}
           key: >-
-            sccache-packed-v2-sccache-0.16.0-${{ runner.os }}-${{
-            matrix.architecture }}-${{ matrix.configure-preset }}-${{
+            sccache-packed-v3-sccache-0.16.0-${{ matrix.artifact-name }}-${{
             steps.dependency-fingerprint.outputs.value }}
           restore-keys: |
-            sccache-packed-v2-sccache-0.16.0-${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.configure-preset }}-
+            sccache-packed-v3-sccache-0.16.0-${{ matrix.artifact-name }}-
 
       # Configure a fresh build tree. sccache reuses individual compilation
       # results, so the CMake/Ninja tree itself does not need to be cached.
@@ -206,6 +338,8 @@ jobs:
           -DNOSPHERA2_DEPENDENCIES_ONLY=OFF
           -DCMAKE_C_COMPILER_LAUNCHER=sccache
           -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          ${{ matrix.configure-flags }}
+          ${{ env.NOSPHERA2_HIP_CONFIGURE_FLAGS }}
 
       - name: Build
         run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
@@ -264,7 +398,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: test-logs-${{ runner.os }}-${{ matrix.architecture }}
+          name: test-logs-${{ matrix.artifact-name }}
           if-no-files-found: ignore
           path: |
             ${{ matrix.build-directory }}/Testing/Temporary

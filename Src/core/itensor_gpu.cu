@@ -531,8 +531,8 @@ __global__ void hold_rows_kernel(const T* I, const double* w, const double* F0, 
 		si += (double)I[base + 2 * k + 1] * w[k];
 	}
 	for (int o = 16; o > 0; o >>= 1) {
-		sr += __shfl_down_sync(0xffffffffu, sr, o);
-		si += __shfl_down_sync(0xffffffffu, si, o);
+		sr += gpuShflDown32(sr, o);
+		si += gpuShflDown32(si, o);
 	}
 	__shared__ double red[2][8];
 	if ((threadIdx.x & 31) == 0) { red[0][threadIdx.x >> 5] = sr; red[1][threadIdx.x >> 5] = si; }
@@ -682,7 +682,7 @@ __global__ void eri_jk_kernel(const double* __restrict__ V, const double* __rest
 		for (int d = lane; d < mmax; d += 32) {
 			double t[R];
 #pragma unroll
-			for (int r = 0; r < R; r++) t[r] = d < m[r] ? __ldcs(v + off[r] + d) : 0.0;
+			for (int r = 0; r < R; r++) t[r] = d < m[r] ? gpuLoadStreaming(v + off[r] + d) : 0.0;
 			if (SPARSE) {
 #pragma unroll
 				for (int r = 0; r < R; r++) {
@@ -717,14 +717,14 @@ __global__ void eri_jk_kernel(const double* __restrict__ V, const double* __rest
 #pragma unroll
 			for (int r = 0; r < k; r++) {
 				const double xa = hi ? sa[r] : sa[r + k], xb = hi ? sb[r] : sb[r + k];
-				sa[r] = (hi ? sa[r + k] : sa[r]) + __shfl_xor_sync(0xffffffffu, xa, w);
-				sb[r] = (hi ? sb[r + k] : sb[r]) + __shfl_xor_sync(0xffffffffu, xb, w);
+				sa[r] = (hi ? sa[r + k] : sa[r]) + gpuShflXor32(xa, w);
+				sb[r] = (hi ? sb[r + k] : sb[r]) + gpuShflXor32(xb, w);
 			}
 		}
 #pragma unroll
 		for (int w = 32 / R / 2; w >= 1; w >>= 1) {
-			sa[0] += __shfl_xor_sync(0xffffffffu, sa[0], w);
-			sb[0] += __shfl_xor_sync(0xffffffffu, sb[0], w);
+			sa[0] += gpuShflXor32(sa[0], w);
+			sb[0] += gpuShflXor32(sb[0], w);
 		}
 		const int c = c0 + lane / (32 / R);
 		if (lane % (32 / R) == 0 && c <= a) {
@@ -742,7 +742,7 @@ __global__ void eri_jk_kernel(const double* __restrict__ V, const double* __rest
 			sKb[c] += sb[0] - t * Da[c];
 		}
 	}
-	for (int o = 16; o > 0; o >>= 1) j += __shfl_down_sync(0xffffffffu, j, o);
+	for (int o = 16; o > 0; o >>= 1) j += gpuShflDown32(j, o);
 	if (lane == 0) red[warp] = j;
 	__syncthreads();
 	if (threadIdx.x == 0) {
