@@ -37,9 +37,8 @@ private:
     void convert_to_fracs(std::vector<asym_atom>& atoms, const std::string input_unit);
     vec apply_symmetry(const vec& pos, const int sym_op);
     bool check_special(const vec& pos1, const vec& pos2, const double& tolerance = 1e-10);
-	ivec confirm_applied_symmetry(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
+	ivec confirm_applied_symmetry(ivec3& linking_list);
 	void delete_symmetry(const ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl);
-    void link_symmetry_atoms(std::vector<asym_atom>& asym_atoms, ivec3& linking_list, const int& asymmetric_atoms);
 	bool check_identity(const int& sym_op);
 
 public:
@@ -64,8 +63,9 @@ public:
 
     //void get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
 	void grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_atom>& xyz_atoms);
-    void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list, const bool& grown = false);
-    void apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
+    void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list);
+    void apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list);
+    void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
 
     cell()
     {

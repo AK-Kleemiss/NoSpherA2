@@ -62,12 +62,11 @@ private:
 		vec U_iso;
 
 		void grow_U_iso(const std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list) {
-			for (int i = 0; i < asym_atoms.size(); ++i) {
-				if (asym_atoms[i].grown) {
-					continue;
-				}
+			for (int i = 0; i < symmetry_linking_list.size(); i++) {
 				for (int j = 0; j < symmetry_linking_list[i].size(); j++) {
-					U_iso[symmetry_linking_list[i][j][0]] = U_iso[i];
+					if (symmetry_linking_list[i][j].size() != 0) {
+						U_iso[j] = U_iso[i];
+					}
 				}
 			}
 		};
@@ -100,7 +99,7 @@ private:
 		std::string basis_set_name;
 		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
 		std::string df_basis_name;
-		bool grown;
+		bool grown = false;
 		int n_params;
 		int refine_against;
 		int XWR_type;

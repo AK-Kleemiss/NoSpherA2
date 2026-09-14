@@ -41,15 +41,18 @@ void XCW::construct(const options& opt_in) {
 	}
 
 	// Evaluate symmetry and assign asymmetry factors to each atom (also update ncen)
-	//The linking list is ordered like this: Asymmetric atom first, then symmetry generated atom, then index of symmetry operation that generated it
+	//The linking list is ordered like this: Asymmetric atom, list with all atoms, then index of symmetry operation that generated it 
+	// "diagonal elements" have to have size equivalent to multiplicity, otherwise something broke
 	ivec3 symmetry_linking_list;
-	unit_cell.eval_symm(asym_atoms, cryst.ncen, symmetry_linking_list, settings.grown);
+	unit_cell.eval_symm(asym_atoms, cryst.ncen, symmetry_linking_list);
 	cryst.ncen = asym_atoms.size();
 
 	// Load whether or not the structure is grown, find applied symmetries and delete the corresponding reflections
 	if (settings.grown) {
 		unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list);
 	}
+
+	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
 
 	// Generate WFN object from asym_atoms
 	dummy_wave.assign_charge(opt->charge);
@@ -364,7 +367,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	if (conv_preset == "sloppy") {
 		settings.quant_diff = 3e-5;
 		settings.max_diis_error = 1e-4;
-		settings.gradient = 1e-4;
+		settings.gradient = 5e-4;
 		settings.MaxP_diff = 1e-4;
 		settings.RMSP_diff = 1e-5;
 		settings.max_scf_iterations = 100;
@@ -372,7 +375,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	else if (conv_preset == "normal") {
 		settings.quant_diff = 1e-6;
 		settings.max_diis_error = 1e-5;
-		settings.gradient = 1e-5;
+		settings.gradient = 7e-5;
 		settings.MaxP_diff = 1e-5;
 		settings.RMSP_diff = 1e-6;
 		settings.max_scf_iterations = 100;
@@ -380,7 +383,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	else if (conv_preset == "tight") {
 		settings.quant_diff = 5e-7;
 		settings.max_diis_error = 5e-6;
-		settings.gradient = 5e-6;
+		settings.gradient = 3e-5;
 		settings.MaxP_diff = 1e-6;
 		settings.RMSP_diff = 1e-7;
 		settings.max_scf_iterations = 100;
@@ -388,7 +391,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	else if (conv_preset == "very_tight") {
 		settings.quant_diff = 1e-7;
 		settings.max_diis_error = 1e-6;
-		settings.gradient = 1e-6;
+		settings.gradient = 1e-5;
 		settings.MaxP_diff = 1e-7;
 		settings.RMSP_diff = 1e-8;
 		settings.max_scf_iterations = 100;
