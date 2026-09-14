@@ -72,7 +72,8 @@ Lib/*
 /Windows/**/*.recipe
 /Windows/**/*.pch
 /Windows/**/*.lib
-/Windows/NoSpherA2_LIB/Profile_x64
+/Windows/NoSpherA2**/Profile*
+/Windows/Test**/Profile*
 *.iobj
 *.ipdb
 *.ilk

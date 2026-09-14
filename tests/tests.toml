@@ -154,6 +154,17 @@ cif = "epoxide.cif"
 dmin = 0.4
 ri_fit = "combo_basis_fit"
 
+[ri_fit_multipoles]
+directory = "epoxide_gbw"
+good = "ri_fit_multipoles.good"
+
+[ri_fit_multipoles.args]
+wfn = "epoxide.gbw"
+cif = "epoxide.cif"
+dmin = 0.4
+ri_fit = "combo_basis_fit"
+multipole_moments = ["Hirshfeld", 2]
+
 [rubredoxin_cmtc]
 directory = "rubredoxin_cmtc"
 
@@ -187,6 +198,18 @@ cif = "test_cysteine.cif"
 wfn = "test_cysteine.xyz"
 dmin = 0.73
 no_gpu_salted = ""
+
+[SALTED_charge_constraint]
+directory = "SALTED"
+good = "SALTED_charge_constraint.good"
+
+[SALTED_charge_constraint.args]
+SALTED = "Model"
+cif = "test_cysteine.cif"
+wfn = "test_cysteine.xyz"
+dmin = 0.73
+no_gpu_salted = ""
+salted_charge_constraint = ""
 
 [sucrose_IAM]
 directory = "sucrose_IAM_SF"

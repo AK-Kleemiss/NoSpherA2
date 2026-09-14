@@ -112,6 +112,19 @@ namespace SALTED_Utils
     metatensor::TensorMap calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
 }
 
+//Flat copy of an aux basis for evaluating the fitted density on many points, see aux_density.h
+struct aux_density_table
+{
+    int n_at = 0, n_sh = 0, n_pr = 0, n_coef = 0;
+    vec cx, cy, cz, r2_max, pr_exp, pr_norm;
+    ivec sh_start, sh_l, pr_start, coef_off;
+    aux_density_table(const std::vector<atom>& atoms);
+    double operator()(const double x, const double y, const double z, const double* coefs) const;
+    double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz) const;
+    double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double& lap) const;
+};
+//rho on np points, OpenMP on the host or on the device when the set is large enough; with gx, gy, gz its gradient too
+void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx = nullptr, double* gy = nullptr, double* gz = nullptr, double* lap = nullptr);
 //Calc density from RI fit coefficients
 const double calc_density_ML(const double& x,
                             const double& y,
@@ -138,4 +151,4 @@ double apply_charge_constraint(const std::vector<atom> &atoms, vec &coefs,
 cube calc_cube_ML(const vec& data, WFN &dummy, const int& atom_nr = -1);
 void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr = -1);
 
-void create_SALTED_training_data(const WFN& orbital, const WFN& aux);
+void create_SALTED_training_data(const WFN& orbital, const WFN& aux, const options& opts);

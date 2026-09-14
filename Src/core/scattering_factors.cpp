@@ -2038,6 +2038,16 @@ void calc_SF(const int& points,
 
 				re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
 				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
+#elif defined(_MSC_VER) && defined(__AVX__)
+				//one SVML call for both instead of the separate sin4 and cos4 the vectoriser emits
+				__m256d cv;
+				const __m256d sv = _mm256_sincos_pd(&cv, _mm256_set_pd(work3, work2, work1, work0));
+				const __m256d rv = _mm256_loadu_pd(dens_local + p);
+				alignas(32) double cr[4], sr[4];
+				_mm256_store_pd(cr, _mm256_mul_pd(rv, cv));
+				_mm256_store_pd(sr, _mm256_mul_pd(rv, sv));
+				re += cr[0] + cr[1] + cr[2] + cr[3];
+				im += sr[0] + sr[1] + sr[2] + sr[3];
 #else
 				const double c0 = cos(work0);
 				const double si0 = sin(work0);
@@ -3155,8 +3165,7 @@ tsc_block_type calculate_scattering_factors(
 			WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis);
 
             //TODO: only compute coefs for atoms that are actually in the symmetric unit!
-            DensityFitting::CONFIG config;
-            config.analyze_quality = opt.debug;
+            DensityFitting::CONFIG config = DensityFitting::config_from_options(opt);
             config.asym_atm_list = asym_atom_list;
             //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
             //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;

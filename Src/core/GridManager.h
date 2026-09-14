@@ -119,6 +119,8 @@ public:
     void calculateNonSphericalg(const WFN &wave, const cell &unit_cell);
 
     PartitionResults calculatePartitionedCharges(const WFN &wave, const cell &unit_cell = cell());
+    //Sum_p rho w_A r^l Y_lm(r_hat) about each nucleus for the configured scheme, [atom][l*l+l+m], l = 0..lmax
+    vec2 calculatePartitionedMultipoles(const WFN &wave, const int lmax);
 
     void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g = false);
     void getDensityVectorsFromCube(const WFN &wave, const ivec &atom_list, const cube &density_cube, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, vec &atom_electrons);
@@ -129,6 +131,7 @@ public:
     const GridData &getGridData() const { return grid_data_; }
 	GridData& getGridData() { return grid_data_; }  //Access to a mutable reference if deeper access is needed
 	const bool& getNeedsHelper() const { return needs_helper_grids_; }
+    GridData::GridIndex partitionWeightIndex() const;
     int getTotalGridPoints() const { return grid_data_.total_points; }
     int getNumPointsForAtom(const int &atom_index) const { return grid_data_.num_points_per_atom[atom_index]; }
 

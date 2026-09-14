@@ -120,6 +120,7 @@ namespace constants
     constexpr double fine_pi = inv_fine_struct / TWO_PI / PI;
     constexpr double inv_fine_mod = inv_fine_struct / FOUR_PI;
     constexpr double keV_per_hartree = 0.027211386245988;
+    constexpr double kcal_mol_per_hartree = 627.5094740631;
     constexpr double angstrom2eV = 1.23984193 * 10000;
     constexpr double angstrom2keV = 12.3984193;
     constexpr double f_to_mu = 4208.031548;

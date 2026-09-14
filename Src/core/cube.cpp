@@ -3,21 +3,33 @@
 #include "convenience.h"
 #include "constants.h"
 
-cube::cube()
+void cube::reset()
 {
-    loaded = false;
+    dv = 0.0;
     na = 0;
-    parent_wavefunction = new WFN(e_origin::cub);
+    loaded = false;
+    comment1.clear();
+    comment2.clear();
     size = { 0, 0, 0 };
     origin = { 0.0, 0.0, 0.0 };
+    vectors = { { { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 } } };
+    values.clear();
+    path.clear();
+    parent_wavefunction = nullptr;
+    refine_points.clear();
+};
+
+cube::cube()
+{
+    reset();
+    parent_wavefunction = new WFN(e_origin::cub);
     calc_dv();
 };
 
 cube::cube(const std::array<int, 3> xyz, int g_na, bool grow_values)
 {
+    reset();
     size = xyz;
-
-    origin = { 0.0, 0.0, 0.0 };
     loaded = grow_values;
     if (grow_values)
     {
@@ -32,13 +44,13 @@ cube::cube(const std::array<int, 3> xyz, int g_na, bool grow_values)
     }
     na = g_na;
     parent_wavefunction = new WFN(e_origin::cub);
-    vectors = { { { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 } } };
     calc_dv();
 };
 
 cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ostream &file, const bool expert, const bool header)
 {
     err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
+    reset();
     parent_wavefunction = &wave;
     na = parent_wavefunction->get_ncen();
     path = filepath;
@@ -50,6 +62,7 @@ cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ost
 cube::cube(const int g_na, const ivec &g_size, const vec &g_origin, const vec2 &g_vectors, const vec3 &g_values)
 {
     using namespace std;
+    reset();
     na = g_na;
     parent_wavefunction = new WFN(e_origin::cub);
     std::cout << "Assigned Nr of Atoms" << endl;
@@ -79,34 +92,8 @@ cube::cube(const int g_na, const ivec &g_size, const vec &g_origin, const vec2 &
 
 cube::cube(const cube &given)
 {
-    na = given.get_na();
-    path = given.path;
-    comment1 = given.get_comment1();
-    comment2 = given.get_comment2();
-    dv = given.get_dv();
-    for (int i = 0; i < 3; i++)
-    {
-        size[i] = given.get_size(i);
-        origin[i] = given.get_origin(i);
-        for (int j = 0; j < 3; j++)
-            vectors[i][j] = given.get_vector(i, j);
-    }
-    loaded = given.get_loaded();
-    if (loaded)
-    {
-        values.resize(size[0]);
-#pragma omp parallel for
-        for (int x = 0; x < size[0]; x++)
-        {
-            values[x].resize(size[1]);
-            for (int y = 0; y < size[1]; y++)
-            {
-                values[x][y].resize(size[2]);
-                for (int z = 0; z < size[2]; z++)
-                    values[x][y][z] = given.get_value(x, y, z);
-            }
-        }
-    }
+    reset();
+    *this = given;
 };
 
 bool cube::read_values(std::ifstream &file) {
@@ -801,39 +788,24 @@ double cube::ewald_sum(const int kMax, const double conv) {
     return totalEnergy;
 }
 
-void cube::operator=(const cube &right)
+cube &cube::operator=(const cube &right)
 {
-    for (int i = 0; i < 3; i++)
-        size[i] = right.get_size(i);
-    comment1 = right.get_comment1();
-    comment2 = right.get_comment2();
-    na = right.get_na();
-    values.resize(size[0]);
-#pragma omp parallel for
-    for (int i = 0; i < size[0]; i++)
-    {
-        values[i].resize(size[1]);
-        for (int j = 0; j < size[1]; j++)
-            values[i][j].resize(size[2]);
-    }
-    for (int i = 0; i < 3; i++)
-    {
-        for (int j = 0; j < 3; j++)
-            vectors[i][j] = right.get_vector(i, j);
-    }
-    calc_dv();
-    if (right.get_loaded())
-    {
-#pragma omp parallel for
-        for (int x = 0; x < size[0]; x++)
-        {
-            for (int y = 0; y < size[1]; y++)
-                for (int z = 0; z < size[2]; z++)
-                    values[x][y][z] = right.get_value(x, y, z);
-        }
-        loaded = true;
-    }
+    if (this == &right)
+        return *this;
+    reset();
+    dv = right.dv;
+    na = right.na;
+    loaded = right.loaded;
+    comment1 = right.comment1;
+    comment2 = right.comment2;
+    size = right.size;
+    origin = right.origin;
+    vectors = right.vectors;
+    values = right.values;
+    path = right.path;
     parent_wavefunction = right.parent_wavefunction;
+    refine_points = right.refine_points;
+    return *this;
 };
 
 cube cube::operator+(const cube &right) const

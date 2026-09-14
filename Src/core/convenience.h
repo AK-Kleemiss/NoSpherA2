@@ -769,6 +769,14 @@ struct options
     std::filesystem::path profiling_tests_root = "tests";
     std::filesystem::path promol_nci_xyz1;
     std::filesystem::path promol_nci_xyz2;
+    //Geometry-aid jobs (-calc_featomic_descriptor(s), -classify_atoms(_list)): the flags queue, run_app_impl runs geometry_aid::run and quits
+    bool calc_featomic_descriptor = false;
+    std::filesystem::path classify_atoms_out;
+    std::filesystem::path geometry_aid_model;
+    pathvec featomic_structures;
+    pathvec classify_structures;
+    double geometry_aid_cutoff = 3.5;
+    std::filesystem::path interaction_energies_job;
 	std::filesystem::path xcw_settings_path;
     properties_options properties;
     bool debug = false;
@@ -865,17 +873,21 @@ struct options
     //largest of the device paths, and it moves the total energy only in the tenth
     //significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
     bool gpu_itensor = true;
-    //Use FP16 Tensor Core operands with FP32 accumulation when cuBLAS provides them. The
-    //I tensor falls back to ordinary FP32 GEMM when it does not, and the no-flag is for
-    //reproducibility with older output.
-    bool gpu_itensor_tensor = true;
+    //FP16 Tensor Core operands with FP32 accumulation for the I tensor. Off by default: the
+    //half-precision operands move the XCW energies in the fourth decimal, plain FP32 GEMM
+    //sits within 1e-8 Eh of double.
+    bool gpu_itensor_tensor = false;
     //SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
     bool gpu_salted = true;
+    //-salted_charge_constraint rescales the l=0 coefficients of every SALTED prediction to the electron count, whether or not the model asks for it
+    bool salted_charge_constraint = false;
     //-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
     bool gpu_grid = true;
     //Owned by the caller; the scattering-factor grid is built in it instead of a local, so
     //a second table for the same geometry reuses the points and weights
     GridManager* grid_cache = nullptr;
+    //-no_gpu_density keeps the fitted density of the Gordon-Kim repulsion grid on the CPU
+    bool gpu_density = true;
     //-gpu_blas offers large dense GEMMs in nos_math to the device
     bool gpu_blas = false;
     //The I tensor GEMM goes through cuBLAS when the machine has it, and through the
@@ -901,6 +913,16 @@ struct options
     int charge = 0;
     int ECP_mode = 0;
     PartitionType partition_type = PartitionType::Hirshfeld;
+    //-multipole_moments: the RI fit is restrained to this scheme's atomic moments up to this order, -1 = unrestrained
+    int multipole_lmax = -1;
+    PartitionType multipole_scheme = PartitionType::Hirshfeld;
+    double multipole_strength = 1.0;
+    //-multipole_centre switches the restraint rows from partition-weighted grid moments of every aux function to centre moments
+    bool multipole_partition = true;
+    //-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
+    double repulsion_overlap = 0.0;
+    //-repulsion_exchange: exchange functional of the Gordon-Kim repulsion, 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L
+    int repulsion_exchange = 0;
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 

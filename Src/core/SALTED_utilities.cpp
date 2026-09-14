@@ -6,6 +6,10 @@
 #include "wfn_class.h"
 #include "metatensor.hpp"
 #include "featomic.hpp"
+#include "aux_density.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "aux_density_gpu.h"
+#endif
 
 std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
@@ -329,6 +333,71 @@ metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::Simpl
     return descriptor;
 }
 
+aux_density_table::aux_density_table(const std::vector<atom>& atoms)
+{
+    n_at = (int)atoms.size();
+    cx.resize(n_at), cy.resize(n_at), cz.resize(n_at), r2_max.resize(n_at), sh_start.resize(n_at + 1);
+    for (int a = 0; a < n_at; a++) {
+        cx[a] = atoms[a].get_coordinate(0), cy[a] = atoms[a].get_coordinate(1), cz[a] = atoms[a].get_coordinate(2);
+        const std::vector<unsigned int> sc = atoms[a].get_shellcount();
+        double alpha_min = DBL_MAX;
+        sh_start[a] = n_sh;
+        int prim = 0;
+        for (int s = 0; s < (int)sc.size(); s++) {
+            const int l = atoms[a].get_basis_set_type(prim);
+            err_checkf(l <= 8, "Aux basis shells above l = 8 are not supported on the grid", std::cout);
+            sh_l.push_back(l), pr_start.push_back(n_pr), coef_off.push_back(n_coef);
+            for (int e = 0; e < (int)sc[s]; e++, prim++) {
+                const primitive& pr = atoms[a].get_basis_set_entry(prim).get_primitive();
+                pr_exp.push_back(pr.get_exp()), pr_norm.push_back(pr.get_normalized_coefficient());
+                alpha_min = std::min(alpha_min, pr.get_exp());
+            }
+            n_pr += sc[s], n_coef += 2 * l + 1, n_sh++;
+        }
+        r2_max[a] = 46.0517 / alpha_min;
+    }
+    sh_start[n_at] = n_sh, pr_start.push_back(n_pr);
+}
+
+double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs) const
+{
+    return aux_density::at(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs);
+}
+
+double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz) const
+{
+    return aux_density::at_grad(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz);
+}
+
+double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double& lap) const
+{
+    return aux_density::at_lap(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, lap);
+}
+
+void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* lap)
+{
+    err_checkf((int)coefficients.size() == t.n_coef, "Coefficient count does not match the auxiliary basis", std::cout);
+#ifdef NOSPHERA2_USE_GPU
+    if (aux_density_gpu_enabled() && aux_density_gpu_eval(t.n_at, t.cx.data(), t.cy.data(), t.cz.data(), t.r2_max.data(), t.n_sh, t.sh_start.data(), t.sh_l.data(), t.pr_start.data(), t.coef_off.data(), t.n_pr, t.pr_exp.data(), t.pr_norm.data(), t.n_coef, coefficients.data(), np, x, y, z, rho, gx, gy, gz, lap)) {
+        static std::atomic<bool> announced{ false };
+        if (!announced.exchange(true) && !constants::hide_gpu_notes)
+            std::cout << "GPU in use: fitted density on the grid" << std::endl;
+        return;
+    }
+#endif
+    if (gx == nullptr) {
+#pragma omp parallel for
+        for (int p = 0; p < np; p++) rho[p] = t(x[p], y[p], z[p], coefficients.data());
+        return;
+    }
+    if (lap == nullptr) {
+#pragma omp parallel for
+        for (int p = 0; p < np; p++) rho[p] = t(x[p], y[p], z[p], coefficients.data(), gx[p], gy[p], gz[p]);
+        return;
+    }
+#pragma omp parallel for
+    for (int p = 0; p < np; p++) rho[p] = t(x[p], y[p], z[p], coefficients.data(), gx[p], gy[p], gz[p], lap[p]);
+}
 
 const double calc_density_ML(const double& x,
     const double& y,
@@ -352,8 +421,10 @@ const double calc_density_ML(const double& x,
             z - atoms[a].get_coordinate(2), 0.0 };
         // store r in last element
         d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        if (d[3] < -46.0517)
-        { // corresponds to cutoff of ex ~< 1E-20
+        double alpha_min = DBL_MAX;
+        for (unsigned int e = 0; e < atoms[a].get_basis_set_size(); e++) alpha_min = std::min(alpha_min, atoms[a].get_basis_set_exponent(e));
+        if (alpha_min * d[3] * d[3] > 46.0517)
+        { // most diffuse primitive below 1E-20
             for (shell = 0; shell < n_shells; shell++)
             {
                 coef_counter += (2 * atoms[a].get_basis_set_type(prim) + 1);
@@ -733,9 +804,9 @@ cube calc_cube_ML(const vec& data, WFN& dummy, const int& atom_nr)
 #include "libCintMain.h"
 #include "nos_math.h"
 #include "npy.h"
-void create_SALTED_training_data(const WFN& orbital, const WFN& aux) {
+void create_SALTED_training_data(const WFN& orbital, const WFN& aux, const options& opts) {
     std::cout << "Calculating density fitting coefficients..." << std::endl;
-    DensityFitting::CONFIG config;
+    DensityFitting::CONFIG config = DensityFitting::config_from_options(opts);
     config.analyze_quality = true;
     //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
     //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
@@ -754,19 +825,10 @@ void create_SALTED_training_data(const WFN& orbital, const WFN& aux) {
     dMatrix2 overlap_mat(nao_max, nao_max);
     overlap_mat.container() = overlap;
 
-    dMatrix1 proj = dot(overlap_mat, coefs_vec);
-
     npy::write_npy("coefficients.npy", 
         npy::npy_data<double>{
             coefs, 
             { static_cast<unsigned long>(coefs.size()) },
-            false}
-    );
-
-    npy::write_npy("projections.npy",
-        npy::npy_data<double>{
-        proj.container(),
-        { static_cast<unsigned long>(proj.size()) },
             false}
     );
 

@@ -158,8 +158,6 @@ void calc_screend_functions_and_max_ij(
         worst_exp[i] = w;
     }
 
-    const double exp_cutoff = 0.5 * constants::exp_cutoff;
-
     // --- 2) Loop over atom pairs and do screening + max-block computation (parallel) ---
 
     std::string output = "";    //Only used for debug output
@@ -176,8 +174,9 @@ void calc_screend_functions_and_max_ij(
                 const double dist = atoms[atom_i].distance_to(atoms[atom_j]);
                 const double dist2 = dist * dist;
 
-                const double crit = -dist2 * (worst_exp[atom_i] + worst_exp[atom_j]);
-                if (crit < exp_cutoff) {
+                //Gaussian product prefactor exp(-a b / (a + b) d^2) of the two most diffuse primitives
+                const double crit = -dist2 * worst_exp[atom_i] * worst_exp[atom_j] / (worst_exp[atom_i] + worst_exp[atom_j]);
+                if (crit < constants::exp_cutoff) {
                     //if (false){
                         //local_output += "Screening atom pair (" + std::to_string(atom_i) + ", " + std::to_string(atom_j) + ") with distance " + std::to_string(dist) + " and criterion " + std::to_string(crit) + " < " + std::to_string(exp_cutoff) + "\n";
                     screened[atom_i][atom_j] = true;

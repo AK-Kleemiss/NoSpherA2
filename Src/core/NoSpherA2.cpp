@@ -11,8 +11,11 @@
 #include "cif.h"
 #include "bondwise_analysis.h"
 #include "XCW.h"
+#include "geometry_aid.h"
+#include "crystal_energies.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
+#include "aux_density_gpu.h"
 #include "sf_gpu.h"
 #include "blas_gpu.h"
 #include "cublas_dynamic.h"
@@ -103,6 +106,7 @@ static int run_app_impl(int argc, char **argv)
     //only inside the scattering-factor entry points, so a run reaching XCW instead inherited
     //whatever the previous run in the process had left on. Olex2 calls run_app repeatedly.
     grid_gpu_set_enabled(opt.use_gpu && opt.gpu_grid);
+    aux_density_gpu_set_enabled(opt.use_gpu && opt.gpu_density);
     blas_gpu_set_enabled(opt.gpu_blas);
     equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
     cublas_dynamic_set_enabled(opt.gpu_cublas);
@@ -149,6 +153,11 @@ static int run_app_impl(int argc, char **argv)
     }
     log_file.flush();
 
+    //Geometry-aid descriptors or element probabilities and quit; the flags queue jobs, so -wfn and -geometry_aid_cutoff may come in any order
+    if (opt.calc_featomic_descriptor || !opt.featomic_structures.empty() || !opt.classify_atoms_out.empty() || !opt.classify_structures.empty())
+        return geometry_aid::run(opt);
+    if (!opt.interaction_energies_job.empty())
+        return crystal_energies::run(opt);
     //Start QCT menu and leave
     if (opt.qct) {
         //restore cout

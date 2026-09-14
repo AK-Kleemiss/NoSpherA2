@@ -11,6 +11,8 @@
 #include "basis_set.h"
 #include "fchk.h"
 #include "bondwise_analysis.h"
+#include "geometry_aid.h"
+#include "crystal_energies.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -544,6 +546,14 @@ std::string help_message =
  "  -Becke | -TFVC | -mbis | -embis    Select partitioning (default Hirshfeld).\n"
  "  -ri_fit [basis ...]                RI partitioning; omit a basis or use\n"
  "                                    auto_aux to generate one automatically.\n"
+ "  -multipole_moments <scheme> <N>    Restrain the RI fit to the Hirshfeld, TFVC,\n"
+ "                                    MBIS or EMBIS atomic charges and multipoles\n"
+ "                                    up to order N (implies -ri_fit).\n"
+ "  -multipole_strength <x>            Weight of the restraint rows against the\n"
+ "                                    density-fit metric, default 1.\n"
+ "  -multipole_centre                  Restrain the moments of each atom's own\n"
+ "                                    functions instead of the partition-weighted\n"
+ "                                    moments of the whole fitted density.\n"
  "  -cpus <n>                          Maximum worker threads [all available].\n"
  "  -mem <MB>                          Memory budget for everything sliceable\n"
  "                                    [unset]. When given, the tsc block size\n"
@@ -580,9 +590,11 @@ std::string help_message =
  "                                    run; worth it on a card whose double\n"
  "                                    precision is slower than the host.\n"
  "  -gpu_itensor_tensor                FP16 Tensor Core operands with FP32\n"
- "                                    accumulation for the I tensor (default\n"
- "                                    when cuBLAS provides it); use\n"
- "                                    -no_gpu_itensor_tensor for FP32 GEMM.\n"
+ "                                    accumulation for the I tensor, about\n"
+ "                                    2x faster than the FP32 GEMM default\n"
+ "                                    but off in the fourth decimal of the\n"
+ "                                    energy; -no_gpu_itensor_tensor is the\n"
+ "                                    default.\n"
  "  -gpu_salted / -no_gpu_salted       The SALTED descriptor combination\n"
  "                                    (equicomb). It falls back to the CPU when\n"
  "                                    no usable device is present.\n"
@@ -590,6 +602,8 @@ std::string help_message =
  "                                    and TFVC). It falls back to the CPU when\n"
  "                                    the grid is incompatible or does not fit\n"
  "                                    on the device.\n"
+ "  -gpu_density / -no_gpu_density      The fitted density on the Gordon-Kim\n"
+ "                                    repulsion grid of -interaction_energy.\n"
  "\n"
  "  Off unless asked:\n"
  "  -gpu_blas                          Offer large dense matrix products to the\n"
@@ -702,10 +716,28 @@ std::string help_message =
  "  -fchk <output.fchk>                Write FCHK output (requires -b and -d).\n"
  "  -SALTED <model-dir>                Predict density with a SALTED model.\n"
  "  -SALTED_COEFS <model-dir>          Write SALTED_COEFS.npy (requires -wfn).\n"
+ "  -salted_charge_constraint          Rescale the l=0 coefficients of every\n"
+ "                                    SALTED prediction to the electron count.\n"
  "  -RI_CUBE <coefficients.npy>        Write an RI density cube; use -wfn and\n"
  "                                    -ri_fit first.\n"
- "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn and\n"
- "                                    -ri_fit first.\n"
+ "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn, -ri_fit\n"
+ "                                    and -multipole_moments first.\n"
+ "  -interaction_energy <A> <B>         Electrostatic interaction energy of two\n"
+ "                                    fitted densities: two wavefunctions with\n"
+ "                                    -ri_fit, or two .xyz with -SALTED. With\n"
+ "                                    <A> <A.npy> <B> <B.npy> the coefficient\n"
+ "                                    files are read instead; use -ri_fit.\n"
+ "  -interaction_energies <job>         Interaction energies of every molecule\n"
+ "                                    pair in contact in a crystal; the job file\n"
+ "                                    lists cif, cutoff, output and one\n"
+ "                                    molecule <xyz> [<coef.npy>] per line.\n"
+ "                                    Use -ri_fit or -SALTED first.\n"
+ "  -repulsion_overlap <K>             Exchange-repulsion of -interaction_energy\n"
+ "                                    as K * Int rhoA rhoB, K in Eh bohr^3/e^2,\n"
+ "                                    instead of the Gordon-Kim default.\n"
+ "  -repulsion_exchange <dirac|pbe|b88|r2scan> Exchange functional of the\n"
+ "                                    Gordon-Kim repulsion, default dirac;\n"
+ "                                    r2scan is the deorbitalised r2SCAN-L.\n"
  "  -combine_mos <wfn1> <wfn2>          Combine molecular orbitals.\n"
  "  -cmos1 <MO ...>  -cmos2 <MO ...>   MO selections for -combine_mos.\n"
  "  -QCT                               Enter the legacy QCT workflow.\n\n"
@@ -743,8 +775,7 @@ std::string help_message =
  "  -dipole_moments  -polarizabilities <7 wfn files>\n"
  "  -geometry_aid_cutoff <r>            SOAP cutoff for the geometry-aid descriptor:\n"
  "                                      3.5 (default) matches the c_only models,\n"
- "                                      3.0 matches the dirty models. Give it BEFORE\n"
- "                                      the descriptor flag.\n"
+ "                                      3.0 matches the dirty models.\n"
  "  -calc_featomic_descriptor           Write descriptor.npy (requires -wfn).\n"
  "  -calc_featomic_descriptors <list>   Same, for many structures in one run.\n"
  "                                      <list> holds one structure path per\n"
@@ -3236,7 +3267,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
         WFN wavy(wfn);
         WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
 
-        create_SALTED_training_data(wavy, wavy_aux);
+        create_SALTED_training_data(wavy, wavy_aux, *this);
         exit(0);
     }
     else if (temp == "-sfac_diffuse")
@@ -3522,10 +3553,16 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_salted = true;
     else if (temp == "-no_gpu_salted")
         gpu_salted = false;
+    else if (temp == "-salted_charge_constraint")
+        salted_charge_constraint = true;
     else if (temp == "-gpu_grid")
         gpu_grid = true;
     else if (temp == "-no_gpu_grid")
         gpu_grid = false;
+    else if (temp == "-gpu_density")
+        gpu_density = true;
+    else if (temp == "-no_gpu_density")
+        gpu_density = false;
     else if (temp == "-gpu_blas")
         gpu_blas = true;
     else if (temp == "-fukui" || temp == "-Fukui")
@@ -3751,6 +3788,21 @@ bool options::digest_property_options(const std::string &temp, int &i)
         get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
         exit(0);
     }
+    else if (temp == "-rho_at_points")
+    {
+        //-wfn <file> -rho_at_points <points>: total density at the points (count, then x y z in bohr per line) to <points>.rho
+        err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -rho_at_points.", std::cout);
+        WFN wavy(wfn);
+        ifstream in(arguments[i + 1]);
+        int n = 0; in >> n;
+        std::vector<d3> pts(n); vec rho(n);
+        for (int p = 0; p < n; p++) in >> pts[p][0] >> pts[p][1] >> pts[p][2];
+#pragma omp parallel for
+        for (int p = 0; p < n; p++) rho[p] = wavy.compute_dens(pts[p]);
+        ofstream out(arguments[i + 1] + ".rho"); out << setprecision(12);
+        for (int p = 0; p < n; p++) out << rho[p] << "\n";
+        exit(0);
+    }
     else
         return false;
     return true;
@@ -3762,161 +3814,37 @@ bool options::digest_ri_options(const std::string &temp, int &i)
     using namespace std;
     const int argc = (int)arguments.size();
     if (temp == "-geometry_aid_cutoff") {
-        // Selects the geometry-aid model family: 3.5 the `c_only` models,
-        // 3.0 the `dirty` ones. Must appear BEFORE the flag that computes
-        // anything -- the descriptor flags exit(0) as soon as they have run.
-        // A descriptor at the wrong cutoff is 42,042 long either way and is
-        // rejected by nothing downstream, so the value used is echoed.
-        // `arguments`, not `argv` -- this parser walks a vector<string>.
-        err_chkf(i + 1 < arguments.size(),
-                 "-geometry_aid_cutoff needs a radius in Angstrom", std::cout);
-        geometry_aid_cutoff_radius = std::stod(arguments[++i]);
-        std::cout << "  geometry-aid SOAP cutoff radius set to "
-                  << geometry_aid_cutoff_radius << " A ("
-                  << (geometry_aid_cutoff_radius > 3.25 ? "c_only" : "dirty")
-                  << " model family)" << std::endl;
-    }
-    else if (temp == "-calc_featomic_descriptor") {
-        err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_featomic_descriptor to specify a molecule.", std::cout);
-        // Unchanged behaviour, down to the output file name: Olex2 calls
-        // exactly this and reads `descriptor.npy` from the working
-        // directory. The hyperparameters moved to a shared function so the
-        // batch flag below cannot drift away from them.
-        write_featomic_descriptor(wfn, "descriptor.npy", geometry_aid_hyperparameters());
-        exit(0);
+        //3.5 selects the c_only model family, 3.0 the dirty one. Both descriptors are 42,042 long and
+        //nothing downstream rejects the wrong one, so the value used is echoed.
+        err_checkf(i + 1 < argc, "-geometry_aid_cutoff needs a radius in Angstrom", std::cout);
+        geometry_aid_cutoff = std::stod(arguments[++i]);
+        std::cout << "  geometry-aid SOAP cutoff radius set to " << geometry_aid_cutoff << " A ("
+                  << (geometry_aid_cutoff > 3.25 ? "c_only" : "dirty") << " model family)" << std::endl;
     }
     else if (temp == "-classify_atoms") {
-        // -wfn <structure> -classify_atoms <model.bin> [<out.npy>]
-        //
-        // Writes class probabilities, one row per atom, in the class order
-        // the model carries. Default output `probabilities.npy`, matching
-        // the way `-calc_featomic_descriptor` defaults to descriptor.npy.
-        err_chkf(!wfn.empty(), "No structure specified! Use -wfn BEFORE -classify_atoms.", std::cout);
-        const std::filesystem::path model_path = arguments[i + 1];
-        err_chkf(std::filesystem::exists(model_path),
-            "The geometry-aid model does not exist: " + model_path.string(), std::cout);
-        std::filesystem::path out_path = "probabilities.npy";
-        if (i + 2 < arguments.size() && !arguments[i + 2].empty() && arguments[i + 2][0] != '-')
-            out_path = arguments[i + 2];
-        write_geometry_aid_probabilities(wfn, out_path, model_path,
-            geometry_aid_hyperparameters());
-        exit(0);
+        //-wfn <structure> -classify_atoms <model.bin> [<out.npy>], default probabilities.npy
+        err_checkf(i + 1 < argc, "-classify_atoms needs the model file", std::cout);
+        geometry_aid_model = arguments[++i];
+        err_checkf(std::filesystem::exists(geometry_aid_model), "The geometry-aid model does not exist: " + geometry_aid_model.string(), std::cout);
+        classify_atoms_out = "probabilities.npy";
+        if (i + 1 < argc && !arguments[i + 1].empty() && arguments[i + 1][0] != '-')
+            classify_atoms_out = arguments[++i];
     }
     else if (temp == "-classify_atoms_list") {
-        // The batch form: -classify_atoms_list <list> <model.bin>, one
-        // structure path per line, each written as <path>.probs.npy.
-        const std::filesystem::path list_file = arguments[i + 1];
-        const std::filesystem::path model_path = arguments[i + 2];
-        err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
-        err_chkf(std::filesystem::exists(model_path), "The geometry-aid model does not exist: " + model_path.string(), std::cout);
-
-        std::vector<std::filesystem::path> jobs;
-        {
-            std::ifstream list(list_file);
-            std::string line;
-            while (getline_universal(list, line))
-            {
-                const std::string entry = trim(line);
-                if (entry.empty() || entry[0] == '#') continue;
-                jobs.push_back(std::filesystem::path(entry));
-            }
-        }
-        err_chkf(!jobs.empty(), "The structure list is empty: " + list_file.string(), std::cout);
-
-        const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
-        const auto started = std::chrono::steady_clock::now();
-        size_t done = 0, failed = 0;
-        for (const std::filesystem::path& structure : jobs)
-        {
-            if (!std::filesystem::exists(structure))
-            {
-                std::cout << "MISSING " << structure.string() << std::endl;
-                ++failed;
-                continue;
-            }
-            try
-            {
-                const auto one = std::chrono::steady_clock::now();
-                std::filesystem::path out_path = structure;
-                out_path += ".probs.npy";
-                write_geometry_aid_probabilities(structure, out_path, model_path, hyperparams);
-                std::cout << "PROBABILITIES " << out_path.string() << " seconds="
-                          << std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count()
-                          << std::endl;
-                ++done;
-            }
-            catch (const std::exception& e)
-            {
-                std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
-                ++failed;
-            }
-        }
-        const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-        std::cout << "BATCH done=" << done << " failed=" << failed
-                  << " seconds=" << total
-                  << " per_structure=" << (done ? total / done : 0.0) << std::endl;
-        exit(failed && !done ? 1 : 0);
+        //<list> <model.bin>, one structure path per line, each written as <path>.probs.npy
+        err_checkf(i + 2 < argc, "-classify_atoms_list needs the list and the model file", std::cout);
+        classify_structures = geometry_aid::read_structure_list(arguments[++i]);
+        geometry_aid_model = arguments[++i];
+        err_checkf(std::filesystem::exists(geometry_aid_model), "The geometry-aid model does not exist: " + geometry_aid_model.string(), std::cout);
     }
+    else if (temp == "-calc_featomic_descriptor")
+        //Olex2 calls exactly this and reads descriptor.npy from the working directory
+        calc_featomic_descriptor = true;
     else if (temp == "-calc_featomic_descriptors") {
-        // Many structures in one process: a descriptor call carries a fixed
-        // setup cost of roughly 0.7 s against about 0.0009 s per atom, and
-        // `calculate_SOAP_Powerspectrum` keeps its calculator for the lifetime
-        // of the process (see `cached_calculator`).
-        //
-        // The list file is one structure path per line; blank lines and lines
-        // beginning with '#' are ignored. Each descriptor is written beside its
-        // structure as `<path>.npy` -- one field per line, so paths with spaces
-        // need no quoting rules.
-        const std::filesystem::path list_file = arguments[i + 1];
-        err_chkf(std::filesystem::exists(list_file), "The structure list does not exist: " + list_file.string(), std::cout);
-
-        std::vector<std::filesystem::path> jobs;
-        {
-            std::ifstream list(list_file);
-            std::string line;
-            while (getline_universal(list, line))
-            {
-                const std::string entry = trim(line);
-                if (entry.empty() || entry[0] == '#')
-                    continue;
-                jobs.push_back(std::filesystem::path(entry));
-            }
-        }
-        err_chkf(!jobs.empty(), "The structure list is empty: " + list_file.string(), std::cout);
-
-        const SALTED_Utils::FeatomicHyperParameters hyperparams = geometry_aid_hyperparameters();
-        const auto started = std::chrono::steady_clock::now();
-        size_t done = 0, failed = 0;
-        for (const std::filesystem::path& structure : jobs)
-        {
-            // One unreadable structure must not abort the rest of the batch.
-            if (!std::filesystem::exists(structure))
-            {
-                std::cout << "MISSING " << structure.string() << std::endl;
-                ++failed;
-                continue;
-            }
-            try
-            {
-                const auto one = std::chrono::steady_clock::now();
-                std::filesystem::path out_path = structure;
-                out_path += ".npy";
-                write_featomic_descriptor(structure, out_path, hyperparams);
-                const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - one).count();
-                std::cout << "DESCRIPTOR " << out_path.string() << " seconds=" << seconds << std::endl;
-                ++done;
-            }
-            catch (const std::exception& e)
-            {
-                std::cout << "FAILED " << structure.string() << " : " << e.what() << std::endl;
-                ++failed;
-            }
-        }
-        const double total = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-        std::cout << "BATCH done=" << done << " failed=" << failed
-                  << " seconds=" << total
-                  << " per_structure=" << (done ? total / done : 0.0) << std::endl;
-        exit(failed && !done ? 1 : 0);
+        //One structure path per line, each descriptor written as <path>.npy. One process for all of
+        //them because the calculator setup costs 0.7 s against 0.0009 s per atom (cached_calculator).
+        err_checkf(i + 1 < argc, "-calc_featomic_descriptors needs the list file", std::cout);
+        featomic_structures = geometry_aid::read_structure_list(arguments[++i]);
     }
     else if (temp == "-rgbi")
         rgbi = true;
@@ -3980,11 +3908,38 @@ bool options::digest_ri_options(const std::string &temp, int &i)
             aux_basis.push_back(std::make_shared<BasisSet>());
         }
     }
+    else if (temp == "-multipole_moments" || temp == "-multipole-moments") {
+        err_checkf(i + 2 < argc, "-multipole_moments needs a partitioning scheme and the highest order, e.g. -multipole_moments Hirshfeld 2", std::cout);
+        std::string scheme = arguments[++i];
+        std::transform(scheme.begin(), scheme.end(), scheme.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (scheme == "hirshfeld" || scheme == "hirsh")
+            multipole_scheme = PartitionType::Hirshfeld;
+        else if (scheme == "tfvc")
+            multipole_scheme = PartitionType::TFVC;
+        else if (scheme == "mbis")
+            multipole_scheme = PartitionType::MBIS;
+        else if (scheme == "embis")
+            multipole_scheme = PartitionType::EMBIS;
+        else
+            err("Unknown partitioning for -multipole_moments: " + arguments[i] + " (Hirshfeld, TFVC, MBIS or EMBIS)", std::cout);
+        multipole_lmax = std::stoi(arguments[++i]);
+        err_checkf(multipole_lmax >= 0 && multipole_lmax <= 8, "-multipole_moments: the order must be between 0 and 8", std::cout);
+        RI_FIT = true;
+        partition_type = PartitionType::RI;
+    }
+    else if (temp == "-multipole_partition")
+        multipole_partition = true;
+    else if (temp == "-multipole_centre" || temp == "-multipole_center")
+        multipole_partition = false;
+    else if (temp == "-multipole_strength") {
+        multipole_strength = std::stod(arguments[++i]);
+        err_checkf(multipole_strength > 0.0, "-multipole_strength must be positive", std::cout);
+    }
     else if (temp == "-write_ri_coefs") {
         WFN wavy(wfn);
         WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
-        DensityFitting::CONFIG config;
-        config.analyze_quality = debug;
+        DensityFitting::CONFIG config = DensityFitting::config_from_options(*this);
         //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
         //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
         vec ri_coefs = DensityFitting::density_fit(wavy, wavy_aux, config);
@@ -3994,6 +3949,35 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         np_coeffs.shape = { static_cast<unsigned long>(ri_coefs.size()) };
         npy::write_npy("RI_COEFS.npy", np_coeffs);
         exit(0);
+    }
+    else if (temp == "-repulsion_overlap") {
+        repulsion_overlap = std::stod(arguments[++i]);
+        err_checkf(repulsion_overlap >= 0.0, "-repulsion_overlap must not be negative", std::cout);
+    }
+    else if (temp == "-repulsion_exchange") {
+        const std::string f = arguments[++i];
+        repulsion_exchange = f == "dirac" ? 0 : f == "pbe" ? 1 : f == "b88" ? 2 : f == "r2scan" ? 3 : -1;
+        err_checkf(repulsion_exchange >= 0, "-repulsion_exchange takes dirac, pbe, b88 or r2scan", std::cout);
+    }
+    else if (temp == "-interaction_energy") {
+        //-interaction_energy <A> <B>: electrostatics between two fitted densities. With -SALTED <model-dir> both are predicted
+        //from the model, otherwise A and B are wavefunctions and each is RI-fitted with the -ri_fit basis.
+        //<A> <A.npy> <B> <B.npy> takes coefficient files in the fitted_multipoles layout instead
+        err_checkf(i + 2 < argc, "-interaction_energy needs two structure files", std::cout);
+        const bool from_files = i + 4 < argc && std::filesystem::path(arguments[i + 2]).extension() == ".npy";
+        WFN wavy_A(arguments[i + 1]), wavy_B(arguments[from_files ? i + 3 : i + 2]);
+        WFN aux_A(e_origin::NOT_YET_DEFINED), aux_B(e_origin::NOT_YET_DEFINED);
+        if (SALTED && !from_files) std::cout << "Predicting both densities with the SALTED model in " << salted_model_dir << std::endl;
+        const vec coef_A = crystal_energies::fitted_coefficients(wavy_A, from_files ? arguments[i + 2] : "", aux_A, *this);
+        const vec coef_B = crystal_energies::fitted_coefficients(wavy_B, from_files ? arguments[i + 4] : "", aux_B, *this);
+        DensityFitting::print_interaction_energy(DensityFitting::interaction_energy(coef_A, aux_A, coef_B, aux_B, repulsion_overlap, repulsion_exchange), aux_A, aux_B, std::cout);
+        exit(0);
+    }
+    else if (temp == "-interaction_energies") {
+        //-interaction_energies <job>: every molecule pair in contact in the crystal, run after the options are parsed
+        err_checkf(i + 1 < argc, "-interaction_energies needs a job file", std::cout);
+        interaction_energies_job = arguments[++i];
+        err_checkf(std::filesystem::exists(interaction_energies_job), "The job file does not exist: " + interaction_energies_job.string(), std::cout);
     }
     else if (temp == "-RI_CUBE" || temp == "-ri_cube")
     {
@@ -4197,6 +4181,9 @@ void options::digest_options()
         if (debug)
             log_file << "Using -xyz input as the SALTED structure: " << wfn << endl;
     }
+    //-multipole_moments without -ri_fit: auto_aux, whichever order the two came in
+    if (multipole_lmax >= 0 && aux_basis.empty())
+        aux_basis.push_back(std::make_shared<BasisSet>());
 };
 
 namespace {

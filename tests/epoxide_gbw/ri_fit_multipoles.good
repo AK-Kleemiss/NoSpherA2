@@ -1,0 +1,122 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                                "epoxide.gbw" done!
+Number of atoms in Wavefunction file: 7 Number of MOs: 62
+Number of protons: 24
+Number of electrons: 24.000000
+Reading:                                "epoxide.cif" done!
+Generating hkl indices up to d=:              0.40... done!
+Nr of reflections generated:                 32637
+Number of symmetry operations:                   2
+Nr of reflections to be used:                16318
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 16318
+
+Generating densities... 
+
+=== Density Fitting ===
+Normal basis functions: 62
+Auxiliary basis functions: 522
+Metric: Coulomb
+Screened out 0 atom pairs due to overlap criteria.
+[                   Calculating Eri3c Matrix                  ]
+[#############################################################] 100% 
+Using partition restraints on every auxiliary function with moments from: Hirshfeld
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 32776 grid points.
+Added partition restraints up to l=2 for 7 atoms over 522 auxiliary functions.
+Solving regularized linear system...
+Restraint residual: 0.000783185501
+
+Atomic multipoles of the fitted density partitioned on the grid, Racah normalisation, e bohr^l
+  Atom  l  m       target       fitted    deviation
+     O  0  0     8.199048     8.199007    -0.000042
+     O  1 -1    -0.089778    -0.090498    -0.000721
+     O  1  0    -0.133032    -0.133992    -0.000960
+     O  1  1     0.105847     0.106618     0.000771
+     O  2 -2    -0.113245    -0.113354    -0.000109
+     O  2 -1    -0.111575    -0.111999    -0.000424
+     O  2  0     0.063106     0.063172     0.000066
+     O  2  1    -0.068680    -0.068637     0.000043
+     O  2  2    -0.111830    -0.112087    -0.000257
+     C  0  0     5.993754     5.993818     0.000063
+     C  1 -1    -0.027885    -0.028126    -0.000242
+     C  1  0    -0.016700    -0.017206    -0.000506
+     C  1  1    -0.056908    -0.056409     0.000499
+     C  2 -2     0.097293     0.097111    -0.000183
+     C  2 -1     0.070953     0.071185     0.000233
+     C  2  0    -0.020238    -0.020023     0.000215
+     C  2  1     0.096190     0.096057    -0.000133
+     C  2  2     0.020669     0.020533    -0.000136
+     H  0  0     0.949478     0.949514     0.000036
+     H  1 -1     0.043862     0.043798    -0.000064
+     H  1  0    -0.093146    -0.093076     0.000070
+     H  1  1    -0.038209    -0.038240    -0.000031
+     H  2 -2    -0.009235    -0.009228     0.000008
+     H  2 -1    -0.017557    -0.017558    -0.000001
+     H  2  0     0.030098     0.030089    -0.000008
+     H  2  1     0.026980     0.026980     0.000000
+     H  2  2     0.019879     0.019884     0.000005
+     H  0  0     0.950770     0.950790     0.000020
+     H  1 -1    -0.108275    -0.108170     0.000105
+     H  1  0     0.022647     0.022607    -0.000039
+     H  1  1    -0.008624    -0.008662    -0.000038
+     H  2 -2     0.017904     0.017906     0.000002
+     H  2 -1    -0.007452    -0.007454    -0.000002
+     H  2  0    -0.035106    -0.035110    -0.000004
+     H  2  1    -0.008106    -0.008101     0.000005
+     H  2  2    -0.027962    -0.027951     0.000012
+     C  0  0     5.996298     5.996333     0.000036
+     C  1 -1     0.027494     0.027030    -0.000464
+     C  1  0     0.028200     0.027682    -0.000518
+     C  1  1     0.062894     0.063037     0.000143
+     C  2 -2     0.077593     0.077331    -0.000262
+     C  2 -1     0.013477     0.013491     0.000015
+     C  2  0    -0.064581    -0.064524     0.000057
+     C  2  1     0.050267     0.049971    -0.000296
+     C  2  2     0.100653     0.100701     0.000049
+     H  0  0     0.954458     0.954503     0.000045
+     H  1 -1    -0.052774    -0.052686     0.000087
+     H  1  0     0.065893     0.065864    -0.000029
+     H  1  1     0.075144     0.075136    -0.000008
+     H  2 -2    -0.030704    -0.030693     0.000011
+     H  2 -1    -0.009400    -0.009396     0.000003
+     H  2  0    -0.001095    -0.001098    -0.000003
+     H  2  1     0.034832     0.034836     0.000004
+     H  2  2     0.008875     0.008873    -0.000002
+     H  0  0     0.955804     0.955823     0.000019
+     H  1 -1     0.085087     0.085030    -0.000056
+     H  1  0    -0.055266    -0.055161     0.000105
+     H  1  1     0.045560     0.045571     0.000011
+     H  2 -2     0.036998     0.037001     0.000003
+     H  2 -1    -0.018791    -0.018786     0.000005
+     H  2  0    -0.002867    -0.002867    -0.000000
+     H  2  1    -0.022061    -0.022049     0.000011
+     H  2  2    -0.017144    -0.017141     0.000003
+==============================================
+
+                                        ... done!
+Table of Charges in electrons
+       Atom  Charge_RI
+        O1    -0.942
+        C2    -0.114
+       H2a     0.289
+       H2b     0.292
+        C3    -0.101
+       H3a     0.325
+       H3b     0.251
+Total number of analytical Electrons: 23.9999
+Streaming tsc in blocks of 1000 reflections
+[               Generating scattering factors...              ]
+[#############################################################] 100% 
+                                         ... done!
+Writing tsc file...  ... done!
+  (written block by block while the factors were computed)
