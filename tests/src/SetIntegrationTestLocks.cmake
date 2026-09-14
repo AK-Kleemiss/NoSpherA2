@@ -54,6 +54,7 @@ set_tests_properties(
 )
 set_tests_properties(
     TomlIntegrationTests.SALTED
+    TomlIntegrationTests.SALTEDChargeConstraint
     SALTEDTests.ReadingSALTEDBinaryFile
     BesselTests.AnalyticFourier
     PROPERTIES
