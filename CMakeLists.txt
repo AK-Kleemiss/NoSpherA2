@@ -10,15 +10,48 @@ option(NOSPHERA2_DEPENDENCIES_ONLY "Build dependencies without building NoSpherA
 option(NOSPHERA2_USE_CUDA "Build the CUDA scattering-factor path" OFF)
 option(NOSPHERA2_USE_HIP "Build the HIP (AMD) scattering-factor path" OFF)
 #Apple silicon only: the Metal I tensor path wants unified memory, which an Intel Mac has not.
-if(APPLE AND (CMAKE_OSX_ARCHITECTURES MATCHES "arm64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64"))
-    set(_nosphera2_metal_default ON)
-else()
-    set(_nosphera2_metal_default OFF)
+#Detected rather than assumed: the arm64 slice of the universal binary carries the Metal path
+#when the SDK the build runs against has the two frameworks, and is a CPU build otherwise, so
+#a machine or SDK without them still builds. The frameworks are the only build-time need,
+#the kernels being compiled at run time; whether a device is there is decided at run time
+#too (itensor_metal.mm gives up when MTLCreateSystemDefaultDevice returns nil).
+#The target architecture is CMAKE_OSX_ARCHITECTURES when a preset names one (the x86_64 preset
+#on an M-series host is a cross build and gets no Metal), the host's otherwise.
+set(_nosphera2_metal_default OFF)
+set(_nosphera2_metal_why "not an Apple silicon build")
+set(_nosphera2_target_arch "${CMAKE_OSX_ARCHITECTURES}")
+if(NOT _nosphera2_target_arch)
+    set(_nosphera2_target_arch "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+if(APPLE AND _nosphera2_target_arch MATCHES "arm64|aarch64")
+    set(_nosphera2_metal_why "the SDK has no Metal or MetalPerformanceShaders framework")
+    set(_sdk "${CMAKE_OSX_SYSROOT}")
+    if(NOT _sdk OR NOT IS_DIRECTORY "${_sdk}")
+        execute_process(COMMAND xcrun --sdk macosx --show-sdk-path
+            OUTPUT_VARIABLE _sdk ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    endif()
+    if(IS_DIRECTORY "${_sdk}/System/Library/Frameworks/Metal.framework"
+       AND IS_DIRECTORY "${_sdk}/System/Library/Frameworks/MetalPerformanceShaders.framework")
+        set(_nosphera2_metal_default ON)
+        set(_nosphera2_metal_why "Apple silicon, frameworks in ${_sdk}")
+    endif()
 endif()
 option(NOSPHERA2_USE_METAL "Build the Metal XCW I tensor path (Apple silicon)" ${_nosphera2_metal_default})
+if(APPLE)
+    if(NOSPHERA2_USE_METAL)
+        message(STATUS "Metal I tensor path: ON (${_nosphera2_metal_why})")
+    elseif(_nosphera2_metal_default)
+        message(STATUS "Metal I tensor path: OFF (switched off, NOSPHERA2_USE_METAL=OFF)")
+    else()
+        message(STATUS "Metal I tensor path: OFF (${_nosphera2_metal_why}; -DNOSPHERA2_USE_METAL=ON to force)")
+    endif()
+endif()
 option(NOSPHERA2_GPU_AUTO "Pick the GPU backend from the hardware present" ON)
 #For a binary that will be copied to other machines rather than run where it was built.
 option(NOSPHERA2_CUDA_PORTABLE "Build CUDA code for every major architecture, not just this card" OFF)
+#The AMD counterpart. HIP has no PTX, so a binary runs only on the ISAs it was compiled for
+#and a portable one has to name every card it might meet; the list is in the HIP block below.
+option(NOSPHERA2_HIP_PORTABLE "Build HIP code for every supported AMD architecture, not just this card" OFF)
 #CUTLASS runs the I tensor GEMM at cuBLAS speed against the built-in kernel's ~57%. Off
 #turns that call site back over to the built-in one, which is also what a HIP build uses.
 option(NOSPHERA2_USE_CUTLASS "Use CUTLASS for the I tensor GEMM (CUDA only)" ON)
@@ -85,18 +118,53 @@ if(NOSPHERA2_USE_CUDA)
     endif()
 endif()
 
-if(NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP)
-    message(FATAL_ERROR "NOSPHERA2_USE_CUDA and NOSPHERA2_USE_HIP are mutually exclusive")
-endif()
+#Both backends at once is a fat binary: each kernel source is compiled twice, once per
+#backend, into its own namespace (Src/core/gpu_api.h), and Src/core/gpu_dispatch.cpp forwards
+#the global entry points to whichever backend has a device. Neither runtime is linked - CUDA's
+#is static, HIP's is opened by name (Src/core/hip_runtime_shim.cpp) - so the one binary runs
+#on an NVIDIA machine, an AMD machine and a machine with no GPU at all. That is what the CI
+#ships (.github/workflows/c-cpp_all.yml).
 
-#Nothing delay-loads a CUDA library any more, cuBLAS having been the only one. Deleting the
-#code that set this was not enough to stop it being used: it was cached, so a build directory
-#configured before that change kept handing the flag and delayimp to every link. Cleared
-#rather than left to rot, the same way an unusable cached compiler is above.
+#Whether this file may choose CMAKE_<LANG>_ARCHITECTURES. A list given on the command line is
+#the user's and is left alone. The trap is that enable_language() creates the cache entry
+#itself when nobody has (sm_52 for nvcc, gfx906 or whatever rocm_agent_enumerator reports
+#for HIP), so testing DEFINED after the language is enabled always says "the user set it"
+#and the portable list never applies - the Linux HIP build came out as gfx906 only. Asked
+#before the language is enabled, and a list this file wrote last time (remembered in
+#NOSPHERA2_<LANG>_ARCH_MANAGED) counts as not given, so a reconfigure with the portable
+#option toggled takes effect. A tree configured before this marker existed still carries
+#CMake's default without the marker and looks user-set: -UCMAKE_<LANG>_ARCHITECTURES once.
+macro(nosphera2_arch_managed lang)
+    set(_nosphera2_${lang}_arch_managed OFF)
+    if(NOT DEFINED CMAKE_${lang}_ARCHITECTURES
+       OR (DEFINED NOSPHERA2_${lang}_ARCH_MANAGED
+           AND "${CMAKE_${lang}_ARCHITECTURES}" STREQUAL "${NOSPHERA2_${lang}_ARCH_MANAGED}"))
+        set(_nosphera2_${lang}_arch_managed ON)
+    endif()
+endmacro()
+macro(nosphera2_set_arch lang)
+    set(CMAKE_${lang}_ARCHITECTURES "${ARGN}" CACHE STRING "${lang} architectures" FORCE)
+    set(NOSPHERA2_${lang}_ARCH_MANAGED "${ARGN}" CACHE INTERNAL "The list this project chose")
+endmacro()
+
+#Nothing delay-loads a GPU library any more: cuBLAS was the last CUDA one, and the HIP
+#runtime is opened by name (Src/core/hip_runtime_shim.cpp) rather than delay-loaded. Deleting
+#the code that set these was not enough to stop them being used: they were cached, so a build
+#directory configured before that change kept handing the flag and delayimp to every link.
+#Cleared rather than left to rot, the same way an unusable cached compiler is above.
 unset(NOSPHERA2_CUDA_DELAYLOAD CACHE)
+unset(NOSPHERA2_HIP_DELAYLOAD CACHE)
 
 if(NOSPHERA2_USE_CUDA)
+    #nvcc takes its host compiler from PATH unless told, and on a machine whose PATH carries
+    #a different gcc than the one CMake picked for C++ the two halves of one binary would be
+    #built by different compilers. Named before the language is enabled, since that is when
+    #it is first used. Windows is left alone: nvcc finds cl.exe through the developer prompt.
+    if(NOT WIN32 AND NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND NOT DEFINED ENV{CUDAHOSTCXX})
+        set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler for nvcc")
+    endif()
     include(CheckLanguage)
+    nosphera2_arch_managed(CUDA)
     check_language(CUDA)
     if(CMAKE_CUDA_COMPILER)
         enable_language(CUDA)
@@ -121,17 +189,22 @@ if(NOSPHERA2_USE_CUDA)
         #that has seen more than one toolkit it goes stale as well. The version is neither.
         #
         #CUDA 13 dropped Volta, so 70 appears only on a 12.x toolkit - which is what a V100
-        #needs anyway - and Blackwell only on 13.
-        if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        #needs anyway. Blackwell arrived with 12.8, so a 12.8 or 12.9 toolkit is the one
+        #that covers everything from a V100 to an RTX 50 in a single binary, which is why
+        #the CI release build pins 12.9 (scripts/GpuToolkit.cmake).
+        if(_nosphera2_CUDA_arch_managed)
             if(NOSPHERA2_CUDA_PORTABLE)
                 if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13)
-                    set(CMAKE_CUDA_ARCHITECTURES 75 80 86 89 90 100 120)
+                    set(_arch_list 75 80 86 89 90 100 120)
+                elseif(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 12.8)
+                    set(_arch_list 70 75 80 86 89 90 100 120)
                 else()
-                    set(CMAKE_CUDA_ARCHITECTURES 70 75 80 86 89 90)
+                    set(_arch_list 70 75 80 86 89 90)
                 endif()
             else()
-                set(CMAKE_CUDA_ARCHITECTURES native)
+                set(_arch_list native)
             endif()
+            nosphera2_set_arch(CUDA ${_arch_list})
         endif()
         #A pinned list compiles to those architectures and nothing else, so the binary has
         #no code at all for a card outside it and every GPU path quietly declines - which
@@ -185,28 +258,110 @@ if(NOSPHERA2_USE_CUDA)
 endif()
 
 if(NOSPHERA2_USE_HIP)
-    include(CheckLanguage)
-    check_language(HIP)
-    if(CMAKE_HIP_COMPILER)
-        enable_language(HIP)
-        set(CMAKE_HIP_STANDARD 17)
-        set(CMAKE_HIP_STANDARD_REQUIRED ON)
-        if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
-            set(CMAKE_HIP_ARCHITECTURES gfx90a;gfx942;gfx1100)
-        endif()
-        #ROCm's bin directory is not on PATH by default, so a HIP build fails to start with
-        #STATUS_DLL_NOT_FOUND on a machine that has the GPU but not the SDK. Measured on the
-        #AMD node: without this the process is rejected before main(). hipBLAS is no longer
-        #among these, which is what lets every kernel build on a conda-forge ROCm - it
-        #packages hipcc without hipBLAS, and that used to strand the I tensor on the CPU.
-        if(MSVC)
-            string(REGEX MATCH "^[0-9]+" NOSPHERA2_HIP_MAJOR "${CMAKE_HIP_COMPILER_VERSION}")
-            if(NOT NOSPHERA2_HIP_MAJOR)
-                set(NOSPHERA2_HIP_MAJOR 6)
+    #Two ways to compile the kernels. On Linux they are a HIP language for CMake and clang
+    #handles the whole program. On Windows the program is built with MSVC and CMake refuses to
+    #mix that with a clang HIP compiler ("mixes Clang and MSVC", Platform/Windows-Clang.cmake,
+    #still there in 4.3); building all of NoSpherA2 with ROCm's clang is a different compiler
+    #for the whole program, so instead the kernels are compiled the way the Visual Studio
+    #projects do it (NoSpherA2_gpu.props): clang++ -x hip on each .cu into an MSVC-ABI object
+    #that links like any other, in Src/core. This block finds that clang and settles the
+    #architecture list for both routes. The compiler is taken from -DCMAKE_HIP_COMPILER, else
+    #from HIP_PATH (the HIP SDK keeps it in bin, the ROCm pip wheels in lib/llvm/bin), else
+    #from the CMAKE_PREFIX_PATH entries - never from PATH, where Visual Studio's own clang++
+    #would be found first and cannot compile HIP.
+    set(_nosphera2_hip_version "")
+    if(MSVC)
+        if(CMAKE_HIP_COMPILER)
+            set(NOSPHERA2_HIP_CLANG "${CMAKE_HIP_COMPILER}" CACHE FILEPATH "ROCm clang++ that compiles the HIP kernels")
+        else()
+            set(_hip_clang_hints "")
+            if(DEFINED ENV{HIP_PATH})
+                file(TO_CMAKE_PATH "$ENV{HIP_PATH}" _hip_path)
+                list(APPEND _hip_clang_hints "${_hip_path}/bin" "${_hip_path}/lib/llvm/bin")
             endif()
-            set(NOSPHERA2_HIP_DELAYLOAD
-                "/DELAYLOAD:amdhip64_${NOSPHERA2_HIP_MAJOR}.dll"
-                CACHE INTERNAL "ROCm DLLs to delay-load")
+            foreach(_p ${CMAKE_PREFIX_PATH})
+                list(APPEND _hip_clang_hints "${_p}/bin" "${_p}/lib/llvm/bin")
+            endforeach()
+            find_program(NOSPHERA2_HIP_CLANG clang++ HINTS ${_hip_clang_hints} NO_DEFAULT_PATH
+                DOC "ROCm clang++ that compiles the HIP kernels")
+        endif()
+        if(NOSPHERA2_HIP_CLANG)
+            execute_process(COMMAND "${NOSPHERA2_HIP_CLANG}" --version
+                OUTPUT_VARIABLE _hip_clang_banner ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if(_hip_clang_banner MATCHES "clang version ([0-9]+\\.[0-9]+\\.[0-9]+)")
+                set(_nosphera2_hip_version "${CMAKE_MATCH_1}")
+            endif()
+            message(STATUS "HIP kernels compiled by ${NOSPHERA2_HIP_CLANG} (clang ${_nosphera2_hip_version})")
+        endif()
+        #The only HIP platform on Windows; hip-config.cmake would otherwise ask hipconfig,
+        #which the pip wheels do not ship.
+        if(NOT DEFINED HIP_PLATFORM AND NOT DEFINED ENV{HIP_PLATFORM})
+            set(HIP_PLATFORM "amd")
+        endif()
+        set(_nosphera2_hip_ready ${NOSPHERA2_HIP_CLANG})
+    else()
+        include(CheckLanguage)
+        nosphera2_arch_managed(HIP)
+        check_language(HIP)
+        if(CMAKE_HIP_COMPILER)
+            enable_language(HIP)
+            set(CMAKE_HIP_STANDARD 17)
+            set(CMAKE_HIP_STANDARD_REQUIRED ON)
+            set(_nosphera2_hip_version "${CMAKE_HIP_COMPILER_VERSION}")
+            #The HIP language would otherwise link libamdhip64 into every target that
+            #carries a HIP object, directly or through a static library (hip-lang::device,
+            #CMakeHIPInformation.cmake), and a binary that needs libamdhip64.so to start is
+            #a binary that does not start without ROCm. NONE names no runtime library at
+            #all; Src/core/hip_runtime_shim.cpp supplies the entry points and opens the real
+            #library by name when there is one.
+            set(CMAKE_HIP_RUNTIME_LIBRARY NONE)
+        endif()
+        set(_nosphera2_hip_ready ${CMAKE_HIP_COMPILER})
+    endif()
+    if(_nosphera2_hip_ready)
+        #Unlike CUDA there is no intermediate code the driver could finish at run time: a
+        #kernel built for gfx1030 does not run on a gfx1031, and the generic targets
+        #(gfx10-3-generic and so on) demand a runtime newer than most machines carry. So the
+        #portable list is every ISA ROCm still supports, one by one - GCN Vega, the three CDNA
+        #generations and RDNA 1 to 4. The two newest generations are only known to the clang
+        #of ROCm 6.3 and later, so the list is trimmed on an older toolkit rather than
+        #failing the build. A card missing from the list is what sf_gpu_available() reports.
+        if(MSVC)
+            #No enable_language on this path, so nothing has created the entry yet.
+            nosphera2_arch_managed(HIP)
+        endif()
+        if(_nosphera2_HIP_arch_managed)
+            if(NOSPHERA2_HIP_PORTABLE)
+                set(_arch_list
+                    gfx900 gfx906 gfx908 gfx90a gfx942
+                    gfx1010 gfx1012 gfx1030 gfx1031 gfx1032 gfx1034 gfx1035 gfx1036
+                    gfx1100 gfx1101 gfx1102 gfx1103)
+                if(_nosphera2_hip_version VERSION_GREATER_EQUAL 19)
+                    list(APPEND _arch_list gfx1150 gfx1151 gfx1200 gfx1201)
+                endif()
+                if(_nosphera2_hip_version VERSION_GREATER_EQUAL 20)
+                    list(APPEND _arch_list gfx950)
+                endif()
+            else()
+                set(_arch_list gfx90a gfx942 gfx1100)
+            endif()
+            nosphera2_set_arch(HIP ${_arch_list})
+        endif()
+        #Nothing links the HIP runtime, on either route. ROCm's lib/bin directory is not on
+        #the path of a machine that has the card but not the SDK, and a binary whose loader
+        #wants libamdhip64.so / amdhip64_7.dll is rejected before main() (measured on the
+        #AMD node as STATUS_DLL_NOT_FOUND). Src/core/hip_runtime_shim.cpp defines the entry
+        #points the kernel objects import and opens the library by name on the first call,
+        #answering "no device" when it is absent. The name carries the HIP runtime's major
+        #version, which is neither the ROCm release nor the clang version (ROCm 6.x ships
+        #amdhip64_6.dll, ROCm 7 to 10 amdhip64_7.dll); the shim takes it from HIP_VERSION_MAJOR
+        #in the headers it was compiled against. hipBLAS is not needed at all, which is what
+        #lets every kernel build on a ROCm that packages the compiler without it.
+        if(MSVC)
+            #hip-config runs this to name the compiler-rt builtins clang's host code may
+            #need; left to itself it would ask cl.exe and get nothing.
+            set(HIP_CXX_COMPILER "${NOSPHERA2_HIP_CLANG}")
+            find_package(hip REQUIRED)
         endif()
         message(STATUS "HIP enabled, arch ${CMAKE_HIP_ARCHITECTURES}")
     elseif(_nosphera2_gpu_auto_enabled)

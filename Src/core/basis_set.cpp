@@ -617,7 +617,7 @@ int load_basis_into_WFN(WFN& wavy,const std::shared_ptr<BasisSet> b, const bool 
 				for (int idx = 0; idx < end; idx++, nex_++, effective_type++) {
 					exponents_.push_back(temp_exp);
 					types_.push_back(effective_type);
-					centers_.push_back(i);
+					centers_.push_back(i + 1);
 				}
 			}
 		}

@@ -13,7 +13,8 @@ public:
         const double alpha_max,
         const int max_l_quantum_number,
         const double alpha_min[],
-        std::ostream &file);
+        std::ostream &file,
+        const double radial_step_scale = 1.0);
 
     ~AtomGrid();
 
@@ -33,9 +34,7 @@ public:
         double grid_aw[],
         double grid_becke_w[],
         double grid_TFVC_w[],
-        const WFN &wfn,
-        vec &chi,
-        bool debug = false) const;
+        const vec &chi) const;
 
     void get_radial_grid(double grid_r_bohr[], double grid_w[]) const;
     void get_radial_distances(double grid_r_bohr[]) const;

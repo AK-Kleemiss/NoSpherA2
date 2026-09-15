@@ -214,6 +214,7 @@ struct Block {
 struct State {
 	bool ready = false;
 	int nmo = 0, packed = 0, n_grids = 0;
+	double issued_flops = 0.0;
 	long long n_points = 0;
 	id<MTLBuffer> ao = nil, aos = nil, compact = nil;
 	id<MTLBuffer> d1 = nil, d2 = nil, d3 = nil, w = nil;
@@ -259,6 +260,7 @@ bool init_impl(const itensor_gpu_layout& L)
 		max_ld = std::max(max_ld, ld);
 		max_ldc = std::max(max_ldc, padded(na));
 		ao_len += (uint64_t)na * ld;
+		s.issued_flops += throughput::flops_gemm(na, 2.0 * na, L.blk_point_count[b]);
 	}
 	if (throughput::enabled()) {
 		int min_na = L.n_blocks ? L.blk_n_active[0] : 0;
@@ -464,6 +466,8 @@ bool itensor_gpu_available() { return open_device(); }
 
 const char* itensor_gpu_gemm_name() { return "Metal Performance Shaders"; }
 
+double itensor_gpu_issued_flops() { return state().issued_flops; }
+
 bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec, const bool)
 {
 	itensor_gpu_free();
@@ -478,17 +482,32 @@ bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec, cons
 	return ok;
 }
 
-bool itensor_gpu_submit(const int slot, const int num_syms,
+//The Metal engine contracts one reflection at a time, so a batch is one reflection here
+int itensor_gpu_batch(const int) { return 1; }
+
+bool itensor_gpu_submit(const int slot, const int n_refl, const int num_syms,
 	const double* kx, const double* ky, const double* kz,
 	const std::complex<double>* factors)
 {
+	if (n_refl != 1) return false;
 	return submit_impl(slot, num_syms, kx, ky, kz, factors);
 }
 
-bool itensor_gpu_collect(const int slot, std::complex<double>* I_r)
+bool itensor_gpu_collect(const int slot, std::complex<double>* I_r, const long long)
 {
 	return collect_impl(slot, I_r);
 }
+
+//The SCF walks stay on the host here
+bool itensor_gpu_hold(const std::complex<float>*, int, int) { return false; }
+bool itensor_gpu_hold(const std::complex<double>*, int, int) { return false; }
+bool itensor_gpu_held() { return false; }
+bool itensor_gpu_rows(const double*, const std::complex<double>*, std::complex<double>*) { return false; }
+bool itensor_gpu_cols(const std::complex<double>*, double*) { return false; }
+void itensor_gpu_release() {}
+bool eri_gpu_hold(const double*, int, int, const int*, const int*, const int*, const int*) { return false; }
+bool eri_gpu_JK(const double*, double*, double*) { return false; }
+void eri_gpu_release() {}
 
 void itensor_gpu_free()
 {

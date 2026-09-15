@@ -7,6 +7,7 @@
 #include "nos_math.h"
 #include "integration_params.h"
 #include "b2c.h"
+#include "spherical_density.h"
 #include <occ/qm/hf.h>
 
 namespace {
@@ -2598,13 +2599,77 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     eli_cube.calc_dv();
 
     Calc_RhoEli(rho, eli_cube, l_w, radius);
+    //An ECP took the core electrons out of the density. The QTAIM basins get them back from
+    //Thakkar's spherical core densities, the fill the Hirshfeld grids and the scattering
+    //factors apply: the nucleus is a cusp again and its basin holds the atom's full count.
+    //ELI-D stays on the valence density the wavefunction has.
+    ivec ecp_atoms;
+    std::vector<Thakkar> ecp_cores;
+    double ecp_electrons = 0.0;
+    for (int a = 0; a < l_w.get_ncen(); a++)
+        if (l_w.get_atom_ECP_electrons(a) > 0) {
+            const int mode = l_w.get_ECP_mode() > 0 ? l_w.get_ECP_mode() : 1;
+            ecp_atoms.push_back(a);
+            ecp_cores.emplace_back(l_w.get_atom_charge(a), mode);
+            ecp_electrons += l_w.get_atom_ECP_electrons(a);
+        }
+    std::function<double(const d3&)> core_density = [&](const d3 &p) {
+        double s = 0.0;
+        for (size_t k = 0; k < ecp_atoms.size(); k++) {
+            const d3 ap = l_w.get_atom_pos(ecp_atoms[k]);
+            const double d = std::sqrt(std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2));
+            s += ecp_cores[k].get_core_density(d, l_w.get_atom_ECP_electrons(ecp_atoms[k]));
+        }
+        return s;
+    };
+    std::function<void(const d3&, d3&)> core_gradient = [&](const d3 &p, d3 &g) {
+        const double h = 1e-4;
+        for (int k = 0; k < 3; k++) {
+            d3 a = p, b = p;
+            a[k] += h; b[k] -= h;
+            g[k] = (core_density(a) - core_density(b)) / (2.0 * h);
+        }
+    };
+    const bool fill_cores = !ecp_atoms.empty();
+    if (fill_cores) {
+        std::cout << "ECP cores of " << ecp_atoms.size() << " atoms filled with Thakkar densities: " << std::fixed << std::setprecision(1) << ecp_electrons << " electrons added for the QTAIM basins" << std::endl;
+        for (int x = 0; x < rho.get_size(0); x++)
+            for (int y = 0; y < rho.get_size(1); y++)
+                for (int z = 0; z < rho.get_size(2); z++)
+                    if (rho.get_value(x, y, z) > 0.0) rho.set_value(x, y, z, rho.get_value(x, y, z) + core_density(rho.get_pos(x, y, z)));
+    }
     rho.set_path("rho.cube");
     eli_cube.set_path("eli.cube");
     //rho.write_file(true);
     //eli_cube.write_file(true);
 
     const double density_floor = std::max(1e-8, rho.max_value() * 1e-6);
-    const std::vector<critical_point> density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+    std::vector<critical_point> density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+    //Core shells make critical points of their own and an ECP atom a whole sphere of them,
+    //none of which says anything about bonding and none of which any two machines find at
+    //the same spots; only the nuclear attractor survives inside an atom's core radius. Sorted
+    //by type, density and position so the listing reads the same everywhere.
+    {
+        std::vector<critical_point> kept;
+        for (const critical_point &cp : density_critical_points) {
+            bool core = false, nuclear = false;
+            for (int a = 0; a < l_w.get_ncen(); a++) {
+                const d3 apos = l_w.get_atom_pos(a);
+                const double d2 = std::pow(cp.position[0] - apos[0], 2) + std::pow(cp.position[1] - apos[1], 2) + std::pow(cp.position[2] - apos[2], 2);
+                if (d2 < 0.01) nuclear = true;
+                else if (d2 < std::pow(core_shell_radius(l_w.get_atom_charge(a)), 2)) core = true;
+            }
+            if (!core || nuclear) kept.push_back(cp);
+        }
+        std::sort(kept.begin(), kept.end(), [](const critical_point &a, const critical_point &b) {
+            if (a.type != b.type) return a.type < b.type;
+            if (std::abs(a.density - b.density) > 1e-6 * std::max(1.0, std::abs(a.density))) return a.density > b.density;
+            for (int k = 0; k < 3; k++)
+                if (std::abs(a.position[k] - b.position[k]) > 1e-4) return a.position[k] < b.position[k];
+            return false;
+        });
+        density_critical_points.swap(kept);
+    }
     std::cout << "Density Critical Points";
     if (!density_critical_points.empty())
         std::cout << " (" << density_critical_points.size() << " found)";
@@ -2674,18 +2739,22 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
                 << std::setw(nw) << cp.hessian_eigenvalues[1]
                 << std::setw(nw) << cp.hessian_eigenvalues[2]
                 << std::fixed << std::setprecision(4) << "\n";
-            std::cout << "    HessRho_EigVecs v1:"
-                << std::setw(nw) << cp.hessian_eigenvectors[0][0]
-                << std::setw(nw) << cp.hessian_eigenvectors[0][1]
-                << std::setw(nw) << cp.hessian_eigenvectors[0][2] << "\n";
-            std::cout << "                    v2:"
-                << std::setw(nw) << cp.hessian_eigenvectors[1][0]
-                << std::setw(nw) << cp.hessian_eigenvectors[1][1]
-                << std::setw(nw) << cp.hessian_eigenvectors[1][2] << "\n";
-            std::cout << "                    v3:"
-                << std::setw(nw) << cp.hessian_eigenvectors[2][0]
-                << std::setw(nw) << cp.hessian_eigenvectors[2][1]
-                << std::setw(nw) << cp.hessian_eigenvectors[2][2] << "\n";
+            //The eigenvectors of a degenerate pair are any two in their plane and their signs
+            //are free; both differ from machine to machine, so they are for -debug
+            if (opt.debug) {
+                std::cout << "    HessRho_EigVecs v1:"
+                    << std::setw(nw) << cp.hessian_eigenvectors[0][0]
+                    << std::setw(nw) << cp.hessian_eigenvectors[0][1]
+                    << std::setw(nw) << cp.hessian_eigenvectors[0][2] << "\n";
+                std::cout << "                    v2:"
+                    << std::setw(nw) << cp.hessian_eigenvectors[1][0]
+                    << std::setw(nw) << cp.hessian_eigenvectors[1][1]
+                    << std::setw(nw) << cp.hessian_eigenvectors[1][2] << "\n";
+                std::cout << "                    v3:"
+                    << std::setw(nw) << cp.hessian_eigenvectors[2][0]
+                    << std::setw(nw) << cp.hessian_eigenvectors[2][1]
+                    << std::setw(nw) << cp.hessian_eigenvectors[2][2] << "\n";
+            }
             std::cout << "    DelSqRho  :" << std::setw(nw) << cp.laplacian << "\n";
             if (std::isfinite(cp.ellipticity))
                 std::cout << "    Bond Ellipticity:" << std::setw(nw) << cp.ellipticity << "\n";
@@ -2703,7 +2772,7 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     //Every nucleus is a maximum of the density, whatever the grid says
     std::vector<d3> nuclei;
     for (const atom &a : atoms) nuclei.push_back(a.get_pos());
-    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius, 5e-3, &nuclei, &l_w);
+    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius, 5e-3, &nuclei, &l_w, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr);
     svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
 
     //ELI-D is a ratio of quantities that both vanish in the density's tail and turns to noise
@@ -2714,6 +2783,10 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
             for (int z = 0; z < eli_cube.get_size(2); z++)
                 if (rho.get_value(x, y, z) < 1e-4) eli_cube.set_value(x, y, z, 0.0);
     std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+    //The shells of a heavy atom's core structure ELI-D into several basins each; one core
+    //basin per atom is what a bonding analysis wants, and what DGrid's ELIDcore gives
+    const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms);
+    if (core_merged) std::cout << "Unified " << core_merged << " core-shell basins into their atoms' cores, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
     svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
 
     //Two integrations of the density over each basin set: the voxel sum, which is what the cube
@@ -2724,7 +2797,7 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
         integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
         vec vol;
         double outside = 0.0;
-        const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside);
+        const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid);
         std::cout << "\n" << title << " (atomic quadrature grids):\n";
         std::cout << "  basin  label               electrons" << (eli ? "" : "     charge") << "      volume     maximum        x          y          z\n";
         double total = 0.0;

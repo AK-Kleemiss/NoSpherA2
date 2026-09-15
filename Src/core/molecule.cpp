@@ -28,19 +28,16 @@ bool molecule::read_molecule(std::string path)
     }
     file.seekg(0);
     getline_universal(file, line);
-    size_t length;
-    char tempchar[200];
     int count = 0;
-    stringstream streamy;
     while (!file.eof())
     {
-        length = line.copy(tempchar, line.size(), 0);
-        tempchar[length] = '\0';
+        stringstream streamy(line);
         string junk;
-        streamy << tempchar;
         bonds.push_back(vector<int>());
         bonds[bonds.size() - 1].resize(3);
         streamy >> junk >> bonds[count][0] >> bonds[count][1] >> bonds[count][2];
+        count++;
+        getline_universal(file, line);
     }
     return true;
 }

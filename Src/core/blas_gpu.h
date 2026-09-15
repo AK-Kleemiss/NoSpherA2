@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gpu_api.h"
+
 //A device GEMM behind the same row-major interface cblas_dgemm presents, so nos_math's
 //dot_BLAS can hand off without the callers knowing. Works against cuBLAS or hipBLAS.
 //
@@ -12,6 +14,8 @@
 //Returns false whenever the caller should just call BLAS, which includes every case where
 //no device is present.
 
+NOSPHERA2_GPU_API_BEGIN
+
 bool blas_gpu_available();
 
 //-gpu_blas turns the offload on; off unless asked, like the other GPU paths
@@ -23,3 +27,5 @@ bool blas_gpu_enabled();
 bool blas_gpu_dgemm(bool transA, bool transB, int m, int n, int k,
 	double alpha, const double* A, int lda, const double* B, int ldb,
 	double beta, double* C, int ldc);
+
+NOSPHERA2_GPU_API_END

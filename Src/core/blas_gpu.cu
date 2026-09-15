@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <cstdlib>
 
+NOSPHERA2_GPU_API_BEGIN
+
 //What the device has to earn before it is offered the work. The operands live on the host,
 //so every call ships them across and back, and a shape too small to hide that loses. Stated
 //in flops so it does not depend on how the caller shaped the matrices.
@@ -80,3 +82,5 @@ bool blas_gpu_dgemm(const bool transA, const bool transB, const int m, const int
 	gpuFree(dA); gpuFree(dB); gpuFree(dC); gpuFree(dP);
 	return ok;
 }
+
+NOSPHERA2_GPU_API_END

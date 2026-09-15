@@ -4,6 +4,8 @@
 #include <vector>
 #include <algorithm>
 
+NOSPHERA2_GPU_API_BEGIN
+
 #define GPU_TRY(call) do { const gpuError_t e_ = (call); if (e_ != gpuSuccess) { \
 	std::fprintf(stderr, "NoSpherA2 SALTED GPU: %s at %s:%d\n", gpuGetErrorString(e_), __FILE__, __LINE__); \
 	return false; } } while (0)
@@ -276,3 +278,5 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q, int* empty_environments)
 	gpuFree(d_sel); gpuFree(d_out); gpuFree(d_inner); gpuFree(d_p); gpuFree(d_empty);
 	return true;
 }
+
+NOSPHERA2_GPU_API_END

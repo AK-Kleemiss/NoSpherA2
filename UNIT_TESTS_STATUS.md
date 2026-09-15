@@ -1,5 +1,15 @@
 # Unit Test Status
-**Last updated: 2026-09-09** (geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
+**Last updated: 2026-09-14** (one GPU binary per OS: the CUDA and HIP kernels compiled side by side into
+their own namespaces, dispatched at run time, neither runtime linked; `Linux GPU Release` and `Windows GPU
+Release` replace the four single-backend CI jobs. Earlier the same day: GPU CI: CUDA and HIP builds for
+Linux and Windows on GPU-less runners, occ `9bde072f7` compiles `ccsd.cpp` at `/O2` again;
+`-dmin` and `-hkl_min_max` together keep only the symmetry images of the
+measured index box from the resolution sphere, `HklGenerationTests`; 300 pass, 5 fail on `release-windows`
+(the five P1 XCW goldens broken by the `5b6eb296` "Symmetry & Bugfix (WIP)" commit, see below), the 4
+`*_full` XCW cases skip and 2 `DeltaSeriesTests` stay disabled. Earlier the same day: `-dmin` generates
+the resolution sphere, the ten `-dmin` goldens regenerated with their new reflection counts, 307/307; stored XCW two-electron integrals over the screened-in pairs,
+`StoredEriTests` and three `-xcw_incremental` golden cases, 307/307; occ submodule moved to upstream 0.9.4,
+`e9ebbdb13`, 302/302. 2026-09-09: geometry-aid pipeline gtests: hyperparameters, descriptor, GEOAID01 model, the
 four flags through `run_app`; `-repulsion_exchange <dirac|pbe|b88>` picks the exchange functional of
 the Gordon-Kim repulsion, with an H-atom gtest for the three functionals; `-interaction_energy` computes
 the exchange-repulsion by the Gordon-Kim functionals of the fitted densities on a Becke grid over the
@@ -9,6 +19,172 @@ partner's field, D4 dispersion and the density overlap S; `-salted_charge_constr
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
+
+## 2026-09-14 — One GPU binary: CUDA and HIP kernels in the same executable
+
+The four single-backend GPU jobs become `Linux GPU Release` and `Windows GPU Release`, each configured
+with `-DNOSPHERA2_USE_CUDA=ON -DNOSPHERA2_USE_HIP=ON` and both `*_PORTABLE` options (artifacts
+`NoSpherA2-linux-x86_64-gpu.tar.gz`, `NoSpherA2-windows-x64-gpu.zip`). Every kernel source is
+compiled twice, once per backend, with `NOSPHERA2_GPU_BACKEND_NS` naming a namespace
+(`nosphera2_cuda` / `nosphera2_hip`, `Src/core/gpu_api.h`); `Src/core/gpu_dispatch.cpp` defines the
+global entry points of the six GPU headers by forwarding to the backend that has a device (CUDA probed
+first, `NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). Host code sees `NOSPHERA2_USE_GPU` only; the
+backend macros reach the device compilers alone. On the CMake HIP-language route a source has one
+LANGUAGE, so the HIP compiles of a fat build go through generated `hip/<name>.hip` wrappers that
+`#include` the `.cu`. Neither runtime is a load-time import: cudart stays static, and the HIP runtime
+is no longer linked at all - `Src/core/hip_runtime_shim.cpp` defines the 27 `hip*` entries the kernel
+objects import and opens `libamdhip64.so.<major>` / `amdhip64_<major>.dll` on the first call
+(`NOSPHERA2_HIP_RUNTIME`, `ROCM_PATH`, `HIP_PATH`, `/opt/rocm`), answering `hipErrorNoDevice` when
+none is found. That replaces the Windows delay-load hook of the previous entry (`Src/hip_delayload_hook.cpp`
+deleted) and, on Linux, the `libamdhip64.so` NEEDED entry: `readelf -d` of the fat Linux binary lists
+only libiomp5, libquadmath, libtbb, libgcc_s, libm, libstdc++, libc; `dumpbin /DEPENDENTS` of the
+Windows one lists no amdhip64 and no cudart. `CMAKE_HIP_RUNTIME_LIBRARY NONE` keeps CMake's HIP
+language from linking the runtime behind the shim's back; the Visual Studio props do the same fat
+build when `CUDA_PATH` and `HIP_PATH` are both set, HIP objects now named `<name>.hip.obj` so they no
+longer collide with the CUDA objects of the same source.
+
+Checked on the CUDA machine (RTX 2080 Ti, CUDA 13.3 + ROCm 10 wheel, MSVC 14.44) and in its WSL
+(CUDA 12.9 from the bootstrap + the same wheel, gcc host): both fat binaries start without ROCm on the
+path (`-h` exit 0, also with `NOSPHERA2_GPU_BACKEND=hip`), the GPU gtests run on the NVIDIA card
+through the CUDA side of the fat binary (`BlasGpuTests` 3/3, `sucrose_SF_gpu_{grid,fp64,fp32}` pass;
+`P1_test_XCW_gpu_itensor` fails on the same 93098-vs-102932 grid-point golden as the four CPU P1 XCW
+cases since `5b6eb296`; the whole suite on the Windows fat tree is 304/309 with the 4 `*_full`
+skips), and with `NOSPHERA2_GPU_BACKEND=hip` they skip both without the runtime and
+with it on the path (`LD_DEBUG=libs` shows the shim opening `libamdhip64.so.7` from the wheel, then
+no AMD device). A plain `cmake --build <dir>` of the Windows tree from a `VsDevCmd` shell fails in
+featomic's cargo step with `Could not create named generator Visual Studio 18 2026`: the
+`CMAKE_GENERATOR=Ninja` the preset sets for cargo is only exported by `cmake --build --preset`, so
+set it by hand when building a tree by directory.
+
+CI (`CTEST_PARALLEL_LEVEL=4`) then exposed two parallel-ctest races that only bite when the two
+tests land on the same slot: `SALTEDChargeConstraint` was missing from the `integration_SALTED`
+resource lock in `tests/src/SetIntegrationTestLocks.cmake`, so it wrote into the `SALTED` log while
+`SALTED` was comparing it (`a54d28de`); and the two `HklGenerationTests` cases wrote and removed the
+same `nosphera2_geometry_aid_p63.cif` in the temp directory, which Windows refuses to remove while
+the other test still reads it - each case now has its own file (`0b7d21b4`). With those, `Linux GPU
+Release` and `Windows GPU Release` are 305/309 like every other job: the four P1 XCW goldens only.
+The Windows fat build takes 63 min on a cold sccache (every `.cu` twice under MSVC).
+
+## 2026-09-14 — GPU builds in CI, and occ CCSD back at `/O2`
+
+`.github/workflows/c-cpp_all.yml` gains `Linux CUDA Release`, `Windows CUDA Release`, `Linux HIP
+Release` and `Windows HIP Release`. None of the GitHub runners has a GPU, so the toolkits are named
+rather than detected (`-DNOSPHERA2_GPU_AUTO=OFF -DNOSPHERA2_USE_{CUDA,HIP}=ON`) and the kernels are
+built for every supported architecture (`NOSPHERA2_CUDA_PORTABLE`, `NOSPHERA2_HIP_PORTABLE`); the
+test suite then runs on the same GPU-less runner, so what the four jobs prove is that the binaries
+start and fall back to the CPU when there is no device. CUDA 12.9 comes from conda-forge through the
+bootstrap (`-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9`) and is
+linked statically. ROCm 10.0.0 comes from AMD's pip wheels (`rocm[devel]`, `rocm-sdk init`), the
+same on Linux and Windows; the Linux HIP artifact needs a ROCm runtime where it runs, the Windows one
+delay-loads `amdhip64_7.dll`. The delay-load alone was not enough: `NoSpherA2_Tests.exe` built with
+HIP exited with `0xC06D007E` on a machine without ROCm, because clang's HIP module constructors call
+`__hipRegisterFatBinary`/`__hipRegisterFunction` before `main()` (dumpbin `/IMPORTS:amdhip64_7.dll`
+lists them among the delay-loaded entries). `Src/hip_delayload_hook.cpp` installs a
+`__pfnDliFailureHook2` that answers those calls with a stub returning `hipErrorNoDevice`; it has to be
+an object of each executable and of the DLL, not of the core library, because the linker takes the
+first definition it meets. With it the HIP build of the test suite passes on the CUDA machine (GPU
+tests skip) and `NoSpherA2.exe -h` exits 0. Kernel sources use `gpuShflDown32`/`gpuShflXor32`/
+`gpuLoadStreaming` from `gpu_backend.h` instead of the `_sync`/`__ldcs` CUDA spellings, and the
+`LoadLibraryA` presence check is hidden from the HIP device pass (`__HIP_DEVICE_COMPILE__`). On
+Windows the ROCm clang headers need MSVC 14.4x; the workflow keeps that job on `windows-2022`.
+macOS needs no new job: `NOSPHERA2_USE_METAL` now defaults from the SDK (ON for an arm64 build whose
+SDK has Metal and MetalPerformanceShaders, OFF otherwise, the reason printed at configure time), so the
+arm64 slice of the universal artifact carries the Metal I tensor path and the run-time device check in
+`itensor_metal.mm` hands a machine without a Metal device to the CPU code.
+
+occ `9bde072f7` (`nosphera2-upstream-0.9.4`) restructures `CCSD::update_amps` in `src/qm/cc/ccsd.cpp`
+into staged helpers (`f_and_l_intermediates`, `w_intermediates`, `t1_residual`, `t2_residual`) with
+the four-index permutation as an out-of-line parallel `perm4` rather than one expression MSVC's
+optimiser spent hours on; the file compiles in 52 s at `/O2` and the `/Od /Ob0` exception in
+`src/qm/cc/CMakeLists.txt` is gone. Checked with a temporary gtest: water and HF in STO-3G through
+occ's SCF and CCSD from the `/O2` build reproduce the PySCF reference energies to 1e-7 (HF: e_hf
+-98.5711004441, e_corr -0.0260730845).
+
+## 2026-09-14 — `-dmin` with `-hkl_min_max` keeps the orbit of the measured box
+
+Olex2 sends the measured index box (`-hkl_min_max`) and now also the hkl file's d_min (`-dmin`,
+`_file_d_min()` in `util/pyUtil/NoSpherA2/utilities.py`, the HKLF-transformed file without the
+SHEL/OMIT/sigma filter). `generate_hkl_from_options` (`Src/core/scattering_factors.cpp`) dispatches:
+both given, the sphere is walked as before but an index is kept only when one of its images h.R
+(or the Friedel mate of one) lies in the box; `-dmin` alone gives the sphere, `-hkl_min_max` alone
+the box with its symmetry images, neither reads `-hkl`, and `-ED` takes the sphere at dmin/2 - 0.001
+and ignores the box (the dynamical calculation in `smtbx/ED/n_beam.h` needs every beam). The kept set
+is exactly what cctbx's tsc reader (`smtbx/structure_factors/direct/table_based.h`, h.R over the
+rotations with the -h.R fallback) resolves for a measured list, and since rotations preserve d every
+image of a box index is inside the sphere, so nothing the reader asks for is dropped.
+`cell::get_sym()` stores R^T, so the products in the generator form h.R, the cctbx convention.
+Checked with cctbx's own reader (`direct.f_calc_modulus_squared(..., table_file_name=)` then
+`evaluate(h)` over every measured index, the merged ASU and the mask completion set) on sucrose
+P2_1, Fe P2_12_12_1 (partial dataset), epoxide P2_1/n, Au2Br2 I2/a, malbac P-1 and a synthetic
+P6_3 cell with an asymmetric wedge and a random 30 % subset: 0 unresolved indices in every case;
+rows both <= sphere <= box (Fe: 286998 sphere, 42262 box, 308 both). `HklGenerationTests`
+(`tests/src/UnitTests.cpp`) build a P6_3 cell where R^T != R^-1, compare the boxed set with the
+hand-worked h.R orbit of the box (equal) and with the R.h orbit (different), and check that the
+options dispatch combines the two and that `-ED` ignores the box. `ctest --preset release-windows`:
+300 passed, 5 failed (`P1_test_XCW`, `P1_test_XCW_gpu_itensor`, `P1_test_XCW_h2`, `P1_F2_test_XCW`,
+`P1_F2_test_XCW_h2`: grid points 102932 -> 93098 and a new XCW criterion line from Johannes
+Bartusel's `5b6eb296` WIP, present before this change and not touched by it).
+
+## 2026-09-14 — `-dmin` generates the resolution sphere
+
+`generate_hkl(dmin)` (`Src/core/scattering_factors.cpp`) used to keep the whole index box
+|h| <= a/dmin, |k| <= b/dmin, |l| <= c/dmin, expand it by the symmetry operations into further
+`std::set` copies and reduce it by Friedel pairs, which is 1.9 times the sphere for an orthogonal
+cell (8 x 1.9 for the ED half spacing) and why `-dmin 0.1` took 20 s and `-dmin 0.05` three
+minutes on sucrose. It now generates the sphere d*^2 <= 1/d_keep^2 from the reciprocal metric
+(`cell::get_reciprocal_metric`), the Friedel-unique half directly and the l range per (h, k) from
+the quadratic, with d_keep = dmin (1 - 1e-3) so the table never ends above the dmin Olex2 or cctbx
+asked for. The ED callers pass dmin/2 - 0.001, the resolution `smtbx/ED/n_beam.h` generates to.
+Checked against an independent numpy build of cctbx's set (d*^2 <= 1/d^2, one of each Friedel
+pair) on sucrose at 0.8, 0.5, 0.31 and ED 0.8, 0.5: nothing missing, the only extra reflections
+sit in the 1e-3 margin band, everything inside the old box, no duplicates, IAM form factors
+bit-identical to the old table (up to the Friedel conjugate where the old code kept -hkl).
+Sucrose IAM: 0.8 A 5386 -> 2957 reflections, 0.1 A 20.5 -> 7.5 s, 0.05 A 178 -> 54 s. The ten
+golden cases with `-dmin` (`alanine_occ`, `alanine_integrated_occ`, `Hybrid_mode`, `ri_fit`,
+`ri_fit_multipoles`, `SALTED`, `SALTED_charge_constraint`, `sucrose_ptb`, `TFVC`, `TFVC_ECP`) were
+regenerated; only their three reflection-count lines changed. `ctest --preset release-windows`:
+307/307 passing, 0 failed, 110 s.
+
+## 2026-09-14 — Stored two-electron integrals over the screened-in pairs (`StoredEriTests`)
+
+`XCW::store_ERIs` / `eri_JK` / `eri_fock` became the class `stored_eri` (`Src/core/stored_eri.cpp`).
+It keeps only the basis-function pairs a >= b that survive OCC's shell-pair screen and a Schwarz
+screen (`sqrt((ab|ab)) * max_cd sqrt((cd|cd)) >= 1e-12`, OCC's own quartet threshold), packed over
+the kept-pair numbering so the contraction keeps its shape (row k holds kept pairs 0..k, the pairs
+of one first index c are one contiguous segment). The budget is four fifths of the free memory, the
+I tensor's. `-xcw_incremental` now applies to the stored path too: the difference density is
+contracted with every segment skipped whose Schwarz bound times the largest difference element it
+touches falls below 1e-12; the device contraction (`eri_jk_kernel<R, SPARSE>` in
+`itensor_gpu.cu`) takes the whole density and is excluded from the incremental step. Accuracy,
+all against `HartreeFock::compute_fock` with Schwarz screening (`tests/src/StoredEriTests.cpp`):
+water def2-SVP RHF (all 300 pairs kept) max |dF| 1.1e-14; two waters 14 A apart def2-SVP RHF
+(600 of 1176 pairs kept) 6.2e-15; methyl radical def2-SVP UHF 5.3e-15; the incremental
+G(D0) + G_screened(D1 - D0) against G(D1) for |D1 - D0| up to 0.06: 3.6e-15 to 8.9e-15; the CUDA
+kernel against the CPU contraction, dense and sparse: |dJ| <= 4.4e-15, |dK| <= 8.9e-16. P1 sto-3g
+keeps 4445 of 5356 pairs (75 MB instead of 115 MB); the three new golden cases
+`P1_test_XCW_incremental`, `P1_test_XCW_h2_incremental`, `P1_F2_test_XCW_incremental` agree with
+their full-build counterparts to 4e-7 Eh, the SCF convergence. `ctest --preset release-windows`:
+307/307 passing, 0 failed, 110 s.
+
+## 2026-09-14 — occ submodule on upstream 0.9.4
+
+The `occ` submodule now tracks `peterspackman/occ` main at 0.9.4 (`d17f1d6af`) with the NoSpherA2
+patches cherry-picked on top (branch `nosphera2-upstream-0.9.4`, head `e9ebbdb13`). Florian's Ca
+initial-guess fix (`Z <= 20` in `guess_density.cpp`) is subsumed by the upstream Madelung guess.
+What changed on our side: `occ/disp/dftd4.h` (cpp-d4) is gone, `d4_energy` in `Src/core/integrator.cpp`
+uses the native `occ::disp::D4Dispersion` with `RefqMode::DFT`, `set_functional("pbe")` and EEQ charges
+(same PBE parameters as before). occ `e9ebbdb13` compiles `share/dftd4/{refdata,functionals}.json` into
+`occ_disp` (a file under `OCC_DATA_PATH` still wins), so no data directory is needed for D4 and the three
+D4 gtests pass with `OCC_DATA_PATH` unset; `supports_incremental_fock_build()` became
+`fock_build_properties().density_screened` in `Src/core/XCW.cpp`; the VS lib lists and
+`cmake/InstallDependenciesOnly.cmake` gain `occ_cc`, `occ_correlation`, `occ_mults` and lose `dftd4`.
+MSVC fixes inside occ: `Eigen::Index` casts in the 4c/DF tensor code, `MULTS_RESTRICT` macro for
+`__restrict__`, explicit `get<std::string>()` for a json → `fs::path` conversion, and `occ_cc_obj` built
+with `/Od /Ob0` on MSVC because `ccsd.cpp` at `/O2` did not finish in 26 min (lifted again by occ
+`9bde072f7`, see the entry above). Reconfiguring an existing
+build tree needs `cmake -U CPM_DIRECTORY -U CPM_DRY_RUN -U CPM_VERSION <build dir>` first, the stale
+`CPM_DIRECTORY` cache entry makes the new CPM return before `CPMAddPackage` is defined.
+`ctest --preset release-windows`: 302/302 passing, 0 failed, 107 s.
 
 ## 2026-09-09 — Geometry-aid pipeline tests (`GeometryAidTests`, `GeometryAidDeathTest`)
 
@@ -241,6 +417,32 @@ differences of the analytic gradient on 200000 points and the GPU kernel against
 exact, -0.3125; PC07opt shifts it) and one point value against the Python transcription of the libxc maple
 sources to 1e-12. Water-methanol Delta E_x -2.03 (free fit, total -0.47) and -2.28 kcal/mol (Model V7,
 total +2.13), between PBE and B88; GPU and CPU agree to all printed digits, cost equals the PBE run.
+
+## 2026-09-09 — ECP cores filled for QTAIM, and the Flawfinder check
+
+`ELI_HgH2_ECP` now runs with `-ECP 1`: the 60 electrons the def2 ECP removed from mercury are
+put back from Thakkar's spherical core density for the QTAIM basins (the topology is followed on
+the filled density, the count added analytically since the valence grid cannot integrate a 1s at
+Z = 80). Hg comes out at 79.431 e against 79.431 for the all-electron DKH2 calculation and 79.454
+from AIMAll. ELI-D stays on the valence density.
+
+The code-scanning check `Flawfinder` failed the pull request on six level-4/5 hits: a `readlink`
+of `/proc/self/exe`, two `system("which ...")` calls, two `popen` calls for the zenity/kdialog
+file dialogs, and a false positive on a variable named `system`. The `which` calls now search
+PATH directly, the variable is renamed, and the three remaining calls carry reviewed
+`Flawfinder: ignore` markers with their reason. `flawfinder --minlevel=4 Src` reports nothing.
+
+## 2026-09-09 — heavy-element basin cases: `ELI_HgH2_ECP` and `ELI_UH6`
+
+Two golden cases in the new `tests/ELI_heavy` directory (one resource lock, they share the log):
+HgH2 with the def2 ECP on mercury (RHF/def2-TZVP, 10 s) and UH6 all-electron (RHF/DKH2 with
+SARC-DKH-TZVP, 34 s), both from ORCA 6.1.1 inputs kept in the handover. They pin the ECP
+handling (a nucleus without core density wears a sphere of valence maxima, which the trajectory
+code folds into it) and the core-shell unification for Z = 92. Reference values: HgH2-ECP QTAIM
+Hg 19.431 (AIMAll 19.454), ELI-D Hg core 18.17 (the 5s5p5d semicore); UH6 QTAIM U 89.115 / H
+1.4807 (AIMAll 89.020 / 1.4967; `-acc 4` gives 89.075 / 1.4874), ELI-D U core 85.7, six hydride
+basins of 1.71-1.75 e plus U-H fragments of 0.31. DGrid is no reference here: its voxel
+integration of a Z = 80 cusp gives 478 electrons for the mercury core.
 
 ## 2026-09-09 — f-function phases in the OCC-to-WFN constructor
 

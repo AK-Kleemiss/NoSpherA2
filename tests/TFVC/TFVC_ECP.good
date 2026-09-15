@@ -14,11 +14,11 @@ Number of electrons: 116.000000
 Number of ECP electrons: 28
 Reading:                                     "Rh.cif" done!
 Generating hkl indices up to d=:              0.84... done!
-Nr of reflections generated:                 12167
+Nr of reflections generated:                  3561
 Number of symmetry operations:                   1
-Nr of reflections to be used:                 6083
+Nr of reflections to be used:                 3561
 Generating k-points...                            ... done!
-Number of k-points to evaluate: 6083
+Number of k-points to evaluate: 3561
 There are:
   15 atoms read from the wavefunction, of which 
   15 are identified as asymmetric unit atoms!

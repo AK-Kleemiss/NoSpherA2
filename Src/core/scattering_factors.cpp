@@ -465,60 +465,75 @@ void generate_hkl(const double& dmin,
 	const vec2& twin_law,
 	cell& unit_cell,
 	std::ostream& file,
-	bool debug)
+	bool debug,
+	const ivec2& hkl_min_max)
 {
 	using namespace std;
+	const ivec3 sym = unit_cell.get_sym();
+	const int n_sym = sym[0][0].size();
+	//An index box narrows the sphere to the orbit of the measured indices: h is kept when one
+	//of its images h.R, or the Friedel mate of one, lies in the box. That is the set cctbx's
+	//table reader resolves for a measured list (smtbx table_based.h walks h.R over the
+	//rotations and falls back to -h.R), and since a rotation preserves d every image of a
+	//box index is inside the sphere already, so nothing the reader asks for is dropped.
+	//sym[j][h][s] holds R^T, so the products below form h.R, the cctbx convention.
+	const bool boxed = hkl_min_max.size() == 3;
+	if (boxed)
+		file << "Keeping only the symmetry images of the index box ["
+			<< setw(2) << hkl_min_max[0][0] << "," << setw(2) << hkl_min_max[0][1] << "] ; ["
+			<< setw(2) << hkl_min_max[1][0] << "," << setw(2) << hkl_min_max[1][1] << "] ; ["
+			<< setw(2) << hkl_min_max[2][0] << "," << setw(2) << hkl_min_max[2][1] << "]\n";
+	auto in_box = [&hkl_min_max](const int h, const int k, const int l) {
+		return h >= hkl_min_max[0][0] && h <= hkl_min_max[0][1] &&
+			k >= hkl_min_max[1][0] && k <= hkl_min_max[1][1] &&
+			l >= hkl_min_max[2][0] && l <= hkl_min_max[2][1];
+	};
+	auto wanted = [&](const int h, const int k, const int l) {
+		if (!boxed || in_box(h, k, l) || in_box(-h, -k, -l))
+			return true;
+		for (int s = 0; s < n_sym; s++)
+		{
+			const int h_ = h * sym[0][0][s] + k * sym[0][1][s] + l * sym[0][2][s];
+			const int k_ = h * sym[1][0][s] + k * sym[1][1][s] + l * sym[1][2][s];
+			const int l_ = h * sym[2][0][s] + k * sym[2][1][s] + l * sym[2][2][s];
+			if (in_box(h_, k_, l_) || in_box(-h_, -k_, -l_))
+				return true;
+		}
+		return false;
+	};
 	file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
-	i3 hkl_;
-	string line, temp;
-	/* A reflection with spacing d has |h| <= a/d, and likewise for k and l with
-	b and c, in any cell: the bound is the real-space axis length times the
-	reciprocal radius. It is tight, so the loops have to reach it. They used to
-	stop one short and lean on a 0.01 A widening of dmin to make the difference
-	up, which is not the same thing - the slack that buys scales with the axis
-	length, so it covers the shortfall on a long axis and not on a short one.
-	For a dynamical calculation the list has to be complete rather than nearly
-	so: a single index the table misses is a failed refinement, not a slightly
-	worse number.
-	*/
+	//The sphere d*^2 <= 1/d_keep^2 (cctbx index_generator, smtbx n_beam.h) is closed under
+	//the point group, so the Friedel half l > 0 | l = 0, k > 0 | k = l = 0, h > 0 is the list.
+	//d_keep sits 1e-3 inside dmin so a reflection at dmin from a rounded cell is never lost.
+	const double d_keep = dmin * (1.0 - 1e-3);
+	const double s_max = 1.0 / (d_keep * d_keep);
+	const array<double, 6> G = unit_cell.get_reciprocal_metric();
 	const ivec extreme = {
-		int(std::floor(unit_cell.get_a() / dmin)),
-		int(std::floor(unit_cell.get_b() / dmin)),
-		int(std::floor(unit_cell.get_c() / dmin)) };
+		int(unit_cell.get_a() / d_keep + 1e-4),
+		int(unit_cell.get_b() / d_keep + 1e-4),
+		int(unit_cell.get_c() / d_keep + 1e-4) };
 	if (debug)
 		file << "extreme: " << extreme[0] << " " << extreme[1] << " " << extreme[2] << endl;
 	for (int h = -extreme[0]; h <= extreme[0]; h++)
 	{
 		for (int k = -extreme[1]; k <= extreme[1]; k++)
 		{
-			for (int l = -extreme[2]; l <= extreme[2]; l++)
-			{
-				hkl_ = { h, k, l };
-				hkl.emplace(hkl_);
-			}
+			//d*^2 = A l^2 + B l + C; the loops run in the order i3 compares, hence the hint
+			const double A = G[2];
+			const double B = 2.0 * (h * G[4] + k * G[5]);
+			const double C = h * h * G[0] + k * k * G[1] + 2.0 * h * k * G[3] - s_max;
+			const double disc = B * B - 4.0 * A * C;
+			if (disc < 0.0)
+				continue;
+			const double root = sqrt(disc);
+			const int l_lo = max(int(ceil((-B - root) / (2.0 * A))), (k > 0 || (k == 0 && h > 0)) ? 0 : 1);
+			const int l_hi = min(int(floor((-B + root) / (2.0 * A))), extreme[2]);
+			for (int l = l_lo; l <= l_hi; l++)
+				if (wanted(h, k, l))
+					hkl.emplace_hint(hkl.end(), i3{ h, k, l });
 		}
 	}
 	file << "... done!\nNr of reflections generated: " << setw(21) << hkl.size() << endl;
-
-	if (debug)
-		file << "Number of reflections before twin: " << hkl.size() << endl;
-	if (twin_law.size() > 0)
-	{
-		for (const i3& hkl__ : hkl)
-			for (int i = 0; i < twin_law.size(); i++)
-				hkl.emplace(i3{
-					int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
-	}
-	if (debug)
-		file << "Number of reflections after twin: " << hkl.size() << endl;
-
-	vector<vector<ivec>> sym(3);
-	for (int i = 0; i < 3; i++)
-		sym[i].resize(3);
-	sym = unit_cell.get_sym();
-
 	if (debug)
 	{
 		file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
@@ -535,48 +550,57 @@ void generate_hkl(const double& dmin,
 	}
 	else
 		file << "Number of symmetry operations: " << setw(19) << sym[0][0].size() << endl;
-
-	i3 tempv;
-	hkl_list hkl_enlarged = hkl;
-	for (int s = 0; s < sym[0][0].size(); s++)
+	//A twin law is no point-group operation, so its images leave the sphere: expand and reduce
+	if (twin_law.size() > 0)
 	{
-		if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
-			sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
-			sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0)
-		{
-			continue;
-		}
+		if (debug)
+			file << "Number of reflections before twin: " << hkl.size() << endl;
+		hkl_list twinned = hkl;
 		for (const i3& hkl__ : hkl)
+			for (int i = 0; i < twin_law.size(); i++)
+				twinned.emplace(i3{
+					int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
+					int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
+					int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+		if (debug)
+			file << "Number of reflections after twin: " << twinned.size() << endl;
+		i3 tempv;
+		hkl_list hkl_enlarged = twinned;
+		for (int s = 0; s < sym[0][0].size(); s++)
 		{
-			tempv = { 0, 0, 0 };
-			for (int h = 0; h < 3; h++)
+			if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
+				sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
+				sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0)
 			{
-				for (int j = 0; j < 3; j++)
-					tempv[j] += hkl__[h] * sym[j][h][s];
+				continue;
 			}
-			hkl_enlarged.emplace(tempv);
+			for (const i3& hkl__ : twinned)
+			{
+				tempv = { 0, 0, 0 };
+				for (int h = 0; h < 3; h++)
+				{
+					for (int j = 0; j < 3; j++)
+						tempv[j] += hkl__[h] * sym[j][h][s];
+				}
+				hkl_enlarged.emplace(tempv);
+			}
 		}
-	}
-	hkl.clear();
-	if (debug)
-		file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
-
-	for (const i3& hkl__ : hkl_enlarged)
-	{
-		if (hkl.find(hkl__) != hkl.end())
-			continue;
-		tempv = hkl__;
-		tempv[0] *= -1;
-		tempv[1] *= -1;
-		tempv[2] *= -1;
-		if (hkl.find(tempv) == hkl.end())
+		hkl.clear();
+		if (debug)
+			file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
+		for (const i3& hkl__ : hkl_enlarged)
 		{
-			hkl.emplace(hkl__);
+			if (hkl.find(hkl__) != hkl.end())
+				continue;
+			tempv = hkl__;
+			tempv[0] *= -1;
+			tempv[1] *= -1;
+			tempv[2] *= -1;
+			if (hkl.find(tempv) == hkl.end())
+				hkl.emplace(hkl__);
 		}
-	}
-	// Remove 0 0 0 if it exists
-	if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
 		hkl.erase(i3{ 0, 0, 0 });
+	}
 	file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
@@ -598,9 +622,9 @@ void generate_hkl(const ivec2& hkl_min_max,
 	reflections out to half the measured spacing, and it is the latter a
 	dynamical calculation asks for. A box and a resolution shell are different
 	shapes: the shell reaches further along the shorter axes, so this leaves a
-	gap there. Olex2 sends -dmin for ED, which takes precedence over the box
-	and generates the right set; this stays for callers that pass only a box,
-	and says so rather than looking complete.
+	gap there. Olex2 sends -dmin for ED, which generates the sphere and ignores
+	the box; this stays for callers that pass only a box, and says so rather
+	than looking complete.
 	*/
 	if (ED) {
 		h_max *= 2, k_max *= 2, l_max *= 2;
@@ -704,6 +728,25 @@ void generate_hkl(const ivec2& hkl_min_max,
 	if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
 		hkl.erase(i3{ 0, 0, 0 });
 	file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
+}
+
+void generate_hkl_from_options(const options& opt,
+	hkl_list& hkl,
+	cell& unit_cell,
+	std::ostream& file)
+{
+	const bool have_dmin = opt.dmin != 99.0;
+	const bool have_box = opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100;
+	if (have_dmin && opt.electron_diffraction)
+		generate_hkl(opt.dmin / 2.0 - 0.001, hkl, opt.twin_law, unit_cell, file, opt.debug);
+	else if (have_dmin && have_box)
+		generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.hkl_min_max);
+	else if (have_dmin)
+		generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+	else if (have_box)
+		generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
+	else
+		read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
 }
 
 /**
@@ -1952,6 +1995,16 @@ void calc_SF(const int& points,
 
 				re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
 				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
+#elif defined(_MSC_VER) && defined(__AVX__)
+				//one SVML call for both instead of the separate sin4 and cos4 the vectoriser emits
+				__m256d cv;
+				const __m256d sv = _mm256_sincos_pd(&cv, _mm256_set_pd(work3, work2, work1, work0));
+				const __m256d rv = _mm256_loadu_pd(dens_local + p);
+				alignas(32) double cr[4], sr[4];
+				_mm256_store_pd(cr, _mm256_mul_pd(rv, cv));
+				_mm256_store_pd(sr, _mm256_mul_pd(rv, sv));
+				re += cr[0] + cr[1] + cr[2] + cr[3];
+				im += sr[0] + sr[1] + sr[2] + sr[3];
 #else
 				const double c0 = cos(work0);
 				const double si0 = sin(work0);
@@ -2460,7 +2513,10 @@ int make_atomic_grids_wrapper(
 	config.debug = opt.debug;
 	config.all_charges = opt.all_charges;
 
-	GridManager grid_manager(config);
+	GridManager local_manager(config);
+	GridManager& grid_manager = opt.grid_cache ? *opt.grid_cache : local_manager;
+	if (opt.grid_cache)
+		grid_manager.setConfiguration(config);
 
 	WFN temp = wave;
 	temp.delete_unoccupied_MOs();
@@ -2535,21 +2591,7 @@ itsc_block calculate_scattering_factors_from_cube(
 	}
 	else if (opt.read_k_pts == false)
 	{
-		if (opt.dmin != 99.0)
-		{
-			if (opt.electron_diffraction)
-				generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
-			else
-				generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
-		}
-		else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-		{
-			generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-		}
-		else
-		{
-			read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
-		}
+		generate_hkl_from_options(opt, hkl, unit_cell, file);
 		opt.m_hkl_list = hkl;
 	}
 
@@ -2768,15 +2810,7 @@ tsc_block_type calculate_scattering_factors(
 	}
 	else if (nr == 0 && opt.read_k_pts == false)
 	{
-		if (opt.dmin != 99.0)
-			if (opt.electron_diffraction)
-				generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
-			else
-				generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
-		else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-			generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-		else
-			read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+		generate_hkl_from_options(opt, hkl, unit_cell, file);
 		opt.m_hkl_list = hkl;
 	}
 	if (kpts == NULL || kpts->size() == 0)

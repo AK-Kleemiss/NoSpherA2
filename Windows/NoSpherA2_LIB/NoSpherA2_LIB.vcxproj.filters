@@ -1994,6 +1994,9 @@
     <ClInclude Include="..\..\Src\core\cube.h">
       <Filter>Header Files\Utils</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Src\core\stored_eri.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Src\core\xcw_halting.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -5240,6 +5243,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Src\core\convenience.cpp">
       <Filter>Source Files\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Src\core\stored_eri.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Src\core\xcw_halting.cpp">
       <Filter>Source Files</Filter>

@@ -70,7 +70,7 @@ namespace {
         }
 #else
         char exe_path[4096];
-        ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+        ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1); /* Flawfinder: ignore - fixed path, bounded, terminated below */
         if (len > 0)
         {
             exe_path[len] = '\0';
@@ -186,12 +186,15 @@ std::string help_message =
  "  -occ <file.toml>                   Run an OCC wavefunction calculation.\n"
  "  -xyz <file.xyz>                    Atomic positions for IAM or SALTED.\n"
  "  -hkl <file.hkl>                    Reflection list.\n"
- "  -dmin <angstrom>                   Generate reflections to this d-spacing\n"
- "                                    instead of reading -hkl.  Takes precedence\n"
- "                                    over -hkl_min_max and -hkl.\n"
+ "  -dmin <angstrom>                   Generate the resolution sphere to this\n"
+ "                                    d-spacing instead of reading -hkl. With\n"
+ "                                    -hkl_min_max only the symmetry images of\n"
+ "                                    that box are kept from the sphere (the set\n"
+ "                                    a refinement of the box needs); with -ED\n"
+ "                                    the box is ignored.\n"
  "  -hkl_min_max hmin hmax kmin kmax lmin lmax\n"
- "                                    Explicit HKL bounds; used instead of -hkl,\n"
- "                                    but only when -dmin is not given.\n"
+ "                                    Measured index box; alone it generates the\n"
+ "                                    box and its symmetry images instead of -hkl.\n"
  "  -IAM                               Use Thakkar independent-atom factors.\n"
  "  -tsc_block <n>                     Reflections per block when writing the\n"
  "                                    tsc [1000]. The table is streamed to disk\n"
@@ -223,9 +226,9 @@ std::string help_message =
  "                                    up to order N (implies -ri_fit).\n"
  "  -multipole_strength <x>            Weight of the restraint rows against the\n"
  "                                    density-fit metric, default 1.\n"
- "  -multipole_partition               Restrain the partition-weighted moments of\n"
- "                                    the whole fitted density instead of the\n"
- "                                    moments of each atom's own functions.\n"
+ "  -multipole_centre                  Restrain the moments of each atom's own\n"
+ "                                    functions instead of the partition-weighted\n"
+ "                                    moments of the whole fitted density.\n"
  "  -cpus <n>                          Maximum worker threads [all available].\n"
  "  -mem <MB>                          Memory budget for everything sliceable\n"
  "                                    [unset]. When given, the tsc block size\n"
@@ -254,15 +257,19 @@ std::string help_message =
  "  -no_cpu_itensor_fp32               Build the I tensor on the CPU in double;\n"
  "                                    single precision, as the device path\n"
  "                                    runs, is the default.\n"
- "  -no_itensor_hybrid                 Leave every reflection of the I tensor to\n"
- "                                    the device. By default the CPU threads\n"
- "                                    take reflections alongside it and stop\n"
- "                                    when the device would finish the rest\n"
- "                                    sooner than they would one more.\n"
+ "  -itensor_hybrid                    Let the CPU threads take reflections of\n"
+ "                                    the I tensor alongside the device. The\n"
+ "                                    split is decided by timing and the two\n"
+ "                                    sides differ in the last bits, so the\n"
+ "                                    result is no longer reproducible run to\n"
+ "                                    run; worth it on a card whose double\n"
+ "                                    precision is slower than the host.\n"
  "  -gpu_itensor_tensor                FP16 Tensor Core operands with FP32\n"
- "                                    accumulation for the I tensor (default\n"
- "                                    when cuBLAS provides it); use\n"
- "                                    -no_gpu_itensor_tensor for FP32 GEMM.\n"
+ "                                    accumulation for the I tensor, about\n"
+ "                                    2x faster than the FP32 GEMM default\n"
+ "                                    but off in the fourth decimal of the\n"
+ "                                    energy; -no_gpu_itensor_tensor is the\n"
+ "                                    default.\n"
  "  -gpu_salted / -no_gpu_salted       The SALTED descriptor combination\n"
  "                                    (equicomb). It falls back to the CPU when\n"
  "                                    no usable device is present.\n"
@@ -428,7 +435,13 @@ std::string help_message =
  "                                    voxel sum and on the atomic quadrature\n"
  "                                    grids, the boundary followed along the\n"
  "                                    field; -acc 4 before it tightens the\n"
- "                                    latter from 0.005 to 0.002 e.\n"
+ "                                    latter from 0.005 to 0.002 e. With -ECP\n"
+ "                                    the core an ECP removed is filled from\n"
+ "                                    Thakkar densities for the QTAIM basins.\n"
+ "  -basin_grid <n>                    Pull the basin quadrature into the core:\n"
+ "                                    tightest exponent sharpened n^2-fold, the\n"
+ "                                    radial step divided by n, the angular\n"
+ "                                    order up n-1 steps. For heavy atoms.\n"
  "  -ewal_sum <cube> [kmax] [accuracy] Ewald sum of a cube.\n"
  "  -atom_dens <wfn> [alpha-MOs beta-MOs]\n"
  "  -atom_dens_diff <gbw1> <gbw2>      Difference density from two GBW files.\n"
@@ -473,8 +486,9 @@ std::string help_message =
  "                                    alone instead of the density extrapolated\n"
  "                                    through the two previous steps.\n"
  "  -xcw_incremental                   Two-electron Fock build from the change of\n"
- "                                    the density each iteration; needs\n"
- "                                    -xcw_int_precision 1e-12.\n"
+ "                                    the density each iteration, from the stored\n"
+ "                                    integrals when they fit in memory; the\n"
+ "                                    direct build needs -xcw_int_precision 1e-12.\n"
  "  -xcw_int_precision <p>             Integral screening threshold of the XCW\n"
  "                                    Fock build, default 1e-10 (OCC's own 1e-12).\n"
  "  -XCW_settings <file>                Keywords for -do_XCW. Besides the\n"
@@ -625,7 +639,7 @@ bool ensure_occ_data_path(const char *argv0)
         free(occ_data_path_env);
     }
 #else
-    const char* tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH");
+    const char* tmp_occ_data_path_env = std::getenv("OCC_DATA_PATH"); // Flawfinder: ignore
     if (tmp_occ_data_path_env != nullptr)
     {
         std::string occ_data_path_env(tmp_occ_data_path_env);
@@ -771,7 +785,7 @@ std::filesystem::path get_home_path(void)
     temp1.append(temp2);
     return temp1;
 #else
-    const char *home_env = getenv("HOME");
+    const char *home_env = getenv("HOME"); // Flawfinder: ignore
     if (home_env == nullptr) {
         std::cerr << "Warning: HOME environment variable not set." << std::endl;
         return std::filesystem::path("/tmp"); // Fallback to /tmp
@@ -1919,7 +1933,9 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                         wavy.set_atom_ADPs(a, ADPs);
                         if (grown) {
                             for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
-                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                                if (symmetry_linking_list[a][b].size() != 0) {
+                                    wavy.set_atom_ADPs(b, ADPs);
+                                }
                             }
                         }
                         atom_found = true;
@@ -2566,6 +2582,8 @@ bool options::digest_run_options(const std::string &temp, int &i)
     const int argc = (int)arguments.size();
     if (temp == "-acc")
         accuracy = stoi(arguments[i + 1]);
+    else if (temp == "-basin_grid")
+        basin_grid = std::max(1, stoi(arguments[i + 1]));
     else if (temp == "-Anion")
     {
         int n = 1;
@@ -3597,6 +3615,8 @@ bool options::digest_ri_options(const std::string &temp, int &i)
     }
     else if (temp == "-multipole_partition")
         multipole_partition = true;
+    else if (temp == "-multipole_centre" || temp == "-multipole_center")
+        multipole_partition = false;
     else if (temp == "-multipole_strength") {
         multipole_strength = std::stod(arguments[++i]);
         err_checkf(multipole_strength > 0.0, "-multipole_strength must be positive", std::cout);
@@ -4247,7 +4267,17 @@ bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std:
     return false;
 #else
     std::string command;
-    bool use_zenity = (system("which zenity > /dev/null 2>&1") == 0);
+    //Looked up on PATH rather than asked of a shell
+    auto on_path = [](const char* name) {
+        const char* path = std::getenv("PATH"); /* Flawfinder: ignore - only split on ':' and joined to a directory */
+        if (!path) return false;
+        std::stringstream dirs(path);
+        std::string dir;
+        while (std::getline(dirs, dir, ':'))
+            if (!dir.empty() && std::filesystem::exists(std::filesystem::path(dir) / name)) return true;
+        return false;
+    };
+    bool use_zenity = on_path("zenity");
     bool use_kdialog = false;
 
     if (use_zenity) {
@@ -4262,7 +4292,7 @@ bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std:
         command += " 2> /dev/null";
     }
     else {
-        use_kdialog = (system("which kdialog > /dev/null 2>&1") == 0);
+        use_kdialog = on_path("kdialog");
         if (use_kdialog) {
             command = "kdialog --getopenfilename \"";
             command += current_path;
@@ -4305,7 +4335,7 @@ bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std:
         std::cout << "Executing command: " << command << std::endl;
     }
 
-    FILE *f = popen(command.c_str(), "r");
+    FILE *f = popen(command.c_str(), "r"); /* Flawfinder: ignore - a fixed dialog program and its quoted arguments */
     if (!f) {
         std::cerr << "Error: Failed to execute file dialog command." << std::endl;
         return false;
@@ -4415,7 +4445,7 @@ bool save_file_dialog(std::filesystem::path &path, bool debug, const std::vector
     command += "/\" --save --confirm-overwrite 2> /dev/null";
     bool end = false;
     while (!end) {
-        FILE *f = popen(command.c_str(), "r");
+        FILE *f = popen(command.c_str(), "r"); /* Flawfinder: ignore - a fixed dialog program and its quoted arguments */
         if (!f) {
             std::cout << "ERROR" << std::endl;
             return false;

@@ -35,89 +35,70 @@ constexpr void WFN::fill_Afac_pre()
                 Afac_pre[l][r][s] = constants::ft[r] * constants::ft[s] * constants::ft[l - 2 * r - 2 * s];
 }
 
-WFN::WFN()
+void WFN::reset()
 {
     ncen = 0;
     nfunc = 0;
     nmo = 0;
     nex = 0;
     charge = 0;
+    ECP_m = 0;
     multi = 0;
     origin = e_origin::NOT_YET_DEFINED;
-    ECP_m = 0;
     total_energy = 0.0;
     virial_ratio = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
     basis_set_name = " ";
-    has_ECPs = false;
     comment = "Test";
+    path.clear();
+    method.clear();
+    MOs.clear();
+    coef_primitive_major.clear();
+    coef_primitive_major_valid = false;
+    centers.clear();
+    types.clear();
+    exponents.clear();
+    UT_DensityMatrix.clear();
+    UT_SpinDensityMatrix.clear();
+    DM = dMatrix2();
+    MO_sph = dMatrix2();
     basis_set = NULL;
+    cub.clear();
+    atoms.clear();
+    modified = false;
+    d_f_switch = false;
+    distance_switch = false;
+    has_ECPs = false;
+    isBohr = false;
+    is_unrestricted = false;
+};
+
+WFN::WFN()
+{
+    reset();
     fill_pre();
     fill_Afac_pre();
 };
 
 WFN::WFN(e_origin given_origin)
 {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
-    charge = 0;
-    multi = 0;
-    ECP_m = 0;
-    total_energy = 0.0;
+    reset();
     origin = given_origin;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
     fill_pre();
     fill_Afac_pre();
 };
 
 WFN::WFN(const std::filesystem::path &filename, const bool &debug)
 {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
-    charge = 0;
-    multi = 0;
-    ECP_m = 0;
-    total_energy = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
+    reset();
     fill_pre();
     fill_Afac_pre();
     read_known_wavefunction_format(filename, std::cout, debug);
 };
 
 WFN::WFN(const std::filesystem::path &filename, const int g_charge, const int g_mult, const bool &debug) {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
+    reset();
     charge = g_charge;
     multi = g_mult;
-    ECP_m = 0;
-    total_energy = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
     fill_pre();
     fill_Afac_pre();
     read_known_wavefunction_format(filename, std::cout, debug);
@@ -518,6 +499,7 @@ bool WFN::push_back_MO(const int &nr, const double &occ, const double &ener)
     nmo++;
     err_checkf(nr <= nmo, "unreasonable MO number", std::cout);
     MOs.push_back(MO(nr, occ, ener));
+    invalidate_coef_cache();
     return true;
 };
 
@@ -525,6 +507,7 @@ bool WFN::push_back_MO(const int &nr, const double &occ, const double &ener, con
 {
     nmo++;
     MOs.push_back(MO(nr, occ, ener, oper));
+    invalidate_coef_cache();
     return true;
 };
 
@@ -532,6 +515,7 @@ bool WFN::push_back_MO(const MO &given)
 {
     nmo++;
     MOs.push_back(given);
+    invalidate_coef_cache();
     return true;
 };
 
@@ -539,12 +523,14 @@ void WFN::push_back_MO_coef(const int &nr, const double &value)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs[nr].push_back_coef(value);
+    invalidate_coef_cache();
 };
 
 void WFN::assign_MO_coefs(const int &nr, vec &values)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs[nr].assign_coefs(values);
+    invalidate_coef_cache();
 };
 
 const double &WFN::get_MO_energy(const int &mo) const
@@ -558,6 +544,7 @@ const void WFN::clear_MOs()
     MOs.clear();
     MOs.shrink_to_fit();
     nmo = 0;
+    invalidate_coef_cache();
 }
 
 bool WFN::push_back_center(const int &cent)
@@ -636,6 +623,7 @@ void WFN::delete_MO(const int &nr)
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs.erase(MOs.begin() + nr);
     nmo--;
+    invalidate_coef_cache();
 };
 
 bool WFN::push_back_type(const int &type)
@@ -668,6 +656,7 @@ bool WFN::erase_exponent(const int &nr)
 bool WFN::remove_primitive(const int &nr)
 {
     nex--;
+    invalidate_coef_cache();
     if (erase_center(nr) && erase_exponent(nr) && erase_type(nr))
     {
         for (int n = 0; n < nmo; n++)
@@ -681,6 +670,7 @@ bool WFN::remove_primitive(const int &nr)
 bool WFN::add_primitive(const int &cent, const int &type, const double &e, double *values)
 {
     nex++;
+    invalidate_coef_cache();
     if (push_back_center(cent) && push_back_type(type) && push_back_exponent(e))
         for (int n = 0; n < nmo; n++)
             MOs[n].push_back_coef(values[n]);
@@ -751,6 +741,7 @@ void WFN::change_center(const int &nr)
 bool WFN::set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value)
 {
     err_checkf(nr_mo <= MOs.size(), "MO doesn't exist!", std::cout);
+    invalidate_coef_cache();
     return MOs[nr_mo].set_coefficient(nr_primitive, value);
 };
 
@@ -4108,6 +4099,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     }
     if (debug)
         std::cout << "types assignements written, now for the exponents..\n";
+    char buf[32];
     run = 0;
     exnum = 0;
     for (int i = 0; i < nex / 5; i++)
@@ -4115,11 +4107,8 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         rf << "EXPONENTS ";
         for (int j = 0; j < 5; j++)
         {
-            stringstream stream;
-            string temp;
-            stream << uppercase << scientific << setw(14) << setprecision(7) << exponents[exnum];
-            temp = stream.str();
-            rf << temp;
+            snprintf(buf, sizeof(buf), "%14.7E", exponents[exnum]);
+            rf << buf;
             if (exnum > nex)
             {
                 std::cout << "run is too big in exponents writing";
@@ -4135,11 +4124,8 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         rf << "EXPONENTS ";
         for (int j = 0; j < nex % 5; j++)
         {
-            stringstream stream;
-            string temp;
-            stream << uppercase << scientific << setw(14) << setprecision(7) << exponents[exnum];
-            temp = stream.str();
-            rf << temp;
+            snprintf(buf, sizeof(buf), "%14.7E", exponents[exnum]);
+            rf << buf;
             if (run > nex)
             {
                 std::cout << "run is too big in exponents writing";
@@ -4171,11 +4157,8 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         {
             for (int j = 0; j < 5; j++)
             {
-                stringstream stream;
-                string temp;
-                stream << uppercase << scientific << showpoint << setprecision(8) << setw(16) << MOs[mo_counter].get_coefficient(run);
-                temp = stream.str();
-                rf << temp;
+                snprintf(buf, sizeof(buf), "%16.8E", MOs[mo_counter].get_coefficient(run));
+                rf << buf;
                 if (run > nex)
                 {
                     std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
@@ -4191,11 +4174,8 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
                 std::cout << "Still some left to write... going in % for loop...." << endl;
             for (int j = 0; j < nex % 5; j++)
             {
-                stringstream stream;
-                string temp;
-                stream << uppercase << scientific << showpoint << setprecision(8) << setw(16) << MOs[mo_counter].get_coefficient(run);
-                temp = stream.str();
-                rf << temp;
+                snprintf(buf, sizeof(buf), "%16.8E", MOs[mo_counter].get_coefficient(run));
+                rf << buf;
                 if (run > nex)
                 {
                     std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
@@ -6522,55 +6502,51 @@ void WFN::set_ECPs(ivec &nr, ivec &elcount)
     }
 };
 
-void WFN::operator=(const WFN &right)
+WFN::WFN(const WFN &right)
 {
+    reset();
+    *this = right;
+};
+
+WFN &WFN::operator=(const WFN &right)
+{
+    if (this == &right)
+        return *this;
+    reset();
+    ncen = right.ncen;
+    nfunc = right.nfunc;
+    nmo = right.nmo;
+    nex = right.nex;
+    charge = right.charge;
+    ECP_m = right.ECP_m;
+    multi = right.multi;
+    origin = right.origin;
+    total_energy = right.total_energy;
+    virial_ratio = right.virial_ratio;
+    basis_set_name = right.basis_set_name;
+    comment = right.comment;
+    path = right.path;
+    method = right.method;
+    MOs = right.MOs;
+    centers = right.centers;
+    types = right.types;
+    exponents = right.exponents;
+    UT_DensityMatrix = right.UT_DensityMatrix;
+    UT_SpinDensityMatrix = right.UT_SpinDensityMatrix;
+    DM = right.DM;
+    MO_sph = right.MO_sph;
+    basis_set = right.basis_set;
+    cub = right.cub;
+    atoms = right.atoms;
+    modified = right.modified;
+    d_f_switch = right.d_f_switch;
+    distance_switch = right.distance_switch;
+    has_ECPs = right.has_ECPs;
     isBohr = right.isBohr;
-    ncen = right.get_ncen();
-    origin = right.get_origin();
-    nex = right.get_nex();
-    multi = right.get_multi();
-    charge = right.get_charge();
-    nfunc = right.get_nfunc();
-    has_ECPs = right.get_has_ECPs();
-    basis_set = right.get_basis_set_ptr();
-    method = right.get_method();
-    ECP_m = right.get_ECP_mode();
-    comment = right.get_comment();
-    basis_set_name = right.get_basis_set_name();
-    path = right.get_path();
-    multi = right.get_multi();
-    total_energy = right.get_total_energy();
-    virial_ratio = right.get_virial_ratio();
-    UT_DensityMatrix = right.get_DensityMatrix();
-    UT_SpinDensityMatrix = right.get_SpinDensityMatrix();
-    centers.clear();
-    types.clear();
-    exponents.clear();
-    for (int i = 0; i < nex; i++)
-    {
-        push_back_center(right.get_center(i));
-        push_back_type(right.get_type(i));
-        push_back_exponent(right.get_exponent(i));
-    }
-    MOs.clear();
-    for (int i = 0; i < right.get_nmo(); i++)
-    {
-        push_back_MO(i, right.get_MO_primitive_count(i), right.get_MO_energy(i));
-        for (int j = 0; j < right.get_MO_primitive_count(i); j++)
-            push_back_MO_coef(i, right.get_MO_coef(i, j));
-    }
-    cub.clear();
-    for (int c = 0; c < right.cub.size(); c++)
-    {
-        cub.push_back(right.cub[c]);
-    }
-    atoms.clear();
-    for (int a = 0; a < right.atoms.size(); a++)
-    {
-        atoms.push_back(right.atoms[a]);
-    }
+    is_unrestricted = right.is_unrestricted;
     fill_pre();
     fill_Afac_pre();
+    return *this;
 };
 
 int WFN::calculate_charge()
@@ -6696,6 +6672,7 @@ void WFN::delete_unoccupied_MOs()
             nmo--;
         }
     }
+    invalidate_coef_cache();
 };
 void WFN::delete_Qs() {
     for (int i = static_cast<int>(atoms.size()) - 1; i >= 0; i--) {
@@ -7977,22 +7954,29 @@ void WFN::pop_back_MO()
 {
     MOs.pop_back();
     nmo--;
+    invalidate_coef_cache();
 }
 
 //Transposed MO coefficients, [primitive * nmo + mo], built once and reused by every point.
-//Locked because the first caller is usually several threads at once: make_chi parallelises
-//over atom pairs, and compute_dens underneath it is what asks for this. Unlocked, two
-//threads both find it cold and one reallocates under the other. A plain bool cannot be
-//double-checked and an atomic member would make WFN non-copyable.
+//The first caller is usually several threads at once: make_chi parallelises over atom
+//pairs, and compute_dens underneath it is what asks for this. Unlocked, two threads both
+//find it cold and one reallocates under the other. The valid flag is read through an
+//atomic_ref so the warm path takes no lock (it is called per grid point from every
+//density evaluator); the member stays a plain bool so WFN stays copyable.
 const double* WFN::get_coef_primitive_major() const
 {
 	const int _nmo = get_nmo(false);
 	if (_nmo <= 0 || nex <= 0) return nullptr;
-	static std::mutex coef_cache_mutex;
-	std::lock_guard<std::mutex> lock(coef_cache_mutex);
-	if (coef_primitive_major_valid
+	std::atomic_ref<bool> valid(coef_primitive_major_valid);
+	if (valid.load(std::memory_order_acquire)
 	    && coef_primitive_major.size() == (size_t)nex * (size_t)_nmo)
 		return coef_primitive_major.data();
+	static std::mutex coef_cache_mutex;
+	std::lock_guard<std::mutex> lock(coef_cache_mutex);
+	if (valid.load(std::memory_order_acquire)
+	    && coef_primitive_major.size() == (size_t)nex * (size_t)_nmo)
+		return coef_primitive_major.data();
+	valid.store(false, std::memory_order_release);
 	coef_primitive_major.assign((size_t)nex * (size_t)_nmo, 0.0);
 	for (int mo = 0; mo < _nmo; mo++) {
 		const double* src = MOs[mo].get_coefficient_ptr();
@@ -8000,7 +7984,7 @@ const double* WFN::get_coef_primitive_major() const
 		for (int j = 0; j < nex; j++)
 			coef_primitive_major[(size_t)j * _nmo + mo] = src[j];
 	}
-	coef_primitive_major_valid = true;
+	valid.store(true, std::memory_order_release);
 	return coef_primitive_major.data();
 }
 
@@ -9143,38 +9127,39 @@ const double WFN::computeMO(
     const int &mo) const
 {
     double result = 0.0;
-    int iat = 0;
     int l[3]{ 0, 0, 0 };
-    double ex = 0;
-    double temp = 0;
-
-    // x, y, z and dsqd
-    vec2 d(ncen);
-    for (int i = 0; i < ncen; i++)
-        d[i].resize(4);
-
-    for (iat = 0; iat < ncen; iat++)
+    double ex = 0, *d_;
+    // x, y, z, r^2 and the powers 2..5 laid out as in compute_dens_cartesian; per-thread scratch
+    // because this is called per grid point per orbital from parallel loops
+    thread_local vec d;
+    if (d.size() < (size_t)16 * ncen) d.resize((size_t)16 * ncen);
+    for (int iat = 0; iat < ncen; iat++)
     {
-        d[iat][0] = PosGrid[0] - atoms[iat].get_coordinate(0);
-        d[iat][1] = PosGrid[1] - atoms[iat].get_coordinate(1);
-        d[iat][2] = PosGrid[2] - atoms[iat].get_coordinate(2);
-        d[iat][3] = pow(std::hypot(d[iat][0], d[iat][1], d[iat][2]), 2);
+        d_ = d.data() + (size_t)16 * iat;
+        d_[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d_[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d_[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
+        d_[4] = d_[0] * d_[0];
+        d_[5] = d_[1] * d_[1];
+        d_[6] = d_[2] * d_[2];
+        d_[3] = d_[4] + d_[5] + d_[6];
+        for (int k = 7; k < 16; k++)
+            d_[k] = d_[k - 3] * d_[(k - 7) % 3];
     }
-
+    const double *c = MOs[mo].get_coefficient_ptr();
     for (int j = 0; j < nex; j++)
     {
-        iat = get_center(j) - 1;
-        // if (iat != atom) continue;
-        constants::type2vector(get_type(j), l);
-        temp = -get_exponent(j) * d[iat][3];
-        if (temp < constants::exp_cutoff)
+        d_ = d.data() + (size_t)16 * (get_center(j) - 1);
+        ex = -get_exponent(j) * d_[3];
+        if (ex < constants::exp_cutoff)
             continue;
-        ex = exp(temp);
+        ex = exp(ex);
+        constants::type2vector(get_type(j), l);
+        // power p of coordinate k sits at k for p = 1 and at 3p - 2 + k above
         for (int k = 0; k < 3; k++)
-            ex *= pow(d[iat][k], l[k]);
-        result += MOs[mo].get_coefficient_f(j) * ex; // build MO values at this point
+            if (l[k]) ex *= d_[(l[k] == 1 ? 0 : 3 * l[k] - 2) + k];
+        result += c[j] * ex;
     }
-    shrink_vector<vec>(d);
     return result;
 }
 

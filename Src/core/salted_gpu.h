@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gpu_api.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -14,9 +15,6 @@
 //
 //Returns false if no device is present or the problem will not fit, and the caller keeps
 //the CPU loop.
-
-bool salted_gpu_available();
-void salted_gpu_clear_cache();
 
 struct salted_gpu_problem {
 	int natoms = 0;
@@ -58,5 +56,12 @@ struct salted_gpu_problem {
 	double* p = nullptr;                 //[natoms * l21 * nfps], the caller's buffer
 };
 
+NOSPHERA2_GPU_API_BEGIN
+
+bool salted_gpu_available();
+void salted_gpu_clear_cache();
+
 //Runs the whole lambda block. Returns false if the caller should fall back to the CPU.
 bool salted_gpu_equicomb(const salted_gpu_problem& prob, int* empty_environments);
+
+NOSPHERA2_GPU_API_END

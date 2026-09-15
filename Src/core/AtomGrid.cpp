@@ -2,7 +2,6 @@
 #include "convenience.h"
 #include "AtomGrid.h"
 #ifdef NOSPHERA2_USE_GPU
-#include "grid_gpu.h"
 #endif
 #include "sphere_lebedev_rule.h"
 #include "constants.h"
@@ -142,7 +141,8 @@ AtomGrid::AtomGrid(const double radial_precision,
     const double alpha_max,
     const int max_l_quantum_number,
     const double alpha_min[],
-    std::ostream &file)
+    std::ostream &file,
+    const double radial_step_scale)
 {
     using namespace std;
     const int min_num_angular_points_closest =
@@ -183,6 +183,7 @@ AtomGrid::AtomGrid(const double radial_precision,
             h = (((h) < (get_h(radial_precision, l, 0.1 * (r_outer - r_inner)))) ? (h) : (get_h(radial_precision, l, 0.1 * (r_outer - r_inner))));
         }
     }
+    h /= radial_step_scale;
 
     //if (debug)
     //  file << "ATOM GRID: "
@@ -405,7 +406,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
         }
     }
 
-    if (std::getenv("NOSPHERA2_CHI_DEBUG")) {
+    if (std::getenv("NOSPHERA2_CHI_DEBUG")) { // Flawfinder: ignore
         double s = 0.0;
         for (int i = 0; i < chi.size(); i++) s += chi[i] * chi[i];
         std::fprintf(stderr, "chi checksum %.17g size %zu\n", s, chi.size());
@@ -425,50 +426,11 @@ void AtomGrid::get_grid(const int num_centers,
     double grid_aw[],
     double grid_becke_w[],
     double grid_TFVC_w[],
-    const WFN &wfn,
-    vec &chi,
-    bool debug) const
+    const vec &chi) const
 {
 
     if (num_centers > 1) {
-        if (chi.size() == 0)
-            chi = make_chi(wfn, 40, true, debug);
         const int np = get_num_grid_points();
-#ifdef NOSPHERA2_USE_GPU
-        //Same walk on the device. Bragg radii are looked up here so the kernel takes
-        //plain doubles and needs no constants table of its own.
-        //The kernel transcribes the chi-present branch and indexes chi with a stride of
-        //num_centers. make_chi returns empty without MOs and uses a stride of ncen, so
-        //neither is guaranteed; a wrongly sized chi would copy and come back wrong.
-        const bool chi_fits = chi.size() == (size_t)num_centers * (size_t)num_centers;
-        if (grid_gpu_enabled() && chi_fits) {
-            vec R_v(num_centers);
-            for (int a = 0; a < num_centers; a++)
-                R_v[a] = constants::bragg_angstrom[proton_charges[a]];
-            if (grid_gpu_becke_weights(np, num_centers, center_index,
-                    atom_grid_x_bohr_.data(), atom_grid_y_bohr_.data(),
-                    atom_grid_z_bohr_.data(), atom_grid_w_.data(),
-                    x_coordinates_bohr, y_coordinates_bohr, z_coordinates_bohr,
-                    R_v.data(), chi.data(), constants::far_away, constants::cutoff,
-                    grid_x_bohr, grid_y_bohr, grid_z_bohr,
-                    grid_aw, grid_becke_w, grid_TFVC_w)) {
-                //Once per run. Every other GPU path announces itself; this one did not, which
-                //is how it fell back to the CPU for a session with its test still passing.
-                static std::atomic<bool> announced{false};
-                if (!announced.exchange(true) && !constants::hide_gpu_notes)
-                    std::cout << "GPU in use: atomic grid weights (Becke and TFVC) on "
-                              << grid_gpu_backend() << std::endl;
-                return;
-            }
-        }
-        else if (grid_gpu_enabled() && !chi_fits) {
-            static std::atomic<bool> warned{false};
-            if (!warned.exchange(true) && !constants::hide_gpu_notes)
-                std::cout << "-gpu_grid asked for but not used: chi is " << chi.size()
-                          << " entries, the kernel needs " << (size_t)num_centers * num_centers
-                          << ". Weights stay on the CPU." << std::endl;
-        }
-#endif
 #pragma omp parallel
         {
             vec pa_b(num_centers);
@@ -1028,31 +990,22 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
         }
         it == 0 ? file << "Starting MBIS iterations..." << std::endl : file << "MBIS iteration: " << it << " max change: " << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
-        for (int i = 0; i < ncen; i++) {
-            const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
-            const int end = num_grid_points[i];
-            //Assuming 3 is the quadrature weight and 7 is the electron density 
-            b_weight = grid[i][5].data();
-            dens = grid[i][7].data();
-            //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-            gx = grid[i][0].data();
-            gy = grid[i][1].data();
-            gz = grid[i][2].data();
-
+        //one parallel region per iteration: per-thread partial sums over all grids, merged in thread order after it
+        const int nthr = omp_get_max_threads();
+        vec2 si_part(nthr), pop_part(nthr);
 #pragma omp parallel
-            {
-                vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0);
-                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq, bw, _x, _y, _z;
-                int j, shell, nshell, *ECP_els_j;
-                double dx[3], *dist_j, *pop, *si;
-                sp_vec local = sig_pop_vector;
-                for (j = 0; j < ncen; j++) {
-                    std::fill(local[j].first.begin(), local[j].first.end(), 0.0);
-                    std::fill(local[j].second.begin(), local[j].second.end(), 0.0);
-                }
-                std::pair<vec, vec> *coi;
-
-#pragma omp for schedule(dynamic, 1) nowait
+        {
+            vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0);
+            double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq, bw, _x, _y, _z;
+            int j, shell, nshell, *ECP_els_j;
+            double dx[3], *dist_j, *pop, *si;
+            vec si_local(ncen * 6, 0.0), pop_local(ncen * 6, 0.0);
+            std::pair<vec, vec> *coi;
+            for (int i = 0; i < ncen; i++) {
+                const int end = num_grid_points[i];
+                //5 is the becke weight, 7 the electron density, GridIndex X = 0, Y = 1, Z = 2
+                const double *b_weight = grid[i][5].data(), *dens = grid[i][7].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+#pragma omp for schedule(dynamic, 16) nowait
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(dists.begin(), dists.end(), 0.0);
@@ -1086,7 +1039,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 
                         for (shell = 0; shell < nshell; shell++) {
                             sigval = 1.0 / si[shell];
-                            tmp = pop[shell] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-*dist_j * sigval);
+                            tmp = pop[shell] * constants::INV_EIGHT_PI * sigval * sigval * sigval * exp(-*dist_j * sigval);
                             if (abs(tmp) < 1e-20)
                                 continue;
                             rho0shell[j * 6 + shell] = tmp;
@@ -1098,8 +1051,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                     for (j = 0; j < ncen; j++) {
                         nshell = nshell_cache[j];
                         dist_j = &dists[j];
-                        pop = local[j].second.data();
-                        si = local[j].first.data();
+                        pop = pop_local.data() + j * 6;
+                        si = si_local.data() + j * 6;
                         for (shell = 0; shell < nshell; shell++) {
                             r0s = rho0shell[j * 6 + shell];
                             if (r0s == 0)
@@ -1110,17 +1063,17 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
                         }
                     }
                 }
-
-                for (j = 0; j < ncen; j++) {
-                    nshell = nshell_cache[j];
-                    for (shell = 0; shell < nshell; shell++) {
-#pragma omp atomic
-                        sig_pop_vector[j].first[shell] += local[j].first[shell];
-#pragma omp atomic
-                        sig_pop_vector[j].second[shell] += local[j].second[shell];
-                    }
-                }
             }
+            si_part[omp_get_thread_num()].swap(si_local);
+            pop_part[omp_get_thread_num()].swap(pop_local);
+        }
+        for (int t = 0; t < nthr; t++) {
+            if (si_part[t].empty()) continue;
+            for (int j = 0; j < ncen; j++)
+                for (int shell = 0; shell < nshell_cache[j]; shell++) {
+                    sig_pop_vector[j].first[shell] += si_part[t][j * 6 + shell];
+                    sig_pop_vector[j].second[shell] += pop_part[t][j * 6 + shell];
+                }
         }
         //back to the cycle main loop, we updated sig and pop based on information loss :)
 
@@ -1254,47 +1207,41 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
         }
         it == 0 ? file << "Starting EMBIS iterations..." << std::endl : file << "EMBIS iteration: " << std::setw(4) << it << " max charge/alpha change: " << varsig << "/" << varmax << std::endl;
         varmax = 0.0, varsig = 0.0;
-        for (int i = 0; i < ncen; i++) {
-            const double *b_weight = NULL, *dens = NULL, *gx = NULL, *gy = NULL, *gz = NULL;
-            const int end = num_grid_points[i];
-            //Assuming 3 is the quadrature weight and 7 is the electron density 
-            b_weight = grid[i][5].data();
-            dens = corrected_dens[i].data();
-            //This assumes GridIndex enum being X = 0, Y = 1, Z = 2
-            gx = grid[i][0].data();
-            gy = grid[i][1].data();
-            gz = grid[i][2].data();
-
+        //one parallel region per iteration: per-thread partial sums over all grids, merged in thread order after it
+        const int nthr = omp_get_max_threads();
+        vec2 alpha_part(nthr), pop_part(nthr);
 #pragma omp parallel
-            {
-                vec rho0shell(ncen * 6, 0.0);
-                double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
-                int j, shell, nshell, ind;
-                double *alpha, *d_local, *pop_p;
-                vec dx(ncen * 3);
-                vec alpha_local(ncen * 36, 0.0);
-                vec pop_local(ncen * 6, 0.0);
-                vec g_cache(6 * ncen, 0.0);
-                double d_cache[6] = { 0.0 };
-                std::pair<vec2, vec> *coi;
-
-                // Precompute determinants for all atoms and shells - they don't change per point
-                vec det_pop_cache(ncen * 6, 0.0);
-                for (int k = 0; k < ncen; k++) {
-                    nshell = nshell_cache[k];
-                    coi = &copy_of_input[k];
-                    for (shell = 0; shell < nshell; shell++) {
-                        alpha = coi->first[shell].data();
-                        det = sqrt(alpha[0] * alpha[3] * alpha[5] -
-                            alpha[0] * alpha[4] * alpha[4] -
-                            alpha[3] * alpha[2] * alpha[2] -
-                            alpha[5] * alpha[1] * alpha[1] +
-                            2 * alpha[1] * alpha[2] * alpha[4]);
-                        det_pop_cache[k * 6 + shell] = coi->second[shell] * constants::INV_EIGHT_PI * det;
-                    }
+        {
+            vec rho0shell(ncen * 6, 0.0);
+            double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
+            int j, shell, nshell, ind;
+            double *alpha, *d_local, *pop_p;
+            vec dx(ncen * 3);
+            vec alpha_local(ncen * 36, 0.0);
+            vec pop_local(ncen * 6, 0.0);
+            vec g_cache(6 * ncen, 0.0);
+            double d_cache[6] = { 0.0 };
+            std::pair<vec2, vec> *coi;
+            // Precompute determinants for all atoms and shells - they don't change per point
+            vec det_pop_cache(ncen * 6, 0.0);
+            for (int k = 0; k < ncen; k++) {
+                nshell = nshell_cache[k];
+                coi = &copy_of_input[k];
+                for (shell = 0; shell < nshell; shell++) {
+                    alpha = coi->first[shell].data();
+                    det = sqrt(alpha[0] * alpha[3] * alpha[5] -
+                        alpha[0] * alpha[4] * alpha[4] -
+                        alpha[3] * alpha[2] * alpha[2] -
+                        alpha[5] * alpha[1] * alpha[1] +
+                        2 * alpha[1] * alpha[2] * alpha[4]);
+                    det_pop_cache[k * 6 + shell] = coi->second[shell] * constants::INV_EIGHT_PI * det;
                 }
-
-#pragma omp for schedule(dynamic,4) nowait
+            }
+            for (int i = 0; i < ncen; i++) {
+                const int end = num_grid_points[i];
+                //5 is the becke weight, corrected_dens the ECP-corrected electron density, GridIndex X = 0, Y = 1, Z = 2
+                const double *b_weight = grid[i][5].data(), *dens = corrected_dens[i].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+#pragma omp for schedule(dynamic, 16) nowait
                 for (int point = 0; point < end; point++) {
                     rho0 = 0.0;
                     std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
@@ -1384,28 +1331,25 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
                         }
                     }
                 }
-
-                // Use critical section for batch updates instead of individual atomic operations
-#pragma omp critical
-                {
-                    for (j = 0; j < ncen; j++) {
-                        nshell = nshell_cache[j];
-                        const int alpha_base = j * 36;
-                        const int pop_base = j * 6;
-                        for (shell = 0; shell < nshell; shell++) {
-                            const int alpha_offset = alpha_base + shell * 6;
-                            // Batch update all values in critical section
-                            double *sig_alpha = sig_pop_vector[j].first[shell].data();
-
-                            sig_alpha[0] += alpha_local[alpha_offset + 0];
-                            sig_alpha[1] += alpha_local[alpha_offset + 1];
-                            sig_alpha[2] += alpha_local[alpha_offset + 2];
-                            sig_alpha[3] += alpha_local[alpha_offset + 3];
-                            sig_alpha[4] += alpha_local[alpha_offset + 4];
-                            sig_alpha[5] += alpha_local[alpha_offset + 5];
-                            sig_pop_vector[j].second[shell] += pop_local[pop_base + shell];
-                        }
-                    }
+            }
+            alpha_part[omp_get_thread_num()].swap(alpha_local);
+            pop_part[omp_get_thread_num()].swap(pop_local);
+        }
+        for (int t = 0; t < nthr; t++) {
+            if (alpha_part[t].empty()) continue;
+            const double *alpha_local = alpha_part[t].data(), *pop_local = pop_part[t].data();
+            for (int j = 0; j < ncen; j++) {
+                const int nshell = nshell_cache[j];
+                for (int shell = 0; shell < nshell; shell++) {
+                    const int alpha_offset = j * 36 + shell * 6;
+                    double *sig_alpha = sig_pop_vector[j].first[shell].data();
+                    sig_alpha[0] += alpha_local[alpha_offset + 0];
+                    sig_alpha[1] += alpha_local[alpha_offset + 1];
+                    sig_alpha[2] += alpha_local[alpha_offset + 2];
+                    sig_alpha[3] += alpha_local[alpha_offset + 3];
+                    sig_alpha[4] += alpha_local[alpha_offset + 4];
+                    sig_alpha[5] += alpha_local[alpha_offset + 5];
+                    sig_pop_vector[j].second[shell] += pop_local[j * 6 + shell];
                 }
             }
         }

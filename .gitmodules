@@ -10,7 +10,7 @@
 [submodule "occ"]
 	path = occ
 	url = https://github.com/MilitaoLucas/occ.git
-	branch = libs_rebase2
+	branch = nosphera2-upstream-0.9.4
 [submodule "BasisSetGenerator"]
 	path = BasisSetGenerator
 	url = https://github.com/AK-Kleemiss/BasisSetGenerator.git

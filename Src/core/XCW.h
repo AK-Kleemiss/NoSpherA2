@@ -8,6 +8,7 @@
 #include "xcw_halting.h"
 #include <occ/qm/hf.h>
 #include "i_tensor_stream.h"
+#include "stored_eri.h"
 #include <thread>
 
 class XCW {
@@ -61,12 +62,11 @@ private:
 		vec U_iso;
 
 		void grow_U_iso(const std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list) {
-			for (int i = 0; i < asym_atoms.size(); ++i) {
-				if (asym_atoms[i].grown) {
-					continue;
-				}
+			for (int i = 0; i < symmetry_linking_list.size(); i++) {
 				for (int j = 0; j < symmetry_linking_list[i].size(); j++) {
-					U_iso[symmetry_linking_list[i][j][0]] = U_iso[i];
+					if (symmetry_linking_list[i][j].size() != 0) {
+						U_iso[j] = U_iso[i];
+					}
 				}
 			}
 		};
@@ -92,12 +92,14 @@ private:
 		bool conv_MaxP_diff = false;
 		double diis_stop_damping;
 		bool apply_shift = true;
+		bool method_apply_shift = true;
 		double diis_stop_shift;
 		bool apply_damping = true;
+		bool method_apply_damping = true;
 		std::string basis_set_name;
 		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
 		std::string df_basis_name;
-		bool grown;
+		bool grown = false;
 		int n_params;
 		int refine_against;
 		int XWR_type;
@@ -138,8 +140,8 @@ private:
 			conv_gradient = false;
 			conv_RMSP_diff = false;
 			conv_MaxP_diff = false;
-			apply_shift = true;
-			apply_damping = true;
+			apply_shift = method_apply_shift;
+			apply_damping = method_apply_damping;
 		}
 
 		// Performs the convergence check and sets flags accordingly
@@ -290,6 +292,13 @@ private:
 	// Checks convergence for SCF cycle
 	bool SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last);
 
+	// The Roothaan step and the DIIS of occ's SCF with their matrix products on MKL
+	void solve_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat& F) const;
+	occ::Mat diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf);
+	occ::core::diis::DIIS cdiis_;
+	occ::qm::ADIIS adiis_;
+	occ::qm::EDIIS ediis_;
+
 	// Computes the orbital gradient for usage as a convergence criterion
 	double compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf);
 
@@ -324,6 +333,8 @@ private:
 	//choice the build precision makes.
 	std::vector<std::complex<float>> I32;
 	bool i_float_ = false;
+	//A copy of the resident tensor on the device does both SCF walks there
+	bool i_on_device_ = false;
 	// The background writer for `save <path>`. Joined, never detached: a thread still
 	// running at exit is how the GPU warm-up bug of 939268f happened, and this one holds a
 	// FILE* and reads the resident tensor.
@@ -332,6 +343,11 @@ private:
 	occ::Mat G_last_, D_last_build_;
 	int last_full_build_ = 0;
 	double next_full_build_error_ = 0.0;
+	//Two-electron integrals over the screened-in pairs, built once per run when they fit in
+	//memory: the Fock build then contracts them instead of recomputing every quartet per iteration
+	stored_eri eri_;
+	bool eri_on_device_ = false;
+	occ::Mat eri_fock(const occ::qm::MolecularOrbitals& mo, bool screen) const;
 	std::string i_writer_error_;
 	void start_i_save();
 	void finish_i_save();
@@ -357,6 +373,7 @@ private:
 	std::vector<scattering_data> obs;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
+	GridManager tsc_grids;
 	// Ordered snapshot of `hkl` (see ensure_hkl_ordered), i.e. hkl_ordered_[r]
 	// is the Miller index of reflection r as used for obs[r]/F_calc[0][r].
 	std::vector<i3> hkl_ordered_;

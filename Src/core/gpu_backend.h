@@ -6,6 +6,9 @@
 
 #ifdef NOSPHERA2_USE_HIP
 #include <hip/hip_runtime.h>
+//Nothing here links the HIP runtime: every call lands in hip_runtime_shim.cpp, which opens
+//amdhip64 by name on first use and answers hipErrorNoDevice without it, so a binary carrying
+//AMD kernels starts on a machine without ROCm.
 #define gpuError_t hipError_t
 #define gpuSuccess hipSuccess
 #define gpuGetErrorString hipGetErrorString
@@ -20,6 +23,7 @@
 #define gpuMemcpy hipMemcpy
 #define gpuMemcpyHostToDevice hipMemcpyHostToDevice
 #define gpuMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define gpuMemcpyDeviceToDevice hipMemcpyDeviceToDevice
 #define gpuGetLastError hipGetLastError
 #define gpuDeviceSynchronize hipDeviceSynchronize
 #define gpuStream_t hipStream_t
@@ -35,6 +39,12 @@
 #define gpuMemcpyAsync hipMemcpyAsync
 #define gpuHostAlloc hipHostMalloc
 #define gpuFreeHost hipHostFree
+//The kernels assume 32-lane warps (lane = threadIdx.x & 31); a gfx9 wavefront is 64 wide, so
+//the shuffles get the width explicitly and act within each half. The streaming load is clang's
+//non-temporal load, the slc bit like __ldcs on NVIDIA.
+#define gpuShflDown32(v, o) __shfl_down((v), (o), 32)
+#define gpuShflXor32(v, m) __shfl_xor((v), (m), 32)
+#define gpuLoadStreaming(p) __builtin_nontemporal_load(p)
 #else
 #include <cuda_runtime.h>
 #define gpuError_t cudaError_t
@@ -51,6 +61,7 @@
 #define gpuMemcpy cudaMemcpy
 #define gpuMemcpyHostToDevice cudaMemcpyHostToDevice
 #define gpuMemcpyDeviceToHost cudaMemcpyDeviceToHost
+#define gpuMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
 #define gpuGetLastError cudaGetLastError
 #define gpuDeviceSynchronize cudaDeviceSynchronize
 #define gpuStream_t cudaStream_t
@@ -66,6 +77,9 @@
 #define gpuMemcpyAsync cudaMemcpyAsync
 #define gpuHostAlloc(p, n) cudaHostAlloc((p), (n), cudaHostAllocDefault)
 #define gpuFreeHost cudaFreeHost
+#define gpuShflDown32(v, o) __shfl_down_sync(0xffffffffu, (v), (o))
+#define gpuShflXor32(v, m) __shfl_xor_sync(0xffffffffu, (v), (m))
+#define gpuLoadStreaming(p) __ldcs(p)
 #endif
 
 //No BLAS library is mapped here on purpose. The GEMMs are in gemm_gpu.cuh, which removed

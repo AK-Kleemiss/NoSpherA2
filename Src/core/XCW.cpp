@@ -41,15 +41,18 @@ void XCW::construct(const options& opt_in) {
 	}
 
 	// Evaluate symmetry and assign asymmetry factors to each atom (also update ncen)
-	//The linking list is ordered like this: Asymmetric atom first, then symmetry generated atom, then index of symmetry operation that generated it
+	//The linking list is ordered like this: Asymmetric atom, list with all atoms, then index of symmetry operation that generated it
+	// "diagonal elements" have to have size equivalent to multiplicity, otherwise something broke
 	ivec3 symmetry_linking_list;
-	unit_cell.eval_symm(asym_atoms, cryst.ncen, symmetry_linking_list, settings.grown);
+	unit_cell.eval_symm(asym_atoms, cryst.ncen, symmetry_linking_list);
 	cryst.ncen = asym_atoms.size();
 
 	// Load whether or not the structure is grown, find applied symmetries and delete the corresponding reflections
 	if (settings.grown) {
 		unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list);
 	}
+
+	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
 
 	// Generate WFN object from asym_atoms
 	dummy_wave.assign_charge(opt->charge);
@@ -364,7 +367,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	if (conv_preset == "sloppy") {
 		settings.quant_diff = 3e-5;
 		settings.max_diis_error = 1e-4;
-		settings.gradient = 1e-4;
+		settings.gradient = 5e-4;
 		settings.MaxP_diff = 1e-4;
 		settings.RMSP_diff = 1e-5;
 		settings.max_scf_iterations = 100;
@@ -372,7 +375,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	else if (conv_preset == "normal") {
 		settings.quant_diff = 1e-6;
 		settings.max_diis_error = 1e-5;
-		settings.gradient = 1e-5;
+		settings.gradient = 7e-5;
 		settings.MaxP_diff = 1e-5;
 		settings.RMSP_diff = 1e-6;
 		settings.max_scf_iterations = 100;
@@ -380,7 +383,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	else if (conv_preset == "tight") {
 		settings.quant_diff = 5e-7;
 		settings.max_diis_error = 5e-6;
-		settings.gradient = 5e-6;
+		settings.gradient = 3e-5;
 		settings.MaxP_diff = 1e-6;
 		settings.RMSP_diff = 1e-7;
 		settings.max_scf_iterations = 100;
@@ -388,7 +391,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	else if (conv_preset == "very_tight") {
 		settings.quant_diff = 1e-7;
 		settings.max_diis_error = 1e-6;
-		settings.gradient = 1e-6;
+		settings.gradient = 1e-5;
 		settings.MaxP_diff = 1e-7;
 		settings.RMSP_diff = 1e-8;
 		settings.max_scf_iterations = 100;
@@ -407,6 +410,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		settings.diis_stop_shift = 1e-2;
 	}
 	else if (speed_preset == "fast_conv") {
+		settings.method_apply_damping = false;
+		settings.method_apply_shift = false;
 	}
 
 	if (basis_set_name == "Undefined") {
@@ -1148,7 +1153,7 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 		i_pair_nu_ = i_file_.pair_nu();
 		//The file's element type is kept as it is: a single-precision tensor cannot regain
 		//anything by widening, and a double one is narrowed only on request
-		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
+		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT"); // Flawfinder: ignore
 		i_float_ = single_on_disk || (!i_streamed_ && (settings.i_tensor_single || (f && std::atoi(f) != 0)));
 		std::cout << "I tensor read from " << i_tensor_path().string()
 			<< " (" << (i_tensor_file::total_bytes(cryst.nr_small, i_compact_, single_on_disk) / 1048576.0)
@@ -1322,6 +1327,15 @@ static void tile_gemm(const int m, const int n, const int k, const double* a, co
 static void tile_gemm(const int m, const int n, const int k, const float* a, const float* b, float* c)
 {
 	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0f, a, k, b, k, 0.0f, c, n);
+}
+
+//C = op(A) op(B) for column-major occ matrices through MKL, Src/core's Eigen being serial
+static occ::Mat gemm(const occ::Mat& A, const occ::Mat& B, const bool ta = false, const bool tb = false)
+{
+	const int m = static_cast<int>(ta ? A.cols() : A.rows()), k = static_cast<int>(ta ? A.rows() : A.cols()), n = static_cast<int>(tb ? B.rows() : B.cols());
+	occ::Mat C(m, n);
+	cblas_dgemm(CblasColMajor, ta ? CblasTrans : CblasNoTrans, tb ? CblasTrans : CblasNoTrans, m, n, k, 1.0, A.data(), static_cast<int>(A.rows()), B.data(), static_cast<int>(B.rows()), 0.0, C.data(), m);
+	return C;
 }
 
 void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase, double& time_taken, long long& screen_counter, long long& skipped_grids_) {
@@ -1566,13 +1580,14 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//nothing would be dropped, and paying the compaction cost for that would make asking for
 	//more accuracy slower for no reason.
 	const double ao_block_threshold = [&] {
-		const char* e = std::getenv("NOSPHERA2_ITENSOR_AO_TOL");
+		const char* e = std::getenv("NOSPHERA2_ITENSOR_AO_TOL"); // Flawfinder: ignore
 		if (e) { const double v = std::atof(e); return v >= 0.0 ? v : 0.0; }
 		return cutoff(opt->accuracy);
 	}();
-	const bool morton_applied = (std::getenv("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr)
+	const bool morton_applied = (std::getenv("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr) // Flawfinder: ignore
 		&& ao_block_threshold >= 1e-20;
 	if (morton_applied) {
+#pragma omp parallel for schedule(dynamic)
 		for (int g = 0; g < n_atom_grids; g++) {
 			const int npts = points[g];
 			if (npts < 2) continue;
@@ -1650,7 +1665,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//Work is sum over blocks of na^2 * points, so what an OCC-style per-batch bounding
 	//sphere would save is quadratic in whatever this measures. The AO values are already
 	//computed here, so the honest number is a max over the points they hold, not an estimate.
-	if (std::getenv("NOSPHERA2_ITENSOR_AOSTATS")) {
+	if (std::getenv("NOSPHERA2_ITENSOR_AOSTATS")) { // Flawfinder: ignore
 		for (int g = 0; g < n_atom_grids; g++) {
 			const int npts = points[g];
 			if (npts <= 0) continue;
@@ -1714,6 +1729,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	i_compact_ = i_pair_mu_.size();
 	ivec2 grid_active_aos(n_atom_grids);
 	vec2 grid_ao_values(n_atom_grids);
+#pragma omp parallel for schedule(dynamic)
 	for (int g = 0; g < n_atom_grids; g++) {
 		ivec& active_aos = grid_active_aos[g];
 		vec& values = grid_ao_values[g];
@@ -1780,7 +1796,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//distant tiles, which is the only way a tile becomes wholly dead. Measured here, per
 	//block, before anyone writes a kernel that depends on it.
 	auto skipstats = [&](const int g, const ivec& active, const int npoints) {
-		if (!std::getenv("NOSPHERA2_ITENSOR_SKIPSTATS")) return;
+		if (!std::getenv("NOSPHERA2_ITENSOR_SKIPSTATS")) return; // Flawfinder: ignore
 		const int na = static_cast<int>(active.size());
 		if (na < 2) return;
 		auto tiles_alive = [&](const ivec& order, const int T) {
@@ -1846,6 +1862,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//ao_block_threshold is defined above, with the reordering it enables. What counts as
 	//nothing is the run's -acc setting, not a number invented here: cutoff() is the same
 	//ladder the scattering-factor code screens on, 1e-10 up to -acc 2 and 1e-14 at 3.
+#pragma omp parallel for schedule(dynamic) reduction(+:ao_slots_carrying, ao_slots_kept)
 	for (int g = 0; g < n_atom_grids; g++) {
 		const ivec& active_aos = grid_active_aos[g];
 		const vec& full_ao_values = grid_ao_values[g];
@@ -1864,7 +1881,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		//
 		//NOSPHERA2_ITENSOR_CHUNK sets the target; 0 restores the three whole bands.
 		const int chunk = [] {
-			const char* e = std::getenv("NOSPHERA2_ITENSOR_CHUNK");
+			const char* e = std::getenv("NOSPHERA2_ITENSOR_CHUNK"); // Flawfinder: ignore
 			return e ? std::atoi(e) : 1024;
 		}();
 		//Even chunks rather than a short tail: a 40-point remainder is a GEMM that costs a
@@ -1956,9 +1973,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		//reads as a thousandth of the truth.
 		const double runs = static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
 		if (work_done > 0.0)
-			std::cout << std::fixed << std::setprecision(1)
-				<< "I tensor work after all screening: " << (work_done * runs / 1e15)
-				<< " of " << (work_unscreened * runs / 1e15) << " Pflop-equivalents ("
+			std::cout << std::fixed << std::setprecision(2)
+				<< "I tensor work after all screening: " << (work_done * runs / 1e12)
+				<< " of " << (work_unscreened * runs / 1e12) << " Tflop-equivalents ("
 				<< std::setprecision(2) << 100.0 * work_done / work_unscreened << "%, "
 				<< (work_unscreened / work_done) << "x less than unscreened)\n";
 	}
@@ -2051,18 +2068,21 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		L.compact = compact_flat.data(); L.grid_point_off = goff.data();
 		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
 		L.n_points = static_cast<long long>(fd1.size());
-		//What the device path actually issues: one dense na x 2na GEMM per block, the real
-		//and imaginary halves together. Counted the way the path runs, or the GFLOP/s row
-		//is fiction.
-		for (int b = 0; b < L.n_blocks; b++)
-			itensor_gpu_dense_flops += throughput::flops_gemm(L.blk_n_active[b],
-				2.0 * L.blk_n_active[b], L.blk_point_count[b]);
-		itensor_gpu_dense_flops *= static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
 		//-gpu_fp64 raises the whole device path to double. It is worth asking for on a card
 		//with real double-precision units and expensive on one without, which is why it is
 		//asked for rather than detected.
 		const sf_precision iprec = opt->gpu_fp64 ? sf_precision::FP64 : sf_precision::FP32;
+		const auto init_start = std::chrono::high_resolution_clock::now();
 		itensor_on_gpu = itensor_gpu_init(L, iprec, opt->gpu_itensor_tensor);
+		if (itensor_on_gpu && throughput::enabled())
+			std::fprintf(stderr, "I tensor GPU: %.3f s upload and plan\n",
+				std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - init_start).count());
+		//What the device path actually issues, the blocks padded to their batch shapes,
+		//real and imaginary halves together. Counted the way the path runs, or the GFLOP/s
+		//row is fiction.
+		if (itensor_on_gpu)
+			itensor_gpu_dense_flops = itensor_gpu_issued_flops()
+				* static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
 		//Say which processor produced the numbers, and which GEMM: the three do not agree
 		//in the last digits, so a log that does not name one cannot be compared with
 		//another. Gated like the other timing lines so the golden-file tests, which run
@@ -2087,7 +2107,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//any path that contributes runs single. nr_small * i_compact_ deliberately in size_t,
 	//the product passes 2^31 at nmo = 500 with 20k reflections.
 	{
-		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT");
+		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT"); // Flawfinder: ignore
 		const bool single_build = (itensor_on_gpu && !opt->gpu_fp64)
 			|| ((!itensor_on_gpu || opt->itensor_hybrid) && opt->cpu_itensor_fp32);
 		i_float_ = settings.i_tensor_single || (f && std::atoi(f) != 0) || (single_build && !settings.i_tensor_double);
@@ -2110,59 +2130,68 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	if (itensor_on_gpu) gpu_thread = std::thread([&]() {
 		const auto gpu_start = std::chrono::high_resolution_clock::now();
+		//The device takes reflections in batches; the CPU threads keep taking them one at
+		//a time from the same counter
+		const int gpu_batch = itensor_gpu_batch(static_cast<int>(num_syms));
 		cvec blk_gpu;
-		if (i_streamed_ || i_float_) blk_gpu.assign(i_compact_, cdouble{});
-		vec kxs(num_syms), kys(num_syms), kzs(num_syms);
-		cvec facs(static_cast<size_t>(num_syms) * n_atom_grids);
+		if (i_streamed_ || i_float_) blk_gpu.assign(static_cast<size_t>(gpu_batch) * i_compact_, cdouble{});
+		vec kxs(static_cast<size_t>(gpu_batch) * num_syms), kys(kxs.size()), kzs(kxs.size());
+		cvec facs(kxs.size() * n_atom_grids);
 		int done = 0;
-		auto collect_gpu = [&](const int rr, const int slot) {
+		auto collect_gpu = [&](const int rr0, const int n, const int slot) {
 			if (i_streamed_ || i_float_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
 			cdouble* const I_rr = (i_streamed_ || i_float_) ? blk_gpu.data()
-									  : I.data() + static_cast<size_t>(rr) * i_compact_;
-			if (!itensor_gpu_collect(slot, I_rr))
+									  : I.data() + static_cast<size_t>(rr0) * i_compact_;
+			if (!itensor_gpu_collect(slot, I_rr, static_cast<long long>(i_compact_)))
 				err_checkf(false, "I tensor GPU read-back failed", std::cout);
-			if (i_streamed_) {
-				std::lock_guard<std::mutex> lock(i_write_mutex);
-				i_file_.write_block(rr, blk_gpu.data());
+			for (int r = 0; r < n && (i_streamed_ || i_float_); r++) {
+				const cdouble* const row = blk_gpu.data() + static_cast<size_t>(r) * i_compact_;
+				if (i_streamed_) {
+					std::lock_guard<std::mutex> lock(i_write_mutex);
+					i_file_.write_block(rr0 + r, row);
+				}
+				else if (i_float_) {
+					std::complex<float>* const dst = I32.data() + static_cast<size_t>(rr0 + r) * i_compact_;
+					for (size_t i = 0; i < i_compact_; i++)
+						dst[i] = std::complex<float>(static_cast<float>(row[i].real()),
+													 static_cast<float>(row[i].imag()));
+				}
 			}
-			else if (i_float_) {
-				std::complex<float>* const dst = I32.data() + static_cast<size_t>(rr) * i_compact_;
-				for (size_t i = 0; i < i_compact_; i++)
-					dst[i] = std::complex<float>(static_cast<float>(blk_gpu[i].real()),
-												 static_cast<float>(blk_gpu[i].imag()));
-			}
-			done++;
+			done += n;
 			gpu_ns_per_refl = std::chrono::duration_cast<std::chrono::nanoseconds>(
 				std::chrono::high_resolution_clock::now() - gpu_start).count() / done;
-			if (!(opt->no_date) && pb) pb->update();
+			if (!(opt->no_date) && pb) for (int r = 0; r < n; r++) pb->update();
 		};
-		//Two result slots: a reflection is collected after the next one has been
-		//submitted, so the read-back overlaps that calculation
-		int prev = -1, slot = 0;
+		//Two result slots: a batch is collected after the next one has been submitted, so
+		//the read-back overlaps that calculation
+		int prev = -1, prev_n = 0, slot = 0;
 		for (;;) {
-			const int rr = next_refl.fetch_add(1);
-			if (rr >= cryst.nr_small) break;
-			for (int sy = 0; sy < static_cast<int>(num_syms); sy++) {
-				kxs[sy] = k_pt[0][asym_lookup[rr][sy]];
-				kys[sy] = k_pt[1][asym_lookup[rr][sy]];
-				kzs[sy] = k_pt[2][asym_lookup[rr][sy]];
-				for (int gg = 0; gg < n_atom_grids; gg++)
-					facs[static_cast<size_t>(sy) * n_atom_grids + gg] =
-					asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
-					* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
-			}
-			if (!itensor_gpu_submit(slot, static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data()))
+			const int rr0 = next_refl.fetch_add(gpu_batch);
+			if (rr0 >= cryst.nr_small) break;
+			const int n = std::min(gpu_batch, cryst.nr_small - rr0);
+			for (int r = 0; r < n; r++)
+				for (int sy = 0; sy < static_cast<int>(num_syms); sy++) {
+					const int rr = rr0 + r, c = r * static_cast<int>(num_syms) + sy;
+					kxs[c] = k_pt[0][asym_lookup[rr][sy]];
+					kys[c] = k_pt[1][asym_lookup[rr][sy]];
+					kzs[c] = k_pt[2][asym_lookup[rr][sy]];
+					for (int gg = 0; gg < n_atom_grids; gg++)
+						facs[static_cast<size_t>(c) * n_atom_grids + gg] =
+						asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
+						* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
+				}
+			if (!itensor_gpu_submit(slot, n, static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data()))
 				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
-			if (prev >= 0) collect_gpu(prev, slot ^ 1);
-			prev = rr;
+			if (prev >= 0) collect_gpu(prev, prev_n, slot ^ 1);
+			prev = rr0; prev_n = n;
 			slot ^= 1;
 		}
-		if (prev >= 0) collect_gpu(prev, slot ^ 1);
-		itensor_gpu_free();
+		if (prev >= 0) collect_gpu(prev, prev_n, slot ^ 1);
 		if (throughput::enabled())
 			std::fprintf(stderr, "I tensor GPU: %.3f s wall time, %d of %d reflections\n",
 				std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - gpu_start).count(),
 				done, cryst.nr_small);
+		itensor_gpu_free();
 		//No bookkeeping here: the loop above runs for both paths and eval_I multiplies the
 		//total by nr_small on the way out, so anything added here counts twice.
 	});
@@ -2237,7 +2266,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				for (const GridBlock& block : grid_blocks[g]) {
 					max_ao_block_size = std::max(max_ao_block_size, block.ao_values.size());
 					for (const MatrixTile& tile : block.matrix_tiles) {
-						max_tile_result_size = std::max(max_tile_result_size, static_cast<size_t>(tile.result_offset + tile.row_count * tile.col_count));
+						max_tile_result_size = std::max(max_tile_result_size, tile.result_offset + static_cast<size_t>(tile.row_count) * tile.col_count);
 					}
 				}
 			}
@@ -2389,6 +2418,15 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 	//load() can throw and an exception must not leave an OpenMP structured block,
 	//so it is recorded and rethrown after the region.
 	std::string io_error;
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	if (i_on_device_) {
+		vec w(i_compact_);
+		for (size_t k = 0; k < i_compact_; k++)
+			w[k] = (i_pair_mu_[k] == i_pair_nu_[k] ? 2.0 : 4.0) * D(i_pair_mu_[k], i_pair_nu_[k]);
+		err_checkf(itensor_gpu_rows(w.data(), F_calc[1].data(), F_calc[0].data()), "I tensor walk on the device failed", std::cout);
+		return;
+	}
+#endif
 #pragma omp parallel
 	{
 		for (int r0 = 0; r0 < cryst.nr_small; r0 += step) {
@@ -2438,15 +2476,41 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 		: 2.0 * cryst.F_scale / (cryst.nr_small - settings.n_params);
 
 	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
+	auto precompute_of = [&](const int r) {
+		cdouble precompute;
+		if (against_F2) {
+			const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
+			precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
+		}
+		else {
+			const double F_calc_abs = std::abs(F_calc[0][r]);
+			precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
+		}
+		if (weighted) precompute *= inv_H2_[r];
+		return precompute;
+	};
+	bool on_device = false;
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	if (i_on_device_ && valid) {
+		cvec pre(cryst.nr_small);
+#pragma omp parallel for
+		for (int r = 0; r < cryst.nr_small; r++) pre[r] = precompute_of(r);
+		vec out(i_compact_);
+		err_checkf(itensor_gpu_cols(pre.data(), out.data()), "I tensor walk on the device failed", std::cout);
+		for (size_t k = 0; k < i_compact_; k++) perturb(i_pair_mu_[k], i_pair_nu_[k]) = out[k];
+		on_device = true;
+	}
+#endif
 	// See calc_F_calc: an exception must not leave an OpenMP structured block.
 	std::string io_error;
 	//One region, one accumulator per thread, one reduction, however many windows the
 	//budget implies: an nmo x nmo matrix per window is what made narrow windows dear
-#pragma omp parallel
+	std::vector<occ::Mat> parts(omp_get_max_threads());
+#pragma omp parallel if (!on_device)
 	{
 		occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
 		double* local_ptr = local.data();
-		for (int r0 = 0; valid && r0 < cryst.nr_small; r0 += step) {
+		for (int r0 = 0; valid && !on_device && r0 < cryst.nr_small; r0 += step) {
 			const int r1 = std::min(r0 + step, cryst.nr_small);
 			if (i_streamed_) {
 #pragma omp single
@@ -2459,17 +2523,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 #pragma omp for
 			for (int r = r0; r < r1; r++) {
 				if (!io_error.empty()) continue;
-				cdouble precompute;
-				if (against_F2) {
-					const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
-					precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
-				}
-				else {
-					const double F_calc_abs = std::abs(F_calc[0][r]);
-					precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
-				}
-				if (weighted) precompute *= inv_H2_[r];
-
+				const cdouble precompute = precompute_of(r);
 				//As in calc_F_calc: one walk over whichever element type is resident, with
 				//the accumulation in double either way.
 				auto accumulate = [&](const auto* I_r) {
@@ -2484,12 +2538,21 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 				if (i_float_) accumulate(i_block32(r)); else accumulate(i_block(r));
 			}
 		}
-#pragma omp critical
-		{
-			perturb += local;
-		}
+		parts[omp_get_thread_num()].swap(local);
 	}
 	if (!io_error.empty()) throw std::runtime_error(io_error);
+	//The partials outweigh the matrix many times over, so their sum is parallel too
+	if (!on_device) {
+#pragma omp parallel for schedule(static)
+		for (int mu = 0; mu < cryst.nmo; mu++) {
+			for (int nu = mu; nu < cryst.nmo; nu++) {
+				double sum = 0.0;
+				for (int t = 0; t < static_cast<int>(parts.size()); t++)
+					if (parts[t].size() != 0) sum += parts[t](mu, nu);
+				perturb(mu, nu) = sum;
+			}
+		}
+	}
 	perturb *= prefactor;
 	for (int mu = 0; mu < cryst.nmo; mu++) {
 		for (int nu = mu + 1; nu < cryst.nmo; nu++) {
@@ -2593,6 +2656,9 @@ void XCW::build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMat
 void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess) {
 
 	settings.clear();
+	cdiis_.reset();
+	adiis_.reset();
+	ediis_.reset();
 
 	XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
 	XCW_log << "____________________________________________________________________________________\n";
@@ -2601,6 +2667,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	XCW_log << "____________________________________________________________________________________\n";
 
 	// Compute first guess and update the energy according to this guess
+	const _time_point guess_t0 = get_time();
 	if (has_guess) {
 		scf.set_initial_guess_from_wfn(last_wfn);
 	}
@@ -2615,6 +2682,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	next_full_build_error_ = 0.0;
 
 	scf.ctx.H = scf.ctx.T + scf.ctx.V;
+	throughput::record_time("XCW initial guess", false, get_msec(guess_t0, get_time()));
 	bool converged;
 	double quant;
 	double last_quant = 0;
@@ -2622,8 +2690,9 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	occ::Mat dm_last = scf.ctx.mo.D;
 
 	do {
+		const _time_point scf_t0 = get_time();
 		converged = SCF_iteration(scf, lambda, alpha, quant_diff_mem, quant, last_quant, dm_last);
-
+		throughput::record_time("XCW SCF iteration", false, get_msec(scf_t0, get_time()));
 	} while (!converged && scf.iter < scf.maxiter);
 
 	if (converged) {
@@ -2663,7 +2732,9 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		}
 		std::cout << std::endl;
 
+		const _time_point tscb_t0 = get_time();
 		create_tscb(scf, lambda);
+		throughput::record_time("XCW tscb", false, get_msec(tscb_t0, get_time()));
 	}
 	else {
 		XCW_log << "____________________________________________________________________________________\n";
@@ -2719,11 +2790,10 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 
 double XCW::compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	if (settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
-		occ::Mat C = scf.molecular_orbitals().C;
-		occ::Mat Cocc = scf.molecular_orbitals().Cocc;
-		occ::Mat Cvir = C.rightCols(C.cols() - Cocc.cols());
-		occ::Mat G = 2.0 * Cvir.transpose() * scf.ctx.F * Cocc;
-		return G.norm();
+		const occ::Mat& C = scf.molecular_orbitals().C;
+		const occ::Mat& Cocc = scf.molecular_orbitals().Cocc;
+		const occ::Mat Cvir = C.rightCols(C.cols() - Cocc.cols());
+		return 2.0 * gemm(Cvir, gemm(scf.ctx.F, Cocc), true).norm();
 	}
 	else if (settings.hf_type == occ::qm::SpinorbitalKind::Unrestricted) {
 		occ::Mat C_alpha = scf.molecular_orbitals().C.topRows(cryst.nmo);
@@ -2738,6 +2808,60 @@ double XCW::compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& s
 	}
 	err_not_impl_f("Orbital gradient for a general spinorbital kind", std::cout);
 	return 0.0;
+}
+
+//F C = e S C through the orthogonaliser's X, one spin block at a time: X^T F X diagonalised
+//by MKL, C = X C'. occ's MolecularOrbitals::update does the same with Eigen, which occ
+//compiles serial; the occupation, smearing and density steps stay occ's.
+void XCW::solve_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat& F) const {
+	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+	const occ::Mat& X = scf.ctx.orthogonalizer.transformation_matrix();
+	const int n = static_cast<int>(X.rows()), m = static_cast<int>(X.cols()), nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1, ldf = static_cast<int>(F.rows());
+	occ::Mat FX(n, m), Fp(m, m);
+	mo.C.resize(static_cast<Eigen::Index>(nb) * n, m);
+	mo.energies.resize(static_cast<Eigen::Index>(nb) * m);
+	for (int b = 0; b < nb; b++) {
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, m, n, 1.0, F.data() + b * n, ldf, X.data(), n, 0.0, FX.data(), n);
+		cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, m, m, n, 1.0, X.data(), n, FX.data(), n, 0.0, Fp.data(), m);
+#if defined(__APPLE__)
+		int mm = m, lwork = -1, liwork = -1, iwq = 0, info = 0;
+		double wq = 0.0;
+		dsyevd_((char*)"V", (char*)"L", &mm, Fp.data(), &mm, mo.energies.data() + b * m, &wq, &lwork, &iwq, &liwork, &info);
+		lwork = static_cast<int>(wq), liwork = iwq;
+		vec work(lwork);
+		ivec iwork(liwork);
+		dsyevd_((char*)"V", (char*)"L", &mm, Fp.data(), &mm, mo.energies.data() + b * m, work.data(), &lwork, iwork.data(), &liwork, &info);
+		err_checkf(info == 0, "Fock diagonalisation failed", std::cout);
+#else
+		err_checkf(LAPACKE_dsyevd(LAPACK_COL_MAJOR, 'V', 'L', m, Fp.data(), m, mo.energies.data() + b * m) == 0, "Fock diagonalisation failed", std::cout);
+#endif
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, m, m, 1.0, X.data(), n, Fp.data(), m, 0.0, mo.C.data() + b * n, nb * n);
+	}
+	mo.update_occupied_orbitals();
+	mo.smearing.smear_orbitals(mo);
+	mo.update_density_matrix();
+}
+
+//occ's ConvergenceAccelerator::update with the CDIIS commutator S D F - F D S from MKL; with
+//the three matrices symmetric it is T - T^T for T = S D F. The extrapolations are occ's.
+occ::Mat XCW::diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
+	const occ::Mat& S = scf.ctx.S;
+	const occ::Mat& D = scf.ctx.mo.D;
+	const occ::Mat& F = scf.ctx.F;
+	const int n = static_cast<int>(D.cols()), nb = static_cast<int>(D.rows()) / n;
+	occ::Mat comm(nb * n, n), T(n, n), SD(n, n);
+	for (int b = 0; b < nb; b++) {
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, S.data() + b * n, nb * n, D.data() + b * n, nb * n, 0.0, SD.data(), n);
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, SD.data(), n, F.data() + b * n, nb * n, 0.0, T.data(), n);
+		comm.middleRows(static_cast<Eigen::Index>(b) * n, n) = T - T.transpose();
+	}
+	scf.diis_error = comm.array().abs().maxCoeff();
+	occ::Mat F_cdiis = F;
+	cdiis_.extrapolate(F_cdiis, comm);
+	const occ::qm::DiisStrategy strategy = scf.convergence_settings.diis_strategy;
+	if (strategy == occ::qm::DiisStrategy::CDIIS || scf.diis_error <= scf.convergence_settings.diis_switch_threshold) return F_cdiis;
+	if (strategy == occ::qm::DiisStrategy::ADIIS_CDIIS) return adiis_.update(scf.ctx.mo.kind, D, F);
+	return ediis_.update(scf.ctx.mo.kind, D, F, scf.ctx.energy["electronic"]);
 }
 
 void XCW::get_density_criteria(double& RMSP_diff, double& maxP_diff, const occ::Mat& dm, const occ::Mat& dm_last) {
@@ -2764,7 +2888,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	occ::Mat perturbation;
 	calc_perturb(perturbation, scf);
 	const _time_point it_t1 = get_time();
-	throughput::record_time("XCW structure factors + perturbation", false, get_msec(it_t0, it_t1));
+	throughput::record_time("XCW structure factors + perturbation", i_on_device_, get_msec(it_t0, it_t1));
 
 	// Build perturbed Fock matrix
 	// Maybe necessary to update the Hamiltoian if a potential changes depending on the density, but that does not happen in normal HF
@@ -2772,26 +2896,28 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H);
 	scf.ctx.F = scf.ctx.H;
 	const _time_point fock_t0 = get_time();
-	//G(D) = G(D_last) + G(D - D_last): the kernel screens shell quartets on the density's
-	//shell-block norms, and the difference shrinks as the SCF converges. Rebuilt in full
-	//every 8 iterations or once the DIIS error has fallen tenfold since the last full build,
-	//as OCC's own loop does, so the screening error does not accumulate.
-	const bool incremental = opt->xcw_incremental && scf.m_procedure.supports_incremental_fock_build() && G_last_.size() > 0
+	//G(D) = G(D_last) + G(D - D_last): the direct kernel screens shell quartets on the density's
+	//shell-block norms and the stored one skips integral segments on the difference's elements,
+	//and the difference shrinks as the SCF converges. Rebuilt in full every 8 iterations or once
+	//the DIIS error has fallen tenfold since the last full build, as OCC's own loop does, so the
+	//screening error does not accumulate. A device that holds the integrals contracts the whole
+	//density each time, nothing to skip.
+	const bool incremental = opt->xcw_incremental && !eri_on_device_ && scf.m_procedure.fock_build_properties().density_screened && G_last_.size() > 0
 		&& scf.iter - last_full_build_ < 8 && scf.diis_error > next_full_build_error_;
 	if (incremental) {
 		occ::Mat D_diff = scf.ctx.mo.D - D_last_build_;
 		std::swap(scf.ctx.mo.D, D_diff);
-		G_last_ += scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
+		G_last_ += eri_ ? eri_fock(scf.ctx.mo, true) : scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
 		std::swap(scf.ctx.mo.D, D_diff);
 	}
 	else {
-		G_last_ = scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
+		G_last_ = eri_ ? eri_fock(scf.ctx.mo, false) : scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
 		last_full_build_ = scf.iter;
 		next_full_build_error_ = scf.diis_error / 10.0;
 	}
 	D_last_build_ = scf.ctx.mo.D;
 	scf.ctx.F += G_last_;
-	throughput::record_time("XCW Fock build (OCC)", false, get_msec(fock_t0, get_time()));
+	throughput::record_time("XCW Fock build (OCC)", eri_on_device_, get_msec(fock_t0, get_time()));
 	scf.update_scf_energy(false);
 
 	double current_criterion = 0;
@@ -2822,8 +2948,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 	// DIIS extrapolation
-	occ::Mat F_diis = scf.convergence_accelerator.update(scf.ctx.mo.kind, scf.ctx.S, scf.ctx.mo.D, scf.ctx.F, scf.ctx.energy["electronic"]);
-	scf.diis_error = scf.convergence_accelerator.max_error();
+	occ::Mat F_diis = diis_update(scf);
 	settings.current_max_diis_error = scf.diis_error;
 	settings.update(XCW_log, alpha);
 
@@ -2842,7 +2967,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	}
 
 	// Solves central eigenvalue problem
-	scf.ctx.orthogonalizer.orthogonalize_molecular_orbitals(scf.ctx.mo, F_diis);
+	solve_orbitals(scf, F_diis);
 
 	// Apply damping
 	if (settings.apply_damping) {
@@ -2925,6 +3050,7 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	vec2 known_kpts_;
 	options* opt_ = const_cast<options*>(opt);
 	opt_->m_hkl_list = hkl_enlarged;
+	opt_->grid_cache = &tsc_grids;
 	result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
 		*opt_,
 		sf_wave_vec,
@@ -2972,6 +3098,21 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 		std::cout.rdbuf(cout_buf);
 		XCW_log << "RGBI analysis written to " << oss5.str() << std::endl;
 	}
+}
+
+//The stored integrals' two-electron Fock part, contracted on the device when it holds them
+occ::Mat XCW::eri_fock(const occ::qm::MolecularOrbitals& mo, bool screen) const {
+	stored_eri::jk_fn jk;
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	if (eri_on_device_) {
+		jk = [](const occ::Mat& D, occ::Mat& J, occ::Mat& K) {
+			J.resize(D.rows(), D.cols());
+			K.resize(D.rows(), D.cols());
+			err_checkf(eri_gpu_JK(D.data(), J.data(), K.data()), "Fock build on the device failed", std::cout);
+		};
+	}
+#endif
+	return eri_.fock(mo, screen, jk);
 }
 
 occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
@@ -3086,6 +3227,37 @@ void XCW::run_XCW_fitting() {
 	//already used every core - but it makes -cpus bind the 82% of a run that OCC owns.
 	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
 	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor);
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	//The two walks of an iteration read the whole tensor and the host is bound by its memory
+	//bandwidth doing so; the device reads it several times faster. The host copy stays for
+	//the background writer.
+	if (opt->gpu_itensor && opt->use_gpu && !i_streamed_) {
+		i_on_device_ = i_float_ ? itensor_gpu_hold(I32.data(), cryst.nr_small, static_cast<int>(i_compact_))
+			: itensor_gpu_hold(I.data(), cryst.nr_small, static_cast<int>(i_compact_));
+		if (!(opt->no_date))
+			std::cerr << "GPU in use: XCW structure factors and perturbation on "
+			<< (i_on_device_ ? "the device" : "the CPU - device unavailable or the tensor too large") << std::endl;
+	}
+#endif
+	//Four fifths of the free memory, the I tensor's budget, for the stored integrals
+	eri_.clear();
+	if (settings.hf_type != occ::qm::SpinorbitalKind::General) {
+		const _time_point eri_t0 = get_time();
+		const size_t avail = available_memory_bytes();
+		if (eri_.build(hf, avail ? avail / 5 * 4 : 0, XCW_log))
+			throughput::record_time("XCW two-electron integrals", false, get_msec(eri_t0, get_time()));
+	}
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	if (eri_ && opt->gpu_itensor && opt->use_gpu) {
+		const auto up_t0 = get_time();
+		eri_on_device_ = eri_gpu_hold(eri_.data(), eri_.nbf(), eri_.npairs(), eri_.pair_a().data(), eri_.pair_b().data(),
+			eri_.first_pair().data(), eri_.pair_index().data());
+		if (eri_on_device_) throughput::record_time("XCW two-electron integrals upload", true, get_msec(up_t0, get_time()));
+		if (!(opt->no_date))
+			std::cerr << "GPU in use: XCW Fock build from the stored integrals on "
+			<< (eri_on_device_ ? "the device" : "the CPU - device unavailable or the integrals too large") << std::endl;
+	}
+#endif
 	occ::qm::SCF scf(hf, settings.hf_type);
 	bool has_guess = false;
 	occ::qm::Wavefunction last_wfn, prev_wfn;
@@ -3133,8 +3305,6 @@ void XCW::run_XCW_fitting() {
 		scf.convergence_settings.level_shift = settings.level_shift;
 		scf.convergence_settings.level_shift_threshold = 0;
 		scf.update_occupied_orbital_count();
-		scf.convergence_accelerator.set_strategy(scf.convergence_settings.diis_strategy);
-		scf.convergence_accelerator.set_switch_threshold(scf.convergence_settings.diis_switch_threshold);
 		if (opt->xcw_extrapolate && step >= 2 && settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
 			//The density extrapolated through the two previous steps, pulled back to
 			//idempotency by two McWeeny steps D <- 3DSD - 2DSDSD; the orbitals stay those of
@@ -3168,6 +3338,11 @@ void XCW::run_XCW_fitting() {
 	//by now it has usually been finished for a long while - the refinement takes far longer
 	//than the write. Joining is what keeps it from outliving the process.
 	finish_i_save();
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	itensor_gpu_release();
+	eri_gpu_release();
+	i_on_device_ = eri_on_device_ = false;
+#endif
 
 	std::cout << "Finished XCW fitting procedure." << std::endl;
 }

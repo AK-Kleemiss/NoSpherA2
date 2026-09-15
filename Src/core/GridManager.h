@@ -32,6 +32,12 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
 
 struct GridConfiguration {
     int accuracy = 2;
+    //A grid pulled into the core: the tightest exponent, which sets the inner radius and the
+    //radial step, is sharpened by alpha_max_scale, the step divided by radial_step_scale and
+    //the Lebedev order stepped up angular_boost entries. The basin integration uses it.
+    double alpha_max_scale = 1.0;
+    double radial_step_scale = 1.0;
+    int angular_boost = 0;
     int pbc = 0;
     PartitionType partition_type = PartitionType::Hirshfeld;
     bool debug = false;
@@ -77,6 +83,11 @@ private:
     std::vector<std::tuple<std::string, _time_point>> timing_points_;
     bool non_spherical_densities_calculated_ = false;
     bool needs_helper_grids_ = false;
+    vec grid_key_;
+
+    //Everything the points, the weights and the pruning depend on when the partition is
+    //geometric; empty when it is not, so such a grid is never reused
+    vec gridKey(const WFN &wave, const ivec &atom_list, const bvec &needs_grid) const;
 
     // Internal helper methods
     void setupPrototypeGrids(const WFN &wave, const ivec &atom_types, std::ostream& file = std::cout);

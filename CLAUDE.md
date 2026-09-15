@@ -50,6 +50,42 @@ Important CMake options:
 
 CI configures with `NOSPHERA2_BUILD_TESTS=ON` and `NOSPHERA2_DEPENDENCIES_ONLY=OFF` after restoring or creating a dependency-only cache.
 
+### GPU builds
+
+`NOSPHERA2_GPU_AUTO` (default ON) picks `NOSPHERA2_USE_CUDA` or `NOSPHERA2_USE_HIP` from the card
+that is present; set it OFF and name the backend to build for a machine other than the build host.
+`NOSPHERA2_CUDA_PORTABLE` / `NOSPHERA2_HIP_PORTABLE` compile the kernels for every architecture the
+vendor still supports (the lists live in `CMakeLists.txt`) instead of the local card only. The
+bootstrap script takes `-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9`
+to fetch a conda-forge CUDA toolkit without a GPU, and `-DNOSPHERA2_BOOTSTRAP_GPU=OFF` to fetch none.
+
+Both backends at once make a fat binary: every kernel source is compiled twice, once per backend,
+into its own namespace (`Src/core/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
+`Src/core/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
+device (CUDA probed first; `NOSPHERA2_GPU_BACKEND=cuda|hip` in the environment overrides). A function
+added to one of the six GPU headers has to be added to the X-macro in `gpu_dispatch.cpp` too, or the
+fat link fails on it. Neither runtime is linked: cudart is static, and the HIP runtime is opened by
+name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
+`dlopen`s / `LoadLibrary`s `libamdhip64.so.<major>` / `amdhip64_<major>.dll` on the first call
+(`NOSPHERA2_HIP_RUNTIME=<file>` names one explicitly) and answers `hipErrorNoDevice` when there is
+none - the shim rather than delay-loading because clang registers the kernels with the runtime from
+static initialisers before `main()`, where nothing else can intercept. The CMake HIP language would
+link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it. The
+Visual Studio solution does the same through `Windows/Windows_utils/NoSpherA2_gpu.props`: a machine
+with `CUDA_PATH` and `HIP_PATH` gets the fat build.
+
+CI builds that fat binary for Linux and Windows on GPU-less runners (`Linux GPU Release`, `Windows
+GPU Release` in `.github/workflows/c-cpp_all.yml`, artifacts `NoSpherA2-linux-x86_64-gpu` and
+`NoSpherA2-windows-x64-gpu`) and runs the test suite on them, which checks that the binaries start
+and fall back to the CPU without a device. ROCm comes from AMD's pip wheels
+(`pip install --index-url https://stable.repo.amd.com/rocm/whl-next/ "rocm[devel]==10.0.0"`,
+`rocm-sdk init`, `rocm-sdk path --root`), the only ROCm that installs without root on Linux and
+exists at all on Windows. On Windows the ROCm 10 clang headers do not compile against the MSVC 14.5x
+standard library; use toolset 14.4x (`vcvars64.bat -vcvars_ver=14.44`). On macOS `NOSPHERA2_USE_METAL` defaults to ON when the build is
+arm64 and the SDK carries the Metal and MetalPerformanceShaders frameworks (configure prints
+`Metal I tensor path: ON/OFF (...)`), so the arm64 slice of the universal binary has the Metal I tensor
+path and falls back to the CPU at run time when `MTLCreateSystemDefaultDevice()` returns nothing.
+
 ### Windows Agent/CLI Notes
 
 For CMake preset builds, run from an x64 Visual Studio Developer PowerShell or initialize the MSVC environment before invoking CMake/Ninja. If Ninja can find `cl.exe` but compilation fails on missing standard headers such as `stdlib.h`, the shell/toolchain environment is incomplete.
@@ -222,8 +258,24 @@ cases (`-E XCW`), including the new `TomlIntegrationTests.ELI_NH3Li` golden case
 rewritten `-eli_analysis` basin analysis; the nine XCW cases pass on a V100 node, a CPU node
 and the M2 Mac. See `UNIT_TESTS_STATUS.md`.
 
-As of 2026-09-02, `ctest --preset release-windows` reports **275/275 passing, 0 failed**
-(253 s; 6 not run: the four `full = true` XCW cases and two disabled `DeltaSeriesTests`).
+As of 2026-09-14, `ctest --preset release-windows` reports **300 passing, 5 failed**
+(6 not run: the four `full = true` XCW cases and two disabled `DeltaSeriesTests`)
+against occ 0.9.4 (submodule `e9ebbdb13`): upstream `peterspackman/occ` main plus the
+NoSpherA2 patches and MSVC fixes. The five failures are the P1 XCW goldens
+(`P1_test_XCW`, `P1_test_XCW_gpu_itensor`, `P1_test_XCW_h2`, `P1_F2_test_XCW`,
+`P1_F2_test_XCW_h2`) that Johannes Bartusel's `5b6eb296` "Symmetry & Bugfix (WIP)"
+changed (grid points 102932 -> 93098, new XCW criterion line); they are his to
+regenerate. This baseline has `-dmin` generate the resolution sphere directly
+(`generate_hkl(dmin)`, the set cctbx's `index_generator` produces, with a 1e-3 relative
+margin inside dmin); the ten golden cases that use `-dmin` were regenerated and differ
+only in their reflection counts. With `-hkl_min_max` as well, `generate_hkl_from_options`
+keeps from the sphere only the symmetry images h.R (and Friedel mates) of the measured
+box - the set cctbx's tsc reader resolves for a measured list, verified with that reader
+on seven cases with 0 unresolved indices - and `-ED` ignores the box
+(`HklGenerationTests`). Olex2's `utilities.py` sends both the file box and the file's
+d_min. Earlier that day: 307/307 with the stored
+two-electron integrals over the Schwarz-screened pairs (`Src/core/stored_eri.cpp`,
+`StoredEriTests`, three `-xcw_incremental` golden cases), 302/302 (107 s) before that. Earlier baseline, 2026-09-02: 275/275 passing (253 s).
 This baseline covers the pTB cartesian-f fix in `WFN::read_ptb` and the new
 `-no_date_but_gpu` flag. On a machine with a CUDA device, 16 golden-file cases had been
 failing on GPU notes absent from the references; those notes now follow `-no-date`, with

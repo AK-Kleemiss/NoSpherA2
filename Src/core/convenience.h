@@ -8,6 +8,7 @@
 class WFN;
 class cell;
 class atom;
+class GridManager;
 class BasisSet;
 struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
@@ -844,17 +845,19 @@ struct options
     //Single-precision tiles for the CPU I tensor, as the device path runs; sgemm is twice
     //dgemm's rate. -no_cpu_itensor_fp32 keeps double.
     bool cpu_itensor_fp32 = true;
-    //CPU threads take reflections alongside the device; -no_itensor_hybrid leaves them all
-    //to the device.
-    bool itensor_hybrid = true;
+    //-itensor_hybrid lets the CPU threads take reflections alongside the device. Off by
+    //default: the two sides differ in the last bits and a shared counter decides which rows
+    //each takes, so the result changes from run to run. For a card slow in double only.
+    bool itensor_hybrid = false;
     //Seed each lambda step from the density extrapolated through the two previous steps
     //rather than the last one alone; the step is small and the trajectory smooth.
     bool xcw_extrapolate = true;
     //Build the two-electron Fock matrix from the change of the density between iterations,
-    //which the integral kernel screens on, rather than from the whole density every time.
-    //Only with xcw_int_precision 1e-12: at 1e-10 the increments' screening error accumulates
-    //to a gradient floor of 3e-5 and the SCF never meets its 1e-5, and the full build at
-    //1e-10 is the faster of the two anyway.
+    //rather than from the whole density every time: the stored integrals skip the segments
+    //the difference cannot reach (stored_eri::JK), the direct kernel skips shell quartets.
+    //The direct build only with xcw_int_precision 1e-12: at 1e-10 the increments' screening
+    //error accumulates to a gradient floor of 3e-5 and the SCF never meets its 1e-5, and the
+    //full build at 1e-10 is the faster of the two anyway.
     bool xcw_incremental = false;
     //Integral screening threshold of the XCW Fock build; OCC's own default is 1e-12.
     double xcw_int_precision = 1e-10;
@@ -871,16 +874,19 @@ struct options
     //largest of the device paths, and it moves the total energy only in the tenth
     //significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
     bool gpu_itensor = true;
-    //Use FP16 Tensor Core operands with FP32 accumulation when cuBLAS provides them. The
-    //I tensor falls back to ordinary FP32 GEMM when it does not, and the no-flag is for
-    //reproducibility with older output.
-    bool gpu_itensor_tensor = true;
+    //FP16 Tensor Core operands with FP32 accumulation for the I tensor. Off by default: the
+    //half-precision operands move the XCW energies in the fourth decimal, plain FP32 GEMM
+    //sits within 1e-8 Eh of double.
+    bool gpu_itensor_tensor = false;
     //SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
     bool gpu_salted = true;
     //-salted_charge_constraint rescales the l=0 coefficients of every SALTED prediction to the electron count, whether or not the model asks for it
     bool salted_charge_constraint = false;
     //-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
     bool gpu_grid = true;
+    //Owned by the caller; the scattering-factor grid is built in it instead of a local, so
+    //a second table for the same geometry reuses the points and weights
+    GridManager* grid_cache = nullptr;
     //-no_gpu_density keeps the fitted density of the Gordon-Kim repulsion grid on the CPU
     bool gpu_density = true;
     //-gpu_blas offers large dense GEMMs in nos_math to the device
@@ -900,6 +906,9 @@ struct options
     bool promol_nci = false;
     bool get_g = false;
     int accuracy = 2;
+    //-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
+    //exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
+    int basin_grid = 1;
     int threads = -1;
     int pbc = 0;
     int charge = 0;
@@ -909,8 +918,8 @@ struct options
     int multipole_lmax = -1;
     PartitionType multipole_scheme = PartitionType::Hirshfeld;
     double multipole_strength = 1.0;
-    //-multipole_partition: the restraint rows are partition-weighted grid moments of every aux function instead of centre moments
-    bool multipole_partition = false;
+    //-multipole_centre switches the restraint rows from partition-weighted grid moments of every aux function to centre moments
+    bool multipole_partition = true;
     //-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
     double repulsion_overlap = 0.0;
     //-repulsion_exchange: exchange functional of the Gordon-Kim repulsion, 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L

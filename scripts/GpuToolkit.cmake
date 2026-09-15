@@ -9,7 +9,7 @@
 # Both vendors are fetched, but they are not equally well served and it is worth knowing why
 # before trusting the AMD side.
 #
-# CUDA is complete: conda-forge ships the compiler, the runtime and cuBLAS.
+# CUDA is complete: conda-forge ships the compiler and the runtime, static and shared.
 #
 # ROCm is partial. conda-forge has hipcc and hip-devel for linux-64 only, and no hipBLAS at
 # all - checked against the package index and then confirmed by actually creating an
@@ -19,7 +19,15 @@
 # So on linux-64 we fetch what exists and build the three kernels that need no BLAS - which
 # includes the scattering-factor transform, the one path that runs without being asked for -
 # and the I tensor and the offloaded GEMM stay on the CPU. Everywhere else ROCm has to be
-# installed by hand, and this detects it and uses it.
+# installed by hand, and this detects it and uses it. Since ROCm 7 AMD also publishes the SDK
+# as pip wheels for linux_x86_64 and win_amd64 (python -m pip install --index-url
+# https://stable.repo.amd.com/rocm/whl-next/ "rocm[devel]"), which is what the CI's HIP jobs
+# use - `rocm-sdk path --root` names a tree that hip-config.cmake accepts as CMAKE_PREFIX_PATH.
+#
+# Building for a GPU the build machine does not have - the CI runners, a cluster head node -
+# is the one case detection cannot serve, so the bootstrap accepts the vendor by name too
+# (NOSPHERA2_BOOTSTRAP_GPU_VENDOR in BootstrapMicromamba.cmake) and, for CUDA, a toolkit
+# version to pin.
 
 # NVIDIA, AMD or NONE, from the driver rather than from any toolkit.
 function(nosphera2_detect_gpu out_var)
@@ -29,7 +37,8 @@ function(nosphera2_detect_gpu out_var)
         if(EXISTS "$ENV{SystemRoot}/System32/nvcuda.dll")
             set(_vendor "NVIDIA")
         elseif(EXISTS "$ENV{SystemRoot}/System32/amdhip64.dll"
-            OR EXISTS "$ENV{SystemRoot}/System32/amdhip64_6.dll")
+            OR EXISTS "$ENV{SystemRoot}/System32/amdhip64_6.dll"
+            OR EXISTS "$ENV{SystemRoot}/System32/amdhip64_7.dll")
             set(_vendor "AMD")
         endif()
     else()
@@ -177,16 +186,26 @@ function(nosphera2_env_nvcc env_prefix out_var)
     set(${out_var} "" PARENT_SCOPE)
 endfunction()
 
-# Add the CUDA compiler and the two libraries the kernels link against to an existing
-# micromamba environment.
+# Add the CUDA compiler and the runtime the kernels link against to an existing micromamba
+# environment. cuBLAS is not among them any more: nothing links it, and the one path that
+# still uses it opens the library by name at run time (cublas_dynamic.cpp).
 #
 # Deliberately a separate step from creating that environment rather than three more lines in
 # environment.yaml. The environment is what every build needs and its creation is fatal if it
 # fails; this is optional, and on a machine whose driver is too old for any packaged toolkit
 # the solve will fail. Folding it into the base environment would turn "your driver is old"
 # into "you cannot build NoSpherA2 at all". Here a failure costs the GPU path and nothing else.
+#
+# VERSION pins cuda-version. Without it micromamba reports the installed driver as the
+# __cuda virtual package and conda-forge's cuda-version metapackage is constrained against
+# it, so the solver picks a toolkit this driver can actually run - the right thing on a
+# workstation, where pinning would hand the user a toolkit their driver refuses. On a machine
+# with no driver there is no __cuda to constrain against and the solver takes the newest
+# toolkit it can find, which is the wrong thing for a binary meant to run elsewhere: CUDA 13
+# has no Volta support and wants a driver from 2025. So a build for other machines names the
+# version, and CONDA_OVERRIDE_CUDA tells the solver the driver it should pretend to see.
 function(nosphera2_bootstrap_cuda_toolkit)
-    cmake_parse_arguments(GPU "" "PREFIX;ROOT_PREFIX;EXECUTABLE" "" ${ARGN})
+    cmake_parse_arguments(GPU "" "PREFIX;ROOT_PREFIX;EXECUTABLE;VERSION" "" ${ARGN})
 
     nosphera2_env_nvcc("${GPU_PREFIX}" _existing)
     if(_existing)
@@ -194,21 +213,24 @@ function(nosphera2_bootstrap_cuda_toolkit)
         return()
     endif()
 
-    # No version pin. Micromamba reports the installed driver as the __cuda virtual package
-    # and conda-forge's cuda-version metapackage is constrained against it, so the solver
-    # picks a toolkit this driver can actually run. Pinning here would override that and
-    # hand the user a toolkit their driver refuses.
-    message(STATUS "NVIDIA driver found and no CUDA toolkit present - fetching one (~600 MB)")
+    set(_packages cuda-nvcc cuda-cudart-dev cuda-cudart-static)
+    set(_env "MAMBA_ROOT_PREFIX=${GPU_ROOT_PREFIX}")
+    if(GPU_VERSION)
+        list(APPEND _packages "cuda-version=${GPU_VERSION}")
+        list(APPEND _env "CONDA_OVERRIDE_CUDA=${GPU_VERSION}")
+        message(STATUS "Fetching CUDA toolkit ${GPU_VERSION} (~600 MB)")
+    else()
+        message(STATUS "NVIDIA driver found and no CUDA toolkit present - fetching one (~600 MB)")
+    endif()
     execute_process(
         COMMAND
-            "${CMAKE_COMMAND}" -E env
-            "MAMBA_ROOT_PREFIX=${GPU_ROOT_PREFIX}"
+            "${CMAKE_COMMAND}" -E env ${_env}
             "${GPU_EXECUTABLE}"
             install
             --yes
             --prefix "${GPU_PREFIX}"
             -c conda-forge
-            cuda-nvcc cuda-cudart-dev libcublas-dev
+            ${_packages}
         RESULT_VARIABLE _cuda_result
         OUTPUT_VARIABLE _cuda_output
         ERROR_VARIABLE  _cuda_error
