@@ -170,7 +170,6 @@ namespace {
 
             occ::gto::Shell shell(l, exponents, { coefficients }, { 0.0, 0.0, 0.0 });
             shell.kind = cartesian ? occ::gto::Shell::Kind::Cartesian : occ::gto::Shell::Kind::Spherical;
-            shell.incorporate_shell_norm();
             shells.push_back(shell);
         }
 
@@ -227,13 +226,12 @@ namespace {
         scf.set_charge_multiplicity(0, multiplicity);
         scf.compute_scf_energy();
 
-        occ::qm::MolecularOrbitals mo =
-            occ::io::conversion::orb::to_gaussian_order(basis, scf.wavefunction().mo);
+        occ::qm::MolecularOrbitals mo = scf.wavefunction().mo;
         mo.update_occupied_orbitals();
         mo.update_density_matrix();
 
         if (spin_kind == occ::qm::SpinorbitalKind::Restricted)
-            return eigen_matrix_to_dmatrix2(mo.D);
+            return eigen_matrix_to_dmatrix2(2.0 * mo.D);
 
         const occ::Mat spin_summed =
             occ::qm::block::a(mo.D) + occ::qm::block::b(mo.D);
@@ -1401,7 +1399,7 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 
     //err_checkf()
 
-    const double occupancy_cutoff = 0.17;
+    const double occupancy_cutoff = use_ano_basis ? 1.0 / 14.0 : 1.0 / 6.0;
 
     int last_index = 0;
     ivec2 indices(wavy.get_ncen());
@@ -1461,7 +1459,9 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
                 indices[a.get_nr() - 1],
                 symmetrize ? shell_angular_momenta : ivec{},
                 spherical,
-                occupancy_cutoff);
+                occupancy_cutoff,
+                0,
+                EVs);
             fallback.atom_index = a.get_nr() - 1;
             return fallback;
         };
@@ -1484,7 +1484,9 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
                     local_indices,
                     symmetrize ? shell_angular_momenta : ivec{},
                     spherical,
-                    occupancy_cutoff);
+                    occupancy_cutoff,
+                    0,
+                    EVs);
                 ano.sub_OM = S_sub;
                 ano.sub_DM = atomic_density.container();
                 ano.matrix_elements = indices[a.get_nr() - 1];
@@ -1691,6 +1693,49 @@ std::map<char, dMatrix2> Roby_information::make_covalent_from_ionic(
     }
 
     return res;
+}
+
+std::string Roby_information::make_theta_info(const WFN &wavy, const std::pair<int, int> &bond,
+    const vec &eigvals, const ivec &pairs, const dMatrix2 &angles,
+    const vec &covalent_populations, const vec &ionic_populations) const {
+    const auto &atoms = wavy.get_atoms();
+    std::ostringstream out;
+    out << "\nRoby-Gould theta subspaces for "
+        << atoms[bond.first].get_label() << " (A) - " << atoms[bond.second].get_label() << " (B)\n";
+    out << " Pair    theta/degrees       C+       C-      Cov.       I+       I-      Ion.     Total\n";
+    out << "----------------------------------------------------------------------------------------------\n";
+    for (int i = 0; i < static_cast<int>(eigvals.size()); ++i) {
+        if (pairs[i] < 0 || eigvals[i] < eigvals[pairs[i]])
+            continue;
+        const int pair = pairs[i];
+        const double c_plus = covalent_populations[i];
+        const double c_minus = covalent_populations[pair];
+        const double covalent = pair == i ? 0.0 : 0.5 * (c_plus - c_minus);
+        double i_plus = ionic_populations[i], i_minus = ionic_populations[pair], ionic = 0.0;
+        if (pair == i) {
+            if (eigvals[i] < 0.0) {
+                i_minus = i_plus;
+                i_plus = 0.0;
+                ionic = -0.5 * i_minus;
+            }
+            else {
+                i_minus = 0.0;
+                ionic = 0.5 * i_plus;
+            }
+        }
+        else
+            ionic = 0.5 * (i_plus - i_minus);
+        const double total = std::sqrt(covalent * covalent + ionic * ionic);
+        out << std::fixed << std::setprecision(3)
+            << std::setw(4) << i + 1 << "," << std::setw(3) << pair + 1
+            << std::setw(16) << angles(i, 0)
+            << std::setw(9) << c_plus << std::setw(9) << c_minus
+            << std::setw(10) << covalent << std::setw(9) << i_plus
+            << std::setw(9) << i_minus << std::setw(10) << ionic
+            << std::setw(10) << total << '\n';
+    }
+    out << "----------------------------------------------------------------------------------------------\n";
+    return out.str();
 }
 
 // Assembles the block-projected PAS matrix for a group: each atom's projection matrix
@@ -2053,13 +2098,14 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
     std::cout << sep << "\n";
 }
 
-Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis, const bool EVs) {
+Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool theta_info) {
     auto bonds = get_bonded_atom_pairs(wavy);
-    const double occupancy_cutoff = 0.17;
     const char *orbital_label = use_ano_basis ? "ANOs" : "NAOs";
     std::cout << "Calculating " << orbital_label << " for all atoms...                 " << std::flush;
-    computeAllAtomicNAOs(wavy, symmetrize, use_ano_basis);
+    computeAllAtomicNAOs(wavy, symmetrize, use_ano_basis, EVs);
     std::cout << " ...done!" << std::endl;
+    if (theta_info)
+        std::cout << "RGBI theta-subspace reports enabled." << std::endl;
     if (use_ano_basis) {
         if (ano_fallback_atoms.empty()) {
             std::cout << "ANO fallback summary: no atom-level fallbacks were needed." << std::endl;
@@ -2209,6 +2255,7 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 #ifndef NSA2DEBUG
     pb = new ProgressBar(bonds.size(), 40, "-", " ", "Calculating Bond Populations");
 #endif
+    std::string theta_reports;
     //now perform bond analysis for all bonded atoms
     for (auto bond : bonds) {
         //std::cout << std::endl << "---------------------------- Atom Pair: " << bond.first << " " << bond.second << " ----------------------\n";
@@ -2361,6 +2408,8 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
             temp = transpose(EVC2);
             ionic_popul[i] = projection_matrix_and_expectation(bond_indices, { i }, vals, &(temp));
         }
+        if (theta_info)
+            theta_reports += make_theta_info(wavy, bond, pruned_eigvals, pairs, covalent_info['A'], covalent_popul, ionic_popul);
 #ifdef NSA2DEBUG
         std::cout << "Covalent populations:\n";
         for (int i = 0; i < n0; i++)
@@ -2426,6 +2475,8 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 #ifndef NSA2DEBUG
     delete pb;
 #endif
+    if (theta_info)
+        std::cout << theta_reports << std::endl;
     const double number_of_electrons = wavy.get_nr_electrons();
     const double omitted_population = use_ano_basis
         ? all_atom_population_with_omitted - all_atom_population

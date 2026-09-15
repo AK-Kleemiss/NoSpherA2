@@ -476,6 +476,7 @@ std::string help_message =
  "  -get_g                              Enable reciprocal-space g calculation.\n"
  "  -refine [accuracy]                  Set refinement integral accuracy [0.1].\n"
  "  -rgbi_EVs                           Include RGBI eigenvectors.\n"
+ "  -rgbi_theta                         Include per-bond Roby-Gould theta-subspace populations and indices.\n"
  "  -sfac_diffuse x y z cif wfn dmin    Calculate diffuse scattering factors.\n\n"
  "EXPERIMENTAL AND DEVELOPER COMMANDS\n"
  "  -coef <file>                        Use externally supplied SALTED\n"
@@ -3532,6 +3533,10 @@ bool options::digest_ri_options(const std::string &temp, int &i)
     }
     else if (temp == "-rgbi_EVs") {
         rgbi_EVs = true;
+    }
+    else if (temp == "-rgbi_theta") {
+        rgbi = true;
+        rgbi_theta = true;
     }
     else if (temp == "-rgbi_basis") {
         err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);

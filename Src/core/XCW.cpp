@@ -55,8 +55,8 @@ void XCW::construct(const options& opt_in) {
 	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
 
 	// Generate WFN object from asym_atoms
-	dummy_wave.assign_charge(opt->charge);
-	dummy_wave.assign_multi(opt->mult);
+	dummy_wave.assign_charge(settings.charge);
+	dummy_wave.assign_multi(settings.multiplicity);
 	for (int at = 0; at < cryst.ncen; at++) {
 		asym_atom_list.push_back(at);
 		atom temp_atom;
@@ -2585,8 +2585,8 @@ void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
 
 	std::string init = init_stream.str();
 	mol = occ::io::molecule_from_xyz_string(init);
-	mol.set_charge(opt->charge);
-	mol.set_multiplicity(opt->mult);
+	mol.set_charge(settings.charge);
+	mol.set_multiplicity(settings.multiplicity);
 }
 
 void XCW::setup_basis(occ::core::Molecule& mol, std::string& basis_set_name, occ::qm::AOBasis& occ_basis_set) {
@@ -3094,7 +3094,7 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 		std::ofstream rgbi_out(oss5.str());
 		std::streambuf* const cout_buf = std::cout.rdbuf(rgbi_out.rdbuf());
 		Roby_information Roby(sf_wave_vec[0], opt->rgbi_group_sets, !opt->rgbi_no_sym,
-			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs);
+			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs, opt->rgbi_theta);
 		std::cout.rdbuf(cout_buf);
 		XCW_log << "RGBI analysis written to " << oss5.str() << std::endl;
 	}
