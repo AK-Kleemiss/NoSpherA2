@@ -956,11 +956,6 @@ cdouble hypergeometric(double a, double b, double c, cdouble x);
 
 bool ends_with(const std::string& str, const std::string& suffix);
 
-bool is_nan(const double& in);
-bool is_nan(const float& in);
-bool is_nan(const long double& in);
-bool is_nan(const cdouble& in);
-
 bool read_block_from_fortran_binary(std::ifstream& file, void* Target);
 template <typename T>
 bool read_block_from_fortran_binary(std::ifstream& file, std::vector<T>& Target);

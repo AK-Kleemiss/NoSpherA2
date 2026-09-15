@@ -553,7 +553,7 @@ bool BasisSetLibrary::check_basis_set_exists(std::string basis_name) {
 
 
 
-int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b, bool decontract, bool complete)
+int load_basis_into_WFN(WFN& wavy,const std::shared_ptr<BasisSet> b, const bool decontract, const bool complete)
 {
 	int nex_ = 0;
 	vec exponents_;
@@ -649,7 +649,7 @@ bool basis_set_complete(const WFN& orbital_wfn, std::shared_ptr<BasisSet> aux_ba
 	return true;
 }
 
-WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>>& aux_basis) {
+WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>>& aux_basis, const bool decontract) {
 	err_checkf(aux_basis.size() > 0, "Aux-Basis Vecor == 0, something went wrong... try calling -ri_fit and see what happens", std::cout);
 	//Check every basis set in the vector, if it is empty, generate it using auto_aux
 	for (int basis_nr = 0; basis_nr < aux_basis.size(); basis_nr++) { if ((*aux_basis[basis_nr]).get_primitive_count() == 0)(*aux_basis[basis_nr]).gen_auto_aux(orbital_wfn); }
@@ -666,7 +666,7 @@ WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSe
 	wavy_aux.set_atoms(orbital_wfn.get_atoms());
 	wavy_aux.set_ncen(orbital_wfn.get_ncen());
 	wavy_aux.delete_basis_set();
-	load_basis_into_WFN(wavy_aux, combined_aux_basis);
+	load_basis_into_WFN(wavy_aux, combined_aux_basis, decontract);
 
 	return std::move(wavy_aux);
 }

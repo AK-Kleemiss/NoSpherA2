@@ -1737,127 +1737,41 @@ static inline cdouble sfac_bessel_r(const primitive& p, const double* k_point, c
 	}
 }
 
-//TODO�: This breaks if the aux_basis is contracted... Need to fix that!
-//a streaming caller owns one bar for the whole table and passes it in, else every block draws its own
-void calc_SF_SALTED(const vec2& k_pt,
+void calc_SF_SALTED(
+	const vec2& k_pt,
 	const vec& coefs,
-	const std::vector<atom>& atom_list,
+	const aux_density_table& table,
 	const ivec& asym_atom_list,
 	cvec2& sf,
 	ProgressBar* progress = nullptr)
 {
-	const int num_atoms = (int)atom_list.size();
-	const int num_asym_atoms = (int)asym_atom_list.size();
+	const int num_asym_atoms =
+		static_cast<int>(asym_atom_list.size());
 
-	// coefficients per *atom* (full list)
-	std::vector<int> atom_ncoefs(num_atoms, 0);
-
-	// global offset for each atom in coefs[]
-	std::vector<int> atom_offsets(num_atoms + 1, 0);
-
-#pragma omp parallel for
-	for (int iat = 0; iat < num_atoms; ++iat) {
-		const atom& a = atom_list[iat];
-
-		int prim = 0;
-		int n_this = 0;
-
-		for (int shell = 0; shell < a.get_shellcount_size(); ++shell) {
-			int L = a.get_basis_set_type(prim);
-			n_this += 2 * L + 1;
-			prim += a.get_shellcount(shell);
-		}
-
-		atom_ncoefs[iat] = n_this;
-	}
-
-	// prefix sum over *all* atoms
-	std::partial_sum(atom_ncoefs.begin(),
-		atom_ncoefs.end(),
-		atom_offsets.begin() + 1);
-
-
-    ivec coef_offsets(num_asym_atoms, 0);
-
-	for (int ia = 0; ia < num_asym_atoms; ++ia) {
-		coef_offsets[ia] = atom_offsets[asym_atom_list[ia]];
-	}
+	const int nk =
+		static_cast<int>(k_pt[0].size());
 
 	sf.resize(num_asym_atoms);
-	//The radial factor depends only on (exponent, l) and |k|, so collect the distinct pairs once instead of recomputing per atom
-	vec uniq_b, uniq_elp32;
-	ivec uniq_l;
-	ivec2 bl_index(num_asym_atoms);
-	for (int ia = 0; ia < num_asym_atoms; ia++) {
-		const atom& a = atom_list[asym_atom_list[ia]];
-		const int lim = (int)a.get_basis_set_size();
-		bl_index[ia].resize(lim);
-		for (int ib = 0; ib < lim; ib++) {
-			const primitive& pr = a.get_basis_set_entry(ib).get_primitive();
-			int slot = -1;
-			for (int u = 0; u < (int)uniq_b.size(); u++)
-				if (uniq_b[u] == pr.get_exp() && uniq_l[u] == pr.get_type()) { slot = u; break; }
-			if (slot < 0) {
-				slot = (int)uniq_b.size();
-				uniq_b.push_back(pr.get_exp());
-				uniq_l.push_back(pr.get_type());
-				uniq_elp32.push_back(pr.get_exp_l_plus_3_2());
-			}
-			bl_index[ia][ib] = slot;
-		}
-	}
-	const int n_uniq = (int)uniq_b.size();
-	std::unique_ptr<ProgressBar> local_pb;
-	if (!progress)
-		local_pb = std::make_unique<ProgressBar>(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
-	ProgressBar& pb = progress ? *progress : *local_pb;
 
-#pragma omp parallel shared(pb, sf)
+	for (int ia = 0; ia < num_asym_atoms; ++ia)
+		sf[ia].assign(nk, constants::cnull);
+
+#pragma omp parallel for
+	for (int ik = 0; ik < nk; ++ik)
 	{
-		// init SF
-#pragma omp for
-		for (int ia = 0; ia < num_asym_atoms; ++ia) {
-			sf[ia].assign(k_pt[0].size(), constants::cnull);
-		}
-
-		vec radial(n_uniq, 0.0);
-#pragma omp for
-		for (int i_kpt = 0; i_kpt < (int)k_pt[0].size(); ++i_kpt)
+		for (int ia = 0; ia < num_asym_atoms; ++ia)
 		{
-			double k_pt_local[4] = {
-				k_pt[0][i_kpt],
-				k_pt[1][i_kpt],
-				k_pt[2][i_kpt],
-				0.0
-			};
-
-			k_pt_local[3] = std::hypot(k_pt_local[0], k_pt_local[1], k_pt_local[2]);
-
-			for (int i = 0; i < 3; i++)
-				k_pt_local[i] /= k_pt_local[3];
-			for (int u = 0; u < n_uniq; u++)
-				radial[u] = fourier_bessel_radial(uniq_b[u], uniq_l[u], uniq_elp32[u], k_pt_local[3]);
-
-			for (int ia = 0; ia < num_asym_atoms; ++ia)
-			{
-				const atom& a = atom_list[asym_atom_list[ia]];
-
-				const basis_set_entry* basis_ptr = &a.get_basis_set_entry(0);
-				const int lim = (int)a.get_basis_set_size();
-
-				const double* coef_slice_ptr = coefs.data() + coef_offsets[ia];
-
-				const int* bl_row = bl_index[ia].data();
-				for (int i_basis = 0; i_basis < lim; ++i_basis, ++basis_ptr)
-				{
-					// IMPORTANT: make basis local, not shared between threads
-					const primitive& basis = basis_ptr->get_primitive();
-					sf[ia][i_kpt] += sfac_bessel_r(basis, k_pt_local, coef_slice_ptr, radial[bl_row[i_basis]]);
-					coef_slice_ptr += 2 * basis.get_type() + 1;
-				}
-			}
-			pb.update();
+			sf[ia][ik] =
+				table.fourier_atom(
+					k_pt[0][ik],
+					k_pt[1][ik],
+					k_pt[2][ik],
+					coefs.data(),
+					asym_atom_list[ia]
+				);
 		}
+		if (progress)
+			progress->update();
 	}
 }
 /**
@@ -3149,7 +3063,7 @@ tsc_block_type calculate_scattering_factors(
 		else if (opt.partition_type == PartitionType::RI)
 		{
 			file << "\nGenerating densities... " << endl;
-			WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis);
+			WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis, true);
 
             //TODO: only compute coefs for atoms that are actually in the symmetric unit!
             DensityFitting::CONFIG config = DensityFitting::config_from_options(opt);

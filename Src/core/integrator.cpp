@@ -95,7 +95,7 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
     switch (config.metric) {
     case METRIC_TYPE::COULOMB:
         compute2C<Coulomb2C_SPH>(aux_basis, eri2c);
-        computeRho<Coulomb3C_SPH>(wavy, wavy_aux, dm, rho, config.asym_atm_list);
+        computeRho<Coulomb3C_SPH>(normal_basis, aux_basis, dm, rho, config.asym_atm_list);
         break;
     case METRIC_TYPE::OVERLAP:
         compute2C<Overlap2C_SPH>(aux_basis, eri2c);
@@ -335,14 +335,16 @@ void DensityFitting::add_electron_restraint(vec& eri2c, vec& rho, const WFN& wav
             if (type == 0) { // s-orbital only
                 radial = 0.0;
 
-                // Sum over primitives in this s-shell
-                for (unsigned int e = 0; e < current_atom.get_shellcount()[shell]; e++) {
-                    bf = current_atom.get_basis_set_entry(prim + e);
-                    primitive p(0, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
+                vec shell_coefs(current_atom.get_shellcount()[shell]), shell_exps(current_atom.get_shellcount()[shell]);
+                for (unsigned int e = 0; e < current_atom.get_shellcount()[shell]; e++, prim++) {
+                    bf = current_atom.get_basis_set_entry(prim);
+                    shell_coefs[e] = bf.get_coefficient();
+                    shell_exps[e] = bf.get_exponent();
+                }
+                const vec normalized_coefs = Int_Params::normalize_gto(shell_coefs, shell_exps, 0);
 
-                    // Electron-nucleus attraction integral for s-orbital: <χ|1|χ>
-                    radial += constants::PI / (2.0 * std::pow(p.get_exp(), 1.5))
-                        * p.normalization_constant() * p.get_coef();
+                for (unsigned int e = 0; e < current_atom.get_shellcount()[shell]; e++, prim++) {
+                    radial += normalized_coefs[e] * std::pow(M_PI / shell_exps[e], 1.5);
                 }
 
                 // Store the electron integral for this s-orbital
@@ -1047,41 +1049,30 @@ void DensityFitting::analyze_density_fit_quality(const vec& coefficients, const 
 
     vec atomic_populations(wavy_aux.get_ncen(), 0.0);
     int expected_total_electrons = 0;
-    int coef_idx = 0;
-
+    const double *coef_ptr = coefficients.data();
+    std::map<int, LibCintBasis> basis_map = Int_Params(wavy_aux).get_basis_sets();
+    
     // Calculate atomic populations from coefficients using only s-orbitals
     for (int atm_idx = 0; atm_idx < wavy_aux.get_ncen(); atm_idx++) {
         atom current_atom = wavy_aux.get_atoms()[atm_idx];
         expected_total_electrons += current_atom.get_charge();
-        int type = -1, prim = 0;
-        for (unsigned int shell = 0; shell < current_atom.get_shellcount().size(); shell++) {
-            type = current_atom.get_basis_set_entry(prim).get_type();
+        const LibCintBasis basis = basis_map.at(current_atom.get_charge());
 
-            // Only calculate population from s-orbitals (type == 0)
+        unsigned int prim = 0;
+        for (unsigned int shell = 0; shell < basis.shelltypes.size(); shell++) {
+            int type = basis.shelltypes[shell];
             if (type == 0) { // s-orbital
                 double radial_integral = 0.0;
-                basis_set_entry bf;
-
-                // Calculate the radial integration for s-orbital
-                for (unsigned int e = 0; e < current_atom.get_shellcount()[shell]; e++) {
-                    bf = current_atom.get_basis_set_entry(prim + e);
-                    primitive p(0, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
-
-                    // Radial integral for s-orbital: <χ|1|χ>
-                    radial_integral += constants::PI / (2.0 * std::pow(p.get_exp(), 1.5))
-                        * p.normalization_constant() * p.get_coef();
+                for (unsigned int local_prim = 0; local_prim < current_atom.get_shellcount()[shell]; local_prim++, prim++) {
+                    radial_integral += constants::PI / (2.0 * std::pow(basis.exponents[prim], 1.5)) * basis.coefficients[prim];
                 }
-
-                // Multiply radial part with the coefficient to get electron population contribution
-                atomic_populations[atm_idx] += coefficients[coef_idx] * radial_integral;
-                coef_idx++;
+                atomic_populations[atm_idx] += *coef_ptr * radial_integral;
+                coef_ptr++;
             }
             else {
-                // Skip non-s orbitals but still increment coefficient index
-                coef_idx += (2 * type + 1);
+                prim += current_atom.get_shellcount()[shell];
+                coef_ptr += (2 * type + 1); // Skip non-s orbitals but still increment coefficient pointer
             }
-
-            prim += current_atom.get_shellcount()[shell];
         }
 
         atomic_populations[atm_idx] += current_atom.get_ECP_electrons(); // Include ECP electrons if any
@@ -1172,23 +1163,23 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
     std::vector<atom> atoms = wavy_aux.get_atoms();
     vec partitioned_densities(wavy.get_ncen(), 0.0);
 
+    int coef_idx = 0;
     for (int i = 0; i < wavy.get_ncen(); i++) {
+        const aux_density_table t({wavy_aux.get_atoms()[i]});
+        const int natom_points = grid_data.num_points_per_atom[i];
 
-
-        auto calc_density_unrestrained = [&](double x, double y, double z) {
-            return calc_density_ML(x, y, z, coeff_unrestrained, atoms, i);
-            };
-        auto calc_density_enhanced = [&](double x, double y, double z) {
-            return calc_density_ML(x, y, z, coeff_enhanced, atoms, i);
-            };
-        auto calc_density_hybrid = [&](double x, double y, double z) {
-            return calc_density_ML(x, y, z, coeff_hybrid, atoms, i);
-            };
-
+        auto calc_density = [&](vec& coeff) {
+            vec ri_density(natom_points);
+            vec atom_coefs(t.n_coef);
+            std::copy(coeff.data() + coef_idx, coeff.data() + coef_idx + t.n_coef, atom_coefs.begin());
+            calc_density_ML(t, atom_coefs, natom_points,
+                grid_data.atomic_grids[i][GridData::GridIndex::X].data(), grid_data.atomic_grids[i][GridData::GridIndex::Y].data(), grid_data.atomic_grids[i][GridData::GridIndex::Z].data(),
+                ri_density.data());
+            return ri_density;
+        };
 
         double diff_pos = 0, diff_neg = 0;
-        const int natom_points = grid_data.num_points_per_atom[i];
-        vec riDensity = grid_manager.evaluateFunctionOnGrid(grid_data.atomic_grids[i], calc_density_unrestrained);
+        vec riDensity = calc_density(coeff_unrestrained);
         for (int p = 0; p < natom_points; p++) {
             diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM_NO_DIFF] += riDensity[p];
 
@@ -1203,7 +1194,7 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
         }
         diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::RRS] = diff_neg / diff_pos;
 
-        riDensity = grid_manager.evaluateFunctionOnGrid(grid_data.atomic_grids[i], calc_density_enhanced);
+        riDensity = calc_density(coeff_enhanced);
         diff_pos = 0, diff_neg = 0;
         for (int p = 0; p < natom_points; p++) {
             diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::SUM_NO_DIFF] += riDensity[p];
@@ -1218,7 +1209,7 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
         }
         diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::RRS] = diff_neg / diff_pos;
 
-        riDensity = grid_manager.evaluateFunctionOnGrid(grid_data.atomic_grids[i], calc_density_hybrid);
+        riDensity = calc_density(coeff_hybrid);
         diff_pos = 0, diff_neg = 0;
         for (int p = 0; p < natom_points; p++) {
             diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::SUM_NO_DIFF] += riDensity[p];
@@ -1232,6 +1223,8 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
 
         }
         diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::RRS] = diff_neg / diff_pos;
+
+        coef_idx += t.n_coef;
     }
     std::cout << "\n=======================Unrestrained==========================" << std::endl;
     for (int i = 0; i < wavy.get_ncen(); i++) {

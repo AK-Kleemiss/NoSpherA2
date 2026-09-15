@@ -87,6 +87,7 @@ namespace {
             wavy.push_back_MO(0, 1.0, -13);
             wavy.push_back_atom("H", 0, 0, 0, 1);
             wavy.push_back_atom_basis_set(0, c_exp, vals[0], type, 0);
+            const aux_density_table t(wavy.get_atoms());
             primitive p(1, type, c_exp, vals[0]);
 
             for (unsigned int l = 0; l < type * 2 + 1; l++)
@@ -99,12 +100,7 @@ namespace {
                 max_diff = 0.0;
                 coefs[l] = 1.0;
 
-
-                for (int i = 0; i < grid[0].size(); i++)
-                {
-                    //grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
-                    grid[3][i] = calc_density_ML(grid[0][i], grid[1][i], grid[2][i], coefs, wavy.get_atoms());
-                }
+                calc_density_ML(t, coefs, grid[0].size(), grid[0].data(), grid[1].data(), grid[2].data(), grid[3].data());
 
                 // Empty the vectors sf:A nad sf_N
                 for (int i = 0; i < kpts.size(); i++)
@@ -419,6 +415,67 @@ namespace {
         }
 
         std::cout << "All tests passed!\n";
+    }
+
+    //Here only as a reference for simple tests, the actual implementation is in SALTED_utilities.cpp
+    const double calc_density_ML(const double& x,
+        const double& y,
+        const double& z,
+        const vec& coefficients,
+        const std::vector<atom>& atoms)
+    {
+        double dens = 0, radial;
+        int coef_counter = 0;
+        unsigned int shell = 0, n_shells = 0, prim = 0;
+        basis_set_entry bf;
+        primitive p;
+
+        for (int a = 0; a < atoms.size(); a++)
+        {
+            prim = 0;
+            n_shells = static_cast<unsigned int>(atoms[a].get_shellcount().size());
+            double d[4]{
+                x - atoms[a].get_coordinate(0),
+                y - atoms[a].get_coordinate(1),
+                z - atoms[a].get_coordinate(2), 0.0 };
+            // store r in last element
+            d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+            double alpha_min = DBL_MAX;
+            for (unsigned int e = 0; e < atoms[a].get_basis_set_size(); e++) alpha_min = std::min(alpha_min, atoms[a].get_basis_set_exponent(e));
+            if (alpha_min * d[3] * d[3] > 46.0517)
+            { // most diffuse primitive below 1E-20
+                for (shell = 0; shell < n_shells; shell++)
+                {
+                    coef_counter += (2 * atoms[a].get_basis_set_type(prim) + 1);
+                    prim += atoms[a].get_shellcount()[shell];
+                }
+                continue;
+            }
+            // normalize distances for spherical harmonic
+            for (int i = 0; i < 3; i++)
+                d[i] /= d[3];
+
+            for (int shell = 0; shell < n_shells; shell++) {
+                radial = 0;
+                int type = atoms[a].get_basis_set_entry(prim).get_type();
+
+                for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
+                    bf = atoms[a].get_basis_set_entry(prim);
+                    radial += bf.get_primitive().eval_gaussian(d[3]);
+                }
+
+                if (radial < 1E-10)
+                {
+                    coef_counter += (2 * type + 1);
+                    continue;
+                }
+
+                dens += radial * constants::spherical_harmonic(type, d, &coefficients[coef_counter]);
+                coef_counter += (2 * type + 1);
+            }
+        }
+        // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
+        return dens;
     }
 }
 
@@ -2618,15 +2675,19 @@ namespace NoSpherA2UnitTests
         vec coefs(n_aux);
         for (int i = 0; i < n_aux; i++) coefs[i] = std::sin(1.0 + i);
         vec2 Q(1, vec(n_moments, 0.0));
+
+        const aux_density_table t(aux.get_atoms());
+        vec f(n_points);
+        calc_density_ML(t, coefs, n_points, gx.data(), gy.data(), gz.data(), f.data());
+
         for (int p = 0; p < n_points; p++) {
-            const double f = calc_density_ML(gx[p], gy[p], gz[p], coefs, aux.get_atoms()) * bw[p];
             double d[3] = { gx[p] - pos[0], gy[p] - pos[1], gz[p] - pos[2] };
             const double r = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
             for (int i = 0; i < 3; i++) d[i] /= r;
             double rl = 1.0;
             for (int l = 0; l <= lmax; l++) {
                 for (int m = -l; m <= l; m++)
-                    Q[0][l * l + l + m] += f * rl * constants::spherical_harmonic(l, m, d);
+                    Q[0][l * l + l + m] += f[p] * bw[p] * rl * constants::spherical_harmonic(l, m, d);
                 rl *= r;
             }
         }
@@ -3202,16 +3263,19 @@ namespace NoSpherA2UnitTests
         vec coefs(n_aux);
         for (int i = 0; i < n_aux; i++) coefs[i] = std::sin(1.0 + i);
         vec2 Q(1, vec(n_moments, 0.0));
+
+        vec f(n_points);
+        calc_density_ML(t, coefs, n_points, gx.data(), gy.data(), gz.data(), f.data());
+
         double n_becke = 0.0;
         for (int p = 0; p < n_points; p++) {
-            const double f = calc_density_ML(gx[p], gy[p], gz[p], coefs, aux.get_atoms()) * bw[p];
             double d[3] = { gx[p] - xs[0], gy[p] - ys[0], gz[p] - zs[0] };
             const double r = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
             for (int i = 0; i < 3; i++) d[i] /= r;
             double rl = 1.0;
             for (int l = 0; l <= lmax; l++) {
                 for (int m = -l; m <= l; m++)
-                    Q[0][l * l + l + m] += f * rl * constants::spherical_harmonic(l, m, d);
+                    Q[0][l * l + l + m] += f[p] * bw[p] * rl * constants::spherical_harmonic(l, m, d);
                 rl *= r;
             }
             n_becke += bw[p];

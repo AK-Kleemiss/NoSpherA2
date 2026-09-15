@@ -6543,29 +6543,34 @@ void WFN::operator=(const WFN &right)
     virial_ratio = right.get_virial_ratio();
     UT_DensityMatrix = right.get_DensityMatrix();
     UT_SpinDensityMatrix = right.get_SpinDensityMatrix();
+    centers.clear();
+    types.clear();
+    exponents.clear();
     for (int i = 0; i < nex; i++)
     {
         push_back_center(right.get_center(i));
         push_back_type(right.get_type(i));
         push_back_exponent(right.get_exponent(i));
     }
+    MOs.clear();
     for (int i = 0; i < right.get_nmo(); i++)
     {
         push_back_MO(i, right.get_MO_primitive_count(i), right.get_MO_energy(i));
         for (int j = 0; j < right.get_MO_primitive_count(i); j++)
             push_back_MO_coef(i, right.get_MO_coef(i, j));
     }
+    cub.clear();
     for (int c = 0; c < right.cub.size(); c++)
     {
         cub.push_back(right.cub[c]);
     }
+    atoms.clear();
     for (int a = 0; a < right.atoms.size(); a++)
     {
         atoms.push_back(right.atoms[a]);
     }
     fill_pre();
     fill_Afac_pre();
-
 };
 
 int WFN::calculate_charge()

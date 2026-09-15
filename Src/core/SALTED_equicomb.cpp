@@ -123,7 +123,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     }
     if (ProgressBar::report_counts)
     {
-        std::cout << "[equicomb] lam " << lam << 
+        std::cout << "[equicomb] lam " << lam
                   << ", " << total_terms << " wigner terms"
                   << ", natoms " << natoms << ", nrad1 " << nrad1 << ", nrad2 " << nrad2
                   << ", llmax " << llmax << ", l21 " << l21

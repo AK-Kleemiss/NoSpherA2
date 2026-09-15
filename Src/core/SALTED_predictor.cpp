@@ -16,27 +16,30 @@
 #include <future>
 
 
-SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in) : wavy(wavy_in) //We copy the input WFN to modify it later
+SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 {
     std::filesystem::path _path = opt_in.salted_model_dir;
     SALTED_DIR = opt_in.salted_model_dir;
     debug = opt_in.debug;
     force_charge_constraint = opt_in.salted_charge_constraint;
 
-    config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
+    if (opt_in.salted_model_dir.empty() && opt_in.coef_file != "") {
+        std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
+        wavy = generate_aux_wfn(wavy_in, opt_in.aux_basis);
+        bbasis_set_loaded = true;
+        config.dfbasis = opt_in.aux_basis[0]->get_name();
+        config.salted_filename = "coefficient file";
+        coef_file = opt_in.coef_file;
+        return;
+    }
 
-    if (config.salted_filename == "") {
-        if (opt_in.coef_file != "") {
-            std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
-            config.dfbasis = "cc-pvqz-jkfit";
-            config.salted_filename = "coefficient file";
-            coef_file = opt_in.coef_file;
-            return;
-        }
+    config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
+    if (config.salted_filename.empty()) {
         std::cout << "No SALTED binary file found in directory: " << opt_in.salted_model_dir << std::endl;
         exit(1);
     }
 
+    wavy = wavy_in;
     if (opt_in.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
     _path = _path / config.salted_filename;
     SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
@@ -298,13 +301,12 @@ vec SALTEDPredictor::predict()
     std::vector<dMatrix2> kernell0(config.species.size());
     for (int lam = 0; lam <= lmax_max; lam++)
     {
-        const int lam1 = std::min(lam0 + lam_group, lmax_max + 1);
-        vec2 pg(lam1 - lam0);
+        vec p;
         std::future<double> model_loader;
         if (overlap_model_loading)
-            model_loader = std::async(std::launch::async, [this, lam0, lam1]() {
+            model_loader = std::async(std::launch::async, [this, lam]() {
                 const auto start = std::chrono::steady_clock::now();
-                for (int lam = lam0; lam < lam1; lam++) load_model_lambda(lam);
+                load_model_lambda(lam);
                 return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
             });
         const auto _t_eq = std::chrono::steady_clock::now();
@@ -353,7 +355,7 @@ vec SALTEDPredictor::predict()
         if (overlap_model_loading)
             _t_model_work += model_loader.get();
         else
-            for (int lam = lam0; lam < lam1; lam++) load_model_lambda(lam);
+            load_model_lambda(lam);
         const double model_wait = _elapsed(_t_wait);
         _t_model_wait += model_wait;
         if (!overlap_model_loading) _t_model_work += model_wait;
@@ -416,7 +418,7 @@ vec SALTEDPredictor::predict()
             }
         }
         _t_kernels += _elapsed(_t_kn);
-        for (int lam = lam0; lam < lam1; lam++) free_model_lambda(lam);
+        free_model_lambda(lam);
     }
 
     unordered_map<string, dMatrix1> C{};
@@ -544,9 +546,9 @@ vec SALTEDPredictor::gen_SALTED_densities()
     using namespace std;
     if (coef_file != "")
     {
-        std::vector<float> coefs{};
+        std::vector<double> coefs{};
         std::cout << "Reading coefficients from file: " << coef_file << endl;
-        read_npy<float>(coef_file, coefs);
+        read_npy<double>(coef_file, coefs);
         vec double_coefs(coefs.size());
         for (int i = 0; i < coefs.size(); i++)
         {

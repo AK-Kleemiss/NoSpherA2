@@ -119,27 +119,20 @@ struct aux_density_table
 {
     int n_at = 0, n_sh = 0, n_pr = 0, n_coef = 0;
     vec cx, cy, cz, r2_max, pr_exp, pr_norm;
+    // alpha^(l + 3/2), needed for Fourier-Bessel transform
+    vec pr_exp_l32;
     ivec sh_start, sh_l, pr_start, coef_off;
+
     aux_density_table(const std::vector<atom>& atoms);
     double operator()(const double x, const double y, const double z, const double* coefs) const;
     double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz) const;
     double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double& lap) const;
+
+    // Convenience function for one atom
+    cdouble fourier_atom(double kx, double ky, double kz, const double* coefs, int atom_idx) const;
 };
 //rho on np points, OpenMP on the host or on the device when the set is large enough; with gx, gy, gz its gradient too
 void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx = nullptr, double* gy = nullptr, double* gz = nullptr, double* lap = nullptr);
-//Calc density from RI fit coefficients
-const double calc_density_ML(const double& x,
-                            const double& y,
-                            const double& z,
-                            const vec& coefficients,
-                            const std::vector<atom>& atoms);
-//Perform the calculation for only one atom
-const double calc_density_ML(const double &x,
-                             const double &y,
-                             const double &z,
-                             const vec &coefficients,
-                             const std::vector<atom> &atoms,
-                             const int &atom_nr);
 
 vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs);
 

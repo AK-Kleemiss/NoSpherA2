@@ -1,13 +1,32 @@
 {
+  "DevContainersInfoBarHidden": true,
   "OutputFoldersPerTargetSystem": {
     "Local Machine": [
-      "out\\build\\x64-Debug",
-      "out\\install\\x64-Debug"
+      "build\\release-windows",
+      "build\\debug-windows"
+    ],
+    "WSL: Ubuntu": [
+      "out\\Ubuntu\\build\\release-linux",
+      "out\\Ubuntu\\install\\release-linux",
+      "out\\Ubuntu\\build\\debug-linux",
+      "out\\Ubuntu\\install\\debug-linux"
     ]
   },
+  "ActiveTargetSystem": "WSL: Ubuntu",
+  "MRUPresetsPerTargetSystem": {
+    "Local Machine": {
+      "configure": "release-windows-release-windows",
+      "build": "release-windows"
+    },
+    "WSL: Ubuntu": {
+      "configure": "debug-linux-debug-linux",
+      "build": "debug-linux"
+    }
+  },
+  "ActiveBuildPreset": "debug-linux",
   "ExpandedNodes": [
     ""
   ],
-  "SelectedNode": "\\NoSpherA2.sln",
+  "SelectedNode": "\\C:\\Users\\Lukas\\source\\repos\\NoSpherA2\\CMakeLists.txt",
   "PreviewInSolutionExplorer": false
 }
