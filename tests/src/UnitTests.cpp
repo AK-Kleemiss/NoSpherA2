@@ -3485,7 +3485,7 @@ namespace NoSpherA2UnitTests
 
     TEST(HklGenerationTests, DminWithBoxKeepsExactlyTheOrbitOfTheBox)
     {
-        const std::filesystem::path cif = geometry_aid_tmp("p63.cif");
+        const std::filesystem::path cif = geometry_aid_tmp("p63_orbit.cif");
         write_p63_cif(cif);
         cell c(cif, std::cout, false, true);
         std::filesystem::remove(cif);
@@ -3522,7 +3522,7 @@ namespace NoSpherA2UnitTests
 
     TEST(HklGenerationTests, OptionsCombineDminAndBoxExceptForED)
     {
-        const std::filesystem::path cif = geometry_aid_tmp("p63.cif");
+        const std::filesystem::path cif = geometry_aid_tmp("p63_options.cif");
         write_p63_cif(cif);
         cell c(cif, std::cout, false, true);
         std::filesystem::remove(cif);
