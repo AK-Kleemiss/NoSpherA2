@@ -13,16 +13,23 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Profile|x64">
+      <Configuration>Profile</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\tests\src\DeltaSeriesTests.cpp" />
+    <ClCompile Include="..\..\tests\src\Nbo47Tests.cpp" />
     <ClCompile Include="..\..\tests\src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\tests\src\main.cpp" />
+    <ClCompile Include="..\..\tests\src\TscStreamTests.cpp" />
     <ClCompile Include="..\..\tests\src\UnitTests.cpp" />
     <ClCompile Include="..\..\tests\src\IntegrationTests.cpp" />
   </ItemGroup>
@@ -54,6 +61,7 @@
     <Import Project="..\Windows_utils\NoSpherA2_includes.props" />
     <Import Project="..\Windows_utils\NoSpherA2_universal.props" />
     <Import Project="..\Windows_utils\NoSpherA2_moveLibs.props" />
+    <Import Project="..\Windows_utils\NoSpherA2_gpu.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />

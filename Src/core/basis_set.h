@@ -36,6 +36,7 @@ public:
     void operator+=(const BasisSet& other);
 
     void set_name(const std::string& name) { _name = name; }
+    const std::string& get_name() const { return _name; }
     void set_primitive_count(uint32_t count) { _primitiveCount = count; }
     uint32_t get_primitive_count() const { return _primitiveCount; }
     void set_element_ranges(const std::array<int, 118>& counts) { _elementCounts = counts; }
@@ -66,6 +67,9 @@ public:
     }
 
     occ::qm::AOBasis to_AOBasis(const std::vector<occ::core::Atom>& atoms) const;
+    //The elements given, in the JSON layout OCC's basis reader takes, so OCC can load a
+    //set from this library by file name
+    void write_occ_json(const std::filesystem::path& path, const ivec& atomic_numbers) const;
 private:
     std::vector<SimplePrimitive> _ownedPrimitives;
     SimplePrimitive* _primitives = nullptr;
@@ -87,7 +91,6 @@ namespace BasisSetLibrary {
     bool read_basis_set_missing(const std::filesystem::path& basis_set_path, WFN& wave, bool debug);
 }
 
-int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b, bool decontract = true);
-void complete_WFN_basis(WFN& wavy);
+int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b, bool decontract = true, bool complete = false);
 WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>>& aux_basis);
 

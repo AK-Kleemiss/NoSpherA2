@@ -1,0 +1,18 @@
+loop_
+  _atom_type_symbol
+  _atom_type_scat_dispersion_real
+  _atom_type_scat_dispersion_imag
+  _atom_type_scat_source
+  _atom_type_scat_dispersion_source
+ C 0.00313 0.00162 'NoSpherA2: Chem.Sci. 2021, DOI:10.1039/D0SC05526C'
+ 'Brennan, Cowan, Rev. Sci. Instrum., 1992, 63, 850'
+ Cl 0.14908 0.15974 'NoSpherA2: Chem.Sci. 2021, DOI:10.1039/D0SC05526C'
+ 'Brennan, Cowan, Rev. Sci. Instrum., 1992, 63, 850'
+ H 0.00000 0.00000 'NoSpherA2: Chem.Sci. 2021, DOI:10.1039/D0SC05526C'
+ 'Brennan, Cowan, Rev. Sci. Instrum., 1992, 63, 850'
+ N 0.00612 0.00332 'NoSpherA2: Chem.Sci. 2021, DOI:10.1039/D0SC05526C'
+ 'Brennan, Cowan, Rev. Sci. Instrum., 1992, 63, 850'
+ O 0.01085 0.00610 'NoSpherA2: Chem.Sci. 2021, DOI:10.1039/D0SC05526C'
+ 'Brennan, Cowan, Rev. Sci. Instrum., 1992, 63, 850'
+ S 0.12485 0.12449 'NoSpherA2: Chem.Sci. 2021, DOI:10.1039/D0SC05526C'
+ 'Brennan, Cowan, Rev. Sci. Instrum., 1992, 63, 850'

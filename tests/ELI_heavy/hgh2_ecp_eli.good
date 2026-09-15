@@ -1,0 +1,106 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Analysing ELI basins in the wavefunction...
+Calcualting grid of size 120 x 120 x 187...
+Number of points: 2692800
+Grid parameters:
+  Min: (-5.66918, -5.66918, -8.78723)
+  Max: (5.66918, 5.66918, 8.78723)
+Atom positions:
+  Atom 0: (0, 0, 0)
+  Atom 1: (0, 0, 3.11805)
+  Atom 2: (0, 0, -3.11805)
+ECP cores of 1 atoms filled with Thakkar densities: 60.0 electrons added for the QTAIM basins
+Density Critical Points (5 found):
+
+  CP   1  [attractor   ]  converged   H2
+    Position  :         0.0000         0.0000        -3.1029
+    Rho       :         0.3485
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -6.9607e+00    -6.9607e+00    -6.8000e+00
+    DelSqRho  :       -20.7214
+   V         :     5.1804e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
+
+  CP   2  [attractor   ]  converged   H1
+    Position  :         0.0000         0.0000         3.1029
+    Rho       :         0.3485
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -6.9607e+00    -6.9607e+00    -6.8000e+00
+    DelSqRho  :       -20.7214
+   V         :     5.1804e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
+
+  CP   3  [attractor   ]  converged   Hg0
+    Position  :         0.0000         0.0000         0.0000
+    Rho       :         0.0007
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -7.5323e-02    -7.5323e-02    -6.7014e-02
+    DelSqRho  :        -0.2177
+   V         :     5.4415e-02   G         :         0.0154   K         :     6.9816e-02   L         :     5.4415e-02
+
+  CP   4  [bond        ]  converged   H2-Hg0 bond
+    Position  :         0.0000         0.0000        -2.1083
+    Rho       :         0.1396
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
+    DelSqRho  :         0.0176
+    Bond Ellipticity:         0.0000
+   V         :    -4.4108e-03   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
+
+  CP   5  [bond        ]  converged   H1-Hg0 bond
+    Position  :         0.0000         0.0000         2.1083
+    Rho       :         0.1396
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
+    DelSqRho  :         0.0176
+    Bond Ellipticity:         0.0000
+   V         :    -4.4108e-03   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
+
+Assigning basins along the density gradient...
+I found 3 Basins.
+Assigning basins by near-grid ascent...
+I found 28 Basins.
+Merged 22 noise maxima, 6 basins remain.
+Unified 1 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
+
+QTAIM Analysis (voxel sum):
+basin:    0 label:              Hg0 integrated value:  77.6414 volume:  484.1846
+basin:    1 label:               H1 integrated value:   1.2877 volume:  446.1958
+basin:    2 label:               H2 integrated value:   1.2877 volume:  446.1958
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 65266 grid points.
+Quadrature points sent along the field: 328799, left the grid: 0
+
+QTAIM Analysis (atomic quadrature grids):
+  basin  label               electrons     charge      volume     maximum        x          y          z
+      1  Hg0                   79.4314     0.5686    808.4662   4840.4723      0.000      0.000      0.000
+      2  H1                     1.2825    -0.2825    744.9110      0.3415      0.000      0.000      3.118
+      3  H2                     1.2826    -0.2826    748.7134      0.3415      0.000      0.000     -3.118
+  total in basins: 81.9965   outside every basin: 0.0035
+
+ELI-D Analysis (voxel sum):
+basin:    0 label:      H2-Hg0 bond integrated value:   0.4967 volume:  280.4184
+basin:    1 label:      H1-Hg0 bond integrated value:   0.4595 volume:  274.7415
+basin:    2 label:               H2 integrated value:   1.4003 volume:   32.9865
+basin:    3 label:               H1 integrated value:   1.4375 volume:   38.7011
+basin:    4 label:         Hg0 core integrated value:  76.4013 volume:  231.8184
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 65266 grid points.
+Quadrature points sent along the field: 5538, left the grid: 0
+
+ELI-D Analysis (atomic quadrature grids):
+  basin  label               electrons      volume     maximum        x          y          z
+      1  H2-Hg0 bond            0.4559    283.4283      5.0732      0.000      0.000     -5.028
+      2  H1-Hg0 bond            0.4426    281.3620      5.0732      0.000      0.000      5.028
+      3  H2                     1.4428     37.7030      7.2168      0.000      0.000     -3.148
+      4  H1                     1.4561     39.7694      7.2168      0.000      0.000      3.148
+      5  Hg0 core              18.1726    213.0064      1.4330      0.283     -0.472      0.705
+  total in basins: 21.9700   outside every basin: 0.0300

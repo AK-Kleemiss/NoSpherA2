@@ -19,6 +19,8 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wignored-attributes"
 #endif
+
+#define HAVE_ECPINT 1
 #include <occ/main/occ_scf.h>
 #include <occ/gto/gto.h>
 #include <occ/core/parallel.h>

@@ -14,11 +14,11 @@ Number of electrons: 136.000000
 Number of ECP electrons: 46
 Reading:                                "sucrose.cif" done!
 Generating hkl indices up to d=:              0.80... done!
-Nr of reflections generated:                 10773
+Nr of reflections generated:                  2957
 Number of symmetry operations:                   2
-Nr of reflections to be used:                 5386
+Nr of reflections to be used:                 2957
 Generating k-points...                            ... done!
-Number of k-points to evaluate: 5386
+Number of k-points to evaluate: 2957
 There are:
   45 atoms read from the wavefunction, of which 
   45 are identified as asymmetric unit atoms!

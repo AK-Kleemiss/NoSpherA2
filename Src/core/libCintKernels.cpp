@@ -180,34 +180,19 @@ void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, l
     }
 }
 
-
-enum COORDINATE_TYPE {
-    SPH = 1,
-    CART = 2
-};
-
 template<COORDINATE_TYPE CT>
 ivec make_loc(ivec &bas, int nbas) {
     ivec dims(nbas, 0);
-    // Calculate (2*l + 1) * nctr for spherical harmonics
-    for (size_t i = 0; i < nbas; i++)
-    {
+    for (int i = 0; i < nbas; i++) {
         if constexpr (CT == COORDINATE_TYPE::CART) {
-            int l = bas(ANG_OF, i);
-            dims[i] = ((l + 1) * (l + 2)) / 2 * bas(NCTR_OF, i); // Number of cartesian functions for given l
-            continue;
+            const int l = bas(ANG_OF, i);
+            dims[i] = ((l + 1) * (l + 2)) / 2 * bas(NCTR_OF, i);
         }
-        else if constexpr (CT == COORDINATE_TYPE::SPH) {
+        else
             dims[i] = (2 * bas(ANG_OF, i) + 1) * bas(NCTR_OF, i);
-        }
     }
-
-    // Create the ao_loc array
     ivec ao_loc(nbas + 1, 0);
-
-    // Compute the cumulative sum
     std::partial_sum(dims.begin(), dims.end(), ao_loc.begin() + 1);
-
     return ao_loc;
 }
 template ivec make_loc<COORDINATE_TYPE::CART>(ivec &bas, int nbas);

@@ -32,6 +32,12 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
 
 struct GridConfiguration {
     int accuracy = 2;
+    //A grid pulled into the core: the tightest exponent, which sets the inner radius and the
+    //radial step, is sharpened by alpha_max_scale, the step divided by radial_step_scale and
+    //the Lebedev order stepped up angular_boost entries. The basin integration uses it.
+    double alpha_max_scale = 1.0;
+    double radial_step_scale = 1.0;
+    int angular_boost = 0;
     int pbc = 0;
     PartitionType partition_type = PartitionType::Hirshfeld;
     bool debug = false;
@@ -77,18 +83,23 @@ private:
     std::vector<std::tuple<std::string, _time_point>> timing_points_;
     bool non_spherical_densities_calculated_ = false;
     bool needs_helper_grids_ = false;
+    vec grid_key_;
+
+    //Everything the points, the weights and the pruning depend on when the partition is
+    //geometric; empty when it is not, so such a grid is never reused
+    vec gridKey(const WFN &wave, const ivec &atom_list, const bvec &needs_grid) const;
 
     // Internal helper methods
-    void setupPrototypeGrids(const WFN &wave, const ivec &atom_types);
+    void setupPrototypeGrids(const WFN &wave, const ivec &atom_types, std::ostream& file = std::cout);
 
     void generateIntegrationGrids(const WFN &wave, const cell &unit_cell,
-        const ivec &atom_list);
+        const ivec &atom_list, std::ostream& file = std::cout);
     void getIntegrationGrid1D(const WFN &wave, const int atom_1, const int atom_2, const int num_points, const double padding);
 
     void calculateSphericalDensities(const WFN &wave, const cell &unit_cell, const ivec &atom_list, vec2 &single_spherical_density, vec2 &combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
     void calculateHirshfeldWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list);
-    std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid);
-    void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid);
+    std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid, std::ostream &file = std::cout);
+    void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid, std::ostream &file = std::cout);
     void pruneGrid();
 
     void addTimingPoint(const std::string &label) {
@@ -100,7 +111,7 @@ public:
 
     // Main interface methods
     void setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list = {},
-        const bvec &needs_grid = {}, const cell &unit_cell = cell(), const bool get_g = false);
+        const bvec &needs_grid = {}, const cell &unit_cell = cell(), const bool get_g = false, std::ostream& file = std::cout);
 
     void setup1DGridsForMolecule(const WFN &wave, const int atom_1, const int atom_2, const int gridpoints, const double padding);
 
@@ -108,6 +119,8 @@ public:
     void calculateNonSphericalg(const WFN &wave, const cell &unit_cell);
 
     PartitionResults calculatePartitionedCharges(const WFN &wave, const cell &unit_cell = cell());
+    //Sum_p rho w_A r^l Y_lm(r_hat) about each nucleus for the configured scheme, [atom][l*l+l+m], l = 0..lmax
+    vec2 calculatePartitionedMultipoles(const WFN &wave, const int lmax);
 
     void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g = false);
     void getDensityVectorsFromCube(const WFN &wave, const ivec &atom_list, const cube &density_cube, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, vec &atom_electrons);
@@ -118,6 +131,7 @@ public:
     const GridData &getGridData() const { return grid_data_; }
 	GridData& getGridData() { return grid_data_; }  //Access to a mutable reference if deeper access is needed
 	const bool& getNeedsHelper() const { return needs_helper_grids_; }
+    GridData::GridIndex partitionWeightIndex() const;
     int getTotalGridPoints() const { return grid_data_.total_points; }
     int getNumPointsForAtom(const int &atom_index) const { return grid_data_.num_points_per_atom[atom_index]; }
 

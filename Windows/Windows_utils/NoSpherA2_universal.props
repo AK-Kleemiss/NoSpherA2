@@ -28,6 +28,9 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <AdditionalOptions>-openmp:experimental /utf-8 /wd4068 %(AdditionalOptions)</AdditionalOptions>
+      <!-- occ is built without OpenMP and parallelises with TBB; its header templates instantiated here would otherwise
+           run Eigen's OpenMP gemm inside every TBB worker. -->
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);EIGEN_DONT_PARALLELIZE</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>

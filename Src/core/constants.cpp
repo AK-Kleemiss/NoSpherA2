@@ -6,6 +6,7 @@
 
 namespace constants {
     double exp_cutoff = -23.5;
+    bool hide_gpu_notes = false;
     const char* atnr2letter(const int& nr)
     {
         if (nr == 0)
@@ -465,113 +466,10 @@ namespace constants {
                      d[3] = r^2 IGNORED
                      d[4] = r   IGNORED
                      */
-                     // Will need extension for up to l=8
-                     // calc spherical harmonic
+        if (l <= 8) return spherical_harmonic(l, d[0], d[1], d[2], coefs);
         double SH = 0;
-        const double x = d[0], y = d[1], z = d[2];
-        switch (l)
-        {
-        case 0: // S
-        {
-            SH = constants::c_1_4p * coefs[0];
-            break;
-        }
-        case 1:
-        {
-            SH = constants::c_3_4p * (coefs[0] * y + coefs[1] * z + coefs[2] * x);
-            break;
-        }
-        case 2:
-        {
-            SH = constants::c_15_4p * (y * x * coefs[0] + y * z * coefs[1] + x * z * coefs[3]) + constants::c_5_16p * (3 * z * z - 1.0) * coefs[2] + constants::c_15_16p * (x * x - y * y) * coefs[4];
-            break;
-        }
-        case 3:
-        {
-            const double y2 = y * y, x2 = x * x, z2 = z * z;
-            SH = constants::c_35_32p * (y * (3 * x2 - y2) * coefs[0] + x * (x2 - 3 * y2) * coefs[6]) +
-                constants::c_105_4p * x * y * z * coefs[1] +
-                constants::c_21_32p * (y * (5 * z2 - 1.0) * coefs[2] + x * (5 * z2 - 1.0) * coefs[4]) +
-                constants::c_7_16p * (5 * z2 * z - 3 * z) * coefs[3] +
-                constants::c_105_16p * ((x2 - y2) * z) * coefs[5];
-            break;
-        }
-        case 4:
-        {
-            const double x2 = x * x, y2 = y * y, z2 = z * z;
-            SH = constants::c_315_16p * x * y * (x2 - y2) * coefs[0] +
-                constants::c_315_32p * (y * (3 * x2 - y2) * z * coefs[1] + x * (x2 - 3 * y2) * z * coefs[7]) +
-                constants::c_45_16p * x * y * (7 * z2 - 1.0) * coefs[2] +
-                constants::c_45_32p * (y * (7 * z2 * z - 3 * z) * coefs[3] + x * (7 * z2 * z - 3 * z) * coefs[5]) +
-                constants::c_9_256p * (35 * z2 * z2 - 30 * z2 + 3.0) * coefs[4] +
-                constants::c_45_64p * (x2 - y2) * (7 * z2 - 1.0) * coefs[6] +
-                constants::c_315_256p * ((x2 * (x2 - 3 * y2)) - (y2 * (3 * x2 - y2))) * coefs[8];
-            break;
-        }
-        case 5:
-        {
-            const double x2 = x * x, y2 = y * y, z2 = z * z;
-            SH = constants::c_693_2048p * (2 * y2 * y2 * y - 20 * x2 * y2 * y + 10 * y * x2 * x2) * coefs[0] +
-                -constants::c_3465_256p * z * ((4 * x * y2 * y - 4 * x2 * x * y) * coefs[1] - (x2 * x2 - 6 * x2 * y2 + y2 * y2) * coefs[9]) +
-                constants::c_385_512p * (9 * z2 - 1.0) * (y * (3 * x2 - y2) * coefs[2] + x * (x2 - 3 * y2) * coefs[8]) +
-                constants::c_1155_64p * (3 * z2 * z - z) * (2 * x * y * coefs[3] + (x2 - y2) * coefs[7]) +
-                constants::c_165_256p * (21 * z2 * z2 - 14 * z2 + 1.0) * (y * coefs[4] + x * coefs[6]) +
-                constants::c_11_256p * (63 * z2 * z2 * z - 70 * z2 * z + 15 * z) * coefs[5] +
-                constants::c_693_2048p * (2 * x2 * x2 * x - 20 * x2 * x * y2 + 10 * x * y2 * y2) * coefs[10];
-            break;
-        }
-        case 6:
-        {
-            const double x2 = x * x, y2 = y * y, z2 = z * z;
-            const double x4 = x2 * x2, y4 = y2 * y2, z4 = z2 * z2;
-            SH = (1.0 / 32.0) * std::sqrt(13.0 / PI) * (z2 * (z2 * (231.0 * z2 - 315.0) + 105.0) - 5.0) * coefs[6] +
-                (1.0 / 16.0) * std::sqrt(273.0 / (PI)) * (33 * z4 - 30 * z2 + 5) * (x * z * coefs[7] + y * z * coefs[5]) +
-                (1.0 / 32.0) * std::sqrt(1365.0 / (2 * PI)) * (33 * z4 - 18 * z2 + 1) * ((x2 - y2) * coefs[8] + 2 * x * y * coefs[4]) +
-                (1.0 / 16.0) * std::sqrt(1365.0 / (2 * PI)) * z * (11 * z2 - 3) * (x * (x2 - 3 * y2) * coefs[9] + y * (3 * x2 - y2) * coefs[3]) +
-                (3.0 / 32.0) * std::sqrt(91.0 / (PI)) * (11 * z2 - 1) * ((x2 * (x2 - 6 * y2) + y4) * coefs[10] + x * y * 4 * (x2 - y2) * coefs[2]) +
-                (3.0 / 16.0) * std::sqrt(1001.0 / (2 * PI)) * z * ((x4 * x - 10 * x2 * x * y2 + 5 * x * y4) * coefs[11] + (5 * x4 * y - 10 * x2 * y2 * y + y4 * y) * coefs[1]) +
-                (1.0 / 32.0) * std::sqrt(3003.0 / (2 * PI)) * (-y4 * y2 + 15 * y4 * x2 - 15 * y2 * x4 + x4 * x2) * coefs[12] +
-                (1.0 / 32.0) * std::sqrt(3003.0 / (2 * PI)) * (6 * x4 * x * y - 20 * x2 * x * y2 * y + 6 * x * y4 * y) * coefs[0];
-            break;
-        }
-        case 7:
-        {
-            const double x2 = x * x, y2 = y * y, z2 = z * z;
-            const double x4 = x2 * x2, y4 = y2 * y2;
-            SH = (1.0 / 32.0) * std::sqrt(15.0 / PI) * z * (z2 * (z2 * (429.0 * z2 - 693.0) + 315.0) - 35.0) * coefs[7] +
-                (1.0 / 64.0) * std::sqrt(105.0 / PI) * (z2 * (z2 * (429.0 * z2 - 495.0) + 135.0) - 5.0) * (x * coefs[8] + y * coefs[6]) +
-                (3.0 / 32.0) * std::sqrt(35.0 / (2 * PI)) * z * (z2 * (143.0 * z2 - 110.0) + 15.0) * ((x2 - y2) * coefs[9] + 2 * x * y * coefs[5]) +
-                (3.0 / 64.0) * std::sqrt(35.0 / PI) * (z2 * (143.0 * z2 - 66.0) + 3.0) * (x * (x2 - 3 * y2) * coefs[10] + y * (3 * x2 - y2) * coefs[4]) +
-                (3.0 / 32.0) * std::sqrt(385.0 / PI) * z * (13.0 * z2 - 3.0) * ((x2 * (x2 - 6 * y2) + y4) * coefs[11] + x * y * 4 * (x2 - y2) * coefs[3]) +
-                (3.0 / 64.0) * std::sqrt(385.0 / PI) * (13.0 * z2 - 1.0) * (x * (x4 + 5 * y2 * (-2 * x2 + y2)) * coefs[12] + y * (5 * x2 * (x2 - 2 * y2) + y4) * coefs[2]) +
-                (3.0 / 32.0) * std::sqrt(5005.0 / (2 * PI)) * z * ((y2 * (y2 * (-y2 + 15 * x2) - 15 * x4) + x4 * x2) * coefs[13] + x * y * (x2 * (6 * x2 - 20 * y2) + 6 * y4) * coefs[1]) +
-                (3.0 / 64.0) * std::sqrt(715.0 / PI) * x * (x4 * x2 + 7 * y2 * (-3 * x4 + y2 * (5 * x2 - y2))) * coefs[14] +
-                (3.0 / 64.0) * std::sqrt(715.0 / PI) * y * (x2 * (x2 * (7 * x2 - 35 * y2) + 21 * y4) - y4 * y2) * coefs[0];
-            break;
-        }
-        case 8:
-        {
-            const double x2 = x * x, y2 = y * y, z2 = z * z;
-            const double x4 = x2 * x2, y4 = y2 * y2, z4 = z2 * z2;
-            SH = (1.0 / 256.0) * std::sqrt(17.0 / PI) * (z2 * (z2 * (z2 * (6435.0 * z2 - 12012.0) + 6930.0) - 1260.0) + 35.0) * coefs[8] +
-                (3.0 / 64.0) * std::sqrt(17.0 / PI) * z * (715.0 * z4 * z2 - 1001.0 * z4 + 385.0 * z2 - 35.0) * (x * coefs[9] + y * coefs[7]) +
-                (3.0 / 64.0) * std::sqrt(595.0 / (2 * PI)) * (143 * z4 * z2 - 143 * z4 + 33 * z2 - 1) * ((x2 - y2) * coefs[10] + 2 * x * y * coefs[6]) +
-                (1.0 / 64.0) * std::sqrt(19635.0 / PI) * z * (39 * z4 - 26 * z2 + 3) * ((x2 * x - 3 * x * y2) * coefs[11] + (3 * x2 * y - y2 * y) * coefs[5]) +
-                (3.0 / 128.0) * std::sqrt(1309.0 / PI) * (65 * z4 - 26 * z2 + 1) * ((x2 * (x2 - 6 * y2) + y4) * coefs[12] + x * y * 4 * (x2 - y2) * coefs[4]) +
-                (3.0 / 64.0) * std::sqrt(17017.0 / PI) * z * (5 * z2 - 1) * (x * (x4 + 5 * y2 * (-2 * x2 + y2)) * coefs[13] + y * (5 * x2 * (x2 - 2 * y2) + y4) * coefs[3]) +
-                (1.0 / 64.0) * std::sqrt(7293.0 / (2 * PI)) * (15 * z2 - 1) * ((y2 * (y2 * (-y2 + 15 * x2) - 15 * x4) + x4 * x2) * coefs[14] + x * y * (x2 * (6 * x2 - 20 * y2) + 6 * y4) * coefs[2]) +
-                (3.0 / 64.0) * std::sqrt(12155.0 / PI) * z * (x * (x4 * x2 + 7 * y2 * (-3 * x4 + y2 * (5 * x2 - y2))) * coefs[15] + y * (x2 * (x2 * (7 * x2 - 35 * y2) + 21 * y4) - y4 * y2) * coefs[1]) +
-                (3.0 / 256.0) * std::sqrt(12155.0 / PI) * (y2 * (y2 * (y4 - 28 * x2 * y2 + 70 * x4) - 28 * x4 * x2) + x4 * x4) * coefs[16] +
-                (3.0 / 256.0) * std::sqrt(12155.0 / PI) * y * x * (y2 * (y2 * (-8 * y2 + 56 * x2) - 56 * x4) + 8 * x4 * x2) * coefs[0];
-            break;
-        }
-        default:
-        {
-            for (int m = -l; m <= l; m++) {
-                SH += spherical_harmonic(l, m, d) * coefs[m + l];
-            }
-        }
-        }
+        for (int m = -l; m <= l; m++)
+            SH += spherical_harmonic(l, m, d) * coefs[m + l];
         return SH;
     }
 

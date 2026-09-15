@@ -1752,7 +1752,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                         std::filesystem::path path = wavy[selection[0][0]].get_cube_path(selection[1][0]);
                         if (!wavy[selection[0][0]].get_cube_loaded(selection[1][0]))
                             wavy[selection[0][0]].read_cube(selection[1][0], true, false, false);
-                        wavy[selection[0][0]].write_cube_dgrid(selection[1][0], path.replace_extension(".dgrid"), opt.debug);
+                        wavy[selection[0][0]].write_cube_file(selection[1][0], path.replace_extension(".dgrid"), opt.debug);
                         break;
                     }
                     case 'X':
