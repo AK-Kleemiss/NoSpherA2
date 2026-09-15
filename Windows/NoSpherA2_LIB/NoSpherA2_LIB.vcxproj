@@ -141,6 +141,7 @@
     <ClInclude Include="..\..\Src\core\Slater_ion_coefs.h" />
     <ClInclude Include="..\..\Src\core\sphere_lebedev_rule.h" />
     <ClInclude Include="..\..\Src\core\spherical_density.h" />
+    <ClInclude Include="..\..\Src\core\spherical_harmonic.h" />
     <ClInclude Include="..\..\Src\core\test_functions.h" />
     <ClInclude Include="..\..\Src\core\Thakkar_coefs.h" />
     <ClInclude Include="..\..\Src\core\throughput.h" />
