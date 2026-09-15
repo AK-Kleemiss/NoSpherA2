@@ -1,18 +1,10 @@
-//The global GPU entry points of a build that carries both CUDA and HIP kernels.
-//
-//Such a build compiles every kernel source twice, once per backend, each time with
-//NOSPHERA2_GPU_BACKEND_NS naming a namespace (gpu_api.h), so the two sets of functions
-//and their static state live side by side in nosphera2_cuda and nosphera2_hip. Host code
-//calls the global names declared in the six headers; those are defined here and forward to
-//the backend that has a device. Ordinary single-backend builds do not compile this file:
-//their kernel objects define the global names themselves.
-//
-//The backend is chosen once, on the first call, and the choice sticks: the two sides keep
-//separate state (held tensors, streams, caches) and a caller that initialised on one must
-//collect from the same one. CUDA is asked first, then HIP; a machine with neither gets the
-//CUDA side, which reports no device exactly as a CUDA-only build would. NOSPHERA2_GPU_BACKEND
-//(cuda or hip) in the environment overrides the probe, which is what a test on a machine
-//carrying both kinds of card uses.
+//The global GPU entry points of a build that carries both CUDA and HIP kernels. Every kernel
+//source is compiled once per backend with NOSPHERA2_GPU_BACKEND_NS naming its namespace
+//(gpu_api.h); the global names the six headers declare are defined here and forward to the
+//backend that has a device. Single-backend builds do not compile this file. The backend is
+//chosen once and sticks, since the two sides keep separate state: CUDA first, then HIP, and
+//neither gives the CUDA side, which reports no device as a CUDA-only build would.
+//NOSPHERA2_GPU_BACKEND=cuda|hip in the environment overrides the probe.
 #include "sf_gpu.h"
 #include "itensor_gpu.h"
 #include "grid_gpu.h"
@@ -26,9 +18,8 @@
 #include <cstdlib>
 #include <string>
 
-//ret, name, parameter list, argument list - every function the six headers declare between
-//their NOSPHERA2_GPU_API markers, defaults omitted (the headers carry those). A function
-//added to a header and not here is an unresolved global at link time of a fat build.
+//ret, name, parameter list, argument list: every function between the headers' NOSPHERA2_GPU_API
+//markers, defaults omitted. One missing here is an unresolved global at link time of a fat build.
 #define NOSPHERA2_GPU_ENTRIES(F) \
 	F(bool, sf_gpu_available, (), ()) \
 	F(void, sf_gpu_warmup_start, (), ()) \

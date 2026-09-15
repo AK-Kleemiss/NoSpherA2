@@ -1,25 +1,12 @@
-//The HIP runtime, opened by name instead of linked.
-//
-//A binary that carries AMD kernels has to start on a machine without ROCm - the CPU path
-//is still there, and a fat build has CUDA kernels beside the AMD ones. Linking amdhip64
-//the ordinary way makes the loader refuse the whole program when the library is absent,
-//and delay-loading it on Windows only postponed the failure to before main(): clang
-//registers the kernels with the runtime from static initialisers, so the first call into
-//the missing DLL was made by nobody in particular and there was no error to return.
-//
-//So nothing links the runtime. The kernel objects reference the entry points below by
-//their plain C names, this file defines every one of them, and each definition forwards to
-//the real function once libamdhip64.so.<major> / amdhip64_<major>.dll has been opened. The
-//library is looked for the first time any entry point is called, all entry points are
-//resolved together, and a library missing any of them counts as absent. Absent means
-//hipErrorNoDevice from anything that returns an error, a device count of zero, and a
-//registration that does nothing - which is exactly what a machine with no AMD card looks
-//like to the kernel sources, whose every path begins by counting devices.
-//
-//The include below is what keeps this file honest: hip_runtime_api.h declares the same
-//C-linkage functions, and a definition here whose parameters differ from the declaration
-//does not compile. New runtime calls in a kernel source show up as unresolved symbols at
-//link time and are added to NOSPHERA2_HIP_RUNTIME_ENTRIES.
+//The HIP runtime, opened by name instead of linked: a fat binary has to start on a machine
+//without ROCm, and linking or delay-loading amdhip64 fails before main() because clang
+//registers the kernels from static initialisers. The kernel objects import the entry points
+//below by their plain C names; each definition forwards to libamdhip64.so.<major> /
+//amdhip64_<major>.dll once opened. All entry points resolve together and a library missing
+//one counts as absent: hipErrorNoDevice, a device count of zero, a registration that does
+//nothing. hip_runtime_api.h declares the same functions, so a definition whose parameters
+//differ does not compile; a new runtime call in a kernel source is an unresolved symbol at
+//link time and goes into NOSPHERA2_HIP_RUNTIME_ENTRIES.
 #include <hip/hip_runtime_api.h>
 
 #include <cstdio>
@@ -34,8 +21,7 @@
 #include <dlfcn.h>
 #endif
 
-//The three the compiler calls from the module constructors, declared in no public header
-//(hip_api_trace.hpp has them as typedefs only).
+//The three the module constructors call, declared in no public header
 extern "C" {
 void** __hipRegisterFatBinary(const void* data);
 void __hipRegisterFunction(void** modules, const void* hostFunction, char* deviceFunction,
@@ -44,8 +30,7 @@ void __hipRegisterFunction(void** modules, const void* hostFunction, char* devic
 void __hipUnregisterFatBinary(void** modules);
 }
 
-//ret, name, parameter list, argument list. The list is what the kernel objects import;
-//nm -u on one of them (or dumpbin /SYMBOLS on Windows) is where a new entry comes from.
+//ret, name, parameter list, argument list; nm -u / dumpbin /SYMBOLS on a kernel object lists them
 #define NOSPHERA2_HIP_RUNTIME_ENTRIES(F) \
 	F(void**, __hipRegisterFatBinary, (const void* data), (data)) \
 	F(void, __hipRegisterFunction, (void** modules, const void* hostFunction, char* deviceFunction, const char* deviceName, unsigned int threadLimit, uint3* tid, uint3* bid, dim3* blockDim, dim3* gridDim, int* wSize), (modules, hostFunction, deviceFunction, deviceName, threadLimit, tid, bid, blockDim, gridDim, wSize)) \
@@ -129,10 +114,8 @@ lib_handle open_runtime()
 	return nullptr;
 }
 
-//Resolved once, on the first call into any entry point; a function-local static, so the
-//module constructors that register the kernels before main() get the same answer as the
-//device probes later on. All or nothing: a library with one entry missing is not one this
-//binary was built against, and the safe reading of that is "no runtime".
+//Resolved once, on the first call into any entry point, so the module constructors before
+//main() and the device probes later get the same answer
 const hip_runtime& runtime()
 {
 	static const hip_runtime rt = [] {
@@ -212,8 +195,7 @@ extern "C" const char* hipGetErrorString(hipError_t hipError)
 	return rt.hipGetErrorString(hipError);
 }
 
-//Registration without a runtime registers nothing; a null module handle is what the
-//unregister call then gets, and it is ignored the same way.
+//Registration without a runtime registers nothing, and the null module handle is ignored
 extern "C" void** __hipRegisterFatBinary(const void* data)
 {
 	const hip_runtime& rt = runtime();

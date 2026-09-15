@@ -41,7 +41,7 @@ void XCW::construct(const options& opt_in) {
 	}
 
 	// Evaluate symmetry and assign asymmetry factors to each atom (also update ncen)
-	//The linking list is ordered like this: Asymmetric atom, list with all atoms, then index of symmetry operation that generated it 
+	//The linking list is ordered like this: Asymmetric atom, list with all atoms, then index of symmetry operation that generated it
 	// "diagonal elements" have to have size equivalent to multiplicity, otherwise something broke
 	ivec3 symmetry_linking_list;
 	unit_cell.eval_symm(asym_atoms, cryst.ncen, symmetry_linking_list);

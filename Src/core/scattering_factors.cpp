@@ -469,11 +469,8 @@ void generate_hkl(const double& dmin,
 	const ivec2& hkl_min_max)
 {
 	using namespace std;
-	vector<vector<ivec>> sym(3);
-	for (int i = 0; i < 3; i++)
-		sym[i].resize(3);
-	sym = unit_cell.get_sym();
-	const size_t n_sym = sym[0][0].size();
+	const ivec3 sym = unit_cell.get_sym();
+	const int n_sym = sym[0][0].size();
 	//An index box narrows the sphere to the orbit of the measured indices: h is kept when one
 	//of its images h.R, or the Friedel mate of one, lies in the box. That is the set cctbx's
 	//table reader resolves for a measured list (smtbx table_based.h walks h.R over the
@@ -494,7 +491,7 @@ void generate_hkl(const double& dmin,
 	auto wanted = [&](const int h, const int k, const int l) {
 		if (!boxed || in_box(h, k, l) || in_box(-h, -k, -l))
 			return true;
-		for (size_t s = 0; s < n_sym; s++)
+		for (int s = 0; s < n_sym; s++)
 		{
 			const int h_ = h * sym[0][0][s] + k * sym[0][1][s] + l * sym[0][2][s];
 			const int k_ = h * sym[1][0][s] + k * sym[1][1][s] + l * sym[1][2][s];
@@ -553,7 +550,6 @@ void generate_hkl(const double& dmin,
 	}
 	else
 		file << "Number of symmetry operations: " << setw(19) << sym[0][0].size() << endl;
-
 	//A twin law is no point-group operation, so its images leave the sphere: expand and reduce
 	if (twin_law.size() > 0)
 	{

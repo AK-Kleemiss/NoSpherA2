@@ -31,7 +31,7 @@ namespace {
 			catch (const std::exception&) {
 				return false;
 			}
-			};
+		};
 		const size_t slash = number.find('/');
 		if (slash == std::string::npos)
 			return to_double(number, value);
@@ -170,7 +170,7 @@ void cell::eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_a
 	const int total_atoms = asym_atoms.size();
 	auto frac_pos = [&](int i) -> vec {
 		return { asym_atoms[i].frac_pos[0], asym_atoms[i].frac_pos[1], asym_atoms[i].frac_pos[2] };
-		};
+	};
 	linking_list.resize(asymmetric_atoms);
 	const int num_sym_ops = sym[0][0].size();
 	int idx1 = 0;
@@ -300,11 +300,9 @@ void cell::delete_symmetry(const ivec& applied_symmetry, hkl_list& hkl_enlarged,
 				inner.erase(inner.begin() + sym_op);
 			}
 		}
-
 		for (vec& inner : trans) {
 			inner.erase(inner.begin() + sym_op);
 		}
 	}
-
 	// closing function
 }
