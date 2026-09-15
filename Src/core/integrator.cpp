@@ -59,6 +59,479 @@ vec reorder_p(vec coefs_in, WFN aux_basis)
     return coefs_out;
 }
 
+
+static inline int lm_index(const int l, const int m)
+{
+    return l * l + l + m;
+}
+
+
+struct restraint_data
+{
+    int lmax = -1;
+    bool partitioned = false;
+
+    vec expected_populations;
+    vec2 multipole_targets;
+    vec2 partition_rows;
+    vec atom_weights;
+
+    bool has_multipoles() const
+    {
+        return lmax >= 0;
+    }
+};
+
+static void print_multipole_report(
+    const vec& coefficients,
+    const WFN& wavy_aux,
+    const restraint_data& restraints)
+{
+    if (!restraints.has_multipoles())
+        return;
+
+    const vec2 fitted =
+        restraints.partition_rows.empty()
+        ? DensityFitting::fitted_multipoles(
+            coefficients,
+            wavy_aux,
+            restraints.lmax)
+        : DensityFitting::grid_multipoles(
+            restraints.partition_rows,
+            coefficients,
+            restraints.lmax);
+
+    const double stone = std::sqrt(constants::FOUR_PI);
+
+    std::cout
+        << "\nAtomic multipoles of the fitted density"
+        << (restraints.partition_rows.empty()
+            ? ""
+            : " partitioned on the grid")
+        << ", Racah normalisation, e bohr^l\n"
+        << "  Atom  l  m"
+        << "       target"
+        << "       fitted"
+        << "    deviation"
+        << std::endl;
+
+    for (int a = 0; a < wavy_aux.get_ncen(); ++a) {
+        for (int l = 0; l <= restraints.lmax; ++l) {
+            const double normalization =
+                stone / std::sqrt(2.0 * l + 1.0);
+
+            for (int m = -l; m <= l; ++m) {
+                const int k = lm_index(l, m);
+
+                const double target =
+                    restraints.multipole_targets[a][k]
+                    * normalization;
+
+                const double value =
+                    fitted[a][k]
+                    * normalization;
+
+                const double deviation =
+                    value - target;
+
+                std::cout
+                    << std::setw(6)
+                    << wavy_aux.get_atom_label(a)
+                    << std::setw(3)
+                    << l
+                    << std::setw(3)
+                    << m
+                    << std::fixed
+                    << std::setprecision(6)
+                    << std::setw(13)
+                    << target
+                    << std::setw(13)
+                    << value
+                    << std::setw(13)
+                    << deviation
+                    << std::endl;
+            }
+        }
+    }
+}
+static void apply_tikhonov_regularization(
+    vec& eri2c,
+    const size_t n_aux,
+    const double lambda)
+{
+    err_checkf(
+        eri2c.size() == n_aux * n_aux,
+        "Tikhonov regularization expects a square auxiliary matrix",
+        std::cout);
+
+    for (size_t i = 0; i < n_aux; ++i)
+        eri2c[i * n_aux + i] += lambda;
+}
+
+static const char* charge_scheme_name(
+    const DensityFitting::CHARGE_SCHEME scheme)
+{
+    switch (scheme) {
+    case DensityFitting::CHARGE_SCHEME::MULLIKEN:
+        return "Mulliken";
+    case DensityFitting::CHARGE_SCHEME::SANDERSON_ESTIMATE:
+        return "Sanderson Estimate";
+    case DensityFitting::CHARGE_SCHEME::TFVC:
+        return "TFVC";
+    case DensityFitting::CHARGE_SCHEME::HIRSHFELD:
+        return "Hirshfeld";
+    case DensityFitting::CHARGE_SCHEME::NUCLEAR:
+        return "Nuclear Charge";
+    case DensityFitting::CHARGE_SCHEME::MBIS:
+        return "MBIS";
+    case DensityFitting::CHARGE_SCHEME::EMBIS:
+        return "EMBIS";
+    }
+
+    return "Unknown";
+}
+
+static void print_restraint_info(
+    const DensityFitting::CONFIG& config)
+{
+    const char* scheme =
+        charge_scheme_name(config.charge_scheme);
+
+    switch (config.restrain_type) {
+    case DensityFitting::RESTRAINT_TYPE::SIMPLE:
+        std::cout
+            << "Using simple restraints with charges from: "
+            << scheme << std::endl;
+        break;
+
+    case DensityFitting::RESTRAINT_TYPE::PARTITION:
+        std::cout
+            << "Using partition restraints on every auxiliary "
+            "function with moments from: "
+            << scheme << std::endl;
+        break;
+
+    case DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK:
+        std::cout
+            << "Using simple restraints and Tikhonov regularization "
+            "with charges from: "
+            << scheme << std::endl;
+        break;
+
+    default:
+        break;
+    }
+}
+
+
+static void solve_metric_penalty_system(
+    const vec& augmented_matrix,
+    const vec& augmented_rhs,
+    const size_t n_aux,
+    vec& coefficients)
+{
+    const size_t n_rows = augmented_rhs.size();
+
+    err_checkf(
+        augmented_matrix.size() == n_rows * n_aux,
+        "Invalid augmented restraint system",
+        std::cout);
+
+    vec J(
+        augmented_matrix.begin(),
+        augmented_matrix.begin() + n_aux * n_aux);
+
+    vec b(
+        augmented_rhs.begin(),
+        augmented_rhs.begin() + n_aux);
+
+    for (size_t k = n_aux; k < n_rows; ++k) {
+        const double* row =
+            augmented_matrix.data() + k * n_aux;
+
+        const double target = augmented_rhs[k];
+
+        for (size_t i = 0; i < n_aux; ++i) {
+            if (row[i] == 0.0)
+                continue;
+
+            b[i] += row[i] * target;
+
+            for (size_t j = 0; j < n_aux; ++j)
+                J[i * n_aux + j] += row[i] * row[j];
+        }
+    }
+
+    solve_linear_system(J, n_aux, b);
+
+    double residual2 = 0.0;
+
+    for (size_t k = n_aux; k < n_rows; ++k) {
+        const double* row =
+            augmented_matrix.data() + k * n_aux;
+
+        double residual = -augmented_rhs[k];
+
+        for (size_t i = 0; i < n_aux; ++i)
+            residual += row[i] * b[i];
+
+        residual2 += residual * residual;
+    }
+
+    std::cout
+        << "Restraint residual: "
+        << std::fixed
+        << std::setprecision(12)
+        << std::sqrt(residual2)
+        << std::endl;
+
+    coefficients = std::move(b);
+}
+
+static void solve_stacked_least_squares(
+    vec& matrix,
+    vec& rhs,
+    const size_t n_aux)
+{
+    solve_linear_system(
+        matrix,
+        rhs.size(),
+        n_aux,
+        rhs);
+
+    rhs.resize(n_aux);
+}
+
+static void solve_restrained_system(
+    vec& eri2c,
+    vec& rho,
+    const size_t n_aux,
+    const bool use_metric_penalty)
+{
+    std::cout << "Solving regularized linear system..." << std::endl;
+
+    if (use_metric_penalty)
+        solve_metric_penalty_system(eri2c, rho, n_aux, rho);
+    else
+        solve_stacked_least_squares(eri2c, rho, n_aux);
+}
+
+
+static PartitionType scheme_partition(const DensityFitting::CHARGE_SCHEME& scheme)
+{
+    switch (scheme) {
+    case DensityFitting::CHARGE_SCHEME::TFVC: return PartitionType::TFVC;
+    case DensityFitting::CHARGE_SCHEME::HIRSHFELD: return PartitionType::Hirshfeld;
+    case DensityFitting::CHARGE_SCHEME::MBIS: return PartitionType::MBIS;
+    case DensityFitting::CHARGE_SCHEME::EMBIS: return PartitionType::EMBIS;
+    default: err_not_impl_f("Only TFVC, Hirshfeld, MBIS and EMBIS partition the density on a grid", std::cout);
+    }
+    return PartitionType::Hirshfeld;
+}
+
+//Grids of every atom partitioned by scheme, set up on the returned copy of wavy without its virtual orbitals
+static WFN setup_partition_grid(const WFN& wavy, const DensityFitting::CHARGE_SCHEME& scheme, GridManager& grid_manager)
+{
+    GridConfiguration config;
+    config.partition_type = scheme_partition(scheme);
+    config.pbc = 0;
+    config.debug = false;
+    grid_manager.setConfiguration(config);
+    ivec atom_list(wavy.get_ncen());
+    for (int a = 0; a < wavy.get_ncen(); a++) atom_list[a] = a;
+    WFN temp = wavy;
+    temp.delete_unoccupied_MOs();
+    grid_manager.setup3DGridsForMolecule(temp, atom_list);
+    return temp;
+}
+
+vec2 DensityFitting::calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax)
+{
+    GridManager grid_manager;
+    const WFN temp = setup_partition_grid(wavy, scheme, grid_manager);
+    return grid_manager.calculatePartitionedMultipoles(temp, lmax);
+}
+
+struct partition_multipole_data
+{
+    vec2 targets;
+    vec2 rows;
+};
+
+static partition_multipole_data calculate_partition_multipoles(
+    const WFN& wavy,
+    const WFN& wavy_aux,
+    const DensityFitting::CHARGE_SCHEME scheme,
+    const int lmax)
+{
+    err_checkf(
+        lmax >= 0 && lmax <= 8,
+        "Partition restraints are implemented for 0 <= l <= 8",
+        std::cout);
+
+    GridManager grid_manager;
+    const WFN temp = setup_partition_grid(wavy, scheme, grid_manager);
+
+    partition_multipole_data result;
+
+    result.targets =
+        grid_manager.calculatePartitionedMultipoles(temp, lmax);
+
+    const aux_density_table table(wavy_aux.get_atoms());
+
+    const int n_atoms = wavy.get_ncen();
+    const int n_mom = (lmax + 1) * (lmax + 1);
+
+    result.rows.assign(
+        n_atoms * n_mom,
+        vec(table.n_coef, 0.0));
+
+    const GridData& grid_data = grid_manager.getGridData();
+    const bool helper = grid_manager.getNeedsHelper();
+
+    const vec3& grid =
+        helper ? grid_data.helper_grids
+        : grid_data.atomic_grids;
+
+    const GridData::GridIndex weight_index =
+        grid_manager.partitionWeightIndex();
+
+#pragma omp parallel for schedule(dynamic)
+    for (int a = 0; a < n_atoms; ++a) {
+        const vec2& atom_grid = grid[a];
+
+        const int n_points =
+            helper
+            ? grid_data.helper_num_points_per_atom[a]
+            : grid_data.num_points_per_atom[a];
+
+        const double centre[3] = {
+            wavy.get_atom_coordinate(a, 0),
+            wavy.get_atom_coordinate(a, 1),
+            wavy.get_atom_coordinate(a, 2)
+        };
+
+        DensityFitting::partition_rows_on_grid(
+            table,
+            n_points,
+            atom_grid[GridData::X].data(),
+            atom_grid[GridData::Y].data(),
+            atom_grid[GridData::Z].data(),
+            atom_grid[weight_index].data(),
+            centre,
+            lmax,
+            result.rows,
+            a * n_mom);
+    }
+
+    return result;
+}
+
+static void apply_restraints(
+    vec& eri2c,
+    vec& rho,
+    const WFN& wavy_aux,
+    const restraint_data& data,
+    const size_t n_aux)
+{
+    if (data.partitioned) {
+        DensityFitting::add_partition_restraint(
+            eri2c,
+            rho,
+            wavy_aux,
+            data.partition_rows,
+            data.multipole_targets,
+            data.atom_weights,
+            data.lmax,
+            n_aux);
+
+        return;
+    }
+
+    DensityFitting::add_electron_restraint(
+        eri2c,
+        rho,
+        wavy_aux,
+        data.atom_weights,
+        data.expected_populations);
+
+    if (data.lmax > 0) {
+        DensityFitting::add_multipole_restraint(
+            eri2c,
+            rho,
+            wavy_aux,
+            data.multipole_targets,
+            data.atom_weights,
+            data.lmax);
+    }
+}
+
+
+static restraint_data build_restraint_data(
+    const WFN& wavy,
+    const WFN& wavy_aux,
+    const DensityFitting::CONFIG& config,
+    const size_t n_aux)
+{
+    restraint_data data;
+    data.lmax = config.multipole_lmax;
+    data.partitioned = config.restrain_type == DensityFitting::RESTRAINT_TYPE::PARTITION;
+
+    if (data.has_multipoles()) {
+        if (data.partitioned) {
+            const auto result = calculate_partition_multipoles(
+                wavy,
+                wavy_aux,
+                config.charge_scheme,
+                data.lmax);
+
+            data.multipole_targets = result.targets;
+            data.partition_rows = result.rows;
+        }
+        else {
+            data.multipole_targets =
+                calculate_expected_multipoles(
+                    wavy,
+                    config.charge_scheme,
+                    data.lmax);
+        }
+
+        data.expected_populations.resize(wavy.get_ncen());
+
+        for (int a = 0; a < wavy.get_ncen(); ++a) {
+            data.expected_populations[a] =
+                std::sqrt(constants::FOUR_PI) *
+                data.multipole_targets[a][0];
+        }
+
+        data.atom_weights =
+            vec(wavy.get_ncen(), config.multipole_strength);
+    }
+    else {
+        data.expected_populations =
+            calculate_expected_populations(
+                wavy,
+                wavy_aux,
+                config.charge_scheme);
+
+        if (wavy.get_has_ECPs()) {
+            for (int a = 0; a < wavy.get_ncen(); ++a) {
+                data.expected_populations[a] -=
+                    wavy.get_atom_ECP_electrons(a);
+            }
+        }
+
+        data.atom_weights =
+            DensityFitting::restraint_weights(
+                wavy_aux,
+                n_aux,
+                config.restraint_strength,
+                config.adaptive_restraint);
+    }
+
+    return data;
+}
+
 vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONFIG& config) {
 
     //if (wavy.get_origin() == e_origin::xtb || wavy.get_origin() == e_origin::ptb) {
@@ -103,148 +576,59 @@ vec DensityFitting::density_fit(const WFN& wavy, const WFN& wavy_aux, const CONF
         break;
     }
 
-    vec expected_populations;
+    const size_t n_aux = aux_basis.get_nao();
+
     if (config.restrain_type == RESTRAINT_TYPE::NONE) {
         std::cout << "Solving unrestrained linear system..." << std::endl;
-        solve_linear_system(eri2c, aux_basis.get_nao(), rho);
+        solve_linear_system(eri2c, n_aux, rho);
+        // Analyze quality if requested
+        if (config.analyze_quality) {
+            analyze_density_fit_quality(rho, wavy_aux, vec());
+        }
     }
     else {
-        //Convert the charge scheme enum to string for display
-        std::string charge_scheme;
-        switch (config.charge_scheme) {
-        case CHARGE_SCHEME::MULLIKEN:
-            charge_scheme = "Mulliken";
-            break;
-        case CHARGE_SCHEME::SANDERSON_ESTIMATE:
-            charge_scheme = "Sanderson Estimate";
-            break;
-        case CHARGE_SCHEME::TFVC:
-            charge_scheme = "TFVC";
-            break;
-        case CHARGE_SCHEME::HIRSHFELD:
-            charge_scheme = "Hirshfeld";
-            break;
-        case CHARGE_SCHEME::NUCLEAR:
-            charge_scheme = "Nuclear Charge";
-            break;
-        case CHARGE_SCHEME::MBIS:
-            charge_scheme = "MBIS";
-            break;
-        case CHARGE_SCHEME::EMBIS:
-            charge_scheme = "EMBIS";
-            break;
-        }
+        print_restraint_info(config);
 
-        //Simple does nothing extra here
-        if (config.restrain_type == RESTRAINT_TYPE::SIMPLE) {
-            std::cout << "Using simple restraints with charges from: " << charge_scheme << std::endl;
-        }
-        else if (config.restrain_type == RESTRAINT_TYPE::PARTITION) {
-            std::cout << "Using partition restraints on every auxiliary function with moments from: " << charge_scheme << std::endl;
-        }
-        //Hybrid applies Tikhonov regularization
-        else if (config.restrain_type == RESTRAINT_TYPE::SIMPLE_AND_TIK) {
-            std::cout << "Using simple restraints and Tikhonov regularization with charges from: " << charge_scheme << std::endl;
-            // First apply Tikhonov regularization to the original matrix
-            size_t n = aux_basis.get_nao();
-            for (size_t i = 0; i < n; i++) {
-                eri2c[i * n + i] += config.tikhonov_lambda;
-            }
-        }
+        if (config.restrain_type == RESTRAINT_TYPE::SIMPLE_AND_TIK)
+            apply_tikhonov_regularization(
+                eri2c,
+                n_aux,
+                config.tikhonov_lambda);
 
-        // Calculate expected charges based on chosen scheme
-        vec2 targets, rows;
-        if (config.multipole_lmax >= 0) {
-            //One grid for populations and moments; its l=0 term is the electron count without ECP electrons
-            if (config.restrain_type == RESTRAINT_TYPE::PARTITION)
-                rows = partition_multipole_rows(wavy, wavy_aux, config.charge_scheme, config.multipole_lmax, targets);
-            else
-                targets = calculate_expected_multipoles(wavy, config.charge_scheme, config.multipole_lmax);
-            expected_populations.resize(wavy.get_ncen());
-            for (int i = 0; i < wavy.get_ncen(); i++)
-                expected_populations[i] = std::sqrt(constants::FOUR_PI) * targets[i][0];
+        const restraint_data restraints =
+            build_restraint_data(
+                wavy,
+                wavy_aux,
+                config,
+                n_aux);
+
+        apply_restraints(
+            eri2c,
+            rho,
+            wavy_aux,
+            restraints,
+            n_aux);
+
+        solve_restrained_system(
+            eri2c,
+            rho,
+            n_aux,
+            restraints.has_multipoles());
+
+        if (restraints.has_multipoles()) {
+            print_multipole_report(
+                rho,
+                wavy_aux,
+                restraints);
         }
-        else {
-            expected_populations = calculate_expected_populations(wavy, wavy_aux, config.charge_scheme);
-            if (wavy.get_has_ECPs()) {
-                //Subtract the ecp electrons from the populations
-                for (int i = 0; i < wavy.get_ncen(); i++) {
-                    expected_populations[i] -= wavy.get_atom_ECP_electrons(i);
-                }
-            }
-        }
-        //The moment rows are meant to pin the partitioned atoms, so they carry the user's strength alone, O(1) against the metric
-        const vec weights = config.multipole_lmax >= 0 ? vec(wavy.get_ncen(), config.multipole_strength)
-            : restraint_weights(wavy_aux, aux_basis.get_nao(), config.restraint_strength, config.adaptive_restraint);
-        // Apply enhanced electron restraints
-        if (config.restrain_type == RESTRAINT_TYPE::PARTITION)
-            add_partition_restraint(eri2c, rho, wavy_aux, rows, targets, weights, config.multipole_lmax);
-        else {
-            add_electron_restraint(eri2c, rho, wavy_aux, weights, expected_populations);
-            if (config.multipole_lmax > 0)
-                add_multipole_restraint(eri2c, rho, wavy_aux, targets, weights, config.multipole_lmax);
-        }
-        // Solve the regularized 
-        std::cout << "Solving regularized linear system..." << std::endl;
-        if (config.multipole_lmax >= 0) {
-            //Penalty on the Coulomb-metric objective, (J + R^T R) c = rho + R^T t: a deviation from the targets is paid
-            //for in residual self-energy dc^T J dc. Least squares on the stacked [J; R] measures it as |J dc|^2 instead,
-            //which costs nothing along the near-dependent diffuse functions and blew |c| up to ~100 on three heavy atoms.
-            const int n = (int)aux_basis.get_nao(), m = (int)rho.size();
-            vec J(eri2c.begin(), eri2c.begin() + (size_t)n * n), b(rho.begin(), rho.begin() + n);
-            for (int k = n; k < m; k++) {
-                const double* r = eri2c.data() + (size_t)k * n;
-                for (int i = 0; i < n; i++) {
-                    if (r[i] == 0.0) continue;
-                    b[i] += r[i] * rho[k];
-                    for (int j = 0; j < n; j++) J[(size_t)i * n + j] += r[i] * r[j];
-                }
-            }
-            solve_linear_system(J, (size_t)n, b);
-            double error = 0.0;
-            for (int k = n; k < m; k++) {
-                double d = -rho[k];
-                for (int i = 0; i < n; i++) d += eri2c[(size_t)k * n + i] * b[i];
-                error += d * d;
-            }
-            std::cout << "Restraint residual: " << std::fixed << std::setprecision(12) << std::sqrt(error) << std::endl;
-            rho = b;
-        }
-        else {
-            solve_linear_system(eri2c, rho.size(), aux_basis.get_nao(), rho);
-            //dgels leaves the restraint residuals behind the solution
-            rho.resize(aux_basis.get_nao());
-        }
-        if (config.multipole_lmax >= 0) {
-            const vec2 fitted = rows.empty() ? fitted_multipoles(rho, wavy_aux, config.multipole_lmax) : grid_multipoles(rows, rho, config.multipole_lmax);
-            const double stone = std::sqrt(constants::FOUR_PI);
-            std::cout << "\nAtomic multipoles of the fitted density" << (rows.empty() ? "" : " partitioned on the grid") << ", Racah normalisation, e bohr^l\n"
-                << "  Atom  l  m       target       fitted    deviation" << std::endl;
-            for (int a = 0; a < wavy_aux.get_ncen(); a++)
-                for (int l = 0; l <= config.multipole_lmax; l++)
-                    for (int m = -l; m <= l; m++) {
-                        const double f = stone / std::sqrt(2.0 * l + 1.0), t = targets[a][l * l + l + m] * f, q = fitted[a][l * l + l + m] * f;
-                        std::cout << std::setw(6) << wavy_aux.get_atom_label(a) << std::setw(3) << l << std::setw(3) << m
-                            << std::fixed << std::setprecision(6) << std::setw(13) << t << std::setw(13) << q << std::setw(13) << q - t << std::endl;
-                    }
+        // Analyze quality if requested
+        if (config.analyze_quality) {
+            analyze_density_fit_quality(rho, wavy_aux, restraints.expected_populations);
         }
     }
 
 
-    //write out fitted density coefficients
-    //std::cout << "\nFitted density coefficients:" << std::endl;
-    //for (size_t i = 0; i < rho.size(); i++) {
-    //    std::cout << std::fixed << std::setprecision(6) << rho[i] << ", ";
-    //}
-    //std::cout << "\n";
-    //rho = reorder_p(rho, wavy_aux);
 
-
-
-    // Analyze quality if requested
-    if (config.analyze_quality) {
-        analyze_density_fit_quality(rho, wavy_aux, expected_populations);
-    }
 
     std::cout << "==============================================\n" << std::endl;
     return rho;
@@ -343,8 +727,8 @@ void DensityFitting::add_electron_restraint(vec& eri2c, vec& rho, const WFN& wav
                 }
                 const vec normalized_coefs = Int_Params::normalize_gto(shell_coefs, shell_exps, 0);
 
-                for (unsigned int e = 0; e < current_atom.get_shellcount()[shell]; e++, prim++) {
-                    radial += normalized_coefs[e] * std::pow(M_PI / shell_exps[e], 1.5);
+                for (unsigned int e = 0; e < current_atom.get_shellcount()[shell]; e++) {
+                    radial += normalized_coefs[e] * std::pow(constants::PI / shell_exps[e], 1.5);
                 }
 
                 // Store the electron integral for this s-orbital
@@ -354,9 +738,8 @@ void DensityFitting::add_electron_restraint(vec& eri2c, vec& rho, const WFN& wav
             else {
                 // Skip non-s orbitals but still increment indices appropriately
                 coef_idx += (2 * type + 1);
+                prim += current_atom.get_shellcount()[shell];
             }
-
-            prim += current_atom.get_shellcount()[shell];
         }
     }
 
@@ -794,18 +1177,6 @@ void DensityFitting::print_interaction_energy(const INTERACTION& E, const WFN& a
     file << std::endl;
 }
 
-static PartitionType scheme_partition(const DensityFitting::CHARGE_SCHEME& scheme)
-{
-    switch (scheme) {
-    case DensityFitting::CHARGE_SCHEME::TFVC: return PartitionType::TFVC;
-    case DensityFitting::CHARGE_SCHEME::HIRSHFELD: return PartitionType::Hirshfeld;
-    case DensityFitting::CHARGE_SCHEME::MBIS: return PartitionType::MBIS;
-    case DensityFitting::CHARGE_SCHEME::EMBIS: return PartitionType::EMBIS;
-    default: err_not_impl_f("Only TFVC, Hirshfeld, MBIS and EMBIS partition the density on a grid", std::cout);
-    }
-    return PartitionType::Hirshfeld;
-}
-
 //PartitionType and PartitionResults::CHARGE_ORDER are numbered differently
 static int charge_order(const PartitionType type)
 {
@@ -815,29 +1186,6 @@ static int charge_order(const PartitionType type)
     case PartitionType::EMBIS: return PartitionResults::CHARGE_ORDER::S_EMBIS;
     default: return PartitionResults::CHARGE_ORDER::S_HIRSH;
     }
-}
-
-//Grids of every atom partitioned by scheme, set up on the returned copy of wavy without its virtual orbitals
-static WFN partition_grids(const WFN& wavy, const DensityFitting::CHARGE_SCHEME& scheme, GridManager& grid_manager)
-{
-    GridConfiguration config;
-    config.partition_type = scheme_partition(scheme);
-    config.pbc = 0;
-    config.debug = false;
-    grid_manager.setConfiguration(config);
-    ivec atom_list(wavy.get_ncen());
-    for (int a = 0; a < wavy.get_ncen(); a++) atom_list[a] = a;
-    WFN temp = wavy;
-    temp.delete_unoccupied_MOs();
-    grid_manager.setup3DGridsForMolecule(temp, atom_list);
-    return temp;
-}
-
-vec2 DensityFitting::calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax)
-{
-    GridManager grid_manager;
-    const WFN temp = partition_grids(wavy, scheme, grid_manager);
-    return grid_manager.calculatePartitionedMultipoles(temp, lmax);
 }
 
 void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0)
@@ -887,7 +1235,7 @@ vec2 DensityFitting::partition_multipole_rows(const WFN& wavy, const WFN& wavy_a
 {
     err_checkf(lmax >= 0 && lmax <= 8, "Partition restraints are implemented for 0 <= l <= 8", std::cout);
     GridManager grid_manager;
-    const WFN temp = partition_grids(wavy, scheme, grid_manager);
+    const WFN temp = setup_partition_grid(wavy, scheme, grid_manager);
     targets = grid_manager.calculatePartitionedMultipoles(temp, lmax);
     const aux_density_table t(wavy_aux.get_atoms());
     const int n_atoms = wavy.get_ncen(), n_mom = (lmax + 1) * (lmax + 1);
@@ -906,9 +1254,9 @@ vec2 DensityFitting::partition_multipole_rows(const WFN& wavy, const WFN& wavy_a
     return rows;
 }
 
-void DensityFitting::add_partition_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux, const vec2& rows, const vec2& targets, const vec& atom_weights, const int lmax)
+void DensityFitting::add_partition_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux, const vec2& rows, const vec2& targets, const vec& atom_weights, const int lmax, const int n_aux)
 {
-    const int n_atoms = wavy_aux.get_ncen(), n_old = (int)rho.size(), n_aux = (int)(eri2c.size() / rho.size());
+    const int n_atoms = wavy_aux.get_ncen(), n_old = (int)rho.size();
     const int n_mom = (lmax + 1) * (lmax + 1), n_rows = n_atoms * n_mom;
     err_checkf((int)rows.size() == n_rows && (int)rows[0].size() == n_aux, "Partition restraint rows do not match the auxiliary basis", std::cout);
     eri2c.resize((size_t)(n_old + n_rows) * n_aux, 0.0);

@@ -73,7 +73,7 @@ namespace DensityFitting
     vec2 partition_multipole_rows(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME& scheme, const int lmax, vec2& targets);
     // The rows of one atom from np grid points with the partition weights w, added into rows[row0 + l*l+l+m]
     void partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0);
-    void add_partition_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux, const vec2& rows, const vec2& targets, const vec& atom_weights, const int lmax);
+    void add_partition_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux, const vec2& rows, const vec2& targets, const vec& atom_weights, const int lmax, const int n_aux);
     // Partition-weighted moments of the fitted density, rows applied to the coefficients, same layout as the targets
     vec2 grid_multipoles(const vec2& rows, const vec& coefficients, const int lmax);
 

@@ -519,7 +519,7 @@ cdouble aux_density_table::fourier_atom(
             radial += pr_norm[p] * Hl_over_2l * std::exp(-H2 / (4.0 * pr_exp[p])) / pr_exp_l32[p];
         }
 
-        const double angular = aux_density::harmonic(l, k[0], k[1], k[2], coefs + coef_off[s]);
+        const double angular = constants::spherical_harmonic(l, k[0], k[1], k[2], coefs + coef_off[s]);
 
         sf += apply_i_to_l(l, constants::PI3_2 * radial * angular);
     }
@@ -609,7 +609,7 @@ vec calc_atomic_density(
                     normalized_coefs[e] / (2.0 * std::pow(shell_exps[e], 1.5));
             }
 
-            atom_elecs[a] += radial_integral * coefs[coef_counter] * M_PI;
+            atom_elecs[a] += radial_integral * coefs[coef_counter] * constants::PI;
 
             ++coef_counter;
         }

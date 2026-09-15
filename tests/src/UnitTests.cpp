@@ -2836,7 +2836,13 @@ namespace NoSpherA2UnitTests
         for (int a = 0; a < 2; a++) EXPECT_NEAR(F.pair[0][a], E.pair[a][0], 1e-12);
     }
     namespace {
-        const std::filesystem::path thpp = "../Lukas_Test/thpp_p1.xyz";
+        const std::filesystem::path get_thpp_path() {
+            std::filesystem::path thpp("../Lukas_Test/thpp_p1.xyz");
+            if (!std::filesystem::exists(thpp)) {
+                thpp = "../../../tests/Lukas_Test/thpp_p1.xyz";
+            }
+            return thpp;
+        }
         std::filesystem::path geometry_aid_tmp(const std::string& name)
         {
             return std::filesystem::temp_directory_path() / ("nosphera2_geometry_aid_" + name);
@@ -2950,8 +2956,8 @@ namespace NoSpherA2UnitTests
     {
         //thpp_p1 has 12 C, 4 N, 2 F and 14 H; H is no SOAP species, so 18 centres and at most the 6 pair blocks of C, N, F, each 7 * 7 * 13 wide
         const std::filesystem::path out = geometry_aid_tmp("thpp.npy"), dirty = geometry_aid_tmp("thpp_dirty.npy");
-        geometry_aid::write_descriptor(thpp, out, geometry_aid::hyperparameters());
-        geometry_aid::write_descriptor(thpp, dirty, geometry_aid::hyperparameters(3.0));
+        geometry_aid::write_descriptor(get_thpp_path(), out, geometry_aid::hyperparameters());
+        geometry_aid::write_descriptor(get_thpp_path(), dirty, geometry_aid::hyperparameters(3.0));
         std::vector<unsigned long> shape, shape_dirty;
         vec d, d_dirty;
         load_npy(out, shape, d);
@@ -2978,7 +2984,7 @@ namespace NoSpherA2UnitTests
     TEST(GeometryAidTests, BatchSkipsAMissingStructureAndFailsOnlyWhenNothingWasWritten)
     {
         const std::filesystem::path good = geometry_aid_tmp("batch.npy"), missing = geometry_aid_tmp("missing.npy");
-        const geometry_aid::jobvec jobs{ { thpp, good }, { geometry_aid_tmp("does_not_exist.xyz"), missing } };
+        const geometry_aid::jobvec jobs{ { get_thpp_path(), good }, { geometry_aid_tmp("does_not_exist.xyz"), missing } };
         EXPECT_EQ(geometry_aid::write_descriptors(jobs, geometry_aid::hyperparameters()), 0);
         EXPECT_TRUE(std::filesystem::exists(good));
         EXPECT_FALSE(std::filesystem::exists(missing));
@@ -3033,26 +3039,26 @@ namespace NoSpherA2UnitTests
     TEST(GeometryAidTests, FlagsQueueTheirJobsInAnyOrder)
     {
         const std::filesystem::path list = geometry_aid_tmp("flags.txt"), model = geometry_aid_tmp("flags.bin");
-        { std::ofstream(list) << "# structures\n\n" << thpp.string() << "\n"; }
+        { std::ofstream(list) << "# structures\n\n" << get_thpp_path().string() << "\n"; }
         write_model(model, tiny_model(false));
-        options a = parse_options({ "-calc_featomic_descriptor", "-wfn", thpp.string() });
+        options a = parse_options({ "-calc_featomic_descriptor", "-wfn", get_thpp_path().string() });
         EXPECT_TRUE(a.calc_featomic_descriptor);
-        EXPECT_EQ(a.wfn, thpp);
+        EXPECT_EQ(a.wfn, get_thpp_path());
         EXPECT_EQ(a.geometry_aid_cutoff, 3.5);
         EXPECT_TRUE(a.featomic_structures.empty() && a.classify_atoms_out.empty() && a.classify_structures.empty());
         options b = parse_options({ "-calc_featomic_descriptors", list.string(), "-geometry_aid_cutoff", "3.0" });
         EXPECT_FALSE(b.calc_featomic_descriptor);
-        EXPECT_EQ(b.featomic_structures, (pathvec{ thpp }));
+        EXPECT_EQ(b.featomic_structures, (pathvec{ get_thpp_path() }));
         EXPECT_EQ(b.geometry_aid_cutoff, 3.0);
-        options c = parse_options({ "-wfn", thpp.string(), "-classify_atoms", model.string() });
+        options c = parse_options({ "-wfn", get_thpp_path().string(), "-classify_atoms", model.string() });
         EXPECT_EQ(c.classify_atoms_out, "probabilities.npy");
         EXPECT_EQ(c.geometry_aid_model, model);
-        options d = parse_options({ "-classify_atoms", model.string(), "out.npy", "-no_date", "-wfn", thpp.string() });
+        options d = parse_options({ "-classify_atoms", model.string(), "out.npy", "-no_date", "-wfn", get_thpp_path().string() });
         EXPECT_EQ(d.classify_atoms_out, "out.npy");
         EXPECT_TRUE(d.no_date);
-        EXPECT_EQ(d.wfn, thpp);
+        EXPECT_EQ(d.wfn, get_thpp_path());
         options e = parse_options({ "-classify_atoms_list", list.string(), model.string() });
-        EXPECT_EQ(e.classify_structures, (pathvec{ thpp }));
+        EXPECT_EQ(e.classify_structures, (pathvec{ get_thpp_path() }));
         EXPECT_EQ(e.geometry_aid_model, model);
         EXPECT_TRUE(e.classify_atoms_out.empty());
         std::filesystem::remove(list);
@@ -3063,10 +3069,10 @@ namespace NoSpherA2UnitTests
     {
         //A copy of the structure in the temp directory, because the batch flag writes <path>.npy beside it
         const std::filesystem::path copy = geometry_aid_tmp("copy.xyz"), list = geometry_aid_tmp("run.txt"), copy_npy = copy.string() + ".npy", direct = geometry_aid_tmp("direct.npy");
-        std::filesystem::copy_file(thpp, copy, std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(get_thpp_path(), copy, std::filesystem::copy_options::overwrite_existing);
         { std::ofstream(list) << copy.string() << "\n"; }
         std::filesystem::remove("descriptor.npy");
-        ASSERT_EQ(run_nosphera2({ "-wfn", thpp.string(), "-calc_featomic_descriptor", "-no_date" }), 0);
+        ASSERT_EQ(run_nosphera2({ "-wfn", get_thpp_path().string(), "-calc_featomic_descriptor", "-no_date" }), 0);
         std::vector<unsigned long> shape;
         vec d, d_direct;
         load_npy("descriptor.npy", shape, d);
@@ -3074,7 +3080,7 @@ namespace NoSpherA2UnitTests
         std::filesystem::remove("descriptor.npy");
         //The cutoff after the descriptor flag must still apply, so the batch output is the dirty descriptor
         ASSERT_EQ(run_nosphera2({ "-calc_featomic_descriptors", list.string(), "-geometry_aid_cutoff", "3.0", "-no_date" }), 0);
-        geometry_aid::write_descriptor(thpp, direct, geometry_aid::hyperparameters(3.0));
+        geometry_aid::write_descriptor(get_thpp_path(), direct, geometry_aid::hyperparameters(3.0));
         load_npy(copy_npy, shape, d);
         load_npy(direct, shape, d_direct);
         ASSERT_EQ(d.size(), d_direct.size());
@@ -3091,9 +3097,9 @@ namespace NoSpherA2UnitTests
     {
         const std::filesystem::path model = geometry_aid_tmp("wide.bin"), out = geometry_aid_tmp("probs.npy"), copy = geometry_aid_tmp("copy2.xyz"), list = geometry_aid_tmp("classify.txt"), copy_probs = copy.string() + ".probs.npy", descr = geometry_aid_tmp("descr.npy");
         write_model(model, wide_model());
-        std::filesystem::copy_file(thpp, copy, std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(get_thpp_path(), copy, std::filesystem::copy_options::overwrite_existing);
         { std::ofstream(list) << copy.string() << "\n"; }
-        ASSERT_EQ(run_nosphera2({ "-wfn", thpp.string(), "-classify_atoms", model.string(), out.string(), "-no_date" }), 0);
+        ASSERT_EQ(run_nosphera2({ "-wfn", get_thpp_path().string(), "-classify_atoms", model.string(), out.string(), "-no_date" }), 0);
         std::vector<unsigned long> shape;
         vec p, p_batch, d;
         load_npy(out, shape, p);
@@ -3104,7 +3110,7 @@ namespace NoSpherA2UnitTests
             EXPECT_GT(p[2 * a + 1], 0.0);
         }
         //The same numbers from the pieces: the descriptor written by the other flag, classified with the loaded model
-        geometry_aid::write_descriptor(thpp, descr, geometry_aid::hyperparameters());
+        geometry_aid::write_descriptor(get_thpp_path(), descr, geometry_aid::hyperparameters());
         load_npy(descr, shape, d);
         const vec direct = geometry_aid::classify_descriptor(d.data(), 18, 42042, geometry_aid::load_model(model));
         ASSERT_EQ(direct.size(), p.size());
@@ -3290,7 +3296,7 @@ namespace NoSpherA2UnitTests
         vec eri2c(n_aux * n_aux, 0.0), rho(n_aux, 0.0);
         WFN aux_O(e_origin::NOT_YET_DEFINED);
         aux_O.push_back_atom("O", xs[0], ys[0], zs[0], 8);
-        DensityFitting::add_partition_restraint(eri2c, rho, aux_O, rows, Q, vec(1, 1.0), lmax);
+        DensityFitting::add_partition_restraint(eri2c, rho, aux_O, rows, Q, vec(1, 1.0), lmax, n_aux);
         ASSERT_EQ(eri2c.size(), (size_t)(n_aux + n_moments) * n_aux);
         ASSERT_EQ(rho.size(), (size_t)(n_aux + n_moments));
         const vec2 fitted = DensityFitting::grid_multipoles(rows, coefs, lmax);

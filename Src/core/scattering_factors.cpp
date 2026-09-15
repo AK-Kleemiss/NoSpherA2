@@ -3097,7 +3097,7 @@ tsc_block_type calculate_scattering_factors(
 		else if (opt.partition_type == PartitionType::RI)
 		{
 			file << "\nGenerating densities... " << endl;
-			WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis, true);
+			WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis, false);
 
             //TODO: only compute coefs for atoms that are actually in the symmetric unit!
             DensityFitting::CONFIG config = DensityFitting::config_from_options(opt);
