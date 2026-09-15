@@ -10,6 +10,7 @@
 #include "i_tensor_stream.h"
 #include "stored_eri.h"
 #include <thread>
+#include <deque>
 
 class XCW {
 public:
@@ -158,6 +159,7 @@ private:
 		void update(std::ostream& file, double& alpha) {
 			if (current_max_diis_error < diis_stop_damping && apply_damping == true) {
 				apply_damping = false;
+				alpha = 0;
 				print_centered_message("***Turned off damping***", 84, file);
 			}
 			if (current_max_diis_error < diis_stop_shift && apply_shift == true) {
@@ -284,7 +286,7 @@ private:
 	void calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf);
 
 	// Executes a single SCF solver (for specific lambda step)
-	void do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess);
+	bool do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess, bool write_result = true);
 
 	// Executes a single SCF iteration
 	bool SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda, double& alpha, double& e_diff_mem, double& quant, double& last_quant, occ::Mat& dm_last);
@@ -295,7 +297,10 @@ private:
 	// The Roothaan step and the DIIS of occ's SCF with their matrix products on MKL
 	void solve_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat& F) const;
 	occ::Mat diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf);
-	occ::core::diis::DIIS cdiis_;
+	// CDIIS over the last diis_subspace_ Fock matrices and their commutators, see cdiis_extrapolate
+	occ::Mat cdiis_extrapolate(const occ::Mat& F, const occ::Mat& E);
+	std::deque<occ::Mat> diis_F_, diis_E_;
+	static constexpr size_t diis_subspace_ = 8;
 	occ::qm::ADIIS adiis_;
 	occ::qm::EDIIS ediis_;
 
