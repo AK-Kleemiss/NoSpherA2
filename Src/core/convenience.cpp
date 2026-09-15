@@ -373,7 +373,7 @@ std::string help_message =
  "                                    NA2_<lambda>_RGBI.txt; the .wfn and\n"
  "                                    .fchk written there cannot carry it.\n"
  "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization.\n"
- "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO [nao] or ANO.\n"
+ "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
  "  -rgbi-groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
  "                                    for multiple group sets.\n"
  "  -promol_nci <a.xyz> <b.xyz> [rcut1 rcut2 rho_max rdg_max]\n"

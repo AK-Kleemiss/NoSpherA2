@@ -807,45 +807,61 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 }
 
 void XCW::eval_scale() {
-	double numerator = 0.0;
-	double denominator = 0.0;
-
-#pragma omp parallel for reduction(+:numerator, denominator)
-	for (int i = 0; i < cryst.nr_small; ++i) {
-		const double calc = std::abs(F_calc[0][i]);
-		numerator += calc * obs[i].F_obs;
-		denominator += calc * calc;
+	const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
+	vec numerators(nchunk), denominators(nchunk);
+#pragma omp parallel for schedule(static)
+	for (int c = 0; c < nchunk; c++) {
+		const int first = c * chunk, last = std::min(first + chunk, cryst.nr_small);
+		for (int i = first; i < last; i++) {
+			const double calc = std::abs(F_calc[0][i]);
+			numerators[c] += calc * obs[i].F_obs;
+			denominators[c] += calc * calc;
+		}
 	}
-
+	double numerator = 0.0, denominator = 0.0;
+	for (int c = 0; c < nchunk; c++) {
+		numerator += numerators[c];
+		denominator += denominators[c];
+	}
 	cryst.F_scale = (denominator != 0.0) ? numerator / denominator : 1.0;
 }
 
 void XCW::calc_criteria() {
 	ensure_inv_H2_weights();
 	double prefactor = 1.0 / static_cast<double>(cryst.nr_small - settings.n_params);
-	double sum_goof1 = 0, sum_goof2 = 0;
-	double sum_weighted_goof1 = 0, sum_weighted_goof2 = 0;
+	const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
+	vec sum_goof1_parts(nchunk), sum_goof2_parts(nchunk), sum_weighted_goof1_parts(nchunk), sum_weighted_goof2_parts(nchunk);
 	const double scale = cryst.F_scale;
 	const cdouble* F_calc_0 = F_calc[0].data();
-#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_weighted_goof1, sum_weighted_goof2)
-	for (int i = 0; i < cryst.nr_small; i++) {
-		const scattering_data& obs_ptr = obs[i];
-		const double scaled_F_calc = scale * std::abs(F_calc_0[i]);
-		const double scaled_difference = scaled_F_calc - obs_ptr.F_obs;
-		const double diff2 = (scaled_F_calc * scaled_F_calc) - obs_ptr.F_obs2;
-		const double inv_sigma_obs = 1.0 / obs_ptr.sigma_obs;
-		const double inv_sigma_obs2 = 1.0 / obs_ptr.sigma_obs2;
-		const double weighted_diff1 = scaled_difference * inv_sigma_obs;
-		const double weighted_diff2 = diff2 * inv_sigma_obs2;
-		const double weighted_diff1_sq = weighted_diff1 * weighted_diff1;
-		const double weighted_diff2_sq = weighted_diff2 * weighted_diff2;
-		sum_goof1 += weighted_diff1_sq;
-		sum_goof2 += weighted_diff2_sq;
-		if (settings.XWR_type == 2) {
-			const double w = inv_H2_[i];
-			sum_weighted_goof1 += weighted_diff1_sq * w;
-			sum_weighted_goof2 += weighted_diff2_sq * w;
+#pragma omp parallel for schedule(static)
+	for (int c = 0; c < nchunk; c++) {
+		const int first = c * chunk, last = std::min(first + chunk, cryst.nr_small);
+		for (int i = first; i < last; i++) {
+			const scattering_data& obs_ptr = obs[i];
+			const double scaled_F_calc = scale * std::abs(F_calc_0[i]);
+			const double scaled_difference = scaled_F_calc - obs_ptr.F_obs;
+			const double diff2 = (scaled_F_calc * scaled_F_calc) - obs_ptr.F_obs2;
+			const double inv_sigma_obs = 1.0 / obs_ptr.sigma_obs;
+			const double inv_sigma_obs2 = 1.0 / obs_ptr.sigma_obs2;
+			const double weighted_diff1 = scaled_difference * inv_sigma_obs;
+			const double weighted_diff2 = diff2 * inv_sigma_obs2;
+			const double weighted_diff1_sq = weighted_diff1 * weighted_diff1;
+			const double weighted_diff2_sq = weighted_diff2 * weighted_diff2;
+			sum_goof1_parts[c] += weighted_diff1_sq;
+			sum_goof2_parts[c] += weighted_diff2_sq;
+			if (settings.XWR_type == 2) {
+				const double w = inv_H2_[i];
+				sum_weighted_goof1_parts[c] += weighted_diff1_sq * w;
+				sum_weighted_goof2_parts[c] += weighted_diff2_sq * w;
+			}
 		}
+	}
+	double sum_goof1 = 0, sum_goof2 = 0, sum_weighted_goof1 = 0, sum_weighted_goof2 = 0;
+	for (int c = 0; c < nchunk; c++) {
+		sum_goof1 += sum_goof1_parts[c];
+		sum_goof2 += sum_goof2_parts[c];
+		sum_weighted_goof1 += sum_weighted_goof1_parts[c];
+		sum_weighted_goof2 += sum_weighted_goof2_parts[c];
 	}
 	cryst.GooF1 = std::sqrt(prefactor * sum_goof1);
 	cryst.GooF2 = std::sqrt(prefactor * sum_goof2);
@@ -2995,21 +3011,11 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 
 bool XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last) {
 	get_density_criteria(settings.current_RMSP_diff, settings.current_MaxP_diff, scf.ctx.mo.D, dm_last);
-	if (settings.current_quant_diff < settings.quant_diff) {
-		settings.conv_quant_diff = true;
-	}
-	if (settings.current_max_diis_error < settings.max_diis_error) {
-		settings.conv_max_diis_error = true;
-	}
-	if (settings.current_gradient < settings.gradient) {
-		settings.conv_gradient = true;
-	}
-	if (settings.current_RMSP_diff < settings.RMSP_diff) {
-		settings.conv_RMSP_diff = true;
-	}
-	if (settings.current_MaxP_diff < settings.MaxP_diff) {
-		settings.conv_MaxP_diff = true;
-	}
+	settings.conv_quant_diff = settings.current_quant_diff < settings.quant_diff;
+	settings.conv_max_diis_error = settings.current_max_diis_error < settings.max_diis_error;
+	settings.conv_gradient = settings.current_gradient < settings.gradient;
+	settings.conv_RMSP_diff = settings.current_RMSP_diff < settings.RMSP_diff;
+	settings.conv_MaxP_diff = settings.current_MaxP_diff < settings.MaxP_diff;
 	return settings.convergence_check();
 	// closing function
 }

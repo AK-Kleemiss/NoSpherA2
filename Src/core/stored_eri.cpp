@@ -47,13 +47,15 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 	std::vector<double> q(npair, -1.0);
 #pragma omp parallel
 	{
-		occ::qm::cint::Optimizer opt(env, occ::qm::cint::Operator::coulomb, 4);
-		std::vector<double> buffer(env.buffer_size_2e()), cache;
-#pragma omp for schedule(dynamic)
+		occ::qm::IntegralEngine local_engine(hf.aobasis());
+		auto& local_env = local_engine.env();
+		occ::qm::cint::Optimizer opt(local_env, occ::qm::cint::Operator::coulomb, 4);
+		std::vector<double> buffer(local_env.buffer_size_2e()), cache;
+#pragma omp for schedule(static)
 		for (int pq = 0; pq < npq; pq++) {
 			const int p = static_cast<int>((std::sqrt(8.0 * pq + 1.0) - 1.0) / 2.0), qs = pq - p * (p + 1) / 2;
 			if (!significant(p, qs)) continue;
-			const std::array<int, 4> dims = quartet(env, sph, { p, qs, p, qs }, opt, buffer, cache);
+			const std::array<int, 4> dims = quartet(local_env, sph, { p, qs, p, qs }, opt, buffer, cache);
 			//dims[0] is -1 for an all-zero quartet; dims[2] is the same shell's size
 			const int d0 = dims[2], d1 = dims[1];
 			for (int f1 = 0; f1 < d1; f1++)
@@ -86,11 +88,13 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 	v_.reset(new double[nint]);
 #pragma omp parallel
 	{
-		occ::qm::cint::Optimizer opt(env, occ::qm::cint::Operator::coulomb, 4);
-		std::vector<double> buffer(env.buffer_size_2e()), cache;
+		occ::qm::IntegralEngine local_engine(hf.aobasis());
+		auto& local_env = local_engine.env();
+		occ::qm::cint::Optimizer opt(local_env, occ::qm::cint::Operator::coulomb, 4);
+		std::vector<double> buffer(local_env.buffer_size_2e()), cache;
 #pragma omp for schedule(static)
 		for (long long i = 0; i < static_cast<long long>(nint); i++) v_[i] = 0.0;
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(static)
 		for (int pq = 0; pq < npq; pq++) {
 			const int p = static_cast<int>((std::sqrt(8.0 * pq + 1.0) - 1.0) / 2.0), qs = pq - p * (p + 1) / 2;
 			if (!significant(p, qs)) continue;
@@ -98,7 +102,7 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 				const int s_max = p == r ? qs : r;
 				for (const size_t s : shellpairs[r]) {
 					if (static_cast<int>(s) > s_max) break;
-					const std::array<int, 4> dims = quartet(env, sph, { p, qs, r, static_cast<int>(s) }, opt, buffer, cache);
+					const std::array<int, 4> dims = quartet(local_env, sph, { p, qs, r, static_cast<int>(s) }, opt, buffer, cache);
 					if (dims[0] < 0) continue;
 					const double* v = buffer.data();
 					for (int f3 = 0; f3 < dims[3]; f3++) {
@@ -156,7 +160,7 @@ void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool scre
 		std::vector<double> Jl(npk, 0.0), t(n);
 		occ::Mat Kl = occ::Mat::Zero(n, n);
 		double* Kd = Kl.data();
-#pragma omp for schedule(dynamic, 16)
+#pragma omp for schedule(static)
 		for (int k = 0; k < npk; k++) {
 			const int a = pa[k], b = pb[k];
 			if (screen && q_[k] * qmax_ * rmax < threshold) continue;
