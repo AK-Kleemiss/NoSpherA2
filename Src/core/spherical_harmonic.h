@@ -1,11 +1,12 @@
 #pragma once
-#include <cmath>
+#include <limits>
 
-//The real spherical harmonics of one l contracted with their 2l+1 coefficients, x, y, z
-//normalised; the l <= 8 switch of constants::spherical_harmonic(l, d, coefs) in constants.cpp,
-//which forwards here. Templated on the number type so aux_density.h differentiates it with
-//dual, and free of project includes so aux_density_gpu.cu compiles it under nvcc and hipcc:
-//those see the host-device attribute, every other compiler plain inline functions.
+//constants::sqrt and the real spherical harmonics of one l contracted with their 2l+1
+//coefficients, x, y, z normalised; the l <= 8 switch of constants::spherical_harmonic(l, d, coefs)
+//in constants.cpp, which forwards here. Templated on the number type so aux_density.h
+//differentiates it with dual, and free of project includes so aux_density_gpu.cu compiles it
+//under nvcc and hipcc: those see the host-device attribute, every other compiler plain inline
+//functions. The prefactors are constants::sqrt, the same constexpr values as c_* in constants.h.
 #if defined(__CUDACC__) || defined(__HIPCC__)
 #define AUX_HD __host__ __device__
 #else
@@ -14,6 +15,26 @@
 
 namespace constants
 {
+    AUX_HD double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
+    {
+        return curr == prev
+            ? curr
+            : sqrtNewtonRaphson(x, 0.5 * (curr + x / curr), curr);
+    }
+
+    /*
+     * Constexpr version of the square root
+     * Return value:
+     *   - For a finite and non-negative value of "x", returns an approximation for the square root of "x"
+     *   - Otherwise, returns NaN
+     * Taken from https://stackoverflow.com/questions/8622256/in-c11-is-sqrt-defined-as-constexpr
+     */
+    AUX_HD double constexpr sqrt(double x)
+    {
+        return x >= 0 && x < std::numeric_limits<double>::infinity()
+            ? sqrtNewtonRaphson(x, x, 0)
+            : std::numeric_limits<double>::quiet_NaN();
+    }
     template <class T>
     AUX_HD inline T spherical_harmonic(const int l, const T x, const T y, const T z, const double* coefs)
     {

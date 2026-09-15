@@ -9,26 +9,6 @@ namespace constants
     extern bool hide_gpu_notes;
     static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
     constexpr int grid_max_no_flip = 50;
-    double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
-    {
-        return curr == prev
-            ? curr
-            : sqrtNewtonRaphson(x, 0.5 * (curr + x / curr), curr);
-    }
-
-    /*
-     * Constexpr version of the square root
-     * Return value:
-     *   - For a finite and non-negative value of "x", returns an approximation for the square root of "x"
-     *   - Otherwise, returns NaN
-     * Taken from https://stackoverflow.com/questions/8622256/in-c11-is-sqrt-defined-as-constexpr
-     */
-    double constexpr sqrt(double x)
-    {
-        return x >= 0 && x < std::numeric_limits<double>::infinity()
-            ? sqrtNewtonRaphson(x, x, 0)
-            : std::numeric_limits<double>::quiet_NaN();
-    }
     int constexpr const_abs(int x)
     {
         return x < 0 ? -x : x;
