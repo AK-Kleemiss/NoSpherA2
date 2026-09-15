@@ -48,12 +48,22 @@ Checked on the CUDA machine (RTX 2080 Ti, CUDA 13.3 + ROCm 10 wheel, MSVC 14.44)
 path (`-h` exit 0, also with `NOSPHERA2_GPU_BACKEND=hip`), the GPU gtests run on the NVIDIA card
 through the CUDA side of the fat binary (`BlasGpuTests` 3/3, `sucrose_SF_gpu_{grid,fp64,fp32}` pass;
 `P1_test_XCW_gpu_itensor` fails on the same 93098-vs-102932 grid-point golden as the four CPU P1 XCW
-cases since `5b6eb296`; the whole suite on the Windows fat tree is 304/309 with the 4 `*_full` skips, `ctest -j 6` also trips `SALTED` and `SALTEDChargeConstraint` over their shared `tests/SALTED` log, both pass alone), and with `NOSPHERA2_GPU_BACKEND=hip` they skip both without the runtime and
+cases since `5b6eb296`; the whole suite on the Windows fat tree is 304/309 with the 4 `*_full`
+skips), and with `NOSPHERA2_GPU_BACKEND=hip` they skip both without the runtime and
 with it on the path (`LD_DEBUG=libs` shows the shim opening `libamdhip64.so.7` from the wheel, then
 no AMD device). A plain `cmake --build <dir>` of the Windows tree from a `VsDevCmd` shell fails in
 featomic's cargo step with `Could not create named generator Visual Studio 18 2026`: the
 `CMAKE_GENERATOR=Ninja` the preset sets for cargo is only exported by `cmake --build --preset`, so
 set it by hand when building a tree by directory.
+
+CI (`CTEST_PARALLEL_LEVEL=4`) then exposed two parallel-ctest races that only bite when the two
+tests land on the same slot: `SALTEDChargeConstraint` was missing from the `integration_SALTED`
+resource lock in `tests/src/SetIntegrationTestLocks.cmake`, so it wrote into the `SALTED` log while
+`SALTED` was comparing it (`a54d28de`); and the two `HklGenerationTests` cases wrote and removed the
+same `nosphera2_geometry_aid_p63.cif` in the temp directory, which Windows refuses to remove while
+the other test still reads it - each case now has its own file (`0b7d21b4`). With those, `Linux GPU
+Release` and `Windows GPU Release` are 305/309 like every other job: the four P1 XCW goldens only.
+The Windows fat build takes 63 min on a cold sccache (every `.cu` twice under MSVC).
 
 ## 2026-09-14 — GPU builds in CI, and occ CCSD back at `/O2`
 
