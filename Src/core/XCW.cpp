@@ -2883,17 +2883,13 @@ occ::Mat XCW::diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	return ediis_.update(scf.ctx.mo.kind, D, F, scf.ctx.energy["electronic"]);
 }
 
-//Pulay's CDIIS on the Fock matrix. Extrapolates as soon as two vectors exist: the perturbed
-//Roothaan map is stiff (its dominant eigenvalue is about -1500 lambda for CaF2, so a converged
-//guess diverges by an order of magnitude per undamped step) and the five plain steps occ's DIIS
-//takes before its first extrapolation put the SCF into the nonlinear regime. The system
-//B c = 1 over the error overlaps B_ij = <E_i|E_j>, normalised to its largest diagonal element,
-//is solved through the pseudo-inverse over the eigenvalues above eigenvalue_cutoff: errors of an
-//SCF that starts close to convergence are nearly collinear, B is then rank-deficient to working
-//precision, and a QR solve hands back coefficients in the hundreds that amplify the noise in
-//the stored Fock matrices - the energy jumps at the first extrapolation of every lambda step.
-//The minimum-norm solution keeps the coefficients bounded; should one still exceed
-//max_coefficient the oldest vector is dropped and the system solved again.
+//Pulay's CDIIS on the Fock matrix, extrapolating from the second vector on: the perturbed
+//Roothaan map is stiff and the plain steps occ's DIIS takes first already leave the linear
+//regime. B c = 1 over B_ij = <E_i|E_j>, scaled by its largest diagonal element, is solved by
+//the pseudo-inverse over the eigenvalues above eigenvalue_cutoff: near convergence the errors
+//are almost collinear and a QR solve returns coefficients in the hundreds that amplify the
+//noise of the stored Fock matrices. Should one still exceed max_coefficient the oldest vector
+//is dropped and the system solved again.
 occ::Mat XCW::cdiis_extrapolate(const occ::Mat& F, const occ::Mat& E) {
 	diis_F_.push_back(F);
 	diis_E_.push_back(E);
