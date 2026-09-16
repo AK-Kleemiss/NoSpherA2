@@ -398,7 +398,13 @@ aux_density_table::aux_density_table(const std::vector<atom>& atoms)
         for (int s = 0; s < (int)sc.size(); s++) {
             const int l = atoms[a].get_basis_set_type(prim);
             err_checkf(l <= 8, "Aux basis shells above l = 8 are not supported on the grid", std::cout);
-            sh_l.push_back(l), pr_start.push_back(n_pr), coef_off.push_back(n_coef);
+            sh_l.push_back(l), pr_start.push_back(n_pr), coef_off.push_back(n_coef), sh_atom.push_back(a);
+            
+            for (int m = -l; m <= l; ++m)
+            {
+                coef_shell.push_back(n_sh);
+                coef_m.push_back(m);
+            }
 
             vec exponents(sc[s]);
             vec coefficients(sc[s]);
@@ -414,14 +420,37 @@ aux_density_table::aux_density_table(const std::vector<atom>& atoms)
             }
             coefficients = Int_Params::normalize_gto(coefficients, exponents, l);
 
-            pr_norm.reserve(pr_norm.size() + sc[s]);
-            std::copy(coefficients.begin(), coefficients.end(), std::back_inserter(pr_norm));
+            pr_norm.insert(
+                pr_norm.end(),
+                coefficients.begin(),
+                coefficients.end());
 
             n_pr += sc[s], n_coef += 2 * l + 1, n_sh++;
         }
         r2_max[a] = 46.0517 / alpha_min;
     }
     sh_start[n_at] = n_sh, pr_start.push_back(n_pr);
+
+    err_checkf(
+        static_cast<int>(sh_l.size()) == n_sh &&
+        static_cast<int>(sh_atom.size()) == n_sh &&
+        static_cast<int>(coef_off.size()) == n_sh &&
+        static_cast<int>(pr_start.size()) == n_sh + 1,
+        "Invalid auxiliary shell table",
+        std::cout);
+
+    err_checkf(
+        static_cast<int>(pr_exp.size()) == n_pr &&
+        static_cast<int>(pr_norm.size()) == n_pr &&
+        static_cast<int>(pr_exp_l32.size()) == n_pr,
+        "Invalid auxiliary primitive table",
+        std::cout);
+
+    err_checkf(
+        static_cast<int>(coef_shell.size()) == n_coef &&
+        static_cast<int>(coef_m.size()) == n_coef,
+        "Invalid auxiliary coefficient table",
+        std::cout);
 }
 
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs) const
@@ -550,6 +579,60 @@ void calc_density_ML(const aux_density_table& t, const vec& coefficients, const 
     }
 #pragma omp parallel for
     for (int p = 0; p < np; p++) rho[p] = t(x[p], y[p], z[p], coefficients.data(), gx[p], gy[p], gz[p], lap[p]);
+}
+
+
+double aux_density_table::shell_radial_moment(
+    const int shell) const
+{
+    const int l = sh_l[shell];
+
+    const double prefactor =
+        0.5 * std::tgamma(l + 1.5);
+
+    double integral = 0.0;
+
+    for (int p = pr_start[shell];
+        p < pr_start[shell + 1];
+        ++p)
+    {
+        // pr_exp_l32[p] = alpha^(l + 3/2)
+        integral +=
+            pr_norm[p]
+            * prefactor
+            / pr_exp_l32[p];
+    }
+
+    return integral;
+}
+
+double aux_density_table::shell_population_integral(
+    const int shell) const
+{
+    err_checkf(
+        sh_l[shell] == 0,
+        "Population integral requested for non-s auxiliary shell",
+        std::cout
+    );
+
+    double integral = 0.0;
+
+    for (int p = pr_start[shell];
+        p < pr_start[shell + 1];
+        ++p)
+    {
+        // For l=0:
+        //
+        // ∫ exp(-alpha r²) Y00 d³r
+        //
+        // = pi / (2 alpha^(3/2))
+        integral +=
+            pr_norm[p]
+            * constants::PI
+            / (2.0 * pr_exp_l32[p]);
+    }
+
+    return integral;
 }
 
 /**

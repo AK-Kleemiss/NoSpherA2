@@ -118,10 +118,15 @@ namespace SALTED_Utils
 struct aux_density_table
 {
     int n_at = 0, n_sh = 0, n_pr = 0, n_coef = 0;
+
     vec cx, cy, cz, r2_max, pr_exp, pr_norm;
     // alpha^(l + 3/2), needed for Fourier-Bessel transform
     vec pr_exp_l32;
-    ivec sh_start, sh_l, pr_start, coef_off;
+    ivec sh_start, sh_atom, sh_l, pr_start, coef_off;
+
+    // coefficient index -> shell / m
+    ivec coef_shell;
+    ivec coef_m;
 
     aux_density_table(const std::vector<atom>& atoms);
     double operator()(const double x, const double y, const double z, const double* coefs) const;
@@ -130,6 +135,20 @@ struct aux_density_table
 
     // Convenience function for one atom
     cdouble fourier_atom(double kx, double ky, double kz, const double* coefs, int atom_idx) const;
+
+    // Integral:
+    //
+    // ∫_0^inf R_l(r) r^(l+2) dr
+    //
+    // where
+    //
+    // R_l(r) = sum_p pr_norm[p] exp(-alpha_p r²)
+    //
+    double shell_radial_moment(int shell) const;
+
+    // Full 3D integral of an s-shell including Y_00.
+    // Only valid for l = 0.
+    double shell_population_integral(int shell) const;
 };
 //rho on np points, OpenMP on the host or on the device when the set is large enough; with gx, gy, gz its gradient too
 void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx = nullptr, double* gy = nullptr, double* gz = nullptr, double* lap = nullptr);

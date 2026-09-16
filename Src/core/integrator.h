@@ -31,7 +31,11 @@ namespace DensityFitting
     struct CONFIG {
         METRIC_TYPE metric = METRIC_TYPE::COULOMB; // Metric to use for density fitting
         bool analyze_quality = false; // Whether to analyze the quality of the density fitting
-        RESTRAINT_TYPE restrain_type = RESTRAINT_TYPE::NONE; // Type of electron population restraints to apply
+        bool use_tikhonov = false;
+        bool restrain_charges = false;
+        bool restrain_multipoles = false;
+        bool partition_restraints = false;
+        bool constrain_total_electrons = false;
 
         //Next only neccecary if restraints are used
         double restraint_strength = 5.0e-5; // Base strength of electron population restraints
@@ -44,6 +48,8 @@ namespace DensityFitting
         std::optional<ivec> asym_atm_list = std::nullopt; //Currently unsued till fixed!// Optional list of atom indices to only compute atoms actually present in the assymetic unit
     };
 
+    // Helper function to partition the density-fitting rows on a grid for multipole restraints. The rows are stored in a 2D vector, where each row corresponds to a multipole moment (l, m) and each column corresponds to an auxiliary basis function. The function takes the auxiliary density table, the number of grid points, the grid coordinates and weights, the center of the atom, the maximum multipole order, and the starting row index as input. It fills the rows vector with the contributions of each auxiliary basis function to each multipole moment at the given grid points.
+    void partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0);
 
     vec density_fit(const WFN& wavy, const WFN& wavy_aux, const CONFIG& config);
     // Fit settings from the command line: -multipole_moments switches the restraints on
@@ -54,29 +60,9 @@ namespace DensityFitting
     // Grid moments of the partitioned density about each nucleus, [atom][l*l+l+m] for l = 0..lmax, electrons only
     vec2 calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax);
 
-    void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const vec& expected_charges = vec());
+    void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const aux_density_table& aux_density, const vec& expected_charges = vec());
     // Per-atom row weight of the restraints
     vec restraint_weights(const WFN& wavy_aux, const size_t n_aux, double base_restraint_coef = 0.00005, bool adaptive_weighting = true);
-    void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
-        const vec& atom_weights, const vec& expected_charges = vec());
-    // Moment of one aux primitive about its own centre, Int r^l Y_lm chi = N c Gamma(l+3/2) / (2 alpha^(l+3/2))
-    double radial_moment(const double exponent, const double coef, const int l);
-    // Every shell of A with l <= lmax: its rank, the coefficient index of its m = -l function and its summed radial moment
-    void shell_moments(const atom& A, const int lmax, int& coef_idx, ivec& shell_l, ivec& shell_idx, vec& shell_I);
-    void add_multipole_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
-        const vec2& targets, const vec& atom_weights, const int lmax);
-    // Moments of the fitted density, same layout as the targets, from the coefficients alone
-    vec2 fitted_multipoles(const vec& coefficients, const WFN& wavy_aux, const int lmax);
-    // Same partition on both sides: rows[a*(lmax+1)^2 + l*l+l+m][p] = Int w_a chi_p |r-R_a|^l Y_lm(r-R_a) over every aux
-    // function p on the grid that also gives the targets, so the exact density satisfies the restraint and the l = 0
-    // rows are the partition populations. Unscaled; add_partition_restraint applies sqrt(4pi) (l = 0) or r_cov^-l
-    vec2 partition_multipole_rows(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME& scheme, const int lmax, vec2& targets);
-    // The rows of one atom from np grid points with the partition weights w, added into rows[row0 + l*l+l+m]
-    void partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0);
-    void add_partition_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux, const vec2& rows, const vec2& targets, const vec& atom_weights, const int lmax, const int n_aux);
-    // Partition-weighted moments of the fitted density, rows applied to the coefficients, same layout as the targets
-    vec2 grid_multipoles(const vec2& rows, const vec& coefficients, const int lmax);
-
     // Interaction energy of two fitted densities and their nuclei in Hartree, from the coefficients and the aux basis
     // alone (RI or SALTED). pair[a][b] over the atoms, rank[i][j] with 0 the nuclei and l+1 the aux functions of rank l.
     // pol_X = -1/2 sum alpha_a F_a^2 with Thakkar polarizabilities in the partner's field, disp the D4 dimer minus

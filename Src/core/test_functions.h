@@ -810,7 +810,8 @@ void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>> &aux_basis,
     RI_config.analyze_quality = true;
     vec ri_coefs_u = DensityFitting::density_fit(wavy, wavy_aux, RI_config);
 
-    RI_config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+    RI_config.use_tikhonov = true;
+    RI_config.restrain_charges = true;
     RI_config.charge_scheme = DensityFitting::CHARGE_SCHEME::TFVC;
     RI_config.restraint_strength = 2.0E-4;
     RI_config.tikhonov_lambda = 1E-6;
@@ -945,7 +946,8 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     WFN wavy_aux = generate_aux_wfn(wavy, aux_basis_set);
 
     DensityFitting::CONFIG RI_config;
-    RI_config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+    RI_config.use_tikhonov = true;
+    RI_config.restrain_charges = true;
     RI_config.analyze_quality = opt->debug;
 
     vec ri_coefs = density_fit(wavy, wavy_aux, RI_config);
