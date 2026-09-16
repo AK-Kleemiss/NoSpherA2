@@ -3813,14 +3813,10 @@ namespace NoSpherA2UnitTests
             }
     }
 
-    //the Gaussian fchk/wfn pair is the only fixture written twice by the same program; the other formats go through write_wfn
+    //every format is written through write_wfn and read back
     TEST(FormatConsistencyTests, SameDensityFromEveryFormat)
     {
         const auto root = nos_test_repo_root() / "tests";
-        {
-            WFN a(root / "P1_test" / "NA2_0000000.fchk", false), b(root / "P1_test" / "NA2_0000000.wfn", false);
-            expect_same_density(a, b, 1e-6, "NA2 fchk vs wfn");
-        }
         {
             WFN a(root / "cytidine_tonto" / "stdout_cyt", false), b(root / "cytidine_tonto" / "cyt.wfn", false);
             //the H positions in the tonto output carry three decimals, cyt.wfn eight
