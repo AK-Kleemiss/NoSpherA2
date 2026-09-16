@@ -610,7 +610,8 @@ std::string NoSpherA2_message(bool no_date)
         t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst. 2024, 57, 161 - 174.\n");
         t.append("ECP correction functions at : Kleemiss et al. J. Appl. Cryst. 2025, 58, 374 - 382.\n");
-        t.append("Aux basis /RI partitioning  : Seifert et al. Z. Krist. - Cryst. Mat. 2026, 10.1515/zkri-2026-0013.\n");
+        t.append("Aux basis /RI partitioning  : Seifert et al. Z. Krist. - Cryst. Mat. 2026, 241, 283 - 295.\n");
+        t.append("Embedding for HAR at        : Landeros-Rivera & Kleemiss, J. Appl. Cryst. 2026, 59, 10.1107/S160057672600717X.\n");
         t.append("TFVC partitioning at        : Gimferrer et al. TBA.\n");
         t.append("MBIS/EMBIS partitioning at  : Nielsen et al. TBA.\n");
     }
