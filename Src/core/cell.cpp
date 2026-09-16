@@ -229,7 +229,7 @@ void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3&
 		}
 		for (int idx2 = 0; idx2 < linking_list.size(); idx2++) {
 			if (linking_list[idx2][idx1].size() != 0) {
-				a.asym_fact = 1.0 / surviving_stabilizer_count(linking_list[idx2][idx2], applied_symmetry);
+				a.asym_fact = 1.0 / surviving_symmetries_count(linking_list[idx2][idx2], applied_symmetry);
 			}
 		}
 		idx1++;
