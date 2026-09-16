@@ -31,7 +31,7 @@ Density Critical Points (5 found):
   CP   2  [attractor   ]  converged   H1
     Position  :         0.0000         0.0000         3.1029
     Rho       :         0.3485
-    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -6.9607e+00    -6.9607e+00    -6.8000e+00
     DelSqRho  :       -20.7215
    V         :     5.1804e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
@@ -86,21 +86,21 @@ QTAIM Analysis (atomic quadrature grids):
   total in basins: 81.9965   outside every basin: 0.0035
 
 ELI-D Analysis (voxel sum):
-basin:    0 label:      H2-Hg0 bond integrated value:   0.5052 volume:  280.7397
-basin:    1 label:      H1-Hg0 bond integrated value:   0.4635 volume:  275.0243
-basin:    2 label:               H2 integrated value:   1.3920 volume:   32.4218
-basin:    3 label:               H1 integrated value:   1.4338 volume:   38.1667
-basin:    4 label:         Hg0 core integrated value:  76.4011 volume:  232.3402
+basin:    0 label:      H2-Hg0 bond integrated value:   0.5034 volume:  280.5199
+basin:    1 label:      H1-Hg0 bond integrated value:   0.4627 volume:  274.8942
+basin:    2 label:               H2 integrated value:   1.3938 volume:   32.6140
+basin:    3 label:               H1 integrated value:   1.4345 volume:   38.2732
+basin:    4 label:         Hg0 core integrated value:  76.4011 volume:  232.3914
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 5535, left the grid: 0
+Quadrature points sent along the field: 5532, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume     maximum        x          y          z
-      1  H2-Hg0 bond            0.4675    284.2812      5.0732      0.000      0.000     -5.028
+      1  H2-Hg0 bond            0.4667    284.1871      5.0732      0.000      0.000     -5.028
       2  H1-Hg0 bond            0.4506    281.7936      5.0732      0.000      0.000      5.028
-      3  H2                     1.4313     36.8501      7.2166      0.000      0.000     -3.148
-      4  H1                     1.4482     39.3377      7.2166      0.000      0.000      3.148
-      5  Hg0 core              18.1725    213.0064      1.4330     -0.283      0.472      0.705
+      3  H2                     1.4321     36.9442      7.2167      0.000      0.000     -3.148
+      4  H1                     1.4482     39.3377      7.2167      0.000      0.000      3.148
+      5  Hg0 core              18.1725    213.0064      1.4330      0.283     -0.472      0.705
   total in basins: 21.9700   outside every basin: 0.0300

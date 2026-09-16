@@ -239,6 +239,7 @@ public:
     const double get_maximum_MO_coefficient(bool occu = true) const;
     /** Set constants::exp_cutoff so that c r^l exp(-a r^2) below density_accuracy is skipped. */
     void set_exp_cutoff() const;
+    void push_back_spherical_shell(const int mo, const int l, const vec2& shell, const std::vector<primitive>& prims, const int start, const int size);
 
 	const std::vector<MO> &get_MOs_vec() const { return MOs; };
 

@@ -1651,21 +1651,40 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     return true;
 };
 
-//the neglected tail of c x^a y^b z^c exp(-ar^2) is bounded by c (u/a_min)^(l/2) exp(-u) for u = a r^2 beyond l/2,
-//so the cutoff on -a r^2 alone loses 1e-3 electrons per l = 10 orbital; three fixed-point steps of the bound
+//shell[m][s] holds the m-th spherical coefficient times the s-th contraction coefficient of one shell starting at prims[start]
+void WFN::push_back_spherical_shell(const int mo, const int l, const vec2& shell, const std::vector<primitive>& prims, const int start, const int size)
+{
+    const int nsph = constants::n_spher(l);
+    for (int s = 0; s < size; s++)
+        for (int cart = 0; cart < constants::n_cart(l); cart++)
+        {
+            double t = 0;
+            for (int m = 0; m < nsph; m++)
+                t += constants::sph2cart(l)[cart * nsph + m] * shell[m][s];
+            push_back_MO_coef(mo, abs(t) < 1E-10 ? 0 : t);
+            if (mo == 0)
+            {
+                push_back_exponent(prims[start + s].get_exp());
+                push_back_center(prims[start].get_center());
+                push_back_type(constants::first_type[l] + cart);
+                nex++;
+            }
+        }
+}
+//the neglected tail of c x^a y^b z^c exp(-ar^2) is bounded by c (u/a)^(l/2) exp(-u) for u = a r^2 beyond l/2,
+//so the cutoff on -a r^2 alone loses 1e-3 electrons per l = 10 orbital; three fixed-point steps per primitive, the minimum wins
 void WFN::set_exp_cutoff() const {
-    int lmax = 0;
-    double a_min = DBL_MAX;
+    const double cut0 = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    double cut = cut0;
     for (int i = 0; i < nex; i++) {
         int v[3];
         constants::type2vector(get_type(i), v);
-        lmax = std::max(lmax, v[0] + v[1] + v[2]);
-        a_min = std::min(a_min, get_exponent(i));
+        const int l = v[0] + v[1] + v[2];
+        double ci = cut0;
+        for (int it = 0; it < 3 && l > 0; it++)
+            ci = cut0 - 0.5 * l * std::log(std::max(-ci / get_exponent(i), 0.5 * l));
+        cut = std::min(cut, ci);
     }
-    const double cut0 = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
-    double cut = cut0;
-    for (int it = 0; it < 3 && lmax > 0; it++)
-        cut = cut0 - 0.5 * lmax * std::log(std::max(-cut / a_min, 0.5 * lmax));
     constants::exp_cutoff = cut;
 }
 const double WFN::get_maximum_MO_coefficient(bool occu) const {
@@ -1876,21 +1895,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 for (int s = 0; s < size; s++)
                     shell[run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
                 if (++run < nsph) continue;
-                for (int s = 0; s < size; s++)
-                    for (int cart = 0; cart < constants::n_cart(l); cart++)
-                    {
-                        double t = 0;
-                        for (int m = 0; m < nsph; m++)
-                            t += constants::sph2cart(l)[cart * nsph + m] * shell[m][s];
-                        push_back_MO_coef(MO_run, abs(t) < 1E-10 ? 0 : t);
-                        if (MO_run == 0)
-                        {
-                            push_back_exponent(prims[basis_run + s].get_exp());
-                            push_back_center(prims[basis_run].get_center());
-                            push_back_type(constants::first_type[l] + cart);
-                            nex++;
-                        }
-                    }
+                push_back_spherical_shell(MO_run, l, shell, prims, basis_run, size);
                 run = 0;
                 basis_run += size;
             }
@@ -3086,21 +3091,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                     for (int s = 0; s < size; s++)
                         shell[run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].get_coef();
                     if (++run < nsph) continue;
-                    for (int s = 0; s < size; s++)
-                        for (int cart = 0; cart < constants::n_cart(l); cart++)
-                        {
-                            double t = 0;
-                            for (int m = 0; m < nsph; m++)
-                                t += constants::sph2cart(l)[cart * nsph + m] * shell[m][s];
-                            push_back_MO_coef(MO_run, abs(t) < 1E-10 ? 0 : t);
-                            if (MO_run == 0)
-                            {
-                                push_back_exponent(prims[basis_run + s].get_exp());
-                                push_back_center(prims[basis_run].get_center());
-                                push_back_type(constants::first_type[l] + cart);
-                                nex++;
-                            }
-                        }
+                    push_back_spherical_shell(MO_run, l, shell, prims, basis_run, size);
                     run = 0;
                     basis_run += size;
                 }

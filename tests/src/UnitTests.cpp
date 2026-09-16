@@ -3801,6 +3801,38 @@ namespace NoSpherA2UnitTests
         expect_orthonormal(wave);
     }
 
+    static void expect_same_density(const WFN& a, const WFN& b, const double rtol, const std::string& what)
+    {
+        ASSERT_EQ(a.get_ncen(), b.get_ncen()) << what;
+        for (int i = 0; i < a.get_ncen(); i++)
+            for (const double r : { 0.3, 1.1, 2.5 })
+            {
+                const d3 pos{ a.get_atom_coordinate(i, 0) + r, a.get_atom_coordinate(i, 1) + 0.5 * r, a.get_atom_coordinate(i, 2) - 0.7 * r };
+                const double da = a.compute_dens(pos);
+                EXPECT_NEAR(da, b.compute_dens(pos), rtol * std::max(1.0, da)) << what << " atom " << i << " r " << r;
+            }
+    }
+
+    //the Gaussian fchk/wfn pair is the only fixture written twice by the same program; the other formats go through write_wfn
+    TEST(FormatConsistencyTests, SameDensityFromEveryFormat)
+    {
+        const auto root = nos_test_repo_root() / "tests";
+        {
+            WFN a(root / "P1_test" / "NA2_0000000.fchk", false), b(root / "P1_test" / "NA2_0000000.wfn", false);
+            expect_same_density(a, b, 1e-6, "NA2 fchk vs wfn");
+        }
+        const std::filesystem::path inputs[] = { root / "epoxide_gbw" / "epoxide.gbw", root / "CuF2_i_func" / "71" / "calc.gbw", root / "molden_file" / "Sc_full.molden", root / "molden_file" / "Ce_full.molden" };
+        const auto tmp = std::filesystem::temp_directory_path() / "nosphera2_format_roundtrip.wfn";
+        for (const auto& input : inputs)
+        {
+            WFN a(input, false);
+            ASSERT_TRUE(a.write_wfn(tmp, false, true)) << input;
+            WFN b(tmp, false);
+            expect_same_density(a, b, 1e-6, input.filename().string() + " vs its wfn");
+        }
+        std::filesystem::remove(tmp);
+    }
+
     TEST(OccHighAngularTests, IntegratesElectronCountToL10)
     {
         for (const int lmax : { 5, 10 })
