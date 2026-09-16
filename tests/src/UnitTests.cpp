@@ -3781,4 +3781,40 @@ namespace NoSpherA2UnitTests
         EXPECT_GT(ed.size(), 4 * sphere.size());
         EXPECT_EQ(ed_box, ed);
     }
+
+    TEST(Sph2CART, LibcintMatchesOldMatrices)
+    {
+
+        const vec2 converted = orca_sph2cart_matrix(5, true);
+        vec2 old_p, old_d, old_f, old_g;
+        generate_sph2cart_mat(old_p, old_d, old_f, old_g);
+
+        const std::array<const vec2*, 3> old = { &old_d, &old_f, &old_g };
+
+        for (int l = 2; l <= 4; ++l)
+        {
+            const vec2 converted = orca_sph2cart_matrix(l, true);
+            ASSERT_EQ(converted.size(), old[l - 2]->size());
+
+            for (int cart = 0; cart < static_cast<int>(converted.size()); ++cart)
+            {
+                ASSERT_EQ(converted[cart].size(), (*old[l - 2])[cart].size());
+
+                for (int sph = 0; sph < static_cast<int>(converted[cart].size()); ++sph)
+                    EXPECT_NEAR(converted[cart][sph], (*old[l - 2])[cart][sph], 1e-12) << "l = " << l << ", cart = " << cart << ", sph = " << sph;
+            }
+        }
+    }
+
+    TEST(Sph2CART, SupportsAllOrcaShells)
+    {
+        for (int l = 0; l <= 10; ++l)
+        {
+            const vec2& transformation = orca_sph2cart_matrix(l);
+            EXPECT_EQ(transformation.size(), libcint::CINTlen_cart(l));
+
+            for (const vec& row : transformation)
+                EXPECT_EQ(row.size(), 2 * l + 1);
+        }
+    }
 } // namespace NoSpherA2UnitTests

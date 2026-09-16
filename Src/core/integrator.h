@@ -93,3 +93,6 @@ namespace DensityFitting
     void QM_RI_difference_cube(WFN& wavy, const WFN& wavy_aux);
 
 }
+vec2 orca_sph2cart_matrix(int l, const bool reorder = false);
+vec orca_sph2cart(const vec& spherical, int l, const bool reorder = false);
+int first_cartesian_type(const int l);
