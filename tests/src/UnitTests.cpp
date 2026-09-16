@@ -21,6 +21,9 @@
 #include "core/NoSpherA2.h"
 #include "core/npy.h"
 #include "core/libCintMain.h"
+#include <occ/qm/hf.h>
+#include <occ/qm/scf.h>
+#include <spdlog/spdlog.h>
 #undef I
 #ifdef NOSPHERA2_USE_GPU
 #include "core/blas_gpu.h"
@@ -3612,6 +3615,33 @@ namespace NoSpherA2UnitTests
         return s * std::sqrt(constants::PI / p);
     }
 
+    static vec2 primitive_overlap(const WFN& wave)
+    {
+        const int nex = wave.get_nex();
+        vec2 S(nex, vec(nex));
+#pragma omp parallel for schedule(dynamic)
+        for (int a = 0; a < nex; a++)
+        {
+            int la[3], lb[3];
+            constants::type2vector(wave.get_type(a), la);
+            const double al = wave.get_exponent(a);
+            for (int b = 0; b <= a; b++)
+            {
+                constants::type2vector(wave.get_type(b), lb);
+                const double be = wave.get_exponent(b), p = al + be;
+                double s = 1, AB2 = 0;
+                for (int k = 0; k < 3; k++)
+                {
+                    const double A = wave.get_atom_coordinate(wave.get_center(a) - 1, k), B = wave.get_atom_coordinate(wave.get_center(b) - 1, k), P = (al * A + be * B) / p;
+                    AB2 += (A - B) * (A - B);
+                    s *= prim_overlap_1d(la[k], lb[k], P - A, P - B, p);
+                }
+                S[a][b] = S[b][a] = s * std::exp(-al * be / p * AB2);
+            }
+        }
+        return S;
+    }
+
     //ORCA stores every contraction normalised, so each shell's m = 0 function and every occupied MO of the i-function
     //GBWs has unit norm under the analytic primitive overlap; this pins the h and i tables where the grid integral cannot
     TEST(GbwHighAngularTests, OccupiedMOsAreNormalised_full)
@@ -3626,27 +3656,7 @@ namespace NoSpherA2UnitTests
             WFN wave(input, false);
             wave.delete_unoccupied_MOs();
             const int nex = wave.get_nex(), nmo = wave.get_nmo();
-            vec2 S(nex, vec(nex));
-#pragma omp parallel for schedule(dynamic)
-            for (int a = 0; a < nex; a++)
-            {
-                int la[3], lb[3];
-                constants::type2vector(wave.get_type(a), la);
-                const double al = wave.get_exponent(a);
-                for (int b = 0; b <= a; b++)
-                {
-                    constants::type2vector(wave.get_type(b), lb);
-                    const double be = wave.get_exponent(b), p = al + be;
-                    double s = 1, AB2 = 0;
-                    for (int k = 0; k < 3; k++)
-                    {
-                        const double A = wave.get_atom_coordinate(wave.get_center(a) - 1, k), B = wave.get_atom_coordinate(wave.get_center(b) - 1, k), P = (al * A + be * B) / p;
-                        AB2 += (A - B) * (A - B);
-                        s *= prim_overlap_1d(la[k], lb[k], P - A, P - B, p);
-                    }
-                    S[a][b] = S[b][a] = s * std::exp(-al * be / p * AB2);
-                }
-            }
+            const vec2 S = primitive_overlap(wave);
             for (int at = 0; at < wave.get_ncen(); at++)
             {
                 const atom& A = wave.get_atom(at);
@@ -3711,6 +3721,100 @@ namespace NoSpherA2UnitTests
             gm.setup3DGridsForMolecule(wave, atom_list);
             const PartitionResults res = gm.calculatePartitionedCharges(wave);
             EXPECT_NEAR(res.overall_charges[PartitionResults::S_BECKE], wave.get_nr_electrons(), 1e-3) << angle;
+        }
+    }
+    //H2 in a made-up spherical basis with one primitive per l, converted through the OCC constructor: every MO keeps
+    //unit norm and stays orthogonal to the others under the analytic primitive overlap, which pins the sph2cart tables,
+    //the |m| phase flips and the type order for every l at once. OCC's Hartree-Fock provides the MOs up to h; beyond
+    //that libcint's Rys quadrature breaks down on MSVC (12 roots and up), so the l = 10 MOs are OCC's overlap matrix
+    //Loewdin-orthonormalised with the lowest one doubly occupied
+    static WFN occ_h2(const int lmax)
+    {
+        spdlog::set_level(spdlog::level::err);
+        const std::vector<occ::core::Atom> atoms{ { 1, 0.0, 0.0, -0.7 }, { 1, 0.0, 0.0, 0.7 } };
+        std::vector<occ::gto::Shell> shells;
+        for (const auto& at : atoms)
+            for (int l = 0; l <= lmax; l++)
+            {
+                shells.emplace_back(l, std::vector<double>{ l == 0 ? 1.2 : 0.8 + 0.1 * l }, std::vector<vec>{ { 1.0 } }, std::array<double, 3>{ at.x, at.y, at.z });
+                shells.back().kind = occ::gto::Shell::Kind::Spherical;
+                shells.back().incorporate_shell_norm();
+            }
+        occ::gto::AOBasis basis(atoms, shells, "l" + std::to_string(lmax));
+        basis.set_pure(true);
+        occ::qm::HartreeFock hf(basis);
+        if (lmax <= 5)
+        {
+            occ::qm::SCF<occ::qm::HartreeFock> scf(hf, occ::qm::SpinorbitalKind::Restricted);
+            scf.set_charge_multiplicity(0, 1);
+            scf.compute_initial_guess();
+            scf.compute_scf_energy();
+            return WFN(scf.wavefunction(), false);
+        }
+        occ::qm::Wavefunction wf;
+        wf.basis = basis;
+        wf.atoms = atoms;
+        wf.nbf = (int)basis.nbf();
+        wf.num_electrons = 2;
+        wf.mo.n_alpha = wf.mo.n_beta = 1;
+        wf.mo.n_ao = wf.nbf;
+        wf.mo.C = Eigen::SelfAdjointEigenSolver<occ::Mat>(hf.compute_overlap_matrix()).operatorInverseSqrt();
+        wf.mo.energies = occ::Vec::Zero(wf.nbf);
+        wf.mo.update_occupied_orbitals();
+        wf.mo.update_density_matrix();
+        return WFN(wf, false);
+    }
+
+    static void expect_orthonormal(const WFN& wave)
+    {
+        const int nex = wave.get_nex(), nmo = wave.get_nmo();
+        const vec2 S = primitive_overlap(wave);
+        vec2 SC(nmo, vec(nex));
+        for (int i = 0; i < nmo; i++)
+            for (int a = 0; a < nex; a++)
+                for (int b = 0; b < nex; b++) SC[i][a] += S[a][b] * wave.get_MO_coef(i, b);
+        double electrons = 0;
+        for (int i = 0; i < nmo; i++)
+            for (int j = 0; j <= i; j++)
+            {
+                double o = 0;
+                for (int a = 0; a < nex; a++) o += wave.get_MO_coef(i, a) * SC[j][a];
+                EXPECT_NEAR(o, i == j ? 1.0 : 0.0, 1e-8) << "MOs " << i << " " << j;
+                if (i == j) electrons += wave.get_MO_occ(i) * o;
+            }
+        EXPECT_NEAR(electrons, 2.0, 1e-8);
+    }
+
+    TEST(OccHighAngularTests, HartreeFockMOsAreOrthonormalToH)
+    {
+        const WFN wave = occ_h2(5);
+        EXPECT_EQ(wave.get_nex(), 2 * 56);
+        EXPECT_EQ(wave.get_nmo(), 2 * 36);
+        expect_orthonormal(wave);
+    }
+
+    TEST(OccHighAngularTests, LoewdinMOsAreOrthonormalToL10)
+    {
+        const WFN wave = occ_h2(10);
+        EXPECT_EQ(wave.get_nex(), 2 * 286);
+        EXPECT_EQ(wave.get_nmo(), 2 * 121);
+        expect_orthonormal(wave);
+    }
+
+    TEST(OccHighAngularTests, IntegratesElectronCountToL10)
+    {
+        for (const int lmax : { 5, 10 })
+        {
+            WFN wave = occ_h2(lmax);
+            wave.delete_unoccupied_MOs();
+            GridConfiguration config;
+            config.partition_type = PartitionType::Becke;
+            config.accuracy = 4;
+            GridManager gm(config);
+            ivec atom_list{ 0, 1 };
+            gm.setup3DGridsForMolecule(wave, atom_list);
+            const PartitionResults res = gm.calculatePartitionedCharges(wave);
+            EXPECT_NEAR(res.overall_charges[PartitionResults::S_BECKE], 2.0, 1e-4) << "lmax " << lmax;
         }
     }
 } // namespace NoSpherA2UnitTests

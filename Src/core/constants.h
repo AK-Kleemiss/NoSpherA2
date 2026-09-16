@@ -13,6 +13,8 @@ namespace constants
     constexpr int n_spher(const int l) { return 2 * l + 1; };
     constexpr int first_type[11] = { 1, 2, 5, 11, 21, 36, 57, 85, 121, 166, 221 };
     const double* sph2cart(const int l);
+    //ORCA stores g over sqrt(3) and h and up over sqrt((2l-1)!!) of the physical primitive norm; the tables follow ORCA, occ does not
+    constexpr double sph2cart_norm2[11] = { 1, 1, 1, 1, 3, 945, 10395, 135135, 2027025, 34459425, 654729075 };
     static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
     constexpr int grid_max_no_flip = 50;
     int constexpr const_abs(int x)

@@ -124,18 +124,12 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
         push_back_atom(constants::atnr2letter(occ_WF.atoms[i].atomic_number), atom_positions(0, i), atom_positions(1, i), atom_positions(2, i), static_cast<int>(occ_WF.nuclear_charges()(i)), {});
     }
     auto &shells = occ_WF.basis.shells();
+    auto &mo = occ_WF.mo;
+    const bool unrestricted = (mo.kind == occ::qm::Unrestricted);
+    const int n_spin = unrestricted ? 2 : 1;
 
-    // ── Guard 1: max supported angular momentum is l=4 (G). ──────────────────
-    // MappedMatrices has exactly 5 entries (l=0..4). Accessing MappedMatrices[l]
-    // for l>=5 is out-of-bounds UB on std::array and corrupts the heap.
-    for (const auto &shell : shells) {
-        err_checkf(shell.l < static_cast<int>(MappedMatrices.size()),
-            "Shell with angular momentum l=" + std::to_string(shell.l) +
-            " (H or higher) is not supported by the OCC WFN constructor. "
-            "Max supported l is " + std::to_string(MappedMatrices.size() - 1) + " (G).",
-            std::cout);
-    }
-
+    for (const auto &shell : shells)
+        err_checkf(shell.l <= 10, "Shell with angular momentum l=" + std::to_string(shell.l) + " is not supported by the OCC WFN constructor", std::cout);
     // ── Guard 2: this constructor assumes a spherical basis. ─────────────────
     // It applies A = MappedMatrices[l] (n_cart x n_sph) to transform spherical
     // MO coefficients to Cartesian. A Cartesian basis wavefunction would require
@@ -145,9 +139,6 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
         "Cartesian basis sets will produce incorrect MO coefficients.",
         std::cout);
 
-    auto &mo = occ_WF.mo;
-    const bool unrestricted = (mo.kind == occ::qm::Unrestricted);
-    const int n_spin = unrestricted ? 2 : 1;
     auto shell2atom = occ_WF.basis.shell_to_atom();
     vec con_coefs;
     VectorXd shellType(shells.size() + 1);
@@ -165,22 +156,20 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
         nex += n_cart * shell.exponents.size();
     }
     auto mo_go = occ::io::conversion::orb::to_gaussian_order(occ_WF.basis, occ_WF.mo);
-    //OCC's reordering leaves the phases as libcint has them, while the matrices below are
-    //Gaussian's, whose f(+-3), g(+-3) and g(+-4) carry the opposite sign - the same
-    //difference write_nbo corrects for. Without this a def2-TZVP wavefunction integrates
-    //to 149.58 electrons of 150 and its orbitals lose up to 3% of their norm.
+    //OCC's reordering leaves the phases as libcint has them, while the sph2cart tables are
+    //ORCA's, whose |m| = 3, 4, 7, 8 functions carry the opposite sign - the same difference
+    //write_nbo corrects for. Without this a def2-TZVP wavefunction integrates to 149.58
+    //electrons of 150 and its orbitals lose up to 3% of their norm.
     {
         int row = 0;
         for (const auto &shell : occ_WF.basis.shells()) {
-            const int nsph = 2 * shell.l + 1;
-            if (shell.l >= 3)
-                for (int spin = 0; spin < (occ_WF.mo.kind == occ::qm::Unrestricted ? 2 : 1); spin++) {
-                    const int base = spin * occ_WF.nbf + row;
-                    mo_go.C.row(base + 5) *= -1.0;
-                    mo_go.C.row(base + 6) *= -1.0;
-                    if (shell.l >= 4) { mo_go.C.row(base + 7) *= -1.0; mo_go.C.row(base + 8) *= -1.0; }
-                }
-            row += nsph;
+            for (int spin = 0; spin < n_spin; spin++)
+                for (int m = 3; m <= shell.l; m++)
+                    if (m % 4 == 3 || m % 4 == 0) {
+                        mo_go.C.row(spin * occ_WF.nbf + row + 2 * m - 1) *= -1.0;
+                        mo_go.C.row(spin * occ_WF.nbf + row + 2 * m) *= -1.0;
+                    }
+            row += 2 * shell.l + 1;
         }
     }
     Vector<int, 10> d_orbital_corr{ 0, 1, 2, 6, 3, 4, 7, 8, 5, 9 };
@@ -259,11 +248,13 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
             for (const auto& shell : shells) {
                 l = shell.l;
                 p = (2.0 * l + 3.0) / 4.0;
-                scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25);
-                const auto& A = MappedMatrices[l];
-                n_sph = A.cols();
+                scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25) / std::sqrt(constants::sph2cart_norm2[l]);
+                n_sph = constants::n_spher(l);
                 n_prim = shell.num_primitives();
-                n_cart = A.rows();
+                n_cart = constants::n_cart(l);
+                //occ's Gaussian order is x,y,z for p and m = 0,+1,-1,... above, the table columns are m ordered
+                MatrixXd A = Map<const Matrix<double, Dynamic, Dynamic, RowMajor>>(constants::sph2cart(l), n_cart, n_sph);
+                if (l == 1) A.setIdentity();
                 chunk_size = n_cart * n_prim;
                 const auto& exp_arr = shell.exponents.array();
                 // normalizing the contraction_coeffs
@@ -283,7 +274,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
             }
         }
     }
-    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    set_exp_cutoff();
 
     d_f_switch = false;
     int nmo_ = occ_WF.mo.D.cols();
@@ -389,7 +380,7 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
             if (m > best) { best = m; j_ref = j; }
         }
         occ::Vec ratio = dest_block0.col(j_ref);
-        const double scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25);
+        const double scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25) / std::sqrt(constants::sph2cart_norm2[l]);
         const double p = (2.0 * l + 3.0) / 4.0;
         std::vector<double> cc_input(n_prim), expo(n_prim);
         for (int i = 0; i < n_prim; i++) {
@@ -441,7 +432,8 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
                 const occ::Vec& cc = actual_contraction_coeffs[k];
                 occ::Vec cart_mo_coeffs =
                     (dest_block.transpose() * cc) / cc.squaredNorm();
-                const auto& A = MappedMatrices[rs.l];
+                Eigen::MatrixXd A = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(constants::sph2cart(rs.l), rs.n_cart, constants::n_spher(rs.l));
+                if (rs.l == 1) A.setIdentity();
                 occ::Vec MOc = A.completeOrthogonalDecomposition().pseudoInverse() * cart_mo_coeffs;
                 C_gaussian_order.block(sph_offset, n, MOc.size(), 1) = MOc;
                 sph_offset += A.cols();
@@ -1241,7 +1233,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
             MOs[i].push_back_coef(temp_val[i][j]);
         }
     }
-    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    set_exp_cutoff();
     return true;
 };
 
@@ -1655,10 +1647,27 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     getline_universal(rf, line);
     virial_ratio = stod(line);
     rf.close();
-    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    set_exp_cutoff();
     return true;
 };
 
+//the neglected tail of c x^a y^b z^c exp(-ar^2) is bounded by c (u/a_min)^(l/2) exp(-u) for u = a r^2 beyond l/2,
+//so the cutoff on -a r^2 alone loses 1e-3 electrons per l = 10 orbital; three fixed-point steps of the bound
+void WFN::set_exp_cutoff() const {
+    int lmax = 0;
+    double a_min = DBL_MAX;
+    for (int i = 0; i < nex; i++) {
+        int v[3];
+        constants::type2vector(get_type(i), v);
+        lmax = std::max(lmax, v[0] + v[1] + v[2]);
+        a_min = std::min(a_min, get_exponent(i));
+    }
+    const double cut0 = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    double cut = cut0;
+    for (int it = 0; it < 3 && lmax > 0; it++)
+        cut = cut0 - 0.5 * lmax * std::log(std::max(-cut / a_min, 0.5 * lmax));
+    constants::exp_cutoff = cut;
+}
 const double WFN::get_maximum_MO_coefficient(bool occu) const {
     double max_coef = 0.0;
     for (int i = 0; i < nmo; i++) {
@@ -1814,26 +1823,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             {
                 if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
-                    if (atoms[a].get_basis_set_type(s) == 1)
-                    {
-                        expected_coefs++;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 2)
-                    {
-                        expected_coefs += 3;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 3)
-                    {
-                        expected_coefs += 5;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 4)
-                    {
-                        expected_coefs += 7;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 5)
-                    {
-                        expected_coefs += 9;
-                    }
+                    expected_coefs += 2 * atoms[a].get_basis_set_type(s) - 1;
                     current_shell++;
                 }
                 temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
@@ -1927,26 +1917,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             {
                 if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
-                    if (atoms[a].get_basis_set_type(s) == 1)
-                    {
-                        expected_coefs++;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 2)
-                    {
-                        expected_coefs += 3;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 3)
-                    {
-                        expected_coefs += 6;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 4)
-                    {
-                        expected_coefs += 10;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 5)
-                    {
-                        expected_coefs += 15;
-                    }
+                    expected_coefs += constants::n_cart(atoms[a].get_basis_set_type(s) - 1);
                     current_shell++;
                 }
                 temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
@@ -2209,7 +2180,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     dMatrix2 m_coefs = reshape<dMatrix2>(_coefficients, Shape2D((int)coefficients[0].size(), (int)coefficients[0].size()));
     dMatrix2 temp_co = diag_dot(m_coefs, occ, true);
     DM = dot(temp_co, m_coefs);
-    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    set_exp_cutoff();
     return true;
 };
 
@@ -2858,7 +2829,7 @@ __________________________________
                     DM(i, j) += DM_beta(i, j);
         }
     }
-    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    set_exp_cutoff();
     return true;
 };
 
@@ -2994,7 +2965,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 int ang_mom = 0, coeff_ind = 0, nr_funct = 0, center = 0;
                 rf.read((char *)&ang_mom, constants::soi);
                 err_checkf(rf.good(), "Error reading ang_mom", file);
-                err_checkf(ang_mom <= 6, "Higher angular momentum basis functions than I", file);
+                err_checkf(ang_mom <= 10, "Higher angular momentum basis functions than l = 10", file);
                 rf.read((char *)&coeff_ind, constants::soi);
                 err_checkf(rf.good(), "Error reading ceof_ind", file);
                 rf.read((char *)&nr_funct, constants::soi);
@@ -3029,34 +3000,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             {
                 if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
-                    if (atoms[a].get_basis_set_type(s) == 1)
-                    {
-                        expected_coefs++;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 2)
-                    {
-                        expected_coefs += 3;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 3)
-                    {
-                        expected_coefs += 5;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 4)
-                    {
-                        expected_coefs += 7;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 5)
-                    {
-                        expected_coefs += 9;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 6)
-                    {
-                        expected_coefs += 11;
-                    }
-                    else if (atoms[a].get_basis_set_type(s) == 7)
-                    {
-                        expected_coefs += 13;
-                    }
+                    expected_coefs += 2 * atoms[a].get_basis_set_type(s) - 1;
                     current_shell++;
                 }
                 temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
@@ -3137,7 +3081,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 for (int p = 0; p < constant_expected_coefs; p++)
                 {
                     const int l = prims[basis_run].get_type() - 1, nsph = constants::n_spher(l), size = temp_shellsizes[basis_run];
-                    err_checkf(l <= 6, "Types higher than i type in gbws", file);
+                    err_checkf(l <= 10, "Types higher than l = 10 in gbws", file);
                     if (run == 0) shell.assign(nsph, vec(size));
                     for (int s = 0; s < size; s++)
                         shell[run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].get_coef();
@@ -3368,7 +3312,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     {
         err_checkf(false, "Error during reading of the gbw file! " + string(e.what()), file);
     }
-    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    set_exp_cutoff();
     return true;
 };
 
@@ -6568,7 +6512,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 
         }
     }
-    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    set_exp_cutoff();
     return true;
 };
 
@@ -6800,6 +6744,208 @@ const double WFN::compute_dens_cartesian(
         case 82: ex *= d_[13] * d_[2]; break;// 5, 0, 1,
         case 83: ex *= d_[13] * d_[1]; break;// 5, 1, 0,
         case 84: ex *= d_[13] * d_[0]; break;// 6, 0, 0,
+        case 85: ex *= d_[15] * d_[6]; break;// 0, 0, 7,
+        case 86: ex *= d_[1] * d_[15] * d_[2]; break;// 0, 1, 6,
+        case 87: ex *= d_[5] * d_[15]; break;// 0, 2, 5,
+        case 88: ex *= d_[8] * d_[12]; break;// 0, 3, 4,
+        case 89: ex *= d_[11] * d_[9]; break;// 0, 4, 3,
+        case 90: ex *= d_[14] * d_[6]; break;// 0, 5, 2,
+        case 91: ex *= d_[14] * d_[1] * d_[2]; break;// 0, 6, 1,
+        case 92: ex *= d_[14] * d_[5]; break;// 0, 7, 0,
+        case 93: ex *= d_[0] * d_[15] * d_[2]; break;// 1, 0, 6,
+        case 94: ex *= d_[0] * d_[1] * d_[15]; break;// 1, 1, 5,
+        case 95: ex *= d_[0] * d_[5] * d_[12]; break;// 1, 2, 4,
+        case 96: ex *= d_[0] * d_[8] * d_[9]; break;// 1, 3, 3,
+        case 97: ex *= d_[0] * d_[11] * d_[6]; break;// 1, 4, 2,
+        case 98: ex *= d_[0] * d_[14] * d_[2]; break;// 1, 5, 1,
+        case 99: ex *= d_[0] * d_[14] * d_[1]; break;// 1, 6, 0,
+        case 100: ex *= d_[4] * d_[15]; break;// 2, 0, 5,
+        case 101: ex *= d_[4] * d_[1] * d_[12]; break;// 2, 1, 4,
+        case 102: ex *= d_[4] * d_[5] * d_[9]; break;// 2, 2, 3,
+        case 103: ex *= d_[4] * d_[8] * d_[6]; break;// 2, 3, 2,
+        case 104: ex *= d_[4] * d_[11] * d_[2]; break;// 2, 4, 1,
+        case 105: ex *= d_[4] * d_[14]; break;// 2, 5, 0,
+        case 106: ex *= d_[7] * d_[12]; break;// 3, 0, 4,
+        case 107: ex *= d_[7] * d_[1] * d_[9]; break;// 3, 1, 3,
+        case 108: ex *= d_[7] * d_[5] * d_[6]; break;// 3, 2, 2,
+        case 109: ex *= d_[7] * d_[8] * d_[2]; break;// 3, 3, 1,
+        case 110: ex *= d_[7] * d_[11]; break;// 3, 4, 0,
+        case 111: ex *= d_[10] * d_[9]; break;// 4, 0, 3,
+        case 112: ex *= d_[10] * d_[1] * d_[6]; break;// 4, 1, 2,
+        case 113: ex *= d_[10] * d_[5] * d_[2]; break;// 4, 2, 1,
+        case 114: ex *= d_[10] * d_[8]; break;// 4, 3, 0,
+        case 115: ex *= d_[13] * d_[6]; break;// 5, 0, 2,
+        case 116: ex *= d_[13] * d_[1] * d_[2]; break;// 5, 1, 1,
+        case 117: ex *= d_[13] * d_[5]; break;// 5, 2, 0,
+        case 118: ex *= d_[13] * d_[0] * d_[2]; break;// 6, 0, 1,
+        case 119: ex *= d_[13] * d_[0] * d_[1]; break;// 6, 1, 0,
+        case 120: ex *= d_[13] * d_[4]; break;// 7, 0, 0,
+        case 121: ex *= d_[15] * d_[9]; break;// 0, 0, 8,
+        case 122: ex *= d_[1] * d_[15] * d_[6]; break;// 0, 1, 7,
+        case 123: ex *= d_[5] * d_[15] * d_[2]; break;// 0, 2, 6,
+        case 124: ex *= d_[8] * d_[15]; break;// 0, 3, 5,
+        case 125: ex *= d_[11] * d_[12]; break;// 0, 4, 4,
+        case 126: ex *= d_[14] * d_[9]; break;// 0, 5, 3,
+        case 127: ex *= d_[14] * d_[1] * d_[6]; break;// 0, 6, 2,
+        case 128: ex *= d_[14] * d_[5] * d_[2]; break;// 0, 7, 1,
+        case 129: ex *= d_[14] * d_[8]; break;// 0, 8, 0,
+        case 130: ex *= d_[0] * d_[15] * d_[6]; break;// 1, 0, 7,
+        case 131: ex *= d_[0] * d_[1] * d_[15] * d_[2]; break;// 1, 1, 6,
+        case 132: ex *= d_[0] * d_[5] * d_[15]; break;// 1, 2, 5,
+        case 133: ex *= d_[0] * d_[8] * d_[12]; break;// 1, 3, 4,
+        case 134: ex *= d_[0] * d_[11] * d_[9]; break;// 1, 4, 3,
+        case 135: ex *= d_[0] * d_[14] * d_[6]; break;// 1, 5, 2,
+        case 136: ex *= d_[0] * d_[14] * d_[1] * d_[2]; break;// 1, 6, 1,
+        case 137: ex *= d_[0] * d_[14] * d_[5]; break;// 1, 7, 0,
+        case 138: ex *= d_[4] * d_[15] * d_[2]; break;// 2, 0, 6,
+        case 139: ex *= d_[4] * d_[1] * d_[15]; break;// 2, 1, 5,
+        case 140: ex *= d_[4] * d_[5] * d_[12]; break;// 2, 2, 4,
+        case 141: ex *= d_[4] * d_[8] * d_[9]; break;// 2, 3, 3,
+        case 142: ex *= d_[4] * d_[11] * d_[6]; break;// 2, 4, 2,
+        case 143: ex *= d_[4] * d_[14] * d_[2]; break;// 2, 5, 1,
+        case 144: ex *= d_[4] * d_[14] * d_[1]; break;// 2, 6, 0,
+        case 145: ex *= d_[7] * d_[15]; break;// 3, 0, 5,
+        case 146: ex *= d_[7] * d_[1] * d_[12]; break;// 3, 1, 4,
+        case 147: ex *= d_[7] * d_[5] * d_[9]; break;// 3, 2, 3,
+        case 148: ex *= d_[7] * d_[8] * d_[6]; break;// 3, 3, 2,
+        case 149: ex *= d_[7] * d_[11] * d_[2]; break;// 3, 4, 1,
+        case 150: ex *= d_[7] * d_[14]; break;// 3, 5, 0,
+        case 151: ex *= d_[10] * d_[12]; break;// 4, 0, 4,
+        case 152: ex *= d_[10] * d_[1] * d_[9]; break;// 4, 1, 3,
+        case 153: ex *= d_[10] * d_[5] * d_[6]; break;// 4, 2, 2,
+        case 154: ex *= d_[10] * d_[8] * d_[2]; break;// 4, 3, 1,
+        case 155: ex *= d_[10] * d_[11]; break;// 4, 4, 0,
+        case 156: ex *= d_[13] * d_[9]; break;// 5, 0, 3,
+        case 157: ex *= d_[13] * d_[1] * d_[6]; break;// 5, 1, 2,
+        case 158: ex *= d_[13] * d_[5] * d_[2]; break;// 5, 2, 1,
+        case 159: ex *= d_[13] * d_[8]; break;// 5, 3, 0,
+        case 160: ex *= d_[13] * d_[0] * d_[6]; break;// 6, 0, 2,
+        case 161: ex *= d_[13] * d_[0] * d_[1] * d_[2]; break;// 6, 1, 1,
+        case 162: ex *= d_[13] * d_[0] * d_[5]; break;// 6, 2, 0,
+        case 163: ex *= d_[13] * d_[4] * d_[2]; break;// 7, 0, 1,
+        case 164: ex *= d_[13] * d_[4] * d_[1]; break;// 7, 1, 0,
+        case 165: ex *= d_[13] * d_[7]; break;// 8, 0, 0,
+        case 166: ex *= d_[15] * d_[12]; break;// 0, 0, 9,
+        case 167: ex *= d_[1] * d_[15] * d_[9]; break;// 0, 1, 8,
+        case 168: ex *= d_[5] * d_[15] * d_[6]; break;// 0, 2, 7,
+        case 169: ex *= d_[8] * d_[15] * d_[2]; break;// 0, 3, 6,
+        case 170: ex *= d_[11] * d_[15]; break;// 0, 4, 5,
+        case 171: ex *= d_[14] * d_[12]; break;// 0, 5, 4,
+        case 172: ex *= d_[14] * d_[1] * d_[9]; break;// 0, 6, 3,
+        case 173: ex *= d_[14] * d_[5] * d_[6]; break;// 0, 7, 2,
+        case 174: ex *= d_[14] * d_[8] * d_[2]; break;// 0, 8, 1,
+        case 175: ex *= d_[14] * d_[11]; break;// 0, 9, 0,
+        case 176: ex *= d_[0] * d_[15] * d_[9]; break;// 1, 0, 8,
+        case 177: ex *= d_[0] * d_[1] * d_[15] * d_[6]; break;// 1, 1, 7,
+        case 178: ex *= d_[0] * d_[5] * d_[15] * d_[2]; break;// 1, 2, 6,
+        case 179: ex *= d_[0] * d_[8] * d_[15]; break;// 1, 3, 5,
+        case 180: ex *= d_[0] * d_[11] * d_[12]; break;// 1, 4, 4,
+        case 181: ex *= d_[0] * d_[14] * d_[9]; break;// 1, 5, 3,
+        case 182: ex *= d_[0] * d_[14] * d_[1] * d_[6]; break;// 1, 6, 2,
+        case 183: ex *= d_[0] * d_[14] * d_[5] * d_[2]; break;// 1, 7, 1,
+        case 184: ex *= d_[0] * d_[14] * d_[8]; break;// 1, 8, 0,
+        case 185: ex *= d_[4] * d_[15] * d_[6]; break;// 2, 0, 7,
+        case 186: ex *= d_[4] * d_[1] * d_[15] * d_[2]; break;// 2, 1, 6,
+        case 187: ex *= d_[4] * d_[5] * d_[15]; break;// 2, 2, 5,
+        case 188: ex *= d_[4] * d_[8] * d_[12]; break;// 2, 3, 4,
+        case 189: ex *= d_[4] * d_[11] * d_[9]; break;// 2, 4, 3,
+        case 190: ex *= d_[4] * d_[14] * d_[6]; break;// 2, 5, 2,
+        case 191: ex *= d_[4] * d_[14] * d_[1] * d_[2]; break;// 2, 6, 1,
+        case 192: ex *= d_[4] * d_[14] * d_[5]; break;// 2, 7, 0,
+        case 193: ex *= d_[7] * d_[15] * d_[2]; break;// 3, 0, 6,
+        case 194: ex *= d_[7] * d_[1] * d_[15]; break;// 3, 1, 5,
+        case 195: ex *= d_[7] * d_[5] * d_[12]; break;// 3, 2, 4,
+        case 196: ex *= d_[7] * d_[8] * d_[9]; break;// 3, 3, 3,
+        case 197: ex *= d_[7] * d_[11] * d_[6]; break;// 3, 4, 2,
+        case 198: ex *= d_[7] * d_[14] * d_[2]; break;// 3, 5, 1,
+        case 199: ex *= d_[7] * d_[14] * d_[1]; break;// 3, 6, 0,
+        case 200: ex *= d_[10] * d_[15]; break;// 4, 0, 5,
+        case 201: ex *= d_[10] * d_[1] * d_[12]; break;// 4, 1, 4,
+        case 202: ex *= d_[10] * d_[5] * d_[9]; break;// 4, 2, 3,
+        case 203: ex *= d_[10] * d_[8] * d_[6]; break;// 4, 3, 2,
+        case 204: ex *= d_[10] * d_[11] * d_[2]; break;// 4, 4, 1,
+        case 205: ex *= d_[10] * d_[14]; break;// 4, 5, 0,
+        case 206: ex *= d_[13] * d_[12]; break;// 5, 0, 4,
+        case 207: ex *= d_[13] * d_[1] * d_[9]; break;// 5, 1, 3,
+        case 208: ex *= d_[13] * d_[5] * d_[6]; break;// 5, 2, 2,
+        case 209: ex *= d_[13] * d_[8] * d_[2]; break;// 5, 3, 1,
+        case 210: ex *= d_[13] * d_[11]; break;// 5, 4, 0,
+        case 211: ex *= d_[13] * d_[0] * d_[9]; break;// 6, 0, 3,
+        case 212: ex *= d_[13] * d_[0] * d_[1] * d_[6]; break;// 6, 1, 2,
+        case 213: ex *= d_[13] * d_[0] * d_[5] * d_[2]; break;// 6, 2, 1,
+        case 214: ex *= d_[13] * d_[0] * d_[8]; break;// 6, 3, 0,
+        case 215: ex *= d_[13] * d_[4] * d_[6]; break;// 7, 0, 2,
+        case 216: ex *= d_[13] * d_[4] * d_[1] * d_[2]; break;// 7, 1, 1,
+        case 217: ex *= d_[13] * d_[4] * d_[5]; break;// 7, 2, 0,
+        case 218: ex *= d_[13] * d_[7] * d_[2]; break;// 8, 0, 1,
+        case 219: ex *= d_[13] * d_[7] * d_[1]; break;// 8, 1, 0,
+        case 220: ex *= d_[13] * d_[10]; break;// 9, 0, 0,
+        case 221: ex *= d_[15] * d_[15]; break;// 0, 0, 10,
+        case 222: ex *= d_[1] * d_[15] * d_[12]; break;// 0, 1, 9,
+        case 223: ex *= d_[5] * d_[15] * d_[9]; break;// 0, 2, 8,
+        case 224: ex *= d_[8] * d_[15] * d_[6]; break;// 0, 3, 7,
+        case 225: ex *= d_[11] * d_[15] * d_[2]; break;// 0, 4, 6,
+        case 226: ex *= d_[14] * d_[15]; break;// 0, 5, 5,
+        case 227: ex *= d_[14] * d_[1] * d_[12]; break;// 0, 6, 4,
+        case 228: ex *= d_[14] * d_[5] * d_[9]; break;// 0, 7, 3,
+        case 229: ex *= d_[14] * d_[8] * d_[6]; break;// 0, 8, 2,
+        case 230: ex *= d_[14] * d_[11] * d_[2]; break;// 0, 9, 1,
+        case 231: ex *= d_[14] * d_[14]; break;// 0, 10, 0,
+        case 232: ex *= d_[0] * d_[15] * d_[12]; break;// 1, 0, 9,
+        case 233: ex *= d_[0] * d_[1] * d_[15] * d_[9]; break;// 1, 1, 8,
+        case 234: ex *= d_[0] * d_[5] * d_[15] * d_[6]; break;// 1, 2, 7,
+        case 235: ex *= d_[0] * d_[8] * d_[15] * d_[2]; break;// 1, 3, 6,
+        case 236: ex *= d_[0] * d_[11] * d_[15]; break;// 1, 4, 5,
+        case 237: ex *= d_[0] * d_[14] * d_[12]; break;// 1, 5, 4,
+        case 238: ex *= d_[0] * d_[14] * d_[1] * d_[9]; break;// 1, 6, 3,
+        case 239: ex *= d_[0] * d_[14] * d_[5] * d_[6]; break;// 1, 7, 2,
+        case 240: ex *= d_[0] * d_[14] * d_[8] * d_[2]; break;// 1, 8, 1,
+        case 241: ex *= d_[0] * d_[14] * d_[11]; break;// 1, 9, 0,
+        case 242: ex *= d_[4] * d_[15] * d_[9]; break;// 2, 0, 8,
+        case 243: ex *= d_[4] * d_[1] * d_[15] * d_[6]; break;// 2, 1, 7,
+        case 244: ex *= d_[4] * d_[5] * d_[15] * d_[2]; break;// 2, 2, 6,
+        case 245: ex *= d_[4] * d_[8] * d_[15]; break;// 2, 3, 5,
+        case 246: ex *= d_[4] * d_[11] * d_[12]; break;// 2, 4, 4,
+        case 247: ex *= d_[4] * d_[14] * d_[9]; break;// 2, 5, 3,
+        case 248: ex *= d_[4] * d_[14] * d_[1] * d_[6]; break;// 2, 6, 2,
+        case 249: ex *= d_[4] * d_[14] * d_[5] * d_[2]; break;// 2, 7, 1,
+        case 250: ex *= d_[4] * d_[14] * d_[8]; break;// 2, 8, 0,
+        case 251: ex *= d_[7] * d_[15] * d_[6]; break;// 3, 0, 7,
+        case 252: ex *= d_[7] * d_[1] * d_[15] * d_[2]; break;// 3, 1, 6,
+        case 253: ex *= d_[7] * d_[5] * d_[15]; break;// 3, 2, 5,
+        case 254: ex *= d_[7] * d_[8] * d_[12]; break;// 3, 3, 4,
+        case 255: ex *= d_[7] * d_[11] * d_[9]; break;// 3, 4, 3,
+        case 256: ex *= d_[7] * d_[14] * d_[6]; break;// 3, 5, 2,
+        case 257: ex *= d_[7] * d_[14] * d_[1] * d_[2]; break;// 3, 6, 1,
+        case 258: ex *= d_[7] * d_[14] * d_[5]; break;// 3, 7, 0,
+        case 259: ex *= d_[10] * d_[15] * d_[2]; break;// 4, 0, 6,
+        case 260: ex *= d_[10] * d_[1] * d_[15]; break;// 4, 1, 5,
+        case 261: ex *= d_[10] * d_[5] * d_[12]; break;// 4, 2, 4,
+        case 262: ex *= d_[10] * d_[8] * d_[9]; break;// 4, 3, 3,
+        case 263: ex *= d_[10] * d_[11] * d_[6]; break;// 4, 4, 2,
+        case 264: ex *= d_[10] * d_[14] * d_[2]; break;// 4, 5, 1,
+        case 265: ex *= d_[10] * d_[14] * d_[1]; break;// 4, 6, 0,
+        case 266: ex *= d_[13] * d_[15]; break;// 5, 0, 5,
+        case 267: ex *= d_[13] * d_[1] * d_[12]; break;// 5, 1, 4,
+        case 268: ex *= d_[13] * d_[5] * d_[9]; break;// 5, 2, 3,
+        case 269: ex *= d_[13] * d_[8] * d_[6]; break;// 5, 3, 2,
+        case 270: ex *= d_[13] * d_[11] * d_[2]; break;// 5, 4, 1,
+        case 271: ex *= d_[13] * d_[14]; break;// 5, 5, 0,
+        case 272: ex *= d_[13] * d_[0] * d_[12]; break;// 6, 0, 4,
+        case 273: ex *= d_[13] * d_[0] * d_[1] * d_[9]; break;// 6, 1, 3,
+        case 274: ex *= d_[13] * d_[0] * d_[5] * d_[6]; break;// 6, 2, 2,
+        case 275: ex *= d_[13] * d_[0] * d_[8] * d_[2]; break;// 6, 3, 1,
+        case 276: ex *= d_[13] * d_[0] * d_[11]; break;// 6, 4, 0,
+        case 277: ex *= d_[13] * d_[4] * d_[9]; break;// 7, 0, 3,
+        case 278: ex *= d_[13] * d_[4] * d_[1] * d_[6]; break;// 7, 1, 2,
+        case 279: ex *= d_[13] * d_[4] * d_[5] * d_[2]; break;// 7, 2, 1,
+        case 280: ex *= d_[13] * d_[4] * d_[8]; break;// 7, 3, 0,
+        case 281: ex *= d_[13] * d_[7] * d_[6]; break;// 8, 0, 2,
+        case 282: ex *= d_[13] * d_[7] * d_[1] * d_[2]; break;// 8, 1, 1,
+        case 283: ex *= d_[13] * d_[7] * d_[5]; break;// 8, 2, 0,
+        case 284: ex *= d_[13] * d_[10] * d_[2]; break;// 9, 0, 1,
+        case 285: ex *= d_[13] * d_[10] * d_[1]; break;// 9, 1, 0,
+        case 286: ex *= d_[13] * d_[13]; break;// 10, 0, 0,
         default: break;
         }
 
@@ -6991,6 +7137,208 @@ const double WFN::compute_g_cartesian(
         case 82: ex *= d_[13] * d_[2]; break;// 5, 0, 1,
         case 83: ex *= d_[13] * d_[1]; break;// 5, 1, 0,
         case 84: ex *= d_[13] * d_[0]; break;// 6, 0, 0,
+        case 85: ex *= d_[15] * d_[6]; break;// 0, 0, 7,
+        case 86: ex *= d_[1] * d_[15] * d_[2]; break;// 0, 1, 6,
+        case 87: ex *= d_[5] * d_[15]; break;// 0, 2, 5,
+        case 88: ex *= d_[8] * d_[12]; break;// 0, 3, 4,
+        case 89: ex *= d_[11] * d_[9]; break;// 0, 4, 3,
+        case 90: ex *= d_[14] * d_[6]; break;// 0, 5, 2,
+        case 91: ex *= d_[14] * d_[1] * d_[2]; break;// 0, 6, 1,
+        case 92: ex *= d_[14] * d_[5]; break;// 0, 7, 0,
+        case 93: ex *= d_[0] * d_[15] * d_[2]; break;// 1, 0, 6,
+        case 94: ex *= d_[0] * d_[1] * d_[15]; break;// 1, 1, 5,
+        case 95: ex *= d_[0] * d_[5] * d_[12]; break;// 1, 2, 4,
+        case 96: ex *= d_[0] * d_[8] * d_[9]; break;// 1, 3, 3,
+        case 97: ex *= d_[0] * d_[11] * d_[6]; break;// 1, 4, 2,
+        case 98: ex *= d_[0] * d_[14] * d_[2]; break;// 1, 5, 1,
+        case 99: ex *= d_[0] * d_[14] * d_[1]; break;// 1, 6, 0,
+        case 100: ex *= d_[4] * d_[15]; break;// 2, 0, 5,
+        case 101: ex *= d_[4] * d_[1] * d_[12]; break;// 2, 1, 4,
+        case 102: ex *= d_[4] * d_[5] * d_[9]; break;// 2, 2, 3,
+        case 103: ex *= d_[4] * d_[8] * d_[6]; break;// 2, 3, 2,
+        case 104: ex *= d_[4] * d_[11] * d_[2]; break;// 2, 4, 1,
+        case 105: ex *= d_[4] * d_[14]; break;// 2, 5, 0,
+        case 106: ex *= d_[7] * d_[12]; break;// 3, 0, 4,
+        case 107: ex *= d_[7] * d_[1] * d_[9]; break;// 3, 1, 3,
+        case 108: ex *= d_[7] * d_[5] * d_[6]; break;// 3, 2, 2,
+        case 109: ex *= d_[7] * d_[8] * d_[2]; break;// 3, 3, 1,
+        case 110: ex *= d_[7] * d_[11]; break;// 3, 4, 0,
+        case 111: ex *= d_[10] * d_[9]; break;// 4, 0, 3,
+        case 112: ex *= d_[10] * d_[1] * d_[6]; break;// 4, 1, 2,
+        case 113: ex *= d_[10] * d_[5] * d_[2]; break;// 4, 2, 1,
+        case 114: ex *= d_[10] * d_[8]; break;// 4, 3, 0,
+        case 115: ex *= d_[13] * d_[6]; break;// 5, 0, 2,
+        case 116: ex *= d_[13] * d_[1] * d_[2]; break;// 5, 1, 1,
+        case 117: ex *= d_[13] * d_[5]; break;// 5, 2, 0,
+        case 118: ex *= d_[13] * d_[0] * d_[2]; break;// 6, 0, 1,
+        case 119: ex *= d_[13] * d_[0] * d_[1]; break;// 6, 1, 0,
+        case 120: ex *= d_[13] * d_[4]; break;// 7, 0, 0,
+        case 121: ex *= d_[15] * d_[9]; break;// 0, 0, 8,
+        case 122: ex *= d_[1] * d_[15] * d_[6]; break;// 0, 1, 7,
+        case 123: ex *= d_[5] * d_[15] * d_[2]; break;// 0, 2, 6,
+        case 124: ex *= d_[8] * d_[15]; break;// 0, 3, 5,
+        case 125: ex *= d_[11] * d_[12]; break;// 0, 4, 4,
+        case 126: ex *= d_[14] * d_[9]; break;// 0, 5, 3,
+        case 127: ex *= d_[14] * d_[1] * d_[6]; break;// 0, 6, 2,
+        case 128: ex *= d_[14] * d_[5] * d_[2]; break;// 0, 7, 1,
+        case 129: ex *= d_[14] * d_[8]; break;// 0, 8, 0,
+        case 130: ex *= d_[0] * d_[15] * d_[6]; break;// 1, 0, 7,
+        case 131: ex *= d_[0] * d_[1] * d_[15] * d_[2]; break;// 1, 1, 6,
+        case 132: ex *= d_[0] * d_[5] * d_[15]; break;// 1, 2, 5,
+        case 133: ex *= d_[0] * d_[8] * d_[12]; break;// 1, 3, 4,
+        case 134: ex *= d_[0] * d_[11] * d_[9]; break;// 1, 4, 3,
+        case 135: ex *= d_[0] * d_[14] * d_[6]; break;// 1, 5, 2,
+        case 136: ex *= d_[0] * d_[14] * d_[1] * d_[2]; break;// 1, 6, 1,
+        case 137: ex *= d_[0] * d_[14] * d_[5]; break;// 1, 7, 0,
+        case 138: ex *= d_[4] * d_[15] * d_[2]; break;// 2, 0, 6,
+        case 139: ex *= d_[4] * d_[1] * d_[15]; break;// 2, 1, 5,
+        case 140: ex *= d_[4] * d_[5] * d_[12]; break;// 2, 2, 4,
+        case 141: ex *= d_[4] * d_[8] * d_[9]; break;// 2, 3, 3,
+        case 142: ex *= d_[4] * d_[11] * d_[6]; break;// 2, 4, 2,
+        case 143: ex *= d_[4] * d_[14] * d_[2]; break;// 2, 5, 1,
+        case 144: ex *= d_[4] * d_[14] * d_[1]; break;// 2, 6, 0,
+        case 145: ex *= d_[7] * d_[15]; break;// 3, 0, 5,
+        case 146: ex *= d_[7] * d_[1] * d_[12]; break;// 3, 1, 4,
+        case 147: ex *= d_[7] * d_[5] * d_[9]; break;// 3, 2, 3,
+        case 148: ex *= d_[7] * d_[8] * d_[6]; break;// 3, 3, 2,
+        case 149: ex *= d_[7] * d_[11] * d_[2]; break;// 3, 4, 1,
+        case 150: ex *= d_[7] * d_[14]; break;// 3, 5, 0,
+        case 151: ex *= d_[10] * d_[12]; break;// 4, 0, 4,
+        case 152: ex *= d_[10] * d_[1] * d_[9]; break;// 4, 1, 3,
+        case 153: ex *= d_[10] * d_[5] * d_[6]; break;// 4, 2, 2,
+        case 154: ex *= d_[10] * d_[8] * d_[2]; break;// 4, 3, 1,
+        case 155: ex *= d_[10] * d_[11]; break;// 4, 4, 0,
+        case 156: ex *= d_[13] * d_[9]; break;// 5, 0, 3,
+        case 157: ex *= d_[13] * d_[1] * d_[6]; break;// 5, 1, 2,
+        case 158: ex *= d_[13] * d_[5] * d_[2]; break;// 5, 2, 1,
+        case 159: ex *= d_[13] * d_[8]; break;// 5, 3, 0,
+        case 160: ex *= d_[13] * d_[0] * d_[6]; break;// 6, 0, 2,
+        case 161: ex *= d_[13] * d_[0] * d_[1] * d_[2]; break;// 6, 1, 1,
+        case 162: ex *= d_[13] * d_[0] * d_[5]; break;// 6, 2, 0,
+        case 163: ex *= d_[13] * d_[4] * d_[2]; break;// 7, 0, 1,
+        case 164: ex *= d_[13] * d_[4] * d_[1]; break;// 7, 1, 0,
+        case 165: ex *= d_[13] * d_[7]; break;// 8, 0, 0,
+        case 166: ex *= d_[15] * d_[12]; break;// 0, 0, 9,
+        case 167: ex *= d_[1] * d_[15] * d_[9]; break;// 0, 1, 8,
+        case 168: ex *= d_[5] * d_[15] * d_[6]; break;// 0, 2, 7,
+        case 169: ex *= d_[8] * d_[15] * d_[2]; break;// 0, 3, 6,
+        case 170: ex *= d_[11] * d_[15]; break;// 0, 4, 5,
+        case 171: ex *= d_[14] * d_[12]; break;// 0, 5, 4,
+        case 172: ex *= d_[14] * d_[1] * d_[9]; break;// 0, 6, 3,
+        case 173: ex *= d_[14] * d_[5] * d_[6]; break;// 0, 7, 2,
+        case 174: ex *= d_[14] * d_[8] * d_[2]; break;// 0, 8, 1,
+        case 175: ex *= d_[14] * d_[11]; break;// 0, 9, 0,
+        case 176: ex *= d_[0] * d_[15] * d_[9]; break;// 1, 0, 8,
+        case 177: ex *= d_[0] * d_[1] * d_[15] * d_[6]; break;// 1, 1, 7,
+        case 178: ex *= d_[0] * d_[5] * d_[15] * d_[2]; break;// 1, 2, 6,
+        case 179: ex *= d_[0] * d_[8] * d_[15]; break;// 1, 3, 5,
+        case 180: ex *= d_[0] * d_[11] * d_[12]; break;// 1, 4, 4,
+        case 181: ex *= d_[0] * d_[14] * d_[9]; break;// 1, 5, 3,
+        case 182: ex *= d_[0] * d_[14] * d_[1] * d_[6]; break;// 1, 6, 2,
+        case 183: ex *= d_[0] * d_[14] * d_[5] * d_[2]; break;// 1, 7, 1,
+        case 184: ex *= d_[0] * d_[14] * d_[8]; break;// 1, 8, 0,
+        case 185: ex *= d_[4] * d_[15] * d_[6]; break;// 2, 0, 7,
+        case 186: ex *= d_[4] * d_[1] * d_[15] * d_[2]; break;// 2, 1, 6,
+        case 187: ex *= d_[4] * d_[5] * d_[15]; break;// 2, 2, 5,
+        case 188: ex *= d_[4] * d_[8] * d_[12]; break;// 2, 3, 4,
+        case 189: ex *= d_[4] * d_[11] * d_[9]; break;// 2, 4, 3,
+        case 190: ex *= d_[4] * d_[14] * d_[6]; break;// 2, 5, 2,
+        case 191: ex *= d_[4] * d_[14] * d_[1] * d_[2]; break;// 2, 6, 1,
+        case 192: ex *= d_[4] * d_[14] * d_[5]; break;// 2, 7, 0,
+        case 193: ex *= d_[7] * d_[15] * d_[2]; break;// 3, 0, 6,
+        case 194: ex *= d_[7] * d_[1] * d_[15]; break;// 3, 1, 5,
+        case 195: ex *= d_[7] * d_[5] * d_[12]; break;// 3, 2, 4,
+        case 196: ex *= d_[7] * d_[8] * d_[9]; break;// 3, 3, 3,
+        case 197: ex *= d_[7] * d_[11] * d_[6]; break;// 3, 4, 2,
+        case 198: ex *= d_[7] * d_[14] * d_[2]; break;// 3, 5, 1,
+        case 199: ex *= d_[7] * d_[14] * d_[1]; break;// 3, 6, 0,
+        case 200: ex *= d_[10] * d_[15]; break;// 4, 0, 5,
+        case 201: ex *= d_[10] * d_[1] * d_[12]; break;// 4, 1, 4,
+        case 202: ex *= d_[10] * d_[5] * d_[9]; break;// 4, 2, 3,
+        case 203: ex *= d_[10] * d_[8] * d_[6]; break;// 4, 3, 2,
+        case 204: ex *= d_[10] * d_[11] * d_[2]; break;// 4, 4, 1,
+        case 205: ex *= d_[10] * d_[14]; break;// 4, 5, 0,
+        case 206: ex *= d_[13] * d_[12]; break;// 5, 0, 4,
+        case 207: ex *= d_[13] * d_[1] * d_[9]; break;// 5, 1, 3,
+        case 208: ex *= d_[13] * d_[5] * d_[6]; break;// 5, 2, 2,
+        case 209: ex *= d_[13] * d_[8] * d_[2]; break;// 5, 3, 1,
+        case 210: ex *= d_[13] * d_[11]; break;// 5, 4, 0,
+        case 211: ex *= d_[13] * d_[0] * d_[9]; break;// 6, 0, 3,
+        case 212: ex *= d_[13] * d_[0] * d_[1] * d_[6]; break;// 6, 1, 2,
+        case 213: ex *= d_[13] * d_[0] * d_[5] * d_[2]; break;// 6, 2, 1,
+        case 214: ex *= d_[13] * d_[0] * d_[8]; break;// 6, 3, 0,
+        case 215: ex *= d_[13] * d_[4] * d_[6]; break;// 7, 0, 2,
+        case 216: ex *= d_[13] * d_[4] * d_[1] * d_[2]; break;// 7, 1, 1,
+        case 217: ex *= d_[13] * d_[4] * d_[5]; break;// 7, 2, 0,
+        case 218: ex *= d_[13] * d_[7] * d_[2]; break;// 8, 0, 1,
+        case 219: ex *= d_[13] * d_[7] * d_[1]; break;// 8, 1, 0,
+        case 220: ex *= d_[13] * d_[10]; break;// 9, 0, 0,
+        case 221: ex *= d_[15] * d_[15]; break;// 0, 0, 10,
+        case 222: ex *= d_[1] * d_[15] * d_[12]; break;// 0, 1, 9,
+        case 223: ex *= d_[5] * d_[15] * d_[9]; break;// 0, 2, 8,
+        case 224: ex *= d_[8] * d_[15] * d_[6]; break;// 0, 3, 7,
+        case 225: ex *= d_[11] * d_[15] * d_[2]; break;// 0, 4, 6,
+        case 226: ex *= d_[14] * d_[15]; break;// 0, 5, 5,
+        case 227: ex *= d_[14] * d_[1] * d_[12]; break;// 0, 6, 4,
+        case 228: ex *= d_[14] * d_[5] * d_[9]; break;// 0, 7, 3,
+        case 229: ex *= d_[14] * d_[8] * d_[6]; break;// 0, 8, 2,
+        case 230: ex *= d_[14] * d_[11] * d_[2]; break;// 0, 9, 1,
+        case 231: ex *= d_[14] * d_[14]; break;// 0, 10, 0,
+        case 232: ex *= d_[0] * d_[15] * d_[12]; break;// 1, 0, 9,
+        case 233: ex *= d_[0] * d_[1] * d_[15] * d_[9]; break;// 1, 1, 8,
+        case 234: ex *= d_[0] * d_[5] * d_[15] * d_[6]; break;// 1, 2, 7,
+        case 235: ex *= d_[0] * d_[8] * d_[15] * d_[2]; break;// 1, 3, 6,
+        case 236: ex *= d_[0] * d_[11] * d_[15]; break;// 1, 4, 5,
+        case 237: ex *= d_[0] * d_[14] * d_[12]; break;// 1, 5, 4,
+        case 238: ex *= d_[0] * d_[14] * d_[1] * d_[9]; break;// 1, 6, 3,
+        case 239: ex *= d_[0] * d_[14] * d_[5] * d_[6]; break;// 1, 7, 2,
+        case 240: ex *= d_[0] * d_[14] * d_[8] * d_[2]; break;// 1, 8, 1,
+        case 241: ex *= d_[0] * d_[14] * d_[11]; break;// 1, 9, 0,
+        case 242: ex *= d_[4] * d_[15] * d_[9]; break;// 2, 0, 8,
+        case 243: ex *= d_[4] * d_[1] * d_[15] * d_[6]; break;// 2, 1, 7,
+        case 244: ex *= d_[4] * d_[5] * d_[15] * d_[2]; break;// 2, 2, 6,
+        case 245: ex *= d_[4] * d_[8] * d_[15]; break;// 2, 3, 5,
+        case 246: ex *= d_[4] * d_[11] * d_[12]; break;// 2, 4, 4,
+        case 247: ex *= d_[4] * d_[14] * d_[9]; break;// 2, 5, 3,
+        case 248: ex *= d_[4] * d_[14] * d_[1] * d_[6]; break;// 2, 6, 2,
+        case 249: ex *= d_[4] * d_[14] * d_[5] * d_[2]; break;// 2, 7, 1,
+        case 250: ex *= d_[4] * d_[14] * d_[8]; break;// 2, 8, 0,
+        case 251: ex *= d_[7] * d_[15] * d_[6]; break;// 3, 0, 7,
+        case 252: ex *= d_[7] * d_[1] * d_[15] * d_[2]; break;// 3, 1, 6,
+        case 253: ex *= d_[7] * d_[5] * d_[15]; break;// 3, 2, 5,
+        case 254: ex *= d_[7] * d_[8] * d_[12]; break;// 3, 3, 4,
+        case 255: ex *= d_[7] * d_[11] * d_[9]; break;// 3, 4, 3,
+        case 256: ex *= d_[7] * d_[14] * d_[6]; break;// 3, 5, 2,
+        case 257: ex *= d_[7] * d_[14] * d_[1] * d_[2]; break;// 3, 6, 1,
+        case 258: ex *= d_[7] * d_[14] * d_[5]; break;// 3, 7, 0,
+        case 259: ex *= d_[10] * d_[15] * d_[2]; break;// 4, 0, 6,
+        case 260: ex *= d_[10] * d_[1] * d_[15]; break;// 4, 1, 5,
+        case 261: ex *= d_[10] * d_[5] * d_[12]; break;// 4, 2, 4,
+        case 262: ex *= d_[10] * d_[8] * d_[9]; break;// 4, 3, 3,
+        case 263: ex *= d_[10] * d_[11] * d_[6]; break;// 4, 4, 2,
+        case 264: ex *= d_[10] * d_[14] * d_[2]; break;// 4, 5, 1,
+        case 265: ex *= d_[10] * d_[14] * d_[1]; break;// 4, 6, 0,
+        case 266: ex *= d_[13] * d_[15]; break;// 5, 0, 5,
+        case 267: ex *= d_[13] * d_[1] * d_[12]; break;// 5, 1, 4,
+        case 268: ex *= d_[13] * d_[5] * d_[9]; break;// 5, 2, 3,
+        case 269: ex *= d_[13] * d_[8] * d_[6]; break;// 5, 3, 2,
+        case 270: ex *= d_[13] * d_[11] * d_[2]; break;// 5, 4, 1,
+        case 271: ex *= d_[13] * d_[14]; break;// 5, 5, 0,
+        case 272: ex *= d_[13] * d_[0] * d_[12]; break;// 6, 0, 4,
+        case 273: ex *= d_[13] * d_[0] * d_[1] * d_[9]; break;// 6, 1, 3,
+        case 274: ex *= d_[13] * d_[0] * d_[5] * d_[6]; break;// 6, 2, 2,
+        case 275: ex *= d_[13] * d_[0] * d_[8] * d_[2]; break;// 6, 3, 1,
+        case 276: ex *= d_[13] * d_[0] * d_[11]; break;// 6, 4, 0,
+        case 277: ex *= d_[13] * d_[4] * d_[9]; break;// 7, 0, 3,
+        case 278: ex *= d_[13] * d_[4] * d_[1] * d_[6]; break;// 7, 1, 2,
+        case 279: ex *= d_[13] * d_[4] * d_[5] * d_[2]; break;// 7, 2, 1,
+        case 280: ex *= d_[13] * d_[4] * d_[8]; break;// 7, 3, 0,
+        case 281: ex *= d_[13] * d_[7] * d_[6]; break;// 8, 0, 2,
+        case 282: ex *= d_[13] * d_[7] * d_[1] * d_[2]; break;// 8, 1, 1,
+        case 283: ex *= d_[13] * d_[7] * d_[5]; break;// 8, 2, 0,
+        case 284: ex *= d_[13] * d_[10] * d_[2]; break;// 9, 0, 1,
+        case 285: ex *= d_[13] * d_[10] * d_[1]; break;// 9, 1, 0,
+        case 286: ex *= d_[13] * d_[13]; break;// 10, 0, 0,
         default: break;
         }
 
@@ -7156,6 +7504,208 @@ const double WFN::compute_spin_dens_cartesian(
         case 82: ex *= d_[13] * d_[2]; break;// 5, 0, 1,
         case 83: ex *= d_[13] * d_[1]; break;// 5, 1, 0,
         case 84: ex *= d_[13] * d_[0]; break;// 6, 0, 0,
+        case 85: ex *= d_[15] * d_[6]; break;// 0, 0, 7,
+        case 86: ex *= d_[1] * d_[15] * d_[2]; break;// 0, 1, 6,
+        case 87: ex *= d_[5] * d_[15]; break;// 0, 2, 5,
+        case 88: ex *= d_[8] * d_[12]; break;// 0, 3, 4,
+        case 89: ex *= d_[11] * d_[9]; break;// 0, 4, 3,
+        case 90: ex *= d_[14] * d_[6]; break;// 0, 5, 2,
+        case 91: ex *= d_[14] * d_[1] * d_[2]; break;// 0, 6, 1,
+        case 92: ex *= d_[14] * d_[5]; break;// 0, 7, 0,
+        case 93: ex *= d_[0] * d_[15] * d_[2]; break;// 1, 0, 6,
+        case 94: ex *= d_[0] * d_[1] * d_[15]; break;// 1, 1, 5,
+        case 95: ex *= d_[0] * d_[5] * d_[12]; break;// 1, 2, 4,
+        case 96: ex *= d_[0] * d_[8] * d_[9]; break;// 1, 3, 3,
+        case 97: ex *= d_[0] * d_[11] * d_[6]; break;// 1, 4, 2,
+        case 98: ex *= d_[0] * d_[14] * d_[2]; break;// 1, 5, 1,
+        case 99: ex *= d_[0] * d_[14] * d_[1]; break;// 1, 6, 0,
+        case 100: ex *= d_[4] * d_[15]; break;// 2, 0, 5,
+        case 101: ex *= d_[4] * d_[1] * d_[12]; break;// 2, 1, 4,
+        case 102: ex *= d_[4] * d_[5] * d_[9]; break;// 2, 2, 3,
+        case 103: ex *= d_[4] * d_[8] * d_[6]; break;// 2, 3, 2,
+        case 104: ex *= d_[4] * d_[11] * d_[2]; break;// 2, 4, 1,
+        case 105: ex *= d_[4] * d_[14]; break;// 2, 5, 0,
+        case 106: ex *= d_[7] * d_[12]; break;// 3, 0, 4,
+        case 107: ex *= d_[7] * d_[1] * d_[9]; break;// 3, 1, 3,
+        case 108: ex *= d_[7] * d_[5] * d_[6]; break;// 3, 2, 2,
+        case 109: ex *= d_[7] * d_[8] * d_[2]; break;// 3, 3, 1,
+        case 110: ex *= d_[7] * d_[11]; break;// 3, 4, 0,
+        case 111: ex *= d_[10] * d_[9]; break;// 4, 0, 3,
+        case 112: ex *= d_[10] * d_[1] * d_[6]; break;// 4, 1, 2,
+        case 113: ex *= d_[10] * d_[5] * d_[2]; break;// 4, 2, 1,
+        case 114: ex *= d_[10] * d_[8]; break;// 4, 3, 0,
+        case 115: ex *= d_[13] * d_[6]; break;// 5, 0, 2,
+        case 116: ex *= d_[13] * d_[1] * d_[2]; break;// 5, 1, 1,
+        case 117: ex *= d_[13] * d_[5]; break;// 5, 2, 0,
+        case 118: ex *= d_[13] * d_[0] * d_[2]; break;// 6, 0, 1,
+        case 119: ex *= d_[13] * d_[0] * d_[1]; break;// 6, 1, 0,
+        case 120: ex *= d_[13] * d_[4]; break;// 7, 0, 0,
+        case 121: ex *= d_[15] * d_[9]; break;// 0, 0, 8,
+        case 122: ex *= d_[1] * d_[15] * d_[6]; break;// 0, 1, 7,
+        case 123: ex *= d_[5] * d_[15] * d_[2]; break;// 0, 2, 6,
+        case 124: ex *= d_[8] * d_[15]; break;// 0, 3, 5,
+        case 125: ex *= d_[11] * d_[12]; break;// 0, 4, 4,
+        case 126: ex *= d_[14] * d_[9]; break;// 0, 5, 3,
+        case 127: ex *= d_[14] * d_[1] * d_[6]; break;// 0, 6, 2,
+        case 128: ex *= d_[14] * d_[5] * d_[2]; break;// 0, 7, 1,
+        case 129: ex *= d_[14] * d_[8]; break;// 0, 8, 0,
+        case 130: ex *= d_[0] * d_[15] * d_[6]; break;// 1, 0, 7,
+        case 131: ex *= d_[0] * d_[1] * d_[15] * d_[2]; break;// 1, 1, 6,
+        case 132: ex *= d_[0] * d_[5] * d_[15]; break;// 1, 2, 5,
+        case 133: ex *= d_[0] * d_[8] * d_[12]; break;// 1, 3, 4,
+        case 134: ex *= d_[0] * d_[11] * d_[9]; break;// 1, 4, 3,
+        case 135: ex *= d_[0] * d_[14] * d_[6]; break;// 1, 5, 2,
+        case 136: ex *= d_[0] * d_[14] * d_[1] * d_[2]; break;// 1, 6, 1,
+        case 137: ex *= d_[0] * d_[14] * d_[5]; break;// 1, 7, 0,
+        case 138: ex *= d_[4] * d_[15] * d_[2]; break;// 2, 0, 6,
+        case 139: ex *= d_[4] * d_[1] * d_[15]; break;// 2, 1, 5,
+        case 140: ex *= d_[4] * d_[5] * d_[12]; break;// 2, 2, 4,
+        case 141: ex *= d_[4] * d_[8] * d_[9]; break;// 2, 3, 3,
+        case 142: ex *= d_[4] * d_[11] * d_[6]; break;// 2, 4, 2,
+        case 143: ex *= d_[4] * d_[14] * d_[2]; break;// 2, 5, 1,
+        case 144: ex *= d_[4] * d_[14] * d_[1]; break;// 2, 6, 0,
+        case 145: ex *= d_[7] * d_[15]; break;// 3, 0, 5,
+        case 146: ex *= d_[7] * d_[1] * d_[12]; break;// 3, 1, 4,
+        case 147: ex *= d_[7] * d_[5] * d_[9]; break;// 3, 2, 3,
+        case 148: ex *= d_[7] * d_[8] * d_[6]; break;// 3, 3, 2,
+        case 149: ex *= d_[7] * d_[11] * d_[2]; break;// 3, 4, 1,
+        case 150: ex *= d_[7] * d_[14]; break;// 3, 5, 0,
+        case 151: ex *= d_[10] * d_[12]; break;// 4, 0, 4,
+        case 152: ex *= d_[10] * d_[1] * d_[9]; break;// 4, 1, 3,
+        case 153: ex *= d_[10] * d_[5] * d_[6]; break;// 4, 2, 2,
+        case 154: ex *= d_[10] * d_[8] * d_[2]; break;// 4, 3, 1,
+        case 155: ex *= d_[10] * d_[11]; break;// 4, 4, 0,
+        case 156: ex *= d_[13] * d_[9]; break;// 5, 0, 3,
+        case 157: ex *= d_[13] * d_[1] * d_[6]; break;// 5, 1, 2,
+        case 158: ex *= d_[13] * d_[5] * d_[2]; break;// 5, 2, 1,
+        case 159: ex *= d_[13] * d_[8]; break;// 5, 3, 0,
+        case 160: ex *= d_[13] * d_[0] * d_[6]; break;// 6, 0, 2,
+        case 161: ex *= d_[13] * d_[0] * d_[1] * d_[2]; break;// 6, 1, 1,
+        case 162: ex *= d_[13] * d_[0] * d_[5]; break;// 6, 2, 0,
+        case 163: ex *= d_[13] * d_[4] * d_[2]; break;// 7, 0, 1,
+        case 164: ex *= d_[13] * d_[4] * d_[1]; break;// 7, 1, 0,
+        case 165: ex *= d_[13] * d_[7]; break;// 8, 0, 0,
+        case 166: ex *= d_[15] * d_[12]; break;// 0, 0, 9,
+        case 167: ex *= d_[1] * d_[15] * d_[9]; break;// 0, 1, 8,
+        case 168: ex *= d_[5] * d_[15] * d_[6]; break;// 0, 2, 7,
+        case 169: ex *= d_[8] * d_[15] * d_[2]; break;// 0, 3, 6,
+        case 170: ex *= d_[11] * d_[15]; break;// 0, 4, 5,
+        case 171: ex *= d_[14] * d_[12]; break;// 0, 5, 4,
+        case 172: ex *= d_[14] * d_[1] * d_[9]; break;// 0, 6, 3,
+        case 173: ex *= d_[14] * d_[5] * d_[6]; break;// 0, 7, 2,
+        case 174: ex *= d_[14] * d_[8] * d_[2]; break;// 0, 8, 1,
+        case 175: ex *= d_[14] * d_[11]; break;// 0, 9, 0,
+        case 176: ex *= d_[0] * d_[15] * d_[9]; break;// 1, 0, 8,
+        case 177: ex *= d_[0] * d_[1] * d_[15] * d_[6]; break;// 1, 1, 7,
+        case 178: ex *= d_[0] * d_[5] * d_[15] * d_[2]; break;// 1, 2, 6,
+        case 179: ex *= d_[0] * d_[8] * d_[15]; break;// 1, 3, 5,
+        case 180: ex *= d_[0] * d_[11] * d_[12]; break;// 1, 4, 4,
+        case 181: ex *= d_[0] * d_[14] * d_[9]; break;// 1, 5, 3,
+        case 182: ex *= d_[0] * d_[14] * d_[1] * d_[6]; break;// 1, 6, 2,
+        case 183: ex *= d_[0] * d_[14] * d_[5] * d_[2]; break;// 1, 7, 1,
+        case 184: ex *= d_[0] * d_[14] * d_[8]; break;// 1, 8, 0,
+        case 185: ex *= d_[4] * d_[15] * d_[6]; break;// 2, 0, 7,
+        case 186: ex *= d_[4] * d_[1] * d_[15] * d_[2]; break;// 2, 1, 6,
+        case 187: ex *= d_[4] * d_[5] * d_[15]; break;// 2, 2, 5,
+        case 188: ex *= d_[4] * d_[8] * d_[12]; break;// 2, 3, 4,
+        case 189: ex *= d_[4] * d_[11] * d_[9]; break;// 2, 4, 3,
+        case 190: ex *= d_[4] * d_[14] * d_[6]; break;// 2, 5, 2,
+        case 191: ex *= d_[4] * d_[14] * d_[1] * d_[2]; break;// 2, 6, 1,
+        case 192: ex *= d_[4] * d_[14] * d_[5]; break;// 2, 7, 0,
+        case 193: ex *= d_[7] * d_[15] * d_[2]; break;// 3, 0, 6,
+        case 194: ex *= d_[7] * d_[1] * d_[15]; break;// 3, 1, 5,
+        case 195: ex *= d_[7] * d_[5] * d_[12]; break;// 3, 2, 4,
+        case 196: ex *= d_[7] * d_[8] * d_[9]; break;// 3, 3, 3,
+        case 197: ex *= d_[7] * d_[11] * d_[6]; break;// 3, 4, 2,
+        case 198: ex *= d_[7] * d_[14] * d_[2]; break;// 3, 5, 1,
+        case 199: ex *= d_[7] * d_[14] * d_[1]; break;// 3, 6, 0,
+        case 200: ex *= d_[10] * d_[15]; break;// 4, 0, 5,
+        case 201: ex *= d_[10] * d_[1] * d_[12]; break;// 4, 1, 4,
+        case 202: ex *= d_[10] * d_[5] * d_[9]; break;// 4, 2, 3,
+        case 203: ex *= d_[10] * d_[8] * d_[6]; break;// 4, 3, 2,
+        case 204: ex *= d_[10] * d_[11] * d_[2]; break;// 4, 4, 1,
+        case 205: ex *= d_[10] * d_[14]; break;// 4, 5, 0,
+        case 206: ex *= d_[13] * d_[12]; break;// 5, 0, 4,
+        case 207: ex *= d_[13] * d_[1] * d_[9]; break;// 5, 1, 3,
+        case 208: ex *= d_[13] * d_[5] * d_[6]; break;// 5, 2, 2,
+        case 209: ex *= d_[13] * d_[8] * d_[2]; break;// 5, 3, 1,
+        case 210: ex *= d_[13] * d_[11]; break;// 5, 4, 0,
+        case 211: ex *= d_[13] * d_[0] * d_[9]; break;// 6, 0, 3,
+        case 212: ex *= d_[13] * d_[0] * d_[1] * d_[6]; break;// 6, 1, 2,
+        case 213: ex *= d_[13] * d_[0] * d_[5] * d_[2]; break;// 6, 2, 1,
+        case 214: ex *= d_[13] * d_[0] * d_[8]; break;// 6, 3, 0,
+        case 215: ex *= d_[13] * d_[4] * d_[6]; break;// 7, 0, 2,
+        case 216: ex *= d_[13] * d_[4] * d_[1] * d_[2]; break;// 7, 1, 1,
+        case 217: ex *= d_[13] * d_[4] * d_[5]; break;// 7, 2, 0,
+        case 218: ex *= d_[13] * d_[7] * d_[2]; break;// 8, 0, 1,
+        case 219: ex *= d_[13] * d_[7] * d_[1]; break;// 8, 1, 0,
+        case 220: ex *= d_[13] * d_[10]; break;// 9, 0, 0,
+        case 221: ex *= d_[15] * d_[15]; break;// 0, 0, 10,
+        case 222: ex *= d_[1] * d_[15] * d_[12]; break;// 0, 1, 9,
+        case 223: ex *= d_[5] * d_[15] * d_[9]; break;// 0, 2, 8,
+        case 224: ex *= d_[8] * d_[15] * d_[6]; break;// 0, 3, 7,
+        case 225: ex *= d_[11] * d_[15] * d_[2]; break;// 0, 4, 6,
+        case 226: ex *= d_[14] * d_[15]; break;// 0, 5, 5,
+        case 227: ex *= d_[14] * d_[1] * d_[12]; break;// 0, 6, 4,
+        case 228: ex *= d_[14] * d_[5] * d_[9]; break;// 0, 7, 3,
+        case 229: ex *= d_[14] * d_[8] * d_[6]; break;// 0, 8, 2,
+        case 230: ex *= d_[14] * d_[11] * d_[2]; break;// 0, 9, 1,
+        case 231: ex *= d_[14] * d_[14]; break;// 0, 10, 0,
+        case 232: ex *= d_[0] * d_[15] * d_[12]; break;// 1, 0, 9,
+        case 233: ex *= d_[0] * d_[1] * d_[15] * d_[9]; break;// 1, 1, 8,
+        case 234: ex *= d_[0] * d_[5] * d_[15] * d_[6]; break;// 1, 2, 7,
+        case 235: ex *= d_[0] * d_[8] * d_[15] * d_[2]; break;// 1, 3, 6,
+        case 236: ex *= d_[0] * d_[11] * d_[15]; break;// 1, 4, 5,
+        case 237: ex *= d_[0] * d_[14] * d_[12]; break;// 1, 5, 4,
+        case 238: ex *= d_[0] * d_[14] * d_[1] * d_[9]; break;// 1, 6, 3,
+        case 239: ex *= d_[0] * d_[14] * d_[5] * d_[6]; break;// 1, 7, 2,
+        case 240: ex *= d_[0] * d_[14] * d_[8] * d_[2]; break;// 1, 8, 1,
+        case 241: ex *= d_[0] * d_[14] * d_[11]; break;// 1, 9, 0,
+        case 242: ex *= d_[4] * d_[15] * d_[9]; break;// 2, 0, 8,
+        case 243: ex *= d_[4] * d_[1] * d_[15] * d_[6]; break;// 2, 1, 7,
+        case 244: ex *= d_[4] * d_[5] * d_[15] * d_[2]; break;// 2, 2, 6,
+        case 245: ex *= d_[4] * d_[8] * d_[15]; break;// 2, 3, 5,
+        case 246: ex *= d_[4] * d_[11] * d_[12]; break;// 2, 4, 4,
+        case 247: ex *= d_[4] * d_[14] * d_[9]; break;// 2, 5, 3,
+        case 248: ex *= d_[4] * d_[14] * d_[1] * d_[6]; break;// 2, 6, 2,
+        case 249: ex *= d_[4] * d_[14] * d_[5] * d_[2]; break;// 2, 7, 1,
+        case 250: ex *= d_[4] * d_[14] * d_[8]; break;// 2, 8, 0,
+        case 251: ex *= d_[7] * d_[15] * d_[6]; break;// 3, 0, 7,
+        case 252: ex *= d_[7] * d_[1] * d_[15] * d_[2]; break;// 3, 1, 6,
+        case 253: ex *= d_[7] * d_[5] * d_[15]; break;// 3, 2, 5,
+        case 254: ex *= d_[7] * d_[8] * d_[12]; break;// 3, 3, 4,
+        case 255: ex *= d_[7] * d_[11] * d_[9]; break;// 3, 4, 3,
+        case 256: ex *= d_[7] * d_[14] * d_[6]; break;// 3, 5, 2,
+        case 257: ex *= d_[7] * d_[14] * d_[1] * d_[2]; break;// 3, 6, 1,
+        case 258: ex *= d_[7] * d_[14] * d_[5]; break;// 3, 7, 0,
+        case 259: ex *= d_[10] * d_[15] * d_[2]; break;// 4, 0, 6,
+        case 260: ex *= d_[10] * d_[1] * d_[15]; break;// 4, 1, 5,
+        case 261: ex *= d_[10] * d_[5] * d_[12]; break;// 4, 2, 4,
+        case 262: ex *= d_[10] * d_[8] * d_[9]; break;// 4, 3, 3,
+        case 263: ex *= d_[10] * d_[11] * d_[6]; break;// 4, 4, 2,
+        case 264: ex *= d_[10] * d_[14] * d_[2]; break;// 4, 5, 1,
+        case 265: ex *= d_[10] * d_[14] * d_[1]; break;// 4, 6, 0,
+        case 266: ex *= d_[13] * d_[15]; break;// 5, 0, 5,
+        case 267: ex *= d_[13] * d_[1] * d_[12]; break;// 5, 1, 4,
+        case 268: ex *= d_[13] * d_[5] * d_[9]; break;// 5, 2, 3,
+        case 269: ex *= d_[13] * d_[8] * d_[6]; break;// 5, 3, 2,
+        case 270: ex *= d_[13] * d_[11] * d_[2]; break;// 5, 4, 1,
+        case 271: ex *= d_[13] * d_[14]; break;// 5, 5, 0,
+        case 272: ex *= d_[13] * d_[0] * d_[12]; break;// 6, 0, 4,
+        case 273: ex *= d_[13] * d_[0] * d_[1] * d_[9]; break;// 6, 1, 3,
+        case 274: ex *= d_[13] * d_[0] * d_[5] * d_[6]; break;// 6, 2, 2,
+        case 275: ex *= d_[13] * d_[0] * d_[8] * d_[2]; break;// 6, 3, 1,
+        case 276: ex *= d_[13] * d_[0] * d_[11]; break;// 6, 4, 0,
+        case 277: ex *= d_[13] * d_[4] * d_[9]; break;// 7, 0, 3,
+        case 278: ex *= d_[13] * d_[4] * d_[1] * d_[6]; break;// 7, 1, 2,
+        case 279: ex *= d_[13] * d_[4] * d_[5] * d_[2]; break;// 7, 2, 1,
+        case 280: ex *= d_[13] * d_[4] * d_[8]; break;// 7, 3, 0,
+        case 281: ex *= d_[13] * d_[7] * d_[6]; break;// 8, 0, 2,
+        case 282: ex *= d_[13] * d_[7] * d_[1] * d_[2]; break;// 8, 1, 1,
+        case 283: ex *= d_[13] * d_[7] * d_[5]; break;// 8, 2, 0,
+        case 284: ex *= d_[13] * d_[10] * d_[2]; break;// 9, 0, 1,
+        case 285: ex *= d_[13] * d_[10] * d_[1]; break;// 9, 1, 0,
+        case 286: ex *= d_[13] * d_[13]; break;// 10, 0, 0,
         default: break;
         }
         // use pointer arithmetic and cache coefficient pointer
@@ -8006,7 +8556,7 @@ void WFN::computeRhoELI(
         int lx = 0;
         int ly = 0;
         int lz = 0;
-        if (type > 1 && type <= 84) {
+        if (type > 1 && type <= 286) {
             lx = constants::type_vector[type_index];
             ly = constants::type_vector[type_index + 1];
             lz = constants::type_vector[type_index + 2];
@@ -8029,6 +8579,10 @@ void WFN::computeRhoELI(
         case 4: x0 = d_[10]; x1 = 4*d_[7]; xnext = d_[13]; break;
         case 5: x0 = d_[13]; x1 = 5*d_[10]; xnext = d_[13]*d_[0]; break;
         case 6: x0 = d_[13]*d_[0]; x1 = 6*d_[13]; xnext = d_[13]*d_[4]; break;
+        case 7: x0 = d_[13] * d_[4]; x1 = 7*d_[13] * d_[0]; xnext = d_[13] * d_[7]; break;
+        case 8: x0 = d_[13] * d_[7]; x1 = 8*d_[13] * d_[4]; xnext = d_[13] * d_[10]; break;
+        case 9: x0 = d_[13] * d_[10]; x1 = 9*d_[13] * d_[7]; xnext = d_[13] * d_[13]; break;
+        case 10: x0 = d_[13] * d_[13]; x1 = 10*d_[13] * d_[10]; xnext = d_[13] * d_[13] * d_[0]; break;
         default:
             err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
             break;
@@ -8041,6 +8595,10 @@ void WFN::computeRhoELI(
         case 4: y0 = d_[11]; y1 = 4*d_[8]; ynext = d_[14]; break;
         case 5: y0 = d_[14]; y1 = 5*d_[11]; ynext = d_[14]*d_[1]; break;
         case 6: y0 = d_[14]*d_[1]; y1 = 6*d_[14]; ynext = d_[14]*d_[5]; break;
+        case 7: y0 = d_[14] * d_[5]; y1 = 7*d_[14] * d_[1]; ynext = d_[14] * d_[8]; break;
+        case 8: y0 = d_[14] * d_[8]; y1 = 8*d_[14] * d_[5]; ynext = d_[14] * d_[11]; break;
+        case 9: y0 = d_[14] * d_[11]; y1 = 9*d_[14] * d_[8]; ynext = d_[14] * d_[14]; break;
+        case 10: y0 = d_[14] * d_[14]; y1 = 10*d_[14] * d_[11]; ynext = d_[14] * d_[14] * d_[1]; break;
         default:
             err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
             break;
@@ -8053,6 +8611,10 @@ void WFN::computeRhoELI(
         case 4: z0 = d_[12]; z1 = 4*d_[9]; znext = d_[15]; break;
         case 5: z0 = d_[15]; z1 = 5*d_[12]; znext = d_[15]*d_[2]; break;
         case 6: z0 = d_[15]*d_[2]; z1 = 6*d_[15]; znext = d_[15]*d_[6]; break;
+        case 7: z0 = d_[15] * d_[6]; z1 = 7*d_[15] * d_[2]; znext = d_[15] * d_[9]; break;
+        case 8: z0 = d_[15] * d_[9]; z1 = 8*d_[15] * d_[6]; znext = d_[15] * d_[12]; break;
+        case 9: z0 = d_[15] * d_[12]; z1 = 9*d_[15] * d_[9]; znext = d_[15] * d_[15]; break;
+        case 10: z0 = d_[15] * d_[15]; z1 = 10*d_[15] * d_[12]; znext = d_[15] * d_[15] * d_[2]; break;
         default:
             err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
             break;
@@ -8156,7 +8718,7 @@ void WFN::computeGrad(
         int lx = 0;
         int ly = 0;
         int lz = 0;
-        if (type > 1 && type <= 84) {
+        if (type > 1 && type <= 286) {
             lx = constants::type_vector[type_index];
             ly = constants::type_vector[type_index + 1];
             lz = constants::type_vector[type_index + 2];
@@ -8179,6 +8741,10 @@ void WFN::computeGrad(
         case 4: x0 = d_[10]; x1 = 4*d_[7]; xnext = d_[13]; break;
         case 5: x0 = d_[13]; x1 = 5*d_[10]; xnext = d_[13]*d_[0]; break;
         case 6: x0 = d_[13]*d_[0]; x1 = 6*d_[13]; xnext = d_[13]*d_[4]; break;
+        case 7: x0 = d_[13] * d_[4]; x1 = 7*d_[13] * d_[0]; xnext = d_[13] * d_[7]; break;
+        case 8: x0 = d_[13] * d_[7]; x1 = 8*d_[13] * d_[4]; xnext = d_[13] * d_[10]; break;
+        case 9: x0 = d_[13] * d_[10]; x1 = 9*d_[13] * d_[7]; xnext = d_[13] * d_[13]; break;
+        case 10: x0 = d_[13] * d_[13]; x1 = 10*d_[13] * d_[10]; xnext = d_[13] * d_[13] * d_[0]; break;
         default:
             err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
             break;
@@ -8191,6 +8757,10 @@ void WFN::computeGrad(
         case 4: y0 = d_[11]; y1 = 4*d_[8]; ynext = d_[14]; break;
         case 5: y0 = d_[14]; y1 = 5*d_[11]; ynext = d_[14]*d_[1]; break;
         case 6: y0 = d_[14]*d_[1]; y1 = 6*d_[14]; ynext = d_[14]*d_[5]; break;
+        case 7: y0 = d_[14] * d_[5]; y1 = 7*d_[14] * d_[1]; ynext = d_[14] * d_[8]; break;
+        case 8: y0 = d_[14] * d_[8]; y1 = 8*d_[14] * d_[5]; ynext = d_[14] * d_[11]; break;
+        case 9: y0 = d_[14] * d_[11]; y1 = 9*d_[14] * d_[8]; ynext = d_[14] * d_[14]; break;
+        case 10: y0 = d_[14] * d_[14]; y1 = 10*d_[14] * d_[11]; ynext = d_[14] * d_[14] * d_[1]; break;
         default:
             err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
             break;
@@ -8203,6 +8773,10 @@ void WFN::computeGrad(
         case 4: z0 = d_[12]; z1 = 4*d_[9]; znext = d_[15]; break;
         case 5: z0 = d_[15]; z1 = 5*d_[12]; znext = d_[15]*d_[2]; break;
         case 6: z0 = d_[15]*d_[2]; z1 = 6*d_[15]; znext = d_[15]*d_[6]; break;
+        case 7: z0 = d_[15] * d_[6]; z1 = 7*d_[15] * d_[2]; znext = d_[15] * d_[9]; break;
+        case 8: z0 = d_[15] * d_[9]; z1 = 8*d_[15] * d_[6]; znext = d_[15] * d_[12]; break;
+        case 9: z0 = d_[15] * d_[12]; z1 = 9*d_[15] * d_[9]; znext = d_[15] * d_[15]; break;
+        case 10: z0 = d_[15] * d_[15]; z1 = 10*d_[15] * d_[12]; znext = d_[15] * d_[15] * d_[2]; break;
         default:
             err_not_impl_f("Higher angular momentum of cartesian function in ELI computation", std::cout);
             break;
@@ -9178,7 +9752,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     inFile.close();
     if (debug)
         this->write_wfn("test_convert_from_xtb.wfn", false, false);
-    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    set_exp_cutoff();
     return true;
 }
 
@@ -9189,13 +9763,13 @@ const double WFN::computeESP(const d3 &PosGrid, const vec2 &d2) const
     double Pi[3]{ 0, 0, 0 };
     double Pj[3]{ 0, 0, 0 };
     double PC[3]{ 0, 0, 0 };
-    double Fn[11]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    double Al[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    double Am[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    double An[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    int maplrsl[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    int maplrsm[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    int maplrsn[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    double Fn[21]{};
+    double Al[506]{};
+    double Am[506]{};
+    double An[506]{};
+    int maplrsl[506]{};
+    int maplrsm[506]{};
+    int maplrsn[506]{};
     int l_i[3]{ 0, 0, 0 };
     int l_j[3]{ 0, 0, 0 };
     int iat = 0, jat = 0, MaxFn = 0;
@@ -9353,13 +9927,13 @@ const double WFN::computeESP_noCore(const d3 &PosGrid, const vec2 &d2) const
     double Pi[3]{ 0, 0, 0 };
     double Pj[3]{ 0, 0, 0 };
     double PC[3]{ 0, 0, 0 };
-    double Fn[11]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    double Al[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    double Am[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    double An[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    int maplrsl[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    int maplrsm[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    int maplrsn[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    double Fn[21]{};
+    double Al[506]{};
+    double Am[506]{};
+    double An[506]{};
+    int maplrsl[506]{};
+    int maplrsm[506]{};
+    int maplrsn[506]{};
     int l_i[3]{ 0, 0, 0 };
     int l_j[3]{ 0, 0, 0 };
     int iat = 0, jat = 0, MaxFn = 0;

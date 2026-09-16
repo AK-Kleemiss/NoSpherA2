@@ -474,7 +474,7 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types, s
         // Calculate basis set parameters for this atom type
         double alpha_max = 0.0;
         unsigned int max_l = 0;
-        vec alpha_min(8, 1e8);  //index l runs to max_l inclusive in the AtomGrid constructor, so i functions read [7]
+        vec alpha_min(12, 1e8);  //l here is the true l + 1 and the AtomGrid constructor reads alpha_min up to max_l inclusive, so l = 10 reads [11]
 
         for (int i = 0; i < wave.get_ncen(); i++) {
             if (wave.get_atom_charge(i) != atom_type) continue;
@@ -492,6 +492,10 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types, s
                 else if (l >= 21 && l <= 35) l = 5;
                 else if (l >= 36 && l <= 56) l = 6;
                 else if (l >= 57 && l <= 84) l = 7;
+                else if (l >= 85 && l <= 120) l = 8;
+                else if (l >= 121 && l <= 165) l = 9;
+                else if (l >= 166 && l <= 220) l = 10;
+                else if (l >= 221 && l <= 286) l = 11;
 
                 max_l = std::max(max_l, l);
                 alpha_min[l - 1] = std::min(alpha_min[l - 1], wave.get_exponent(b));
