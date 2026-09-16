@@ -7,6 +7,12 @@ namespace constants
 {
     extern double exp_cutoff;
     extern bool hide_gpu_notes;
+    //x^lx y^ly z^lz = sum_m sph2cart(l)[cart * n_spher(l) + m] R_lm, cartesians in WFN type order,
+    //R_lm the real solid harmonics in ORCA/Gaussian order m = 0,+1,-1,+2,-2,...
+    constexpr int n_cart(const int l) { return (l + 1) * (l + 2) / 2; };
+    constexpr int n_spher(const int l) { return 2 * l + 1; };
+    constexpr int first_type[7] = { 1, 2, 5, 11, 21, 36, 57 };
+    const double* sph2cart(const int l);
     static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
     constexpr int grid_max_no_flip = 50;
     int constexpr const_abs(int x)
@@ -572,7 +578,7 @@ namespace constants
             -1;
     };
 
-    constexpr int type_vector[168]{
+    constexpr int type_vector[252]{
     0, 0, 0,
     1, 0, 0,
     0, 1, 0,
@@ -628,7 +634,35 @@ namespace constants
     3, 2, 0,
     4, 0, 1,
     4, 1, 0,
-    5, 0, 0 };
+    5, 0, 0,
+    0, 0, 6,
+    0, 1, 5,
+    0, 2, 4,
+    0, 3, 3,
+    0, 4, 2,
+    0, 5, 1,
+    0, 6, 0,
+    1, 0, 5,
+    1, 1, 4,
+    1, 2, 3,
+    1, 3, 2,
+    1, 4, 1,
+    1, 5, 0,
+    2, 0, 4,
+    2, 1, 3,
+    2, 2, 2,
+    2, 3, 1,
+    2, 4, 0,
+    3, 0, 3,
+    3, 1, 2,
+    3, 2, 1,
+    3, 3, 0,
+    4, 0, 2,
+    4, 1, 1,
+    4, 2, 0,
+    5, 0, 1,
+    5, 1, 0,
+    6, 0, 0 };
 
     constexpr int n_val_electrons[] =
     { 1, 2,
@@ -652,7 +686,7 @@ namespace constants
 
     constexpr void type2vector(int index, int *vector)
     {
-        if (index < 1 || index > 56)
+        if (index < 1 || index > 84)
         {
             vector[0] = -1;
             vector[1] = -1;

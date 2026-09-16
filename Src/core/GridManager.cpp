@@ -491,6 +491,7 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types, s
                 else if (l >= 11 && l <= 20) l = 4;
                 else if (l >= 21 && l <= 35) l = 5;
                 else if (l >= 36 && l <= 56) l = 6;
+                else if (l >= 57 && l <= 84) l = 7;
 
                 max_l = std::max(max_l, l);
                 alpha_min[l - 1] = std::min(alpha_min[l - 1], wave.get_exponent(b));

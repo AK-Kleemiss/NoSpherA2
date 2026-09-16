@@ -1567,7 +1567,7 @@ namespace NoSpherA2UnitTests
         int v[3];
         constants::type2vector(0, v);
         EXPECT_EQ(-1, v[0]);
-        constants::type2vector(57, v);
+        constants::type2vector(85, v);
         EXPECT_EQ(-1, v[0]);
     }
 
@@ -3535,5 +3535,35 @@ namespace NoSpherA2UnitTests
         EXPECT_LT(both.size(), sphere.size());
         EXPECT_GT(ed.size(), 4 * sphere.size());
         EXPECT_EQ(ed_box, ed);
+    }
+
+    TEST(Sph2CartTests, ReturnsEmbeddedMatrices)
+    {
+        EXPECT_DOUBLE_EQ(constants::sph2cart(0)[0], 1.0);
+        EXPECT_DOUBLE_EQ(constants::sph2cart(1)[2 * 3 + 0], 1.0);
+        EXPECT_DOUBLE_EQ(constants::sph2cart(2)[2 * 5 + 0], 0.57735026918962576);
+        EXPECT_DOUBLE_EQ(constants::sph2cart(3)[9 * 7 + 4], 1.0);
+        EXPECT_DOUBLE_EQ(constants::sph2cart(4)[0 * 9 + 0], 0.1690308509457033);
+        EXPECT_DOUBLE_EQ(constants::sph2cart(4)[14 * 9 + 0], 0.06338656910463875);
+        EXPECT_DOUBLE_EQ(constants::sph2cart(5)[20 * 11 + 1], 0.060993754559283325);
+        EXPECT_DOUBLE_EQ(constants::sph2cart(6)[27 * 13 + 11], 0.067507715608415203);
+    }
+
+    TEST(GbwHighAngularTests, ReadsIFunctionFixtures)
+    {
+        const auto root = nos_test_repo_root();
+        const std::array<std::string, 3> angles = { "71", "113", "149" };
+        for (const auto& angle : angles) {
+            const auto input = root / "tests" / "CuF2_i_func" / angle / "calc.gbw";
+            if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+            WFN wave(input, false);
+            EXPECT_EQ(wave.get_nmo(), 670);
+            EXPECT_GT(wave.get_nex(), 0);
+            EXPECT_NE(std::find(wave.get_types().begin(), wave.get_types().end(), 56), wave.get_types().end());
+            EXPECT_EQ(*std::max_element(wave.get_types().begin(), wave.get_types().end()), 84);
+            const double density = wave.compute_dens({ 0.23, -0.41, 0.67 });
+            EXPECT_TRUE(std::isfinite(density));
+            EXPECT_GT(density, 0.0);
+        }
     }
 } // namespace NoSpherA2UnitTests
