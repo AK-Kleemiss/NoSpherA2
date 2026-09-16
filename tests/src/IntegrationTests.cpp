@@ -5,25 +5,6 @@
 
 #include "core/NoSpherA2.h"
 
-inline std::filesystem::path nos_test_repo_root()
-    {
-        if (const char* env = std::getenv("NOS_REPO_ROOT")) {
-            return std::filesystem::path(env);
-        }
-
-        auto p = std::filesystem::current_path();
-        for (int i = 0; i < 8; ++i) {
-            if (std::filesystem::exists(p / "tests" / "tests.toml")) {
-                return p;
-            }
-            if (!p.has_parent_path()) {
-                break;
-            }
-            p = p.parent_path();
-        }
-        return std::filesystem::current_path();
-    }
-
 namespace {
 
 struct UT_Result {
