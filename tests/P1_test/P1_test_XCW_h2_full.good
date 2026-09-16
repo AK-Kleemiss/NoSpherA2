@@ -16,8 +16,8 @@ Number of k-points to evaluate: 3215
 XCW orbital basis set: sto-3g-basis
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 102932 grid points.
-Total number of grid points after pruning: 102920
+GridManager: Generated total of 93098 grid points.
+Total number of grid points after pruning: 93092
 AO values calculated for all grids.
 Screened out 1798 unique pairs of mu, nu (33.57%) 
 Skipped evaluation of 64013865 grids (16.16%) 
@@ -27,11 +27,11 @@ ________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	Total Energy	Perturbation	Target quantity 	A^2 (halt)
 										(Eh)		   (a. u.)			(a. u.)
 ____________________________________________________________________________________
-0.00000		9.729		4.695		-1961.923538504		0.000		-1961.923538504		188.1284
-0.01000		6.282		3.708		-1961.790218970		0.063		-1961.727397195		121.7459
-0.02000		5.807		3.520		-1961.706939814		0.116		-1961.590805445		111.2727
+0.00000		9.733		4.696		-1961.923538820		0.000		-1961.923538820		188.3911
+0.01000		6.280		3.705		-1961.789972662		0.063		-1961.727171379		121.5858
+0.02000		5.804		3.517		-1961.706607974		0.116		-1961.590530352		111.0599
 ____________________________________________________________________________
-Recommended halting lambda* = 0.02000 (A^2=111.2727) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+Recommended halting lambda* = 0.02000 (A^2=111.0599) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
   candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
   candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
 WARNING: A^2 is still falling at the last evaluated lambda (0.02000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. Not enough points yet to extrapolate an estimate (need >= 5 evaluated lambda steps).

@@ -16,8 +16,8 @@ Number of k-points to evaluate: 3215
 XCW orbital basis set: sto-3g-basis
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 102932 grid points.
-Total number of grid points after pruning: 102920
+GridManager: Generated total of 93098 grid points.
+Total number of grid points after pruning: 93092
 AO values calculated for all grids.
 Screened out 1798 unique pairs of mu, nu (33.57%) 
 Skipped evaluation of 64013865 grids (16.16%) 
@@ -27,7 +27,7 @@ ________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	Total Energy	Perturbation	Target quantity 
 										(Eh)		   (a. u.)			(a. u.)
 ____________________________________________________________________________________
-0.00000		9.729		4.695		-1961.923538504		0.000		-1961.923538504
-0.01000		6.282		3.708		-1961.790218968		0.063		-1961.727397186
-0.02000		5.807		3.520		-1961.706938927		0.116		-1961.590804617
+0.00000		9.733		4.696		-1961.923538820		0.000		-1961.923538820
+0.01000		6.280		3.705		-1961.789972662		0.063		-1961.727171379
+0.02000		5.804		3.517		-1961.706607974		0.116		-1961.590530352
 Finished XCW fitting procedure.
