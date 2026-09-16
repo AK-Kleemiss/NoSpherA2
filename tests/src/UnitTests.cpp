@@ -3821,7 +3821,12 @@ namespace NoSpherA2UnitTests
             WFN a(root / "P1_test" / "NA2_0000000.fchk", false), b(root / "P1_test" / "NA2_0000000.wfn", false);
             expect_same_density(a, b, 1e-6, "NA2 fchk vs wfn");
         }
-        const std::filesystem::path inputs[] = { root / "epoxide_gbw" / "epoxide.gbw", root / "CuF2_i_func" / "71" / "calc.gbw", root / "molden_file" / "Sc_full.molden", root / "molden_file" / "Ce_full.molden" };
+        {
+            WFN a(root / "cytidine_tonto" / "stdout_cyt", false), b(root / "cytidine_tonto" / "cyt.wfn", false);
+            //the H positions in the tonto output carry three decimals, cyt.wfn eight
+            expect_same_density(a, b, 1e-3, "cytidine tonto vs its wfn");
+        }
+        const std::filesystem::path inputs[] = { root / "epoxide_gbw" / "epoxide.gbw", root / "CuF2_i_func" / "71" / "calc.gbw", root / "molden_file" / "Sc_full.molden", root / "molden_file" / "Ce_full.molden", root / "NiP3_fchk" / "good.fchk", root / "alanine_occ" / "alanine.owf.fchk" };
         const auto tmp = std::filesystem::temp_directory_path() / "nosphera2_format_roundtrip.wfn";
         for (const auto& input : inputs)
         {
@@ -3833,6 +3838,63 @@ namespace NoSpherA2UnitTests
         std::filesystem::remove(tmp);
     }
 
+    //accuracy 5 is the largest Becke grid; the fixture with the highest angular momentum of every format has to integrate to its electron count
+    TEST(FormatConsistencyTests, ElectronCountOnLargestGrid_full)
+    {
+        if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false")
+            GTEST_SKIP() << "Set RUN_FULL_TEST=1 to integrate every format on the accuracy 5 grid";
+        const auto root = nos_test_repo_root() / "tests";
+        const std::filesystem::path inputs[] = { root / "CuF2_i_func" / "71" / "calc.gbw", root / "molden_file" / "Ce_full.molden", root / "molden_file" / "Co2.molden", root / "NiP3_fchk" / "good.fchk", root / "alanine_occ" / "alanine.owf.fchk", root / "sucrose_fchk_SF" / "sucrose.fchk", root / "molden_file" / "Ce_full.wfn", root / "grown" / "water.wfx", root / "cytidine_tonto" / "stdout_cyt", root / "ptb_H_file" / "wfn.xtb" };
+        for (const auto& input : inputs)
+        {
+            WFN wave(input, false);
+            wave.delete_unoccupied_MOs();
+            double electrons = 0;
+            for (int i = 0; i < wave.get_nmo(); i++)
+                electrons += wave.get_MO_occ(i);
+            GridConfiguration config;
+            config.partition_type = PartitionType::Becke;
+            config.accuracy = 5;
+            GridManager gm(config);
+            ivec atom_list(wave.get_ncen());
+            std::iota(atom_list.begin(), atom_list.end(), 0);
+            gm.setup3DGridsForMolecule(wave, atom_list);
+            const PartitionResults res = gm.calculatePartitionedCharges(wave);
+            EXPECT_NEAR(res.overall_charges[PartitionResults::S_BECKE], electrons, 1e-4 * electrons) << input;
+        }
+    }
+    //OCC writes fchk in the Gaussian convention, so the reader's pure conventions are checked against the bridge for every l
+    TEST(FormatConsistencyTests, OccFchkMatchesBridge)
+    {
+        spdlog::set_level(spdlog::level::err);
+        for (int lmax = 1; lmax <= 4; lmax++)
+        {
+            const std::vector<occ::core::Atom> atoms{ { 1, 0.0, 0.0, -0.7 }, { 1, 0.0, 0.3, 0.7 } };
+            std::vector<occ::gto::Shell> shells;
+            for (const auto& at : atoms)
+                for (int l = 0; l <= lmax; l++)
+                {
+                    shells.emplace_back(l, std::vector<double>{ 1.2, 0.5 + 0.1 * l }, std::vector<vec>{ { 0.4, 0.7 } }, std::array<double, 3>{ at.x, at.y, at.z });
+                    shells.back().kind = occ::gto::Shell::Kind::Spherical;
+                    shells.back().incorporate_shell_norm();
+                }
+            occ::gto::AOBasis basis(atoms, shells, "test");
+            basis.set_pure(true);
+            occ::qm::HartreeFock hf(basis);
+            occ::qm::SCF<occ::qm::HartreeFock> scf(hf, occ::qm::SpinorbitalKind::Restricted);
+            scf.set_charge_multiplicity(0, 1);
+            scf.compute_initial_guess();
+            scf.compute_scf_energy();
+            occ::qm::Wavefunction wf = scf.wavefunction();
+            const auto tmp = std::filesystem::temp_directory_path() / ("nosphera2_occ_roundtrip_l" + std::to_string(lmax) + ".fchk");
+            {
+                occ::io::FchkWriter writer(tmp.string());
+                wf.save(writer);
+                writer.write();
+            }
+            expect_same_density(WFN(wf, false), WFN(tmp, false), 1e-6, "occ pure fchk lmax " + std::to_string(lmax));
+        }
+    }
     TEST(OccHighAngularTests, IntegratesElectronCountToL10)
     {
         for (const int lmax : { 5, 10 })

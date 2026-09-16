@@ -1652,15 +1652,32 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
 };
 
 //shell[m][s] holds the m-th spherical coefficient times the s-th contraction coefficient of one shell starting at prims[start]
-void WFN::push_back_spherical_shell(const int mo, const int l, const vec2& shell, const std::vector<primitive>& prims, const int start, const int size)
+static double odd_ft(const int n) { return n < 1 ? 1.0 : (double)constants::double_ft[n]; }
+//norm of x^a y^b z^c relative to x^l: sqrt((2l-1)!! / ((2a-1)!!(2b-1)!!(2c-1)!!)), Gaussian, molden and fchk give only the x^l norm
+static vec cart_norm(const int l)
 {
-    const int nsph = constants::n_spher(l);
+    vec n(constants::n_cart(l));
+    int v[3];
+    for (int cart = 0; cart < (int)n.size(); cart++)
+    {
+        constants::type2vector(constants::first_type[l] + cart, v);
+        n[cart] = sqrt(odd_ft(2 * l - 1) / (odd_ft(2 * v[0] - 1) * odd_ft(2 * v[1] - 1) * odd_ft(2 * v[2] - 1)));
+    }
+    return n;
+}
+//source column of each WFN Cartesian type; Gaussian/molden f: xxx yyy zzz xyy xxy xxz xzz yzz yyz xyz, tonto f swaps types 16/17
+static const int gaussian_f_order[10] = { 0, 1, 2, 4, 5, 8, 3, 6, 7, 9 };
+static const int molden_g_order[15] = { 2, 8, 11, 6, 1, 7, 14, 13, 5, 10, 12, 9, 4, 3, 0 };
+static const int tonto_f_order[10] = { 0, 1, 2, 3, 4, 6, 5, 7, 8, 9 };
+static const int* const molden_order[5] = { nullptr, nullptr, nullptr, gaussian_f_order, molden_g_order };
+static const double tonto_scale[5] = { 1.0, 1.0, 1.0 / sqrt(1.5), 1.0 / sqrt(5.0), 1.0 / sqrt(13.125) };
+//shell[cart][s] in the source order; order[cart] picks the source column of WFN type first_type[l] + cart, scale[cart] its normalisation
+void WFN::push_back_cartesian_shell(const int mo, const int l, const vec2& shell, const std::vector<primitive>& prims, const int start, const int size, const int* order, const double* scale)
+{
     for (int s = 0; s < size; s++)
         for (int cart = 0; cart < constants::n_cart(l); cart++)
         {
-            double t = 0;
-            for (int m = 0; m < nsph; m++)
-                t += constants::sph2cart(l)[cart * nsph + m] * shell[m][s];
+            const double t = shell[order ? order[cart] : cart][s] * (scale ? scale[cart] : 1.0);
             push_back_MO_coef(mo, abs(t) < 1E-10 ? 0 : t);
             if (mo == 0)
             {
@@ -1670,6 +1687,16 @@ void WFN::push_back_spherical_shell(const int mo, const int l, const vec2& shell
                 nex++;
             }
         }
+}
+void WFN::push_back_spherical_shell(const int mo, const int l, const vec2& shell, const std::vector<primitive>& prims, const int start, const int size)
+{
+    const int nsph = constants::n_spher(l);
+    vec2 c(constants::n_cart(l), vec(size, 0.0));
+    for (int cart = 0; cart < (int)c.size(); cart++)
+        for (int m = 0; m < nsph; m++)
+            for (int s = 0; s < size; s++)
+                c[cart][s] += constants::sph2cart(l)[cart * nsph + m] * shell[m][s];
+    push_back_cartesian_shell(mo, l, c, prims, start, size);
 }
 //the neglected tail of c x^a y^b z^c exp(-ar^2) is bounded by c (u/a)^(l/2) exp(-u) for u = a r^2 beyond l/2,
 //so the cutoff on -a r^2 alone loses 1e-3 electrons per l = 10 orbital; three fixed-point steps per primitive, the minimum wins
@@ -1958,210 +1985,27 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             push_back_MO(run, occup, ene, spin);
             occ.push_back(occup);
             coefficients[spin].push_back(vec());
-            // int run_coef = 0;
-            int p_run = 0;
-            vec2 p_temp(3);
-            int d_run = 0;
-            vec2 d_temp(6);
-            int f_run = 0;
-            vec2 f_temp(10);
-            int g_run = 0;
-            vec2 g_temp(15);
-            int basis_run = 0;
+            int basis_run = 0, run = 0;
+            vec2 shell;
             for (int i = 0; i < expected_coefs; i++)
             {
                 getline_universal(rf, line);
                 temp = split_string<string>(line, " ");
                 remove_empty_elements(temp);
                 coefficients[spin][MO_run].push_back(stod(temp[1]));
-                switch (prims[basis_run].get_type())
-                {
-                case 1:
-                {
-                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                    {
-                        double t = stod(temp[1]) * prims[basis_run + s].get_coef();
-                        if (abs(t) < 1E-10)
-                            t = 0;
-                        push_back_MO_coef(MO_run, t);
-                        if (MO_run == 0)
-                        {
-                            push_back_exponent(prims[basis_run + s].get_exp());
-                            push_back_center(prims[basis_run].get_center());
-                            push_back_type(prims[basis_run].get_type());
-                            nex++;
-                        }
-                    }
-                    basis_run += temp_shellsizes[basis_run];
-                    break;
-                }
-                case 2:
-                {
-                    if (p_run == 0)
-                    {
-                        for (int _i = 0; _i < 3; _i++)
-                        {
-                            p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-                        }
-                    }
-                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                    {
-                        p_temp[p_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
-                    }
-                    p_run++;
-                    if (p_run == 3)
-                    {
-                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                        {
-                            double temp_coef = 0;
-                            for (int cart = 0; cart < 3; cart++)
-                            {
-                                temp_coef = p_temp[cart][s];
-                                if (abs(temp_coef) < 1E-10)
-                                    temp_coef = 0;
-                                push_back_MO_coef(MO_run, temp_coef);
-                                if (MO_run == 0)
-                                {
-                                    push_back_exponent(prims[basis_run + s].get_exp());
-                                    push_back_center(prims[basis_run].get_center());
-                                    push_back_type(prims[basis_run].get_type() + cart);
-                                    nex++;
-                                }
-                            }
-                        }
-                        p_run = 0;
-                        basis_run += temp_shellsizes[basis_run];
-                    }
-                    break;
-                }
-                case 3:
-                {
-                    if (d_run == 0)
-                    {
-                        for (int _i = 0; _i < 6; _i++)
-                        {
-                            d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-                        }
-                    }
-                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                    {
-                        d_temp[d_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
-                    }
-                    d_run++;
-                    if (d_run == 6)
-                    {
-                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                        {
-                            for (int _i = 0; _i < 3; _i++)
-                                push_back_MO_coef(MO_run, d_temp[_i][s]);
-                            for (int _i = 3; _i < 6; _i++)
-                                push_back_MO_coef(MO_run, d_temp[_i][s] * sqrt(3));
-                            for (int cart = 0; cart < 6; cart++)
-                            {
-                                if (MO_run == 0)
-                                {
-                                    push_back_exponent(prims[basis_run + s].get_exp());
-                                    push_back_center(prims[basis_run].get_center());
-                                    push_back_type(5 + cart);
-                                    nex++;
-                                }
-                            }
-                        }
-                        d_run = 0;
-                        basis_run += temp_shellsizes[basis_run];
-                    }
-                    break;
-                }
-                case 4:
-                {
-                    if (f_run == 0)
-                    {
-                        for (int _i = 0; _i < 10; _i++)
-                        {
-                            f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-                        }
-                    }
-                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                    {
-                        f_temp[f_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
-                    }
-                    f_run++;
-                    if (f_run == 10)
-                    {
-                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                        {
-                            for (int cart = 0; cart < 10; cart++)
-                            {
-                                // THIS IS A MESS AND NEEDS REEVALUATION; THEY ARE CERTAINLY NOT CORRECT!
-                                if (cart < 3 || cart == 9)
-                                {
-                                    if (cart == 9)
-                                        push_back_MO_coef(MO_run, f_temp[cart][s] * sqrt(15));
-                                    else
-                                        push_back_MO_coef(MO_run, f_temp[cart][s]);
-                                }
-                                else if (cart == 3 || cart == 4)
-                                    push_back_MO_coef(MO_run, f_temp[cart + 1][s] * sqrt(15));
-                                else if (cart == 5)
-                                    push_back_MO_coef(MO_run, f_temp[cart + 3][s] * sqrt(15));
-                                else if (cart == 6)
-                                    push_back_MO_coef(MO_run, f_temp[cart - 3][s] * sqrt(5));
-                                else if (cart == 7)
-                                    push_back_MO_coef(MO_run, f_temp[cart - 1][s] * sqrt(5));
-                                else if (cart == 8)
-                                    push_back_MO_coef(MO_run, f_temp[cart - 1][s] * sqrt(15));
-                                if (MO_run == 0)
-                                {
-                                    push_back_exponent(prims[basis_run + s].get_exp());
-                                    push_back_center(prims[basis_run].get_center());
-                                    push_back_type(11 + cart);
-                                    nex++;
-                                }
-                            }
-                        }
-                        f_run = 0;
-                        basis_run += temp_shellsizes[basis_run];
-                    }
-                    break;
-                }
-                case 5:
-                {
-                    if (g_run == 0)
-                    {
-                        for (int _i = 0; _i < 15; _i++)
-                        {
-                            g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-                        }
-                    }
-                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                    {
-                        g_temp[g_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
-                    }
-                    g_run++;
-                    if (g_run == 15)
-                    {
-                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                        {
-                            for (int cart = 0; cart < 15; cart++)
-                            {
-                                push_back_MO_coef(MO_run, g_temp[cart][s]);
-                                if (MO_run == 0)
-                                {
-                                    push_back_exponent(prims[basis_run].get_exp());
-                                    push_back_center(prims[basis_run].get_center());
-                                    push_back_type(21 + cart);
-                                    nex++;
-                                }
-                            }
-                        }
-                        g_run = 0;
-                        basis_run += temp_shellsizes[basis_run];
-                    }
-                    break;
-                }
-                }
+                const int l = prims[basis_run].get_type() - 1, size = temp_shellsizes[basis_run];
+                err_checkf(l <= 4, "Cartesian molden shells beyond g are not supported", file);
+                if (run == 0)
+                    shell.assign(constants::n_cart(l), vec(size));
+                for (int s = 0; s < size; s++)
+                    shell[run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
+                if (++run < constants::n_cart(l))
+                    continue;
+                push_back_cartesian_shell(MO_run, l, shell, prims, basis_run, size, molden_order[l], cart_norm(l).data());
+                run = 0;
+                basis_run += size;
             }
-            err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
+            err_checkf(run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
             MO_run++;
             getline_universal(rf, line);
         }
@@ -2642,187 +2486,24 @@ __________________________________
                 else
                     push_back_MO(expected_coefs + MO_run, 0.0, energies_beta[MO_run], 1);
             }
-            int p_run = 0;
-            vec2 p_temp(3);
-            int d_run = 0;
-            vec2 d_temp(6);
-            int f_run = 0;
-            vec2 f_temp(10);
-            int g_run = 0;
-            vec2 g_temp(15);
-            int basis_run = 0;
+            const int mo = op == 0 ? MO_run : MO_run + expected_coefs;
+            int basis_run = 0, run = 0;
+            vec2 shell;
             for (int i = 0; i < expected_coefs; i++)
             {
-                switch (prims[basis_run].get_type())
-                {
-                case 1:
-                {
-                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                    {
-                        double t = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
-                        if (abs(t) < 1E-10)
-                            t = 0;
-                        op == 0 ? push_back_MO_coef(MO_run, t) : push_back_MO_coef(MO_run + expected_coefs, t);
-                        if (MO_run == 0 && op == 0)
-                        {
-                            push_back_exponent(prims[basis_run + s].get_exp());
-                            push_back_center(prims[basis_run].get_center());
-                            push_back_type(prims[basis_run].get_type());
-                            nex++;
-                        }
-                    }
-                    basis_run += temp_shellsizes[basis_run];
-                    break;
-                }
-                case 2:
-                {
-                    if (p_run == 0)
-                    {
-                        for (int _i = 0; _i < 3; _i++)
-                        {
-                            p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-                        }
-                    }
-                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                    {
-                        p_temp[p_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
-                    }
-                    p_run++;
-                    if (p_run == 3)
-                    {
-                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                        {
-                            for (int cart = 0; cart < 3; cart++)
-                            {
-                                op == 0 ? push_back_MO_coef(MO_run, p_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, p_temp[cart][s]);
-                                if (MO_run == 0 && op == 0)
-                                {
-                                    push_back_exponent(prims[basis_run + s].get_exp());
-                                    push_back_center(prims[basis_run].get_center());
-                                    push_back_type(prims[basis_run].get_type() + cart);
-                                    nex++;
-                                }
-                            }
-                        }
-                        p_run = 0;
-                        basis_run += temp_shellsizes[basis_run];
-                    }
-                    break;
-                }
-                case 3:
-                {
-                    if (d_run == 0)
-                    {
-                        for (int _i = 0; _i < 6; _i++)
-                        {
-                            d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-                        }
-                    }
-                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                    {
-                        d_temp[d_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(1.5);
-                    }
-                    d_run++;
-                    if (d_run == 6)
-                    {
-                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                        {
-                            for (int cart = 0; cart < 6; cart++)
-                            {
-                                op == 0 ? push_back_MO_coef(MO_run, d_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, d_temp[cart][s]);
-                                if (MO_run == 0 && op == 0)
-                                {
-                                    push_back_exponent(prims[basis_run + s].get_exp());
-                                    push_back_center(prims[basis_run].get_center());
-                                    push_back_type(5 + cart);
-                                    nex++;
-                                }
-                            }
-                        }
-                        d_run = 0;
-                        basis_run += temp_shellsizes[basis_run];
-                    }
-                    break;
-                }
-                case 4:
-                {
-                    if (f_run == 0)
-                    {
-                        for (int _i = 0; _i < 10; _i++)
-                        {
-                            f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-                        }
-                    }
-                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                    {
-                        f_temp[f_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(5.0);
-                    }
-                    f_run++;
-                    if (f_run == 10)
-                    {
-                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                        {
-                            for (int cart = 0; cart < 10; cart++)
-                            {
-                                // tonto swaps type 17 and 16
-                                if (cart != 5 && cart != 6)
-                                    op == 0 ? push_back_MO_coef(MO_run, f_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, f_temp[cart][s]);
-                                else if (cart == 5)
-                                    op == 0 ? push_back_MO_coef(MO_run, f_temp[cart + 1][s]) : push_back_MO_coef(MO_run + expected_coefs, f_temp[cart + 1][s]);
-                                else if (cart == 6)
-                                    op == 0 ? push_back_MO_coef(MO_run, f_temp[cart - 1][s]) : push_back_MO_coef(MO_run + expected_coefs, f_temp[cart - 1][s]);
-                                if (MO_run == 0 && op == 0)
-                                {
-                                    push_back_exponent(prims[basis_run + s].get_exp());
-                                    push_back_center(prims[basis_run].get_center());
-                                    push_back_type(11 + cart);
-                                    nex++;
-                                }
-                            }
-                        }
-                        f_run = 0;
-                        basis_run += temp_shellsizes[basis_run];
-                    }
-                    break;
-                }
-                case 5:
-                {
-                    if (g_run == 0)
-                    {
-                        for (int _i = 0; _i < 15; _i++)
-                        {
-                            g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-                        }
-                    }
-                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                    {
-                        g_temp[g_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(13.125);
-                    }
-                    g_run++;
-                    if (g_run == 15)
-                    {
-                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                        {
-                            for (int cart = 0; cart < 15; cart++)
-                            {
-                                op == 0 ? push_back_MO_coef(MO_run, g_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, g_temp[cart][s]);
-                                if (MO_run == 0 && op == 0)
-                                {
-                                    push_back_exponent(prims[basis_run].get_exp());
-                                    push_back_center(prims[basis_run].get_center());
-                                    push_back_type(21 + cart);
-                                    nex++;
-                                }
-                            }
-                        }
-                        g_run = 0;
-                        basis_run += temp_shellsizes[basis_run];
-                    }
-                    break;
-                }
-                }
+                const int l = prims[basis_run].get_type() - 1, size = temp_shellsizes[basis_run];
+                err_checkf(l <= 4, "tonto shells beyond g are not supported", file);
+                if (run == 0)
+                    shell.assign(constants::n_cart(l), vec(size));
+                for (int s = 0; s < size; s++)
+                    shell[run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() * tonto_scale[l];
+                if (++run < constants::n_cart(l))
+                    continue;
+                push_back_cartesian_shell(mo, l, shell, prims, basis_run, size, l == 3 ? tonto_f_order : nullptr);
+                run = 0;
+                basis_run += size;
             }
-            err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
+            err_checkf(run == 0, "There should not be any unfinished shells! Aborting reading tonto file after MO " + to_string(MO_run) + "!", file);
         }
         dMatrix2 temp_co = diag_dot(coefficients, occ, true);
         if (op == 0)
@@ -6375,132 +6056,48 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     if (debug)
         log << "Finished reading the file! Transferring to WFN object!" << std::endl;
 
-    int nprims = 0;
-    int nshell = (int)shell_types.size();
-    for (int i = 0; i < nshell; i++) {
-        nprims += sht2nbas(abs(shell_types[i])) * nr_prims_shell[i];
-    }
-    nex = nprims;
-    vec con_coefs;
-    int exp_run = 0;
-    for (int a = 0; a < shell_types.size(); a++)
+    std::vector<primitive> prims;
+    for (int a = 0, e = 0; a < shell_types.size(); a++)
     {
-        double confac = 1.0;
-        if (abs(shell_types[a]) == 0)
-        {
-            for (int i = 0; i < nr_prims_shell[a]; i++)
-            {
-                confac = pow(8 * pow(exp[exp_run], 3) / constants::PI3, 0.25);
-                con_coefs.push_back(con[exp_run] * confac);
-                push_back_exponent(exp[exp_run]);
-                push_back_center(shell2atom[a]);
-                push_back_type(abs(shell_types[a]) + 1);
-                exp_run++;
-            }
-        }
-        else if (abs(shell_types[a]) == 1)
-        {
-            for (int cart = 0; cart < 3; cart++) {
-                for (int i = 0; i < nr_prims_shell[a]; i++)
-                {
-                    confac = pow(128 * pow(exp[exp_run + i], 5) / constants::PI3, 0.25);
-                    con_coefs.push_back(con[exp_run + i] * confac);
-                    push_back_exponent(exp[exp_run + i]);
-                    push_back_center(shell2atom[a]);
-                    push_back_type(2 + cart);
-                }
-            }
-            exp_run += nr_prims_shell[a];
-        }
-        else if (abs(shell_types[a]) == 2)
-        {
-            for (int cart = 0; cart < 6; cart++) {
-                for (int i = 0; i < nr_prims_shell[a]; i++)
-                {
-                    confac = pow(2048 * pow(exp[exp_run + i], 7) / constants::PI3, 0.25);
-                    con_coefs.push_back(con[exp_run + i] * confac);
-                    push_back_exponent(exp[exp_run + i]);
-                    push_back_center(shell2atom[a]);
-                    push_back_type(5 + cart);
-                }
-            }
-            exp_run += nr_prims_shell[a];
-        }
-        else if (abs(shell_types[a]) == 3)
-        {
-            for (int cart = 0; cart < 10; cart++) {
-                for (int i = 0; i < nr_prims_shell[a]; i++)
-                {
-                    confac = pow(32768 * pow(exp[exp_run + i], 9) / constants::PI3, 0.25);
-                    con_coefs.push_back(con[exp_run + i] * confac);
-                    push_back_exponent(exp[exp_run + i]);
-                    push_back_center(shell2atom[a]);
-                    push_back_type(11 + cart);
-                }
-            }
-            exp_run += nr_prims_shell[a];
-        }
-        else if (abs(shell_types[a]) == 4)
-        {
-            for (int cart = 0; cart < 15; cart++) {
-                for (int i = 0; i < nr_prims_shell[a]; i++)
-                {
-                    confac = pow(524288 * pow(exp[exp_run + i], 11) / constants::PI3, 0.25);
-                    con_coefs.push_back(con[exp_run + i] * confac);
-                    push_back_exponent(exp[exp_run + i]);
-                    push_back_center(shell2atom[a]);
-                    push_back_type(21 + cart);
-                }
-            }
-            exp_run += nr_prims_shell[a];
-        }
-        else if (abs(shell_types[a]) == 5)
-        {
-            for (int cart = 0; cart < 21; cart++) {
-                for (int i = 0; i < nr_prims_shell[a]; i++)
-                {
-                    confac = pow(8388608 * pow(exp[exp_run + i], 13) / constants::PI3, 0.25);
-                    con_coefs.push_back(con[exp_run + i] * confac);
-                    push_back_exponent(exp[exp_run + i]);
-                    push_back_center(shell2atom[a]);
-                    push_back_type(36 + cart);
-                }
-            }
-            exp_run += nr_prims_shell[a];
-        }
-        else if (abs(shell_types[a]) == 6)
-        {
-            //to-do: Have to calcualte confac for higher l
-        }
+        const int l = abs(shell_types[a]), n = nr_prims_shell[a];
+        err_checkf(shell_types[a] != -1 && l <= 10, "SP shells and l > 10 are not supported in fchk", log);
+        //the MO coefficients refer to normalised contracted functions; NoSpherA2's own fchk writer leaves the contraction unnormalised
+        double norm = 0;
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                norm += con[e + i] * con[e + j] * pow(2 * sqrt(exp[e + i] * exp[e + j]) / (exp[e + i] + exp[e + j]), l + 1.5);
+        //primitive norm of x^l for Cartesian shells, the sph2cart tables expect ORCA's pure scaling
+        norm *= shell_types[a] < 0 ? constants::sph2cart_norm2[l] : odd_ft(2 * l - 1);
+        for (int i = 0; i < n; i++, e++)
+            prims.emplace_back(shell2atom[a], constants::first_type[l], exp[e], con[e] / sqrt(norm) * pow(pow(2, 4 * l + 3) * pow(exp[e], 2 * l + 3) / constants::PI3, 0.25));
     }
     if (debug)
         log << "I read the basis of " << ncen << " atoms successfully" << std::endl;
+    nex = 0;
     for (int i = 0; i < 2; i++) {
         if (MOocc[i].size() == 0)
             break;
         for (int j = 0; j < nbas; j++) {
             push_back_MO(i * nbas + j + 1, MOocc[i][j], MOene[i][j], 0);
-            int cc_run = 0, coef_run = 0;
+            int coef_run = 0, basis_run = 0;
             for (int p = 0; p < nr_prims_shell.size(); p++)
             {
-                const int l = abs(shell_types[p]), nsph = constants::n_spher(l), ncart = constants::n_cart(l);
-                err_checkf(l <= 4, "Types higher than g type in fchk", log);
-                for (int cart = 0; cart < ncart; cart++)
+                const int l = abs(shell_types[p]), size = nr_prims_shell[p], n = shell_types[p] < 0 ? constants::n_spher(l) : constants::n_cart(l);
+                vec2 shell(n, vec(size));
+                for (int m = 0; m < n; m++)
                 {
-                    double t = 0;
-                    if (l < 2)
-                        t = coef[i][j * nbas + coef_run + cart];
-                    else
-                        for (int m = 0; m < nsph; m++)
-                            t += constants::sph2cart(l)[cart * nsph + m] * coef[i][j * nbas + coef_run + m];
-                    for (int s = 0; s < nr_prims_shell[p]; s++)
-                        push_back_MO_coef(j, t * con_coefs[cc_run + s]);
+                    //pure fchk functions m = 0, +1, -1, ... carry the Gaussian/libcint phase, the sph2cart tables ORCA's: |m| = 3, 4, 7, 8 change sign
+                    const double phase = shell_types[p] < 0 && ((m + 1) / 2 % 4 == 3 || (m + 1) / 2 % 4 == 0) && m > 0 ? -1.0 : 1.0;
+                    for (int s = 0; s < size; s++)
+                        shell[m][s] = phase * coef[i][j * nbas + coef_run + m] * prims[basis_run + s].get_coef();
                 }
-                coef_run += l < 2 ? ncart : nsph;
-                cc_run += ncart * nr_prims_shell[p];
+                if (shell_types[p] < 0)
+                    push_back_spherical_shell(i * nbas + j, l, shell, prims, basis_run, size);
+                else
+                    push_back_cartesian_shell(i * nbas + j, l, shell, prims, basis_run, size, l == 3 ? gaussian_f_order : nullptr, cart_norm(l).data());
+                coef_run += n;
+                basis_run += size;
             }
-
-
         }
     }
     set_exp_cutoff();

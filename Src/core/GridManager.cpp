@@ -207,14 +207,14 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
         if (is_hydrogen) {
             return {
                 low_angular_momentum ? constants::lebedev_table[28] : constants::lebedev_table[30],
-                low_angular_momentum ? constants::lebedev_table[30] : constants::lebedev_table[32],
+                low_angular_momentum ? constants::lebedev_table[30] : constants::lebedev_table[31],
                 1e-19
             };
         }
         else {
             return {
                 low_angular_momentum ? constants::lebedev_table[29] : constants::lebedev_table[31],
-                low_angular_momentum ? constants::lebedev_table[31] : constants::lebedev_table[32],
+                constants::lebedev_table[31],
                 1e-20
             };
         }
