@@ -20,6 +20,8 @@
 #include "core/crystal_energies.h"
 #include "core/NoSpherA2.h"
 #include "core/npy.h"
+#include "core/libCintMain.h"
+#undef I
 #ifdef NOSPHERA2_USE_GPU
 #include "core/blas_gpu.h"
 #include "core/aux_density_gpu.h"
@@ -1567,7 +1569,7 @@ namespace NoSpherA2UnitTests
         int v[3];
         constants::type2vector(0, v);
         EXPECT_EQ(-1, v[0]);
-        constants::type2vector(85, v);
+        constants::type2vector(287, v);
         EXPECT_EQ(-1, v[0]);
     }
 
@@ -3545,8 +3547,9 @@ namespace NoSpherA2UnitTests
         EXPECT_DOUBLE_EQ(constants::sph2cart(3)[9 * 7 + 4], 1.0);
         EXPECT_DOUBLE_EQ(constants::sph2cart(4)[0 * 9 + 0], 0.1690308509457033);
         EXPECT_DOUBLE_EQ(constants::sph2cart(4)[14 * 9 + 0], 0.06338656910463875);
-        EXPECT_DOUBLE_EQ(constants::sph2cart(5)[20 * 11 + 1], 0.060993754559283325);
-        EXPECT_DOUBLE_EQ(constants::sph2cart(6)[27 * 13 + 11], 0.067507715608415203);
+        EXPECT_DOUBLE_EQ(constants::sph2cart(5)[20 * 11 + 1], 0.48412291827592713);
+        EXPECT_DOUBLE_EQ(constants::sph2cart(6)[27 * 13 + 11], 0.67169328938139627);
+        EXPECT_DOUBLE_EQ(constants::sph2cart(10)[65 * 21 + 19], 0.59362791713657326);
     }
 
     TEST(GbwHighAngularTests, ReadsIFunctionFixtures)
@@ -3564,6 +3567,150 @@ namespace NoSpherA2UnitTests
             const double density = wave.compute_dens({ 0.23, -0.41, 0.67 });
             EXPECT_TRUE(std::isfinite(density));
             EXPECT_GT(density, 0.0);
+        }
+    }
+
+    //Lukas Seifert's derivation: libcint's c2s with ORCA's phase for |m| = 3, 4, 7, 8 over ORCA's angular norm, which drops sqrt((2l-1)(2l-3)) from l = 5 on
+    TEST(Sph2CartTests, MatchesLibcintWithOrcaPhase)
+    {
+        for (int l = 2; l <= 10; l++)
+        {
+            const int nc = constants::n_cart(l), nsph = constants::n_spher(l);
+            vec identity(nc * nc, 0.0), sph(nsph * nc, 0.0);
+            for (int i = 0; i < nc; i++) identity[i + nc * i] = 1.0;
+            libcint::CINTc2s_bra_sph(sph.data(), nc, identity.data(), l);
+            const double norm = l == 2 ? 0.5 * std::sqrt(15.0 / constants::PI) : l == 3 ? 0.5 * std::sqrt(105.0 / constants::PI) : l == 4 ? 1.5 * std::sqrt(35.0 / constants::PI) : 0.5 * std::sqrt((2.0 * l + 1.0) / constants::PI);
+            for (int cart = 0; cart < nc; cart++)
+            {
+                int e[3];
+                constants::type2vector(constants::first_type[l] + cart, e);
+                int lc = 0;
+                for (int lx = l; lx > e[0]; lx--) lc += l - lx + 1;
+                lc += l - e[0] - e[1];
+                for (int m = -l; m <= l; m++)
+                {
+                    const double phase = std::abs(m) % 4 == 3 || std::abs(m) % 4 == 0 && m != 0 ? -1.0 : 1.0;
+                    EXPECT_NEAR(constants::sph2cart(l)[cart * nsph + (m == 0 ? 0 : m > 0 ? 2 * m - 1 : -2 * m)], phase / norm * sph[(m + l) + nsph * lc], 1e-12) << "l " << l << " cart " << cart << " m " << m;
+                }
+            }
+        }
+    }
+
+    //<x^a e^-ar^2 | x^b e^-br^2> along one axis, PA/PB the centre P = (aA+bB)/p relative to A and B
+    static double prim_overlap_1d(const int a, const int b, const double PA, const double PB, const double p)
+    {
+        double s = 0;
+        for (int i = 0; i <= a; i++)
+            for (int j = i % 2; j <= b; j += 2)
+            {
+                double t = std::pow(PA, a - i) * std::pow(PB, b - j);
+                for (int k = 1; k <= i; k++) t *= double(a - i + k) / k;
+                for (int k = 1; k <= j; k++) t *= double(b - j + k) / k;
+                for (int k = i + j - 1; k > 0; k -= 2) t *= k;
+                s += t / std::pow(2 * p, (i + j) / 2);
+            }
+        return s * std::sqrt(constants::PI / p);
+    }
+
+    //ORCA stores every contraction normalised, so each shell's m = 0 function and every occupied MO of the i-function
+    //GBWs has unit norm under the analytic primitive overlap; this pins the h and i tables where the grid integral cannot
+    TEST(GbwHighAngularTests, OccupiedMOsAreNormalised_full)
+    {
+        if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false")
+            GTEST_SKIP() << "Set RUN_FULL_TEST=1 to build the primitive overlap of the CuF2 i-function GBWs";
+        const auto root = nos_test_repo_root();
+        const std::array<std::string, 3> angles = { "71", "113", "149" };
+        for (const auto& angle : angles) {
+            const auto input = root / "tests" / "CuF2_i_func" / angle / "calc.gbw";
+            if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+            WFN wave(input, false);
+            wave.delete_unoccupied_MOs();
+            const int nex = wave.get_nex(), nmo = wave.get_nmo();
+            vec2 S(nex, vec(nex));
+#pragma omp parallel for schedule(dynamic)
+            for (int a = 0; a < nex; a++)
+            {
+                int la[3], lb[3];
+                constants::type2vector(wave.get_type(a), la);
+                const double al = wave.get_exponent(a);
+                for (int b = 0; b <= a; b++)
+                {
+                    constants::type2vector(wave.get_type(b), lb);
+                    const double be = wave.get_exponent(b), p = al + be;
+                    double s = 1, AB2 = 0;
+                    for (int k = 0; k < 3; k++)
+                    {
+                        const double A = wave.get_atom_coordinate(wave.get_center(a) - 1, k), B = wave.get_atom_coordinate(wave.get_center(b) - 1, k), P = (al * A + be * B) / p;
+                        AB2 += (A - B) * (A - B);
+                        s *= prim_overlap_1d(la[k], lb[k], P - A, P - B, p);
+                    }
+                    S[a][b] = S[b][a] = s * std::exp(-al * be / p * AB2);
+                }
+            }
+            for (int at = 0; at < wave.get_ncen(); at++)
+            {
+                const atom& A = wave.get_atom(at);
+                int prim = 0;
+                for (int sh = 0; sh < (int)A.get_shellcount_size(); sh++)
+                {
+                    const int n = A.get_shellcount(sh), l = A.get_basis_set_type(prim) - 1, nc = constants::n_cart(l), nsph = constants::n_spher(l);
+                    double norm = 0;
+                    for (int u = 0; u < n; u++)
+                        for (int v = 0; v < n; v++)
+                        {
+                            const double p = A.get_basis_set_exponent(prim + u) + A.get_basis_set_exponent(prim + v);
+                            double t = 0;
+                            for (int c1 = 0; c1 < nc; c1++)
+                                for (int c2 = 0; c2 < nc; c2++)
+                                {
+                                    int e1[3], e2[3]; constants::type2vector(constants::first_type[l] + c1, e1); constants::type2vector(constants::first_type[l] + c2, e2);
+                                    double o = 1;
+                                    for (int k = 0; k < 3; k++) o *= prim_overlap_1d(e1[k], e2[k], 0, 0, p);
+                                    t += constants::sph2cart(l)[c1 * nsph] * constants::sph2cart(l)[c2 * nsph] * o;
+                                }
+                            norm += A.get_basis_set_coefficient(prim + u) * A.get_basis_set_coefficient(prim + v) * t;
+                        }
+                    EXPECT_NEAR(norm, 1.0, 1e-12) << angle << " atom " << at << " shell " << sh << " l " << l;
+                    prim += n;
+                }
+            }
+            double electrons = 0;
+            for (int i = 0; i < nmo; i++)
+            {
+                double norm = 0;
+                for (int a = 0; a < nex; a++)
+                {
+                    double t = 0;
+                    for (int b = 0; b < nex; b++) t += S[a][b] * wave.get_MO_coef(i, b);
+                    norm += wave.get_MO_coef(i, a) * t;
+                }
+                EXPECT_NEAR(norm, 1.0, 1e-8) << angle << " MO " << i;
+                electrons += wave.get_MO_occ(i) * norm;
+            }
+            EXPECT_NEAR(electrons, wave.get_nr_electrons(), 1e-6) << angle;
+        }
+    }
+
+    TEST(GbwHighAngularTests, IntegratesElectronCount_full)
+    {
+        if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false")
+            GTEST_SKIP() << "Set RUN_FULL_TEST=1 to integrate the CuF2 i-function densities on a Becke grid";
+        const auto root = nos_test_repo_root();
+        const std::array<std::string, 3> angles = { "71", "113", "149" };
+        for (const auto& angle : angles) {
+            const auto input = root / "tests" / "CuF2_i_func" / angle / "calc.gbw";
+            if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+            WFN wave(input, false);
+            wave.delete_unoccupied_MOs();
+            GridConfiguration config;
+            config.partition_type = PartitionType::Becke;
+            config.accuracy = 4;
+            GridManager gm(config);
+            ivec atom_list(wave.get_ncen());
+            for (int i = 0; i < wave.get_ncen(); i++) atom_list[i] = i;
+            gm.setup3DGridsForMolecule(wave, atom_list);
+            const PartitionResults res = gm.calculatePartitionedCharges(wave);
+            EXPECT_NEAR(res.overall_charges[PartitionResults::S_BECKE], wave.get_nr_electrons(), 1e-3) << angle;
         }
     }
 } // namespace NoSpherA2UnitTests
