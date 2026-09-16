@@ -48,11 +48,12 @@ void XCW::construct(const options& opt_in) {
 	cryst.ncen = asym_atoms.size();
 
 	// Load whether or not the structure is grown, find applied symmetries and delete the corresponding reflections
+	ivec applied_symmetry;
 	if (settings.grown) {
-		unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list);
+		applied_symmetry = unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list);
 	}
 
-	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
+	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list, applied_symmetry);
 
 	// Generate WFN object from asym_atoms
 	dummy_wave.assign_charge(settings.charge);

@@ -202,23 +202,34 @@ bool cell::check_special(const vec& pos1, const vec& pos2, const double& toleran
 }
 
 // Handles the processing of grown structures
-void cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list) {
+ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list) {
 	const ivec applied_symmetry = confirm_applied_symmetry(linking_list);
 	delete_symmetry(applied_symmetry, hkl_enlarged, hkl);
+	return applied_symmetry;
 	// closing function
 }
 
-void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list) {
+int cell::surviving_symmetries_count(const ivec& self_links, const ivec& applied_symmetry) {
+	int count = 0;
+	for (int sym_op : self_links) {
+		if (std::find(applied_symmetry.begin(), applied_symmetry.end(), sym_op) == applied_symmetry.end()) {
+			count++;
+		}
+	}
+	return count;
+}
+
+void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry) {
 	int idx1 = 0;
 	for (asym_atom& a : asym_atoms) {
 		if (!a.grown) {
-			a.asym_fact = 1.0 / linking_list[idx1][idx1].size();
+			a.asym_fact = 1.0 / surviving_symmetries_count(linking_list[idx1][idx1], applied_symmetry);
 			idx1++;
 			continue;
 		}
 		for (int idx2 = 0; idx2 < linking_list.size(); idx2++) {
 			if (linking_list[idx2][idx1].size() != 0) {
-				a.asym_fact = 1.0 / linking_list[idx2][idx2].size();
+				a.asym_fact = 1.0 / surviving_stabilizer_count(linking_list[idx2][idx2], applied_symmetry);
 			}
 		}
 		idx1++;
