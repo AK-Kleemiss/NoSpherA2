@@ -835,7 +835,8 @@ struct options
     bool rgbi = false;
     bool rgbi_no_sym = false;
     bool rgbi_EVs = false;
-    RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
+    bool rgbi_theta = false;
+    RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
     ivec3 rgbi_group_sets;
     bool fract = false;
     //GPU scattering factors when a device is present; -no_gpu forces the CPU loop

@@ -589,8 +589,6 @@ public:
     std::filesystem::path get_cube_path(const int& nr) const;
     /** Write cube (standard format). */
     void write_cube_file(const int& nr, const std::filesystem::path& filename, const bool& debug = false);
-    /** Write cube in dGrid compatible format. */
-    void write_cube_dgrid(const int& nr, const std::filesystem::path& filename, const bool& debug = false);
     /** Write cube in XDGraph compatible format. */
     void write_cube_xdgraph(const int& nr, const std::filesystem::path& filename, const bool& debug = false);
     /** Check if cube data is loaded in memory. */

@@ -297,9 +297,11 @@ ECP = 1
 directory = "RGBI_groups"
 good = "NH3BH3_sym.good"
 
+# NAO pinned: the default RGBI basis is ANO now, and NH3BH3_sym_ANO below covers that.
 [RGBI_Groups_NH3BH3_sym.args]
 wfn = "nh3bh3.gbw"
 rgbi = ""
+rgbi_basis = "nao"
 rgbi-groups = ["0,4,5,7","1,2,3,6"]
 
 [RGBI_Groups_NH3BH3_sym_ANO]
@@ -319,6 +321,7 @@ good = "nh3li_nao.good"
 [RGBI_NH3Li.args]
 wfn = "../RGBI_groups/nh3li.gbw"
 rgbi = ""
+rgbi_basis = "nao"
 
 [ELI_NH3Li]
 directory = "RGBI"
@@ -349,7 +352,6 @@ good = "nh3li_ano.good"
 [RGBI_NH3Li_ANO.args]
 wfn = "../RGBI_groups/nh3li.gbw"
 rgbi = ""
-rgbi_basis = "ano"
 
 # Uses sto-3g (not the def2-svp default) to keep CI resource usage
 # reasonable: def2-svp for this 23-atom/3215-reflection system needs a

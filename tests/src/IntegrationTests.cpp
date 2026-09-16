@@ -5,25 +5,6 @@
 
 #include "core/NoSpherA2.h"
 
-inline std::filesystem::path nos_test_repo_root()
-    {
-        if (const char* env = std::getenv("NOS_REPO_ROOT")) {
-            return std::filesystem::path(env);
-        }
-
-        auto p = std::filesystem::current_path();
-        for (int i = 0; i < 8; ++i) {
-            if (std::filesystem::exists(p / "tests" / "tests.toml")) {
-                return p;
-            }
-            if (!p.has_parent_path()) {
-                break;
-            }
-            p = p.parent_path();
-        }
-        return std::filesystem::current_path();
-    }
-
 namespace {
 
 struct UT_Result {
@@ -597,6 +578,28 @@ TEST(TomlIntegrationTests, P1_test_XCW_h2_full)
 TEST(TomlIntegrationTests, P1_F2_test_XCW)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+// The three quick fits again with -xcw_incremental: the two-electron part of the Fock
+// matrix comes from the difference density contracted from the stored integrals
+// (tests.toml explains the flags). Their goldens agree with the full builds to the SCF
+// convergence, so this is where a broken segment skip would show.
+TEST(TomlIntegrationTests, P1_test_XCW_incremental)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_incremental");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, P1_test_XCW_h2_incremental)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2_incremental");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, P1_F2_test_XCW_incremental)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_incremental");
     EXPECT_TRUE(result.success) << result.message;
 }
 

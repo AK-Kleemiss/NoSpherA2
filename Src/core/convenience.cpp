@@ -373,7 +373,7 @@ std::string help_message =
  "                                    NA2_<lambda>_RGBI.txt; the .wfn and\n"
  "                                    .fchk written there cannot carry it.\n"
  "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization.\n"
- "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO [nao] or ANO.\n"
+ "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
  "  -rgbi-groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
  "                                    for multiple group sets.\n"
  "  -promol_nci <a.xyz> <b.xyz> [rcut1 rcut2 rho_max rdg_max]\n"
@@ -476,6 +476,7 @@ std::string help_message =
  "  -get_g                              Enable reciprocal-space g calculation.\n"
  "  -refine [accuracy]                  Set refinement integral accuracy [0.1].\n"
  "  -rgbi_EVs                           Include RGBI eigenvectors.\n"
+ "  -rgbi_theta                         Include per-bond Roby-Gould theta-subspace populations and indices.\n"
  "  -sfac_diffuse x y z cif wfn dmin    Calculate diffuse scattering factors.\n\n"
  "EXPERIMENTAL AND DEVELOPER COMMANDS\n"
  "  -coef <file>                        Use externally supplied SALTED\n"
@@ -597,6 +598,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Marti Gimferrer,\n");
         t.append("      Anker Nielsen,\n");
         t.append("      Lucas Militao,\n");
+        t.append("      Johannes Bartusel,\n");
         t.append("      and many more in communications or by feedback!\n");
         t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library, as well as OCC for the calculation of wavefunctions, when required.\n");
         t.append("The used packages are published under BSD-3 clause License or explicit consent for the use in this project was given.\n");
@@ -608,7 +610,8 @@ std::string NoSpherA2_message(bool no_date)
         t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst. 2024, 57, 161 - 174.\n");
         t.append("ECP correction functions at : Kleemiss et al. J. Appl. Cryst. 2025, 58, 374 - 382.\n");
-        t.append("Aux basis /RI partitioning  : Seifert et al. Z. Krist. - Cryst. Mat. 2026, 10.1515/zkri-2026-0013.\n");
+        t.append("Aux basis /RI partitioning  : Seifert et al. Z. Krist. - Cryst. Mat. 2026, 241, 283 - 295.\n");
+        t.append("Embedding for HAR at        : Landeros-Rivera & Kleemiss, J. Appl. Cryst. 2026, 59, 10.1107/S160057672600717X.\n");
         t.append("TFVC partitioning at        : Gimferrer et al. TBA.\n");
         t.append("MBIS/EMBIS partitioning at  : Nielsen et al. TBA.\n");
     }
@@ -3559,6 +3562,10 @@ bool options::digest_ri_options(const std::string &temp, int &i)
     }
     else if (temp == "-rgbi_EVs") {
         rgbi_EVs = true;
+    }
+    else if (temp == "-rgbi_theta") {
+        rgbi = true;
+        rgbi_theta = true;
     }
     else if (temp == "-rgbi_basis") {
         err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);

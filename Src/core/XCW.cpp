@@ -48,15 +48,16 @@ void XCW::construct(const options& opt_in) {
 	cryst.ncen = asym_atoms.size();
 
 	// Load whether or not the structure is grown, find applied symmetries and delete the corresponding reflections
+	ivec applied_symmetry;
 	if (settings.grown) {
-		unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list);
+		applied_symmetry = unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list);
 	}
 
-	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
+	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list, applied_symmetry);
 
 	// Generate WFN object from asym_atoms
-	dummy_wave.assign_charge(opt->charge);
-	dummy_wave.assign_multi(opt->mult);
+	dummy_wave.assign_charge(settings.charge);
+	dummy_wave.assign_multi(settings.multiplicity);
 	for (int at = 0; at < cryst.ncen; at++) {
 		asym_atom_list.push_back(at);
 		atom temp_atom;
@@ -807,45 +808,61 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 }
 
 void XCW::eval_scale() {
-	double numerator = 0.0;
-	double denominator = 0.0;
-
-#pragma omp parallel for reduction(+:numerator, denominator)
-	for (int i = 0; i < cryst.nr_small; ++i) {
-		const double calc = std::abs(F_calc[0][i]);
-		numerator += calc * obs[i].F_obs;
-		denominator += calc * calc;
+	const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
+	vec numerators(nchunk), denominators(nchunk);
+#pragma omp parallel for schedule(static)
+	for (int c = 0; c < nchunk; c++) {
+		const int first = c * chunk, last = std::min(first + chunk, cryst.nr_small);
+		for (int i = first; i < last; i++) {
+			const double calc = std::abs(F_calc[0][i]);
+			numerators[c] += calc * obs[i].F_obs;
+			denominators[c] += calc * calc;
+		}
 	}
-
+	double numerator = 0.0, denominator = 0.0;
+	for (int c = 0; c < nchunk; c++) {
+		numerator += numerators[c];
+		denominator += denominators[c];
+	}
 	cryst.F_scale = (denominator != 0.0) ? numerator / denominator : 1.0;
 }
 
 void XCW::calc_criteria() {
 	ensure_inv_H2_weights();
 	double prefactor = 1.0 / static_cast<double>(cryst.nr_small - settings.n_params);
-	double sum_goof1 = 0, sum_goof2 = 0;
-	double sum_weighted_goof1 = 0, sum_weighted_goof2 = 0;
+	const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
+	vec sum_goof1_parts(nchunk), sum_goof2_parts(nchunk), sum_weighted_goof1_parts(nchunk), sum_weighted_goof2_parts(nchunk);
 	const double scale = cryst.F_scale;
 	const cdouble* F_calc_0 = F_calc[0].data();
-#pragma omp parallel for reduction(+:sum_goof1, sum_goof2, sum_weighted_goof1, sum_weighted_goof2)
-	for (int i = 0; i < cryst.nr_small; i++) {
-		const scattering_data& obs_ptr = obs[i];
-		const double scaled_F_calc = scale * std::abs(F_calc_0[i]);
-		const double scaled_difference = scaled_F_calc - obs_ptr.F_obs;
-		const double diff2 = (scaled_F_calc * scaled_F_calc) - obs_ptr.F_obs2;
-		const double inv_sigma_obs = 1.0 / obs_ptr.sigma_obs;
-		const double inv_sigma_obs2 = 1.0 / obs_ptr.sigma_obs2;
-		const double weighted_diff1 = scaled_difference * inv_sigma_obs;
-		const double weighted_diff2 = diff2 * inv_sigma_obs2;
-		const double weighted_diff1_sq = weighted_diff1 * weighted_diff1;
-		const double weighted_diff2_sq = weighted_diff2 * weighted_diff2;
-		sum_goof1 += weighted_diff1_sq;
-		sum_goof2 += weighted_diff2_sq;
-		if (settings.XWR_type == 2) {
-			const double w = inv_H2_[i];
-			sum_weighted_goof1 += weighted_diff1_sq * w;
-			sum_weighted_goof2 += weighted_diff2_sq * w;
+#pragma omp parallel for schedule(static)
+	for (int c = 0; c < nchunk; c++) {
+		const int first = c * chunk, last = std::min(first + chunk, cryst.nr_small);
+		for (int i = first; i < last; i++) {
+			const scattering_data& obs_ptr = obs[i];
+			const double scaled_F_calc = scale * std::abs(F_calc_0[i]);
+			const double scaled_difference = scaled_F_calc - obs_ptr.F_obs;
+			const double diff2 = (scaled_F_calc * scaled_F_calc) - obs_ptr.F_obs2;
+			const double inv_sigma_obs = 1.0 / obs_ptr.sigma_obs;
+			const double inv_sigma_obs2 = 1.0 / obs_ptr.sigma_obs2;
+			const double weighted_diff1 = scaled_difference * inv_sigma_obs;
+			const double weighted_diff2 = diff2 * inv_sigma_obs2;
+			const double weighted_diff1_sq = weighted_diff1 * weighted_diff1;
+			const double weighted_diff2_sq = weighted_diff2 * weighted_diff2;
+			sum_goof1_parts[c] += weighted_diff1_sq;
+			sum_goof2_parts[c] += weighted_diff2_sq;
+			if (settings.XWR_type == 2) {
+				const double w = inv_H2_[i];
+				sum_weighted_goof1_parts[c] += weighted_diff1_sq * w;
+				sum_weighted_goof2_parts[c] += weighted_diff2_sq * w;
+			}
 		}
+	}
+	double sum_goof1 = 0, sum_goof2 = 0, sum_weighted_goof1 = 0, sum_weighted_goof2 = 0;
+	for (int c = 0; c < nchunk; c++) {
+		sum_goof1 += sum_goof1_parts[c];
+		sum_goof2 += sum_goof2_parts[c];
+		sum_weighted_goof1 += sum_weighted_goof1_parts[c];
+		sum_weighted_goof2 += sum_weighted_goof2_parts[c];
 	}
 	cryst.GooF1 = std::sqrt(prefactor * sum_goof1);
 	cryst.GooF2 = std::sqrt(prefactor * sum_goof2);
@@ -2585,8 +2602,8 @@ void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
 
 	std::string init = init_stream.str();
 	mol = occ::io::molecule_from_xyz_string(init);
-	mol.set_charge(opt->charge);
-	mol.set_multiplicity(opt->mult);
+	mol.set_charge(settings.charge);
+	mol.set_multiplicity(settings.multiplicity);
 }
 
 void XCW::setup_basis(occ::core::Molecule& mol, std::string& basis_set_name, occ::qm::AOBasis& occ_basis_set) {
@@ -2653,10 +2670,11 @@ void XCW::build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMat
 	}
 }
 
-void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess) {
+bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess, const bool write_result) {
 
 	settings.clear();
-	cdiis_.reset();
+	diis_F_.clear();
+	diis_E_.clear();
 	adiis_.reset();
 	ediis_.reset();
 
@@ -2732,9 +2750,11 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		}
 		std::cout << std::endl;
 
-		const _time_point tscb_t0 = get_time();
-		create_tscb(scf, lambda);
-		throughput::record_time("XCW tscb", false, get_msec(tscb_t0, get_time()));
+		if (write_result) {
+			const _time_point tscb_t0 = get_time();
+			create_tscb(scf, lambda);
+			throughput::record_time("XCW tscb", false, get_msec(tscb_t0, get_time()));
+		}
 	}
 	else {
 		XCW_log << "____________________________________________________________________________________\n";
@@ -2785,7 +2805,7 @@ void XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		}
 		XCW_log << rmsd_density.str();
 	}
-	// closing function
+	return converged;
 }
 
 double XCW::compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
@@ -2843,7 +2863,8 @@ void XCW::solve_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat
 }
 
 //occ's ConvergenceAccelerator::update with the CDIIS commutator S D F - F D S from MKL; with
-//the three matrices symmetric it is T - T^T for T = S D F. The extrapolations are occ's.
+//the three matrices symmetric it is T - T^T for T = S D F. CDIIS is cdiis_extrapolate below,
+//ADIIS and EDIIS are occ's.
 occ::Mat XCW::diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	const occ::Mat& S = scf.ctx.S;
 	const occ::Mat& D = scf.ctx.mo.D;
@@ -2856,14 +2877,63 @@ occ::Mat XCW::diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 		comm.middleRows(static_cast<Eigen::Index>(b) * n, n) = T - T.transpose();
 	}
 	scf.diis_error = comm.array().abs().maxCoeff();
-	occ::Mat F_cdiis = F;
-	cdiis_.extrapolate(F_cdiis, comm);
+	occ::Mat F_cdiis = cdiis_extrapolate(F, comm);
 	const occ::qm::DiisStrategy strategy = scf.convergence_settings.diis_strategy;
 	if (strategy == occ::qm::DiisStrategy::CDIIS || scf.diis_error <= scf.convergence_settings.diis_switch_threshold) return F_cdiis;
 	if (strategy == occ::qm::DiisStrategy::ADIIS_CDIIS) return adiis_.update(scf.ctx.mo.kind, D, F);
 	return ediis_.update(scf.ctx.mo.kind, D, F, scf.ctx.energy["electronic"]);
 }
 
+//Pulay's CDIIS on the Fock matrix, extrapolating from the second vector on: the perturbed
+//Roothaan map is stiff and the plain steps occ's DIIS takes first already leave the linear
+//regime. B c = 1 over B_ij = <E_i|E_j>, scaled by its largest diagonal element, is solved by
+//the pseudo-inverse over the eigenvalues above eigenvalue_cutoff: near convergence the errors
+//are almost collinear and a QR solve returns coefficients in the hundreds that amplify the
+//noise of the stored Fock matrices. Should one still exceed max_coefficient the oldest vector
+//is dropped and the system solved again.
+occ::Mat XCW::cdiis_extrapolate(const occ::Mat& F, const occ::Mat& E) {
+	diis_F_.push_back(F);
+	diis_E_.push_back(E);
+	if (diis_F_.size() > diis_subspace_) {
+		diis_F_.pop_front();
+		diis_E_.pop_front();
+	}
+	constexpr double eigenvalue_cutoff = 1e-14, max_coefficient = 100.0;
+	while (diis_F_.size() > 1) {
+		const int n = static_cast<int>(diis_F_.size());
+		occ::Mat B(n, n);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j <= i; j++) {
+				B(i, j) = B(j, i) = diis_E_[i].cwiseProduct(diis_E_[j]).sum();
+			}
+		}
+		const double scale = B.diagonal().maxCoeff();
+		if (!(scale > 0.0)) return F;
+		B /= scale;
+		const Eigen::SelfAdjointEigenSolver<occ::Mat> es(B);
+		const occ::Vec& w = es.eigenvalues();
+		const occ::Mat& V = es.eigenvectors();
+		//c = B^+ 1 / (1^T B^+ 1) minimises c^T B c under sum(c) = 1
+		occ::Vec c = occ::Vec::Zero(n);
+		for (int k = 0; k < n; k++) {
+			if (w(k) <= eigenvalue_cutoff * w(n - 1)) continue;
+			c += (V.col(k).sum() / w(k)) * V.col(k);
+		}
+		const double norm = c.sum();
+		if (std::abs(norm) > 0.0 && c.cwiseAbs().maxCoeff() <= max_coefficient * std::abs(norm)) {
+			c /= norm;
+			occ::Mat F_out = c(0) * diis_F_[0];
+			for (int i = 1; i < n; i++) F_out += c(i) * diis_F_[i];
+			return F_out;
+		}
+		diis_F_.pop_front();
+		diis_E_.pop_front();
+	}
+	return F;
+}
+
+//The change from the density of the previous iteration, dm_last, to the one this iteration
+//built its Fock matrix from
 void XCW::get_density_criteria(double& RMSP_diff, double& maxP_diff, const occ::Mat& dm, const occ::Mat& dm_last) {
 	occ::Mat difference = dm - dm_last;
 	RMSP_diff = std::sqrt(difference.squaredNorm() / difference.size());
@@ -2981,7 +3051,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 
 	scf.ctx.mo.D *= (1 - alpha);
 	scf.ctx.mo.D += alpha * dm_old;
-	dm_last = scf.ctx.mo.D;
+	dm_last = dm_old;
 	return false;
 
 	// Apply damping
@@ -2995,21 +3065,11 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 
 bool XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last) {
 	get_density_criteria(settings.current_RMSP_diff, settings.current_MaxP_diff, scf.ctx.mo.D, dm_last);
-	if (settings.current_quant_diff < settings.quant_diff) {
-		settings.conv_quant_diff = true;
-	}
-	if (settings.current_max_diis_error < settings.max_diis_error) {
-		settings.conv_max_diis_error = true;
-	}
-	if (settings.current_gradient < settings.gradient) {
-		settings.conv_gradient = true;
-	}
-	if (settings.current_RMSP_diff < settings.RMSP_diff) {
-		settings.conv_RMSP_diff = true;
-	}
-	if (settings.current_MaxP_diff < settings.MaxP_diff) {
-		settings.conv_MaxP_diff = true;
-	}
+	settings.conv_quant_diff = settings.current_quant_diff < settings.quant_diff;
+	settings.conv_max_diis_error = settings.current_max_diis_error < settings.max_diis_error;
+	settings.conv_gradient = settings.current_gradient < settings.gradient;
+	settings.conv_RMSP_diff = settings.current_RMSP_diff < settings.RMSP_diff;
+	settings.conv_MaxP_diff = settings.current_MaxP_diff < settings.MaxP_diff;
 	return settings.convergence_check();
 	// closing function
 }
@@ -3094,7 +3154,7 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 		std::ofstream rgbi_out(oss5.str());
 		std::streambuf* const cout_buf = std::cout.rdbuf(rgbi_out.rdbuf());
 		Roby_information Roby(sf_wave_vec[0], opt->rgbi_group_sets, !opt->rgbi_no_sym,
-			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs);
+			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs, opt->rgbi_theta);
 		std::cout.rdbuf(cout_buf);
 		XCW_log << "RGBI analysis written to " << oss5.str() << std::endl;
 	}
@@ -3296,32 +3356,69 @@ void XCW::run_XCW_fitting() {
 	std::cout << "____________________________________________________________________________________\n";
 
 	// Runs the lambda steps for XCW fitting
-	for (int step = 0; step < settings.num_xcw_steps; step++) {
+	auto run_lambda = [&](const double lambda, occ::qm::Wavefunction guess, const bool use_guess, const bool write_result) {
 		occ::qm::SCF scf(hf, settings.hf_type);
 		double alpha = settings.alpha;
-		const double lambda = step * settings.xcw_step_size + settings.xcw_start_value;
+		bool has_local_guess = use_guess;
 		scf.set_charge_multiplicity(settings.charge, settings.multiplicity);
 		scf.maxiter = settings.max_scf_iterations;
 		scf.convergence_settings.level_shift = settings.level_shift;
 		scf.convergence_settings.level_shift_threshold = 0;
 		scf.update_occupied_orbital_count();
+		const bool converged = do_SCF(lambda, alpha, scf, guess, has_local_guess, write_result);
+		return std::make_pair(converged, scf.wavefunction());
+	};
+	const double min_lambda_step = settings.xcw_step_size / 128.0;
+	double last_lambda = settings.xcw_start_value;
+	for (int step = 0; step < settings.num_xcw_steps; step++) {
+		const double lambda = step * settings.xcw_step_size + settings.xcw_start_value;
+		const occ::qm::Wavefunction previous_wfn = last_wfn;
+		occ::qm::Wavefunction guess = last_wfn;
 		if (opt->xcw_extrapolate && step >= 2 && settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
 			//The density extrapolated through the two previous steps, pulled back to
 			//idempotency by two McWeeny steps D <- 3DSD - 2DSDSD; the orbitals stay those of
 			//the last step, they only seed the level shift and the gradient
-			occ::qm::Wavefunction guess = last_wfn;
 			occ::Mat D = 2.0 * last_wfn.mo.D - prev_wfn.mo.D;
 			for (int k = 0; k < 2; k++) {
 				const occ::Mat DS = D * S_ao;
 				D = 3.0 * DS * D - 2.0 * DS * DS * D;
 			}
 			guess.mo.D = D;
-			do_SCF(lambda, alpha, scf, guess, has_guess);
 		}
-		else
-			do_SCF(lambda, alpha, scf, last_wfn, has_guess);
-		prev_wfn = last_wfn;
-		last_wfn = scf.wavefunction();
+		auto result = run_lambda(lambda, guess, has_guess, true);
+		if (!result.first && step > 0) {
+			double lambda_step = lambda - last_lambda;
+			while (!result.first && lambda_step > min_lambda_step) {
+				lambda_step *= 0.5;
+				const double trial_lambda = std::min(lambda, last_lambda + lambda_step);
+				XCW_log << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
+					<< " from converged lambda " << last_lambda << " with step " << lambda_step << std::endl;
+				std::cout << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
+					<< " with step " << lambda_step << std::endl;
+				auto trial = run_lambda(trial_lambda, last_wfn, true, trial_lambda == lambda);
+				if (trial.first) {
+					if (trial_lambda == lambda) {
+						result = std::move(trial);
+						break;
+					}
+					last_lambda = trial_lambda;
+					last_wfn = trial.second;
+					lambda_step = std::min(2.0 * lambda_step, lambda - last_lambda);
+					result = run_lambda(lambda, last_wfn, true, true);
+				}
+			}
+		}
+		if (!result.first) {
+			XCW_log << "XCW: unable to converge lambda " << std::fixed << std::setprecision(8) << lambda
+				<< " with a continuation step above " << min_lambda_step << "; stopping scan." << std::endl;
+			std::cout << "XCW: unable to converge lambda " << std::fixed << std::setprecision(8) << lambda
+				<< " with a continuation step above " << min_lambda_step << "; stopping scan." << std::endl;
+			break;
+		}
+		prev_wfn = previous_wfn;
+		last_wfn = result.second;
+		last_lambda = lambda;
+		has_guess = true;
 
 		//Progress estimate every 5 lambda steps; the last step is skipped because the
 		//summary below always prints a final one

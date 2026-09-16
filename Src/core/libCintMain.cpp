@@ -508,24 +508,6 @@ dMatrix2 get_cart2sph_matrix(const WFN &cart_wfn, const bool normalized) {
 }
 
 
-
-ivec make_loc(ivec& bas, int nbas) {
-    ivec dims(nbas, 0);
-    // Calculate (2*l + 1) * nctr for spherical harmonics
-    for (size_t i = 0; i < nbas; i++)
-    {
-        dims[i] = (2 * bas(ANG_OF, i) + 1) * bas(NCTR_OF, i);
-    }
-
-    // Create the ao_loc array
-    ivec ao_loc(nbas + 1, 0);
-
-    // Compute the cumulative sum
-    std::partial_sum(dims.begin(), dims.end(), ao_loc.begin() + 1);
-
-    return ao_loc;
-}
-
 vec eval_GTO_sph(Int_Params& params, vec2& grid, ivec& shl_slice) {
     ivec bas = params.get_bas();
     ivec atm = params.get_atm();
@@ -550,7 +532,7 @@ vec eval_GTO_sph(Int_Params& params, vec2& grid, ivec& shl_slice) {
 		shl_slice = { 0, nbas};
     }
     //ivec aoloc = Kernel::gen_loc(bas, nbas);
-    ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
 	int nao = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
 
     //non0tab = numpy.ones(((ngrids+BLKSIZE-1)//BLKSIZE,nbas),dtype = numpy.uint8)
