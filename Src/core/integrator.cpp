@@ -173,7 +173,7 @@ static vec2 analytic_multipole_rows(
 {
     const int n_mom = (lmax + 1) * (lmax + 1);
 
-    vec2 rows(t.n_at * n_mom, vec(t.n_coef, 0.0));
+    vec2 rows(static_cast<vec::size_type>(t.n_at) * static_cast<vec::size_type>(n_mom), vec(t.n_coef, 0.0));
 
     for (int a = 0; a < t.n_at; ++a)
     {
