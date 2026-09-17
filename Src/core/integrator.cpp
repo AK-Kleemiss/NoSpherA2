@@ -503,7 +503,7 @@ static void apply_charge_restraints(
             add_penalty_row(
                 H,
                 g,
-                restraints.multipole_rows[a * n_mom],
+                restraints.multipole_rows[static_cast<size_t>(a) * static_cast<size_t>(n_mom)],
                 restraints.multipole_targets[a][0],
                 weights[a] * stone,
                 n_aux);
