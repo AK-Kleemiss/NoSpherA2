@@ -154,7 +154,9 @@ void cell::grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_
 		const vec pos1 = { xyz_atom.frac_pos[0], xyz_atom.frac_pos[1], xyz_atom.frac_pos[2] };
 		for (const asym_atom& asym_atom : asym_atoms) {
 			const vec pos2 = { asym_atom.frac_pos[0], asym_atom.frac_pos[1], asym_atom.frac_pos[2] };
-			if (check_special(pos1, pos2, 1e-4)) {
+			// This is not a real solution, only a quick fix. Should use the same procedure as in the cif reader (scattering_factors.cpp)
+
+			if (check_special(pos1, pos2, 1e-2)) {
 				found = true;
 				break;
 			}
