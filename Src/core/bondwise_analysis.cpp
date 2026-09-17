@@ -260,7 +260,7 @@ namespace {
 
     std::vector<std::array<int, 3>> cartesian_exponents(const int l) {
         const int size = cartesian_shell_size(l);
-        // constants::type_vector currently contains Cartesian components through h.
+        // constants::type_vector currently contains Cartesian components through i.
         const int first_type = l * (l + 1) * (l + 2) / 6 + 1;
         std::vector<std::array<int, 3>> result(size);
         for (int component = 0; component < size; ++component) {

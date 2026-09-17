@@ -4,6 +4,13 @@
 #include "basis_set.h"
 #include "constants.h"
 #include "wfn_class.h"
+//fchk f columns XXX YYY ZZZ XYY XXY XXZ XZZ YZZ YYZ XYZ as WFN types; a wfn lists its f primitives in the writer's order, tonto swaps yyz and xyy
+static const int fchk_f_types[10] = { 11, 12, 13, 17, 14, 15, 18, 19, 16, 20 };
+static int prim_of_type(const WFN& wave, int i, const int type)
+{
+    while (wave.get_type(i) != type) i++;
+    return i;
+}
 //----------------------------FCHK Preparation and Gaussian--------------------------------------
 /*
 KEPT AS AN EXAMPLE HOW TO CALL G09 FROM WITHIN C++
@@ -476,13 +483,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
             if (m == 0) nao += 6;
             break;
           case 4:
-            //this hardcoded piece is due to the order of f-type functions in the fchk
-            for (int i = 0; i < 3; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i));
-            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 6));
-            for (int i = 0; i < 2; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i + 3));
-            for (int i = 0; i < 2; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i + 7));
-            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 5));
-            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 9));
+            for (int i = 0; i < 10; i++) CMO.push_back(wave.get_MO_coef(m, prim_of_type(wave, wave.get_shell_start_in_primitives(a, s), fchk_f_types[i])));
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
              std::cout << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             if (m == 0) nao += 10;
@@ -1136,16 +1137,8 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                             file << "Pushing back 6 coefficient for D shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
                         break;
                     case 4:
-                        // this hardcoded piece is due to the order of f-type functions in the fchk
-                        for (int i = 0; i < 3; i++)
-                            CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
-                        CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 6]);
-                        for (int i = 0; i < 2; i++)
-                            CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 3]);
-                        for (int i = 0; i < 2; i++)
-                            CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 7]);
-                        CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 5]);
-                        CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 9]);
+                        for (int i = 0; i < 10; i++)
+                            CMO.push_back(changed_coefs[m][prim_of_type(wave, wave.get_shell_start_in_primitives(a, s), fchk_f_types[i])]);
                         if (debug && wave.get_atom_shell_primitives(a, s) != 1 && m == 0)
                             file << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
                         break;

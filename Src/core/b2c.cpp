@@ -1325,7 +1325,10 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
             if (owner[c] == owner[b]) { target[b + 1] = target[c + 1]; break; }
         if (target[b + 1] == b + 1) continue;
         const int keep = target[b + 1] - 1;
-        if (maxima[b][3] > maxima[keep][3]) std::swap(maxima[b], maxima[keep]);
+        //Symmetry-equivalent maxima tie up to rounding; the tie goes to the lexicographically
+        //larger position so the surviving core maximum is the same on every platform
+        const bool tie = std::abs(maxima[b][3] - maxima[keep][3]) < 1e-8 * std::abs(maxima[keep][3]);
+        if (tie ? maxima[b] > maxima[keep] : maxima[b][3] > maxima[keep][3]) std::swap(maxima[b], maxima[keep]);
     }
     ivec renumber(nb + 1, 0);
     std::vector<d4> kept;
