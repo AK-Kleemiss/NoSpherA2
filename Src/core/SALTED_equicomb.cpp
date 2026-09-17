@@ -135,8 +135,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
 
 #ifdef NOSPHERA2_USE_GPU
     //The device reproduces this walk exactly; it falls through to the CPU loop below if
-    //no device is present, the transform is not the two-per-row form, or it will not fit.
-    if (g_equicomb_use_gpu && c2r_is_sparse)
+    //no device is present or it will not fit.
+    if (g_equicomb_use_gpu)
     {
         ivec flat_runs(static_cast<size_t>(llmax) * l21 * 4);
         for (size_t r = 0; r < runs.size(); ++r) {
