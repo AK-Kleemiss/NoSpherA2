@@ -16,127 +16,46 @@
 #include <future>
 
 
-SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
+SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 {
     std::filesystem::path _path = opt_in.salted_model_dir;
     SALTED_DIR = opt_in.salted_model_dir;
     debug = opt_in.debug;
     force_charge_constraint = opt_in.salted_charge_constraint;
 
-    config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
+    if (opt_in.salted_model_dir.empty() && opt_in.coef_file != "") {
+        std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
+        wavy = generate_aux_wfn(wavy_in, opt_in.aux_basis);
+        bbasis_set_loaded = true;
+        config.dfbasis = opt_in.aux_basis[0]->get_name();
+        config.salted_filename = "coefficient file";
+        coef_file = opt_in.coef_file;
+        return;
+    }
 
-    if (config.salted_filename == "") {
-        if (opt_in.coef_file != "") {
-            std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
-            config.dfbasis = "cc-pvqz-jkfit";
-            config.salted_filename = "coefficient file";
-            coef_file = opt_in.coef_file;
-            wavy = wavy_in;
-            return;
-        }
+    config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
+    if (config.salted_filename.empty()) {
         std::cout << "No SALTED binary file found in directory: " << opt_in.salted_model_dir << std::endl;
         exit(1);
     }
 
+    wavy = wavy_in;
     if (opt_in.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
     _path = _path / config.salted_filename;
     SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
     file.populate_config(config);
 
-    // Lambda blocks held at once; 0 would hold every block
-    lam_group_limit = 1;
-
-    // Two kinds of atom go to the spherical Thakkar fill instead: a species the model
-    // was never trained on, and an atom with nothing inside the descriptor cutoff.
-    // The latter has a descriptor whose equivariant lam >= 1 components are all exactly
-    // zero (only l = 0 survives), so the 1/sqrt(inner) normalisation is +inf and the
-    // prediction is NaN. Dropping them changes no other atom's environment, the
-    // neighbour test being symmetric.
-    // The test here is purely geometric while featomic also ignores neighbours outside
-    // neighspe, so an atom with only disallowed neighbours still reaches equicomb,
-    // where the zero guard leaves it spherical rather than NaN.
-    const int ncen_in = wavy_in.get_ncen();
-    std::vector<char> use_thakkar(ncen_in, 0);
-    for (int a = 0; a < ncen_in; a++)
-        if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
-            use_thakkar[a] = 1;
-    const int n_unknown = static_cast<int>(std::count(use_thakkar.begin(), use_thakkar.end(), (char)1));
-
-    const double rcut = std::min(config.rcut1, config.rcut2);
-    // rcut is in Angstrom, the coordinates may not be
-    const double rcut_internal = wavy_in.get_isBohr() ? constants::ang2bohr(rcut) : rcut;
-    const double cut_sq = rcut_internal * rcut_internal;
-    int n_isolated = 0;
-#pragma omp parallel for reduction(+ : n_isolated)
-    for (int a = 0; a < ncen_in; a++)
-    {
-        if (use_thakkar[a]) continue;
-        bool lonely = true;
-        for (int b = 0; b < ncen_in && lonely; b++)
-        {
-            if (b == a) continue;
-            double d_sq = 0.0;
-            for (unsigned int ax = 0; ax < 3; ax++)
-            {
-                const double dx = wavy_in.get_atom_coordinate(a, ax) - wavy_in.get_atom_coordinate(b, ax);
-                d_sq += dx * dx;
-            }
-            if (d_sq < cut_sq) lonely = false;
-        }
-        if (lonely)
-        {
-            use_thakkar[a] = 1;   // distinct indices, and char so there is no bitfield to race on
-            ++n_isolated;
-        }
-    }
-
-    if (n_unknown + n_isolated > 0)
-    {
-        if (n_unknown > 0)
-        {
-            std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
-            for (int a = 0; a < ncen_in; a++)
-            {
-                if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
-                {
-                    std::cout << constants::atnr2letter(wavy_in.get_atom_charge(a)) << " ";
-                }
-            }
-            std::cout << std::endl;
-        }
-        if (n_isolated > 0)
-        {
-            std::cout << "WARNING: " << n_isolated << " atom(s) have no neighbour within the "
-                      << rcut << " A descriptor cutoff, so there is no environment to predict from."
-                      << " Isolated solvent is the usual cause." << std::endl;
-        }
-        std::cout << "I will fill out these atoms using spherical Thakkar densities!\n";
-        wavy = wavy_in; // make a copy of initial wavefunction, to leave the initial one untouched!
-        for (int a = ncen_in - 1; a >= 0; a--)
-        {
-            if (use_thakkar[a])
-            {
-                wavy.erase_atom(a);
-            }
-        }
-        // remove all known basis sets, to not get problems with newly loaded ones
-        for (int a = 0; a < wavy.get_ncen(); a++)
-        {
-            wavy.clear_atom_basis_set(a);
-        }
-        std::filesystem::path new_fn = wavy.get_path().parent_path() / "SALTED_temp.xyz";
-        wavy.write_xyz(new_fn);
-        wavy.set_path(new_fn);
-        opt_in.needs_Thakkar_fill = true;
+    const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
+    if (!use_thakkar.empty()) {
         spherical_fill_used = true;
-
         // The filled atoms get a NEUTRAL Thakkar density, which fixes how many
         // electrons they carry. Estimate what they should really carry, so the
         // size of that assumption can be reported rather than hidden. EEQ gives
         // smooth non-integer charges from geometry and honours the net charge,
         // which suits coordination chemistry far better than assigning a formal
         // oxidation state.
-        n_filled = n_unknown + n_isolated;
+        const int ncen_in = wavy_in.get_ncen();
+        n_filled = static_cast<int>(std::count(use_thakkar.begin(), use_thakkar.end(), (char)1));
         try
         {
             occ::IVec nums(ncen_in);
@@ -185,13 +104,12 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
             filled_eeq_charge = std::numeric_limits<double>::quiet_NaN();
         }
     }
-    else
-    {
-        wavy = wavy_in;
-    }
-    wavy.write_xyz("temp_rascaline.xyz");
+
+    //wavy.write_xyz("temp_rascaline.xyz"); //Also this
+    //config.predict_filename = "temp_rascaline.xyz";
+
     natoms = wavy.get_ncen();
-    config.predict_filename = "temp_rascaline.xyz";
+    
     if (wavy.get_nmo() != 0)
         wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
 
@@ -233,8 +151,6 @@ void SALTEDPredictor::setup_atomic_environment()
         }
         atomic_symbols.emplace_back(label);
     }
-    // # Define system excluding atoms that belong to species not listed in SALTED input
-    atomic_symbols = SALTED_Utils::filter_species(atomic_symbols, config.species);
 
     // Print all Atomic symbols
     if (debug)
@@ -273,7 +189,7 @@ void SALTEDPredictor::setup_atomic_environment()
         }
     };
 
-    featomic::SimpleSystem featomic_system = SALTED_Utils::gen_featomic_system(config.predict_filename);
+    featomic::SimpleSystem featomic_system = SALTED_Utils::gen_featomic_system(wavy);
     // RASCALINE (Generate descriptors)
     const auto _t_desc = std::chrono::steady_clock::now();
     v1 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp);
@@ -435,27 +351,23 @@ vec SALTEDPredictor::predict()
     // featsize doubles and holding all of them sums to (nang+1)^2 times a single
     // block; fewer bounds that, at the cost of revisiting each species per group
     const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
-    const int lam_group = (lam_group_limit > 0) ? lam_group_limit : (lmax_max + 1);
     ivec featsize(lmax_max + 1);
     std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
     for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
         psi_nm[spe_idx].resize(lmax[config.species[spe_idx]] + 1);
     // The only quantity that crosses lambda: set at lam = 0, reused above it when zeta != 1
     std::vector<dMatrix2> kernell0(config.species.size());
-    for (int lam0 = 0; lam0 <= lmax_max; lam0 += lam_group)
+    for (int lam = 0; lam <= lmax_max; lam++)
     {
-        const int lam1 = std::min(lam0 + lam_group, lmax_max + 1);
-        vec2 pg(lam1 - lam0);
+        vec p;
         std::future<double> model_loader;
         if (overlap_model_loading)
-            model_loader = std::async(std::launch::async, [this, lam0, lam1]() {
+            model_loader = std::async(std::launch::async, [this, lam]() {
                 const auto start = std::chrono::steady_clock::now();
-                for (int lam = lam0; lam < lam1; lam++) load_model_lambda(lam);
+                load_model_lambda(lam);
                 return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
             });
         const auto _t_eq = std::chrono::steady_clock::now();
-        for (int lam = lam0; lam < lam1; lam++)
-        {
         int llmax = 0;
         unordered_map<int, ivec> lvalues{};
         for (int l1 = 0; l1 < config.nang1 + 1; l1++)
@@ -467,7 +379,7 @@ vec SALTEDPredictor::predict()
                 {
                     if (abs(l2 - lam) <= l1 && l1 <= (l2 + lam))
                     {
-                        lvalues[llmax] = {l1, l2};
+                        lvalues[llmax] = { l1, l2 };
                         llmax += 1;
                     }
                 }
@@ -480,10 +392,9 @@ vec SALTEDPredictor::predict()
             llvec[i] = lvalues[i];
         }
 
-        cvec2 c2r = SALTED_Utils::complex_to_real_transformation({2 * lam + 1})[0];
+        cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
 
         featsize[lam] = config.nspe1 * config.nspe2 * config.nrad1 * config.nrad2 * llmax;
-        vec &p = pg[lam - lam0];
         ivec2 llvec_t = transpose<int>(llvec);
         if (config.sparsify)
         {
@@ -497,13 +408,12 @@ vec SALTEDPredictor::predict()
             p.assign((size_t)natoms * ((size_t)2 * lam + 1) * featsize[lam], 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1);
         }
-        }
         _t_equicomb += _elapsed(_t_eq);
         const auto _t_wait = std::chrono::steady_clock::now();
         if (overlap_model_loading)
             _t_model_work += model_loader.get();
         else
-            for (int lam = lam0; lam < lam1; lam++) load_model_lambda(lam);
+            load_model_lambda(lam);
         const double model_wait = _elapsed(_t_wait);
         _t_model_wait += model_wait;
         if (!overlap_model_loading) _t_model_work += model_wait;
@@ -513,15 +423,13 @@ vec SALTEDPredictor::predict()
         {
             const string spe = config.species[spe_idx];
             if (atom_idx.find(spe) == atom_idx.end()) continue;
-            for (int lam = lam0; lam < lam1; lam++)
-            {
-                if (lam > lmax[spe]) continue;
-        {
+            if (lam > lmax[spe]) continue;
+
             int lam2_1 = 2 * lam + 1;
             int row_size = featsize[lam] * lam2_1; // Size of a block of rows
 
             dMatrix2 pvec_lam(atom_idx[spe].size() * lam2_1, featsize[lam]);
-            dMatrixRef2 _pvec(pg[lam - lam0].data(), natoms, featsize[lam] * lam2_1);
+            dMatrixRef2 _pvec(p.data(), natoms, featsize[lam] * lam2_1);
             double* pvec_ptr = pvec_lam.data();
             for (const int idx : atom_idx[spe])
             {
@@ -567,10 +475,8 @@ vec SALTEDPredictor::predict()
                 psi_nm[spe_idx][lam] = dot(kernel_nm, Vmat[spe + to_string(lam)], false, false);
             }
         }
-            }
-        }
         _t_kernels += _elapsed(_t_kn);
-        for (int lam = lam0; lam < lam1; lam++) free_model_lambda(lam);
+        free_model_lambda(lam);
     }
 
     unordered_map<string, dMatrix1> C{};
@@ -698,9 +604,9 @@ vec SALTEDPredictor::gen_SALTED_densities()
     using namespace std;
     if (coef_file != "")
     {
-        std::vector<float> coefs{};
+        std::vector<double> coefs{};
         std::cout << "Reading coefficients from file: " << coef_file << endl;
-        read_npy<float>(coef_file, coefs);
+        read_npy<double>(coef_file, coefs);
         vec double_coefs(coefs.size());
         for (int i = 0; i < coefs.size(); i++)
         {

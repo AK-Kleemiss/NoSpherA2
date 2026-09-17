@@ -105,20 +105,18 @@ void equicomb(int natoms, int nrad1, int nrad2,
     // middle row holds one). Dropping the exact zeros leaves a finite sum bit for
     // bit the same as long as the survivors stay in ascending column order, which
     // is the order the dense loop added them in. The structure is read off c2r
-    // rather than assumed; anything not two-per-row falls back to the dense walk.
+    // rather than assumed; anything not two-per-row is an error.
     struct c2r_entry { int j; double re, im; };
     std::vector<c2r_entry> c2r_nz(static_cast<size_t>(l21) * 2, c2r_entry{0, 0.0, 0.0});
     std::vector<int> c2r_cnt(l21, 0);
-    bool c2r_is_sparse = (c2r.size() >= static_cast<size_t>(l21));
-    for (int i2 = 0; i2 < l21 && c2r_is_sparse; ++i2)
+    for (int i2 = 0; i2 < l21; ++i2)
     {
-        if (c2r[i2].size() < static_cast<size_t>(l21)) { c2r_is_sparse = false; break; }
         int cnt = 0;
         for (int j2 = 0; j2 < l21; ++j2)
         {
             const cdouble &e = c2r[i2][j2];
             if (e.real() == 0.0 && e.imag() == 0.0) continue;
-            if (cnt == 2) { c2r_is_sparse = false; break; }
+            err_checkf(cnt < 2, "equicomb: complex-to-real row " + std::to_string(i2) + " has more than two non-zeros", std::cout);
             c2r_nz[static_cast<size_t>(i2) * 2 + cnt] = { j2, e.real(), e.imag() };
             ++cnt;
         }
@@ -126,8 +124,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     }
     if (ProgressBar::report_counts)
     {
-        std::cout << "[equicomb] lam " << lam << ": c2r "
-                  << (c2r_is_sparse ? "sparse (2 per row)" : "dense fallback")
+        std::cout << "[equicomb] lam " << lam
                   << ", " << total_terms << " wigner terms"
                   << ", natoms " << natoms << ", nrad1 " << nrad1 << ", nrad2 " << nrad2
                   << ", llmax " << llmax << ", l21 " << l21
@@ -213,6 +210,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
         vec ptemp(static_cast<size_t>(l21) * featsize, 0.0);
         vec pcmplx_real(l21);
         vec pcmplx_imag(l21);
+        double* __restrict pvec_real_ptr = pcmplx_real.data();
+        double* __restrict pvec_imag_ptr = pcmplx_imag.data();
         // w * v1 depends on n1 but not on n2, so build it once per (atom, n1); real
         // and imaginary parts live in separate arrays so the inner loop reads plain
         // double streams rather than picking fields out of a complex.
@@ -254,24 +253,22 @@ void equicomb(int natoms, int nrad1, int nrad2,
 
                         // v2 is conj(v1) when the two descriptor sets are the same
                         const cdouble *v2_ptr = v2_src.block(iat, n2, l2);
-
                         for (imu = 0; imu < l21; imu++)
                         {
-                            double acc_real = 0.0;
-                            double acc_imag = 0.0;
-
+                            pvec_real_ptr[imu] = 0.0;
+                            pvec_imag_ptr[imu] = 0.0;
                             const w3j_run &run = runs[static_cast<size_t>(il) * l21 + imu];
                             const double *__restrict ar = wv1_re.data() + run.w_off;
                             const double *__restrict ai = wv1_im.data() + run.w_off;
                             const cdouble *__restrict b = v2_ptr + run.im2_begin;
-                            if (v2_is_conj_of_v1)
+                            if (v2_is_conj_of_v1) [[likely]]
                             {
                                 for (int k = 0; k < run.count; ++k)
                                 {
                                     const double v2_r = b[k].real();
                                     const double v2_i = b[k].imag();
-                                    acc_real += ar[k] * v2_r + ai[k] * v2_i;
-                                    acc_imag += ai[k] * v2_r - ar[k] * v2_i;
+                                    pvec_real_ptr[imu] += ar[k] * v2_r + ai[k] * v2_i;
+                                    pvec_imag_ptr[imu] += ai[k] * v2_r - ar[k] * v2_i;
                                 }
                             }
                             else
@@ -280,51 +277,25 @@ void equicomb(int natoms, int nrad1, int nrad2,
                                 {
                                     const double v2_r = b[k].real();
                                     const double v2_i = b[k].imag();
-                                    acc_real += ar[k] * v2_r - ai[k] * v2_i;
-                                    acc_imag += ar[k] * v2_i + ai[k] * v2_r;
+                                    pvec_real_ptr[imu] += ar[k] * v2_r - ai[k] * v2_i;
+                                    pvec_imag_ptr[imu] += ar[k] * v2_i + ai[k] * v2_r;
                                 }
                             }
-                            pcmplx_real[imu] = acc_real;
-                            pcmplx_imag[imu] = acc_imag;
                         }
                         //recycling this variable
                         limit_l1 = l21 * ifeat;
-                        const double *__restrict pvec_real_ptr = pcmplx_real.data();
-                        const double *__restrict pvec_imag_ptr = pcmplx_imag.data();
-                        if (c2r_is_sparse)
+
+                        for (i = 0; i < l21; ++i)
                         {
-                            for (i = 0; i < l21; ++i)
+                            preal = 0.0;
+                            const c2r_entry *__restrict row = &c2r_nz[static_cast<size_t>(i) * 2];
+                            const int nz = c2r_cnt[i];
+                            for (int k = 0; k < nz; ++k)
                             {
-                                preal = 0.0;
-                                const c2r_entry *__restrict row = &c2r_nz[static_cast<size_t>(i) * 2];
-                                const int nz = c2r_cnt[i];
-                                for (int k = 0; k < nz; ++k)
-                                {
-                                    preal += row[k].re * pvec_real_ptr[row[k].j] - row[k].im * pvec_imag_ptr[row[k].j];
-                                }
-                                inner += preal * preal;
-                                ptemp[i + limit_l1] = preal;
+                                preal += row[k].re * pvec_real_ptr[row[k].j] - row[k].im * pvec_imag_ptr[row[k].j];
                             }
-                        }
-                        else
-                        {
-                            for (i = 0; i < l21; ++i)
-                            {
-                                preal = 0.0;
-                                const cdouble *__restrict cvec_ptr = c2r[i].data();
-#if defined(_MSC_VER)
-#pragma loop(ivdep)
-#elif defined(__GNUC__) || defined(__clang__)
-#pragma GCC ivdep
-#endif
-                                for (j = 0; j < l21; ++j)
-                                {
-                                    const cdouble &c2r_ih = cvec_ptr[j];
-                                    preal += c2r_ih.real() * pvec_real_ptr[j] - c2r_ih.imag() * pvec_imag_ptr[j];
-                                }
-                                inner += preal * preal;
-                                ptemp[i + limit_l1] = preal;
-                            }
+                            inner += preal * preal;
+                            ptemp[i + limit_l1] = preal;
                         }
                         ifeat++;
                     }
@@ -335,7 +306,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
             // 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
             // answer: the kernel contributes nothing and the atom keeps the species
             // average the model adds separately.
-            if (inner > 0.0)
+            if (inner > 0.0) [[likely]]
             {
                 normfact = 1.0 / sqrt(inner);
             }
@@ -357,7 +328,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
                     p[out_idx] = ptemp[feat_idx] * normfact;
                 }
             }
-            //pb.update(std::cout);
         }
     }
     }

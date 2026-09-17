@@ -114,3 +114,4 @@ tests/RGBI_groups/nh3li.nbo
 tests/intermolecular_nci/unit_surrounding_values.dat
 tests/intermolecular_nci/unit_surrounding_nci.vmd
 tests/intermolecular_nci/unit_surrounding_plot.py
+.vs/

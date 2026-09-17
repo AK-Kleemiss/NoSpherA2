@@ -805,17 +805,31 @@ void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>> &aux_basis,
     grid_manager.setup1DGridsForMolecule(wavy, atom_idx_1, atom_idx_2, gridpoints, padding);
     const vec3 atomic_grids_local = grid_manager.getGridData().atomic_grids;
 
-
     WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
     DensityFitting::CONFIG RI_config;
     RI_config.analyze_quality = true;
     vec ri_coefs_u = DensityFitting::density_fit(wavy, wavy_aux, RI_config);
 
-    RI_config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+    RI_config.use_tikhonov = true;
+    RI_config.restrain_charges = true;
     RI_config.charge_scheme = DensityFitting::CHARGE_SCHEME::TFVC;
     RI_config.restraint_strength = 2.0E-4;
     RI_config.tikhonov_lambda = 1E-6;
     vec ri_coefs_tfvc = DensityFitting::density_fit(wavy, wavy_aux, RI_config);
+
+    //RI density of the one atom the grid belongs to: its own table and its slice of the coefficients
+    const aux_density_table full(wavy_aux.get_atoms());
+    auto calc_density = [&](const vec& coeff, const int g) {
+        const int a = g == 0 ? atom_idx_1 : atom_idx_2;
+        const aux_density_table t(std::vector<atom>{ wavy_aux.get_atoms()[a] });
+        const int off = full.coef_off[full.sh_start[a]];
+        const vec sub(coeff.begin() + off, coeff.begin() + off + t.n_coef);
+        vec ri_density(gridpoints);
+        calc_density_ML(t, sub, gridpoints,
+            atomic_grids_local[g][GridData::GridIndex::X].data(), atomic_grids_local[g][GridData::GridIndex::Y].data(), atomic_grids_local[g][GridData::GridIndex::Z].data(),
+            ri_density.data());
+        return ri_density;
+        };
 
     vec2 dens_hirsh(2);
     vec2 dens_becke(2);
@@ -824,25 +838,13 @@ void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>> &aux_basis,
     vec2 dens_RI_tfvc(2);
     ivec atom_indices = { atom_idx_1, atom_idx_2 };
     for (int g = 0; g < 2; ++g) {
+        dens_RI_u[g] = calc_density(ri_coefs_u, g);
+        dens_RI_tfvc[g] = calc_density(ri_coefs_tfvc, g);
         dens_hirsh[g].resize(gridpoints), dens_becke[g].resize(gridpoints), dens_tfvc[g].resize(gridpoints), dens_RI_u[g].resize(gridpoints), dens_RI_tfvc[g].resize(gridpoints);
         for (int p = 0; p < gridpoints; ++p) {
             dens_hirsh[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::HIRSH_WEIGHT][p];
             dens_becke[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::BECKE_WEIGHT][p];
             dens_tfvc[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::TFVC_WEIGHT][p];
-            dens_RI_u[g][p] = calc_density_ML(
-                atomic_grids_local[g][GridData::X][p],
-                atomic_grids_local[g][GridData::Y][p],
-                atomic_grids_local[g][GridData::Z][p],
-                ri_coefs_u,
-                wavy_aux.get_atoms(),
-                atom_indices[g]);
-            dens_RI_tfvc[g][p] = calc_density_ML(
-                atomic_grids_local[g][GridData::X][p],
-                atomic_grids_local[g][GridData::Y][p],
-                atomic_grids_local[g][GridData::Z][p],
-                ri_coefs_tfvc,
-                wavy_aux.get_atoms(),
-                atom_indices[g]);
         }
     }
 
@@ -949,7 +951,8 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     WFN wavy_aux = generate_aux_wfn(wavy, aux_basis_set);
 
     DensityFitting::CONFIG RI_config;
-    RI_config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+    RI_config.use_tikhonov = true;
+    RI_config.restrain_charges = true;
     RI_config.analyze_quality = opt->debug;
 
     vec ri_coefs = density_fit(wavy, wavy_aux, RI_config);
@@ -968,34 +971,16 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     grid.getDensityVectors(wavy, asym_atom_list, d1, d2, d3, dens);
     vec2 ML_grid(wavy.get_ncen());
     auto grid_data = grid.getGridData();
-    int size;
-#pragma omp parallel
-    {
-        vec2 d_temp(wavy.get_ncen());
-        for (int i = 0; i < wavy.get_ncen(); i++)
-        {
-            d_temp[i].resize(16, 0.0);
-        }
-        vec phi_temp(wavy.get_nmo(), 0.0);
 
-        for (int a = 0; a < wavy.get_ncen(); a++) {
-            size = grid.getNumPointsForAtom(a);
-            ML_grid[a].resize(size, 0.0);
-#pragma omp for
-            for (int i = 0; i < size; i++)
-            {
-                ML_grid[a][i] = calc_density_ML(
-                    d1[a][i],
-                    d2[a][i],
-                    d3[a][i],
-                    ri_coefs,
-                    wavy_aux.get_atoms()) * grid_data.atomic_grids[a][GridData::GridIndex::WEIGHT][i];
-            }
-        }
-        for (int i = 0; i < 16; i++)
-            shrink_vector<double>(d_temp[i]);
-        shrink_vector<vec>(d_temp);
-        shrink_vector<double>(phi_temp);
+    //calc_density_ML runs its own OpenMP loop over the points of each atom
+    const aux_density_table t(wavy_aux.get_atoms());
+    for (int a = 0; a < wavy.get_ncen(); a++) {
+        const int size = grid.getNumPointsForAtom(a);
+        ML_grid[a].resize(size, 0.0);
+        calc_density_ML(t, ri_coefs, size, d1[a].data(), d2[a].data(), d3[a].data(), ML_grid[a].data());
+#pragma omp parallel for
+        for (int i = 0; i < size; i++)
+            ML_grid[a][i] *= grid_data.atomic_grids[a][GridData::GridIndex::WEIGHT][i];
     }
     vec elecs_DFT(wavy.get_ncen(), 0.0);
     auto charge_results = grid.calculatePartitionedCharges(wavy);

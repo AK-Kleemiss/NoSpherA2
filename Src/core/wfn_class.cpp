@@ -8,7 +8,7 @@
 #include "basis_set.h"
 #include "nos_math.h"
 #include "libCintMain.h"
-#include "basis_set.h"
+#include "integrator.h"
 #include "cell.h"
 
 #include "occ/OrbitalDefs.h"

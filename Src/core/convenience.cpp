@@ -2372,6 +2372,32 @@ double get_decimal_precision_from_CIF_number(std::string &given_string)
         return 0.005;
 };
 
+static std::vector<std::shared_ptr<BasisSet>> get_aux_basis(const int argc, const svec& arguments, const int i) {
+    std::vector<std::shared_ptr<BasisSet>> aux_basis;
+    int next_basis_set = i + 1;
+    // Check if next argument is a valid basis set name or a new argument starting with "-"
+    while (next_basis_set < argc && arguments[next_basis_set].find("-") != 0) {
+        if (arguments[next_basis_set] == "auto_aux") {
+            double beta = 2.0;
+            //Check if the next argument is a valid double
+            if (next_basis_set + 1 < argc && arguments[next_basis_set + 1].find("-") != 0) {
+                beta = std::stod(arguments[next_basis_set + 1]);
+            }
+            aux_basis.push_back(std::make_shared<BasisSet>());
+            break;
+        }
+        err_chkf(BasisSetLibrary::check_basis_set_exists(arguments[next_basis_set]),
+            "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
+        aux_basis.push_back(BasisSetLibrary::get_basis_set(arguments[next_basis_set]));
+        next_basis_set++;
+    }
+    if (aux_basis.size() == 0) {
+        std::cout << "No basis set specified. Falling back to automatic generation using beta = 2.0!" << std::endl;
+        aux_basis.push_back(std::make_shared<BasisSet>());
+    }
+    return aux_basis;
+}
+
 //file, format and conversion options
 bool options::digest_io_options(const std::string &temp, int &i)
 {
@@ -2382,6 +2408,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
     else if (temp == "-coef")
     {
         coef_file = arguments[i + 1];
+        aux_basis = get_aux_basis(argc, arguments, i + 1);
         err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist", std::cout);
         SALTED = true;
     }
@@ -3447,27 +3474,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
     {
         RI_FIT = true;
         partition_type = PartitionType::RI;
-        int next_basis_set = i + 1;
-        // Check if next argument is a valid basis set name or a new argument starting with "-"
-        while (next_basis_set < argc && arguments[next_basis_set].find("-") != 0) {
-            if (arguments[next_basis_set] == "auto_aux") {
-                double beta = 2.0;
-                //Check if the next argument is a valid double
-                if (next_basis_set + 1 < argc && arguments[next_basis_set + 1].find("-") != 0) {
-                    beta = std::stod(arguments[next_basis_set + 1]);
-                }
-                aux_basis.push_back(std::make_shared<BasisSet>());
-                break;
-            }
-            err_chkf(BasisSetLibrary::check_basis_set_exists(arguments[next_basis_set]),
-                "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
-            aux_basis.push_back(BasisSetLibrary::get_basis_set(arguments[next_basis_set]));
-            next_basis_set++;
-        }
-        if (aux_basis.size() == 0) {
-            cout << "No basis set specified. Falling back to automatic generation using beta = 2.0!" << endl;
-            aux_basis.push_back(std::make_shared<BasisSet>());
-        }
+        aux_basis = get_aux_basis(argc, arguments, i);
     }
     else if (temp == "-multipole_moments" || temp == "-multipole-moments") {
         err_checkf(i + 2 < argc, "-multipole_moments needs a partitioning scheme and the highest order, e.g. -multipole_moments Hirshfeld 2", std::cout);
@@ -3499,7 +3506,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
     }
     else if (temp == "-write_ri_coefs") {
         WFN wavy(wfn);
-        WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+        WFN wavy_aux = generate_aux_wfn(wavy, aux_basis, false);
         DensityFitting::CONFIG config = DensityFitting::config_from_options(*this);
         //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
         //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
@@ -3781,23 +3788,6 @@ void options::look_for_debug(int &argc, char **argv)
             exit(0);
         }
     }
-};
-
-bool is_nan(const double &in)
-{
-    return in != in;
-};
-bool is_nan(const float &in)
-{
-    return in != in;
-};
-bool is_nan(const long double &in)
-{
-    return in != in;
-};
-bool is_nan(const cdouble &in)
-{
-    return in != in;
 };
 
 bool ends_with(const std::string &str, const std::string &suffix)

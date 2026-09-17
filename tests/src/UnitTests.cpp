@@ -15,6 +15,7 @@
 #include "core/wfn_class.h"
 #include "core/properties.h"
 #include "core/integrator.h"
+#include "core/integration_params.h"
 #include "core/basis_set.h"
 #include "core/geometry_aid.h"
 #include "core/crystal_energies.h"
@@ -92,7 +93,7 @@ namespace {
             wavy.push_back_MO(0, 1.0, -13);
             wavy.push_back_atom("H", 0, 0, 0, 1);
             wavy.push_back_atom_basis_set(0, c_exp, vals[0], type, 0);
-            primitive p(1, type, c_exp, vals[0]);
+            const aux_density_table t(wavy.get_atoms());
 
             for (unsigned int l = 0; l < type * 2 + 1; l++)
             {
@@ -104,12 +105,7 @@ namespace {
                 max_diff = 0.0;
                 coefs[l] = 1.0;
 
-
-                for (int i = 0; i < grid[0].size(); i++)
-                {
-                    //grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
-                    grid[3][i] = calc_density_ML(grid[0][i], grid[1][i], grid[2][i], coefs, wavy.get_atoms());
-                }
+                calc_density_ML(t, coefs, grid[0].size(), grid[0].data(), grid[1].data(), grid[2].data(), grid[3].data());
 
                 // Empty the vectors sf:A nad sf_N
                 for (int i = 0; i < kpts.size(); i++)
@@ -121,15 +117,22 @@ namespace {
 #pragma omp parallel for private(work)
                 for (int i = 0; i < kpts.size(); i++)
                 {
-                    double k_pt_local[4] = { kpts[i][0] * 2 * constants::PI , kpts[i][1] * 2 * constants::PI , kpts[i][2] * 2 * constants::PI , 0.0 };
-                    k_pt_local[3] = sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
-                    for (int d = 0; d < 3; d++) k_pt_local[d] /= k_pt_local[3];
+                    const double Hx = constants::TWO_PI * kpts[i][0], Hy = constants::TWO_PI * kpts[i][1], Hz =constants::TWO_PI * kpts[i][2];
 
-                    sf_A[0][i] = sfac_bessel(p, k_pt_local, coefs.data());
-                    //sf_A[0][i] = sfac_bessel(p, k_pt_local, ri_coefs);
+                    sf_A[0][i] =
+                        t.fourier_atom(
+                            Hx,
+                            Hy,
+                            Hz,
+                            coefs.data(),
+                            0
+                        );
+
                     for (int _p = 0; _p < grid[0].size(); _p++)
                     {
-                        work = constants::TWO_PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
+                        work = Hx * grid[0][_p]
+                              + Hy * grid[1][_p]
+                              + Hz * grid[2][_p];
                         sf_N[0][i] += std::polar(grid[3][_p] * grid[4][_p], work);
                     }
                     diff = abs(sf_A[0][i] - sf_N[0][i]);
@@ -369,7 +372,7 @@ namespace {
             path = std::filesystem::path("../SALTED/Model/model.salted");
         }
         SALTED_BINARY_FILE file = SALTED_BINARY_FILE(path, true);
-        Config config;
+        SALTEDConfig config;
         file.populate_config(config);
         std::unordered_map<int, std::vector<int64_t>> fps = file.read_fps();
         std::unordered_map<std::string, vec> averages = file.read_averages();
@@ -424,6 +427,101 @@ namespace {
         }
 
         std::cout << "All tests passed!\n";
+    }
+
+    //Here only as a reference for simple tests, the actual implementation is in SALTED_utilities.cpp
+    static double calc_density_ML(
+        const double x,
+        const double y,
+        const double z,
+        const vec& coefficients,
+        const std::vector<atom>& atoms)
+    {
+        double dens = 0.0;
+        int coef_counter = 0;
+
+        for (const atom& A : atoms)
+        {
+            const double dx = x - A.get_coordinate(0);
+            const double dy = y - A.get_coordinate(1);
+            const double dz = z - A.get_coordinate(2);
+
+            const double r2 = dx * dx + dy * dy + dz * dz;
+
+            const double r = std::sqrt(r2);
+
+            // Same atom cutoff as aux_density_table.
+            double alpha_min = DBL_MAX;
+
+            for (unsigned int p = 0; p < A.get_basis_set_size(); ++p)
+                alpha_min = std::min(alpha_min,A.get_basis_set_exponent(p));
+
+            if (alpha_min * r2 > 46.0517)
+            {
+                // Still have to advance over all coefficient blocks.
+                int prim = 0;
+
+                for (int shell = 0;shell < A.get_shellcount_size(); ++shell)
+                {
+                    const int l =A.get_basis_set_entry(prim).get_type();
+
+                    coef_counter += 2 * l + 1;
+                    prim += A.get_shellcount(shell);
+                }
+                continue;
+            }
+
+            double u[3] = { 0.0, 0.0, 1.0 };
+
+            if (r > 0.0)
+            {
+                u[0] = dx / r;
+                u[1] = dy / r;
+                u[2] = dz / r;
+            }
+
+            int prim = 0;
+
+            for (int shell = 0; shell < A.get_shellcount_size(); ++shell)
+            {
+                const int l = A.get_basis_set_entry(prim).get_type();
+
+                const int nprim = A.get_shellcount(shell);
+
+                vec exponents(nprim);
+                vec raw_coefs(nprim);
+
+                for (int p = 0; p < nprim; ++p)
+                {
+                    const basis_set_entry& bf = A.get_basis_set_entry(prim + p);
+                    exponents[p] = bf.get_exponent();
+                    raw_coefs[p] = bf.get_coefficient();
+                }
+
+                const vec norm_coefs = Int_Params::normalize_gto(raw_coefs, exponents,l);
+                double radial = 0.0;
+                for (int p = 0; p < nprim; ++p)
+                {
+                    radial += norm_coefs[p] * std::exp(-exponents[p] * r2);
+                }
+
+                for (int i = 0; i < l; ++i)
+                    radial *= r;
+
+                if (std::abs(radial) < 1E-10)
+                {
+                    coef_counter += 2 * l + 1;
+                    prim += nprim;
+                    continue;
+                }
+
+                dens += radial * constants::spherical_harmonic(l, u,coefficients.data() + coef_counter);
+
+                coef_counter += 2 * l + 1;
+                prim += nprim;
+            }
+        }
+        return dens;
     }
 }
 
@@ -2442,6 +2540,62 @@ namespace NoSpherA2UnitTests
         EXPECT_EQ(lumo, 3);
     }
 
+    TEST(AuxDensityTableTests,ContractedShellIsNormalizedAsAWhole)
+    {
+        const int l = 2;
+        const vec exponents = {
+            0.35,
+            1.7,
+            8.0
+        };
+
+        const vec raw = {
+            1.0,
+            -0.4,
+            0.15
+        };
+
+        atom A(
+            "H",
+            {},
+            1,
+            0.0,
+            0.0,
+            0.0,
+            1
+        );
+
+        for (int p = 0; p < exponents.size(); ++p)
+        {
+            A.push_back_basis_set(exponents[p],raw[p],l,0);
+        }
+
+        A.set_shellcount(std::vector<unsigned int>{static_cast<unsigned int>(exponents.size())});
+
+        const aux_density_table t({ A });
+
+        ASSERT_EQ(t.n_sh, 1);
+        ASSERT_EQ(t.n_pr, 3);
+        ASSERT_EQ(t.n_coef, 2 * l + 1);
+
+        // Directly check that the complete contracted radial
+        // function has unit norm.
+        double norm2 = 0.0;
+
+        for (int i = 0; i < t.n_pr; ++i)
+        {
+            for (int j = 0; j < t.n_pr; ++j)
+            {
+                const double beta = t.pr_exp[i] + t.pr_exp[j];
+                const double radial_overlap = 0.5 * std::tgamma(l + 1.5) / std::pow(beta, l + 1.5);
+
+                norm2 += t.pr_norm[i] * t.pr_norm[j] * radial_overlap;
+            }
+        }
+
+        EXPECT_NEAR(norm2, 1.0, 1e-12);
+    }
+
 #ifdef NOSPHERA2_USE_GPU
     static void set_min_flop_env(const char* value)
     {
@@ -2562,27 +2716,62 @@ namespace NoSpherA2UnitTests
     }
 #endif
 
+    static aux_density_table single_aux_shell(
+        const double exponent,
+        const double coefficient,
+        const int l)
+    {
+        atom A("H",{},1,0.0,0.0,0.0,1);
+
+        A.push_back_basis_set(
+            exponent,
+            coefficient,
+            l,
+            0
+        );
+
+        A.set_shellcount(
+            std::vector<unsigned int>{ 1u }
+        );
+
+        return aux_density_table({ A });
+    }
+
     // The multipole restraint rests on one integral, int r^(l+2) N c e^(-a r^2) dr = N c Gamma(l+3/2) / (2 a^(l+3/2)),
     // checked against the trapezoid rule and, for l = 0, against the pi/(2 a^(3/2)) N c row that
     // add_electron_restraint has used all along (which carries the sqrt(4 pi) of Y_00).
     TEST(RiMultipoleTests, RadialMomentMatchesQuadratureAndTheChargeRow)
     {
         const double exps[] = { 0.3, 2.5, 40.0 }, coef = 1.3;
-        for (int e = 0; e < 3; e++) {
-            const double a = exps[e];
-            const primitive p0(0, 0, a, coef);
-            EXPECT_NEAR(std::sqrt(4.0 * PI_VAL) * DensityFitting::radial_moment(a, coef, 0), PI_VAL / (2.0 * std::pow(a, 1.5)) * p0.normalization_constant() * p0.get_coef(), 1e-12);
-            for (int l = 0; l <= 4; l++) {
-                const primitive p(0, l, a, coef);
+        const double raw_coef = 1.3;
+        for (double a : exps)
+        {
+            for (int l = 0; l <= 4; ++l)
+            {
+                const aux_density_table t = single_aux_shell(a, raw_coef, l);
+
+                ASSERT_EQ(t.n_sh, 1);
+                ASSERT_EQ(t.n_pr, 1);
+
+                const double normalized_coef = t.pr_norm[0];
+
                 const int n = 200000;
                 const double h = 12.0 / std::sqrt(a) / n;
                 double sum = 0.0;
-                for (int i = 1; i < n; i++) {
+
+                for (int i = 1; i < n; ++i)
+                {
                     const double r = i * h;
-                    sum += std::pow(r, 2 * l + 2) * std::exp(-a * r * r);
+                    sum += normalized_coef * std::pow(r, 2 * l + 2) * std::exp(-a * r * r);
                 }
-                sum *= h * p.normalization_constant() * p.get_coef();
-                EXPECT_NEAR(sum, DensityFitting::radial_moment(a, coef, l), 1e-9 * sum);
+
+                sum *= h;
+                EXPECT_NEAR(sum, t.shell_radial_moment(0), 1e-9 * std::abs(sum));
+
+                if (l == 0)
+                {
+                    EXPECT_NEAR(std::sqrt(4.0 * PI_VAL) * t.shell_radial_moment(0), t.shell_population_integral(0), 1e-12 );
+                }
             }
         }
     }
@@ -2623,35 +2812,64 @@ namespace NoSpherA2UnitTests
         vec coefs(n_aux);
         for (int i = 0; i < n_aux; i++) coefs[i] = std::sin(1.0 + i);
         vec2 Q(1, vec(n_moments, 0.0));
+
+        const aux_density_table t(aux.get_atoms());
+        vec f(n_points);
+        calc_density_ML(t, coefs, n_points, gx.data(), gy.data(), gz.data(), f.data());
+
         for (int p = 0; p < n_points; p++) {
-            const double f = calc_density_ML(gx[p], gy[p], gz[p], coefs, aux.get_atoms()) * bw[p];
             double d[3] = { gx[p] - pos[0], gy[p] - pos[1], gz[p] - pos[2] };
             const double r = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
             for (int i = 0; i < 3; i++) d[i] /= r;
             double rl = 1.0;
             for (int l = 0; l <= lmax; l++) {
                 for (int m = -l; m <= l; m++)
-                    Q[0][l * l + l + m] += f * rl * constants::spherical_harmonic(l, m, d);
+                    Q[0][l * l + l + m] += f[p] * bw[p] * rl * constants::spherical_harmonic(l, m, d);
                 rl *= r;
             }
         }
-        vec eri2c(n_aux * n_aux, 0.0), rho(n_aux, 0.0);
-        const vec weights(1, 1.0);
-        DensityFitting::add_electron_restraint(eri2c, rho, aux, weights, vec(1, 0.0));
-        DensityFitting::add_multipole_restraint(eri2c, rho, aux, Q, weights, lmax);
-        ASSERT_EQ(eri2c.size(), (size_t)(n_aux + n_moments) * n_aux);
-        ASSERT_EQ(rho.size(), (size_t)(n_aux + n_moments));
-        const double r_cov = constants::ang2bohr(constants::covalent_radii[Z]);
-        const vec2 fitted = DensityFitting::fitted_multipoles(coefs, aux, lmax);
-        for (int row = 0; row < n_moments; row++) {
-            const int l = (int)std::floor(std::sqrt(row + 1e-9));
-            const double scale = row == 0 ? std::sqrt(4.0 * PI_VAL) : std::pow(r_cov, -l);
-            double lhs = 0.0;
-            for (int i = 0; i < n_aux; i++) lhs += eri2c[(n_aux + row) * n_aux + i] * coefs[i];
-            EXPECT_NEAR(lhs, scale * Q[0][row], 1e-6 * std::max(1.0, std::abs(scale * Q[0][row]))) << "row " << row;
-            EXPECT_NEAR(rho[n_aux + row], row == 0 ? 0.0 : scale * Q[0][row], 1e-12) << "row " << row;
-            EXPECT_NEAR(fitted[0][row], Q[0][row], 1e-6 * std::max(1.0, std::abs(Q[0][row]))) << "row " << row;
+        vec analytic(n_moments, 0.0);
+
+        for (int s = t.sh_start[0];s < t.sh_start[1];++s)
+        {
+            const int l = t.sh_l[s];
+
+            if (l > lmax)
+                continue;
+
+            const double I = t.shell_radial_moment(s);
+
+            for (int m = -l; m <= l; ++m)
+            {
+                const int k = l * l + l + m;
+                const int coef_idx = t.coef_off[s] + l + m;
+                analytic[k] += I * coefs[coef_idx];
+            }
         }
+
+        for (int k = 0; k < n_moments; ++k)
+        {
+            EXPECT_NEAR(
+                analytic[k],
+                Q[0][k],
+                1e-6 * std::max(1.0, std::abs(Q[0][k]))
+            ) << "moment " << k;
+        }
+
+        double population = 0.0;
+        for (int s = t.sh_start[0]; s < t.sh_start[1]; ++s)
+        {
+            if (t.sh_l[s] != 0)
+                continue;
+
+            population += t.shell_population_integral(s) * coefs[t.coef_off[s]];
+        }
+
+        EXPECT_NEAR(
+            population,
+            std::sqrt(4.0 * PI_VAL) * Q[0][0],
+            1e-6 * std::max(1.0, std::abs(population))
+        );
     }
 
     // gamma(l+3/2, x) = 2 int_0^sqrt(x) u^(2l+2) exp(-u^2) du, in the series and the recurrence regime
@@ -2678,14 +2896,35 @@ namespace NoSpherA2UnitTests
     {
         const double a = 0.9, c = 1.7, R[3] = { 0.8, -0.3, 1.1 };
         const double r = std::sqrt(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]);
-        const double q = std::sqrt(4.0 * PI_VAL) * DensityFitting::radial_moment(a, c, 0);
-        EXPECT_NEAR(DensityFitting::aux_potential(a, c, 0, 0, R), q * std::erf(std::sqrt(a) * r) / r, 1e-12 * q);
+
+        const aux_density_table t = single_aux_shell(a, c, 0);
+        const double cn = t.pr_norm[0];
+        const double q = t.shell_population_integral(0);
+
+        EXPECT_NEAR(
+            DensityFitting::aux_potential(a,cn,0,0,R),
+            q * std::erf(std::sqrt(a) * r) / r,
+            1e-12 * std::abs(q)
+        );
+
         const double Rf[3] = { 5.0 * R[0], 5.0 * R[1], 5.0 * R[2] }, rf = 5.0 * r, d[3] = { R[0] / r, R[1] / r, R[2] / r };
-        for (int l = 1; l <= 4; l++)
-            for (int m = -l; m <= l; m++) {
-                const double V = 4.0 * PI_VAL / (2 * l + 1) * DensityFitting::radial_moment(a, c, l) * constants::spherical_harmonic(l, m, d) / std::pow(rf, l + 1);
-                EXPECT_NEAR(DensityFitting::aux_potential(a, c, l, m, Rf), V, 1e-9 * std::abs(V) + 1e-15) << "l " << l << " m " << m;
+        for (int l = 1; l <= 4; ++l)
+        {
+            const aux_density_table t = single_aux_shell(a, c, l);
+            const double cn = t.pr_norm[0];
+            const double Q = t.shell_radial_moment(0);
+
+            for (int m = -l; m <= l; ++m)
+            {
+                const double V = constants::FOUR_PI / (2 * l + 1) * Q * constants::spherical_harmonic(l,m,d) / std::pow(rf, l + 1);
+
+                EXPECT_NEAR(
+                    DensityFitting::aux_potential(a, cn, l, m, Rf),
+                    V,
+                    1e-9 * std::abs(V) + 1e-15
+                ) << "l " << l << " m " << m;
             }
+        }
     }
 
     // A partner B whose density is one very tight s Gaussian holding exactly Z_B electrons is neutral and
@@ -2735,7 +2974,12 @@ namespace NoSpherA2UnitTests
         B.push_back_basis_set(alpha, 1.0, 0, 0);
         WFN wavy_B(e_origin::NOT_YET_DEFINED);
         wavy_B.push_back_atom(B);
-        const vec coef_B{ ZB / (std::sqrt(4.0 * PI_VAL) * DensityFitting::radial_moment(alpha, 1.0, 0)) };
+
+        const aux_density_table table_B(wavy_B.get_atoms());
+        ASSERT_EQ(table_B.n_sh, 1);
+        ASSERT_EQ(table_B.sh_l[0], 0);
+        const vec coef_B{ZB / table_B.shell_population_integral(0)};
+
         const DensityFitting::INTERACTION E = DensityFitting::interaction_energy(coef_A, aux_A, coef_B, wavy_B);
         EXPECT_NEAR(E.nuc_nuc + E.nucA_rhoB, 0.0, 1e-10 * E.nuc_nuc);
         EXPECT_GT(std::abs(E.nucB_rhoA), 1e-3);
@@ -2780,7 +3024,13 @@ namespace NoSpherA2UnitTests
         for (int a = 0; a < 2; a++) EXPECT_NEAR(F.pair[0][a], E.pair[a][0], 1e-12);
     }
     namespace {
-        const std::filesystem::path thpp = "../Lukas_Test/thpp_p1.xyz";
+        const std::filesystem::path get_thpp_path() {
+            std::filesystem::path thpp("../Lukas_Test/thpp_p1.xyz");
+            if (!std::filesystem::exists(thpp)) {
+                thpp = "../../../tests/Lukas_Test/thpp_p1.xyz";
+            }
+            return thpp;
+        }
         std::filesystem::path geometry_aid_tmp(const std::string& name)
         {
             return std::filesystem::temp_directory_path() / ("nosphera2_geometry_aid_" + name);
@@ -2894,8 +3144,8 @@ namespace NoSpherA2UnitTests
     {
         //thpp_p1 has 12 C, 4 N, 2 F and 14 H; H is no SOAP species, so 18 centres and at most the 6 pair blocks of C, N, F, each 7 * 7 * 13 wide
         const std::filesystem::path out = geometry_aid_tmp("thpp.npy"), dirty = geometry_aid_tmp("thpp_dirty.npy");
-        geometry_aid::write_descriptor(thpp, out, geometry_aid::hyperparameters());
-        geometry_aid::write_descriptor(thpp, dirty, geometry_aid::hyperparameters(3.0));
+        geometry_aid::write_descriptor(get_thpp_path(), out, geometry_aid::hyperparameters());
+        geometry_aid::write_descriptor(get_thpp_path(), dirty, geometry_aid::hyperparameters(3.0));
         std::vector<unsigned long> shape, shape_dirty;
         vec d, d_dirty;
         load_npy(out, shape, d);
@@ -2922,7 +3172,7 @@ namespace NoSpherA2UnitTests
     TEST(GeometryAidTests, BatchSkipsAMissingStructureAndFailsOnlyWhenNothingWasWritten)
     {
         const std::filesystem::path good = geometry_aid_tmp("batch.npy"), missing = geometry_aid_tmp("missing.npy");
-        const geometry_aid::jobvec jobs{ { thpp, good }, { geometry_aid_tmp("does_not_exist.xyz"), missing } };
+        const geometry_aid::jobvec jobs{ { get_thpp_path(), good }, { geometry_aid_tmp("does_not_exist.xyz"), missing } };
         EXPECT_EQ(geometry_aid::write_descriptors(jobs, geometry_aid::hyperparameters()), 0);
         EXPECT_TRUE(std::filesystem::exists(good));
         EXPECT_FALSE(std::filesystem::exists(missing));
@@ -2977,26 +3227,26 @@ namespace NoSpherA2UnitTests
     TEST(GeometryAidTests, FlagsQueueTheirJobsInAnyOrder)
     {
         const std::filesystem::path list = geometry_aid_tmp("flags.txt"), model = geometry_aid_tmp("flags.bin");
-        { std::ofstream(list) << "# structures\n\n" << thpp.string() << "\n"; }
+        { std::ofstream(list) << "# structures\n\n" << get_thpp_path().string() << "\n"; }
         write_model(model, tiny_model(false));
-        options a = parse_options({ "-calc_featomic_descriptor", "-wfn", thpp.string() });
+        options a = parse_options({ "-calc_featomic_descriptor", "-wfn", get_thpp_path().string() });
         EXPECT_TRUE(a.calc_featomic_descriptor);
-        EXPECT_EQ(a.wfn, thpp);
+        EXPECT_EQ(a.wfn, get_thpp_path());
         EXPECT_EQ(a.geometry_aid_cutoff, 3.5);
         EXPECT_TRUE(a.featomic_structures.empty() && a.classify_atoms_out.empty() && a.classify_structures.empty());
         options b = parse_options({ "-calc_featomic_descriptors", list.string(), "-geometry_aid_cutoff", "3.0" });
         EXPECT_FALSE(b.calc_featomic_descriptor);
-        EXPECT_EQ(b.featomic_structures, (pathvec{ thpp }));
+        EXPECT_EQ(b.featomic_structures, (pathvec{ get_thpp_path() }));
         EXPECT_EQ(b.geometry_aid_cutoff, 3.0);
-        options c = parse_options({ "-wfn", thpp.string(), "-classify_atoms", model.string() });
+        options c = parse_options({ "-wfn", get_thpp_path().string(), "-classify_atoms", model.string() });
         EXPECT_EQ(c.classify_atoms_out, "probabilities.npy");
         EXPECT_EQ(c.geometry_aid_model, model);
-        options d = parse_options({ "-classify_atoms", model.string(), "out.npy", "-no_date", "-wfn", thpp.string() });
+        options d = parse_options({ "-classify_atoms", model.string(), "out.npy", "-no_date", "-wfn", get_thpp_path().string() });
         EXPECT_EQ(d.classify_atoms_out, "out.npy");
         EXPECT_TRUE(d.no_date);
-        EXPECT_EQ(d.wfn, thpp);
+        EXPECT_EQ(d.wfn, get_thpp_path());
         options e = parse_options({ "-classify_atoms_list", list.string(), model.string() });
-        EXPECT_EQ(e.classify_structures, (pathvec{ thpp }));
+        EXPECT_EQ(e.classify_structures, (pathvec{ get_thpp_path() }));
         EXPECT_EQ(e.geometry_aid_model, model);
         EXPECT_TRUE(e.classify_atoms_out.empty());
         std::filesystem::remove(list);
@@ -3007,10 +3257,10 @@ namespace NoSpherA2UnitTests
     {
         //A copy of the structure in the temp directory, because the batch flag writes <path>.npy beside it
         const std::filesystem::path copy = geometry_aid_tmp("copy.xyz"), list = geometry_aid_tmp("run.txt"), copy_npy = copy.string() + ".npy", direct = geometry_aid_tmp("direct.npy");
-        std::filesystem::copy_file(thpp, copy, std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(get_thpp_path(), copy, std::filesystem::copy_options::overwrite_existing);
         { std::ofstream(list) << copy.string() << "\n"; }
         std::filesystem::remove("descriptor.npy");
-        ASSERT_EQ(run_nosphera2({ "-wfn", thpp.string(), "-calc_featomic_descriptor", "-no_date" }), 0);
+        ASSERT_EQ(run_nosphera2({ "-wfn", get_thpp_path().string(), "-calc_featomic_descriptor", "-no_date" }), 0);
         std::vector<unsigned long> shape;
         vec d, d_direct;
         load_npy("descriptor.npy", shape, d);
@@ -3018,7 +3268,7 @@ namespace NoSpherA2UnitTests
         std::filesystem::remove("descriptor.npy");
         //The cutoff after the descriptor flag must still apply, so the batch output is the dirty descriptor
         ASSERT_EQ(run_nosphera2({ "-calc_featomic_descriptors", list.string(), "-geometry_aid_cutoff", "3.0", "-no_date" }), 0);
-        geometry_aid::write_descriptor(thpp, direct, geometry_aid::hyperparameters(3.0));
+        geometry_aid::write_descriptor(get_thpp_path(), direct, geometry_aid::hyperparameters(3.0));
         load_npy(copy_npy, shape, d);
         load_npy(direct, shape, d_direct);
         ASSERT_EQ(d.size(), d_direct.size());
@@ -3035,9 +3285,9 @@ namespace NoSpherA2UnitTests
     {
         const std::filesystem::path model = geometry_aid_tmp("wide.bin"), out = geometry_aid_tmp("probs.npy"), copy = geometry_aid_tmp("copy2.xyz"), list = geometry_aid_tmp("classify.txt"), copy_probs = copy.string() + ".probs.npy", descr = geometry_aid_tmp("descr.npy");
         write_model(model, wide_model());
-        std::filesystem::copy_file(thpp, copy, std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(get_thpp_path(), copy, std::filesystem::copy_options::overwrite_existing);
         { std::ofstream(list) << copy.string() << "\n"; }
-        ASSERT_EQ(run_nosphera2({ "-wfn", thpp.string(), "-classify_atoms", model.string(), out.string(), "-no_date" }), 0);
+        ASSERT_EQ(run_nosphera2({ "-wfn", get_thpp_path().string(), "-classify_atoms", model.string(), out.string(), "-no_date" }), 0);
         std::vector<unsigned long> shape;
         vec p, p_batch, d;
         load_npy(out, shape, p);
@@ -3048,7 +3298,7 @@ namespace NoSpherA2UnitTests
             EXPECT_GT(p[2 * a + 1], 0.0);
         }
         //The same numbers from the pieces: the descriptor written by the other flag, classified with the loaded model
-        geometry_aid::write_descriptor(thpp, descr, geometry_aid::hyperparameters());
+        geometry_aid::write_descriptor(get_thpp_path(), descr, geometry_aid::hyperparameters());
         load_npy(descr, shape, d);
         const vec direct = geometry_aid::classify_descriptor(d.data(), 18, 42042, geometry_aid::load_model(model));
         ASSERT_EQ(direct.size(), p.size());
@@ -3078,16 +3328,9 @@ namespace NoSpherA2UnitTests
         }
         int aux_size(const WFN& aux)
         {
-            int n = 0;
-            for (int a = 0; a < aux.get_ncen(); a++) {
-                const atom A = aux.get_atom(a);
-                int prim = 0;
-                for (int shell = 0; shell < (int)A.get_shellcount_size(); shell++) {
-                    n += 2 * A.get_basis_set_entry(prim).get_type() + 1;
-                    prim += A.get_shellcount(shell);
-                }
-            }
-            return n;
+            return aux_density_table(
+                aux.get_atoms()
+            ).n_coef;
         }
         WFN oh_molecule(const double z)
         {
@@ -3207,16 +3450,19 @@ namespace NoSpherA2UnitTests
         vec coefs(n_aux);
         for (int i = 0; i < n_aux; i++) coefs[i] = std::sin(1.0 + i);
         vec2 Q(1, vec(n_moments, 0.0));
+
+        vec f(n_points);
+        calc_density_ML(t, coefs, n_points, gx.data(), gy.data(), gz.data(), f.data());
+
         double n_becke = 0.0;
         for (int p = 0; p < n_points; p++) {
-            const double f = calc_density_ML(gx[p], gy[p], gz[p], coefs, aux.get_atoms()) * bw[p];
             double d[3] = { gx[p] - xs[0], gy[p] - ys[0], gz[p] - zs[0] };
             const double r = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
             for (int i = 0; i < 3; i++) d[i] /= r;
             double rl = 1.0;
             for (int l = 0; l <= lmax; l++) {
                 for (int m = -l; m <= l; m++)
-                    Q[0][l * l + l + m] += f * rl * constants::spherical_harmonic(l, m, d);
+                    Q[0][l * l + l + m] += f[p] * bw[p] * rl * constants::spherical_harmonic(l, m, d);
                 rl *= r;
             }
             n_becke += bw[p];
@@ -3228,22 +3474,21 @@ namespace NoSpherA2UnitTests
         int on_H = 0;
         for (int i = t.coef_off[t.sh_start[1]]; i < n_aux; i++) on_H += std::abs(rows[0][i]) > 1e-6;
         EXPECT_GT(on_H, 0);
-        vec eri2c(n_aux * n_aux, 0.0), rho(n_aux, 0.0);
-        WFN aux_O(e_origin::NOT_YET_DEFINED);
-        aux_O.push_back_atom("O", xs[0], ys[0], zs[0], 8);
-        DensityFitting::add_partition_restraint(eri2c, rho, aux_O, rows, Q, vec(1, 1.0), lmax);
-        ASSERT_EQ(eri2c.size(), (size_t)(n_aux + n_moments) * n_aux);
-        ASSERT_EQ(rho.size(), (size_t)(n_aux + n_moments));
-        const vec2 fitted = DensityFitting::grid_multipoles(rows, coefs, lmax);
-        const double r_cov = constants::ang2bohr(constants::covalent_radii[8]);
-        for (int row = 0; row < n_moments; row++) {
-            const int l = (int)std::floor(std::sqrt(row + 1e-9));
-            const double scale = row == 0 ? std::sqrt(4.0 * PI_VAL) : std::pow(r_cov, -l);
-            double lhs = 0.0;
-            for (int i = 0; i < n_aux; i++) lhs += eri2c[(n_aux + row) * n_aux + i] * coefs[i];
-            EXPECT_NEAR(lhs, scale * Q[0][row], 1e-8 * std::max(1.0, std::abs(scale * Q[0][row]))) << "row " << row;
-            EXPECT_NEAR(rho[n_aux + row], scale * Q[0][row], 1e-12) << "row " << row;
-            EXPECT_NEAR(fitted[0][row], Q[0][row], 1e-8 * std::max(1.0, std::abs(Q[0][row]))) << "row " << row;
+        for (int row = 0; row < n_moments;++row)
+        {
+            double fitted = 0.0;
+
+            for (int i = 0; i < n_aux; ++i)
+                fitted += rows[row][i] * coefs[i];
+
+            EXPECT_NEAR(
+                fitted,
+                Q[0][row],
+                1e-8
+                * std::max(
+                    1.0,
+                    std::abs(Q[0][row]))
+            ) << "row " << row;
         }
     }
 

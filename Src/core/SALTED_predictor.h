@@ -9,7 +9,7 @@
 class SALTEDPredictor
 {
 public:
-    SALTEDPredictor(const WFN &wavy, options &opt_in);
+    SALTEDPredictor(WFN wavy, options &opt_in);
     SALTEDPredictor() = default;
 
     const std::string get_dfbasis_name() const;
@@ -38,7 +38,7 @@ private:
     int n_filled = 0;
     //-salted_charge_constraint: apply the constraint even when the model file does not ask for it
     bool force_charge_constraint = false;
-    Config config;
+    SALTEDConfig config;
     int natoms;
     std::filesystem::path SALTED_DIR;
     std::filesystem::path coef_file;
@@ -50,8 +50,6 @@ private:
     SALTEDDescriptors v1, v2;
     // Both hyperparameter sets identical: v2 is conj(v1), never filled, equicomb conjugates on read
     bool v2_is_conj_of_v1 = false;
-    // Lambda blocks held at once; 0 means all
-    int lam_group_limit = 0;
     void setup_atomic_environment();
 
     vec weights{};

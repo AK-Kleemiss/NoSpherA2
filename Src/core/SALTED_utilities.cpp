@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "SALTED_utilities.h"
+#include "integration_params.h"
+#include "SALTED_io.h"
 #include "constants.h"
 #include "atoms.h"
 #include "cube.h"
@@ -80,46 +82,98 @@ void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int>& lmax, std
     }
 }
 
-// Function to filter out atoms that belong to species not available for the model selected
-std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::string>& atomic_symbols, const std::vector<std::string>& species)
-{
-    std::vector<std::string> filtered_symbols;
-    std::set<std::string> excluded_species;
 
-    // Convert species vector to a set for efficient lookup
-    std::set<std::string> species_set(species.begin(), species.end());
+std::vector<char> SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALTEDConfig& config) {
+    // Two kinds of atom cannot be predicted, and both are handed to the spherical
+    // Thakkar fill instead of guessed at:
+    //
+    //  1. a species the model was never trained on;
+    //  2. an atom with nothing inside the descriptor cutoff.
+    //
+    // Removing them disturbs nobody: the test is symmetric, so an atom with
+    // nothing within rcut is also nobody's neighbour within rcut, and every other
+    // atom's environment is exactly what it was.
+    //
+    // The test here is purely geometric, while featomic additionally ignores
+    // neighbours whose species is outside neighspe. An atom with neighbours but no
+    // ALLOWED ones therefore still reaches equicomb - the zero guard there catches
+    // it, leaves it spherical rather than NaN, and says so in the log.
+    const int ncen_in = wavy.get_ncen();
+    std::vector<char> use_thakkar(ncen_in, 0);
+    for (int a = 0; a < ncen_in; a++)
+        if (std::find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy.get_atom_charge(a)))) == config.species.end())
+            use_thakkar[a] = 1;
+    const int n_unknown = static_cast<int>(std::count(use_thakkar.begin(), use_thakkar.end(), (char)1));
 
-    // Find all species that are not in the input species set
-    for (const auto& symbol : atomic_symbols)
+    const double rcut = std::min(config.rcut1, config.rcut2);
+    // rcut is in Angstrom, the coordinates may not be
+    const double rcut_internal = wavy.get_isBohr() ? constants::ang2bohr(rcut) : rcut;
+    const double cut_sq = rcut_internal * rcut_internal;
+    int n_isolated = 0;
+#pragma omp parallel for reduction(+ : n_isolated)
+    for (int a = 0; a < ncen_in; a++)
     {
-        if (species_set.find(symbol) == species_set.end())
+        if (use_thakkar[a]) continue;
+        bool lonely = true;
+        for (int b = 0; b < ncen_in && lonely; b++)
         {
-            excluded_species.insert(symbol);
+            if (b == a) continue;
+            double d_sq = 0.0;
+            for (unsigned int ax = 0; ax < 3; ax++)
+            {
+                const double dx = wavy.get_atom_coordinate(a, ax) - wavy.get_atom_coordinate(b, ax);
+                d_sq += dx * dx;
+            }
+            if (d_sq < cut_sq) lonely = false;
+        }
+        if (lonely)
+        {
+            use_thakkar[a] = 1;   // distinct indices, and char so there is no bitfield to race on
+            ++n_isolated;
         }
     }
 
-    // Print out the excluded species
-    if (!excluded_species.empty())
+    if (n_unknown + n_isolated > 0)
     {
-        std::cout << "Excluded species: ";
-        for (const auto& _species : excluded_species)
+        if (n_unknown > 0)
         {
-            std::cout << _species << " ";
+            std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
+            for (int a = 0; a < ncen_in; a++)
+            {
+                if (std::find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy.get_atom_charge(a)))) == config.species.end())
+                {
+                    std::cout << constants::atnr2letter(wavy.get_atom_charge(a)) << " ";
+                }
+            }
+            std::cout << std::endl;
         }
-        std::cout << std::endl;
-        err_not_impl_f("This Model does not contain all neccecary molecules to predict this structure\n", std::cout);
-    }
-
-    // Filter out excluded species from atomic_symbols
-    for (const auto& symbol : atomic_symbols)
-    {
-        if (excluded_species.find(symbol) == excluded_species.end())
+        if (n_isolated > 0)
         {
-            filtered_symbols.push_back(symbol);
+            std::cout << "WARNING: " << n_isolated << " atom(s) have no neighbour within the "
+                << rcut << " A descriptor cutoff, so there is no environment to predict from."
+                << " Isolated solvent is the usual cause." << std::endl;
         }
+        std::cout << "I will fill out these atoms using spherical Thakkar densities!\n";
+        // make a copy of initial wavefunction, to leave the initial one untouched!
+        for (int a = ncen_in - 1; a >= 0; a--)
+        {
+            if (use_thakkar[a])
+            {
+                wavy.erase_atom(a);
+            }
+        }
+        // remove all known basis sets, to not get problems with newly loaded ones
+        for (int a = 0; a < wavy.get_ncen(); a++)
+        {
+            wavy.clear_atom_basis_set(a);
+        }
+        //std::filesystem::path new_fn = wavy.get_path().parent_path() / "SALTED_temp.xyz"; //I think this is not actually neccecary....
+        //wavy.write_xyz(new_fn);
+        //wavy.set_path(new_fn);
+        opt.needs_Thakkar_fill = true;
+        return use_thakkar;
     }
-
-    return filtered_symbols;
+    return {};
 }
 
 std::string SALTED_Utils::FeatomicHyperParameters::to_json() const
@@ -346,17 +400,64 @@ aux_density_table::aux_density_table(const std::vector<atom>& atoms)
         for (int s = 0; s < (int)sc.size(); s++) {
             const int l = atoms[a].get_basis_set_type(prim);
             err_checkf(l <= 8, "Aux basis shells above l = 8 are not supported on the grid", std::cout);
-            sh_l.push_back(l), pr_start.push_back(n_pr), coef_off.push_back(n_coef);
-            for (int e = 0; e < (int)sc[s]; e++, prim++) {
-                const primitive& pr = atoms[a].get_basis_set_entry(prim).get_primitive();
-                pr_exp.push_back(pr.get_exp()), pr_norm.push_back(pr.get_normalized_coefficient());
-                alpha_min = std::min(alpha_min, pr.get_exp());
+            sh_l.push_back(l), pr_start.push_back(n_pr), coef_off.push_back(n_coef), sh_atom.push_back(a);
+            
+            for (int m = -l; m <= l; ++m)
+            {
+                coef_shell.push_back(n_sh);
+                coef_m.push_back(m);
             }
+
+            vec exponents(sc[s]);
+            vec coefficients(sc[s]);
+            for (int p = 0; p < sc[s]; ++p, prim++)
+            {
+                const primitive& pr = atoms[a].get_basis_set_entry(prim).get_primitive();
+                exponents[p] = pr.get_exp();
+                coefficients[p] = pr.get_coef();
+
+                pr_exp_l32.push_back(std::pow(exponents[p], l + 1.5));
+                alpha_min = std::min(alpha_min, exponents[p]);
+                pr_exp.push_back(exponents[p]);
+                int slot = 0;
+                while (slot < (int)uniq_exp.size() && !(uniq_exp[slot] == exponents[p] && uniq_l[slot] == l)) slot++;
+                if (slot == (int)uniq_exp.size())
+                    uniq_exp.push_back(exponents[p]), uniq_l.push_back(l), uniq_exp_l32.push_back(pr_exp_l32.back());
+                pr_uniq.push_back(slot);
+            }
+            coefficients = Int_Params::normalize_gto(coefficients, exponents, l);
+
+            pr_norm.insert(
+                pr_norm.end(),
+                coefficients.begin(),
+                coefficients.end());
+
             n_pr += sc[s], n_coef += 2 * l + 1, n_sh++;
         }
         r2_max[a] = 46.0517 / alpha_min;
     }
     sh_start[n_at] = n_sh, pr_start.push_back(n_pr);
+
+    err_checkf(
+        static_cast<int>(sh_l.size()) == n_sh &&
+        static_cast<int>(sh_atom.size()) == n_sh &&
+        static_cast<int>(coef_off.size()) == n_sh &&
+        static_cast<int>(pr_start.size()) == n_sh + 1,
+        "Invalid auxiliary shell table",
+        std::cout);
+
+    err_checkf(
+        static_cast<int>(pr_exp.size()) == n_pr &&
+        static_cast<int>(pr_norm.size()) == n_pr &&
+        static_cast<int>(pr_exp_l32.size()) == n_pr,
+        "Invalid auxiliary primitive table",
+        std::cout);
+
+    err_checkf(
+        static_cast<int>(coef_shell.size()) == n_coef &&
+        static_cast<int>(coef_m.size()) == n_coef,
+        "Invalid auxiliary coefficient table",
+        std::cout);
 }
 
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs) const
@@ -372,6 +473,94 @@ double aux_density_table::operator()(const double x, const double y, const doubl
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double& lap) const
 {
     return aux_density::at_lap(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, lap);
+}
+
+static inline cdouble apply_i_to_l(
+    const int l,
+    const double value)
+{
+    switch (l & 3)
+    {
+    case 0:
+        return cdouble(value, 0.0);
+
+    case 1:
+        return cdouble(0.0, value);
+
+    case 2:
+        return cdouble(-value, 0.0);
+
+    case 3:
+        return cdouble(0.0, -value);
+    }
+
+    return constants::cnull;
+}
+
+cdouble aux_density_table::fourier_atom(
+    const double kx,
+    const double ky,
+    const double kz,
+    const double* coefs,
+    const int atom_idx) const
+{
+    err_checkf(
+        atom_idx >= 0 && atom_idx < n_at,
+        "Invalid atom index in aux_density_table::fourier_atom",
+        std::cout
+    );
+
+    const double H2 =
+        kx * kx +
+        ky * ky +
+        kz * kz;
+
+    const double H = std::sqrt(H2);
+
+    double k[4];
+
+    if (H > 0.0) [[likely]]
+    {
+        k[0] = kx / H;
+        k[1] = ky / H;
+        k[2] = kz / H;
+    }
+    else
+    {
+        k[0] = 0.0;
+        k[1] = 0.0;
+        k[2] = 1.0;
+    }
+
+    k[3] = H;
+
+    cdouble sf = constants::cnull;
+
+    for (int s = sh_start[atom_idx]; s < sh_start[atom_idx + 1]; ++s)
+    {
+        const int l = sh_l[s];
+
+        if (H == 0.0 && l > 0)
+            continue;
+
+        double Hl_over_2l = 1.0;
+
+        for (int i = 0; i < l; ++i)
+            Hl_over_2l *= 0.5 * H;
+
+        double radial = 0.0;
+
+        for (int p = pr_start[s]; p < pr_start[s + 1]; ++p)
+        {
+            radial += pr_norm[p] * Hl_over_2l * std::exp(-H2 / (4.0 * pr_exp[p])) / pr_exp_l32[p];
+        }
+
+        const double angular = constants::spherical_harmonic(l, k[0], k[1], k[2], coefs + coef_off[s]);
+
+        sf += apply_i_to_l(l, constants::PI3_2 * radial * angular);
+    }
+
+    return sf;
 }
 
 void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* lap)
@@ -399,125 +588,59 @@ void calc_density_ML(const aux_density_table& t, const vec& coefficients, const 
     for (int p = 0; p < np; p++) rho[p] = t(x[p], y[p], z[p], coefficients.data(), gx[p], gy[p], gz[p], lap[p]);
 }
 
-const double calc_density_ML(const double& x,
-    const double& y,
-    const double& z,
-    const vec& coefficients,
-    const std::vector<atom>& atoms)
+
+double aux_density_table::shell_radial_moment(
+    const int shell) const
 {
-    double dens = 0, radial;
-    int coef_counter = 0;
-    unsigned int shell = 0, n_shells = 0, prim = 0;
-    basis_set_entry bf;
-    primitive p;
+    const int l = sh_l[shell];
 
-    for (int a = 0; a < atoms.size(); a++)
+    const double prefactor =
+        0.5 * std::tgamma(l + 1.5);
+
+    double integral = 0.0;
+
+    for (int p = pr_start[shell];
+        p < pr_start[shell + 1];
+        ++p)
     {
-        prim = 0;
-        n_shells = static_cast<unsigned int>(atoms[a].get_shellcount().size());
-        double d[4]{
-            x - atoms[a].get_coordinate(0),
-            y - atoms[a].get_coordinate(1),
-            z - atoms[a].get_coordinate(2), 0.0 };
-        // store r in last element
-        d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        double alpha_min = DBL_MAX;
-        for (unsigned int e = 0; e < atoms[a].get_basis_set_size(); e++) alpha_min = std::min(alpha_min, atoms[a].get_basis_set_exponent(e));
-        if (alpha_min * d[3] * d[3] > 46.0517)
-        { // most diffuse primitive below 1E-20
-            for (shell = 0; shell < n_shells; shell++)
-            {
-                coef_counter += (2 * atoms[a].get_basis_set_type(prim) + 1);
-                prim += atoms[a].get_shellcount()[shell];
-            }
-            continue;
-        }
-        // normalize distances for spherical harmonic
-        for (int i = 0; i < 3; i++)
-            d[i] /= d[3];
-        
-        for (int shell = 0; shell < n_shells; shell++) {
-            radial = 0;
-            int type = atoms[a].get_basis_set_entry(prim).get_type();
-
-            for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
-                bf = atoms[a].get_basis_set_entry(prim);
-                radial += bf.get_primitive().eval_gaussian(d[3]);
-            }
-
-            if (radial < 1E-10)
-            {
-                coef_counter += (2 * type + 1);
-                continue;
-            }
-
-            dens += radial * constants::spherical_harmonic(type, d, &coefficients[coef_counter]);
-            coef_counter += (2 * type + 1);
-        }
+        // pr_exp_l32[p] = alpha^(l + 3/2)
+        integral +=
+            pr_norm[p]
+            * prefactor
+            / pr_exp_l32[p];
     }
-    // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
-    return dens;
+
+    return integral;
 }
 
-const double calc_density_ML(const double& x,
-    const double& y,
-    const double& z,
-    const vec& coefficients,
-    const std::vector<atom>& atoms,
-    const int& atom_nr)
+double aux_density_table::shell_population_integral(
+    const int shell) const
 {
-    double dens = 0, radial = 0;
-    int coef_counter = 0;
-    unsigned int shell = 0, n_shells = 0;
+    err_checkf(
+        sh_l[shell] == 0,
+        "Population integral requested for non-s auxiliary shell",
+        std::cout
+    );
 
-    for (int a = 0; a < atoms.size(); a++)
+    double integral = 0.0;
+
+    for (int p = pr_start[shell];
+        p < pr_start[shell + 1];
+        ++p)
     {
-        n_shells = static_cast<unsigned int>(atoms[a].get_shellcount().size());
-        unsigned int prim = 0;
-        if (a != atom_nr) {
-            for (shell = 0; shell < n_shells; shell++)
-            {
-                coef_counter += (2 * atoms[a].get_basis_set_type(prim) + 1);
-                prim += atoms[a].get_shellcount()[shell];
-            }
-            continue;
-        }
-        
-        basis_set_entry bf;
-        double d[4]{
-            x - atoms[a].get_coordinate(0),
-            y - atoms[a].get_coordinate(1),
-            z - atoms[a].get_coordinate(2), 0.0 };
-        // store r in last element
-        d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        // normalize distances for spherical harmonic
-        for (int i = 0; i < 3; i++)
-            d[i] /= d[3];
-        for (shell = 0; shell < n_shells; shell++) {
-            radial = 0;
-            unsigned int type = atoms[a].get_basis_set_entry(prim).get_type();
-
-            for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
-                bf = atoms[a].get_basis_set_entry(prim);
-                radial += bf.get_primitive().eval_gaussian(d[3]);
-            }
-
-            if (radial < 1E-10)
-            {
-                coef_counter += (2 * type + 1);
-                continue;
-            }
-
-            dens += radial * constants::spherical_harmonic(type, d, &coefficients[coef_counter]);
-            coef_counter += (2 * type + 1);
-        }
-        return dens;
+        // For l=0:
+        //
+        // ∫ exp(-alpha r²) Y00 d³r
+        //
+        // = pi / (2 alpha^(3/2))
+        integral +=
+            pr_norm[p]
+            * constants::PI
+            / (2.0 * pr_exp_l32[p]);
     }
-    //This should never happen, but just in case
-    std::cout << "Atom number " << atom_nr << " not found in the list of atoms." << std::endl;
-    return -1;
-}
 
+    return integral;
+}
 
 /**
  * Calculates the atomic density for a given list of atoms and coefficients.
@@ -526,38 +649,64 @@ const double calc_density_ML(const double& x,
  * @param coefs The coefficients used in the calculation.
  * @return The atomic density for each atom.
  */
-vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs)
+vec calc_atomic_density(
+    const std::vector<atom>& atoms,
+    const vec& coefs)
 {
-    double radial;
-    basis_set_entry bf;
-
     vec atom_elecs(atoms.size(), 0.0);
-
     int coef_counter = 0;
-    for (int a = 0; a < atoms.size(); a++)
+    for (int a = 0; a < atoms.size(); ++a)
     {
+        int prim = 0;
+        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); ++shell)
+        {
+            const int type = atoms[a].get_basis_set_entry(prim).get_type();
+            const unsigned int nprim = atoms[a].get_shellcount()[shell];
 
-        int type = -1, prim = 0;
-        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
-            radial = 0;
-            type = atoms[a].get_basis_set_entry(prim).get_type();
+            // Only s-functions have a non-zero integral
+            // over all space.
             if (type != 0)
             {
-                coef_counter += (2 * type + 1); prim += atoms[a].get_shellcount()[shell]; //Skip functions and coefficients
+                coef_counter += 2 * type + 1; prim += nprim;
                 continue;
             }
 
-            for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
-                bf = atoms[a].get_basis_set_entry(prim);
-                primitive p(a, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
-                radial += constants::PI / (2.0 * std::pow(p.get_exp(), 1.5)) * p.normalization_constant() * p.get_coef();
+            vec shell_coefs(nprim);
+            vec shell_exps(nprim);
+
+            // Collect RAW contraction coefficients and exponents.
+            for (unsigned int e = 0; e < nprim; ++e, ++prim)
+            {
+                const basis_set_entry& bf = atoms[a].get_basis_set_entry(prim);
+                shell_coefs[e] = bf.get_coefficient();
+                shell_exps[e] = bf.get_exponent();
             }
 
-            atom_elecs[a] += radial * coefs[coef_counter];
-            coef_counter++;
+            //   primitive normalization, contraction normalization
+            const vec normalized_coefs = Int_Params::normalize_gto(shell_coefs, shell_exps, 0);
+
+            double radial_integral = 0.0;
+            for (unsigned int e = 0; e < nprim; ++e)
+            {
+                // Integral:
+                //
+                // ∫ exp(-alpha*r²) Y_00 d³r
+                //
+                // with Y_00 = 1 / sqrt(4*pi)
+                //
+                // = pi / (2 * alpha^(3/2))
+                radial_integral +=
+                    normalized_coefs[e] / (2.0 * std::pow(shell_exps[e], 1.5));
+            }
+
+            atom_elecs[a] += radial_integral * coefs[coef_counter] * constants::PI;
+
+            ++coef_counter;
         }
+
         atom_elecs[a] += atoms[a].get_ECP_electrons();
     }
+
     return atom_elecs;
 }
 
@@ -747,7 +896,15 @@ void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_
     if (atom_nr != -1)
         std::cout << "Calculation for atom " << atom_nr << std::endl;
 
-    std::vector<atom> atoms = dummy.get_atoms();
+    const std::vector<atom> atoms = dummy.get_atoms();
+    //atom_nr selects one atom: its own table and the slice of the coefficients that belongs to it
+    const aux_density_table full(atoms);
+    const aux_density_table t(atom_nr == -1 ? atoms : std::vector<atom>{ atoms[atom_nr] });
+    vec coefs = data;
+    if (atom_nr != -1) {
+        const int off = full.coef_off[full.sh_start[atom_nr]];
+        coefs.assign(data.begin() + off, data.begin() + off + t.n_coef);
+    }
 #pragma omp parallel for schedule(dynamic)
     for (int index = 0; index < total_size; index++)
     {
@@ -755,14 +912,10 @@ void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_
         int j = (index / s3) % s2;
         int k = index % s3;
 
-        vec PosGrid{
+        cube_data.set_value(i, j, k, t(
             i * v1[0] + j * v2[0] + k * v3[0] + orig[0],
             i * v1[1] + j * v2[1] + k * v3[1] + orig[1],
-            i * v1[2] + j * v2[2] + k * v3[2] + orig[2] };
-        cube_data.set_value(i, j, k,
-            (atom_nr == -1)
-            ? calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, atoms)
-            : calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, atoms, atom_nr));
+            i * v1[2] + j * v2[2] + k * v3[2] + orig[2], coefs.data()));
         progress->update();
     }
     delete (progress);

@@ -37,7 +37,7 @@ namespace aux_density
                 for (int p = pr_start[s]; p < pr_start[s + 1]; p++) radial += exp(-pr_exp[p] * r2) * pr_norm[p];
                 for (int i = 0; i < sh_l[s]; i++) rl *= r;
                 radial *= rl;
-                if (radial < 1E-10) continue;
+                if (std::abs(radial) < 1E-10) continue;
                 dens += radial * constants::spherical_harmonic(sh_l[s], ux, uy, uz, coefs + coef_off[s]);
             }
         }
@@ -69,7 +69,7 @@ namespace aux_density
                 }
                 for (int i = 0; i < l; i++) rl *= r;
                 radial *= rl;
-                if (radial < 1E-10) continue;
+                if (std::abs(radial) < 1E-10) continue;
                 const dual Y = constants::spherical_harmonic(l, dual(ux, 1.0, 0.0, 0.0), dual(uy, 0.0, 1.0, 0.0), dual(uz, 0.0, 0.0, 1.0), coefs + coef_off[s]);
                 const double fr = (l * radial / r2 - 2.0 * dradial * rl) * Y.v, fa = radial / r, ud = ux * Y.x + uy * Y.y + uz * Y.z;
                 dens += radial * Y.v;

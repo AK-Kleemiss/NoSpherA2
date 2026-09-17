@@ -91,6 +91,6 @@ namespace BasisSetLibrary {
     bool read_basis_set_missing(const std::filesystem::path& basis_set_path, WFN& wave, bool debug);
 }
 
-int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b, bool decontract = true, bool complete = false);
-WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>>& aux_basis);
+int load_basis_into_WFN(WFN& wavy, const std::shared_ptr<BasisSet> b,const bool decontract = true, const bool complete = false);
+WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>>& aux_basis, const bool decontract = true);
 
