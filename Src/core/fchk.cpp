@@ -4,6 +4,13 @@
 #include "basis_set.h"
 #include "constants.h"
 #include "wfn_class.h"
+//fchk f columns XXX YYY ZZZ XYY XXY XXZ XZZ YZZ YYZ XYZ as WFN types; a wfn lists its f primitives in the writer's order, tonto swaps yyz and xyy
+static const int fchk_f_types[10] = { 11, 12, 13, 17, 14, 15, 18, 19, 16, 20 };
+static int prim_of_type(const WFN& wave, int i, const int type)
+{
+    while (wave.get_type(i) != type) i++;
+    return i;
+}
 //----------------------------FCHK Preparation and Gaussian--------------------------------------
 /*
 KEPT AS AN EXAMPLE HOW TO CALL G09 FROM WITHIN C++
@@ -58,7 +65,7 @@ bool gaussian(const string &programPath, const bool &debug){
   string preline;
   while (!ifile.eof()){
     preline=line;
-    getline(ifile,line);
+    getline_universal(ifile,line);
   }
   if(line.find("Normal termination")==-1&&preline.find("Normal termination")==-1) success=false;
   else success=true;
@@ -476,13 +483,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
             if (m == 0) nao += 6;
             break;
           case 4:
-            //this hardcoded piece is due to the order of f-type functions in the fchk
-            for (int i = 0; i < 3; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i));
-            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 6));
-            for (int i = 0; i < 2; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i + 3));
-            for (int i = 0; i < 2; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i + 7));
-            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 5));
-            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 9));
+            for (int i = 0; i < 10; i++) CMO.push_back(wave.get_MO_coef(m, prim_of_type(wave, wave.get_shell_start_in_primitives(a, s), fchk_f_types[i])));
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
              std::cout << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             if (m == 0) nao += 10;
@@ -574,7 +575,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
   int dum_nao = 0;
   if (wave.get_origin() == 2 || wave.get_origin() == 4) {
     while (line.find("Alpha Orbital Energies") == -1 && !ifchk.eof()) {
-      getline(ifchk, line);
+      getline_universal(ifchk, line);
       if (debug)std::cout << "line: " << line << endl;
       if (line.find("Alpha Orbital Energies") == -1) ofchk << line << endl;
       else {
@@ -591,7 +592,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     }
     int counter = 0;
     while (line.find("Alpha MO") == -1 && !ifchk.eof()) {
-      getline(ifchk, line);
+      getline_universal(ifchk, line);
       string temp = " ";
       for (int j = 0; j < 5; j++) {
         if (counter + j < wave.get_nmo()) {
@@ -639,19 +640,19 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
       i += 4;
       temp += '\n';
       ofchk << temp;
-      getline(ifchk, line);
+      getline_universal(ifchk, line);
     }
   }
   if (wave.get_origin() == 1) {
     while (line.find("Total SCF Density") == -1 && !ifchk.eof()) {
-      getline(ifchk, line);
+      getline_universal(ifchk, line);
       if (debug)std::cout << "line: " << line << endl;
       if (line.find("Total SCF Density") == -1) ofchk << line << endl;
     }
     ofchk.flush();
   }
   ofchk << "Total SCF Density                          R   N=" << setw(12) << wave.get_DM_size() << endl;
-  getline(ifchk, line);
+  getline_universal(ifchk, line);
   //now write the DM and skip lines in IFCHK
   for (int i = 0; i < wave.get_DM_size(); i++) {
     string temp = " ";
@@ -671,10 +672,10 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     if (debug)std::cout << endl;
     temp += '\n';
     ofchk << temp;
-    getline(ifchk, line);
+    getline_universal(ifchk, line);
   }
   while (!ifchk.eof()) {
-    getline(ifchk, line);
+    getline_universal(ifchk, line);
     ofchk << line;
     if (!ifchk.eof()) ofchk << endl;
   }
@@ -708,7 +709,7 @@ bool read_fchk_integer_block(std::ifstream& in, const char* heading, ivec& resul
     int limit = read_fchk_integer(line);
     int run = 0;
     int temp;
-    getline(in, line);
+    getline_universal(in, line);
     while (run < limit)
     {
         if (in.eof())
@@ -717,7 +718,7 @@ bool read_fchk_integer_block(std::ifstream& in, const char* heading, ivec& resul
         result.push_back(temp);
         run++;
         if (run % 6 == 0)
-            getline(in, line);
+            getline_universal(in, line);
     }
     return true;
 };
@@ -729,7 +730,7 @@ bool read_fchk_double_block(std::ifstream& in, const char* heading, vec& result,
     int limit = read_fchk_integer(line);
     int run = 0;
     double temp;
-    getline(in, line);
+    getline_universal(in, line);
     while (run < limit)
     {
         if (in.eof())
@@ -738,7 +739,7 @@ bool read_fchk_double_block(std::ifstream& in, const char* heading, vec& result,
         result.push_back(temp);
         run++;
         if (run % 5 == 0)
-            getline(in, line);
+            getline_universal(in, line);
     }
     return true;
 };
@@ -1136,16 +1137,8 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                             file << "Pushing back 6 coefficient for D shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
                         break;
                     case 4:
-                        // this hardcoded piece is due to the order of f-type functions in the fchk
-                        for (int i = 0; i < 3; i++)
-                            CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
-                        CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 6]);
-                        for (int i = 0; i < 2; i++)
-                            CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 3]);
-                        for (int i = 0; i < 2; i++)
-                            CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 7]);
-                        CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 5]);
-                        CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 9]);
+                        for (int i = 0; i < 10; i++)
+                            CMO.push_back(changed_coefs[m][prim_of_type(wave, wave.get_shell_start_in_primitives(a, s), fchk_f_types[i])]);
                         if (debug && wave.get_atom_shell_primitives(a, s) != 1 && m == 0)
                             file << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
                         break;

@@ -29,6 +29,13 @@ DECLARE_CINT_KERNEL(Overlap3C_SPH, false);
 
 #undef DECLARE_CINT_KERNEL
 
+enum COORDINATE_TYPE {
+    SPH = 1,
+    CART = 2
+};
+//ao_loc of a bas table: shell offsets in spherical or cartesian functions
+template<COORDINATE_TYPE CT>
+ivec make_loc(ivec& bas, int nbas);
 
 void GTOval_sph(int ngrids, int* shls_slice, int* ao_loc,
     double* ao, double* coord, uint8_t* non0table,

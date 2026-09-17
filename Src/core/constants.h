@@ -1,32 +1,22 @@
 #pragma once
 
 #include "pch.h"
+#include "spherical_harmonic.h"
 
 namespace constants
 {
     extern double exp_cutoff;
+    extern bool hide_gpu_notes;
+    //x^lx y^ly z^lz = sum_m sph2cart(l)[cart * n_spher(l) + m] R_lm, cartesians in WFN type order,
+    //R_lm the real solid harmonics in ORCA/Gaussian order m = 0,+1,-1,+2,-2,...
+    constexpr int n_cart(const int l) { return (l + 1) * (l + 2) / 2; };
+    constexpr int n_spher(const int l) { return 2 * l + 1; };
+    constexpr int first_type[11] = { 1, 2, 5, 11, 21, 36, 57, 85, 121, 166, 221 };
+    const double* sph2cart(const int l);
+    //ORCA stores g over sqrt(3) and h and up over sqrt((2l-1)!!) of the physical primitive norm; the tables follow ORCA, occ does not
+    constexpr double sph2cart_norm2[11] = { 1, 1, 1, 1, 3, 945, 10395, 135135, 2027025, 34459425, 654729075 };
     static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
     constexpr int grid_max_no_flip = 50;
-    double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
-    {
-        return curr == prev
-            ? curr
-            : sqrtNewtonRaphson(x, 0.5 * (curr + x / curr), curr);
-    }
-
-    /*
-     * Constexpr version of the square root
-     * Return value:
-     *   - For a finite and non-negative value of "x", returns an approximation for the square root of "x"
-     *   - Otherwise, returns NaN
-     * Taken from https://stackoverflow.com/questions/8622256/in-c11-is-sqrt-defined-as-constexpr
-     */
-    double constexpr sqrt(double x)
-    {
-        return x >= 0 && x < std::numeric_limits<double>::infinity()
-            ? sqrtNewtonRaphson(x, x, 0)
-            : std::numeric_limits<double>::quiet_NaN();
-    }
     int constexpr const_abs(int x)
     {
         return x < 0 ? -x : x;
@@ -74,6 +64,7 @@ namespace constants
     constexpr double PI_2 = PI / 2.0;
     constexpr double TWO_PI = 2 * PI;
     constexpr double FOUR_PI = 4 * PI;
+	constexpr double INV_FOUR_PI = 1.0 / FOUR_PI;
     constexpr double EIGHT_PI = 8 * PI;
     constexpr double INV_EIGHT_PI = 1.0 / EIGHT_PI;
     constexpr double C0 = SQRT2 * FOUR_PI;
@@ -118,6 +109,7 @@ namespace constants
     constexpr double fine_pi = inv_fine_struct / TWO_PI / PI;
     constexpr double inv_fine_mod = inv_fine_struct / FOUR_PI;
     constexpr double keV_per_hartree = 0.027211386245988;
+    constexpr double kcal_mol_per_hartree = 627.5094740631;
     constexpr double angstrom2eV = 1.23984193 * 10000;
     constexpr double angstrom2keV = 12.3984193;
     constexpr double f_to_mu = 4208.031548;
@@ -588,7 +580,7 @@ namespace constants
             -1;
     };
 
-    constexpr int type_vector[168]{
+    constexpr int type_vector[858]{
     0, 0, 0,
     1, 0, 0,
     0, 1, 0,
@@ -644,7 +636,237 @@ namespace constants
     3, 2, 0,
     4, 0, 1,
     4, 1, 0,
-    5, 0, 0 };
+    5, 0, 0,
+    0, 0, 6,
+    0, 1, 5,
+    0, 2, 4,
+    0, 3, 3,
+    0, 4, 2,
+    0, 5, 1,
+    0, 6, 0,
+    1, 0, 5,
+    1, 1, 4,
+    1, 2, 3,
+    1, 3, 2,
+    1, 4, 1,
+    1, 5, 0,
+    2, 0, 4,
+    2, 1, 3,
+    2, 2, 2,
+    2, 3, 1,
+    2, 4, 0,
+    3, 0, 3,
+    3, 1, 2,
+    3, 2, 1,
+    3, 3, 0,
+    4, 0, 2,
+    4, 1, 1,
+    4, 2, 0,
+    5, 0, 1,
+    5, 1, 0,
+    6, 0, 0,
+    0, 0, 7,
+    0, 1, 6,
+    0, 2, 5,
+    0, 3, 4,
+    0, 4, 3,
+    0, 5, 2,
+    0, 6, 1,
+    0, 7, 0,
+    1, 0, 6,
+    1, 1, 5,
+    1, 2, 4,
+    1, 3, 3,
+    1, 4, 2,
+    1, 5, 1,
+    1, 6, 0,
+    2, 0, 5,
+    2, 1, 4,
+    2, 2, 3,
+    2, 3, 2,
+    2, 4, 1,
+    2, 5, 0,
+    3, 0, 4,
+    3, 1, 3,
+    3, 2, 2,
+    3, 3, 1,
+    3, 4, 0,
+    4, 0, 3,
+    4, 1, 2,
+    4, 2, 1,
+    4, 3, 0,
+    5, 0, 2,
+    5, 1, 1,
+    5, 2, 0,
+    6, 0, 1,
+    6, 1, 0,
+    7, 0, 0,
+    0, 0, 8,
+    0, 1, 7,
+    0, 2, 6,
+    0, 3, 5,
+    0, 4, 4,
+    0, 5, 3,
+    0, 6, 2,
+    0, 7, 1,
+    0, 8, 0,
+    1, 0, 7,
+    1, 1, 6,
+    1, 2, 5,
+    1, 3, 4,
+    1, 4, 3,
+    1, 5, 2,
+    1, 6, 1,
+    1, 7, 0,
+    2, 0, 6,
+    2, 1, 5,
+    2, 2, 4,
+    2, 3, 3,
+    2, 4, 2,
+    2, 5, 1,
+    2, 6, 0,
+    3, 0, 5,
+    3, 1, 4,
+    3, 2, 3,
+    3, 3, 2,
+    3, 4, 1,
+    3, 5, 0,
+    4, 0, 4,
+    4, 1, 3,
+    4, 2, 2,
+    4, 3, 1,
+    4, 4, 0,
+    5, 0, 3,
+    5, 1, 2,
+    5, 2, 1,
+    5, 3, 0,
+    6, 0, 2,
+    6, 1, 1,
+    6, 2, 0,
+    7, 0, 1,
+    7, 1, 0,
+    8, 0, 0,
+    0, 0, 9,
+    0, 1, 8,
+    0, 2, 7,
+    0, 3, 6,
+    0, 4, 5,
+    0, 5, 4,
+    0, 6, 3,
+    0, 7, 2,
+    0, 8, 1,
+    0, 9, 0,
+    1, 0, 8,
+    1, 1, 7,
+    1, 2, 6,
+    1, 3, 5,
+    1, 4, 4,
+    1, 5, 3,
+    1, 6, 2,
+    1, 7, 1,
+    1, 8, 0,
+    2, 0, 7,
+    2, 1, 6,
+    2, 2, 5,
+    2, 3, 4,
+    2, 4, 3,
+    2, 5, 2,
+    2, 6, 1,
+    2, 7, 0,
+    3, 0, 6,
+    3, 1, 5,
+    3, 2, 4,
+    3, 3, 3,
+    3, 4, 2,
+    3, 5, 1,
+    3, 6, 0,
+    4, 0, 5,
+    4, 1, 4,
+    4, 2, 3,
+    4, 3, 2,
+    4, 4, 1,
+    4, 5, 0,
+    5, 0, 4,
+    5, 1, 3,
+    5, 2, 2,
+    5, 3, 1,
+    5, 4, 0,
+    6, 0, 3,
+    6, 1, 2,
+    6, 2, 1,
+    6, 3, 0,
+    7, 0, 2,
+    7, 1, 1,
+    7, 2, 0,
+    8, 0, 1,
+    8, 1, 0,
+    9, 0, 0,
+    0, 0, 10,
+    0, 1, 9,
+    0, 2, 8,
+    0, 3, 7,
+    0, 4, 6,
+    0, 5, 5,
+    0, 6, 4,
+    0, 7, 3,
+    0, 8, 2,
+    0, 9, 1,
+    0, 10, 0,
+    1, 0, 9,
+    1, 1, 8,
+    1, 2, 7,
+    1, 3, 6,
+    1, 4, 5,
+    1, 5, 4,
+    1, 6, 3,
+    1, 7, 2,
+    1, 8, 1,
+    1, 9, 0,
+    2, 0, 8,
+    2, 1, 7,
+    2, 2, 6,
+    2, 3, 5,
+    2, 4, 4,
+    2, 5, 3,
+    2, 6, 2,
+    2, 7, 1,
+    2, 8, 0,
+    3, 0, 7,
+    3, 1, 6,
+    3, 2, 5,
+    3, 3, 4,
+    3, 4, 3,
+    3, 5, 2,
+    3, 6, 1,
+    3, 7, 0,
+    4, 0, 6,
+    4, 1, 5,
+    4, 2, 4,
+    4, 3, 3,
+    4, 4, 2,
+    4, 5, 1,
+    4, 6, 0,
+    5, 0, 5,
+    5, 1, 4,
+    5, 2, 3,
+    5, 3, 2,
+    5, 4, 1,
+    5, 5, 0,
+    6, 0, 4,
+    6, 1, 3,
+    6, 2, 2,
+    6, 3, 1,
+    6, 4, 0,
+    7, 0, 3,
+    7, 1, 2,
+    7, 2, 1,
+    7, 3, 0,
+    8, 0, 2,
+    8, 1, 1,
+    8, 2, 0,
+    9, 0, 1,
+    9, 1, 0,
+    10, 0, 0 };
 
     constexpr int n_val_electrons[] =
     { 1, 2,
@@ -668,7 +890,7 @@ namespace constants
 
     constexpr void type2vector(int index, int *vector)
     {
-        if (index < 1 || index > 56)
+        if (index < 1 || index > 286)
         {
             vector[0] = -1;
             vector[1] = -1;

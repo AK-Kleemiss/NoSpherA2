@@ -29,7 +29,11 @@ enum e_origin {
     tonto = 10,
     xtb = 11,
     ptb = 12,
-    OCC = 13
+    OCC = 13,
+    // An XCW refinement's result: OCC converged it over a basis this program loaded from
+    // BasisSetLibrary (l + 1 in get_type(), coefficients carrying OCC's normalisation), so
+    // Int_Params reads its shells like a gbw's and normalises the contraction only.
+    XCW_fit = 14
 };
 
 /**
@@ -77,6 +81,12 @@ private:
     std::string method;
     // Vector of molecular orbitals
     std::vector<MO> MOs;
+    // The same coefficients transposed, [primitive * nmo + mo]. The grid evaluators walk
+    // primitives outermost and read every MO inside, which in MOs is a stride of nex.
+    // Mutable because it caches what MOs already holds; anything editing MOs or nex must
+    // call invalidate_coef_cache().
+    mutable vec coef_primitive_major;
+    mutable bool coef_primitive_major_valid = false;
     // Vector of centeres that primitives are base on
     ivec centers;
     // Vector of types of primitives
@@ -100,6 +110,9 @@ private:
     vec UT_SpinDensityMatrix;
     // Density Matrix in mdarray
     dMatrix2 DM;
+    // Spherical MO coefficients as OCC converged them, rows = AO in OCC's m = -l..l order
+    // (beta block below alpha when unrestricted), columns = MO. Filled by the OCC constructor.
+    dMatrix2 MO_sph;
     // basis set definition (118 elements for each element in the periodic table)
     std::shared_ptr<std::array<std::vector<primitive>, 118>> basis_set;
     // Vector of cube files associated with the wavefunction (e.g. for the density or MOs)
@@ -152,8 +165,17 @@ private:
     const double compute_dens_cartesian(const d3& Pos, vec2& d, vec& phi) const;
     const double compute_spin_dens_cartesian(const d3& Pos, vec2& d, vec& phi) const;
     const double compute_dens_spherical(const d3& Pos, vec2& d, vec& phi) const;
+    // Empties every container and puts every scalar back to its default; ctors and operator= start here
+    void reset();
 
 public:
+    /** Primitive-major MO coefficients, [primitive * nmo + mo], built on first use.
+     *  The grid evaluators want all MOs for one primitive contiguous; MOs stores the
+     *  transpose of that. Returns an empty span if there is nothing to build from. */
+    const double* get_coef_primitive_major() const;
+    /** Drop the cache above. Call after anything that changes MO coefficients or nex. */
+    void invalidate_coef_cache() const { coef_primitive_major_valid = false; }
+
     /** @name Constructors */
     ///@{
     /** Default constructor creates an empty wavefunction object. */
@@ -167,6 +189,7 @@ public:
     ///@}
     /** Construct from an OCC Wavefunction Struct. If from_file=true, it will use OCC to read any wfn format supported by it*/
     WFN(const occ::qm::Wavefunction& occ_WF, bool from_file=false);
+    WFN(const WFN& right);
 	// virtual ~WFN() {};
     //-------------------- OCC additional things--------------------------------------------
     // friend class WfnAdapter;
@@ -214,6 +237,10 @@ public:
     const void clear_MOs();
     /** Get maximum absolute MO coefficient (for cutoff checks). */
     const double get_maximum_MO_coefficient(bool occu = true) const;
+    /** Set constants::exp_cutoff so that c r^l exp(-a r^2) below density_accuracy is skipped. */
+    void set_exp_cutoff() const;
+    void push_back_spherical_shell(const int mo, const int l, const vec2& shell, const std::vector<primitive>& prims, const int start, const int size);
+    void push_back_cartesian_shell(const int mo, const int l, const vec2& shell, const std::vector<primitive>& prims, const int start, const int size, const int* order = nullptr, const double* scale = nullptr);
 
 	const std::vector<MO> &get_MOs_vec() const { return MOs; };
 
@@ -234,6 +261,8 @@ public:
     bool read_fchk(const std::filesystem::path& filename, std::ostream& log, const bool debug = false);
     /** Read .xyz geometry (no MOs). */
     bool read_xyz(const std::filesystem::path& filename, std::ostream& file, const bool debug = false);
+    /** Extracts xyz position from the wavefunction and saves them as a list of asym_atom objects. Unit determines which unit is wanted in resulting list */
+    std::vector<asym_atom> extract_xyz(const std::string& unit);
     /** Read Molden format (.molden). */
     bool read_molden(const std::filesystem::path& filename, std::ostream& file, const bool debug = false);
     /** Read tonto orbital_energies and molecular_orbitals binary file. */
@@ -279,6 +308,7 @@ public:
     const void set_ncen(const int& in) { ncen = in; };
     /** Number of MOs (including unoccupied). */
     const int& get_nmo() const { return nmo; };
+    void set_nmo(const int& in) { nmo = in; };
     /** Number of (optionally only occupied) MOs. */
     const int get_nmo(const bool& only_occ) const;
     /** Origin/file type code. */
@@ -298,6 +328,10 @@ public:
     const unsigned int get_nr_ECP_electrons() const;
     /** Sum of MO occupations (for consistency checks). */
     double count_nr_electrons(void) const;
+    /** Count alpha electrons. */
+	double count_alpha_electrons(void) const;
+	/** Count beta electrons. */
+	double count_beta_electrons(void) const;
     /** Human-readable string listing centers and positions. */
     const std::string get_centers(const bool& bohr) const;
     /** Basis set name accessor. */
@@ -353,7 +387,9 @@ public:
     /** Query whether ECPs are active. */
     const bool& get_has_ECPs() const { return has_ECPs; };
     /** Copy assignment (deep copy except shared basis definition pointer). */
-    void operator=(const WFN& right);
+    WFN& operator=(const WFN& right);
+    WFN(WFN&&) = default;
+    WFN& operator=(WFN&&) = default;
     /** Compute formal charge from atom charges - electron count (ignores stored charge). */
     int calculate_charge();
     /** Same as calculate_charge() with logging. */
@@ -382,6 +418,9 @@ public:
     /** Retrieve shared basis set pointer. */
     const std::shared_ptr<std::array<std::vector<primitive>, 118>> get_basis_set_ptr() const { return basis_set; };
     //-------------------atom handling--------------------------------------------------------------
+    /** True when the stored coordinates are Bohr rather than Angstrom.
+        Anything comparing a coordinate against a length in Angstrom needs this. */
+    bool get_isBohr() const { return isBohr; };
     /** Cartesian coordinate value of atom nr along axis (0..2). */
     const double get_atom_coordinate(const unsigned int& nr, const unsigned int& axis) const;
     const d3 get_atom_pos(const unsigned int& nr) const;
@@ -554,8 +593,6 @@ public:
     std::filesystem::path get_cube_path(const int& nr) const;
     /** Write cube (standard format). */
     void write_cube_file(const int& nr, const std::filesystem::path& filename, const bool& debug = false);
-    /** Write cube in dGrid compatible format. */
-    void write_cube_dgrid(const int& nr, const std::filesystem::path& filename, const bool& debug = false);
     /** Write cube in XDGraph compatible format. */
     void write_cube_xdgraph(const int& nr, const std::filesystem::path& filename, const bool& debug = false);
     /** Check if cube data is loaded in memory. */
@@ -595,6 +632,8 @@ public:
     void set_types(const ivec& in) { types = in; };
 	const vec& get_exponents() { return exponents; };
 	const ivec& get_centers() { return centers; };
+    // Converting to other formats
+    void wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf);
 };
 
 #include "mo_class.h"

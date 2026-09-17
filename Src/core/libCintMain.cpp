@@ -158,8 +158,6 @@ void calc_screend_functions_and_max_ij(
         worst_exp[i] = w;
     }
 
-    const double exp_cutoff = 0.5 * constants::exp_cutoff;
-
     // --- 2) Loop over atom pairs and do screening + max-block computation (parallel) ---
 
     std::string output = "";    //Only used for debug output
@@ -176,8 +174,9 @@ void calc_screend_functions_and_max_ij(
                 const double dist = atoms[atom_i].distance_to(atoms[atom_j]);
                 const double dist2 = dist * dist;
 
-                const double crit = -dist2 * (worst_exp[atom_i] + worst_exp[atom_j]);
-                if (crit < exp_cutoff) {
+                //Gaussian product prefactor exp(-a b / (a + b) d^2) of the two most diffuse primitives
+                const double crit = -dist2 * worst_exp[atom_i] * worst_exp[atom_j] / (worst_exp[atom_i] + worst_exp[atom_j]);
+                if (crit < constants::exp_cutoff) {
                     //if (false){
                         //local_output += "Screening atom pair (" + std::to_string(atom_i) + ", " + std::to_string(atom_j) + ") with distance " + std::to_string(dist) + " and criterion " + std::to_string(crit) + " < " + std::to_string(exp_cutoff) + "\n";
                     screened[atom_i][atom_j] = true;
@@ -293,7 +292,7 @@ void computeRho(
 
         int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
 
-        vec res(max_block_ij * naok);
+        vec res(static_cast<size_t>(max_block_ij) * naok);
         vec dm_slice(max_block_ij);
         for (int atom_i = 0; atom_i < natoms; atom_i++) {
             shl_slice[0] = bas_orbital_indices[atom_i];
@@ -347,7 +346,7 @@ void computeRho(
                     1);
             }
         }
-        pb.update(std::cout);
+        pb.update();
     }
     if (opty) {
         delete opty;
@@ -438,7 +437,7 @@ dMatrix2 cart2sph(const int l, const bool normalized) {
     err_chkf(l <= 15, "cart2sph_matrix: l must be <= 15", std::cout);
 
     int n_sph = 2 * l + 1;
-    vec c_sph(n_sph * n_cart, 0.0);
+    vec c_sph(static_cast<size_t>(n_sph) * n_cart, 0.0);
 
     libcint::CINTc2s_ket_sph(c_sph.data(), n_cart, c_tensor.data(), l);
     //Transform back to row-major order
@@ -509,24 +508,6 @@ dMatrix2 get_cart2sph_matrix(const WFN &cart_wfn, const bool normalized) {
 }
 
 
-
-ivec make_loc(ivec& bas, int nbas) {
-    ivec dims(nbas, 0);
-    // Calculate (2*l + 1) * nctr for spherical harmonics
-    for (size_t i = 0; i < nbas; i++)
-    {
-        dims[i] = (2 * bas(ANG_OF, i) + 1) * bas(NCTR_OF, i);
-    }
-
-    // Create the ao_loc array
-    ivec ao_loc(nbas + 1, 0);
-
-    // Compute the cumulative sum
-    std::partial_sum(dims.begin(), dims.end(), ao_loc.begin() + 1);
-
-    return ao_loc;
-}
-
 vec eval_GTO_sph(Int_Params& params, vec2& grid, ivec& shl_slice) {
     ivec bas = params.get_bas();
     ivec atm = params.get_atm();
@@ -551,11 +532,11 @@ vec eval_GTO_sph(Int_Params& params, vec2& grid, ivec& shl_slice) {
 		shl_slice = { 0, nbas};
     }
     //ivec aoloc = Kernel::gen_loc(bas, nbas);
-    ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
 	int nao = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
 
     //non0tab = numpy.ones(((ngrids+BLKSIZE-1)//BLKSIZE,nbas),dtype = numpy.uint8)
-	std::vector<uint8_t> non0table(((ngrid + 56 - 1) / 56) * nbas, 1);
+	std::vector<uint8_t> non0table(static_cast<size_t>((ngrid + 56 - 1) / 56) * nbas, 1);
 
     // Compute integrals
     vec res((size_t)nao * (size_t)ngrid, 0.0);

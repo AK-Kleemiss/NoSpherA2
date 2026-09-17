@@ -50,6 +50,42 @@ Important CMake options:
 
 CI configures with `NOSPHERA2_BUILD_TESTS=ON` and `NOSPHERA2_DEPENDENCIES_ONLY=OFF` after restoring or creating a dependency-only cache.
 
+### GPU builds
+
+`NOSPHERA2_GPU_AUTO` (default ON) picks `NOSPHERA2_USE_CUDA` or `NOSPHERA2_USE_HIP` from the card
+that is present; set it OFF and name the backend to build for a machine other than the build host.
+`NOSPHERA2_CUDA_PORTABLE` / `NOSPHERA2_HIP_PORTABLE` compile the kernels for every architecture the
+vendor still supports (the lists live in `CMakeLists.txt`) instead of the local card only. The
+bootstrap script takes `-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9`
+to fetch a conda-forge CUDA toolkit without a GPU, and `-DNOSPHERA2_BOOTSTRAP_GPU=OFF` to fetch none.
+
+Both backends at once make a fat binary: every kernel source is compiled twice, once per backend,
+into its own namespace (`Src/core/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
+`Src/core/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
+device (CUDA probed first; `NOSPHERA2_GPU_BACKEND=cuda|hip` in the environment overrides). A function
+added to one of the six GPU headers has to be added to the X-macro in `gpu_dispatch.cpp` too, or the
+fat link fails on it. Neither runtime is linked: cudart is static, and the HIP runtime is opened by
+name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
+`dlopen`s / `LoadLibrary`s `libamdhip64.so.<major>` / `amdhip64_<major>.dll` on the first call
+(`NOSPHERA2_HIP_RUNTIME=<file>` names one explicitly) and answers `hipErrorNoDevice` when there is
+none - the shim rather than delay-loading because clang registers the kernels with the runtime from
+static initialisers before `main()`, where nothing else can intercept. The CMake HIP language would
+link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it. The
+Visual Studio solution does the same through `Windows/Windows_utils/NoSpherA2_gpu.props`: a machine
+with `CUDA_PATH` and `HIP_PATH` gets the fat build.
+
+CI builds that fat binary for Linux and Windows on GPU-less runners (`Linux GPU Release`, `Windows
+GPU Release` in `.github/workflows/c-cpp_all.yml`, artifacts `NoSpherA2-linux-x86_64-gpu` and
+`NoSpherA2-windows-x64-gpu`) and runs the test suite on them, which checks that the binaries start
+and fall back to the CPU without a device. ROCm comes from AMD's pip wheels
+(`pip install --index-url https://stable.repo.amd.com/rocm/whl-next/ "rocm[devel]==10.0.0"`,
+`rocm-sdk init`, `rocm-sdk path --root`), the only ROCm that installs without root on Linux and
+exists at all on Windows. On Windows the ROCm 10 clang headers do not compile against the MSVC 14.5x
+standard library; use toolset 14.4x (`vcvars64.bat -vcvars_ver=14.44`). On macOS `NOSPHERA2_USE_METAL` defaults to ON when the build is
+arm64 and the SDK carries the Metal and MetalPerformanceShaders frameworks (configure prints
+`Metal I tensor path: ON/OFF (...)`), so the arm64 slice of the universal binary has the Metal I tensor
+path and falls back to the CPU at run time when `MTLCreateSystemDefaultDevice()` returns nothing.
+
 ## Running Tests
 
 Preferred CMake/CTest flow:
@@ -116,6 +152,41 @@ When touching tests:
 - Update `UNIT_TESTS_STATUS.md` whenever adding, removing, modifying, or investigating tests.
 - Update the validation-status block in this file and `CLAUDE.md` if the overall validated pass count changes.
 
+## Code Style
+
+This codebase is terse, dense and comment-sparse. There is no formatter, so style
+is enforced by imitation: **match the file you are editing**, not a global rule.
+Code that is correct but laid out differently has been rejected by reviewers here.
+
+Before committing any C++ change, re-read the staged diff for layout alone:
+
+- **No blank lines inserted inside a function body to group statements.** Core
+  files run 0-9% blank lines; `fchk.cpp` is 0%.
+- **Comment lines should be 0-13% of added lines**, the baseline band for this
+  repo. Rationale belongs in the commit message, not the source. Comments here
+  explain mathematics, not decisions.
+- **No markdown inside C++ comments** (`**bold**`, bullets, ASCII tables) and no
+  benchmark results parked above a default value or function.
+- **No defensive validation that has never fired.** The house guard style is one
+  or two compact `err_checkf` statements at the top of the function.
+- **Index-`for` with `int` and a short name** (`i`, `j`, `a`, `s`, `x`/`y`/`z`).
+  2155 of 2620 loops. Do not introduce range-`for` or `std::accumulate` into
+  index-`for` code.
+- **Do not brace single-statement bodies** in files that leave them off; 40% of
+  `if` and 24% of `for` bodies are braceless.
+- **Use the `convenience.h` typedefs** (`vec`, `vec2`, `ivec`, `cvec`,
+  `hkl_list`, `dMatrix*`), never `std::vector<double>`.
+- **`#pragma omp` at column 0**, always, regardless of loop nesting depth.
+- **Preserve whitespace convention per file.** `scattering_factors.cpp`,
+  `XCW.cpp`, `basis_set.cpp`, `convenience.h`, `XCW.h` and `cell.cpp` are
+  tab-indented; most others use 4 spaces.
+- **Do not reformat untouched code**, delete commented-out code, or "fix" the
+  repo-wide splits in brace style, `&` placement, `NULL` vs `nullptr` or function
+  naming. Those are genuinely mixed and no migration is in progress.
+
+Keep commit-message bodies short and prose-shaped; a one-line subject naming the
+change is the norm here.
+
 ## Source Layout
 
 ```text
@@ -153,6 +224,69 @@ Key core modules live in `Src/core`:
 - oneTBB is intentionally deployed dynamically. Expected runtime files beside packaged executables include `tbb12.dll`, `libtbb.so*`, or `libtbb.dylib`.
 - Do not reintroduce `tbbmalloc_proxy` or `tbbmalloc` linking for NoSpherA2.
 
+## GPU and CPU Must Agree Numerically
+
+Every GPU path exists only as a faster way to compute what the CPU path already
+computes. **A GPU path is not finished until its agreement with the CPU has been
+measured on a real workload and written down.** Speed is not a result on its own; a
+kernel that is fast and wrong is worse than no kernel, because it is harder to notice.
+
+Rules:
+
+- **Measure agreement, do not assume it.** Run the same input through the CPU and GPU
+  paths and compare the physics the code exists to produce - scattering factors, the XCW
+  convergence table, predicted coefficients - not an intermediate you happen to have.
+- **Quote the wR2 shape and the maximum absolute difference.** The maximum *relative*
+  difference is not a stable statistic: it is set by whatever the smallest near-zero
+  component in the sample happens to be, and re-parsing the same data moved it three
+  orders of magnitude once already.
+- **Record the number beside the code and in the commit.** A tolerance nobody wrote down
+  cannot be checked later, and the next reader cannot tell a regression from intent.
+- **Check the physics before the clock.** The first I tensor kernel ran 11x faster and
+  was completely wrong (GooF 69.1 against 4.665). Diff the science first, every time.
+- **A path the hardware never selects is a path no test covers.** Give every branch a
+  switch that forces it - `-gpu_fp64`, `-gpu_fp32`, `NOSPHERA2_GPU_BATCH`,
+  `NOSPHERA2_GRID_LOCAL`, `NOSPHERA2_BLAS_GPU_MIN_FLOP` - or it rots unnoticed. Two paths
+  had already rotted when this rule was written down: `sucrose_SF_gpu_grid` passed for a
+  session while its kernel failed and fell back to the CPU, because a silent fallback
+  reproduces the CPU reference exactly, and `blas_gpu_dgemm` shipped reached by no test at
+  all because its size gate is above anything in the test data.
+
+### Use `-gflops` before optimising anything
+
+`-gflops` reports achieved GFLOP/s per stage for both the CPU and GPU paths, the host
+thread count, and the slowest single call in each row. Each of those three exists because
+something was got wrong without it:
+
+- **The rate** stops a threshold calibrated on one card being trusted on another. A V100
+  runs fp64 at half rate; this laptop's card at a sixty-fourth.
+- **The thread count** because a CPU row that looks like slow hardware is usually a thread
+  count of one. Every Linux build was single-threaded until 29 Aug 2026 and nobody noticed,
+  because an ignored `#pragma omp` is legal and warns about nothing.
+- **The slowest call** because creating the device context costs ~95 ms and lands inside
+  whichever call touches the GPU first. That has twice been mistaken for a slow kernel -
+  once reported as 63 ms of transfers that were really 2.4, and once as SALTED losing to
+  the host 2.5x when per steady-state call it was winning 4.5x.
+
+Measure before and after, in the same sitting, best of three. A speedup is a ratio, and the
+denominator deserves as much suspicion as the numerator: the "20x faster XCW on the
+cluster" that stood for several hours was a correct GPU measurement divided by a CPU
+baseline that was accidentally serial. The honest figure was 1.68x.
+
+Where a kernel deliberately trades precision for speed, the trade must be stated with its
+measured cost, not left implicit. The current paths, all measured on real workloads:
+
+| path | precision | agreement with the CPU |
+|---|---|---|
+| `calc_SF`, `-gpu_fp64` | fp64 throughout | wR2 1.23e-14 |
+| `calc_SF`, default | fp64 phase, fp32 transcendental and sum | wR2 1.84e-8 |
+| I tensor, `-gpu_itensor` | fp32 GEMM | 2.1e-11 worst over the lambda scan |
+| SALTED, `-gpu_salted` | fp64 throughout | wR2 4.95e-13 |
+
+The two fp32 paths are the deliberate trades. Both were measured before being kept, both
+sit orders below the experimental uncertainty of the data being fitted, and the fp64
+alternative is one flag away in each case.
+
 ## Known Pitfalls
 
 - Use `cmake --list-presets=all` or inspect `CMakePresets.json` before assuming preset names. Host-conditional configure presets may hide non-host presets from a plain `cmake --list-presets`.
@@ -165,6 +299,56 @@ Key core modules live in `Src/core`:
 - New libcint parallel call sites should pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use the existing `three_center_max_cache_size<kind>` and `tbb::enumerable_thread_specific` pattern in OCC.
 
 ## Current Validation Notes
+
+As of 2026-09-08, `ctest --preset release-linux` reports **267/267 passing** outside the XCW
+cases (`-E XCW`), including the new `TomlIntegrationTests.ELI_NH3Li` golden case for the
+rewritten `-eli_analysis` basin analysis; the nine XCW cases pass on a V100 node, a CPU node
+and the M2 Mac. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-09-14, `ctest --preset release-windows` reports **300 passing, 5 failed**
+(6 not run: the four `full = true` XCW cases and two disabled `DeltaSeriesTests`)
+against occ 0.9.4 (submodule `e9ebbdb13`): upstream `peterspackman/occ` main plus the
+NoSpherA2 patches and MSVC fixes. The five failures are the P1 XCW goldens
+(`P1_test_XCW`, `P1_test_XCW_gpu_itensor`, `P1_test_XCW_h2`, `P1_F2_test_XCW`,
+`P1_F2_test_XCW_h2`) that Johannes Bartusel's `5b6eb296` "Symmetry & Bugfix (WIP)"
+changed (grid points 102932 -> 93098, new XCW criterion line); they are his to
+regenerate. This baseline has `-dmin` generate the resolution sphere directly
+(`generate_hkl(dmin)`, the set cctbx's `index_generator` produces, with a 1e-3 relative
+margin inside dmin); the ten golden cases that use `-dmin` were regenerated and differ
+only in their reflection counts. With `-hkl_min_max` as well, `generate_hkl_from_options`
+keeps from the sphere only the symmetry images h.R (and Friedel mates) of the measured
+box - the set cctbx's tsc reader resolves for a measured list, verified with that reader
+on seven cases with 0 unresolved indices - and `-ED` ignores the box
+(`HklGenerationTests`). Olex2's `utilities.py` sends both the file box and the file's
+d_min. Earlier that day: 307/307 with the stored
+two-electron integrals over the Schwarz-screened pairs (`Src/core/stored_eri.cpp`,
+`StoredEriTests`, three `-xcw_incremental` golden cases), 302/302 (107 s) before that. Earlier baseline, 2026-09-02: 275/275 passing (253 s).
+This baseline covers the pTB cartesian-f fix in `WFN::read_ptb` and the new
+`-no_date_but_gpu` flag. On a machine with a CUDA device, 16 golden-file cases had been
+failing on GPU notes absent from the references; those notes now follow `-no-date`, with
+`-no_date_but_gpu` for `sucrose_SF_gpu_grid`, whose reference must keep the note. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-08-25, `ctest --preset release-windows` reports **258/258 passing, 0 failed**
+(569 s; 5 skipped, all pre-existing: the four `full = true` XCW cases and the optional
+`Nbo47.EpoxideGennboMatchesReferenceWhenAvailable` fixture). This baseline includes the
+new `-fukui` feature: 7 `FukuiTests` unit cases and the `TomlIntegrationTests.Fukui` /
+`TomlIntegrationTests.FukuiPBC` golden-file cases. It also confirms that fixing
+`WFN::read_fchk` to record `path` — which changes fchk-driven cube filenames from a
+stem-less `_rho.cube` to `<stem>_rho.cube` — regressed nothing. See
+`UNIT_TESTS_STATUS.md` for the Fukui traps and the grid-convergence validation.
+
+As of 2026-07-18, `TomlIntegrationTests.P1_test_XCW` (in-process, `release-windows`,
+`OMP_NUM_THREADS=20`) passes after fixing a real access violation: `GridManager::calculateMBISWeights`/
+`calculateEMBISWeights` ignored `config_.no_density_eval` and forced an invalid WFN density
+evaluation on XCW's MO-pruned dummy wavefunction. A separate `exit(0)` in
+`XCW::run_XCW_fitting()` was also removed — it silently killed the in-process test binary before
+GoogleTest's own pass/fail assertion ran, so earlier "passing" runs of this test were a false
+positive rather than a real pass. See `UNIT_TESTS_STATUS.md` Known Issues for the full
+root-cause writeup, including a still-open follow-up: any XCW orbital basis other than the
+hardcoded default `def2-svp` (selectable via the newly wired `-b` flag) crashes with a separate,
+unrelated access violation in OCC's SOAD initial guess. This was not re-run against the full
+`ctest` suite this session; the last full-suite baseline remains the 2026-07-03 note below.
 
 As of 2026-07-03, `ctest --preset release-windows` reports **201/201 passing** after a full
 rebuild (following the Thakkar cubic-spline interpolation change in

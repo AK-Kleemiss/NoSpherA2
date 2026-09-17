@@ -1,0 +1,154 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Analysing ELI basins in the wavefunction...
+Calcualting grid of size 76 x 84 x 77...
+Number of points: 491568
+Grid parameters:
+  Min: (-17.9751, 3.67361, -5.14485)
+  Max: (-3.75186, 19.4441, 9.38043)
+Atom positions:
+  Atom 0: (-10.4831, 10.0894, 2.20913)
+  Atom 1: (-9.42104, 9.37453, 3.71125)
+  Atom 2: (-12.306, 9.34279, 2.332)
+  Atom 3: (-9.67065, 9.4595, 0.524323)
+  Atom 4: (-10.574, 13.775, 2.31452)
+Density Critical Points (9 found):
+
+  CP   1  [attractor   ]  converged   N0
+    Position  :       -10.4831        10.0894         2.2091
+    Rho       :       198.5481
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -7.3910e+05    -7.3910e+05    -7.3909e+05
+    DelSqRho  :  -2217289.4414
+   V         :     5.5432e+05   G         :        27.6340   K         :     5.5435e+05   L         :     5.5432e+05
+
+  CP   2  [attractor   ]  converged   Li4
+    Position  :       -10.5740        13.7750         2.3145
+    Rho       :        13.6761
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.2435e+04    -1.2435e+04    -1.2435e+04
+    DelSqRho  :    -37304.6709
+   V         :     9.3262e+03   G         :         0.0125   K         :     9.3262e+03   L         :     9.3262e+03
+
+  CP   3  [attractor   ]  converged   H1
+    Position  :        -9.4395         9.3859         3.6850
+    Rho       :         0.4044
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -8.2086e+00    -8.1952e+00    -7.2655e+00
+    DelSqRho  :       -23.6694
+   V         :     5.9173e+00   G         :         0.0155   K         :     5.9329e+00   L         :     5.9173e+00
+
+  CP   4  [attractor   ]  converged   H2
+    Position  :       -12.2742         9.3548         2.3298
+    Rho       :         0.4044
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -8.2086e+00    -8.1952e+00    -7.2655e+00
+    DelSqRho  :       -23.6692
+   V         :     5.9173e+00   G         :         0.0155   K         :     5.9329e+00   L         :     5.9173e+00
+
+  CP   5  [attractor   ]  converged   H3
+    Position  :        -9.6848         9.4694         0.5537
+    Rho       :         0.4044
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -8.2085e+00    -8.1951e+00    -7.2655e+00
+    DelSqRho  :       -23.6691
+   V         :     5.9173e+00   G         :         0.0155   K         :     5.9328e+00   L         :     5.9173e+00
+
+  CP   6  [bond        ]  converged   H1-N0 bond
+    Position  :        -9.7021         9.5581         3.3134
+    Rho       :         0.3090
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.1221e+00    -1.0858e+00     8.3089e-01
+    DelSqRho  :        -1.3770
+    Bond Ellipticity:         0.0334
+   V         :     3.4424e-01   G         :         0.0528   K         :     3.9705e-01   L         :     3.4424e-01
+
+  CP   7  [bond        ]  converged   H2-N0 bond
+    Position  :       -11.8232         9.5348         2.2993
+    Rho       :         0.3090
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.1220e+00    -1.0858e+00     8.3088e-01
+    DelSqRho  :        -1.3769
+    Bond Ellipticity:         0.0334
+   V         :     3.4423e-01   G         :         0.0528   K         :     3.9704e-01   L         :     3.4423e-01
+
+  CP   8  [bond        ]  converged   H3-N0 bond
+    Position  :        -9.8856         9.6206         0.9703
+    Rho       :         0.3090
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.1220e+00    -1.0857e+00     8.3088e-01
+    DelSqRho  :        -1.3769
+    Bond Ellipticity:         0.0334
+   V         :     3.4422e-01   G         :         0.0528   K         :     3.9703e-01   L         :     3.4422e-01
+
+  CP   9  [bond        ]  converged   Li4-N0 bond
+    Position  :       -10.5408        12.4272         2.2760
+    Rho       :         0.0348
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -6.1343e-02    -6.1342e-02     3.4404e-01
+    DelSqRho  :         0.2214
+    Bond Ellipticity:         0.0000
+   V         :    -5.5339e-02   G         :         0.0479   K         :    -7.4287e-03   L         :    -5.5339e-02
+
+Assigning basins along the density gradient...
+I found 5 Basins.
+Assigning basins by near-grid ascent...
+I found 11 Basins.
+Merged 1 noise maxima, 10 basins remain.
+
+QTAIM Analysis (voxel sum):
+basin:    0 label:               N0 integrated value:   8.6177 volume:  447.9514
+basin:    1 label:               H1 integrated value:   0.6211 volume:  220.0254
+basin:    2 label:               H2 integrated value:   0.6452 volume:  258.8129
+basin:    3 label:               H3 integrated value:   0.6377 volume:  239.6312
+basin:    4 label:              Li4 integrated value:   2.6423 volume:  447.9382
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 111906 grid points.
+Quadrature points sent along the field: 535740, left the grid: 0
+
+QTAIM Analysis (atomic quadrature grids):
+  basin  label               electrons     charge      volume     maximum        x          y          z
+      1  N0                     8.2823    -1.2823    668.1202    128.6761    -10.483     10.089      2.209
+      2  H1                     0.6361     0.3639    345.7953      0.3566     -9.421      9.375      3.711
+      3  H2                     0.6360     0.3640    436.4436      0.3506    -12.306      9.343      2.332
+      4  H3                     0.6339     0.3661    366.3754      0.3844     -9.671      9.459      0.524
+      5  Li4                    2.7664     0.2336   1465.6094      6.5745    -10.574     13.775      2.315
+  total in basins: 12.9547   outside every basin: 0.0530
+
+ELI-D Analysis (voxel sum):
+basin:    0 label:      Li4-N0 bond integrated value:   0.7461 volume:  723.2881
+basin:    1 label:      H2-Li4 bond integrated value:   0.0011 volume:    6.4425
+basin:    2 label:               H2 integrated value:   1.9312 volume:  120.0874
+basin:    3 label:            N0 LP integrated value:   2.1384 volume:   56.4446
+basin:    4 label:               H3 integrated value:   1.9209 volume:  120.3724
+basin:    5 label:               H1 integrated value:   1.9369 volume:  118.0459
+basin:    6 label:         Li4 core integrated value:   2.0189 volume:   16.7823
+basin:    7 label:          N0 core integrated value:   2.4525 volume:    0.4640
+WARNING: Integrated value in basin 9 is very low (0.0001) and might be inaccurate due to numerical errors!
+WARNING: Integrated value in basin 10 is very low (0.0002) and might be inaccurate due to numerical errors!
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 111906 grid points.
+Quadrature points sent along the field: 305437, left the grid: 622
+
+ELI-D Analysis (atomic quadrature grids):
+  basin  label               electrons      volume     maximum        x          y          z
+      1  Li4-N0 bond            0.7546    750.5537     14.5441    -10.676     19.256      2.401
+      2  H2-Li4 bond            0.0014      7.1136      2.0065    -15.917     12.873     -0.240
+      3  H2                     1.9334    117.4538      4.4973    -12.361      9.306      2.401
+      4  N0 LP                  2.1668     56.5859      1.9588    -10.489     11.371      2.212
+      5  H3                     1.9231    118.6144      4.2793     -9.741      9.494      0.514
+      6  H1                     1.9197    117.0255      4.5130     -9.366      9.306      3.721
+      7  Li4 core               2.0214     16.3887     26.2967    -10.489     13.812      2.401
+      8  N0 core                2.1094      0.4451      9.4356    -10.489     10.057      2.212
+      9  H3-H1 bond             0.0003      1.8503      1.1126     -4.313     11.183      1.080
+     10  H3-H1 bond             0.0003      1.9942      1.0213     -4.313     10.996      1.458
+  total in basins: 12.8304   outside every basin: 0.1772

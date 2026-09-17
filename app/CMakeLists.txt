@@ -48,3 +48,11 @@ set_target_properties(
 
 
 nosphera2_copy_runtime_libraries(NoSpherA2)
+
+if(NOSPHERA2_USE_HIP)
+    #A static library with HIP objects makes CMake link this with the HIP compiler and
+    #the --offload-arch list, and clang then unbundles every object on the line - a plain
+    #host object comes out empty, so main() goes missing. The kernels carry their own
+    #fat binaries (no separable compilation), so the C++ linker is all that is needed.
+    set_target_properties(NoSpherA2 PROPERTIES LINKER_LANGUAGE CXX)
+endif()

@@ -8,21 +8,7 @@ namespace {
 
 std::filesystem::path repo_root()
 {
-    if (const char* env = std::getenv("NOS_REPO_ROOT")) {
-        return std::filesystem::path(env);
-    }
-
-    auto p = std::filesystem::current_path();
-    for (int i = 0; i < 8; ++i) {
-        if (std::filesystem::exists(p / "tests" / "tests.toml")) {
-            return p;
-        }
-        if (!p.has_parent_path()) {
-            break;
-        }
-        p = p.parent_path();
-    }
-    return std::filesystem::current_path();
+    return nos_test_repo_root();
 }
 
 std::string read_file(const std::filesystem::path& path)
@@ -212,7 +198,7 @@ TEST(Nbo47, WriteNboReportsProgressWhenRequested)
 
     const std::string log_text = progress_log.str();
     EXPECT_NE(log_text.find("[FILE47] Starting .47 conversion"), std::string::npos);
-    EXPECT_NE(log_text.find("[FILE47] Computing Cartesian AO overlap integrals"), std::string::npos);
+    EXPECT_NE(log_text.find("[FILE47] Computing spherical AO overlap integrals"), std::string::npos);
     EXPECT_NE(log_text.find("[FILE47] Writing FILE47 sections"), std::string::npos);
     EXPECT_NE(log_text.find("[FILE47] Finished .47 conversion"), std::string::npos);
 }

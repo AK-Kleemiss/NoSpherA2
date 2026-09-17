@@ -75,7 +75,7 @@ private:
     ivec ano_fallback_atoms;
     NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
         const std::vector<int>& atom_indices, const ivec& shell_angular_momenta = {},
-        bool spherical = false, double occupancy_cutoff = 0.17,
+        bool spherical = false, double occupancy_cutoff = 1.0 / 6.0,
         int leading_orbitals_to_skip = 0, bool EVs = false);
     double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
     void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool use_ano_basis, bool EVs= false);
@@ -96,12 +96,15 @@ private:
         const vec& eigvals,
         const ivec& pairs,
         bool EVs = false);
+    std::string make_theta_info(const WFN& wavy, const std::pair<int, int>& bond,
+        const vec& eigvals, const ivec& pairs, const dMatrix2& angles,
+        const vec& covalent_populations, const vec& ionic_populations) const;
     double Roby_population_analysis(ivec atoms);
 public:
     Roby_information() = default;
     ~Roby_information() = default;
     Roby_information(const Roby_information&) = default;
-    Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool use_ano_basis = false, bool EVs = false);
+    Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool use_ano_basis = false, bool EVs = false, bool theta_info = false);
 
 };
 

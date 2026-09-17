@@ -1,3 +1,6 @@
+#ifdef NOSPHERA2_USE_GPU
+#include "blas_gpu.h"
+#endif
 #include "pch.h"
 #include "nos_math.h"
 
@@ -151,6 +154,23 @@ Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynami
     std::vector<T> result_flat((size_t)m * (size_t)n, 0.0);
     if constexpr (std::is_same_v<T, double>)
     {
+#ifdef NOSPHERA2_USE_GPU
+        //Offered to the device only when the shape earns the transfers; blas_gpu_dgemm
+        //declines otherwise and this falls straight through to MKL
+        const _time_point gemm_t0 = get_time();
+        if (blas_gpu_dgemm(transp1, transp2, m, n, k1, 1.0,
+                flatMat1.data(), transp1 ? m : k1,
+                flatMat2.data(), transp2 ? k2 : n,
+                0.0, result_flat.data(), n))
+        {
+            throughput::record("dense GEMM (dot_BLAS)", true,
+                throughput::flops_gemm(m, n, k1), get_msec(gemm_t0, get_time()));
+            return reshape<Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>>(result_flat, Shape2D{ (unsigned long long)m, (unsigned long long)n });
+        }
+#endif
+        //The host GEMM is timed with the same 2mnk count, which is what makes the two
+        //rows comparable and the offload threshold re-derivable on this machine.
+        const _time_point cpu_gemm_t0 = get_time();
         // Call cblas_dgemm
         cblas_dgemm(CblasRowMajor,
             transp1 ? CblasTrans : CblasNoTrans,
@@ -161,6 +181,8 @@ Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynami
             flatMat2.data(), transp2 ? k2 : n,
             0.0,
             result_flat.data(), n);
+        throughput::record("dense GEMM (dot_BLAS)", false,
+            throughput::flops_gemm(m, n, k1), get_msec(cpu_gemm_t0, get_time()));
     }
     else if constexpr (std::is_same_v<T, cdouble>)
     {
@@ -456,7 +478,7 @@ void get_submatrix(const T2& full,
     err_checkf(indices.size() > 0, "Atom indices list is empty.", std::cout);
     const int n = static_cast<int>(indices.size());
     err_checkf(full.extent(0) == full.extent(1), "Matrix must be square.", std::cout);
-    err_checkf(sub.size() == n * n, "Submatrix has incorrect size.", std::cout);
+    err_checkf(sub.size() == static_cast<size_t>(n) * n, "Submatrix has incorrect size.", std::cout);
 
     for (int i = 0; i < n; ++i) {
         const int global_i = indices[i];
@@ -480,7 +502,7 @@ void get_submatrix(const T2& full,
     const int n2 = static_cast<int>(vec_indices.size());
     err_checkf(n1 > 0, "Val indices list is empty.", std::cout);
     err_checkf(n2 > 0, "Vec indices list is empty.", std::cout);
-    err_checkf(sub.size() == n1 * n2, "Submatrix has incorrect size.", std::cout);
+    err_checkf(sub.size() == static_cast<size_t>(n1) * n2, "Submatrix has incorrect size.", std::cout);
 
     for (int i = 0; i < n1; ++i) {
         const int global_i = val_indices[i];
@@ -583,8 +605,8 @@ void get_submatrices(const T2& D_full,
     err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
     err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
     err_checkf(D_full.extent(0) == S_full.extent(0), "Density and Overlap matrices must be of the same size.", std::cout);
-    err_checkf(D_sub.size() == n * n, "Density submatrix has incorrect size.", std::cout);
-    err_checkf(S_sub.size() == n * n, "Overlap submatrix has incorrect size.", std::cout);
+    err_checkf(D_sub.size() == static_cast<size_t>(n) * n, "Density submatrix has incorrect size.", std::cout);
+    err_checkf(S_sub.size() == static_cast<size_t>(n) * n, "Overlap submatrix has incorrect size.", std::cout);
 
     for (int i = 0; i < n; ++i) {
         const int global_i = indices[i];
@@ -607,8 +629,8 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
 
     // 1. Allocate memory for SVD results
     vec S(k);                 // Singular values
-    vec U(m * k);             // Left singular vectors (m x k)
-    vec Vt(k * n);            // Right singular vectors transposed (k x n)
+    vec U(static_cast<size_t>(m) * k);             // Left singular vectors (m x k)
+    vec Vt(static_cast<size_t>(k) * n);            // Right singular vectors transposed (k x n)
     vec superb(k - 1);        // Workspace for dgesvd
 
     // Make a copy of A because dgesvd destroys the input matrix
@@ -680,7 +702,7 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
         S[i] = S[i] < cutoff ? 0.0 : 1.0 / S[i];
 
     // 4. Compute A^+ = V * S^+ * U^T
-    A_copy = vec(k * m, 0.0); // Reuse A_copy as W to save memory
+    A_copy = vec(static_cast<size_t>(k) * m, 0.0); // Reuse A_copy as W to save memory
     for (int i = 0; i < k; ++i) {
         const int im = i * m;
         if (S[i] == 0.0)
@@ -741,7 +763,7 @@ void make_Eigenvalues(vec& A, vec& W) {
 
 vec mat_sqrt(vec& A, vec& W, const double cutoff) {
     const int n = static_cast<int>(W.size());
-    vec Temp(n * n, 0.0);
+    vec Temp(static_cast<size_t>(n) * n, 0.0);
 
     make_Eigenvalues(A, W);
 

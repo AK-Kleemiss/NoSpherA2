@@ -12,18 +12,40 @@ private:
   vec coefficients;
   int op; //0=alpha, 1=beta
 public:
-  MO() {
+  void reset() {
     nr = 0;
-    op = 0;
     occ = 0.0;
     ener = 0.0;
+    coefficients.clear();
+    op = 0;
+  };
+  MO() {
+    reset();
   };
   MO(const int& number, const double& occupation, const double& energy, const int& oper = 0) {
+    reset();
     nr = number;
     occ = occupation;
     ener = energy;
     op = oper;
   };
+  MO(const MO& rhs) {
+    reset();
+    *this = rhs;
+  };
+  MO& operator=(const MO& rhs) {
+    if (this == &rhs)
+      return *this;
+    reset();
+    nr = rhs.nr;
+    occ = rhs.occ;
+    ener = rhs.ener;
+    coefficients = rhs.coefficients;
+    op = rhs.op;
+    return *this;
+  };
+  MO(MO&&) = default;
+  MO& operator=(MO&&) = default;
   virtual ~MO() {};
   friend class MO_OCC;
   void push_back_coef(const double &val){
@@ -52,11 +74,14 @@ public:
   const vec& get_coefficients() const {
     return coefficients;
   };
+  int get_spin() const {
+	  return op;
+  };
   void assign_coefficients_size(int size)
   {
     coefficients.assign(size, 0.0);
   }
-  void set_coefficients(vec coeff) {
+  void set_coefficients(const vec& coeff) {
     coefficients = coeff;
   };
   void insert_into_coefficients(std::ranges::input_range auto&& v) {
@@ -132,5 +157,5 @@ public:
     return ener;
   };
   const vec& get_ptr_coef_vector() const { return coefficients; };
-  void assign_coefs(const vec& values) { coefficients.resize(values.size()); coefficients = values; }
+  void assign_coefs(const vec& values) { coefficients = values; }
 };

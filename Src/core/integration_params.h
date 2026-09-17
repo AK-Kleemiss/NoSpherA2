@@ -60,7 +60,7 @@ public:
 
     std::map<int, LibCintBasis> get_basis_sets() const { return basis_sets; };
 
-    static vec normalize_gto(vec coef, const vec& exp, const int l);
+    static vec normalize_gto(vec coef, const vec& exp, const int l, const bool primitives_normalized = false);
 
     void print_data(std::string name); //FOR DEBUG PURPOSES
     std::vector<atom> get_atoms() const {

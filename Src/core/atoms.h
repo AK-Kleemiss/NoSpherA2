@@ -1,5 +1,9 @@
 #pragma once
 #include "convenience.h"
+//atomID's string_view constructor calls std::from_chars. MSVC provides it transitively, so
+//Windows builds without this; libstdc++ does not, and the test targets - which include this
+//header outside the core precompiled header - fail to compile on Linux without it.
+#include <charconv>
 
 //-----------------Definition of atoms and basis sets--------------------
 
@@ -411,11 +415,15 @@ private:
      * the CIF reader uses when the file carries no group column.
      */
     int group_nr = 0;
+    void reset();
 public:
     atom();
     atom(const std::string& l, const atomID& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch);
     atom(const std::string& l, const atomID& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
+    atom(const atom& rhs);
     atom& operator=(const atom& rhs);
+    atom(atom&&) = default;
+    atom& operator=(atom&&) = default;
     void print_values() const;
     bool push_back_basis_set(const double & exponent, const double &coefficient, const int &type, const int &shell);
     void print_values_long() const;
