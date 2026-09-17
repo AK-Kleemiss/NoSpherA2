@@ -2640,8 +2640,9 @@ void XCW::apply_level_shift(const occ::Mat& C_old, const occ::qm::SCF<occ::qm::H
 	else {
 		const int nao = C_old.rows() / 2;
 		const auto S_ao = scf.ctx.S.topRows(nao);
-		const occ::Mat SC_virt_a = S_ao * C_old.topRows(nao).rightCols(cryst.nmo - nocc);
-		const occ::Mat SC_virt_b = S_ao * C_old.bottomRows(nao).rightCols(cryst.nmo - nocc);
+		//Cocc has max(n_alpha, n_beta) columns, the spin counts differ for open shells
+		const occ::Mat SC_virt_a = S_ao * C_old.topRows(nao).rightCols(cryst.nmo - scf.ctx.mo.n_alpha);
+		const occ::Mat SC_virt_b = S_ao * C_old.bottomRows(nao).rightCols(cryst.nmo - scf.ctx.mo.n_beta);
 		F_diis.topRows(nao).noalias() += settings.level_shift * SC_virt_a * SC_virt_a.transpose();
 		F_diis.bottomRows(nao).noalias() += settings.level_shift * SC_virt_b * SC_virt_b.transpose();
 	}
@@ -2818,8 +2819,8 @@ double XCW::compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& s
 	else if (settings.hf_type == occ::qm::SpinorbitalKind::Unrestricted) {
 		occ::Mat C_alpha = scf.molecular_orbitals().C.topRows(cryst.nmo);
 		occ::Mat C_beta = scf.molecular_orbitals().C.bottomRows(cryst.nmo);
-		occ::Mat Cocc_alpha = scf.molecular_orbitals().Cocc.topRows(cryst.nmo);
-		occ::Mat Cocc_beta = scf.molecular_orbitals().Cocc.bottomRows(cryst.nmo);
+		occ::Mat Cocc_alpha = C_alpha.leftCols(scf.ctx.mo.n_alpha);
+		occ::Mat Cocc_beta = C_beta.leftCols(scf.ctx.mo.n_beta);
 		occ::Mat Cvir_alpha = C_alpha.rightCols(C_alpha.cols() - Cocc_alpha.cols());
 		occ::Mat Cvir_beta = C_beta.rightCols(C_beta.cols() - Cocc_beta.cols());
 		occ::Mat G_alpha = Cvir_alpha.transpose() * scf.ctx.F.topRows(cryst.nmo) * Cocc_alpha;

@@ -235,7 +235,7 @@ occ::Mat stored_eri::fock(const occ::qm::MolecularOrbitals& mo, const bool scree
 	occ::Mat F = occ::Mat::Zero(mo.D.rows(), mo.D.cols()), Jb, Kb;
 	JK_(occ::qm::block::a(mo.D), J, K);
 	JK_(occ::qm::block::b(mo.D), Jb, Kb);
-	occ::qm::block::a(F) = (J + Jb) - K;
-	occ::qm::block::b(F) = (J + Jb) - Kb;
+	occ::qm::block::a(F) = 2.0 * (J + Jb) - 2.0 * K;
+	occ::qm::block::b(F) = 2.0 * (J + Jb) - 2.0 * Kb;
 	return F;
 }
