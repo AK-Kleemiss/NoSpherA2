@@ -30,7 +30,9 @@
     </ClCompile>
     <ClCompile Include="..\..\tests\src\main.cpp" />
     <ClCompile Include="..\..\tests\src\TscStreamTests.cpp" />
-    <ClCompile Include="..\..\tests\src\UnitTests.cpp" />
+    <ClCompile Include="..\..\tests\src\UnitTests.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="..\..\tests\src\IntegrationTests.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -75,7 +77,7 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Windows_utils\NoSpherA2_release.props" />
   </ImportGroup>
-    <ItemDefinitionGroup>
+  <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NosMainFolder)Src</AdditionalIncludeDirectories>
     </ClCompile>

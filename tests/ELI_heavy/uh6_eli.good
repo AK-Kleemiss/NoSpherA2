@@ -42,7 +42,7 @@ Density Critical Points (13 found):
   CP   3  [attractor   ]  converged   H4
     Position  :        -0.0000        -3.7649         0.0000
     Rho       :         0.3608
-    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
     DelSqRho  :       -21.2503
    V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
@@ -50,7 +50,7 @@ Density Critical Points (13 found):
   CP   4  [attractor   ]  converged   H6
     Position  :         0.0000        -0.0000        -3.7649
     Rho       :         0.3608
-    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
     DelSqRho  :       -21.2503
    V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
@@ -58,7 +58,7 @@ Density Critical Points (13 found):
   CP   5  [attractor   ]  converged   H5
     Position  :        -0.0000         0.0000         3.7649
     Rho       :         0.3608
-    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
     DelSqRho  :       -21.2503
    V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
@@ -66,7 +66,7 @@ Density Critical Points (13 found):
   CP   6  [attractor   ]  converged   H3
     Position  :        -0.0000         3.7649        -0.0000
     Rho       :         0.3608
-    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
     DelSqRho  :       -21.2503
    V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
@@ -74,7 +74,7 @@ Density Critical Points (13 found):
   CP   7  [attractor   ]  converged   H1
     Position  :         3.7649        -0.0000         0.0000
     Rho       :         0.3608
-    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
     DelSqRho  :       -21.2503
    V         :     5.3126e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
@@ -82,7 +82,7 @@ Density Critical Points (13 found):
   CP   8  [bond        ]  converged   H2-U0 bond
     Position  :        -2.4702        -0.0000        -0.0000
     Rho       :         0.1100
-    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
     DelSqRho  :        -0.0626
     Bond Ellipticity:         0.0000
@@ -91,7 +91,7 @@ Density Critical Points (13 found):
   CP   9  [bond        ]  converged   H4-U0 bond
     Position  :        -0.0000        -2.4702         0.0000
     Rho       :         0.1100
-    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
     DelSqRho  :        -0.0626
     Bond Ellipticity:         0.0000
@@ -109,7 +109,7 @@ Density Critical Points (13 found):
   CP  11  [bond        ]  converged   H5-U0 bond
     Position  :        -0.0000         0.0000         2.4702
     Rho       :         0.1100
-    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
     DelSqRho  :        -0.0626
     Bond Ellipticity:         0.0000
@@ -127,7 +127,7 @@ Density Critical Points (13 found):
   CP  13  [bond        ]  converged   H1-U0 bond
     Position  :         2.4702        -0.0000        -0.0000
     Rho       :         0.1100
-    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
     DelSqRho  :        -0.0626
     Bond Ellipticity:         0.0000
@@ -185,17 +185,17 @@ Quadrature points sent along the field: 40751, left the grid: 24
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume     maximum        x          y          z
-      1  H2-U0 bond             0.3167    173.7626     11.0926     -5.513     -0.093     -0.093
-      2  H4-U0 bond             0.3135    171.7422     11.0926      0.093     -5.513     -0.093
+      1  H2-U0 bond             0.3167    173.7626     11.0925     -5.513     -0.093     -0.093
+      2  H4-U0 bond             0.3135    171.7422     11.0925      0.093     -5.513     -0.093
       3  H4                     1.7283     67.5554     12.3869      0.093     -3.831     -0.093
       4  H6                     1.7398     74.1309     12.3869      0.093      0.093     -3.831
       5  H2                     1.7207     63.6860     12.3869     -3.831      0.093     -0.093
-      6  H6-U0 bond             0.3117    170.2752     11.0926      0.093     -0.093     -5.513
-      7  H5-U0 bond             0.3111    170.3178     11.0926      0.093      0.093      5.513
+      6  H6-U0 bond             0.3117    170.2752     11.0925      0.093     -0.093     -5.513
+      7  H5-U0 bond             0.3111    170.3178     11.0925      0.093      0.093      5.513
       8  H5                     1.7187     57.3690     12.3869     -0.093     -0.093      3.831
       9  H3                     1.7284     67.3329     12.3869      0.093      3.831      0.093
-     10  H3-U0 bond             0.3135    172.1180     11.0926      0.093      5.513     -0.093
-     11  U0 core               85.7200     68.8499      1.3679      1.028     -1.028      1.028
+     10  H3-U0 bond             0.3135    172.1180     11.0925      0.093      5.513     -0.093
+     11  U0 core               85.7200     68.8499      1.3679      1.028      1.028      1.028
      12  H1                     1.7222     61.0014     12.3869      3.831     -0.093      0.093
-     13  H1-U0 bond             0.3186    174.8187     11.0926      5.513      0.093     -0.093
+     13  H1-U0 bond             0.3186    174.8187     11.0925      5.513      0.093     -0.093
   total in basins: 97.9633   outside every basin: 0.0365
