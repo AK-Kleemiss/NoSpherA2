@@ -119,7 +119,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768;
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
-	std::string df_basis_name;
+	std::string df_basis_name, guess_basis_name;
 	bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false;
 	bool i_tensor_single = false, i_tensor_double = false;
 	std::filesystem::path i_tensor_file_path;
@@ -219,6 +219,10 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		handlers["df_basis"] = [&](std::istream& is) {
 			if (!(is >> df_basis_name))
 				throw std::runtime_error("Expected a fitting basis name after 'df_basis'");
+			};
+		handlers["guess_basis"] = [&](std::istream& is) {
+			if (!(is >> guess_basis_name))
+				throw std::runtime_error("Expected a basis name after 'guess_basis'");
 			};
 
 		handlers["start"] = [&](std::istream& is) {
@@ -452,6 +456,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.i_tensor_save_path = i_tensor_save_path;
 	settings.nbo_output = nbo_output;
 	settings.df_basis_name = df_basis_name;
+	settings.guess_basis_name = guess_basis_name;
 
 	return settings;
 }
@@ -2606,6 +2611,40 @@ void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
 	mol.set_multiplicity(settings.multiplicity);
 }
 
+//The same walk as OCC's SOAD guess with a converged Hartree-Fock density in place of the
+//tabulated atoms: F = H + G(D_small) through the mixed-basis build, the orbitals from its
+//diagonalisation. The spin blocks are summed, the first iteration polarises them again.
+void XCW::small_basis_guess(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
+	occ::core::Molecule mol;
+	setup_SCF_mol(mol);
+	occ::qm::AOBasis small_bs;
+	setup_basis(mol, settings.guess_basis_name, small_bs);
+	occ::qm::HartreeFock hf_small(small_bs);
+	occ::qm::SCF scf_small(hf_small, settings.hf_type);
+	scf_small.set_charge_multiplicity(settings.charge, settings.multiplicity);
+	scf_small.maxiter = settings.max_scf_iterations;
+	const double e_small = scf_small.compute_scf_energy();
+	XCW_log << "XCW: initial guess from a " << settings.guess_basis_name << " Hartree-Fock (" << small_bs.nbf()
+		<< " functions), E = " << std::fixed << std::setprecision(8) << e_small << " Eh" << std::endl;
+
+	occ::qm::MolecularOrbitals guess;
+	guess.kind = scf.ctx.mo.kind;
+	guess.n_ao = static_cast<int>(small_bs.nbf());
+	guess.n_alpha = scf.n_alpha();
+	guess.n_beta = scf.n_beta();
+	guess.D = settings.hf_type == occ::qm::SpinorbitalKind::Unrestricted
+		? occ::Mat(occ::qm::block::a(scf_small.ctx.mo.D) + occ::qm::block::b(scf_small.ctx.mo.D))
+		: scf_small.ctx.mo.D;
+
+	scf.update_occupied_orbital_count();
+	scf.set_core_matrices();
+	scf.ctx.F = scf.ctx.H;
+	scf.set_conditioning_orthogonalizer();
+	scf.ctx.F += scf.m_procedure.compute_fock_mixed_basis(guess, small_bs, false);
+	scf.ctx.orthogonalizer.orthogonalize_molecular_orbitals(scf.ctx.mo, scf.ctx.F);
+	scf.m_have_initial_guess = true;
+}
+
 void XCW::setup_basis(occ::core::Molecule& mol, std::string& basis_set_name, occ::qm::AOBasis& occ_basis_set) {
 	std::shared_ptr<BasisSet> basis_set = BasisSetLibrary::get_basis_set(basis_set_name);
 	occ_basis_set = basis_set->to_AOBasis(mol.atoms());
@@ -2691,7 +2730,10 @@ bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		scf.set_initial_guess_from_wfn(last_wfn);
 	}
 	else {
-		scf.compute_initial_guess();
+		if (settings.guess_basis_name.empty())
+			scf.compute_initial_guess();
+		else
+			small_basis_guess(scf);
 		has_guess = true;
 	}
 	scf.ctx.K = scf.m_procedure.compute_schwarz_ints();

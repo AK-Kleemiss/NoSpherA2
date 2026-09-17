@@ -100,6 +100,9 @@ private:
 		std::string basis_set_name;
 		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
 		std::string df_basis_name;
+		//`guess_basis <name>`: the first lambda starts from a Hartree-Fock converged in this
+		//(smaller) basis by OCC's own driver, its density projected into the orbital basis
+		std::string guess_basis_name;
 		bool grown = false;
 		int n_params;
 		int refine_against;
@@ -286,6 +289,7 @@ private:
 	void calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf);
 
 	// Executes a single SCF solver (for specific lambda step)
+	void small_basis_guess(occ::qm::SCF<occ::qm::HartreeFock>& scf);
 	bool do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess, bool write_result = true);
 
 	// Executes a single SCF iteration
