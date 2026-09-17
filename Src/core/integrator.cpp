@@ -272,9 +272,11 @@ static partition_multipole_data calculate_partition_multipoles(
 
     const int n_atoms = wavy.get_ncen();
     const int n_mom = (lmax + 1) * (lmax + 1);
+    const std::size_t total_rows =
+        static_cast<std::size_t>(n_atoms) * static_cast<std::size_t>(n_mom);
 
     result.rows.assign(
-        n_atoms * n_mom,
+        total_rows,
         vec(table.n_coef, 0.0));
 
     const GridData& grid_data = grid_manager.getGridData();
