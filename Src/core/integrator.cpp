@@ -10,159 +10,6 @@
 #include <occ/interaction/polarization.h>
 
 
-static int orca_sph_index(int m)
-{
-    if (m == 0)
-        return 0;
-    return m > 0 ? 2 * m - 1 : -2 * m;
-}
-
-static double orca_phase(int l, int m)
-{
-    const int am = std::abs(m);
-
-    if (l >= 3 && l <= 6 && (am == 3 || am == 4))
-        return -1.0;
-
-    if ((l == 7 || l == 8) && (am == 3 || am == 4 || am == 7 || am == 8))
-        return -1.0;
-
-    return 1.0;
-}
-
-static double orca_angular_norm(int l)
-{
-    if (l <= 1)
-        return 1.0;
-
-    switch (l)
-    {
-    case 2:
-        return 0.5 * std::sqrt(15.0 / constants::PI);
-    case 3:
-        return 0.5 * std::sqrt(105.0 / constants::PI);
-    case 4:
-        return 1.5 * std::sqrt(35.0 / constants::PI);
-    default:
-        if (l <= 10)
-            return 0.5 * std::sqrt((2.0 * l + 1.0) / constants::PI);
-        throw std::runtime_error("ORCA spherical transformation only implemented up to l = 10");
-    }
-}
-
-static vec2 libcint_sph2cart_matrix(int l)
-{
-    const int ncart = libcint::CINTlen_cart(l);
-    const int nsph = 2 * l + 1;
-
-    if (l == 0)
-        return { {1.0} };
-
-    if (l == 1)
-        return { {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0} };
-
-    vec identity(ncart * ncart, 0.0);
-    vec spherical(nsph * ncart, 0.0);
-
-    for (int i = 0; i < ncart; ++i)
-        identity[i + ncart * i] = 1.0;
-
-    libcint::CINTc2s_bra_sph(spherical.data(), ncart, identity.data(), l);
-
-    vec2 result(ncart, vec(nsph));
-    for (int cart = 0; cart < ncart; ++cart)
-        for (int sph = 0; sph < nsph; ++sph)
-            result[cart][sph] = spherical[sph + nsph * cart];
-
-    return result;
-}
-
-static const std::vector<int>& cart_from_libcint(const int l)
-{
-    static const std::array<std::vector<int>, 11> map = []()
-        {
-            std::array<std::vector<int>, 11> result;
-
-            result[0] = { 0 };
-            result[1] = { 0, 1, 2 };
-            result[2] = { 0, 3, 5, 1, 2, 4 };
-            result[3] = { 0, 6, 9, 1, 2, 7, 3, 5, 8, 4 };
-            result[4] = { 0, 10, 14, 1, 2, 6, 11, 9, 13, 3, 5, 12, 4, 7, 8 };
-
-            for (int l = 5; l <= 10; l++)
-            {
-                const int ncart = (l + 1) * (l + 2) / 2;
-                result[l].resize(ncart);
-
-                for (int cart = 0; cart < ncart; cart++)
-                    result[l][cart] = ncart - 1 - cart;
-            }
-
-            return result;
-        }();
-
-    return map.at(l);
-}
-
-vec2 orca_sph2cart_matrix(int l, const bool reorder)
-{
-    if (l < 0 || l > 10)
-        throw std::runtime_error("ORCA spherical transformation only implemented for 0 <= l <= 10");
-
-    const int ncart = libcint::CINTlen_cart(l);
-    const int nsph = 2 * l + 1;
-
-    if (l == 0)
-        return { {1.0} };
-
-    if (l == 1)
-    {
-        vec2 result(3, vec(3, 0.0));
-        result[0][1] = 1.0; // x <- p+1
-        result[1][2] = 1.0; // y <- p-1
-        result[2][0] = 1.0; // z <- p0
-        return result;
-    }
-
-    const vec2 libcint = libcint_sph2cart_matrix(l);
-    const double norm = orca_angular_norm(l);
-    ivec map = cart_from_libcint(l);
-
-    vec2 result(ncart, vec(nsph, 0.0));
-
-    for (int m = -l; m <= l; ++m)
-    {
-        const int libcint_sph = m + l;
-        const int orca_sph = orca_sph_index(m);
-        const double factor = orca_phase(l, m) / norm;
-
-        for (int cart = 0; cart < ncart; ++cart)
-            result[cart][orca_sph] = factor * libcint[reorder ? map[cart] : cart][libcint_sph];
-    }
-
-    return result;
-}
-
-vec orca_sph2cart(const vec& spherical, int l, const bool reorder)
-{
-    if (spherical.size() != static_cast<size_t>(2 * l + 1))
-        throw std::runtime_error("Wrong number of spherical coefficients");
-
-    const vec2& transformation = orca_sph2cart_matrix(l, reorder);
-    vec cartesian(transformation.size(), 0.0);
-
-    for (int cart = 0; cart < static_cast<int>(transformation.size()); ++cart)
-        for (int sph = 0; sph < static_cast<int>(spherical.size()); ++sph)
-            cartesian[cart] += transformation[cart][sph] * spherical[sph];
-
-    return cartesian;
-}
-
-int first_cartesian_type(const int l)
-{
-    return 1 + l * (l + 1) * (l + 2) / 6;
-}
-
 vec einsum_ijk_ij_p(const dMatrix3& v1, const dMatrix2& v2)
 {
     const int I = (int)v1.extent(0);
@@ -642,13 +489,11 @@ static void apply_charge_restraints(
     if (!config.restrain_charges)
         return;
 
-    const vec weights = DensityFitting::restraint_weights(
-        wavy_aux,
-        n_aux,
-        config.restraint_strength,
-        config.adaptive_restraint);
-
     const int n_atoms = wavy_aux.get_ncen();
+    // -multipole_moments: the population rows share the multipole weight, otherwise the adaptive charge weights
+    const vec weights = config.multipole_lmax >= 0
+        ? vec(n_atoms, config.multipole_strength)
+        : DensityFitting::restraint_weights(wavy_aux, n_aux, config.restraint_strength, config.adaptive_restraint);
 
     if (restraints.partitioned) {
         const int n_mom = (restraints.lmax + 1) * (restraints.lmax + 1);
@@ -885,10 +730,8 @@ static void print_multipole_report(
         << "    deviation"
         << std::endl;
 
-    // l=0 populations are reported by analyze_density_fit_quality(). Keep this
-    // table strictly for multipoles that were independently enabled.
     for (int a = 0; a < wavy_aux.get_ncen(); ++a) {
-        for (int l = 1; l <= restraints.lmax; ++l) {
+        for (int l = 0; l <= restraints.lmax; ++l) {
             const double normalization =
                 stone / std::sqrt(2.0 * l + 1.0);
 

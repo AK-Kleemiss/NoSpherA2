@@ -64,7 +64,8 @@ private:
 namespace SALTED_Utils
 {
     std::vector<cvec2> complex_to_real_transformation(std::vector<int> sizes);
-    void filter_input(WFN& wavy, options& opt, const SALTEDConfig& config);
+    //Removes the atoms the model cannot predict from wavy; returns which of the input atoms were removed
+    std::vector<char> filter_input(WFN& wavy, options& opt, const SALTEDConfig& config);
     void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const std::array<std::vector<primitive>, 118> &basis_set, std::vector<std::string> species);
     int get_lmax_max(std::unordered_map<std::string, int> &lmax);
 
@@ -123,12 +124,15 @@ struct aux_density_table
     // alpha^(l + 3/2), needed for Fourier-Bessel transform
     vec pr_exp_l32;
     ivec sh_start, sh_atom, sh_l, pr_start, coef_off;
+    // distinct (exponent, l) pairs and the slot of each primitive: the radial Fourier factor depends on nothing else
+    vec uniq_exp, uniq_exp_l32;
+    ivec uniq_l, pr_uniq;
 
     // coefficient index -> shell / m
     ivec coef_shell;
     ivec coef_m;
 
-    aux_density_table(const std::vector<atom>& atoms);
+    explicit aux_density_table(const std::vector<atom>& atoms);
     double operator()(const double x, const double y, const double z, const double* coefs) const;
     double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz) const;
     double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double& lap) const;

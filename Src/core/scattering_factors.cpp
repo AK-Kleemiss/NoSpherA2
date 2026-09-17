@@ -1780,6 +1780,7 @@ static inline cdouble sfac_bessel_r(const primitive& p, const double* k_point, c
 	}
 }
 
+//a streaming caller owns one bar for the whole table and passes it in, else every block draws its own
 void calc_SF_SALTED(
 	const vec2& k_pt,
 	const vec& coefs,
@@ -1788,33 +1789,51 @@ void calc_SF_SALTED(
 	cvec2& sf,
 	ProgressBar* progress = nullptr)
 {
-	const int num_asym_atoms =
-		static_cast<int>(asym_atom_list.size());
-
-	const int nk =
-		static_cast<int>(k_pt[0].size());
-
+	const int num_asym_atoms = static_cast<int>(asym_atom_list.size());
+	const int nk = static_cast<int>(k_pt[0].size());
 	sf.resize(num_asym_atoms);
-
 	for (int ia = 0; ia < num_asym_atoms; ++ia)
 		sf[ia].assign(nk, constants::cnull);
+	std::unique_ptr<ProgressBar> local_pb;
+	if (!progress)
+		local_pb = std::make_unique<ProgressBar>(nk, 60, "#", " ", "Generating scattering factors...");
+	ProgressBar& pb = progress ? *progress : *local_pb;
+	const int n_uniq = static_cast<int>(table.uniq_exp.size());
 
-#pragma omp parallel for
-	for (int ik = 0; ik < nk; ++ik)
+#pragma omp parallel
 	{
-		for (int ia = 0; ia < num_asym_atoms; ++ia)
+		//the radial factor (H/2)^l exp(-H^2/4a) / a^(l+3/2) of aux_density_table::fourier_atom depends on (a, l) and |k| alone,
+		//so it is tabulated once per k-point over the distinct pairs instead of per primitive per atom
+		vec radial(n_uniq);
+#pragma omp for
+		for (int ik = 0; ik < nk; ++ik)
 		{
-			sf[ia][ik] =
-				table.fourier_atom(
-					k_pt[0][ik],
-					k_pt[1][ik],
-					k_pt[2][ik],
-					coefs.data(),
-					asym_atom_list[ia]
-				);
+			const double kx = k_pt[0][ik], ky = k_pt[1][ik], kz = k_pt[2][ik];
+			const double H2 = kx * kx + ky * ky + kz * kz, H = std::sqrt(H2);
+			const double k[3] = { H > 0.0 ? kx / H : 0.0, H > 0.0 ? ky / H : 0.0, H > 0.0 ? kz / H : 1.0 };
+			for (int u = 0; u < n_uniq; u++)
+			{
+				double Hl_over_2l = 1.0;
+				for (int i = 0; i < table.uniq_l[u]; i++)
+					Hl_over_2l *= 0.5 * H;
+				radial[u] = Hl_over_2l * std::exp(-H2 / (4.0 * table.uniq_exp[u])) / table.uniq_exp_l32[u];
+			}
+			for (int ia = 0; ia < num_asym_atoms; ++ia)
+			{
+				const int a = asym_atom_list[ia];
+				cdouble v = constants::cnull;
+				for (int s = table.sh_start[a]; s < table.sh_start[a + 1]; ++s)
+				{
+					const int l = table.sh_l[s];
+					double r = 0.0;
+					for (int p = table.pr_start[s]; p < table.pr_start[s + 1]; ++p)
+						r += table.pr_norm[p] * radial[table.pr_uniq[p]];
+					v += constants::i_pows[l & 3] * (constants::PI3_2 * r * constants::spherical_harmonic(l, k[0], k[1], k[2], coefs.data() + table.coef_off[s]));
+				}
+				sf[ia][ik] = v;
+			}
+			pb.update();
 		}
-		if (progress)
-			progress->update();
 	}
 }
 /**
@@ -2980,6 +2999,8 @@ tsc_block_type calculate_scattering_factors(
 			return tsc_block_type();
 		}
 
+		//one table for every block, building it per block cost more than the transform
+		const aux_density_table aux_table(calculator.wavy.get_atoms());
 		if (stream_tsc)
 		{
 			ScattererLabels stream_ids;
@@ -3019,7 +3040,7 @@ tsc_block_type calculate_scattering_factors(
 				{
 					cvec2 chunk;
 					calc_SF_SALTED(slice_k_points(k_pt, lo, hi), coefs,
-						calculator.wavy.get_atoms(), asym_atom_list, chunk, &progress);
+						aux_table, asym_atom_list, chunk, &progress);
 					//Mott-Bethe never looks outside one reflection, so a block is as valid a unit as a table
 					if (opt.electron_diffraction)
 						convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
@@ -3035,7 +3056,7 @@ tsc_block_type calculate_scattering_factors(
 			calc_SF_SALTED(
 				k_pt,
 				coefs,
-				calculator.wavy.get_atoms(),
+				aux_table,
 				asym_atom_list,
 				sf);
 		}
@@ -3132,6 +3153,7 @@ tsc_block_type calculate_scattering_factors(
             time_points.push_back(get_time());
             time_descriptions.push_back("Calculation of Charges");
 
+            const aux_density_table aux_table(wavy_aux.get_atoms());
             if (stream_tsc)
             {
                 //as the SALTED case above, but the atoms come from the auxiliary wavefunction, so no spherical remainder
@@ -3146,7 +3168,7 @@ tsc_block_type calculate_scattering_factors(
                     {
                         cvec2 chunk;
                         calc_SF_SALTED(slice_k_points(k_pt, lo, hi), coefs,
-                            wavy_aux.get_atoms(), asym_atom_list, chunk, &progress);
+                            aux_table, asym_atom_list, chunk, &progress);
                         if (opt.electron_diffraction)
                             convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
                                 std::vector<i3>(hkl_v.begin() + lo, hkl_v.begin() + hi));
@@ -3158,7 +3180,7 @@ tsc_block_type calculate_scattering_factors(
                 calc_SF_SALTED(
                     k_pt,
                     coefs,
-                    wavy_aux.get_atoms(),
+                    aux_table,
                     asym_atom_list,
                     sf);
             }
@@ -3338,6 +3360,9 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	const size_t n_refl = preps[0].hkl_v.size();
 	file << "Combined tsc: " << ids.size() << " scatterers from "
 		<< n_parts << " parts" << std::endl;
+	std::vector<aux_density_table> aux_tables;
+	for (size_t p = 0; p < preps.size(); p++)
+		aux_tables.emplace_back(*preps[p].atoms);
 
 	//the bar counts reflections * parts, since every part is evaluated for every block
 	stream_blocks(opt, file, "experimental.tscb", ids, preps[0].hkl_v,
@@ -3350,7 +3375,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			{
 				cvec2 chunk;
 				calc_SF_SALTED(slice_k_points(preps[p].k_pt, lo, hi), preps[p].coefs,
-					*preps[p].atoms, preps[p].asym_atom_list, chunk, &progress);
+					aux_tables[p], preps[p].asym_atom_list, chunk, &progress);
 				if (opt.electron_diffraction)
 					convert_to_ED(preps[p].asym_atom_list, preds[p]->wavy, chunk,
 						vec(preps[p].stl_of_reflection.begin() + lo,

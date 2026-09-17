@@ -105,7 +105,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     // middle row holds one). Dropping the exact zeros leaves a finite sum bit for
     // bit the same as long as the survivors stay in ascending column order, which
     // is the order the dense loop added them in. The structure is read off c2r
-    // rather than assumed; anything not two-per-row falls back to the dense walk.
+    // rather than assumed; anything not two-per-row is an error.
     struct c2r_entry { int j; double re, im; };
     std::vector<c2r_entry> c2r_nz(static_cast<size_t>(l21) * 2, c2r_entry{0, 0.0, 0.0});
     std::vector<int> c2r_cnt(l21, 0);
@@ -116,6 +116,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
         {
             const cdouble &e = c2r[i2][j2];
             if (e.real() == 0.0 && e.imag() == 0.0) continue;
+            err_checkf(cnt < 2, "equicomb: complex-to-real row " + std::to_string(i2) + " has more than two non-zeros", std::cout);
             c2r_nz[static_cast<size_t>(i2) * 2 + cnt] = { j2, e.real(), e.imag() };
             ++cnt;
         }
@@ -301,6 +302,10 @@ void equicomb(int natoms, int nrad1, int nrad2,
                 }
             }
 
+            // An empty environment gives an all-zero descriptor, so inner is 0 and
+            // 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
+            // answer: the kernel contributes nothing and the atom keeps the species
+            // average the model adds separately.
             if (inner > 0.0) [[likely]]
             {
                 normfact = 1.0 / sqrt(inner);
@@ -308,6 +313,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
             else
             {
                 normfact = 0.0;
+#pragma omp atomic
+                ++empty_environments;
             }
             const int offset = iat * l21 * nfps;
             for (i = 0; i < nfps; ++i)
@@ -332,6 +339,18 @@ void equicomb(int natoms, int nrad1, int nrad2,
     throughput::record("SALTED equicomb", false,
         throughput::flops_equicomb(natoms, nrad1, nrad2, llmax, l21),
         get_msec(eq_cpu_t0, get_time()));
+
+    static bool warned_empty_environment = false;
+    if (empty_environments > 0 && !warned_empty_environment)
+    {
+        warned_empty_environment = true;
+        std::cout << "WARNING: " << empty_environments << " atom(s) have no neighbour"
+                  << " inside the descriptor cutoff.\n"
+                  << "         Their environment singles out no direction, so their"
+                  << " predicted density stays spherical.\n"
+                  << "         Isolated solvent is the usual cause."
+                  << std::endl;
+    }
 }
 
 void equicomb(int natoms, int nrad1, int nrad2,

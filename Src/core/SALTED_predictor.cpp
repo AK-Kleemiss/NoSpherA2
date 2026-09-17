@@ -45,8 +45,66 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
     SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
     file.populate_config(config);
 
-    SALTED_Utils::filter_input(wavy, opt_in, config);
-    
+    const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
+    if (!use_thakkar.empty()) {
+        spherical_fill_used = true;
+        // The filled atoms get a NEUTRAL Thakkar density, which fixes how many
+        // electrons they carry. Estimate what they should really carry, so the
+        // size of that assumption can be reported rather than hidden. EEQ gives
+        // smooth non-integer charges from geometry and honours the net charge,
+        // which suits coordination chemistry far better than assigning a formal
+        // oxidation state.
+        const int ncen_in = wavy_in.get_ncen();
+        n_filled = static_cast<int>(std::count(use_thakkar.begin(), use_thakkar.end(), (char)1));
+        try
+        {
+            occ::IVec nums(ncen_in);
+            occ::Mat3N pos(3, ncen_in);
+            const bool bohr = wavy_in.get_isBohr();
+            for (int a = 0; a < ncen_in; a++)
+            {
+                nums(a) = wavy_in.get_atom_charge(a);
+                for (int ax = 0; ax < 3; ax++)
+                {
+                    const double c = wavy_in.get_atom_coordinate(a, ax);
+                    pos(ax, a) = bohr ? constants::bohr2ang(c) : c;   // EEQ wants Angstrom
+                }
+            }
+            const occ::Vec q = occ::core::charges::eeq_partial_charges(
+                nums, pos, static_cast<double>(wavy_in.get_charge()));
+            filled_eeq_charge = 0.0;
+            applied_fill_charge = 0.0;
+            opt_in.spherical_fill_charges.clear();
+            for (int a = 0; a < ncen_in; a++)
+            {
+                if (!use_thakkar[a]) continue;
+                filled_eeq_charge += q(a);
+                // Only charge the fill can actually carry may be moved out of
+                // the predicted region. If no ion is tabulated for this element
+                // the fill stays neutral, so the target must stay neutral too -
+                // otherwise the two disagree and the system total is wrong.
+                const int Zf = wavy_in.get_atom_charge(a);
+                const bool ion_ok = (q(a) > 0.0) ? Thakkar_Cation::available(Zf)
+                                                 : Thakkar_Anion::available(Zf);
+                if (ion_ok) applied_fill_charge += q(a);
+                // Position-keyed, in the wavefunction's own units: the fill
+                // rebuilds its wavefunction from the original file, so indices
+                // there are not ours to assume.
+                opt_in.spherical_fill_charges.push_back({
+                    wavy_in.get_atom_coordinate(a, 0),
+                    wavy_in.get_atom_coordinate(a, 1),
+                    wavy_in.get_atom_coordinate(a, 2),
+                    ion_ok ? q(a) : 0.0});
+            }
+        }
+        catch (const std::exception &e)
+        {
+            std::cout << "Could not estimate the filled-region charge (" << e.what()
+                      << "); reporting it as unknown." << std::endl;
+            filled_eeq_charge = std::numeric_limits<double>::quiet_NaN();
+        }
+    }
+
     //wavy.write_xyz("temp_rascaline.xyz"); //Also this
     //config.predict_filename = "temp_rascaline.xyz";
 

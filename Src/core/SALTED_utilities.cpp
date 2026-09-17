@@ -83,7 +83,7 @@ void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int>& lmax, std
 }
 
 
-void SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALTEDConfig& config) {
+std::vector<char> SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALTEDConfig& config) {
     // Two kinds of atom cannot be predicted, and both are handed to the spherical
     // Thakkar fill instead of guessed at:
     //
@@ -171,7 +171,9 @@ void SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALTEDConfig& con
         //wavy.write_xyz(new_fn);
         //wavy.set_path(new_fn);
         opt.needs_Thakkar_fill = true;
+        return use_thakkar;
     }
+    return {};
 }
 
 std::string SALTED_Utils::FeatomicHyperParameters::to_json() const
@@ -417,6 +419,11 @@ aux_density_table::aux_density_table(const std::vector<atom>& atoms)
                 pr_exp_l32.push_back(std::pow(exponents[p], l + 1.5));
                 alpha_min = std::min(alpha_min, exponents[p]);
                 pr_exp.push_back(exponents[p]);
+                int slot = 0;
+                while (slot < (int)uniq_exp.size() && !(uniq_exp[slot] == exponents[p] && uniq_l[slot] == l)) slot++;
+                if (slot == (int)uniq_exp.size())
+                    uniq_exp.push_back(exponents[p]), uniq_l.push_back(l), uniq_exp_l32.push_back(pr_exp_l32.back());
+                pr_uniq.push_back(slot);
             }
             coefficients = Int_Params::normalize_gto(coefficients, exponents, l);
 
@@ -889,8 +896,15 @@ void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_
     if (atom_nr != -1)
         std::cout << "Calculation for atom " << atom_nr << std::endl;
 
-    std::vector<atom> atoms = dummy.get_atoms();
-    const aux_density_table t(atoms);
+    const std::vector<atom> atoms = dummy.get_atoms();
+    //atom_nr selects one atom: its own table and the slice of the coefficients that belongs to it
+    const aux_density_table full(atoms);
+    const aux_density_table t(atom_nr == -1 ? atoms : std::vector<atom>{ atoms[atom_nr] });
+    vec coefs = data;
+    if (atom_nr != -1) {
+        const int off = full.coef_off[full.sh_start[atom_nr]];
+        coefs.assign(data.begin() + off, data.begin() + off + t.n_coef);
+    }
 #pragma omp parallel for schedule(dynamic)
     for (int index = 0; index < total_size; index++)
     {
@@ -898,13 +912,10 @@ void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_
         int j = (index / s3) % s2;
         int k = index % s3;
 
-        vec PosGrid{
+        cube_data.set_value(i, j, k, t(
             i * v1[0] + j * v2[0] + k * v3[0] + orig[0],
             i * v1[1] + j * v2[1] + k * v3[1] + orig[1],
-            i * v1[2] + j * v2[2] + k * v3[2] + orig[2] };
-        vec dens(1);
-        calc_density_ML(t, data, 1, &PosGrid[0], &PosGrid[1], &PosGrid[2], dens.data());
-        cube_data.set_value(i, j, k, dens[0]);
+            i * v1[2] + j * v2[2] + k * v3[2] + orig[2], coefs.data()));
         progress->update();
     }
     delete (progress);
