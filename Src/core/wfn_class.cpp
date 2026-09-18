@@ -1248,10 +1248,29 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
     string line;
     rf.seekg(0);
 
+    // Hand-edited xyz files arrive with the count line missing, an atom too many or
+    // too few, or a label that is not an element; every one of those used to end in
+    // a bare "invalid stod argument" or a charge-0 atom. Name the file and the line.
+    const string where = filename.string() + ": ";
+    auto strict_double = [&](const string &token, const string &what) {
+        size_t used = 0;
+        double value = 0.0;
+        try { value = stod(token, &used); } catch (...) { used = 0; }
+        err_checkf(used == token.size(), where + what + " '" + token + "' is not a number", file);
+        return value;
+    };
+    auto tokens_of = [](const string &l) {
+        svec t = split_string<string>(l, " ");
+        remove_empty_elements(t);
+        return t;
+    };
+
     getline_universal(rf, line);
-    stringstream stream(line);
-    int e_nuc = 0; // number of expected MOs, Exponents and nuclei
-    stream >> e_nuc;
+    svec head = tokens_of(line);
+    err_checkf(head.size() == 1, where + "first line must be the atom count alone, found '" + line + "'", file);
+    const double count = strict_double(head[0], "atom count");
+    err_checkf(count > 0 && count == floor(count), where + "atom count '" + head[0] + "' must be a positive integer", file);
+    int e_nuc = static_cast<int>(count); // number of expected nuclei
     if (debug)
         file << "e_nuc: " << e_nuc << endl;
     getline_universal(rf, line);
@@ -1268,19 +1287,20 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
     dum_label.resize(e_nuc);
     for (int i = 0; i < e_nuc; i++)
     {
-        svec temp;
-        getline_universal(rf, line);
-        stream.str(line);
+        const string atom_i = "atom " + to_string(i + 1) + " of " + to_string(e_nuc);
+        err_checkf(static_cast<bool>(getline_universal(rf, line)), where + "file ends before " + atom_i + " (atom count too large?)", file);
         if (debug)
             file << i << ".run, line:" << line << endl;
         dum_nr[i] = i;
-        temp = split_string<string>(line, " ");
-        remove_empty_elements(temp);
+        svec temp = tokens_of(line);
+        err_checkf(temp.size() >= 4, where + atom_i + " needs 'El x y z', found '" + line + "'", file);
         dum_label[i] = temp[0];
-        dum_x[i] = constants::ang2bohr(stod(temp[1]));
-        dum_y[i] = constants::ang2bohr(stod(temp[2]));
-        dum_z[i] = constants::ang2bohr(stod(temp[3]));
-        dum_ch[i] = constants::get_Z_from_label(dum_label[i].c_str()) + 1;
+        dum_x[i] = constants::ang2bohr(strict_double(temp[1], atom_i + " x"));
+        dum_y[i] = constants::ang2bohr(strict_double(temp[2], atom_i + " y"));
+        dum_z[i] = constants::ang2bohr(strict_double(temp[3], atom_i + " z"));
+        const int Z = constants::get_Z_from_label(dum_label[i].c_str());
+        err_checkf(Z >= 0, where + atom_i + " has unknown element label '" + dum_label[i] + "'", file);
+        dum_ch[i] = Z + 1;
         if (debug)
         {
             file << "label:" << dum_label[i]
@@ -1290,6 +1310,16 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
                 << " z: " << dum_z[i]
                 << " charge: " << dum_ch[i] << endl;
         }
+    }
+    // Anything left must be a further frame (its own count line) or blank; a
+    // trailing atom line means the count is too small.
+    while (getline_universal(rf, line))
+    {
+        svec rest = tokens_of(line);
+        if (rest.empty())
+            continue;
+        err_checkf(rest.size() == 1, where + "more atom lines than the atom count " + to_string(e_nuc) + " announces, first extra line '" + line + "'", file);
+        break;
     }
     isBohr = true;
     //---------------------Start writing everything from the temp arrays into wave ---------------------

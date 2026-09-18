@@ -26,29 +26,34 @@ int QCT(options &opt, std::vector<WFN> &wavy);
 
 static int run_app_impl(int argc, char **argv);
 
+//The log run_app_impl() writes to, so the catch block below can append the error to it
+static std::filesystem::path current_log_path;
+
 //Wrapper so an exception from deep inside a file parser reports instead of fail-fast
 int run_app(int argc, char **argv)
 {
     //Remember the console before run_app_impl() redirects cout into NoSpherA2.log; in the catch block the log file is already destroyed
     std::streambuf *const console = std::cout.rdbuf();
+    auto report = [&](const std::string &what) {
+        std::cout.rdbuf(console);
+        const std::string message = "\nNoSpherA2 stopped with an unhandled error: " + what +
+            "\n\tThis usually means one of the input files is malformed or an option is missing." +
+            "\n\tThe last thing that was read is at the end of " + current_log_path.string() + ".";
+        std::cout << message << std::endl;
+        std::ofstream(current_log_path, std::ios::app) << message << std::endl;
+        return -1;
+    };
     try
     {
         return run_app_impl(argc, argv);
     }
     catch (const std::exception &e)
     {
-        std::cout.rdbuf(console);
-        std::cout << "\nNoSpherA2 stopped with an unhandled error: " << e.what()
-                  << "\n\tThis usually means one of the input files is malformed or an option is missing."
-                  << "\n\tThe last thing that was read is at the end of NoSpherA2.log." << std::endl;
-        return -1;
+        return report(e.what());
     }
     catch (...)
     {
-        std::cout.rdbuf(console);
-        std::cout << "\nNoSpherA2 stopped with an unhandled error of unknown type."
-                  << "\n\tThe last thing that was read is at the end of NoSpherA2.log." << std::endl;
-        return -1;
+        return report("unknown type");
     }
 }
 
@@ -70,6 +75,7 @@ static int run_app_impl(int argc, char **argv)
         }
     }
 
+    current_log_path = output_file;
     ofstream log_file(output_file, ios::out);
     std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
 
@@ -134,6 +140,14 @@ static int run_app_impl(int argc, char **argv)
 #endif
     vector<WFN> wavy;
 
+    //Header first, before any job: a job that fails while reading its input otherwise leaves an empty log
+    log_file << NoSpherA2_message(opt.no_date);
+    if (!opt.no_date)
+    {
+        log_file << build_date;
+    }
+    log_file.flush();
+
     if (opt.promol_nci)
     {
         promolecular_nci_analysis(
@@ -144,13 +158,6 @@ static int run_app_impl(int argc, char **argv)
         std::cout.rdbuf(_coutbuf);
         return 0;
     }
-
-    log_file << NoSpherA2_message(opt.no_date);
-    if (!opt.no_date)
-    {
-        log_file << build_date;
-    }
-    log_file.flush();
 
     //Geometry-aid descriptors or element probabilities and quit; the flags queue jobs, so -wfn and -geometry_aid_cutoff may come in any order
     if (opt.calc_featomic_descriptor || !opt.featomic_structures.empty() || !opt.classify_atoms_out.empty() || !opt.classify_structures.empty())

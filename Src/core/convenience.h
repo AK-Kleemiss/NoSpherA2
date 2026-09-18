@@ -734,7 +734,25 @@ struct options
     std::vector<unsigned int> combined_tsc_calc_mult;
     ivec combined_tsc_calc_charge;
     ivec combined_tsc_calc_ECP;
-    svec arguments;
+    //Bounds-checked: the digesters read arguments[i + n] freely, so a flag that is last on the
+    //line throws missing_argument (caught in digest_options with the flag's name) instead of
+    //reading past the end
+    struct missing_argument : std::out_of_range
+    {
+        using std::out_of_range::out_of_range;
+    };
+    struct checked_svec : svec
+    {
+        using svec::svec;
+        std::string &operator[](size_t i) { return const_cast<std::string &>(std::as_const(*this)[i]); }
+        const std::string &operator[](size_t i) const
+        {
+            if (i >= size())
+                throw missing_argument("argument " + std::to_string(i));
+            return svec::operator[](i);
+        }
+    };
+    checked_svec arguments;
     pathvec combine_mo;
     svec Cations;
     svec Anions;

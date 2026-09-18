@@ -3733,20 +3733,34 @@ void options::digest_options()
         string temp = arguments[i];
         if (temp.find("-") > 0)
             continue;
-        if (digest_io_options(temp, i))
-            continue;
-        if (digest_run_options(temp, i))
-            continue;
-        if (digest_partition_options(temp, i))
-            continue;
-        if (digest_property_options(temp, i))
-            continue;
-        if (digest_ri_options(temp, i))
-            continue;
-        if (digest_xcw_options(temp, i))
-            continue;
-        if (digest_dev_options(temp, i))
-            continue;
+        //The digesters index arguments[i + n] and call stoi/stod directly; a flag that is
+        //last on the line or followed by a non-number used to die as a bare "invalid stod
+        //argument" with no hint which option it was
+        try
+        {
+            if (digest_io_options(temp, i))
+                continue;
+            if (digest_run_options(temp, i))
+                continue;
+            if (digest_partition_options(temp, i))
+                continue;
+            if (digest_property_options(temp, i))
+                continue;
+            if (digest_ri_options(temp, i))
+                continue;
+            if (digest_xcw_options(temp, i))
+                continue;
+            if (digest_dev_options(temp, i))
+                continue;
+        }
+        catch (const missing_argument &)
+        {
+            err_checkf(false, "Option " + temp + " needs more values than were given after it", log_file);
+        }
+        catch (const std::exception &e)
+        {
+            err_checkf(false, "Option " + temp + ": " + e.what() + " - check the value(s) that follow it", log_file);
+        }
     }
 
     // SALTED predicts a density from atom positions.  Historically its
