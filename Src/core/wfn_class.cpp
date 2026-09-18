@@ -1462,16 +1462,9 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
             string jobname;
             stdout_file = filename;
             rf.open(stdout_file.string().c_str(), ios::in);
-            rf.seekg(0);
-            while (rf.good() && line.find("Name ...") == string::npos) {
-                getline_universal(rf, line);
-            }
+            seek_line(rf, line, "Name ...", file);
             jobname = split_string<string>(line, " ")[2];
-
-            rf.seekg(0);
-            while (rf.good() && line.find("SCF kind ....") == string::npos) {
-                getline_universal(rf, line);
-            }
+            seek_line(rf, line, "SCF kind ....", file);
             scf_kind = split_string<string>(line, " ")[3];
             if (scf_kind == "rhf" || scf_kind == "rks" || scf_kind == "xray_rhf" || scf_kind == "xray_rks")
                 restricted_search = true;
@@ -1623,31 +1616,23 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
     //Now read the stdout file to get the atomic positions and basis set
     rf.seekg(0);
     err_checkf(rf.good(), "couldn't open " + stdout_file.string() + ", leaving", file);
-    //fast forward to the atom section
-    while (rf.good() && line.find("Molecule information") == string::npos) {
-        getline_universal(rf, line);
-    }
-    err_checkf(rf.good(), "Couldn't find molecule information in " + stdout_file.string(), file);
-    //skip 8 lines to get to the charge
-    for (int i = 0; i < 8; i++) {
-        getline_universal(rf, line);
-    }
-    svec line_digest = split_string<string>(line, " ");
-    //get the charge form the last element in the line
-    charge = stoi(line_digest[line_digest.size() - 1]);
-    getline_universal(rf, line);
-    line_digest = split_string<string>(line, " ");
-    multi = stoi(line_digest[line_digest.size() - 1]);
-    getline_universal(rf, line);
-    getline_universal(rf, line);
-    line_digest = split_string<string>(line, " ");
-    const int expected_atoms = stoi(line_digest[line_digest.size() - 1]);
-    getline_universal(rf, line);
-    line_digest = split_string<string>(line, " ");
-    const int expected_electrons = stoi(line_digest[line_digest.size() - 1]);
-    while (rf.good() && line.find("Atom coordinates") == string::npos) {
-        getline_universal(rf, line);
-    }
+    //Tonto prints "Label .... value": skip lines, then the last field of the line is the value
+    auto last_field = [&](const int skip, const string &what)
+    {
+        for (int i = 0; i < skip; i++)
+            read_line_or_fail(rf, line, what, file);
+        svec f = split_string<string>(line, " ");
+        remove_empty_elements(f);
+        err_checkf(!f.empty(), "Empty line where " + what + " was expected", file);
+        return f.back();
+    };
+    seek_line(rf, line, "Molecule information", file);
+    charge = stoi(last_field(8, "the charge"));
+    multi = stoi(last_field(1, "the multiplicity"));
+    const int expected_atoms = stoi(last_field(2, "the atom count"));
+    const int expected_electrons = stoi(last_field(1, "the electron count"));
+    seek_line(rf, line, "Atom coordinates", file);
+    svec line_digest;
     //skip 11 lines to get to the atom list
     for (int i = 0; i < 11; i++) {
         getline_universal(rf, line);
@@ -1709,40 +1694,12 @@ bool WFN::read_tonto(const std::filesystem::path &filename, std::ostream &file, 
         err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons: " + std::to_string(alpha_els) + "/" + std::to_string(beta_els), file);
     }
 
-    while (rf.good() && line.find("Gaussian basis sets") == string::npos) {
-        getline_universal(rf, line);
-    }
-    //get 3 lines down to the basis set name
-    for (int i = 0; i < 3; i++) {
-        getline_universal(rf, line);
-    }
-    //read basis set
-    line_digest = split_string<string>(line, " ");
-    remove_empty_elements(line_digest);
-    basis_set_name = line_digest[line_digest.size() - 1];
-    getline_universal(rf, line);//emtpy line
-    getline_universal(rf, line);//number of basis sets that will be printed below
-    line_digest = split_string<string>(line, " ");
-    remove_empty_elements(line_digest);
-    const int no_basis_sets = stoi(line_digest[line_digest.size() - 1]);
-    getline_universal(rf, line);//number of shells
-
-    line_digest = split_string<string>(line, " ");
-    remove_empty_elements(line_digest);
-    const int no_shells = stoi(line_digest[line_digest.size() - 1]);
-
-    getline_universal(rf, line);//number of shell pair (we do not consider this)
-    getline_universal(rf, line);//No of basis functions
-
-    line_digest = split_string<string>(line, " ");
-    remove_empty_elements(line_digest);
-    const int no_bf = stoi(line_digest[line_digest.size() - 1]);
-
-    getline_universal(rf, line);//No of primitives
-
-    line_digest = split_string<string>(line, " ");
-    remove_empty_elements(line_digest);
-    const int no_prim = stoi(line_digest[line_digest.size() - 1]);
+    seek_line(rf, line, "Gaussian basis sets", file);
+    basis_set_name = last_field(3, "the basis set name");
+    const int no_basis_sets = stoi(last_field(2, "the number of basis sets"));
+    const int no_shells = stoi(last_field(1, "the number of shells"));
+    const int no_bf = stoi(last_field(2, "the number of basis functions")); //the shell-pair line before it is skipped
+    const int no_prim = stoi(last_field(1, "the number of primitives"));
     std::vector<std::pair<std::string, atom>> basis_set_data;
     std::map<char, int> l_map = { {'S',0}, {'P',1}, {'D',2}, {'F',3}, {'G',4}, {'H',5}, {'I',6}, {'s',0}, {'p',1}, {'d',2}, {'f',3}, {'g',4}, {'h',5}, {'i',6} };
     for (int nbs = 0; nbs < no_basis_sets; nbs++)
@@ -1990,6 +1947,11 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     auto check_count = [&](const int64_t count, const string &what) {
         err_checkf(count > 0 && count < file_size, what + " of " + to_string(count) + " in a " + to_string(file_size) + " byte file", file);
     };
+    //One binary field; every read is checked so a short file fails here and not on the garbage it would leave behind
+    auto rd = [&](void *dst, const std::streamsize bytes, const string &what) {
+        rf.read(static_cast<char *>(dst), bytes);
+        err_checkf(rf.good(), "Error reading " + what, file);
+    };
     string line;
     int geo_start_bit = 8;
     int basis_start_bit = 16;
@@ -2001,7 +1963,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     {
         rf.seekg(0, ios::beg);
         int64_t magic = 0;
-        rf.read((char *)&magic, sizeof(magic));
+        rd(&magic, sizeof(magic), "magic number");
         if (magic == -1) {
             geo_start_bit += 24;
             basis_start_bit += 24;
@@ -2012,13 +1974,13 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         // Reading geometry
         rf.seekg(geo_start_bit, ios::beg);
         int64_t geo_start = 0;
-        rf.read((char *)&geo_start, sizeof(geo_start));
+        rd(&geo_start, sizeof(geo_start), "geo_start");
         check_offset(geo_start, "geometry section");
         if (debug)
             file << "I read the pointer of geometry successfully" << endl;
         rf.seekg(geo_start, ios::beg);
         int at = 0;
-        rf.read((char *)&at, constants::soi);
+        rd(&at, constants::soi, "atom count");
         check_count(at, "atom count");
         double geo_vals[6]{ 0, 0, 0, 0, 0, 0 }; // x,y,z, ch, exp_fin_nuc, mass
         // Use int64_t to safely hold soi-sized reads (soi may be 4 or 8 bytes)
@@ -2027,14 +1989,12 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         {
             for (int i = 0; i < 6; i++)
             {
-                rf.read((char *)&(geo_vals[i]), constants::sod);
-                err_checkf(rf.good(), "Error reading geo_val", file);
+                rd(&geo_vals[i], constants::sod, "geo_val");
             }
             for (int i = 0; i < geo_int_lim; i++)
             {
                 geo_ints[i] = 0;
-                rf.read((char *)&(geo_ints[i]), soi);
-                err_checkf(rf.good(), "Error reading geo_int", file);
+                rd(&geo_ints[i], soi, "geo_int");
             }
             string temp = constants::atnr2letter(static_cast<int>(geo_ints[0]));
             err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
@@ -2050,14 +2010,14 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
         rf.seekg(basis_start_bit, ios::beg);
         int64_t basis_start = 0;
-        rf.read((char *)&basis_start, constants::soli);
+        rd(&basis_start, constants::soli, "basis_start");
         check_offset(basis_start, "basis set section");
         if (debug)
             file << "I read the pointer of basis set successfully" << endl;
         rf.seekg(basis_start, ios::beg);
         int atoms2 = 0, temp = 0;
-        rf.read((char *)&temp, constants::soi);
-        rf.read((char *)&atoms2, constants::soi);
+        rd(&temp, constants::soi, "basis header");
+        rd(&atoms2, constants::soi, "atoms2");
         err_checkf(atoms2 == at, "Basis set for " + to_string(atoms2) + " atoms but geometry for " + to_string(at), file);
         // long unsigned int atoms_with_basis = 0;
         vec exp(37, 0);
@@ -2065,34 +2025,26 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         for (int a = 0; a < atoms2; a++)
         {
             int atom_based = 0, nr_shells = 0;
-            rf.read((char *)&atom_based, constants::soi);
-            err_checkf(rf.good(), "Error reading atom_based", file);
+            rd(&atom_based, constants::soi, "atom_based");
             err_checkf(atom_based >= 0 && atom_based < ncen, "Basis set for atom " + to_string(atom_based + 1) + " of " + to_string(ncen), file);
-            rf.read((char *)&nr_shells, constants::soi);
-            err_checkf(rf.good(), "Error reading nr_shells", file);
+            rd(&nr_shells, constants::soi, "nr_shells");
             check_count(nr_shells, "shell count");
             int shell = 0;
             for (int p = 0; p < nr_shells; p++)
             {
                 int ang_mom = 0, coeff_ind = 0, nr_funct = 0, center = 0;
-                rf.read((char *)&ang_mom, constants::soi);
-                err_checkf(rf.good(), "Error reading ang_mom", file);
+                rd(&ang_mom, constants::soi, "ang_mom");
                 err_checkf(ang_mom <= 10, "Higher angular momentum basis functions than l = 10", file);
-                rf.read((char *)&coeff_ind, constants::soi);
-                err_checkf(rf.good(), "Error reading ceof_ind", file);
-                rf.read((char *)&nr_funct, constants::soi);
-                err_checkf(rf.good(), "Error reading nr_func", file);
-                rf.read((char *)&center, constants::soi);
-                err_checkf(rf.good(), "Error reading center", file);
+                rd(&coeff_ind, constants::soi, "coeff_ind");
+                rd(&nr_funct, constants::soi, "nr_func");
+                rd(&center, constants::soi, "center");
                 for (int b = 0; b < 37; b++)
                 {
-                    rf.read((char *)&(exp[b]), constants::sod);
-                    err_checkf(rf.good(), "Error reading exp", file);
+                    rd(&exp[b], constants::sod, "exp");
                 }
                 for (int b = 0; b < 37; b++)
                 {
-                    rf.read((char *)&(con[b]), constants::sod);
-                    err_checkf(rf.good(), "Error reading con", file);
+                    rd(&con[b], constants::sod, "con");
                     if (exp[b] != 0 && con[b] != 0)
                     {
                         err_checkf(atoms[atom_based].push_back_basis_set(exp[b], con[b], ang_mom + 1, shell), "Error pushing back basis", file);
@@ -2130,18 +2082,15 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
         rf.seekg(MO_start_bit, ios::beg);
         int64_t MOs_start = 0;
-        rf.read((char *)&MOs_start, constants::soli);
-        err_checkf(rf.good(), "Error reading MO_start", file);
+        rd(&MOs_start, constants::soli, "MO_start");
         check_offset(MOs_start, "MO section");
         if (debug)
             file << "I read the pointer of MOs successfully" << endl;
         rf.seekg(MOs_start, ios::beg);
         int operators = 0;
         int64_t dimension_i64 = 0;
-        rf.read((char *)&operators, constants::soi);
-        err_checkf(rf.good(), "Error reading operators", file);
-        rf.read((char *)&dimension_i64, soi);
-        err_checkf(rf.good(), "Error reading dimnesion", file);
+        rd(&operators, constants::soi, "operators");
+        rd(&dimension_i64, soi, "MO dimension");
         int dimension = static_cast<int>(dimension_i64);
         err_checkf(operators == 1 || operators == 2, "gbw with " + to_string(operators) + " operators", file);
         err_checkf(dimension == expected_coefs, "MO matrix dimension " + to_string(dimension) + " but the basis set has " + to_string(expected_coefs) + " functions", file);
@@ -2162,24 +2111,19 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             cores[i].resize(dimension, 0);
             if (debug)
                 file << "operators: " << operators << " coef_nr: " << coef_nr << " dimension: " << dimension << endl;
-            rf.read((char *)coefficients[i].data(), constants::sod * coef_nr);
-            err_checkf(rf.good(), "Error reading coefficients", file);
+            rd(coefficients[i].data(), constants::sod * coef_nr, "coefficients");
             if (debug)
                 file << "I read the coefficients successfully" << endl;
-            rf.read((char *)occupations[i].data(), constants::sod * dimension);
-            err_checkf(rf.good(), "Error reading occupations", file);
+            rd(occupations[i].data(), constants::sod * dimension, "occupations");
             if (debug)
                 file << "I read the occupations successfully" << endl;
-            rf.read((char *)energies[i].data(), constants::sod * dimension);
-            err_checkf(rf.good(), "Error reading energies", file);
+            rd(energies[i].data(), constants::sod * dimension, "energies");
             if (debug)
                 file << "I read the energies successfully" << endl;
-            rf.read((char *)irreps[i].data(), constants::soi * dimension);
-            err_checkf(rf.good(), "Error reading irreps", file);
+            rd(irreps[i].data(), constants::soi * dimension, "irreps");
             if (debug)
                 file << "I read the irreps successfully" << endl;
-            rf.read((char *)cores[i].data(), constants::soi * dimension);
-            err_checkf(rf.good(), "Error reading cores", file);
+            rd(cores[i].data(), constants::soi * dimension, "cores");
             if (debug)
             {
                 file << "I read the cores successfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;
@@ -2321,8 +2265,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             // Reading ECPs?
             rf.seekg(32, ios::beg);
             long int ECP_start = 0;
-            rf.read((char *)&ECP_start, sizeof(ECP_start));
-            err_checkf(rf.good(), "Error reading center in ECPs", file);
+            rd(&ECP_start, sizeof(ECP_start), "ECP pointer");
             err_checkf(ECP_start != 0, "Could not read ECP information location from GBW file!", file);
             if (debug)
                 file << "I read the pointer of ECP successfully" << endl;
@@ -2331,12 +2274,11 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             int i2 = 0;
             const int soi = 4;
             const int sod = 8;
-            rf.read((char *)&i1, 8);
-            err_checkf(rf.good(), "Error reading center in ECPs", file);
+            rd(&i1, 8, "ECP count");
             file << "First line: " << i1 << endl;
             for (int i = 0; i < i1; i++)
             {
-                rf.read((char *)&i2, 1);
+                rd(&i2, 1, "ECP flag");
                 int Z = 0;
                 int nr_core = 0;
                 int temp_0 = 0;
@@ -2348,52 +2290,39 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 int type = 0;
                 double e = 0;
                 double c = 0;
-                rf.read((char *)&Z, soi);
+                rd(&Z, soi, "Z");
                 err_checkf(Z > 0, "Error reading Z in ECPs", file);
-                err_checkf(rf.good(), "Error reading Z in ECPs", file);
-                rf.read((char *)&temp_0, soi);
+                rd(&temp_0, soi, "temp_0");
                 err_checkf(temp_0 > 0, "Error reading temp_0 in ECPs", file);
-                err_checkf(rf.good(), "Error reading temp_0 in ECPs", file);
                 char *temp_c = new char[temp_0];
-                rf.read(temp_c, temp_0);
-                err_checkf(rf.good(), "Error reading temp_c in ECPs", file);
-                rf.read((char *)&nr_core, soi);
+                rd(temp_c, temp_0, "temp_c in ECPs");
+                rd(&nr_core, soi, "nr_core");
                 err_checkf(nr_core >= 0, "Error reading nr_core in ECPs", file);
-                err_checkf(rf.good(), "Error reading nr_core in ECPs", file);
                 atoms[i].set_ECP_electrons(nr_core);
-                rf.read((char *)&max_contract, soi);
+                rd(&max_contract, soi, "max_contract");
                 err_checkf(max_contract > 0, "Error reading max_contract in ECPs", file);
-                err_checkf(rf.good(), "Error reading max_contract in ECPs", file);
-                rf.read((char *)&max_angular, soi);
+                rd(&max_angular, soi, "max_angular");
                 err_checkf(max_angular > 0, "Error reading max_angular in ECPs", file);
-                err_checkf(rf.good(), "Error reading max_angular in ECPs", file);
-                rf.read((char *)&center, soi);
+                rd(&center, soi, "center");
                 err_checkf(center > 0, "Error reading center in ECPs", file);
-                err_checkf(rf.good(), "Error reading center in ECPs", file);
                 file << "I read " << Z << " " << temp_0 << " " << nr_core << " " << max_contract << " " << max_angular << endl;
                 for (int l = 0; l < max_angular; l++)
                 {
-                    rf.read((char *)&exps, soi);
+                    rd(&exps, soi, "exps");
                     err_checkf(exps > 0, "Error reading exps in ECPs", file);
-                    err_checkf(rf.good(), "Error reading center in ECPs", file);
-                    rf.read((char *)&type, soi);
+                    rd(&type, soi, "type");
                     err_checkf(type >= 0, "Error reading type in ECPs", file);
-                    err_checkf(rf.good(), "Error reading center in ECPs", file);
                     err_checkf(type < 200, "This type will give me a headache...", file);
-                    err_checkf(rf.good(), "Error reading center in ECPs", file);
                     file << "There are " << exps << " exponents of type " << type << " for angular momentum " << l << endl;
                     for (int fun = 0; fun < exps; fun++)
                     {
 
-                        rf.read((char *)&n, sod);
+                        rd(&n, sod, "n");
                         err_checkf(n < 200, "This Exponent will give me a headache...", file);
-                        err_checkf(rf.good(), "Error reading center in ECPs", file);
-                        rf.read((char *)&c, sod);
+                        rd(&c, sod, "c");
                         err_checkf(c < 200, "This Coefficient will give me a headache...", file);
-                        err_checkf(rf.good(), "Error reading center in ECPs", file);
-                        rf.read((char *)&e, sod);
+                        rd(&e, sod, "e");
                         err_checkf(e < 200, "This Exponent will give me a headache...", file);
-                        err_checkf(rf.good(), "Error reading center in ECPs", file);
                         file << fun << " " << c << " " << e << " " << n << endl;
                         ECP_prims.push_back(ECP_primitive(center, type, e, c, static_cast<int>(n)));
                     }
@@ -3378,30 +3307,21 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 bool WFN::write_xyz(const std::filesystem::path &fileName)
 {
     using namespace std;
-    try {
-        ofstream f(fileName, ios::out);
-        f << ncen << endl;
-        f << "XYZ File written by NoSpherA2 based on " << path << endl;
-        for (int i = 0; i < ncen; i++)
-            if (atoms[i].get_label() == "")
-                f << constants::atnr2letter(get_atom_charge(i)) << setw(14) << setprecision(8) << get_atom_coordinate(i, 0) << setw(14) << setprecision(8) << get_atom_coordinate(i, 1) << setw(14) << setprecision(8) << get_atom_coordinate(i, 2) << endl;
-            else {
-                if (isBohr) {
-                    f << atoms[i].get_label() << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i, 0)) << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i, 1)) << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i, 2)) << endl;
-                }
-                else
-                {
-                    f << atoms[i].get_label() << setw(14) << setprecision(8) << get_atom_coordinate(i, 0) << setw(14) << setprecision(8) << get_atom_coordinate(i, 1) << setw(14) << setprecision(8) << get_atom_coordinate(i, 2) << endl;
-                }
-            }
-        f.flush();
-        f.close();
-    }
-    catch (exception) {
+    ofstream f(fileName, ios::out);
+    if (!f.is_open())
+    {
         err("Error writing the xyz file! Aborting!", std::cout);
         return false;
     }
-    return true;
+    f << ncen << '\n' << "XYZ File written by NoSpherA2 based on " << path << '\n';
+    for (int i = 0; i < ncen; i++)
+    {
+        f << (atoms[i].get_label().empty() ? constants::atnr2letter(get_atom_charge(i)) : atoms[i].get_label());
+        for (int c = 0; c < 3; c++)
+            f << setw(14) << setprecision(8) << (isBohr ? constants::bohr2ang(get_atom_coordinate(i, c)) : get_atom_coordinate(i, c));
+        f << '\n';
+    }
+    return f.good();
 };
 
 void WFN::print_primitive(const int &nr) const
@@ -5204,29 +5124,17 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     if (line != "")
         total_energy = read_fchk_double(line);
     ivec atnbrs;
-    if (!read_fchk_integer_block(fchk, "Atomic numbers", atnbrs))
-    {
-        log << "Error reading atnbrs" << std::endl;
-        return false;
-    }
+    err_checkf(read_fchk_integer_block(fchk, "Atomic numbers", atnbrs), "Error reading atnbrs", log);
     ncen = static_cast<int>(atnbrs.size());
     atoms.resize(ncen);
     for (int i = 0; i < ncen; i++)
         atoms[i].set_label(constants::atnr2letter(atnbrs[i]));
     vec charges;
-    if (!read_fchk_double_block(fchk, "Nuclear charges", charges))
-    {
-        log << "Error reading charges" << std::endl;
-        return false;
-    }
+    err_checkf(read_fchk_double_block(fchk, "Nuclear charges", charges), "Error reading charges", log);
     for (int i = 0; i < charges.size(); i++)
         atoms[i].set_charge(static_cast<int>(charges[i]));
     vec coords;
-    if (!read_fchk_double_block(fchk, "Current cartesian coordinates", coords))
-    {
-        log << "Error reading coordinates" << std::endl;
-        return false;
-    }
+    err_checkf(read_fchk_double_block(fchk, "Current cartesian coordinates", coords), "Error reading coordinates", log);
     if (coords.size() != ncen * 3)
     {
         log << "Inconsistant number of atoms and coordinates" << std::endl;
@@ -5239,11 +5147,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         atoms[i].set_coordinate(2, coords[3 * i + 2]);
     }
     ivec shell_types;
-    if (!read_fchk_integer_block(fchk, "Shell types", shell_types, false))
-    {
-        log << "Error reading shell types" << std::endl;
-        return false;
-    }
+    err_checkf(read_fchk_integer_block(fchk, "Shell types", shell_types, false), "Error reading shell types", log);
     bool is_spherical = false;
     for (int i = 0; i < shell_types.size(); i++)
         if (shell_types[i] < -1)
@@ -5252,43 +5156,19 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         log << "This fchk contains spherical harmonics, which will be transformed into cartesian functions!" << std::endl
         << "Loading basis set information..." << std::endl;
     ivec nr_prims_shell;
-    if (!read_fchk_integer_block(fchk, "Number of primitives per shell", nr_prims_shell))
-    {
-        log << "Error reading primitives per shell" << std::endl;
-        return false;
-    }
+    err_checkf(read_fchk_integer_block(fchk, "Number of primitives per shell", nr_prims_shell), "Error reading primitives per shell", log);
     ivec shell2atom;
-    if (!read_fchk_integer_block(fchk, "Shell to atom map", shell2atom))
-    {
-        log << "Error reading shell2atom" << std::endl;
-        return false;
-    }
+    err_checkf(read_fchk_integer_block(fchk, "Shell to atom map", shell2atom), "Error reading shell2atom", log);
     vec exp;
-    if (!read_fchk_double_block(fchk, "Primitive exponents", exp))
-    {
-        log << "Error reading Primitive exponents" << std::endl;
-        return false;
-    }
+    err_checkf(read_fchk_double_block(fchk, "Primitive exponents", exp), "Error reading Primitive exponents", log);
     vec con;
-    if (!read_fchk_double_block(fchk, "Contraction coefficients", con))
-    {
-        log << "Error reading Contraction coefficients" << std::endl;
-        return false;
-    }
+    err_checkf(read_fchk_double_block(fchk, "Contraction coefficients", con), "Error reading Contraction coefficients", log);
     vec2 coef(2);
     vec2 MOocc(2), MOene(2);
     if (r_u_ro_switch == 0 || r_u_ro_switch == 2)
     { // Restricted or Restricted-Open-Shell
-        if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", MOene[0]))
-        {
-            log << "Error during reading of Alpha Energies" << std::endl;
-            return false;
-        }
-        if (!read_fchk_double_block(fchk, "MO coefficients", coef[0]))
-        {
-            log << "Error during reading of Alpha MOs" << std::endl;
-            return false;
-        }
+        err_checkf(read_fchk_double_block(fchk, "Alpha Orbital Energies", MOene[0]), "Error during reading of Alpha Energies", log);
+        err_checkf(read_fchk_double_block(fchk, "MO coefficients", coef[0]), "Error during reading of Alpha MOs", log);
         MOocc[0].resize(MOene[0].size());
         if (r_u_ro_switch == 0)
         {
@@ -5318,26 +5198,10 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     else
     { // Unrestricted
         is_unrestricted = true;
-        if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", MOene[0]))
-        {
-            log << "Error during reading of Alpha Energies" << std::endl;
-            return false;
-        }
-        if (!read_fchk_double_block(fchk, "Beta Orbital Energies", MOene[1]))
-        {
-            log << "Error during reading of Beta Energies" << std::endl;
-            return false;
-        }
-        if (!read_fchk_double_block(fchk, "Alpha MO coefficients", coef[0]))
-        {
-            log << "Error during reading of Alpha MOs" << std::endl;
-            return false;
-        }
-        if (!read_fchk_double_block(fchk, "Beta MO coefficients", coef[1]))
-        {
-            log << "Error during reading of Beta MOs" << std::endl;
-            return false;
-        }
+        err_checkf(read_fchk_double_block(fchk, "Alpha Orbital Energies", MOene[0]), "Error during reading of Alpha Energies", log);
+        err_checkf(read_fchk_double_block(fchk, "Beta Orbital Energies", MOene[1]), "Error during reading of Beta Energies", log);
+        err_checkf(read_fchk_double_block(fchk, "Alpha MO coefficients", coef[0]), "Error during reading of Alpha MOs", log);
+        err_checkf(read_fchk_double_block(fchk, "Beta MO coefficients", coef[1]), "Error during reading of Beta MOs", log);
         MOocc[0].resize(MOene[0].size());
         MOocc[1].resize(MOene[1].size());
 #pragma omp parallel for
