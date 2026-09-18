@@ -213,6 +213,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 		std::cmatch result;
 		if (regex_search(line.c_str(), result, r))
 			continue;
+		err_checkf(line.size() >= 12, "hkl line too short for h k l: '" + line + "'", file);
 		// if (debug) file << "hkl: ";
 		for (int i = 0; i < 3; i++)
 		{
@@ -232,6 +233,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 		hkl.erase(i3{ 0, 0, 0 });
 	}
 	hkl_input.close();
+	err_checkf(!hkl.empty(), "No reflections read from " + hkl_filename.string(), file);
 	file << " done!\nNr of reflections read from file: " << hkl.size() << std::endl;
 
 	if (debug)
@@ -339,6 +341,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		std::cmatch result;
 		if (regex_search(line.c_str(), result, r))
 			continue;
+		err_checkf(line.size() >= 12, "hkl line too short for h k l: '" + line + "'", file);
 		// if (debug) file << "hkl: ";
 		for (int i = 0; i < 3; i++)
 		{
@@ -382,6 +385,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		hkl.erase(i3{ 0, 0, 0 });
 	}
 	hkl_input.close();
+	err_checkf(!hkl.empty(), "No reflections read from " + hkl_filename.string(), file);
 	file << " done!\nNr of reflections read from file: " << hkl.size() << std::endl;
 
 	if (debug)
@@ -1015,11 +1019,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				atoms_read = true;
 				svec fields;
 				int nr = -1;
-				if (!read_cif_loop_row(cif_input, line, count_fields, fields))
-				{
-					file << "CIF atom loop ended mid-row; ignoring the incomplete entry." << std::endl;
-					break;
-				}
+				err_checkf(read_cif_loop_row(cif_input, line, count_fields, fields), "CIF ends inside an atom loop row, last line: '" + line + "'", file);
 				fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
 				fields[type_field].erase(remove_if(fields[type_field].begin(), fields[type_field].end(), ::isspace), fields[type_field].end());
 				if (debug)
@@ -2571,7 +2571,7 @@ itsc_block calculate_scattering_factors_from_cube(
 	err_checkf(wave.get_ncen() != 0, "Cube file does not contain atom definitions in the header.", file);
 
 	vector<_time_point> time_points;
-	vector<string> time_descriptions;
+	svec time_descriptions;
 	time_points.push_back(get_time());
 #ifdef NOSPHERA2_USE_GPU
 	if (opt.use_gpu)
@@ -2774,7 +2774,7 @@ tsc_block_type calculate_scattering_factors(
 	}
 
 	vector<_time_point> time_points;
-	vector<string> time_descriptions;
+	svec time_descriptions;
 	time_points.push_back(get_time());
 
 	filesystem::path cif;
@@ -3432,7 +3432,7 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
 	// time_point start = get_time();
 	// time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
 	vector<_time_point> time_points;
-	vector<string> time_descriptions;
+	svec time_descriptions;
 	time_points.push_back(get_time());
 
 	cell unit_cell(opt.cif, std::cout, opt.debug);

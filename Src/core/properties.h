@@ -401,8 +401,7 @@ void Calc_RhoEli(
 void properties_calculation(options &opt);
 
 void promolecular_nci_analysis(
-    const std::filesystem::path& xyz1,
-    const std::filesystem::path& xyz2,
+    const pathvec& xyz_files,
     const properties_options& opts,
     std::ostream& log);
 

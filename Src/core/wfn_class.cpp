@@ -850,9 +850,6 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     using namespace std;
     if (ncen > 0)
     {
-        // file << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
-        // if (!yesno()) return false;
-        // else file << "okay, carrying on then..." << endl;
         file << "There is already a wavefunction loaded, aborting!" << endl;
         return false;
     }
@@ -863,376 +860,91 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     if (rf.good())
         path = fileName;
     string line;
-    rf.seekg(0);
-    getline_universal(rf, line);
+    read_line_or_fail(rf, line, "wfn title line", file);
     comment = line;
-    getline_universal(rf, line);
+    read_line_or_fail(rf, line, "wfn header line", file);
     stringstream stream(line);
     string header_tmp;
     int e_nmo, e_nex, e_nuc = 0; // number of expected MOs, Exponents and nuclei
     stream >> header_tmp >> e_nmo >> header_tmp >> header_tmp >> e_nex >> header_tmp >> e_nuc;
+    err_checkf(!stream.fail() && e_nmo > 0 && e_nex > 0 && e_nuc > 0, "Bad wfn header line: '" + line + "'", file);
     if (debug)
-    {
         file << "e_nmo: " << e_nmo << ", e_nex: " << e_nex << ", e_nuc : " << e_nuc << endl;
-    }
+    //The wfn blocks are fixed-width Fortran columns (20I3 assignments, 5E14 exponents, 5E16 MO
+    //coefficients); fields can touch, so they are cut by width, not by whitespace. Fortran 'D'
+    //exponents are accepted. Reads lines starting with tag until n values are collected
+    auto read_block = [&](const string &tag, const size_t start, const size_t width, const int n, auto &out)
+    {
+        const string what = tag.empty() ? "MO coefficients" : tag;
+        out.clear();
+        while (static_cast<int>(out.size()) < n)
+        {
+            read_line_or_fail(rf, line, what, file);
+            err_checkf(line.compare(0, tag.size(), tag) == 0 && line.size() > start, "Expected a " + what + " line but found: '" + line + "'", file);
+            for (size_t pos = start; pos < line.size() && static_cast<int>(out.size()) < n; pos += width)
+            {
+                string field = line.substr(pos, width);
+                replace(field.begin(), field.end(), 'D', 'E');
+                append_numbers(field, out, what, file);
+            }
+        }
+    };
+    //A fixed-width field of line as a number
+    auto field = [&](const size_t pos, const size_t len)
+    {
+        err_checkf(line.size() > pos, "wfn line too short: '" + line + "'", file);
+        return stod(line.substr(pos, len));
+    };
     //----------------------------- Read Atoms ------------------------------------------------------------
-    ivec dum_nr, dum_ch;
-    dum_nr.resize(e_nuc);
-    dum_ch.resize(e_nuc);
-    svec dum_label;
-    vec dum_x, dum_y, dum_z;
-    dum_x.resize(e_nuc);
-    dum_y.resize(e_nuc);
-    dum_z.resize(e_nuc);
-    char tempchar[20];
-    size_t length;
     for (int i = 0; i < e_nuc; i++)
     {
-        // int dump = 0;
-        getline_universal(rf, line);
-        if (debug)
-            file << i << ".run, line:" << line << endl;
-        length = line.copy(tempchar, 4, 0);
-        tempchar[length] = '\0';
-        string temp;
-        temp = tempchar;
-        length = line.copy(tempchar, 4, 5);
-        tempchar[length] = '\0';
-        dum_nr[i] = i;
-        length = line.copy(tempchar, 12, 24);
-        tempchar[length] = '\0';
-        dum_x[i] = stod(tempchar);
-        length = line.copy(tempchar, 12, 36);
-        tempchar[length] = '\0';
-        dum_y[i] = stod(tempchar);
-        length = line.copy(tempchar, 12, 48);
-        tempchar[length] = '\0';
-        dum_z[i] = stod(tempchar);
-        length = line.copy(tempchar, 3, 70);
-        tempchar[length] = '\0';
-        dum_ch[i] = stoi(tempchar);
-        dum_label.push_back(shrink_string_to_atom(temp, dum_ch[i]));
+        read_line_or_fail(rf, line, "atom " + to_string(i + 1) + " of " + to_string(e_nuc), file);
+        err_checkf(line.size() >= 73, "wfn atom line " + to_string(i + 1) + " is too short: '" + line + "'", file);
+        string label = line.substr(0, 4);
+        const int charge = static_cast<int>(field(70, 3));
+        err_checkf(push_back_atom(shrink_string_to_atom(label, charge), field(24, 12), field(36, 12), field(48, 12), charge), "Error while making atoms!!\n", file);
     }
-    //------------------------------------ Read center assignements -------------------------------------------
-    ivec dum_center;
-    dum_center.resize(e_nex);
-    if (debug)
-        for (int i = 0; i < e_nex; i++)
-            dum_center[i] = 99;
-    // int run = 0;
-    int exnum = 0;
-    // int dump = 0;
-    getline_universal(rf, line);
-    while (line.compare(0, 6, "CENTRE") == 0 && !rf.eof())
-    {
-        if (exnum + 20 <= e_nex)
-        {
-            for (int i = 0; i < 20; i++)
-            {
-                length = line.copy(tempchar, 3, 20 + 3 * i);
-                tempchar[length] = '\0';
-                dum_center[exnum] = stoi(tempchar);
-                if (dum_center[exnum] > e_nuc)
-                {
-                    std::cout << "this center doesn't exist.. some weird problem!\n";
-                    return false;
-                }
-                exnum++;
-            }
-        }
-        else
-        {
-            if (exnum < e_nex)
-            {
-                for (int i = 0; i < e_nex % 20; i++)
-                {
-                    length = line.copy(tempchar, 3, 20 + 3 * i);
-                    tempchar[length] = '\0';
-                    dum_center[exnum] = stoi(tempchar);
-                    if (dum_center[exnum] > e_nuc)
-                    {
-                        file << "this center doesn't exist.. some weird problem!\n";
-                        return false;
-                    }
-                    exnum++;
-                }
-            }
-            else
-            {
-                getline_universal(rf, line);
-                continue;
-            }
-        }
-        getline_universal(rf, line);
-        if (exnum > e_nex)
-        {
-            file << "run went higher than expected values in center reading, thats suspicius, lets stop here...\n";
-            return false;
-        }
-        // run++;
-    }
-    if (debug)
-    {
-        file << exnum << endl;
-    }
-    if (exnum < e_nex)
-    {
-        file << "We have a problem adding center assignements!\n";
-        return false;
-    }
-    if (debug)
-        file << "finished with centers, moving to types...\n";
-    //------------------------------------ Read Types ---------------------------------------------------------
-    vector<unsigned int> dum_type;
-    dum_type.resize(e_nex);
-    // run = 0;
-    exnum = 0;
-    while (line.compare(0, 4, "TYPE") == 0 && !rf.eof())
-    {
-        if (exnum + 20 <= e_nex)
-        {
-            for (int i = 0; i < 20; i++)
-            {
-                length = line.copy(tempchar, 2, size_t(21 + 3 * i));
-                tempchar[length] = '\0';
-                dum_type[exnum] = stoi(tempchar);
-                exnum++;
-            }
-        }
-        else if (exnum < e_nex)
-        {
-            for (int i = 0; i < e_nex % 20; i++)
-            {
-                length = line.copy(tempchar, 2, 21 + 3 * i);
-                tempchar[length] = '\0';
-                dum_type[exnum] = stoi(tempchar);
-                exnum++;
-            }
-        }
-        else
-        {
-            getline_universal(rf, line);
-            continue;
-        }
-        getline_universal(rf, line);
-        if (exnum > e_nex)
-        {
-            file << "exnum went higher than expected values in type reading, thats suspicius, lets stop here...\n";
-            return false;
-        }
-        // run++;
-    }
-    if (exnum < e_nex)
-    {
-        file << "We have a problem adding type assignements!\n";
-        return false;
-    }
-    if (debug)
-        file << "finished with types, reading exponents now...\n";
-    //----------------------------- Read exponents -------------------------------
-    vec dum_exp;
-    dum_exp.resize(e_nex);
-    // run = 0;
-    exnum = 0;
-    string replace = "E";
-    bool three_exponents = false;
-    while (line.compare(0, 9, "EXPONENTS") == 0 && !rf.eof())
-    {
-        if (exnum + 5 <= e_nex)
-        {
-            if (exnum == 0)
-            {
-                const char test = line.at(10);
-                string temp_str(" ");
-                const char empty = temp_str.at(0);
-                if (test != empty)
-                    three_exponents = true;
-            }
-            for (int i = 0; i < 5; i++)
-            {
-
-                if (!three_exponents)
-                {
-                    line.replace(20 + i * 14, 1, replace);
-                    length = line.copy(tempchar, 13, 11 + 14 * i);
-                    tempchar[length] = '\0';
-                    dum_exp[exnum] = stod(tempchar);
-                    exnum++;
-                }
-                else
-                {
-                    line.replace(19 + i * 14, 1, replace);
-                    length = line.copy(tempchar, 14, 10 + 14 * i);
-                    tempchar[length] = '\0';
-                    dum_exp[exnum] = stod(tempchar);
-                    exnum++;
-                }
-            }
-        }
-        else if (exnum < e_nex)
-        {
-            for (int i = 0; i < e_nex % 5; i++)
-            {
-                if (!three_exponents)
-                {
-                    line.replace(20 + i * 14, 1, replace);
-                    length = line.copy(tempchar, 13, 11 + 14 * i);
-                    tempchar[length] = '\0';
-                    dum_exp[exnum] = stod(tempchar);
-                    exnum++;
-                }
-                else
-                {
-                    line.replace(19 + i * 14, 1, replace);
-                    length = line.copy(tempchar, 14, 10 + 14 * i);
-                    tempchar[length] = '\0';
-                    dum_exp[exnum] = stod(tempchar);
-                    exnum++;
-                }
-            }
-        }
-        else
-        {
-            getline_universal(rf, line);
-            continue;
-        }
-        getline_universal(rf, line);
-        if (exnum > e_nex)
-        {
-            file << "exnum went higher than expected values in exponent reading, thats suspicius, lets stop here...\n";
-            return false;
-        }
-        // run++;
-    }
-    if (exnum < e_nex)
-    {
-        file << "We have a problem adding exponents!\n";
-        return false;
-    }
-    if (debug)
-    {
-        file << "finished with exponents, reading MOs now...\n";
-        file << "line: " << line << endl;
-    }
-    for (int i = 0; i < e_nuc; i++)
-        err_checkf(push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i]), "Error while making atoms!!\n", file);
+    //------------------------------ Read basis: centres, types, exponents ------------------------------
+    ivec centre, type;
+    vec exponent;
+    read_block("CENTRE ASSIGNMENTS", 20, 3, e_nex, centre);
+    read_block("TYPE ASSIGNMENTS", 20, 3, e_nex, type);
+    read_block("EXPONENTS", 10, 14, e_nex, exponent);
     for (int j = 0; j < e_nex; j++)
     {
-        err_checkf(add_exp(dum_center[j], dum_type[j], dum_exp[j]), "Error while writing MO coefficients...\n", file);
+        err_checkf(centre[j] >= 1 && centre[j] <= e_nuc, "Primitive " + to_string(j + 1) + " sits on centre " + to_string(centre[j]) + " of " + to_string(e_nuc), file);
+        err_checkf(add_exp(centre[j], type[j], exponent[j]), "Error while adding primitive " + to_string(j + 1), file);
     }
     isBohr = true;
-    int linecount = 0;
-    int monum = 0;
-    vec2 temp_val;
-    temp_val.resize(e_nmo);
-    for (int i = 0; i < e_nmo; i++)
-        temp_val[i].resize(e_nex);
     //-------------------------------- Read MOs --------------------------------------
-    // bool orca_switch = false;
-    // int temp_orca = check_order(debug),
-    int temp_nr = 0;
     int oper = 0;
-    double temp_occ = -1.0, temp_ener = 0.0, last_ener = -DBL_MAX;
-    // if (temp_orca % 10 == 3)
-    //   orca_switch = true;
-    while (!(line.compare(0, 3, "END") == 0) && !rf.eof())
+    double last_ener = -DBL_MAX;
+    vec coef;
+    for (int monum = 0; monum < e_nmo; monum++)
     {
-        if (monum == e_nmo)
-        {
-            file << "monum went higher than expected values in MO reading, thats suspicius, lets stop here...\n";
-            break;
-        }
-        stringstream stream2(line);
-        string tmp;
-        temp_nr = 0;
-        temp_occ = -1.0;
-        temp_ener = 0.0;
-        length = line.copy(tempchar, 6, 2);
-        tempchar[length] = '\0';
-        temp_nr = stoi(tempchar);
-        length = line.copy(tempchar, 12, 36);
-        tempchar[length] = '\0';
-        temp_occ = stod(tempchar);
-        length = line.copy(tempchar, 12, 61);
-        tempchar[length] = '\0';
-        // if we have a "=" in the line, we have to make it a space
-        if (tempchar[0] == '=') tempchar[0] = ' ';
-        temp_ener = stod(tempchar);
-        if (temp_ener > last_ener)
-        {
-            last_ener = temp_ener;
-        }
+        read_line_or_fail(rf, line, "MO " + to_string(monum + 1) + " of " + to_string(e_nmo), file);
+        err_checkf(line.compare(0, 2, "MO") == 0, "Expected MO " + to_string(monum + 1) + " but found: '" + line + "'", file);
+        const int nr = static_cast<int>(field(2, 6));
+        const double occ = field(36, 12);
+        // some writers glue the '=' to the energy
+        if (line.size() > 61 && line[61] == '=') line[61] = ' ';
+        const double ener = field(61, 12);
+        //the energies restart from the bottom for the second spin
+        if (ener > last_ener)
+            last_ener = ener;
         else
         {
             last_ener = -DBL_MAX;
             oper++;
             is_unrestricted = true;
         }
-        push_back_MO(temp_nr, temp_occ, temp_ener, oper);
-        //---------------------------Start reading MO coefficients-----------------------
-        getline_universal(rf, line);
-        linecount = 0;
-        exnum = 0;
-        while (!(line.compare(0, 2, "MO") == 0) && !rf.eof())
-        {
-            if (exnum + 5 <= e_nex)
-            {
-                for (int i = 0; i < 5; i++)
-                {
-                    if (!three_exponents)
-                        line.replace(12 + i * 16, 1, replace);
-                    else
-                        line.replace(11 + i * 16, 1, replace);
-                    length = line.copy(tempchar, 16, 16 * i);
-                    tempchar[length] = '\0';
-                    temp_val[monum][exnum] = stod(tempchar);
-                    exnum++;
-                }
-            }
-            else if (exnum < e_nex)
-            {
-                for (int i = 0; i < (e_nex % 5); i++)
-                {
-                    if (!three_exponents)
-                    {
-                        line.replace(12 + i * 16, 1, replace);
-                        length = line.copy(tempchar, 15, 1 + 16 * i);
-                        tempchar[length] = '\0';
-                        temp_val[monum][exnum] = stod(tempchar);
-                    }
-                    else
-                    {
-                        line.replace(11 + i * 16, 1, replace);
-                        length = line.copy(tempchar, 16, 16 * i);
-                        tempchar[length] = '\0';
-                        temp_val[monum][exnum] = stod(tempchar);
-                    }
-                    exnum++;
-                }
-            }
-            else
-            {
-                getline_universal(rf, line);
-                continue;
-            }
-            getline_universal(rf, line);
-            if (linecount * 5 > e_nex + 1)
-            {
-                file << "linecount went higher than expected values in exponent reading, thats suspicius, lets stop here...\n";
-                return false;
-            }
-            // run++;
-        }
-        monum++;
+        push_back_MO(nr, occ, ener, oper);
+        read_block("", 0, 16, e_nex, coef);
+        for (const double c : coef)
+            MOs.back().push_back_coef(c);
     }
-    err_checkf(monum + 1 >= e_nmo, "less MOs than expected, quitting...\nmonum: " + to_string(monum) + " e_nmo : " + to_string(e_nmo), file);
-    for (int i = 0; i < e_nmo; i++)
-    {
-        for (int j = 0; j < e_nex; j++)
-        {
-            MOs[i].push_back_coef(temp_val[i][j]);
-        }
-    }
+    //ponytail: what follows (END DATA, energy, virial) is not read; PySCF unrestricted files list a
+    //second spin set past the header count and the old reader ignored it too
     set_exp_cutoff();
     return true;
 };
@@ -1248,10 +960,29 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
     string line;
     rf.seekg(0);
 
+    // Hand-edited xyz files arrive with the count line missing, an atom too many or
+    // too few, or a label that is not an element; every one of those used to end in
+    // a bare "invalid stod argument" or a charge-0 atom. Name the file and the line.
+    const string where = filename.string() + ": ";
+    auto strict_double = [&](const string &token, const string &what) {
+        size_t used = 0;
+        double value = 0.0;
+        try { value = stod(token, &used); } catch (...) { used = 0; }
+        err_checkf(used == token.size(), where + what + " '" + token + "' is not a number", file);
+        return value;
+    };
+    auto tokens_of = [](const string &l) {
+        svec t = split_string<string>(l, " ");
+        remove_empty_elements(t);
+        return t;
+    };
+
     getline_universal(rf, line);
-    stringstream stream(line);
-    int e_nuc = 0; // number of expected MOs, Exponents and nuclei
-    stream >> e_nuc;
+    svec head = tokens_of(line);
+    err_checkf(head.size() == 1, where + "first line must be the atom count alone, found '" + line + "'", file);
+    const double count = strict_double(head[0], "atom count");
+    err_checkf(count > 0 && count == floor(count), where + "atom count '" + head[0] + "' must be a positive integer", file);
+    int e_nuc = static_cast<int>(count); // number of expected nuclei
     if (debug)
         file << "e_nuc: " << e_nuc << endl;
     getline_universal(rf, line);
@@ -1268,19 +999,20 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
     dum_label.resize(e_nuc);
     for (int i = 0; i < e_nuc; i++)
     {
-        svec temp;
-        getline_universal(rf, line);
-        stream.str(line);
+        const string atom_i = "atom " + to_string(i + 1) + " of " + to_string(e_nuc);
+        err_checkf(static_cast<bool>(getline_universal(rf, line)), where + "file ends before " + atom_i + " (atom count too large?)", file);
         if (debug)
             file << i << ".run, line:" << line << endl;
         dum_nr[i] = i;
-        temp = split_string<string>(line, " ");
-        remove_empty_elements(temp);
+        svec temp = tokens_of(line);
+        err_checkf(temp.size() >= 4, where + atom_i + " needs 'El x y z', found '" + line + "'", file);
         dum_label[i] = temp[0];
-        dum_x[i] = constants::ang2bohr(stod(temp[1]));
-        dum_y[i] = constants::ang2bohr(stod(temp[2]));
-        dum_z[i] = constants::ang2bohr(stod(temp[3]));
-        dum_ch[i] = constants::get_Z_from_label(dum_label[i].c_str()) + 1;
+        dum_x[i] = constants::ang2bohr(strict_double(temp[1], atom_i + " x"));
+        dum_y[i] = constants::ang2bohr(strict_double(temp[2], atom_i + " y"));
+        dum_z[i] = constants::ang2bohr(strict_double(temp[3], atom_i + " z"));
+        const int Z = constants::get_Z_from_label(dum_label[i].c_str());
+        err_checkf(Z >= 0, where + atom_i + " has unknown element label '" + dum_label[i] + "'", file);
+        dum_ch[i] = Z + 1;
         if (debug)
         {
             file << "label:" << dum_label[i]
@@ -1290,6 +1022,16 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
                 << " z: " << dum_z[i]
                 << " charge: " << dum_ch[i] << endl;
         }
+    }
+    // Anything left must be a further frame (its own count line) or blank; a
+    // trailing atom line means the count is too small.
+    while (getline_universal(rf, line))
+    {
+        svec rest = tokens_of(line);
+        if (rest.empty())
+            continue;
+        err_checkf(rest.size() == 1, where + "more atom lines than the atom count " + to_string(e_nuc) + " announces, first extra line '" + line + "'", file);
+        break;
     }
     isBohr = true;
     //---------------------Start writing everything from the temp arrays into wave ---------------------
@@ -1331,197 +1073,67 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     ifstream rf(fileName.c_str());
     path = fileName;
     string line;
-    rf.seekg(0);
-    getline_universal(rf, line);
-    while (line.find("<Title>") == string::npos)
-        getline_universal(rf, line);
-    getline_universal(rf, line);
+    //Every block is looked up from the top, so the order of the blocks in the file does not matter
+    auto seek = [&](const string &tag) {
+        rf.clear();
+        rf.seekg(0);
+        line.clear();
+        seek_line(rf, line, "<" + tag + ">", file);
+    };
+    auto read_block = [&](const string &tag, auto &out) {
+        seek(tag);
+        const string end = "</" + tag + ">";
+        size_t pos;
+        do
+        {
+            read_line_or_fail(rf, line, end, file);
+            pos = line.find(end);
+            append_numbers(line.substr(0, pos), out, tag, file);
+        } while (pos == string::npos);
+    };
+    //Read as double: some writers put the net charge as "0.0"
+    auto read_int = [&](const string &tag) {
+        vec v;
+        read_block(tag, v);
+        err_checkf(v.size() == 1, "Expected one number in <" + tag + ">, found " + to_string(v.size()), file);
+        return static_cast<int>(v[0]);
+    };
+    seek("Title");
+    read_line_or_fail(rf, line, "the title", file);
+    comment = line;
     if (debug)
         file << "comment line " << line << endl;
-    comment = line;
-    rf.seekg(0);
-    while (line.find("<Number of Nuclei>") == string::npos)
-        getline_universal(rf, line);
-    getline_universal(rf, line);
-    if (debug)
-        file << line << endl;
-    int temp_ncen = stoi(line);
-    rf.seekg(0);
-    while (line.find("<Number of Primitives>") == string::npos)
-        getline_universal(rf, line);
-    getline_universal(rf, line);
-    if (debug)
-        file << "nex line: " << line << endl;
-    int temp_nex = stoi(line);
-    rf.seekg(0);
-    while (line.find("<Number of Occupied Molecular Orbitals>") == string::npos)
-        getline_universal(rf, line);
-    getline_universal(rf, line);
-    if (debug)
-        file << "nmo line: " << line << endl;
-    int temp_nmo = stoi(line);
-    rf.seekg(0);
-    while (line.find("<Atomic Numbers>") == string::npos)
-        getline_universal(rf, line);
+    const int temp_ncen = read_int("Number of Nuclei");
+    const int temp_nex = read_int("Number of Primitives");
+    const int temp_nmo = read_int("Number of Occupied Molecular Orbitals");
+    err_checkf(temp_ncen > 0 && temp_nex > 0 && temp_nmo > 0, "wfx announces " + to_string(temp_ncen) + " nuclei, " + to_string(temp_nex) + " primitives and " + to_string(temp_nmo) + " MOs", file);
     ivec nrs;
-    while (true)
-    {
-        getline_universal(rf, line);
-        // if (debug) file << "atom number line: " << line << endl;
-        if (line.find("</Atomic Numbers>") != string::npos)
-            break;
-        nrs.push_back(stoi(line));
-    }
+    read_block("Atomic Numbers", nrs);
     err_checkf(nrs.size() == temp_ncen, "Mismatch in atom number size", file);
-    rf.seekg(0);
-    while (line.find("<Nuclear Cartesian Coordinates>") == string::npos)
-        getline_universal(rf, line);
-    vec2 pos;
-    pos.resize(3);
-    double temp[3]{ 0, 0, 0 };
-    while (true)
-    {
-        getline_universal(rf, line);
-        if (line.find("</Nuclear Cartesian Coordinates>") != string::npos)
-            break;
-        istringstream is(line);
-        is >> temp[0] >> temp[1] >> temp[2];
-        for (int i = 0; i < 3; i++)
-            pos[i].push_back(temp[i]);
-    }
-    err_checkf(pos[0].size() == temp_ncen, "Mismatch in atom position size", file);
+    vec pos;
+    read_block("Nuclear Cartesian Coordinates", pos);
+    err_checkf(pos.size() == 3 * temp_ncen, "Mismatch in atom position size", file);
     for (int i = 0; i < temp_ncen; i++)
-        push_back_atom(constants::atnr2letter(nrs[i]) + to_string(i + 1), pos[0][i], pos[1][i], pos[2][i], nrs[i]);
+    {
+        const string label = constants::atnr2letter(nrs[i]);
+        err_checkf(label != "PROBLEM", "Unknown atomic number " + to_string(nrs[i]) + " for atom " + to_string(i + 1), file);
+        push_back_atom(label + to_string(i + 1), pos[3 * i], pos[3 * i + 1], pos[3 * i + 2], nrs[i]);
+    }
     err_checkf(ncen == temp_ncen, "Mismatch in atom position size", file);
     isBohr = true;
-    for (int i = 0; i < 3; i++)
-        pos[i].resize(0);
-    pos.resize(0);
-    rf.seekg(0);
-    while (line.find("<Net Charge>") == string::npos)
-        getline_universal(rf, line);
-    getline_universal(rf, line);
-    charge = stoi(line);
-    rf.seekg(0);
-    while (line.find("<Electronic Spin Multiplicity>") == string::npos)
-        getline_universal(rf, line);
-    getline_universal(rf, line);
-    multi = stoi(line);
-    rf.seekg(0);
-    while (line.find("<Primitive Centers>") == string::npos)
-        getline_universal(rf, line);
-    while (true)
-    {
-        getline_universal(rf, line);
-        if (line.find("</Primitive Centers>") != string::npos)
-            break;
-        int number = CountWords(line.c_str());
-        istringstream is(line);
-        int _temp;
-        for (int i = 0; i < number; i++)
-        {
-            is >> _temp;
-            centers.push_back(_temp);
-        }
-    }
-    rf.seekg(0);
-    while (line.find("<Primitive Types>") == string::npos)
-        getline_universal(rf, line);
-    while (true)
-    {
-        getline_universal(rf, line);
-        if (line.find("</Primitive Types>") != string::npos)
-            break;
-        int number = CountWords(line.c_str());
-        istringstream is(line);
-        int _temp;
-        for (int i = 0; i < number; i++)
-        {
-            is >> _temp;
-            types.push_back(_temp);
-        }
-    }
-    rf.seekg(0);
-    while (line.find("<Primitive Exponents>") == string::npos)
-        getline_universal(rf, line);
-    while (true)
-    {
-        getline_universal(rf, line);
-        bool please_break = false;
-        if (line.find("</Primitive Exponents>") != string::npos)
-        {
-            if (CountWords(line.c_str()) != 2)
-                please_break = true;
-            else
-                break;
-        }
-        int number = CountWords(line.c_str());
-        if (please_break)
-            number -= 2;
-        istringstream is(line);
-        double _temp;
-        for (int i = 0; i < number; i++)
-        {
-            is >> _temp;
-            exponents.push_back(_temp);
-        }
-        if (please_break)
-            break;
-    }
+    charge = read_int("Net Charge");
+    multi = read_int("Electronic Spin Multiplicity");
+    read_block("Primitive Centers", centers);
+    read_block("Primitive Types", types);
+    read_block("Primitive Exponents", exponents);
     err_checkf(exponents.size() == temp_nex && centers.size() == temp_nex && types.size() == temp_nex, "Mismatch in numbers! aborting!", file);
+    for (int i = 0; i < temp_nex; i++)
+        err_checkf(centers[i] >= 1 && centers[i] <= temp_ncen, "Primitive " + to_string(i + 1) + " sits on centre " + to_string(centers[i]) + " of " + to_string(temp_ncen), file);
     nex = temp_nex;
-    rf.seekg(0);
-    while (line.find("<Molecular Orbital Occupation Numbers>") == string::npos)
-        getline_universal(rf, line);
-    vec occ;
-    while (true)
-    {
-        getline_universal(rf, line);
-        bool please_break = false;
-        if (line.find("</Molecular Orbital Occupation Numbers>") != string::npos)
-        {
-            if (CountWords(line.c_str()) != 4)
-                please_break = true;
-            else
-                break;
-        }
-        int number = CountWords(line.c_str());
-        istringstream is(line);
-        double _temp;
-        for (int i = 0; i < number; i++)
-        {
-            is >> _temp;
-            occ.push_back(_temp);
-        }
-        if (please_break)
-            break;
-    }
-    rf.seekg(0);
-    while (line.find("<Molecular Orbital Energies>") == string::npos)
-        getline_universal(rf, line);
-    vec ener;
-    while (true)
-    {
-        getline_universal(rf, line);
-        bool please_break = false;
-        if (line.find("</Molecular Orbital Energies>") != string::npos)
-        {
-            if (CountWords(line.c_str()) != 3)
-                please_break = true;
-            else
-                break;
-        }
-        int number = CountWords(line.c_str());
-        istringstream is(line);
-        double _temp;
-        for (int i = 0; i < number; i++)
-        {
-            is >> _temp;
-            ener.push_back(_temp);
-        }
-        if (please_break)
-            break;
-    }
+    vec occ, ener;
+    read_block("Molecular Orbital Occupation Numbers", occ);
+    read_block("Molecular Orbital Energies", ener);
+    err_checkf(occ.size() == temp_nmo && ener.size() == temp_nmo, "Found " + to_string(occ.size()) + " occupations and " + to_string(ener.size()) + " energies for " + to_string(temp_nmo) + " MOs", file);
     double last_ener = -DBL_MAX;
     int oper = 0;
     for (int i = 0; i < temp_nmo; i++)
@@ -1538,113 +1150,37 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
         }
         err_checkf(push_back_MO(i + 1, occ[i], ener[i], oper), "Error poshing back MO! MO: " + to_string(i), file);
     }
-    occ.resize(0);
-    ener.resize(0);
-    rf.seekg(0);
-    while (line.find("<Molecular Orbital Primitive Coefficients>") == string::npos)
-        getline_universal(rf, line);
+    seek("Molecular Orbital Primitive Coefficients");
+    const string end = "</Molecular Orbital Primitive Coefficients>";
     vec coef;
-    while (line.find("</Molecular Orbital Primitive Coefficients>") == string::npos)
+    int read_MOs = 0;
+    while (read_line_or_fail(rf, line, end, file), line.find(end) == string::npos)
     {
-        while (line.find("<MO Number>") == string::npos)
-            getline_universal(rf, line);
-        getline_universal(rf, line);
-        // if (debug) file << "mo Nr line: " << line << endl;
-        int nr = stoi(line);
-        nr--;
-        while (line.find("</MO Number>") == string::npos)
-            getline_universal(rf, line);
-        while (coef.size() != nex)
+        if (line.find("<MO Number>") == string::npos)
+            continue;
+        ivec nr;
+        read_line_or_fail(rf, line, "MO Number", file);
+        append_numbers(line, nr, "MO Number", file);
+        err_checkf(nr.size() == 1 && nr[0] >= 1 && nr[0] <= temp_nmo, "Bad <MO Number> line: '" + line + "'", file);
+        seek_line(rf, line, "</MO Number>", file);
+        const string what = "coefficients of MO " + to_string(nr[0]);
+        coef.clear();
+        while (coef.size() < nex)
         {
-            getline_universal(rf, line);
-            // if (nr == 1 && debug) file << "first MO Coef lines: " << line << endl;
-            int number = CountWords(line.c_str());
-            istringstream is(line);
-            double _temp;
-            for (int i = 0; i < number; i++)
-            {
-                is >> _temp;
-                coef.push_back(_temp);
-            }
-            err_checkf(coef.size() <= nex, "Error reading coefficients! MO: " + to_string(MOs.size()), file);
+            read_line_or_fail(rf, line, what, file);
+            append_numbers(line, coef, what, file);
         }
+        err_checkf(coef.size() == nex, "More coefficients than primitives in " + what, file);
         for (int i = 0; i < nex; i++)
-            MOs[nr].push_back_coef(coef[i]);
-        coef.resize(0);
-        getline_universal(rf, line);
+            MOs[nr[0] - 1].push_back_coef(coef[i]);
+        read_MOs++;
     }
-
-    //Trying to actually read in all the information where it belongs
-  //  int n_occ = 0;
-  //  vec2 MOs_mat;
-  //  vec2 reordered_MOs_mat(MOs[0].get_primitive_count(), vec(MOs.size()));
-  //  for (int i = 0; i < MOs.size(); i++) {
-  //      if (MOs[i].get_occ() <= 0.0)continue;
-  //      MOs_mat.push_back(MOs[i].get_coefficients());
-  //      n_occ++;
-  //  }
-  //  centers;
-
-  //  MOs_mat = transpose(MOs_mat);
-
-  //  for (int type_idx = 0; type_idx < MOs_mat.size(); type_idx++) {
-  //      int type = types[type_idx];
-  //      if (type == 1) {//s-Type
-  //          atoms[centers[type_idx] - 1].push_back_basis_set(coef[type_idx], exponents[type_idx], 1, atoms[centers[type_idx] - 1].get_shellcount_size());
-  //          reordered_MOs_mat[type_idx] = MOs_mat[type_idx];
-  //          continue;
-  //      }else if (type >1 && type < 5)
-        //{
-        //    type = 1;
-        //}
-        //else if (type >= 5 && type < 10){
-        //    type = 2;
-        //}
-        //else if (type >= 10 && type < 17) {
-        //    type = 3;
-        //}
-        //else if (type >= 17 && type < 26) {
-        //    type = 4;
-        //}
-        //else if (type >= 26 && type < 37) {
-        //    type = 5;
-        //}
-  //      else{
-        //    file << "Higher angular momentum basis functions than G, not supported!" << endl;
-  //          exit(1);
-        //}
-
-  //      //Pretending to not know about contraction....
-  //      int shell = atoms[centers[type_idx] - 1].get_shellcount_size();
-  //      for (int m = -type; m <= type; m++) {
-  //          atoms[centers[type_idx] - 1].push_back_basis_set(coef[type_idx + m + type], exponents[type_idx + m + type], type + 1, shell);
-  //          reordered_MOs_mat[type_idx + constants::orca_2_pySCF[type][m]] = MOs_mat[type_idx + m + type];
-  //      }
-  //      type_idx += 2 * type;
-  //  }
-
-
-  //  vec coeff_mo(n_occ * MOs_mat.size(), 0.0);
-  //  vec coeff_small(n_occ * MOs_mat.size(), 0.0);
-  //  for (int i = 0; i < MOs_mat.size(); i++) {
-  //      for (int oc = 0; oc < MOs.size(); oc++) {
-        //    if (MOs[oc].get_occ() <= 0.0)continue;
-  //          coeff_mo[i * n_occ + oc] = MOs_mat[i][oc] * MOs[oc].get_occ();
-  //          coeff_small[i * n_occ + oc] = MOs_mat[i][oc];
-  //      }
-  //  }
-
-  //  DM = dot(coeff_mo, coeff_small, (int)MOs_mat.size(), (int)n_occ, (int)MOs_mat.size(), (int)n_occ, false, true);
-
-
-
-    while (line.find("<Energy =") == string::npos)
-        getline_universal(rf, line);
-    getline_universal(rf, line);
+    err_checkf(read_MOs == temp_nmo, "Read coefficients for " + to_string(read_MOs) + " of " + to_string(temp_nmo) + " MOs", file);
+    seek_line(rf, line, "<Energy =", file);
+    read_line_or_fail(rf, line, "the energy", file);
     total_energy = stod(line);
-    while (line.find("<Virial Ratio") == string::npos)
-        getline_universal(rf, line);
-    getline_universal(rf, line);
+    seek_line(rf, line, "<Virial Ratio", file);
+    read_line_or_fail(rf, line, "the virial ratio", file);
     virial_ratio = stod(line);
     rf.close();
     set_exp_cutoff();
@@ -1741,280 +1277,158 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     if (rf.good())
         path = filename;
     string line;
-    rf.seekg(0);
-    // d_f_switch = true;
-
-    getline_universal(rf, line);
+    read_line_or_fail(rf, line, "the first line", file);
     err_checkf(line.find("Molden Format") != string::npos, "Does not look like proper molden format file!", file);
-    getline_universal(rf, line);
-    comment = split_string<string>(line, "]")[1];
-    bool au_bohr = false; // au = false, angs = true;
-    while (line.find("[Atoms]") == string::npos)
+    //The whitespace-separated fields of the current line
+    auto fields = [&]()
     {
-        getline_universal(rf, line);
-    }
-    if (split_string<string>(line, "]")[1].find("angs") != string::npos)
-        au_bohr = true;
-    else if (split_string<string>(line, "]")[1].find("Angs") != string::npos)
-        au_bohr = true;
-    getline_universal(rf, line);
-    svec temp;
-    while (line.find("]") == string::npos)
+        svec f = split_string<string>(line, " ");
+        remove_empty_elements(f);
+        return f;
+    };
+    //Everything up to [Atoms] that is not a section header is the title
+    while (read_line_or_fail(rf, line, "[Atoms]", file), line.find("[Atoms]") == string::npos)
+        if (line.find("[") == string::npos)
+            comment += trim(line);
+    const bool angstrom = line.find("ngs") != string::npos;
+    //----------------------------- Atoms: label index charge x y z ------------------------------
+    while (read_line_or_fail(rf, line, "the atoms", file), line.find("[") == string::npos)
     {
-        temp = split_string<string>(line, " ");
-        remove_empty_elements(temp);
-        if (au_bohr)
-            err_checkf(push_back_atom(temp[0],
-                constants::ang2bohr(stod(temp[3])),
-                constants::ang2bohr(stod(temp[4])),
-                constants::ang2bohr(stod(temp[5])),
-                stoi(temp[2])),
-                "Error pushing back atom", file);
-        else
-            err_checkf(push_back_atom(temp[0],
-                stod(temp[3]),
-                stod(temp[4]),
-                stod(temp[5]),
-                stoi(temp[2])),
-                "Error pushing back atom", file);
-        getline_universal(rf, line);
+        const svec f = fields();
+        if (f.empty())
+            continue;
+        err_checkf(f.size() >= 6, "Molden atom line with fewer than 6 fields: '" + line + "'", file);
+        const double scale = angstrom ? constants::ang2bohr(1.0) : 1.0;
+        err_checkf(push_back_atom(f[0], scale * stod(f[3]), scale * stod(f[4]), scale * stod(f[5]), stoi(f[2])), "Error pushing back atom", file);
     }
     err_checkf(line.find("[STO]") == string::npos, "ERROR: STOs are not yet suupported!", file);
-    getline_universal(rf, line);
+    err_checkf(ncen > 0, "No atoms in molden file", file);
+    err_checkf(line.find("[GTO]") != string::npos, "Expected [GTO] after the atoms but found: '" + line + "'", file);
+    //----------------------------- Basis: per atom "index 0", shells "type nprim 1.0", primitives, blank line ------------------------------
     int atoms_with_basis = 0;
-    while (atoms_with_basis < ncen && line.find("[") == string::npos)
+    while (atoms_with_basis < ncen && (read_line_or_fail(rf, line, "the basis set", file), line.find("[") == string::npos))
     {
-        svec line_digest = split_string<string>(line, " ");
-        remove_empty_elements(line_digest);
-        const int atom_based = stoi(line_digest[0]) - 1;
-        getline_universal(rf, line);
+        svec f = fields();
+        if (f.empty())
+            continue;
+        const int atom_based = stoi(f[0]) - 1;
+        err_checkf(atom_based >= 0 && atom_based < ncen, "Basis set for atom " + to_string(atom_based + 1) + " of " + to_string(ncen), file);
+        const string where = "the basis set of atom " + to_string(atom_based + 1);
         int shell = 0;
-        while (line.size() > 2)
+        while (read_line_or_fail(rf, line, where, file), !trim(line).empty())
         {
-            line_digest = split_string<string>(line, " ");
-            remove_empty_elements(line_digest);
-            int shell_type;
-            if (line_digest[0] == "s" || line_digest[0] == "S")
-                shell_type = 1;
-            else if (line_digest[0] == "p" || line_digest[0] == "P")
-                shell_type = 2;
-            else if (line_digest[0] == "d" || line_digest[0] == "D")
-                shell_type = 3;
-            else if (line_digest[0] == "f" || line_digest[0] == "F")
-                shell_type = 4;
-            else if (line_digest[0] == "g" || line_digest[0] == "G")
-                shell_type = 5;
-            else if (line_digest[0] == "h" || line_digest[0] == "H" || line_digest[0] == "i" || line_digest[0] == "I")
-                err_not_impl_f("Higher angular momentum basis functions than G", file);
-            getline_universal(rf, line);
-            const int number_of_functions = stoi(line_digest[1]);
+            f = fields();
+            err_checkf(f.size() >= 2, "Bad shell line in " + where + ": '" + line + "'", file);
+            const size_t shell_type = string("spdfg").find(static_cast<char>(tolower(f[0][0]))) + 1;
+            err_checkf(f[0].size() == 1 && shell_type > 0, "Unknown shell type in " + where + ": '" + line + "'", file);
+            const int number_of_functions = stoi(f[1]);
+            err_checkf(number_of_functions > 0, "Shell without primitives in " + where + ": '" + line + "'", file);
             for (int i = 0; i < number_of_functions; i++)
             {
-                line_digest = split_string<string>(line, " ");
-                remove_empty_elements(line_digest);
-                err_checkf(atoms[atom_based].push_back_basis_set(stod(line_digest[0]), stod(line_digest[1]), shell_type, shell), "Error pushing back basis", file);
-                getline_universal(rf, line);
+                read_line_or_fail(rf, line, where, file);
+                vec v;
+                append_numbers(line, v, where, file);
+                err_checkf(v.size() == 2, "Expected 'exponent coefficient' in " + where + " but found: '" + line + "'", file);
+                err_checkf(atoms[atom_based].push_back_basis_set(v[0], v[1], static_cast<int>(shell_type), shell), "Error pushing back basis", file);
             }
             shell++;
         }
+        err_checkf(shell > 0, "No shells given for atom " + to_string(atom_based + 1), file);
         atoms_with_basis++;
-        getline_universal(rf, line);
     }
-    bool d5 = false;
-    bool f7 = false;
-    bool g9 = false;
+    err_checkf(atoms_with_basis == ncen, "Basis set given for " + to_string(atoms_with_basis) + " of " + to_string(ncen) + " atoms", file);
+    //----------------------------- Flags up to [MO] ------------------------------
+    bool d5 = false, f7 = false, g9 = false;
     while (line.find("[MO]") == string::npos)
     {
-        if (line.find("[5D]") != string::npos || line.find("[5d]") != string::npos)
-        {
-            d5 = true;
-        }
-        if (line.find("[7F]") != string::npos || line.find("[7f]") != string::npos)
-        {
-            f7 = true;
-        }
-        if (line.find("[9G]") != string::npos || line.find("[9g]") != string::npos)
-        {
-            g9 = true;
-        }
-        if (line.find("[5D7F]") != string::npos || line.find("[5d7f]") != string::npos)
-        {
-            f7 = true;
-            d5 = true;
-        }
-        if (line.find("[5D7F9G]") != string::npos || line.find("[5d7f9g]") != string::npos)
-        {
-            f7 = true;
-            d5 = true;
-            g9 = true;
-        }
-        getline_universal(rf, line); // Read more lines until we reach MO block
+        string flag = line;
+        transform(flag.begin(), flag.end(), flag.begin(), [](unsigned char c) { return static_cast<char>(toupper(c)); });
+        d5 |= flag.find("5D") != string::npos;
+        f7 |= flag.find("7F") != string::npos;
+        g9 |= flag.find("9G") != string::npos;
+        read_line_or_fail(rf, line, "[MO]", file);
     }
+    const bool spherical = d5 && f7 && g9;
+    err_checkf(spherical || (!d5 && !f7 && !g9), "Mixed cartesian and spherical shells in molden file are not supported", file);
+    d_f_switch = !spherical;
+    auto nfunc = [spherical](const int l) { return spherical ? constants::n_spher(l) : constants::n_cart(l); };
+    //The primitives in file order, the size of the shell each belongs to and the coefficients per MO
+    vector<primitive> prims;
+    ivec shellsizes;
+    int expected_coefs = 0;
+    for (int a = 0; a < ncen; a++)
+    {
+        int current_shell = -1;
+        for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
+        {
+            if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
+            {
+                const int l = atoms[a].get_basis_set_type(s) - 1;
+                err_checkf(l <= 4, "Molden shells beyond g are not supported", file);
+                expected_coefs += nfunc(l);
+                current_shell++;
+            }
+            shellsizes.push_back(atoms[a].get_shellcount(current_shell));
+            prims.push_back(primitive(a + 1, atoms[a].get_basis_set_type(s), atoms[a].get_basis_set_exponent(s), atoms[a].get_basis_set_coefficient(s)));
+        }
+    }
+    //----------------------------- MOs: "Key= value" header lines, then "index coefficient" lines ------------------------------
     vec3 coefficients(2);
     vec occ;
-    if (d5 && f7 && g9)
+    int nmo = 0;
+    while (getline_universal(rf, line) && line.find("[") == string::npos)
     {
-        int run = 0;
-        string sym;
-        bool spin; // alpha = false, beta = true
-        double ene, occup;
-        int expected_coefs = 0;
-        vector<primitive> prims;
-        ivec temp_shellsizes;
-        for (int a = 0; a < ncen; a++)
+        if (trim(line).empty())
+            continue;
+        const string mo = "MO " + to_string(nmo + 1);
+        double ene = 0.0, occup = 0.0;
+        bool spin = false; // alpha = false, beta = true
+        for (size_t eq = line.find('='); eq != string::npos; eq = line.find('='))
         {
-            int current_shell = -1;
-            // int l = 0;
-            for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
-            {
-                if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
-                {
-                    expected_coefs += 2 * atoms[a].get_basis_set_type(s) - 1;
-                    current_shell++;
-                }
-                temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
-                prims.push_back(primitive(a + 1,
-                    atoms[a].get_basis_set_type(s),
-                    atoms[a].get_basis_set_exponent(s),
-                    atoms[a].get_basis_set_coefficient(s)));
-            }
-        }
-        getline_universal(rf, line);
-        int MO_run = 0;
-        while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos)
-        {
-            run++;
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            sym = temp[1];
-            getline_universal(rf, line);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            ene = stod(temp[1]);
-            getline_universal(rf, line);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            if (temp[1] == "Alpha" || temp[1] == "alpha")
-                spin = false;
-            else {
-                spin = true;
-                is_unrestricted = true;
-            }
-            getline_universal(rf, line);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            occup = stod(temp[1]);
-            push_back_MO(run, occup, ene, spin);
-            occ.push_back(occup);
-            coefficients[spin].push_back(vec());
-            // int run_coef = 0;
-            int run = 0, basis_run = 0;
-            vec2 shell;
-            for (int i = 0; i < expected_coefs; i++)
-            {
-                getline_universal(rf, line);
-                temp = split_string<string>(line, " ");
-                remove_empty_elements(temp);
-                coefficients[spin][MO_run].push_back(stod(temp[1]));
-                const int l = prims[basis_run].get_type() - 1, nsph = constants::n_spher(l), size = temp_shellsizes[basis_run];
-                err_checkf(l <= 4, "Types higher than g type in molden files", file);
-                if (run == 0) shell.assign(nsph, vec(size));
-                for (int s = 0; s < size; s++)
-                    shell[run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
-                if (++run < nsph) continue;
-                push_back_spherical_shell(MO_run, l, shell, prims, basis_run, size);
-                run = 0;
-                basis_run += size;
-            }
-            err_checkf(run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
-            MO_run++;
-            getline_universal(rf, line);
-        }
-    }
-    else if (!d5 && !f7 && !g9)
-    {
-        d_f_switch = true;
-        int run = 0;
-        string sym;
-        bool spin; // alpha = false, beta = true
-        double ene, occup;
-        int expected_coefs = 0;
-        vector<primitive> prims;
-        ivec temp_shellsizes;
-        for (int a = 0; a < ncen; a++)
-        {
-            int current_shell = -1;
-            // int l = 0;
-            for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
-            {
-                if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
-                {
-                    expected_coefs += constants::n_cart(atoms[a].get_basis_set_type(s) - 1);
-                    current_shell++;
-                }
-                temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
-                prims.push_back(primitive(a + 1,
-                    atoms[a].get_basis_set_type(s),
-                    atoms[a].get_basis_set_exponent(s),
-                    atoms[a].get_basis_set_coefficient(s)));
-            }
-        }
-        getline_universal(rf, line);
-        int MO_run = 0;
-        while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos)
-        {
-            run++;
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            sym = temp[1];
-            getline_universal(rf, line);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            ene = stod(temp[1]);
-            getline_universal(rf, line);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            if (temp[1] == "Alpha" || temp[1] == "alpha")
-                spin = false;
+            const string key = trim(line.substr(0, eq)), value = trim(line.substr(eq + 1));
+            if (key == "Ene")
+                ene = stod(value);
+            else if (key == "Occup")
+                occup = stod(value);
+            else if (key == "Spin")
+                spin = value != "Alpha" && value != "alpha";
             else
-                spin = true;
-            getline_universal(rf, line);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            occup = stod(temp[1]);
-            push_back_MO(run, occup, ene, spin);
-            occ.push_back(occup);
-            coefficients[spin].push_back(vec());
-            int basis_run = 0, run = 0;
-            vec2 shell;
-            for (int i = 0; i < expected_coefs; i++)
-            {
-                getline_universal(rf, line);
-                temp = split_string<string>(line, " ");
-                remove_empty_elements(temp);
-                coefficients[spin][MO_run].push_back(stod(temp[1]));
-                const int l = prims[basis_run].get_type() - 1, size = temp_shellsizes[basis_run];
-                err_checkf(l <= 4, "Cartesian molden shells beyond g are not supported", file);
-                if (run == 0)
-                    shell.assign(constants::n_cart(l), vec(size));
-                for (int s = 0; s < size; s++)
-                    shell[run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
-                if (++run < constants::n_cart(l))
-                    continue;
-                push_back_cartesian_shell(MO_run, l, shell, prims, basis_run, size, molden_order[l], cart_norm(l).data());
-                run = 0;
-                basis_run += size;
-            }
-            err_checkf(run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
-            MO_run++;
-            getline_universal(rf, line);
+                err_checkf(key == "Sym", "Unknown key in the header of " + mo + ": '" + line + "'", file);
+            read_line_or_fail(rf, line, "the header of " + mo, file);
         }
-    }
-    else
-    {
-        err_not_impl_f("PLEASE DONT MIX CARTESIAN AND SPERHICAL HARMINICS; THAT IS ANNOYING!", std::cout);
+        if (spin)
+            is_unrestricted = true;
+        push_back_MO(nmo + 1, occup, ene, spin);
+        occ.push_back(occup);
+        coefficients[spin].push_back(vec());
+        int run = 0, basis_run = 0;
+        vec2 shell;
+        for (int i = 0; i < expected_coefs; i++)
+        {
+            if (i > 0)
+                read_line_or_fail(rf, line, "coefficient " + to_string(i + 1) + " of " + mo, file);
+            vec v;
+            append_numbers(line, v, "coefficient " + to_string(i + 1) + " of " + mo, file);
+            err_checkf(v.size() == 2 && static_cast<int>(v[0]) == i + 1, "Expected coefficient " + to_string(i + 1) + " of " + mo + " but found: '" + line + "'", file);
+            coefficients[spin].back().push_back(v[1]);
+            const int l = prims[basis_run].get_type() - 1, size = shellsizes[basis_run], n = nfunc(l);
+            if (run == 0)
+                shell.assign(n, vec(size));
+            for (int s = 0; s < size; s++)
+                shell[run][s] = v[1] * prims[basis_run + s].get_coef();
+            if (++run < n)
+                continue;
+            if (spherical)
+                push_back_spherical_shell(nmo, l, shell, prims, basis_run, size);
+            else
+                push_back_cartesian_shell(nmo, l, shell, prims, basis_run, size, molden_order[l], cart_norm(l).data());
+            run = 0;
+            basis_run += size;
+        }
+        nmo++;
     }
     //Make the matrix square for later use
+    err_checkf(!coefficients[0].empty(), "No MOs in molden file", file);
     while (coefficients[0].size() < coefficients[0][0].size()) {
         coefficients[0].push_back(vec(coefficients[0][0].size(), 0.0));
         occ.push_back(0);
@@ -2568,6 +1982,14 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     ifstream rf(filename.c_str(), ios::binary);
     if (rf.good())
         path = filename;
+    const int64_t file_size = static_cast<int64_t>(std::filesystem::file_size(filename));
+    //A section pointer or count from a damaged file used to be followed blindly
+    auto check_offset = [&](const int64_t offset, const string &what) {
+        err_checkf(offset > 0 && offset < file_size, what + " points to byte " + to_string(offset) + " of a " + to_string(file_size) + " byte file", file);
+    };
+    auto check_count = [&](const int64_t count, const string &what) {
+        err_checkf(count > 0 && count < file_size, what + " of " + to_string(count) + " in a " + to_string(file_size) + " byte file", file);
+    };
     string line;
     int geo_start_bit = 8;
     int basis_start_bit = 16;
@@ -2591,12 +2013,13 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         rf.seekg(geo_start_bit, ios::beg);
         int64_t geo_start = 0;
         rf.read((char *)&geo_start, sizeof(geo_start));
-        err_checkf(geo_start != 0, "Could not read geometry information location from GBW file!", file);
+        check_offset(geo_start, "geometry section");
         if (debug)
             file << "I read the pointer of geometry successfully" << endl;
         rf.seekg(geo_start, ios::beg);
         int at = 0;
         rf.read((char *)&at, constants::soi);
+        check_count(at, "atom count");
         double geo_vals[6]{ 0, 0, 0, 0, 0, 0 }; // x,y,z, ch, exp_fin_nuc, mass
         // Use int64_t to safely hold soi-sized reads (soi may be 4 or 8 bytes)
         int64_t geo_ints[5]{ 0, 0, 0, 0, 0 };
@@ -2628,13 +2051,14 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         rf.seekg(basis_start_bit, ios::beg);
         int64_t basis_start = 0;
         rf.read((char *)&basis_start, constants::soli);
-        err_checkf(basis_start != 0, "Could not read beasis information location from GBW file!", file);
+        check_offset(basis_start, "basis set section");
         if (debug)
             file << "I read the pointer of basis set successfully" << endl;
         rf.seekg(basis_start, ios::beg);
         int atoms2 = 0, temp = 0;
         rf.read((char *)&temp, constants::soi);
         rf.read((char *)&atoms2, constants::soi);
+        err_checkf(atoms2 == at, "Basis set for " + to_string(atoms2) + " atoms but geometry for " + to_string(at), file);
         // long unsigned int atoms_with_basis = 0;
         vec exp(37, 0);
         vec con(37, 0);
@@ -2643,8 +2067,10 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             int atom_based = 0, nr_shells = 0;
             rf.read((char *)&atom_based, constants::soi);
             err_checkf(rf.good(), "Error reading atom_based", file);
+            err_checkf(atom_based >= 0 && atom_based < ncen, "Basis set for atom " + to_string(atom_based + 1) + " of " + to_string(ncen), file);
             rf.read((char *)&nr_shells, constants::soi);
             err_checkf(rf.good(), "Error reading nr_shells", file);
+            check_count(nr_shells, "shell count");
             int shell = 0;
             for (int p = 0; p < nr_shells; p++)
             {
@@ -2706,7 +2132,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         int64_t MOs_start = 0;
         rf.read((char *)&MOs_start, constants::soli);
         err_checkf(rf.good(), "Error reading MO_start", file);
-        err_checkf(MOs_start != 0, "Could not read MO information location from GBW file!", file);
+        check_offset(MOs_start, "MO section");
         if (debug)
             file << "I read the pointer of MOs successfully" << endl;
         rf.seekg(MOs_start, ios::beg);
@@ -2717,6 +2143,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         rf.read((char *)&dimension_i64, soi);
         err_checkf(rf.good(), "Error reading dimnesion", file);
         int dimension = static_cast<int>(dimension_i64);
+        err_checkf(operators == 1 || operators == 2, "gbw with " + to_string(operators) + " operators", file);
+        err_checkf(dimension == expected_coefs, "MO matrix dimension " + to_string(dimension) + " but the basis set has " + to_string(expected_coefs) + " functions", file);
         size_t coef_nr = size_t(dimension) * size_t(dimension);
         vec2 coefficients(operators);
         vec2 occupations(operators);
@@ -9087,21 +8515,22 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     }
     inFile.seekg(0, std::ios::beg);
     int one = 2;
-    err_checkf(read_block_from_fortran_binary(inFile, &one), "Error reading initial number", std::cout);
+    err_checkf(read_block_from_fortran_binary(inFile, &one, sizeof(one)), "Error reading initial number", std::cout);
     err_checkf(one != 2, "Error reading first number in the xtb file!", std::cout);
 
     int infos[4] = { 0, 0, 0, 0 }; //ncent nbf nmomax nprims
-    err_checkf(read_block_from_fortran_binary(inFile, infos), "Error reading sizes of data", std::cout);
+    err_checkf(read_block_from_fortran_binary(inFile, infos, sizeof(infos)), "Error reading sizes of data", std::cout);
     int ncent = infos[0];
     int nbf = infos[1];
     int nmomax = infos[2];
     int nprims = infos[3];
+    err_checkf(ncent > 0 && nbf > 0 && nmomax > 0 && nprims > 0, "xtb file announces " + std::to_string(ncent) + " atoms, " + std::to_string(nbf) + " basis functions, " + std::to_string(nmomax) + " MOs and " + std::to_string(nprims) + " primitives", std::cout);
 
     svec atyp(ncent);
     char temp[3]{ 0, 0, '\0' };
     for (int i = 0; i < ncent; ++i)
     {
-        err_checkf(read_block_from_fortran_binary(inFile, temp), "Error reading atom label " + std::to_string(i), std::cout);
+        err_checkf(read_block_from_fortran_binary(inFile, temp, sizeof(temp) - 1), "Error reading atom label " + std::to_string(i), std::cout);
         atyp[i] = temp;
         atyp[i].erase(remove(atyp[i].begin(), atyp[i].end(), ' '), atyp[i].end());
     }
@@ -9110,10 +8539,10 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     ivec _charge(ncent);
     for (int i = 0; i < ncent; ++i)
     {
-        err_checkf(read_block_from_fortran_binary(inFile, &x[i]), "Error reading atom data for atom " + std::to_string(i), std::cout);
-        err_checkf(read_block_from_fortran_binary(inFile, &y[i]), "Error reading atom data for atom " + std::to_string(i), std::cout);
-        err_checkf(read_block_from_fortran_binary(inFile, &z[i]), "Error reading atom data for atom " + std::to_string(i), std::cout);
-        err_checkf(read_block_from_fortran_binary(inFile, &_charge[i]), "Error reading atom data for atom " + std::to_string(i), std::cout);
+        err_checkf(read_block_from_fortran_binary(inFile, &x[i], sizeof(double)), "Error reading atom data for atom " + std::to_string(i), std::cout);
+        err_checkf(read_block_from_fortran_binary(inFile, &y[i], sizeof(double)), "Error reading atom data for atom " + std::to_string(i), std::cout);
+        err_checkf(read_block_from_fortran_binary(inFile, &z[i], sizeof(double)), "Error reading atom data for atom " + std::to_string(i), std::cout);
+        err_checkf(read_block_from_fortran_binary(inFile, &_charge[i], sizeof(int)), "Error reading atom data for atom " + std::to_string(i), std::cout);
     }
 
     // making it into the wavefunction data
@@ -9124,26 +8553,32 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     err_checkf(ncen == ncent, "Error adding atoms to WFN!", file);
 
     ivec lao(nprims), aoatcart(nprims), ipao(nprims);
-    for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &lao[i]), "Error reading basis set information lao of primitive " + std::to_string(i), std::cout);
-    for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &aoatcart[i]), "Error reading basis set information aotcart of primitive " + std::to_string(i), std::cout);
-    for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &ipao[i]), "Error reading basis set information ipao of primitive " + std::to_string(i), std::cout);
+    for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &lao[i], sizeof(int)), "Error reading basis set information lao of primitive " + std::to_string(i), std::cout);
+    for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &aoatcart[i], sizeof(int)), "Error reading basis set information aotcart of primitive " + std::to_string(i), std::cout);
+    for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &ipao[i], sizeof(int)), "Error reading basis set information ipao of primitive " + std::to_string(i), std::cout);
 
     vec exps(nprims), contr(nprims);
-    err_checkf(read_block_from_fortran_binary(inFile, exps.data()), "Error reading exponents!", std::cout);
-    err_checkf(read_block_from_fortran_binary(inFile, contr.data()), "Error reading contraction coefs!", std::cout);
+    err_checkf(read_block_from_fortran_binary(inFile, exps.data(), exps.size() * sizeof(double)), "Error reading exponents!", std::cout);
+    err_checkf(read_block_from_fortran_binary(inFile, contr.data(), contr.size() * sizeof(double)), "Error reading contraction coefs!", std::cout);
     vec occ(nmomax), eval(nmomax);
-    err_checkf(read_block_from_fortran_binary(inFile, occ.data()), "Error reading occupancies!", std::cout);
-    err_checkf(read_block_from_fortran_binary(inFile, eval.data()), "Error reading energies!", std::cout);
+    err_checkf(read_block_from_fortran_binary(inFile, occ.data(), occ.size() * sizeof(double)), "Error reading occupancies!", std::cout);
+    err_checkf(read_block_from_fortran_binary(inFile, eval.data(), eval.size() * sizeof(double)), "Error reading energies!", std::cout);
 
     vec tempvec((size_t)nbf * (size_t)nmomax);
-    err_checkf(read_block_from_fortran_binary(inFile, tempvec.data()), "Error reading MO coefficients!", std::cout);
+    err_checkf(read_block_from_fortran_binary(inFile, tempvec.data(), tempvec.size() * sizeof(double)), "Error reading MO coefficients!", std::cout);
     dMatrix2 momat = reshape<dMatrix2>(tempvec, Shape2D(nmomax, nbf));
 
     //vec tempvec2((size_t)nmomax * (size_t)nmomax);
     //err_checkf(read_block_from_fortran_binary(inFile, tempvec2.data()), "Error reading spherical MO coefficients!", std::cout);
 
-    vec Pmat((size_t)nmomax * (size_t)(nmomax + 1) / 2);
-    err_checkf(read_block_from_fortran_binary(inFile, Pmat.data()), "Error reading density matrix!", std::cout);
+    //Not every xtb version writes the density matrix record; without it DM stays empty and the
+    //density is built from the MOs (the old reader silently accepted an all-zero DM here)
+    vec Pmat;
+    if (inFile.peek() != std::ifstream::traits_type::eof())
+    {
+        Pmat.resize((size_t)nmomax * (size_t)(nmomax + 1) / 2);
+        err_checkf(read_block_from_fortran_binary(inFile, Pmat.data(), Pmat.size() * sizeof(double)), "Error reading density matrix!", std::cout);
+    }
 
     //  Add Basis set information to atoms
     //  This is a cartesian basis
@@ -9281,16 +8716,18 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     }
 
     //Now turn Pmat into a full matrix
-    DM = dMatrix2(nmomax, nmomax);
-
-    double *pmat_ptr = Pmat.data();
-    for (int j = 0; j < nmomax; j++) {
-        for (int i = 0; i < j; i++) {
-            const double v = *pmat_ptr++;
-            DM(i, j) = v;
-            DM(j, i) = v;
+    if (!Pmat.empty())
+    {
+        DM = dMatrix2(nmomax, nmomax);
+        double *pmat_ptr = Pmat.data();
+        for (int j = 0; j < nmomax; j++) {
+            for (int i = 0; i < j; i++) {
+                const double v = *pmat_ptr++;
+                DM(i, j) = v;
+                DM(j, i) = v;
+            }
+            DM(j, j) = *pmat_ptr++;
         }
-        DM(j, j) = *pmat_ptr++;
     }
 
     ////If i ever need it again, we can reorder the orbitals

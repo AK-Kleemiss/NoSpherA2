@@ -1130,12 +1130,12 @@ void fukui_analysis(options &opt, std::ostream &log2)
 namespace {
 
 struct PromolecularFragmentDensities {
-    double rho1 = 0.0;
-    double rho2 = 0.0;
+    double sum = 0.0;      // over all fragments
+    double dominant = 0.0; // largest single-fragment contribution
 
     double total() const
     {
-        return rho1 + rho2;
+        return sum;
     }
 };
 
@@ -1183,18 +1183,27 @@ PromolecularFragmentDensities promolecular_fragment_densities_at(
     const std::vector<Thakkar> &atom_models)
 {
     PromolecularFragmentDensities result;
+    // atoms are grouped by fragment (add_promolecular_atoms appends whole fragments),
+    // so a running per-fragment sum needs no per-fragment storage
+    double fragment_sum = 0.0;
+    int current_fragment = atoms.empty() ? 0 : atoms.front().fragment;
     for (const PromolecularAtom &atom : atoms)
     {
+        if (atom.fragment != current_fragment)
+        {
+            result.dominant = std::max(result.dominant, fragment_sum);
+            fragment_sum = 0.0;
+            current_fragment = atom.fragment;
+        }
         // Cubic-spline (not linear) table lookup: lambda2_at() differentiates this
         // field twice via finite differences, and a linear interpolant's curvature
         // discontinuities at each table node otherwise show up as sign noise in the
         // (often small) lambda2 that drives NCI coloring.
         const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(array_length(pos, atom.pos));
-        if (atom.fragment == 1)
-            result.rho1 += contribution;
-        else
-            result.rho2 += contribution;
+        fragment_sum += contribution;
+        result.sum += contribution;
     }
+    result.dominant = std::max(result.dominant, fragment_sum);
     return result;
 }
 
@@ -1212,7 +1221,7 @@ bool is_promolecular_nci_point(
     if (fragment_density <= 1E-20)
         return false;
 
-    if (std::max(densities.rho1, densities.rho2) >= fragment_density * dominant_density_cutoff)
+    if (densities.dominant >= fragment_density * dominant_density_cutoff)
         return false;
 
     return fragment_density >= total_density * fragment_sum_cutoff;
@@ -1309,8 +1318,7 @@ std::string tcl_quote_path(const std::filesystem::path &path)
 }
 
 void write_promolecular_nci_vmd(
-    const std::filesystem::path &xyz1,
-    const std::filesystem::path &xyz2,
+    const pathvec &xyz_files,
     const std::filesystem::path &output_base,
     std::ostream &log)
 {
@@ -1329,25 +1337,19 @@ void write_promolecular_nci_vmd(
         << "axes location Off\n"
         << "color Display Background white\n"
         << "color scale method BGR\n"
-        << "\n"
-        << "mol new " << tcl_quote_path(std::filesystem::absolute(xyz1)) << " type xyz waitfor all\n"
-        << "set frag1 [molinfo top]\n"
-        << "mol delrep 0 $frag1\n"
-        << "mol representation CPK\n"
-        << "mol color Name\n"
-        << "mol selection all\n"
-        << "mol material Opaque\n"
-        << "mol addrep $frag1\n"
-        << "\n"
-        << "mol new " << tcl_quote_path(std::filesystem::absolute(xyz2)) << " type xyz waitfor all\n"
-        << "set frag2 [molinfo top]\n"
-        << "mol delrep 0 $frag2\n"
-        << "mol representation CPK\n"
-        << "mol color Name\n"
-        << "mol selection all\n"
-        << "mol material Opaque\n"
-        << "mol addrep $frag2\n"
-        << "\n"
+        << "\n";
+    for (size_t f = 0; f < xyz_files.size(); f++)
+        vmd_file
+            << "mol new " << tcl_quote_path(std::filesystem::absolute(xyz_files[f])) << " type xyz waitfor all\n"
+            << "set frag" << f + 1 << " [molinfo top]\n"
+            << "mol delrep 0 $frag" << f + 1 << "\n"
+            << "mol representation CPK\n"
+            << "mol color Name\n"
+            << "mol selection all\n"
+            << "mol material Opaque\n"
+            << "mol addrep $frag" << f + 1 << "\n"
+            << "\n";
+    vmd_file
         << "mol new " << tcl_quote_path(std::filesystem::absolute(signed_rho_path)) << " type cube first 0 last -1 step 1 waitfor 1 volsets {0 }\n"
         << "set nci [molinfo top]\n"
         << "mol delrep 0 $nci\n"
@@ -1452,38 +1454,42 @@ void write_promolecular_nci_plot_script(
 } // namespace
 
 void promolecular_nci_analysis(
-    const std::filesystem::path &xyz1,
-    const std::filesystem::path &xyz2,
+    const pathvec &xyz_files,
     const properties_options &opts,
     std::ostream &log)
 {
     using namespace std;
 
-    err_checkf(std::filesystem::exists(xyz1), "First XYZ file does not exist: " + xyz1.string(), log);
-    err_checkf(std::filesystem::exists(xyz2), "Second XYZ file does not exist: " + xyz2.string(), log);
+    err_checkf(xyz_files.size() >= 2, "Promolecular NCI needs at least two XYZ fragments.", log);
 
-    WFN fragment1(e_origin::xyz);
-    WFN fragment2(e_origin::xyz);
-    fragment1.read_xyz(xyz1, log, false);
-    fragment2.read_xyz(xyz2, log, false);
+    // Output names join every fragment stem: a_b_c_values.dat etc.
+    std::string joined_stems = xyz_files.front().stem().string();
+    std::string joined_names = xyz_files.front().string();
+    for (size_t f = 1; f < xyz_files.size(); f++)
+    {
+        joined_stems += "_" + xyz_files[f].stem().string();
+        joined_names += (f + 1 == xyz_files.size() ? " and " : ", ") + xyz_files[f].string();
+    }
 
     WFN combined(e_origin::xyz);
-    combined.set_path(xyz1.parent_path() / (xyz1.stem().string() + "_" + xyz2.stem().string() + ".xyz"));
-    add_atoms_to_combined_wfn(fragment1, combined);
-    add_atoms_to_combined_wfn(fragment2, combined);
+    combined.set_path(xyz_files.front().parent_path() / (joined_stems + ".xyz"));
+    vector<PromolecularAtom> atoms;
+    for (size_t f = 0; f < xyz_files.size(); f++)
+    {
+        err_checkf(std::filesystem::exists(xyz_files[f]), "XYZ file does not exist: " + xyz_files[f].string(), log);
+        WFN fragment(e_origin::xyz);
+        fragment.read_xyz(xyz_files[f], log, false);
+        add_atoms_to_combined_wfn(fragment, combined);
+        add_promolecular_atoms(fragment, static_cast<int>(f) + 1, atoms);
+    }
 
     properties_options local_opts = opts;
     readxyzMinMax_fromWFN(combined, local_opts, true);
     err_checkf(local_opts.NbSteps[0] > 1 && local_opts.NbSteps[1] > 1 && local_opts.NbSteps[2] > 1,
         "Promolecular NCI grid is too small; decrease -resolution or increase -radius.", log);
 
-    const std::filesystem::path output_base =
-        xyz1.parent_path() / (xyz1.stem().string() + "_" + xyz2.stem().string());
+    const std::filesystem::path output_base = xyz_files.front().parent_path() / joined_stems;
 
-    vector<PromolecularAtom> atoms;
-    atoms.reserve(fragment1.get_ncen() + fragment2.get_ncen());
-    add_promolecular_atoms(fragment1, 1, atoms);
-    add_promolecular_atoms(fragment2, 2, atoms);
     const vector<Thakkar> atom_models = make_thakkar_interpolators();
 
     cube rho_cube(local_opts.NbSteps, combined.get_ncen(), true);
@@ -1508,13 +1514,13 @@ void promolecular_nci_analysis(
     rdg_cube.calc_dv();
 
     rho_cube.set_comment1("Promolecular density using Thakkar spherical atoms");
-    rho_cube.set_comment2("from " + xyz1.string() + " and " + xyz2.string());
+    rho_cube.set_comment2("from " + joined_names);
     signed_rho_cube.set_comment1("Promolecular signed density using Thakkar spherical atoms");
-    signed_rho_cube.set_comment2("from " + xyz1.string() + " and " + xyz2.string());
+    signed_rho_cube.set_comment2("from " + joined_names);
     rdg_cube.set_comment1("Promolecular reduced density gradient using Thakkar spherical atoms");
-    rdg_cube.set_comment2("from " + xyz1.string() + " and " + xyz2.string());
+    rdg_cube.set_comment2("from " + joined_names);
 
-    log << "Promolecular NCI analysis for " << xyz1 << " and " << xyz2 << endl;
+    log << "Promolecular NCI analysis for " << xyz_files.size() << " fragments: " << joined_names << endl;
     log << "Grid points: " << local_opts.n_grid_points() << endl;
     log << "Dominant-fragment density discard cutoff: " << opts.promol_nci_rcut1 << endl;
     log << "Fragment-sum density keep cutoff: " << opts.promol_nci_rcut2 << endl;
@@ -1619,7 +1625,7 @@ void promolecular_nci_analysis(
     rdg_cube.set_path(output_base.string() + "_rdg.cube");
     signed_rho_cube.write_file(true);
     rdg_cube.write_file(true);
-    write_promolecular_nci_vmd(xyz1, xyz2, output_base, log);
+    write_promolecular_nci_vmd(xyz_files, output_base, log);
     write_promolecular_nci_plot_script(output_base, opts, log);
 
     log << "Wrote " << signed_rho_cube.get_path() << endl;

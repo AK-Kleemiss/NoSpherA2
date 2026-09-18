@@ -376,7 +376,7 @@ std::string help_message =
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
  "  -rgbi-groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
  "                                    for multiple group sets.\n"
- "  -promol_nci <a.xyz> <b.xyz> [rcut1 rcut2 rho_max rdg_max]\n"
+ "  -promol_nci <a.xyz> <b.xyz> [c.xyz ...] [rcut1 rcut2 rho_max rdg_max]\n"
  "                                    Promolecular NCI/RDG outputs. Defaults:\n"
  "                                    rcut1=0.95 and rcut2=0.75.\n"
  "  -promol_nci_single_thread          Disable NCI parallel processing.\n"
@@ -991,13 +991,19 @@ std::string shrink_string_to_atom(std::string &input, const int &atom_number)
     return input;
 };
 
-bool read_block_from_fortran_binary(std::ifstream &file, void *Target)
+bool read_block_from_fortran_binary(std::ifstream &file, void *Target, const size_t capacity)
 {
     int size_begin = 0, size_end = 0;
     file.read(reinterpret_cast<char *>(&size_begin), sizeof(int));
+    //A damaged record length used to be written straight past the end of Target
+    if (!file.good() || size_begin < 0 || static_cast<size_t>(size_begin) > capacity)
+    {
+        std::cout << "Error reading block from binary file: record of " << size_begin << " bytes, expected at most " << capacity << std::endl;
+        return false;
+    }
     file.read(reinterpret_cast<char *>(Target), size_begin);
     file.read(reinterpret_cast<char *>(&size_end), sizeof(int));
-    if (size_begin != size_end)
+    if (!file.good() || size_begin != size_end)
     {
         std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
         return false;
@@ -1009,10 +1015,15 @@ bool read_block_from_fortran_binary(std::ifstream &file, std::vector<T> &Target)
 {
     int size_begin = 0, size_end = 0;
     file.read(reinterpret_cast<char *>(&size_begin), sizeof(int));
+    if (!file.good() || size_begin < 0)
+    {
+        std::cout << "Error reading block from binary file: record of " << size_begin << " bytes" << std::endl;
+        return false;
+    }
     Target.resize(size_begin / sizeof(T));
     file.read(reinterpret_cast<char *>(Target.data()), size_begin);
     file.read(reinterpret_cast<char *>(&size_end), sizeof(int));
-    if (size_begin != size_end)
+    if (!file.good() || size_begin != size_end)
     {
         std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
         return false;
@@ -3225,14 +3236,24 @@ bool options::digest_property_options(const std::string &temp, int &i)
         qct = true;
     else if (temp == "-promol_nci")
     {
-        err_checkf(i + 2 < argc,
-            "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max]",
-            std::cout);
         promol_nci = true;
-        promol_nci_xyz1 = arguments[i + 1];
-        promol_nci_xyz2 = arguments[i + 2];
-        err_checkf(std::filesystem::exists(promol_nci_xyz1), "First XYZ file doesn't exist: " + promol_nci_xyz1.string(), std::cout);
-        err_checkf(std::filesystem::exists(promol_nci_xyz2), "Second XYZ file doesn't exist: " + promol_nci_xyz2.string(), std::cout);
+        //Every following .xyz is a fragment; the optional numeric cutoffs come after the last one
+        int n_xyz = 0;
+        auto is_xyz = [](const std::string &a) {
+            std::string ext = std::filesystem::path(a).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+            return ext == ".xyz";
+        };
+        while (i + 1 + n_xyz < argc && is_xyz(arguments[i + 1 + n_xyz]))
+        {
+            promol_nci_xyz.push_back(arguments[i + 1 + n_xyz]);
+            err_checkf(std::filesystem::exists(promol_nci_xyz.back()), "XYZ file doesn't exist: " + promol_nci_xyz.back().string(), std::cout);
+            n_xyz++;
+        }
+        err_checkf(n_xyz >= 2,
+            "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [frag3.xyz ...] [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max]",
+            std::cout);
+        i += n_xyz - 2;
 
         double *optional_values[] = {
             &properties.promol_nci_rcut1,
@@ -3723,20 +3744,34 @@ void options::digest_options()
         string temp = arguments[i];
         if (temp.find("-") > 0)
             continue;
-        if (digest_io_options(temp, i))
-            continue;
-        if (digest_run_options(temp, i))
-            continue;
-        if (digest_partition_options(temp, i))
-            continue;
-        if (digest_property_options(temp, i))
-            continue;
-        if (digest_ri_options(temp, i))
-            continue;
-        if (digest_xcw_options(temp, i))
-            continue;
-        if (digest_dev_options(temp, i))
-            continue;
+        //The digesters index arguments[i + n] and call stoi/stod directly; a flag that is
+        //last on the line or followed by a non-number used to die as a bare "invalid stod
+        //argument" with no hint which option it was
+        try
+        {
+            if (digest_io_options(temp, i))
+                continue;
+            if (digest_run_options(temp, i))
+                continue;
+            if (digest_partition_options(temp, i))
+                continue;
+            if (digest_property_options(temp, i))
+                continue;
+            if (digest_ri_options(temp, i))
+                continue;
+            if (digest_xcw_options(temp, i))
+                continue;
+            if (digest_dev_options(temp, i))
+                continue;
+        }
+        catch (const missing_argument &)
+        {
+            err_checkf(false, "Option " + temp + " needs more values than were given after it", log_file);
+        }
+        catch (const std::exception &e)
+        {
+            err_checkf(false, "Option " + temp + ": " + e.what() + " - check the value(s) that follow it", log_file);
+        }
     }
 
     // SALTED predicts a density from atom positions.  Historically its
@@ -4257,7 +4292,7 @@ bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std:
 #endif
 };
 
-bool save_file_dialog(std::filesystem::path &path, bool debug, const std::vector<std::string> &endings, const std::string &filename_given, const std::string &current_path) {
+bool save_file_dialog(std::filesystem::path &path, bool debug, const svec &endings, const std::string &filename_given, const std::string &current_path) {
 #ifdef _WIN32
     constexpr size_t MAX_FILENAME_SIZE = 4096;
     std::vector<char> filename_buf(MAX_FILENAME_SIZE);
