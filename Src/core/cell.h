@@ -38,9 +38,8 @@ private:
     vec apply_symmetry(const vec& pos, const int sym_op);
     bool check_special(const vec& pos1, const vec& pos2, const double& tolerance = 1e-10);
 	ivec confirm_applied_symmetry(ivec3& linking_list);
-	void delete_symmetry(const ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl);
 	bool check_identity(const int& sym_op);
-	static int surviving_symmetries_count(const ivec& self_links, const ivec& applied_symmetry);
+	static int orbit_copies(const ivec2& atom_links);
 
 public:
     /**
@@ -65,8 +64,9 @@ public:
     //void get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
 	void grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_atom>& xyz_atoms);
     void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list);
-    ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list);
-    void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry = {});
+    ivec apply_grown(ivec3& linking_list);
+
+    void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
 
     cell()
     {
