@@ -204,34 +204,36 @@ bool cell::check_special(const vec& pos1, const vec& pos2, const double& toleran
 }
 
 // Handles the processing of grown structures
-ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list) {
-	const ivec applied_symmetry = confirm_applied_symmetry(linking_list);
-	delete_symmetry(applied_symmetry, hkl_enlarged, hkl);
-	return applied_symmetry;
+ivec cell::apply_grown(ivec3& linking_list) {
+	return confirm_applied_symmetry(linking_list);
 	// closing function
 }
 
-int cell::surviving_symmetries_count(const ivec& self_links, const ivec& applied_symmetry) {
+// Number of explicit atoms in asym_atoms that are symmetry images of the same
+// asymmetric atom as atom_links belongs to, itself included. Using the full,
+// undeleted symmetry operation set to rebuild each atom's orbit always visits
+// each of its physical sites exactly self_links.size() times,
+// uniformly, whether or not another explicit atom already covers part
+// of that orbit; dividing by orbit_copies as well corrects for that overlap.
+int cell::orbit_copies(const ivec2& atom_links) {
 	int count = 0;
-	for (int sym_op : self_links) {
-		if (std::find(applied_symmetry.begin(), applied_symmetry.end(), sym_op) == applied_symmetry.end()) {
-			count++;
-		}
+	for (const ivec& link : atom_links) {
+		if (!link.empty()) count++;
 	}
 	return count;
 }
 
-void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry) {
+void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list) {
 	int idx1 = 0;
 	for (asym_atom& a : asym_atoms) {
 		if (!a.grown) {
-			a.asym_fact = 1.0 / surviving_symmetries_count(linking_list[idx1][idx1], applied_symmetry);
+			a.asym_fact = 1.0 / (linking_list[idx1][idx1].size() * orbit_copies(linking_list[idx1]));
 			idx1++;
 			continue;
 		}
 		for (int idx2 = 0; idx2 < linking_list.size(); idx2++) {
 			if (linking_list[idx2][idx1].size() != 0) {
-				a.asym_fact = 1.0 / surviving_symmetries_count(linking_list[idx2][idx2], applied_symmetry);
+				a.asym_fact = 1.0 / (linking_list[idx2][idx2].size() * orbit_copies(linking_list[idx2]));
 			}
 		}
 		idx1++;
@@ -290,32 +292,3 @@ ivec cell::confirm_applied_symmetry(ivec3& linking_list) {
 	return applied_symmetry;
 }
 
-void cell::delete_symmetry(const ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl) {
-	const int nr = hkl.size();
-	std::vector<i3> hkl_vec(hkl.begin(), hkl.end());
-	for (int r = 0; r < nr; r++) {
-		vec hkl_temp = { (double)hkl_vec[r][0], (double)hkl_vec[r][1], (double)hkl_vec[r][2] };
-		for (int sym_op : applied_symmetry) {
-			const vec2 rot_temp = { { (double)sym[0][0][sym_op], (double)sym[0][1][sym_op], (double)sym[0][2][sym_op] },
-									{ (double)sym[1][0][sym_op], (double)sym[1][1][sym_op], (double)sym[1][2][sym_op] },
-									{ (double)sym[2][0][sym_op], (double)sym[2][1][sym_op], (double)sym[2][2][sym_op] } };
-			vec new_hkl = self_dot(rot_temp, hkl_temp, false);
-			i3 new_hkl_int = { (int)std::round(new_hkl[0]), (int)std::round(new_hkl[1]), (int)std::round(new_hkl[2]) };
-			if (new_hkl_int[0] == hkl_vec[r][0] && new_hkl_int[1] == hkl_vec[r][1] && new_hkl_int[2] == hkl_vec[r][2]) {
-				continue;
-			}
-			hkl_enlarged.erase(new_hkl_int);
-		}
-	}
-	for (int sym_op : std::views::reverse(applied_symmetry)) {
-		for (ivec2& middle : sym) {
-			for (ivec& inner : middle) {
-				inner.erase(inner.begin() + sym_op);
-			}
-		}
-		for (vec& inner : trans) {
-			inner.erase(inner.begin() + sym_op);
-		}
-	}
-	// closing function
-}
