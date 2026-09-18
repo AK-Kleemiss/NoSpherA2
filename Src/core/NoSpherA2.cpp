@@ -137,8 +137,7 @@ static int run_app_impl(int argc, char **argv)
     if (opt.promol_nci)
     {
         promolecular_nci_analysis(
-            opt.promol_nci_xyz1,
-            opt.promol_nci_xyz2,
+            opt.promol_nci_xyz,
             opt.properties,
             std::cout);
         log_file.flush();

@@ -376,7 +376,7 @@ std::string help_message =
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
  "  -rgbi-groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
  "                                    for multiple group sets.\n"
- "  -promol_nci <a.xyz> <b.xyz> [rcut1 rcut2 rho_max rdg_max]\n"
+ "  -promol_nci <a.xyz> <b.xyz> [c.xyz ...] [rcut1 rcut2 rho_max rdg_max]\n"
  "                                    Promolecular NCI/RDG outputs. Defaults:\n"
  "                                    rcut1=0.95 and rcut2=0.75.\n"
  "  -promol_nci_single_thread          Disable NCI parallel processing.\n"
@@ -3225,14 +3225,24 @@ bool options::digest_property_options(const std::string &temp, int &i)
         qct = true;
     else if (temp == "-promol_nci")
     {
-        err_checkf(i + 2 < argc,
-            "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max]",
-            std::cout);
         promol_nci = true;
-        promol_nci_xyz1 = arguments[i + 1];
-        promol_nci_xyz2 = arguments[i + 2];
-        err_checkf(std::filesystem::exists(promol_nci_xyz1), "First XYZ file doesn't exist: " + promol_nci_xyz1.string(), std::cout);
-        err_checkf(std::filesystem::exists(promol_nci_xyz2), "Second XYZ file doesn't exist: " + promol_nci_xyz2.string(), std::cout);
+        //Every following .xyz is a fragment; the optional numeric cutoffs come after the last one
+        int n_xyz = 0;
+        auto is_xyz = [](const std::string &a) {
+            std::string ext = std::filesystem::path(a).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+            return ext == ".xyz";
+        };
+        while (i + 1 + n_xyz < argc && is_xyz(arguments[i + 1 + n_xyz]))
+        {
+            promol_nci_xyz.push_back(arguments[i + 1 + n_xyz]);
+            err_checkf(std::filesystem::exists(promol_nci_xyz.back()), "XYZ file doesn't exist: " + promol_nci_xyz.back().string(), std::cout);
+            n_xyz++;
+        }
+        err_checkf(n_xyz >= 2,
+            "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [frag3.xyz ...] [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max]",
+            std::cout);
+        i += n_xyz - 2;
 
         double *optional_values[] = {
             &properties.promol_nci_rcut1,

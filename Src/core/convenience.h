@@ -766,8 +766,7 @@ struct options
     std::filesystem::path occ_toml_path;
     std::filesystem::path cwd;
     std::filesystem::path profiling_tests_root = "tests";
-    std::filesystem::path promol_nci_xyz1;
-    std::filesystem::path promol_nci_xyz2;
+    pathvec promol_nci_xyz; //Two or more fragments; a grid point is intermolecular when no single fragment dominates
     //Geometry-aid jobs (-calc_featomic_descriptor(s), -classify_atoms(_list)): the flags queue, run_app_impl runs geometry_aid::run and quits
     bool calc_featomic_descriptor = false;
     std::filesystem::path classify_atoms_out;
