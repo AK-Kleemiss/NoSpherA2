@@ -4058,7 +4058,7 @@ namespace NoSpherA2UnitTests
             }
     }
 
-    //every format is written through write_wfn and read back
+    //every format is written through write_wfn and write_wfx and read back
     TEST(FormatConsistencyTests, SameDensityFromEveryFormat)
     {
         const auto root = nos_test_repo_root() / "tests";
@@ -4068,15 +4068,20 @@ namespace NoSpherA2UnitTests
             expect_same_density(a, b, 1e-3, "cytidine tonto vs its wfn");
         }
         const std::filesystem::path inputs[] = { root / "epoxide_gbw" / "epoxide.gbw", root / "CuF2_i_func" / "71" / "calc.gbw", root / "molden_file" / "Sc_full.molden", root / "molden_file" / "Ce_full.molden", root / "NiP3_fchk" / "good.fchk", root / "alanine_occ" / "alanine.owf.fchk" };
-        const auto tmp = std::filesystem::temp_directory_path() / "nosphera2_format_roundtrip.wfn";
+        const auto tmp = std::filesystem::temp_directory_path() / "nosphera2_format_roundtrip.wfn", tmpx = std::filesystem::temp_directory_path() / "nosphera2_format_roundtrip.wfx";
         for (const auto& input : inputs)
         {
             WFN a(input, false);
             ASSERT_TRUE(a.write_wfn(tmp, false, true)) << input;
-            WFN b(tmp, false);
+            ASSERT_TRUE(a.write_wfx(tmpx, true)) << input;
+            WFN b(tmp, false), c(tmpx, false);
             expect_same_density(a, b, 1e-6, input.filename().string() + " vs its wfn");
+            expect_same_density(a, c, 1e-6, input.filename().string() + " vs its wfx");
+            EXPECT_EQ(a.get_nmo(true), c.get_nmo()) << input;
+            EXPECT_EQ(a.get_nr_electrons(), c.get_nr_electrons()) << input;
         }
         std::filesystem::remove(tmp);
+        std::filesystem::remove(tmpx);
     }
 
     //accuracy 5 is the largest Becke grid; the fixture with the highest angular momentum of every format has to integrate to its electron count

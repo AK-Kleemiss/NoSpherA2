@@ -788,6 +788,7 @@ static int run_app_impl(int argc, char **argv)
         wavy.emplace_back(opt.wfn, opt.debug);
         wavy[0].write_wfn("converted.wfn", false, false);
         wavy[0].write_wfn("occupied.wfn", false, true);
+        wavy[0].write_wfx("converted.wfx", false);
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;

@@ -2623,38 +2623,15 @@ const d3 WFN::get_atom_pos(const unsigned int &nr) const
 bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, const bool occupied) const
 {
     using namespace std;
-    if (debug)
-    {
-        if (std::filesystem::exists(fileName))
-        {
-            std::cout << "File already existed!";
-            return false;
-        }
-        else
-        {
-            if (debug)
-                std::cout << "File didn't exist before, writing comment to it now." << endl;
-        }
-    }
-
     ofstream rf(fileName, ios::out);
-    string line;
     if (!rf.is_open())
     {
         std::cout << "Sorry, can't open the file...\n";
         return false;
     }
-    rf << comment << endl;
     if (debug)
-        std::cout << "comment written, now for the header..\n";
-    rf << hdr(occupied);
-    if (debug)
-    {
-        std::cout << "header written, now for the centers..\n";
-        std::cout << "this is the header: \n"
-            << hdr(occupied);
-    }
-    rf.flush();
+        std::cout << "Writing " << fileName << ": ncen " << ncen << " nex " << nex << " nmo " << nmo << endl;
+    rf << comment << '\n' << hdr(occupied);
     for (int i = 0; i < ncen; i++)
     {
         rf << setw(3) << atoms[i].get_label() << ' ';
@@ -2664,204 +2641,103 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         rf << setw(12) << get_atom_coordinate(i, 0);
         rf << setw(12) << get_atom_coordinate(i, 1);
         rf << setw(12) << get_atom_coordinate(i, 2);
-        rf << "  CHARGE = ";
-        rf << fixed << showpoint << setprecision(1) << setw(2) << get_atom_charge(i);
-        rf << ".0";
-        rf << '\n';
+        rf << "  CHARGE = " << setw(2) << get_atom_charge(i) << ".0\n";
     }
-    if (debug)
-        std::cout << "centers written, now for the center_assignement..\n";
-    if (debug)
-        std::cout << "ncen: " << ncen << " nex: " << nex << " nmo: " << nmo << endl;
-    int run = 0;
-    int exnum = 0;
-    for (int i = 0; i < nex / 20; i++)
-    {
-        rf << "CENTRE ASSIGNMENTS  ";
-        for (int j = 0; j < 20; j++)
-        {
-            rf << setw(3) << centers[exnum];
-            if (exnum > nex)
-            {
-                std::cout << "run is too big in center writing";
-                if (debug)
-                    std::cout << "in 20er-lines...\n";
-                return false;
-            }
-            exnum++;
-        }
-        run++;
-        rf << '\n';
-    }
-    if (debug)
-        std::cout << "this should be the last line... \n";
-    if (exnum < nex)
-    {
-        rf << "CENTRE ASSIGNMENTS  ";
-        for (int j = 0; j < nex % 20; j++)
-        {
-            rf << setw(3) << centers[exnum];
-            if (exnum > nex)
-            {
-                std::cout << "run is too big in center writing";
-                if (debug)
-                    std::cout << " in last line... trying to access # " << exnum << "\n";
-                return false;
-            }
-            exnum++;
-        }
-        rf << '\n';
-    }
-    if (run * 20 < nex / 20 - 1)
-    {
-        std::cout << "Problem during writing of Centre assignments... stopping...\n";
-        return false;
-    }
-    if (debug)
-        std::cout << "center assignements written, now for the types..\n";
-    run = 0;
-    exnum = 0;
-    for (int i = 0; i < nex / 20; i++)
-    {
-        rf << "TYPE ASSIGNMENTS    ";
-        for (int j = 0; j < 20; j++)
-        {
-            rf << setw(3) << types[exnum];
-            if (exnum > nex)
-            {
-                std::cout << "run is too big in types writing\n";
-                return false;
-            }
-            exnum++;
-        }
-        run++;
-        rf << '\n';
-    }
-    if (exnum < nex)
-    {
-        rf << "TYPE ASSIGNMENTS    ";
-        int final_j = 0;
-        for (int j = 0; j < nex % 20; j++)
-        {
-            rf << setw(3) << types[exnum];
-            if (exnum > nex)
-            {
-                std::cout << "run is too big in types writing";
-                return false;
-            }
-            final_j = j;
-            exnum++;
-        }
-        if (debug)
-            std::cout << "final_j: " << final_j << endl;
-        rf << '\n';
-    }
-    if (run * 20 < nex / 20 - 1)
-    {
-        std::cout << "Problem during writing of Type assignments... stopping...";
-        return false;
-    }
-    if (debug)
-        std::cout << "types assignements written, now for the exponents..\n";
+    //Fortran fixed-width blocks: every line starts with tag and holds per values, value(i) prints the i-th
     char buf[32];
-    run = 0;
-    exnum = 0;
-    for (int i = 0; i < nex / 5; i++)
+    auto write_block = [&](const string &tag, const int per, auto value)
     {
-        rf << "EXPONENTS ";
-        for (int j = 0; j < 5; j++)
+        for (int i = 0; i < nex; i++)
         {
-            snprintf(buf, sizeof(buf), "%14.7E", exponents[exnum]);
-            rf << buf;
-            if (exnum > nex)
-            {
-                std::cout << "run is too big in exponents writing";
-                return false;
-            }
-            exnum++;
+            if (i % per == 0)
+                rf << (i ? "\n" : "") << tag;
+            value(i);
         }
-        run++;
-        rf << '\n';
-    }
-    if (exnum < nex)
-    {
-        rf << "EXPONENTS ";
-        for (int j = 0; j < nex % 5; j++)
-        {
-            snprintf(buf, sizeof(buf), "%14.7E", exponents[exnum]);
-            rf << buf;
-            if (run > nex)
-            {
-                std::cout << "run is too big in exponents writing";
-                return false;
-            }
-            exnum++;
-        }
-        rf << '\n';
-    }
-    if (run * 5 < nex / 5 - 1)
-    {
-        std::cout << "Problem during writing of Exponents... stopping...";
-        return false;
-    }
-    if (debug)
-        std::cout << "exponents assignements written, now for the MOs.." << endl
-        << "For informational purposes: ncen "
-        << ncen << " nmo " << nmo << " nex " << nex << endl;
+        if (nex > 0)
+            rf << '\n';
+    };
+    write_block("CENTRE ASSIGNMENTS  ", 20, [&](const int i) { rf << setw(3) << centers[i]; });
+    write_block("TYPE ASSIGNMENTS    ", 20, [&](const int i) { rf << setw(3) << types[i]; });
+    write_block("EXPONENTS ", 5, [&](const int i) { snprintf(buf, sizeof(buf), "%14.7E", exponents[i]); rf << buf; });
     int mo_run = 1;
-    for (int mo_counter = 0; mo_counter < nmo; mo_counter++)
+    for (int m = 0; m < nmo; m++)
     {
-        if (occupied && MOs[mo_counter].get_occ() == 0)
+        if (occupied && MOs[m].get_occ() == 0)
             continue;
-        // rf << MOs[mo_counter].hdr();
-        rf << "MO" << setw(3) << mo_run << setw(29) << "OCC NO =" << setw(13) << fixed << setprecision(8) << MOs[mo_counter].get_occ()
-            << setw(14) << "ORB. ENERGY =" << setw(13) << fixed << setprecision(8) << MOs[mo_counter].get_energy() << endl;
-        run = 0;
-        for (int i = 0; i < nex / 5; i++)
-        {
-            for (int j = 0; j < 5; j++)
-            {
-                snprintf(buf, sizeof(buf), "%16.8E", MOs[mo_counter].get_coefficient(run));
-                rf << buf;
-                if (run > nex)
-                {
-                    std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
-                    return false;
-                }
-                run++;
-            }
-            rf << '\n';
-        }
-        if (run < nex)
-        {
-            if (debug)
-                std::cout << "Still some left to write... going in % for loop...." << endl;
-            for (int j = 0; j < nex % 5; j++)
-            {
-                snprintf(buf, sizeof(buf), "%16.8E", MOs[mo_counter].get_coefficient(run));
-                rf << buf;
-                if (run > nex)
-                {
-                    std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
-                    return false;
-                }
-                run++;
-            }
-            rf << '\n';
-        }
-        mo_run++;
+        rf << "MO" << setw(3) << mo_run++ << setw(29) << "OCC NO =" << setw(13) << fixed << setprecision(8) << MOs[m].get_occ()
+           << setw(14) << "ORB. ENERGY =" << setw(13) << fixed << setprecision(8) << MOs[m].get_energy() << '\n';
+        write_block("", 5, [&](const int i) { snprintf(buf, sizeof(buf), "%16.8E", MOs[m].get_coefficient(i)); rf << buf; });
     }
-    if (run != nex)
+    rf << "END DATA\n";
+    rf << " THE SCF ENERGY =" << setw(20) << fixed << setprecision(12) << total_energy << " THE VIRIAL(-V/T)=   0.00000000" << endl;
+    return rf.good();
+};
+
+//AIM wfx: every quantity in its own <Tag> ... </Tag> block, the ORCA/AIMAll layout that read_wfx expects
+bool WFN::write_wfx(const std::filesystem::path &fileName, const bool occupied) const
+{
+    using namespace std;
+    ofstream rf(fileName, ios::out);
+    if (!rf.is_open())
     {
-        std::cout << "Problem during writing of MOs... stopping...";
-        if (debug)
-            std::cout << "run: " << run << endl;
+        std::cout << "Sorry, can't open the file...\n";
         return false;
     }
-    rf << "END DATA" << endl;
-    rf << " THE SCF ENERGY =" << std::setw(20) << std::fixed << std::setprecision(12) << total_energy << " THE VIRIAL(-V/T)=   0.00000000" << endl;
-    rf.close();
-    return true;
+    char buf[32];
+    auto block = [&](const string &tag, auto body) { rf << '<' << tag << ">\n"; body(); rf << "</" << tag << ">\n"; };
+    //per values per line; value(i) prints the i-th of n
+    auto numbers = [&](const string &tag, const int n, const int per, auto value)
+    {
+        block(tag, [&]() { for (int i = 0; i < n; i++) { value(i); rf << ((i + 1) % per == 0 || i + 1 == n ? "\n" : " "); } });
+    };
+    auto sci = [&](const double x) { snprintf(buf, sizeof(buf), "%16.8E", x); rf << buf; };
+    ivec sel;
+    double nel = 0, nalpha = 0;
+    for (int m = 0; m < nmo; m++)
+    {
+        if (occupied && MOs[m].get_occ() == 0)
+            continue;
+        sel.push_back(m);
+        nel += MOs[m].get_occ();
+        nalpha += is_unrestricted ? (MOs[m].get_op() == 0 ? MOs[m].get_occ() : 0) : MOs[m].get_occ() / 2;
+    }
+    const int n = static_cast<int>(sel.size()), i_nel = static_cast<int>(round(nel)), i_nalpha = static_cast<int>(round(nalpha));
+    block("Title", [&]() { rf << comment << '\n'; });
+    block("Keywords", [&]() { rf << "GTO\n"; });
+    block("Number of Nuclei", [&]() { rf << ncen << '\n'; });
+    block("Number of Primitives", [&]() { rf << nex << '\n'; });
+    block("Number of Occupied Molecular Orbitals", [&]() { rf << n << '\n'; });
+    block("Number of Perturbations", [&]() { rf << "0\n"; });
+    numbers("Nuclear Names", ncen, 1, [&](const int i) { rf << (atoms[i].get_label().empty() ? constants::atnr2letter(get_atom_charge(i)) + to_string(i + 1) : atoms[i].get_label()); });
+    numbers("Atomic Numbers", ncen, 1, [&](const int i) { rf << get_atom_charge(i); });
+    numbers("Nuclear Charges", ncen, 1, [&](const int i) { sci(get_atom_charge(i)); });
+    numbers("Nuclear Cartesian Coordinates", 3 * ncen, 3, [&](const int i) { sci(get_atom_coordinate(i / 3, i % 3)); });
+    block("Net Charge", [&]() { rf << charge << '\n'; });
+    block("Number of Electrons", [&]() { rf << i_nel << '\n'; });
+    block("Number of Alpha Electrons", [&]() { rf << i_nalpha << '\n'; });
+    block("Number of Beta Electrons", [&]() { rf << i_nel - i_nalpha << '\n'; });
+    block("Electronic Spin Multiplicity", [&]() { rf << (multi > 0 ? static_cast<int>(multi) : 2 * i_nalpha - i_nel + 1) << '\n'; });
+    numbers("Primitive Centers", nex, 20, [&](const int i) { rf << centers[i]; });
+    numbers("Primitive Types", nex, 20, [&](const int i) { rf << types[i]; });
+    numbers("Primitive Exponents", nex, 5, [&](const int i) { sci(exponents[i]); });
+    numbers("Molecular Orbital Occupation Numbers", n, 1, [&](const int i) { sci(MOs[sel[i]].get_occ()); });
+    numbers("Molecular Orbital Energies", n, 1, [&](const int i) { sci(MOs[sel[i]].get_energy()); });
+    numbers("Molecular Orbital Spin Types", n, 1, [&](const int i) { rf << (!is_unrestricted ? "Alpha and Beta" : MOs[sel[i]].get_op() == 0 ? "Alpha" : "Beta"); });
+    block("Molecular Orbital Primitive Coefficients", [&]()
+    {
+        for (int i = 0; i < n; i++)
+        {
+            block("MO Number", [&]() { rf << i + 1 << '\n'; });
+            for (int j = 0; j < nex; j++)
+            {
+                sci(MOs[sel[i]].get_coefficient(j));
+                rf << ((j + 1) % 5 == 0 || j + 1 == nex ? "\n" : " ");
+            }
+        }
+    });
+    block("Energy = T + Vne + Vee + Vnn", [&]() { snprintf(buf, sizeof(buf), "%22.14E", total_energy); rf << buf << '\n'; });
+    block("Virial Ratio (-V/T)", [&]() { sci(virial_ratio); rf << '\n'; });
+    return rf.good();
 };
 
 bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, std::ostream* progress_log)
