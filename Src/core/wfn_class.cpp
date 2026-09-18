@@ -1277,281 +1277,155 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     if (rf.good())
         path = filename;
     string line;
-    rf.seekg(0);
-    // d_f_switch = true;
-
-    getline_universal(rf, line);
+    read_line_or_fail(rf, line, "the first line", file);
     err_checkf(line.find("Molden Format") != string::npos, "Does not look like proper molden format file!", file);
-    read_line_or_fail(rf, line, "the title", file);
-    comment = split_string<string>(line, "]")[1];
-    bool au_bohr = false; // au = false, angs = true;
-    seek_line(rf, line, "[Atoms]", file);
-    if (split_string<string>(line, "]")[1].find("angs") != string::npos)
-        au_bohr = true;
-    else if (split_string<string>(line, "]")[1].find("Angs") != string::npos)
-        au_bohr = true;
-    read_line_or_fail(rf, line, "the atoms", file);
-    svec temp;
-    while (line.find("]") == string::npos)
+    //The whitespace-separated fields of the current line
+    auto fields = [&]()
     {
-        temp = split_string<string>(line, " ");
-        remove_empty_elements(temp);
-        err_checkf(temp.size() >= 6, "Molden atom line with fewer than 6 fields: '" + line + "'", file);
-        if (au_bohr)
-            err_checkf(push_back_atom(temp[0],
-                constants::ang2bohr(stod(temp[3])),
-                constants::ang2bohr(stod(temp[4])),
-                constants::ang2bohr(stod(temp[5])),
-                stoi(temp[2])),
-                "Error pushing back atom", file);
-        else
-            err_checkf(push_back_atom(temp[0],
-                stod(temp[3]),
-                stod(temp[4]),
-                stod(temp[5]),
-                stoi(temp[2])),
-                "Error pushing back atom", file);
-        read_line_or_fail(rf, line, "the atoms", file);
+        svec f = split_string<string>(line, " ");
+        remove_empty_elements(f);
+        return f;
+    };
+    //Everything up to [Atoms] that is not a section header is the title
+    while (read_line_or_fail(rf, line, "[Atoms]", file), line.find("[Atoms]") == string::npos)
+        if (line.find("[") == string::npos)
+            comment += trim(line);
+    const bool angstrom = line.find("ngs") != string::npos;
+    //----------------------------- Atoms: label index charge x y z ------------------------------
+    while (read_line_or_fail(rf, line, "the atoms", file), line.find("[") == string::npos)
+    {
+        const svec f = fields();
+        if (f.empty())
+            continue;
+        err_checkf(f.size() >= 6, "Molden atom line with fewer than 6 fields: '" + line + "'", file);
+        const double scale = angstrom ? constants::ang2bohr(1.0) : 1.0;
+        err_checkf(push_back_atom(f[0], scale * stod(f[3]), scale * stod(f[4]), scale * stod(f[5]), stoi(f[2])), "Error pushing back atom", file);
     }
     err_checkf(line.find("[STO]") == string::npos, "ERROR: STOs are not yet suupported!", file);
     err_checkf(ncen > 0, "No atoms in molden file", file);
-    read_line_or_fail(rf, line, "the basis set", file);
+    err_checkf(line.find("[GTO]") != string::npos, "Expected [GTO] after the atoms but found: '" + line + "'", file);
+    //----------------------------- Basis: per atom "index 0", shells "type nprim 1.0", primitives, blank line ------------------------------
     int atoms_with_basis = 0;
-    while (atoms_with_basis < ncen && line.find("[") == string::npos)
+    while (atoms_with_basis < ncen && (read_line_or_fail(rf, line, "the basis set", file), line.find("[") == string::npos))
     {
-        svec line_digest = split_string<string>(line, " ");
-        remove_empty_elements(line_digest);
-        const int atom_based = stoi(line_digest[0]) - 1;
+        svec f = fields();
+        if (f.empty())
+            continue;
+        const int atom_based = stoi(f[0]) - 1;
         err_checkf(atom_based >= 0 && atom_based < ncen, "Basis set for atom " + to_string(atom_based + 1) + " of " + to_string(ncen), file);
-        read_line_or_fail(rf, line, "the basis set of atom " + to_string(atom_based + 1), file);
+        const string where = "the basis set of atom " + to_string(atom_based + 1);
         int shell = 0;
-        while (line.size() > 2)
+        while (read_line_or_fail(rf, line, where, file), !trim(line).empty())
         {
-            line_digest = split_string<string>(line, " ");
-            remove_empty_elements(line_digest);
-            int shell_type;
-            if (line_digest[0] == "s" || line_digest[0] == "S")
-                shell_type = 1;
-            else if (line_digest[0] == "p" || line_digest[0] == "P")
-                shell_type = 2;
-            else if (line_digest[0] == "d" || line_digest[0] == "D")
-                shell_type = 3;
-            else if (line_digest[0] == "f" || line_digest[0] == "F")
-                shell_type = 4;
-            else if (line_digest[0] == "g" || line_digest[0] == "G")
-                shell_type = 5;
-            else if (line_digest[0] == "h" || line_digest[0] == "H" || line_digest[0] == "i" || line_digest[0] == "I")
-                err_not_impl_f("Higher angular momentum basis functions than G", file);
-            else
-                err_checkf(false, "Unknown shell type in molden basis line: '" + line + "'", file);
-            const int number_of_functions = stoi(line_digest[1]);
+            f = fields();
+            err_checkf(f.size() >= 2, "Bad shell line in " + where + ": '" + line + "'", file);
+            const size_t shell_type = string("spdfg").find(static_cast<char>(tolower(f[0][0]))) + 1;
+            err_checkf(f[0].size() == 1 && shell_type > 0, "Unknown shell type in " + where + ": '" + line + "'", file);
+            const int number_of_functions = stoi(f[1]);
+            err_checkf(number_of_functions > 0, "Shell without primitives in " + where + ": '" + line + "'", file);
             for (int i = 0; i < number_of_functions; i++)
             {
-                read_line_or_fail(rf, line, "the basis set of atom " + to_string(atom_based + 1), file);
-                line_digest = split_string<string>(line, " ");
-                remove_empty_elements(line_digest);
-                err_checkf(atoms[atom_based].push_back_basis_set(stod(line_digest[0]), stod(line_digest[1]), shell_type, shell), "Error pushing back basis", file);
+                read_line_or_fail(rf, line, where, file);
+                vec v;
+                append_numbers(line, v, where, file);
+                err_checkf(v.size() == 2, "Expected 'exponent coefficient' in " + where + " but found: '" + line + "'", file);
+                err_checkf(atoms[atom_based].push_back_basis_set(v[0], v[1], static_cast<int>(shell_type), shell), "Error pushing back basis", file);
             }
-            read_line_or_fail(rf, line, "the basis set of atom " + to_string(atom_based + 1), file);
             shell++;
         }
+        err_checkf(shell > 0, "No shells given for atom " + to_string(atom_based + 1), file);
         atoms_with_basis++;
-        read_line_or_fail(rf, line, "the basis set", file);
     }
     err_checkf(atoms_with_basis == ncen, "Basis set given for " + to_string(atoms_with_basis) + " of " + to_string(ncen) + " atoms", file);
-    bool d5 = false;
-    bool f7 = false;
-    bool g9 = false;
+    //----------------------------- Flags up to [MO] ------------------------------
+    bool d5 = false, f7 = false, g9 = false;
     while (line.find("[MO]") == string::npos)
     {
-        if (line.find("[5D]") != string::npos || line.find("[5d]") != string::npos)
-        {
-            d5 = true;
-        }
-        if (line.find("[7F]") != string::npos || line.find("[7f]") != string::npos)
-        {
-            f7 = true;
-        }
-        if (line.find("[9G]") != string::npos || line.find("[9g]") != string::npos)
-        {
-            g9 = true;
-        }
-        if (line.find("[5D7F]") != string::npos || line.find("[5d7f]") != string::npos)
-        {
-            f7 = true;
-            d5 = true;
-        }
-        if (line.find("[5D7F9G]") != string::npos || line.find("[5d7f9g]") != string::npos)
-        {
-            f7 = true;
-            d5 = true;
-            g9 = true;
-        }
+        string flag = line;
+        transform(flag.begin(), flag.end(), flag.begin(), [](unsigned char c) { return static_cast<char>(toupper(c)); });
+        d5 |= flag.find("5D") != string::npos;
+        f7 |= flag.find("7F") != string::npos;
+        g9 |= flag.find("9G") != string::npos;
         read_line_or_fail(rf, line, "[MO]", file);
     }
+    const bool spherical = d5 && f7 && g9;
+    err_checkf(spherical || (!d5 && !f7 && !g9), "Mixed cartesian and spherical shells in molden file are not supported", file);
+    d_f_switch = !spherical;
+    auto nfunc = [spherical](const int l) { return spherical ? constants::n_spher(l) : constants::n_cart(l); };
+    //The primitives in file order, the size of the shell each belongs to and the coefficients per MO
+    vector<primitive> prims;
+    ivec shellsizes;
+    int expected_coefs = 0;
+    for (int a = 0; a < ncen; a++)
+    {
+        int current_shell = -1;
+        for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
+        {
+            if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
+            {
+                const int l = atoms[a].get_basis_set_type(s) - 1;
+                err_checkf(l <= 4, "Molden shells beyond g are not supported", file);
+                expected_coefs += nfunc(l);
+                current_shell++;
+            }
+            shellsizes.push_back(atoms[a].get_shellcount(current_shell));
+            prims.push_back(primitive(a + 1, atoms[a].get_basis_set_type(s), atoms[a].get_basis_set_exponent(s), atoms[a].get_basis_set_coefficient(s)));
+        }
+    }
+    //----------------------------- MOs: "Key= value" header lines, then "index coefficient" lines ------------------------------
     vec3 coefficients(2);
     vec occ;
-    if (d5 && f7 && g9)
+    int nmo = 0;
+    while (getline_universal(rf, line) && line.find("[") == string::npos)
     {
-        int run = 0;
-        string sym;
-        bool spin; // alpha = false, beta = true
-        double ene, occup;
-        int expected_coefs = 0;
-        vector<primitive> prims;
-        ivec temp_shellsizes;
-        for (int a = 0; a < ncen; a++)
+        if (trim(line).empty())
+            continue;
+        const string mo = "MO " + to_string(nmo + 1);
+        double ene = 0.0, occup = 0.0;
+        bool spin = false; // alpha = false, beta = true
+        for (size_t eq = line.find('='); eq != string::npos; eq = line.find('='))
         {
-            int current_shell = -1;
-            // int l = 0;
-            for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
-            {
-                if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
-                {
-                    expected_coefs += 2 * atoms[a].get_basis_set_type(s) - 1;
-                    current_shell++;
-                }
-                temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
-                prims.push_back(primitive(a + 1,
-                    atoms[a].get_basis_set_type(s),
-                    atoms[a].get_basis_set_exponent(s),
-                    atoms[a].get_basis_set_coefficient(s)));
-            }
-        }
-        getline_universal(rf, line);
-        int MO_run = 0;
-        while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos)
-        {
-            run++;
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            sym = temp[1];
-            read_line_or_fail(rf, line, "MO " + to_string(run), file);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            ene = stod(temp[1]);
-            read_line_or_fail(rf, line, "MO " + to_string(run), file);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            if (temp[1] == "Alpha" || temp[1] == "alpha")
-                spin = false;
-            else {
-                spin = true;
-                is_unrestricted = true;
-            }
-            read_line_or_fail(rf, line, "MO " + to_string(run), file);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            occup = stod(temp[1]);
-            push_back_MO(run, occup, ene, spin);
-            occ.push_back(occup);
-            coefficients[spin].push_back(vec());
-            // int run_coef = 0;
-            int run = 0, basis_run = 0;
-            vec2 shell;
-            for (int i = 0; i < expected_coefs; i++)
-            {
-                read_line_or_fail(rf, line, "coefficient " + to_string(i + 1) + " of MO " + to_string(run), file);
-                temp = split_string<string>(line, " ");
-                remove_empty_elements(temp);
-                coefficients[spin][MO_run].push_back(stod(temp[1]));
-                const int l = prims[basis_run].get_type() - 1, nsph = constants::n_spher(l), size = temp_shellsizes[basis_run];
-                err_checkf(l <= 4, "Types higher than g type in molden files", file);
-                if (run == 0) shell.assign(nsph, vec(size));
-                for (int s = 0; s < size; s++)
-                    shell[run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
-                if (++run < nsph) continue;
-                push_back_spherical_shell(MO_run, l, shell, prims, basis_run, size);
-                run = 0;
-                basis_run += size;
-            }
-            err_checkf(run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
-            MO_run++;
-            getline_universal(rf, line);
-        }
-    }
-    else if (!d5 && !f7 && !g9)
-    {
-        d_f_switch = true;
-        int run = 0;
-        string sym;
-        bool spin; // alpha = false, beta = true
-        double ene, occup;
-        int expected_coefs = 0;
-        vector<primitive> prims;
-        ivec temp_shellsizes;
-        for (int a = 0; a < ncen; a++)
-        {
-            int current_shell = -1;
-            // int l = 0;
-            for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
-            {
-                if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
-                {
-                    expected_coefs += constants::n_cart(atoms[a].get_basis_set_type(s) - 1);
-                    current_shell++;
-                }
-                temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
-                prims.push_back(primitive(a + 1,
-                    atoms[a].get_basis_set_type(s),
-                    atoms[a].get_basis_set_exponent(s),
-                    atoms[a].get_basis_set_coefficient(s)));
-            }
-        }
-        getline_universal(rf, line);
-        int MO_run = 0;
-        while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos)
-        {
-            run++;
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            sym = temp[1];
-            read_line_or_fail(rf, line, "MO " + to_string(run), file);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            ene = stod(temp[1]);
-            read_line_or_fail(rf, line, "MO " + to_string(run), file);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            if (temp[1] == "Alpha" || temp[1] == "alpha")
-                spin = false;
+            const string key = trim(line.substr(0, eq)), value = trim(line.substr(eq + 1));
+            if (key == "Ene")
+                ene = stod(value);
+            else if (key == "Occup")
+                occup = stod(value);
+            else if (key == "Spin")
+                spin = value != "Alpha" && value != "alpha";
             else
-                spin = true;
-            read_line_or_fail(rf, line, "MO " + to_string(run), file);
-            temp = split_string<string>(line, " ");
-            remove_empty_elements(temp);
-            occup = stod(temp[1]);
-            push_back_MO(run, occup, ene, spin);
-            occ.push_back(occup);
-            coefficients[spin].push_back(vec());
-            int basis_run = 0, run = 0;
-            vec2 shell;
-            for (int i = 0; i < expected_coefs; i++)
-            {
-                read_line_or_fail(rf, line, "coefficient " + to_string(i + 1) + " of MO " + to_string(run), file);
-                temp = split_string<string>(line, " ");
-                remove_empty_elements(temp);
-                coefficients[spin][MO_run].push_back(stod(temp[1]));
-                const int l = prims[basis_run].get_type() - 1, size = temp_shellsizes[basis_run];
-                err_checkf(l <= 4, "Cartesian molden shells beyond g are not supported", file);
-                if (run == 0)
-                    shell.assign(constants::n_cart(l), vec(size));
-                for (int s = 0; s < size; s++)
-                    shell[run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
-                if (++run < constants::n_cart(l))
-                    continue;
-                push_back_cartesian_shell(MO_run, l, shell, prims, basis_run, size, molden_order[l], cart_norm(l).data());
-                run = 0;
-                basis_run += size;
-            }
-            err_checkf(run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
-            MO_run++;
-            getline_universal(rf, line);
+                err_checkf(key == "Sym", "Unknown key in the header of " + mo + ": '" + line + "'", file);
+            read_line_or_fail(rf, line, "the header of " + mo, file);
         }
-    }
-    else
-    {
-        err_not_impl_f("PLEASE DONT MIX CARTESIAN AND SPERHICAL HARMINICS; THAT IS ANNOYING!", std::cout);
+        if (spin)
+            is_unrestricted = true;
+        push_back_MO(nmo + 1, occup, ene, spin);
+        occ.push_back(occup);
+        coefficients[spin].push_back(vec());
+        int run = 0, basis_run = 0;
+        vec2 shell;
+        for (int i = 0; i < expected_coefs; i++)
+        {
+            if (i > 0)
+                read_line_or_fail(rf, line, "coefficient " + to_string(i + 1) + " of " + mo, file);
+            vec v;
+            append_numbers(line, v, "coefficient " + to_string(i + 1) + " of " + mo, file);
+            err_checkf(v.size() == 2 && static_cast<int>(v[0]) == i + 1, "Expected coefficient " + to_string(i + 1) + " of " + mo + " but found: '" + line + "'", file);
+            coefficients[spin].back().push_back(v[1]);
+            const int l = prims[basis_run].get_type() - 1, size = shellsizes[basis_run], n = nfunc(l);
+            if (run == 0)
+                shell.assign(n, vec(size));
+            for (int s = 0; s < size; s++)
+                shell[run][s] = v[1] * prims[basis_run + s].get_coef();
+            if (++run < n)
+                continue;
+            if (spherical)
+                push_back_spherical_shell(nmo, l, shell, prims, basis_run, size);
+            else
+                push_back_cartesian_shell(nmo, l, shell, prims, basis_run, size, molden_order[l], cart_norm(l).data());
+            run = 0;
+            basis_run += size;
+        }
+        nmo++;
     }
     //Make the matrix square for later use
     err_checkf(!coefficients[0].empty(), "No MOs in molden file", file);
