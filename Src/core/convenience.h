@@ -36,7 +36,22 @@ typedef std::vector<std::vector<cvec2>> cvec4;
 typedef std::vector<bool> bvec;
 typedef std::vector<bvec> bvec2;
 typedef std::vector<bvec2> bvec3;
-typedef std::vector<std::string> svec;
+//A std::vector<std::string> whose operator[] fails with the index instead of reading past the
+//end: the file readers split a line into fields and index them, so a short or blank line in a
+//truncated file used to be undefined behaviour instead of an error
+struct svec : std::vector<std::string>
+{
+    using std::vector<std::string>::vector;
+    svec(const std::vector<std::string> &v) : std::vector<std::string>(v) {}
+    svec(std::vector<std::string> &&v) : std::vector<std::string>(std::move(v)) {}
+    const std::string &operator[](size_t i) const
+    {
+        if (i >= size())
+            throw std::out_of_range("field " + std::to_string(i + 1) + " missing, the line has only " + std::to_string(size()));
+        return std::vector<std::string>::operator[](i);
+    }
+    std::string &operator[](size_t i) { return const_cast<std::string &>(std::as_const(*this)[i]); }
+};
 typedef std::vector<std::filesystem::path> pathvec;
 typedef std::chrono::high_resolution_clock::time_point _time_point;
 typedef Kokkos::Experimental::mdarray<double, Kokkos::extents<unsigned long long, std::dynamic_extent>> dMatrix1;
@@ -347,6 +362,29 @@ inline std::istream& getline_universal(std::istream& is, std::string& line)
 	if (!line.empty() && line.back() == '\r')
 		line.pop_back();
 	return is;
+}
+
+//Line readers for the text formats. At EOF getline leaves the line untouched, so a seek loop
+//written as while (line.find(tag) == npos) getline(...) never ends on a truncated file
+inline void read_line_or_fail(std::istream& is, std::string& line, const std::string& what, std::ostream& log)
+{
+	err_checkf(static_cast<bool>(getline_universal(is, line)), "File ends while reading " + what, log);
+}
+//Advances to the first line containing tag, which is left in line
+inline void seek_line(std::istream& is, std::string& line, const std::string& tag, std::ostream& log)
+{
+	while (line.find(tag) == std::string::npos)
+		read_line_or_fail(is, line, tag, log);
+}
+//Appends every number on line to out; a token that is not a number fails naming the block
+template <typename T>
+void append_numbers(const std::string& line, std::vector<T>& out, const std::string& what, std::ostream& log)
+{
+	std::istringstream is(line);
+	T v;
+	while (is >> v)
+		out.push_back(v);
+	err_checkf(is.eof(), "Not a number in " + what + ": '" + line + "'", log);
 }
 
 inline void print_centered_text(const std::string& text, int& bar_width, std::ostream& file = std::cout)
@@ -982,6 +1020,6 @@ cdouble hypergeometric(double a, double b, double c, cdouble x);
 
 bool ends_with(const std::string& str, const std::string& suffix);
 
-bool read_block_from_fortran_binary(std::ifstream& file, void* Target);
+bool read_block_from_fortran_binary(std::ifstream& file, void* Target, const size_t capacity);
 template <typename T>
 bool read_block_from_fortran_binary(std::ifstream& file, std::vector<T>& Target);

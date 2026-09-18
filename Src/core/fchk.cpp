@@ -693,12 +693,15 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
 };
 */
 //------------------Functions to read from .fchk files----------------------------------
+//The value starts in column 50; go_get_string() hands back "" for a heading the file lacks
 int read_fchk_integer(const std::string& in)
 {
+    err_checkf(in.length() > 49, "fchk heading line missing or too short: '" + in + "'", std::cout);
     return std::stoi(in.substr(49, in.length() - 49));
 };
 double read_fchk_double(const std::string& in)
 {
+    err_checkf(in.length() > 49, "fchk heading line missing or too short: '" + in + "'", std::cout);
     return std::stod(in.substr(49, in.length() - 49));
 };
 bool read_fchk_integer_block(std::ifstream& in, const char* heading, ivec& result, bool rewind)
@@ -746,12 +749,14 @@ bool read_fchk_double_block(std::ifstream& in, const char* heading, vec& result,
 int read_fchk_integer(std::ifstream& in, const char* search, bool rewind)
 {
     std::string temp = go_get_string(in, search, rewind);
-    return std::stoi(temp.substr(49, temp.length() - 49));
+    err_checkf(temp != "", std::string("fchk file lacks '") + search + "'", std::cout);
+    return read_fchk_integer(temp);
 };
 double read_fchk_double(std::ifstream& in, const char* search, bool rewind)
 {
     std::string temp = go_get_string(in, search, rewind);
-    return std::stod(temp.substr(49, temp.length() - 49));
+    err_checkf(temp != "", std::string("fchk file lacks '") + search + "'", std::cout);
+    return read_fchk_double(temp);
 };
 
 bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, const bool &debug, const bool force_overwrite)

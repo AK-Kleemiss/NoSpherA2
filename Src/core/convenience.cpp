@@ -991,13 +991,19 @@ std::string shrink_string_to_atom(std::string &input, const int &atom_number)
     return input;
 };
 
-bool read_block_from_fortran_binary(std::ifstream &file, void *Target)
+bool read_block_from_fortran_binary(std::ifstream &file, void *Target, const size_t capacity)
 {
     int size_begin = 0, size_end = 0;
     file.read(reinterpret_cast<char *>(&size_begin), sizeof(int));
+    //A damaged record length used to be written straight past the end of Target
+    if (!file.good() || size_begin < 0 || static_cast<size_t>(size_begin) > capacity)
+    {
+        std::cout << "Error reading block from binary file: record of " << size_begin << " bytes, expected at most " << capacity << std::endl;
+        return false;
+    }
     file.read(reinterpret_cast<char *>(Target), size_begin);
     file.read(reinterpret_cast<char *>(&size_end), sizeof(int));
-    if (size_begin != size_end)
+    if (!file.good() || size_begin != size_end)
     {
         std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
         return false;
@@ -1009,10 +1015,15 @@ bool read_block_from_fortran_binary(std::ifstream &file, std::vector<T> &Target)
 {
     int size_begin = 0, size_end = 0;
     file.read(reinterpret_cast<char *>(&size_begin), sizeof(int));
+    if (!file.good() || size_begin < 0)
+    {
+        std::cout << "Error reading block from binary file: record of " << size_begin << " bytes" << std::endl;
+        return false;
+    }
     Target.resize(size_begin / sizeof(T));
     file.read(reinterpret_cast<char *>(Target.data()), size_begin);
     file.read(reinterpret_cast<char *>(&size_end), sizeof(int));
-    if (size_begin != size_end)
+    if (!file.good() || size_begin != size_end)
     {
         std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
         return false;
@@ -4281,7 +4292,7 @@ bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std:
 #endif
 };
 
-bool save_file_dialog(std::filesystem::path &path, bool debug, const std::vector<std::string> &endings, const std::string &filename_given, const std::string &current_path) {
+bool save_file_dialog(std::filesystem::path &path, bool debug, const svec &endings, const std::string &filename_given, const std::string &current_path) {
 #ifdef _WIN32
     constexpr size_t MAX_FILENAME_SIZE = 4096;
     std::vector<char> filename_buf(MAX_FILENAME_SIZE);
