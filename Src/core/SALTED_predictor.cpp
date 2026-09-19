@@ -16,6 +16,20 @@
 #include <future>
 
 
+ML_density::ML_density(const WFN& wavy, options& opt) : table(predict(wavy, opt)) {}
+
+std::vector<atom> ML_density::predict(const WFN& wavy, options& opt)
+{
+    err_checkf(!opt.salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED <model-dir>", std::cout);
+    SALTEDPredictor SP(wavy, opt);
+    if (!SP.basis_set_loaded()) load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+    coefs = SP.gen_SALTED_densities();
+    err_checkf(SP.wavy.get_ncen() == wavy.get_ncen(), "The SALTED model does not cover every atom of " + wavy.get_path().string(), std::cout);
+    if (!opt.salted_charge_constraint)
+        std::cout << "Hint: -salted_charge_constraint pins the electron count of the prediction; a missing fraction of an electron shifts the whole ESP by q/r" << std::endl;
+    return SP.wavy.get_atoms();
+}
+
 SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 {
     std::filesystem::path _path = opt_in.salted_model_dir;

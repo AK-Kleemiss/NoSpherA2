@@ -6,6 +6,7 @@
 #include "GridManager.h"
 #include "basis_set.h"
 #include "SALTED_utilities.h"
+#include "aux_density.h"
 #include <occ/disp/d4.h>
 #include <occ/interaction/polarization.h>
 
@@ -1025,22 +1026,7 @@ vec DensityFitting::restraint_weights(
 
 double DensityFitting::lower_gamma_half(const int l, const double x)
 {
-    const double a = l + 1.5;
-    if (x < a + 1.0) {
-        double term = 1.0 / a, sum = term;
-        for (int k = 1; k < 500 && term > 1e-17 * sum; k++) {
-            term *= x / (a + k);
-            sum += term;
-        }
-        return std::pow(x, a) * std::exp(-x) * sum;
-    }
-    double g = std::sqrt(constants::PI) * std::erf(std::sqrt(x)), xa = std::sqrt(x);
-    const double ex = std::exp(-x);
-    for (int k = 0; k <= l; k++) {
-        g = (k + 0.5) * g - xa * ex;
-        xa *= x;
-    }
-    return g;
+    return aux_density::lower_gamma_scaled(l, x) * std::pow(x, l + 1.5);
 }
 
 // V(R) = 4pi/(2l+1) N c [R^-l-1 gamma(l+3/2, aR^2)/(2a^(l+3/2)) + R^l exp(-aR^2)/(2a)] Y_lm(R^)
@@ -1901,7 +1887,7 @@ void DensityFitting::QM_RI_difference_cube(WFN& wavy, const WFN& wavy_aux) {
     props.radius = 3.0;
     props.resolution = 0.1;
 
-    readxyzMinMax_fromWFN(dummy, props, true);
+    readxyzMinMax_fromWFN(dummy, props);
     dummy.delete_unoccupied_MOs();
     //Cubes: 0=WFN, 1=RI
     cube WFN_cube({ props.NbSteps[0], props.NbSteps[1], props.NbSteps[2] }, dummy.get_ncen(), true);

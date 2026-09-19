@@ -8160,54 +8160,43 @@ const double WFN::computeMO(
     return result;
 }
 
-double Integrate(int &m, double i, double &expn)
+// Boys function F_m(T) by a 6-term Taylor expansion around a tabulated grid (step 0.1 up to
+// T = 30, error < 1E-10), asymptotic beyond (1E-14); expn = exp(-T), which the caller has anyway
+static double boys(const int m, const double T, const double expn)
 {
-    int x;
-    if (i <= 10)
+    constexpr int mmax = 24 + 6, nT = 301;
+    constexpr double step = 0.1;
+    static const std::vector<double> table = []()
     {
-        if (expn == 0.0)
-            return 0.0;
-        double a = m + 0.5;
-        double term = 1 / a;
-        double partsum = term;
-        for (x = 2; x < 50; x++)
+        std::vector<double> F((size_t)nT * (mmax + 1));
+        for (int i = 0; i < nT; i++)
         {
-            a++;
-            term *= (i / a);
-            partsum += term;
-            if (term / partsum < 1E-8)
-                return 0.5 * partsum * expn;
+            const double T0 = i * step, e = exp(-T0);
+            // F_mmax by its series e^-T sum_k (2T)^k / ((2m+1)...(2m+2k+1)), then downward
+            double term = 1.0 / (2 * mmax + 1), sum = term;
+            for (int k = 1; term > 1E-17 * sum; k++)
+                term *= 2 * T0 / (2 * mmax + 2 * k + 1), sum += term;
+            double *row = F.data() + (size_t)i * (mmax + 1);
+            row[mmax] = e * sum;
+            for (int n = mmax - 1; n >= 0; n--)
+                row[n] = (2 * T0 * row[n + 1] + e) / (2 * n + 1);
         }
-    }
-    else
+        return F;
+    }();
+    if (T >= (nT - 1) * step)
     {
-        double a = m;
-        double b = a + 0.5;
-        a -= 0.5;
-        const double id = 1 / i;
-        double approx = 0.88622692 * sqrt(id) * pow(id, m);
-        for (x = 0; x < m; x++)
-        {
-            b--;
-            approx *= b;
-        }
-        const double mult = 0.5 * expn * id;
-        if (mult == 0)
-            return approx;
-        const double prop = mult / approx;
-        double term = 1;
-        double partsum = 1;
-        for (x = 1; x < i + m; x++)
-        {
-            term *= a * id;
-            partsum += term;
-            if (abs(term * prop / partsum) < 1E-8)
-                return approx - mult * partsum;
-            a--;
-        }
+        double f = 0.5 * sqrt(constants::PI / T); // F_0, then upward, stable at this T
+        for (int n = 1; n <= m; n++)
+            f = ((2 * n - 1) * f - expn) / (2 * T);
+        return f;
     }
-    return -1;
-};
+    const int i = (int)(T / step + 0.5);
+    const double dT = i * step - T, *row = table.data() + (size_t)i * (mmax + 1) + m;
+    double f = 0, pw = 1;
+    for (int k = 0; k <= 5; k++, pw *= dT / k)
+        f += row[k] * pw;
+    return f;
+}
 const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
 {
     double temp = 0.0;
@@ -8521,322 +8510,130 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     return true;
 }
 
-const double WFN::computeESP(const d3 &PosGrid, const vec2 &d2) const
+// number of (l, r, s) terms of one axis with l_i + l_j = L
+static int esp_axis_terms(const int L)
 {
-    double ESP = 0;
-    double P[3]{ 0, 0, 0 };
-    double Pi[3]{ 0, 0, 0 };
-    double Pj[3]{ 0, 0, 0 };
-    double PC[3]{ 0, 0, 0 };
-    double Fn[21]{};
-    double Al[506]{};
-    double Am[506]{};
-    double An[506]{};
-    int maplrsl[506]{};
-    int maplrsm[506]{};
-    int maplrsn[506]{};
-    int l_i[3]{ 0, 0, 0 };
-    int l_j[3]{ 0, 0, 0 };
-    int iat = 0, jat = 0, MaxFn = 0;
-    double ex_sum = 0,
-        sqd = 0,
-        sqpc = 0,
-        prefac = 0,
-        expc = 0,
-        term = 0,
-        addesp = 0,
-        fjtmp = 0,
-        twoexpc = 0,
-        iex = 0,
-        jex = 0;
+    int n = 0;
+    for (int l = 0; l <= L; l++)
+        for (int r = 0; r <= l / 2; r++)
+            n += (l - 2 * r) / 2 + 1;
+    return n;
+}
 
-    const int MO = get_nmo(true);
+WFN::ESP_pairs WFN::build_ESP_pairs() const
+{
+    ESP_pairs t;
+    const int MO = get_nmo(true), stride = get_nmo(false);
     const int nprim = get_nex();
-
-    double temp;
-    int maxl, maxm, maxn;
-    vec2 pos(3);
-    for (int i = 0; i < 3; i++)
-        pos[i].resize(get_ncen());
-
-    for (iat = 0; iat < get_ncen(); iat++)
-    {
-        pos[0][iat] = atoms[iat].get_coordinate(0);
-        pos[1][iat] = atoms[iat].get_coordinate(1);
-        pos[2][iat] = atoms[iat].get_coordinate(2);
-        ESP += get_atom_charge(iat) / sqrt(pow(PosGrid[0] - pos[0][iat], 2) + pow(PosGrid[1] - pos[1][iat], 2) + pow(PosGrid[2] - pos[2][iat], 2));
-    }
-
+    const double *coef = get_coef_primitive_major(); // [prim][mo]
+    int l_i[3], l_j[3];
+    double Pi[3], Pj[3];
+    t.off.push_back(0);
     for (int iprim = 0; iprim < nprim; iprim++)
     {
-        iat = get_center(iprim) - 1;
+        const int iat = get_center(iprim) - 1;
         constants::type2vector(get_type(iprim), l_i);
-        iex = get_exponent(iprim);
+        const double iex = get_exponent(iprim);
         for (int jprim = iprim; jprim < nprim; jprim++)
         {
-            jat = get_center(jprim) - 1;
-            constants::type2vector(get_type(jprim), l_j);
-            ex_sum = get_exponent(iprim) + get_exponent(jprim);
-            jex = get_exponent(jprim);
-
-            sqd = d2[iat][jat];
-
-            prefac = constants::TWO_PI / ex_sum * exp(-iex * jex * sqd / ex_sum);
+            const int jat = get_center(jprim) - 1;
+            const double jex = get_exponent(jprim);
+            const double ex_sum = iex + jex;
+            double sqd = 0;
+            for (int k = 0; k < 3; k++)
+                sqd += pow(atoms[iat].get_coordinate(k) - atoms[jat].get_coordinate(k), 2);
+            const double prefac = constants::TWO_PI / ex_sum * exp(-iex * jex * sqd / ex_sum);
             if (prefac < 1E-10)
                 continue;
-
-            for (int i = 0; i < 3; i++)
-            {
-                P[i] = (pos[i][iat] * iex + pos[i][jat] * jex) / ex_sum;
-                Pi[i] = P[i] - pos[i][iat];
-                Pj[i] = P[i] - pos[i][jat];
-                PC[i] = P[i] - PosGrid[i];
-            }
-
-            sqpc = pow(PC[0], 2) + pow(PC[1], 2) + pow(PC[2], 2);
-
-            expc = exp(-ex_sum * sqpc);
-            MaxFn = 0;
-            for (int i = 0; i < 3; i++)
-                MaxFn += l_i[i] + l_j[i];
-            temp = Integrate(MaxFn, ex_sum * sqpc, expc);
-            Fn[MaxFn] = temp;
-            twoexpc = 2 * ex_sum * sqpc;
-            for (int nu = MaxFn - 1; nu >= 0; nu--)
-                Fn[nu] = (expc + twoexpc * Fn[nu + 1]) / (2 * (nu + 1) - 1);
-
-            maxl = -1;
-            for (int l = 0; l <= l_i[0] + l_j[0]; l++)
-            {
-                if (l % 2 != 1)
-                    fjtmp = fj(l, l_i[0], l_j[0], Pi[0], Pj[0]); // *factorial[l];
-                else
-                    fjtmp = -fj(l, l_i[0], l_j[0], Pi[0], Pj[0]); // * factorial[l];
-                for (int r = 0; r <= l / 2; r++)
-                    for (int s = 0; s <= (l - 2 * r) / 2; s++)
-                    {
-                        maxl++;
-                        Al[maxl] = Afac(l, r, s, PC[0], ex_sum, fjtmp);
-                        maplrsl[maxl] = l - 2 * r - s;
-                    }
-            }
-            maxm = -1;
-            for (int l = 0; l <= l_i[1] + l_j[1]; l++)
-            {
-                if (l % 2 != 1)
-                    fjtmp = fj(l, l_i[1], l_j[1], Pi[1], Pj[1]); // *factorial[l];
-                else
-                    fjtmp = -fj(l, l_i[1], l_j[1], Pi[1], Pj[1]); // * factorial[l];
-                for (int r = 0; r <= l / 2; r++)
-                    for (int s = 0; s <= (l - 2 * r) / 2; s++)
-                    {
-                        maxm++;
-                        Am[maxm] = Afac(l, r, s, PC[1], ex_sum, fjtmp);
-                        maplrsm[maxm] = l - 2 * r - s;
-                    }
-            }
-            maxn = -1;
-            for (int l = 0; l <= l_i[2] + l_j[2]; l++)
-            {
-                if (l % 2 != 1)
-                    fjtmp = fj(l, l_i[2], l_j[2], Pi[2], Pj[2]); // *factorial[l];
-                else
-                    fjtmp = -fj(l, l_i[2], l_j[2], Pi[2], Pj[2]); // * factorial[l];
-                for (int r = 0; r <= l / 2; r++)
-                    for (int s = 0; s <= (l - 2 * r) / 2; s++)
-                    {
-                        maxn++;
-                        An[maxn] = Afac(l, r, s, PC[2], ex_sum, fjtmp);
-                        maplrsn[maxn] = l - 2 * r - s;
-                    }
-            }
-
-            term = 0.0;
-            for (int l = 0; l <= maxl; l++)
-            {
-                if (Al[l] == 0)
-                    continue;
-                for (int m = 0; m <= maxm; m++)
-                {
-                    if (Am[m] == 0)
-                        continue;
-                    for (int n = 0; n <= maxn; n++)
-                    {
-                        if (An[n] == 0)
-                            continue;
-                        term += Al[l] * Am[m] * An[n] * Fn[maplrsl[l] + maplrsm[m] + maplrsn[n]];
-                    }
-                }
-            }
-
-            if (term == 0)
-                continue;
-
-            if (iprim != jprim)
-                term *= 2.0;
-
-            term *= prefac;
-            addesp = 0.0;
+            double dij = 0;
             for (int mo = 0; mo < MO; mo++)
-                addesp += get_MO_occ(mo) * get_MO_coef_f(mo, iprim) * get_MO_coef_f(mo, jprim);
-            ESP -= addesp * term;
+                dij += get_MO_occ(mo) * coef[iprim * stride + mo] * coef[jprim * stride + mo];
+            // screening: the dropped pairs move the far-field ESP of sucrose by 3E-6 at most (18 Sep 2026)
+            if (abs(prefac * dij) < 1E-8)
+                continue;
+            constants::type2vector(get_type(jprim), l_j);
+            t.ex_sum.push_back(ex_sum);
+            t.weight.push_back(prefac * dij * (iprim != jprim ? 2.0 : 1.0));
+            d3 P;
+            for (int k = 0; k < 3; k++)
+            {
+                P[k] = (atoms[iat].get_coordinate(k) * iex + atoms[jat].get_coordinate(k) * jex) / ex_sum;
+                Pi[k] = P[k] - atoms[iat].get_coordinate(k);
+                Pj[k] = P[k] - atoms[jat].get_coordinate(k);
+            }
+            t.P.push_back(P);
+            t.L.push_back({ l_i[0] + l_j[0], l_i[1] + l_j[1], l_i[2] + l_j[2] });
+            // Afac without its PC power: sign * fj * (1/4g)^(r+s) / (r! s! (l-2r-2s)!)
+            for (int k = 0; k < 3; k++)
+                for (int l = 0; l <= l_i[k] + l_j[k]; l++)
+                {
+                    const double fjtmp = (l % 2 ? -1.0 : 1.0) * fj(l, l_i[k], l_j[k], Pi[k], Pj[k]);
+                    for (int r = 0; r <= l / 2; r++)
+                        for (int s = 0; s <= (l - 2 * r) / 2; s++)
+                        {
+                            t.coef.push_back((s % 2 ? -fjtmp : fjtmp) * pow(0.25 / ex_sum, r + s) / Afac_pre[l][r][s]);
+                            t.pc_pow.push_back((unsigned char)(l - 2 * r - 2 * s));
+                            t.fn_idx.push_back((unsigned char)(l - 2 * r - s));
+                        }
+                }
+            t.off.push_back((int)t.coef.size());
         }
     }
-    return ESP;
-};
+    return t;
+}
 
-const double WFN::computeESP_noCore(const d3 &PosGrid, const vec2 &d2) const
+const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
 {
     double ESP = 0;
-    double P[3]{ 0, 0, 0 };
-    double Pi[3]{ 0, 0, 0 };
-    double Pj[3]{ 0, 0, 0 };
-    double PC[3]{ 0, 0, 0 };
-    double Fn[21]{};
-    double Al[506]{};
-    double Am[506]{};
-    double An[506]{};
-    int maplrsl[506]{};
-    int maplrsm[506]{};
-    int maplrsn[506]{};
-    int l_i[3]{ 0, 0, 0 };
-    int l_j[3]{ 0, 0, 0 };
-    int iat = 0, jat = 0, MaxFn = 0;
-    double ex_sum = 0,
-        sqd = 0,
-        sqpc = 0,
-        prefac = 0,
-        expc = 0,
-        term = 0,
-        addesp = 0,
-        fjtmp = 0,
-        twoexpc = 0,
-        iex = 0,
-        jex = 0;
-
-    const int MO = get_nmo(true);
-    const int nprim = get_nex();
-
-    double temp;
-    int maxl, maxm, maxn;
-    vec2 pos(3);
-    for (int i = 0; i < 3; i++)
-        pos[i].resize(get_ncen());
-
-    for (int iprim = 0; iprim < nprim; iprim++)
+    for (int iat = 0; iat < get_ncen(); iat++)
     {
-        iat = get_center(iprim) - 1;
-        constants::type2vector(get_type(iprim), l_i);
-        iex = get_exponent(iprim);
-        for (int jprim = iprim; jprim < nprim; jprim++)
+        double r2 = 0;
+        for (int k = 0; k < 3; k++)
+            r2 += pow(PosGrid[k] - atoms[iat].get_coordinate(k), 2);
+        ESP += get_atom_charge(iat) / sqrt(r2);
+    }
+
+    double Fn[25], pcp[3][9], Al[506], Am[506], An[506]; // l_i, l_j <= 4 per axis (pre tables)
+    int mapl[506], mapm[506], mapn[506];
+    const int npairs = (int)t.weight.size();
+    for (int p = 0; p < npairs; p++)
+    {
+        const double ex_sum = t.ex_sum[p];
+        const std::array<int, 3> &L = t.L[p];
+        double sqpc = 0;
+        for (int k = 0; k < 3; k++)
         {
-            jat = get_center(jprim) - 1;
-            constants::type2vector(get_type(jprim), l_j);
-            ex_sum = get_exponent(iprim) + get_exponent(jprim);
-            jex = get_exponent(jprim);
-
-            sqd = d2[iat][jat];
-
-            prefac = constants::TWO_PI / ex_sum * exp(-iex * jex * sqd / ex_sum);
-            if (prefac < 1E-10)
-                continue;
-
-            for (int i = 0; i < 3; i++)
-            {
-                P[i] = (pos[i][iat] * iex + pos[i][jat] * jex) / ex_sum;
-                Pi[i] = P[i] - pos[i][iat];
-                Pj[i] = P[i] - pos[i][jat];
-                PC[i] = P[i] - PosGrid[i];
-            }
-
-            sqpc = pow(PC[0], 2) + pow(PC[1], 2) + pow(PC[2], 2);
-
-            expc = exp(-ex_sum * sqpc);
-            MaxFn = 0;
-            for (int i = 0; i < 3; i++)
-                MaxFn += l_i[i] + l_j[i];
-            temp = Integrate(MaxFn, ex_sum * sqpc, expc);
-            Fn[MaxFn] = temp;
-            twoexpc = 2 * ex_sum * sqpc;
-            for (int nu = MaxFn - 1; nu >= 0; nu--)
-                Fn[nu] = (expc + twoexpc * Fn[nu + 1]) / (2 * (nu + 1) - 1);
-
-            maxl = -1;
-            for (int l = 0; l <= l_i[0] + l_j[0]; l++)
-            {
-                if (l % 2 != 1)
-                    fjtmp = fj(l, l_i[0], l_j[0], Pi[0], Pj[0]);
-                else
-                    fjtmp = -fj(l, l_i[0], l_j[0], Pi[0], Pj[0]);
-                for (int r = 0; r <= l / 2; r++)
-                    for (int s = 0; s <= (l - 2 * r) / 2; s++)
-                    {
-                        maxl++;
-                        Al[maxl] = Afac(l, r, s, PC[0], ex_sum, fjtmp);
-                        maplrsl[maxl] = l - 2 * r - s;
-                    }
-            }
-            maxm = -1;
-            for (int l = 0; l <= l_i[1] + l_j[1]; l++)
-            {
-                if (l % 2 != 1)
-                    fjtmp = fj(l, l_i[1], l_j[1], Pi[1], Pj[1]);
-                else
-                    fjtmp = -fj(l, l_i[1], l_j[1], Pi[1], Pj[1]);
-                for (int r = 0; r <= l / 2; r++)
-                    for (int s = 0; s <= (l - 2 * r) / 2; s++)
-                    {
-                        maxm++;
-                        Am[maxm] = Afac(l, r, s, PC[1], ex_sum, fjtmp);
-                        maplrsm[maxm] = l - 2 * r - s;
-                    }
-            }
-            maxn = -1;
-            for (int l = 0; l <= l_i[2] + l_j[2]; l++)
-            {
-                if (l % 2 != 1)
-                    fjtmp = fj(l, l_i[2], l_j[2], Pi[2], Pj[2]);
-                else
-                    fjtmp = -fj(l, l_i[2], l_j[2], Pi[2], Pj[2]);
-                for (int r = 0; r <= l / 2; r++)
-                    for (int s = 0; s <= (l - 2 * r) / 2; s++)
-                    {
-                        maxn++;
-                        An[maxn] = Afac(l, r, s, PC[2], ex_sum, fjtmp);
-                        maplrsn[maxn] = l - 2 * r - s;
-                    }
-            }
-
-            term = 0.0;
-            for (int l = 0; l <= maxl; l++)
-            {
-                if (Al[l] == 0)
-                    continue;
-                for (int m = 0; m <= maxm; m++)
-                {
-                    if (Am[m] == 0)
-                        continue;
-                    for (int n = 0; n <= maxn; n++)
-                    {
-                        if (An[n] == 0)
-                            continue;
-                        term += Al[l] * Am[m] * An[n] * Fn[maplrsl[l] + maplrsm[m] + maplrsn[n]];
-                    }
-                }
-            }
-
-            if (term == 0)
-                continue;
-
-            if (iprim != jprim)
-                term *= 2.0;
-
-            term *= prefac;
-            addesp = 0.0;
-            for (int mo = 0; mo < MO; mo++)
-                addesp += get_MO_occ(mo) * get_MO_coef_f(mo, iprim) * get_MO_coef_f(mo, jprim);
-            ESP -= addesp * term;
+            const double PC = t.P[p][k] - PosGrid[k];
+            sqpc += PC * PC;
+            pcp[k][0] = 1.0;
+            for (int n = 1; n <= L[k]; n++)
+                pcp[k][n] = pcp[k][n - 1] * PC;
         }
+        double expc = exp(-ex_sum * sqpc);
+        int MaxFn = L[0] + L[1] + L[2];
+        Fn[MaxFn] = boys(MaxFn, ex_sum * sqpc, expc);
+        const double twoexpc = 2 * ex_sum * sqpc;
+        for (int nu = MaxFn - 1; nu >= 0; nu--)
+            Fn[nu] = (expc + twoexpc * Fn[nu + 1]) / (2 * (nu + 1) - 1);
+
+        int c = t.off[p];
+        const int nl = esp_axis_terms(L[0]), nm = esp_axis_terms(L[1]), nn = esp_axis_terms(L[2]);
+        for (int l = 0; l < nl; l++, c++)
+            Al[l] = t.coef[c] * pcp[0][t.pc_pow[c]], mapl[l] = t.fn_idx[c];
+        for (int m = 0; m < nm; m++, c++)
+            Am[m] = t.coef[c] * pcp[1][t.pc_pow[c]], mapm[m] = t.fn_idx[c];
+        for (int n = 0; n < nn; n++, c++)
+            An[n] = t.coef[c] * pcp[2][t.pc_pow[c]], mapn[n] = t.fn_idx[c];
+
+        double term = 0.0;
+        for (int l = 0; l < nl; l++)
+            for (int m = 0; m < nm; m++)
+            {
+                const double lm = Al[l] * Am[m];
+                for (int n = 0; n < nn; n++)
+                    term += lm * An[n] * Fn[mapl[l] + mapm[m] + mapn[n]];
+            }
+        ESP -= t.weight[p] * term;
     }
     return ESP;
 };
@@ -8983,7 +8780,7 @@ void WFN::write_rho_cube(const double &radius, const double &increment) const {
     opts.radius = radius;
     opts.resolution = increment;
     WFN dummy = (*this);
-    readxyzMinMax_fromWFN(dummy, opts, true);
+    readxyzMinMax_fromWFN(dummy, opts);
     cube CubeRho(opts.NbSteps, dummy.get_ncen(), true);
     dummy.delete_unoccupied_MOs();
     CubeRho.give_parent_wfn(dummy);

@@ -298,12 +298,12 @@ namespace crystal_energies {
         const double kJ = constants::kcal_mol_per_hartree * 4.184;
         out << "# NoSpherA2 interaction energies in kJ/mol; B = symop(B) + n, centroids and R_AB in Angstrom\n";
         for (int i = 0; i < (int)structures.size(); i++) out << "# molecule " << i << " " << structures[i].string() << "\n";
-        out << "# A B symop n1 n2 n3 R_AB xA yA zA xB yB zB E_elst E_pol E_disp E_rep E_total\n";
+        out << "# A B symop n1 n2 n3 R_AB xA yA zA xB yB zB E_elst E_pol E_disp E_rep E_xc E_total\n";  // E_rep = kinetic (or overlap) repulsion, E_xc = its exchange part
         for (const pair& p : pairs) {
             out << p.A << " " << p.B << " " << p.symop << " " << p.n[0] << " " << p.n[1] << " " << p.n[2] << std::fixed << std::setprecision(4) << " " << p.distance;
             for (int x = 0; x < 3; x++) out << " " << p.centroid_A[x];
             for (int x = 0; x < 3; x++) out << " " << p.centroid_B[x];
-            out << std::setprecision(3) << " " << p.E.electrostatic() * kJ << " " << (p.E.pol_A + p.E.pol_B) * kJ << " " << p.E.disp * kJ << " " << p.E.rep * kJ << " " << p.E.total() * kJ << "\n";
+            out << std::setprecision(3) << " " << p.E.electrostatic() * kJ << " " << (p.E.pol_A + p.E.pol_B) * kJ << " " << p.E.disp * kJ << " " << (p.E.rep - p.E.rep_x) * kJ << " " << p.E.rep_x * kJ << " " << p.E.total() * kJ << "\n";
         }
         out << std::flush;
     }

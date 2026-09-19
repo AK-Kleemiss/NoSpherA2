@@ -390,9 +390,9 @@ metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::Simpl
 aux_density_table::aux_density_table(const std::vector<atom>& atoms)
 {
     n_at = (int)atoms.size();
-    cx.resize(n_at), cy.resize(n_at), cz.resize(n_at), r2_max.resize(n_at), sh_start.resize(n_at + 1);
+    cx.resize(n_at), cy.resize(n_at), cz.resize(n_at), r2_max.resize(n_at), Z.resize(n_at), sh_start.resize(n_at + 1);
     for (int a = 0; a < n_at; a++) {
-        cx[a] = atoms[a].get_coordinate(0), cy[a] = atoms[a].get_coordinate(1), cz[a] = atoms[a].get_coordinate(2);
+        cx[a] = atoms[a].get_coordinate(0), cy[a] = atoms[a].get_coordinate(1), cz[a] = atoms[a].get_coordinate(2), Z[a] = atoms[a].get_charge() - atoms[a].get_ECP_electrons();
         const std::vector<unsigned int> sc = atoms[a].get_shellcount();
         double alpha_min = DBL_MAX;
         sh_start[a] = n_sh;
@@ -561,6 +561,11 @@ cdouble aux_density_table::fourier_atom(
     }
 
     return sf;
+}
+
+double aux_density_table::esp(const double x, const double y, const double z, const double* coefs) const
+{
+    return aux_density::esp_at(x, y, z, n_at, cx.data(), cy.data(), cz.data(), Z.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs);
 }
 
 void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* lap)
@@ -935,7 +940,7 @@ void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_
 cube calc_cube_ML(const vec& data, WFN& dummy, const int& atom_nr)
 {
     properties_options opts;
-    readxyzMinMax_fromWFN(dummy, opts, true);
+    readxyzMinMax_fromWFN(dummy, opts);
     cube CubeRho(opts.NbSteps, dummy.get_ncen(), true);
     CubeRho.give_parent_wfn(dummy);
 

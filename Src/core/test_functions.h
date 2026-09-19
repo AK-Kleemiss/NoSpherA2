@@ -337,12 +337,12 @@ double subtract_dens_from_gbw(std::filesystem::path &wfn_name_1,
     properties_options opts;
     opts.radius = r;
     opts.resolution = resol;
-    readxyzMinMax_fromWFN(wavy1, opts, true);
+    readxyzMinMax_fromWFN(wavy1, opts);
 
     properties_options opts2;
     opts2.radius = r;
     opts2.resolution = resol;
-    readxyzMinMax_fromWFN(wavy2, opts2, true); // and getting the MinMax and steps
+    readxyzMinMax_fromWFN(wavy2, opts2); // and getting the MinMax and steps
 
     double MinMax[6]{ 100, 100, 100, -100, -100, -100 };
     int steps[3]{ 0, 0, 0 };
@@ -891,7 +891,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
     properties_options opts;
     opts.radius = radius;
     opts.resolution = resulution;
-    readxyzMinMax_fromWFN(wavy, opts, true);
+    readxyzMinMax_fromWFN(wavy, opts);
     cube CubeMO(opts.NbSteps, 1, true);
     CubeMO.give_parent_wfn(wavy);
     for (int i = 0; i < 3; i++)

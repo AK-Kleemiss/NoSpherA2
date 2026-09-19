@@ -20,6 +20,7 @@
 #include "blas_gpu.h"
 #include "cublas_dynamic.h"
 #include "SALTED_equicomb.h"
+#include "SALTED_predictor.h"
 #endif
 
 int QCT(options &opt, std::vector<WFN> &wavy);
@@ -153,7 +154,8 @@ static int run_app_impl(int argc, char **argv)
         promolecular_nci_analysis(
             opt.promol_nci_xyz,
             opt.properties,
-            std::cout);
+            std::cout,
+            opt.cif);
         log_file.flush();
         std::cout.rdbuf(_coutbuf);
         return 0;
@@ -202,92 +204,85 @@ static int run_app_impl(int argc, char **argv)
     // Perform Hirshfeld surface based on input and quit
     if (opt.hirshfeld_surface != "")
     {
-        if (opt.properties.radius < 2.5)
-        {
-            std::cout << "Resetting Radius to at least 2.5!" << endl;
-            opt.properties.radius = 2.5;
-        }
         wavy.emplace_back(opt.hirshfeld_surface, opt.debug);
         wavy.emplace_back(opt.hirshfeld_surface2, opt.debug);
-        readxyzMinMax_fromWFN(wavy[0], opt.properties);
-        cube Hirshfeld_grid(opt.properties.NbSteps, wavy[0].get_ncen(), true);
-        cube Hirshfeld_grid2(opt.properties.NbSteps, wavy[1].get_ncen(), true);
-        Hirshfeld_grid.give_parent_wfn(wavy[0]);
-        Hirshfeld_grid2.give_parent_wfn(wavy[1]);
-        double len[3]{ 0, 0, 0 };
-        for (int i = 0; i < 3; i++)
+        std::vector<_time_point> tp{ get_time() };
+        std::vector<std::string> tp_desc;
+        std::vector<Triangle> triangles_i = Hirshfeld_surface(wavy[0], wavy[1], opt.properties, log_file);
+        tp.push_back(get_time()); tp_desc.push_back("weight grid + marching cubes");
+        if (triangles_i.empty())
         {
-            len[i] = (opt.properties.MinMax[3 + i] - opt.properties.MinMax[i]) / opt.properties.NbSteps[i];
+            std::cout.rdbuf(_coutbuf);
+            std::cout << "No Hirshfeld surface found, check the two fragments!" << endl;
+            return 1;
         }
-        for (int i = 0; i < 3; i++)
-        {
-            Hirshfeld_grid.set_origin(i, opt.properties.MinMax[i]);
-            Hirshfeld_grid2.set_origin(i, opt.properties.MinMax[i]);
-            Hirshfeld_grid.set_vector(i, i, len[i]);
-            Hirshfeld_grid2.set_vector(i, i, len[i]);
-        }
-        Hirshfeld_grid.set_comment1("Calculated density using NoSpherA2");
-        Hirshfeld_grid.set_comment2("from " + wavy[0].get_path().string());
-        Hirshfeld_grid2.set_comment1("Calculated density using NoSpherA2");
-        Hirshfeld_grid2.set_comment2("from " + wavy[1].get_path().string());
-        Calc_Spherical_Dens(Hirshfeld_grid, wavy[0], opt.properties.radius, log_file, false);
-        Calc_Spherical_Dens(Hirshfeld_grid2, wavy[1], opt.properties.radius, log_file, false);
-        cube Total_Dens = Hirshfeld_grid + Hirshfeld_grid2;
-        Total_Dens.give_parent_wfn(wavy[0]);
-        cube Hirshfeld_weight = Hirshfeld_grid / Total_Dens;
-        Hirshfeld_weight.give_parent_wfn(wavy[0]);
         std::array<std::array<int, 3>, 3> Colourcode;
 
         Colourcode[0] = { 255, 0, 0 };
         Colourcode[1] = { 255, 255, 255 };
         Colourcode[2] = { 0, 0, 255 };
-
-        std::vector<Triangle> triangles_i = marchingCubes(Hirshfeld_weight, 0.5);
-        std::cout << "Found " << triangles_i.size() << " triangles!" << endl;
         auto triangles_e = triangles_i;
+        auto triangles_n = triangles_i;
+        const int nt = (int)triangles_i.size();
+        vec d_i(nt), d_e(nt), d_norm(nt);
         double area = 0.0;
         double volume = 0.0;
-        double low_lim_di = 1E7;
-        double high_lim_di = 0.0;
-        double low_lim_de = 1E7;
-        double high_lim_de = 0.0;
-        ofstream fingerprint_file("Hirshfeld_fingerprint.dat");
-        fingerprint_file << "d_i\td_e" << endl;
 #pragma omp parallel for reduction(+ : area, volume)
-        for (int i = 0; i < triangles_i.size(); i++)
+        for (int i = 0; i < nt; i++)
         {
             area += triangles_i[i].calc_area();
             volume += triangles_i[i].calc_inner_volume();
-            d3 pos = triangles_i[i].calc_center();
-            double d_i = calc_d_i(pos, wavy[0]);
-            double d_e = calc_d_i(pos, wavy[1]);
-#pragma omp critical
-            {
-                if (d_i < low_lim_di)
-                    low_lim_di = d_i;
-                if (d_i > high_lim_di)
-                    high_lim_di = d_i;
-                if (d_e < low_lim_de)
-                    low_lim_de = d_e;
-                if (d_e > high_lim_de)
-                    high_lim_de = d_e;
-                fingerprint_file << d_i << "\t" << d_e << "\n";
-            }
+            const d3 pos = triangles_i[i].calc_center();
+            d_i[i] = calc_d_i(pos, wavy[0]);
+            d_e[i] = calc_d_i(pos, wavy[1]);
+            d_norm[i] = calc_d_norm_term(pos, wavy[0]) + calc_d_norm_term(pos, wavy[1]);
         }
-        fingerprint_file.flush();
-        fingerprint_file.close();
-        std::cout << "d_i is scaled from " << low_lim_di << " to " << high_lim_di * 0.9 << endl;
-        std::cout << "d_e is scaled from " << low_lim_de << " to " << high_lim_de * 0.9 << endl;
-#pragma omp parallel for
-        for (int i = 0; i < triangles_i.size(); i++)
+        tp.push_back(get_time()); tp_desc.push_back("d_i, d_e, d_norm");
+        vec esp;
+        if (wavy[0].get_nmo() > 0)
+            esp = surface_ESP(triangles_i, wavy[0]);
+        else if (opt.SALTED)
         {
-            get_colour(triangles_i[i], calc_d_i, wavy[0], Colourcode, low_lim_di, high_lim_di * 0.9);
-            get_colour(triangles_e[i], calc_d_i, wavy[1], Colourcode, low_lim_de, high_lim_de * 0.9);
+            const ML_density ml(wavy[0], opt);
+            esp = surface_ESP(triangles_i, [&](const d3& p) { return ml.esp(p); });
+        }
+        tp.push_back(get_time()); tp_desc.push_back("surface ESP");
+        // one row per face in obj order (d_i, d_e in Angstrom, esp in a.u.): Olex2 colours the surface from these, columns 1-2 are the fingerprint plot
+        ofstream dat("Hirshfeld_surface.dat");
+        dat << "# d_i d_e d_norm" << (esp.empty() ? "" : " esp") << "\n";
+        for (int i = 0; i < nt; i++)
+        {
+            dat << constants::bohr2ang(d_i[i]) << "\t" << constants::bohr2ang(d_e[i]) << "\t" << d_norm[i];
+            if (!esp.empty())
+                dat << "\t" << esp[i];
+            dat << "\n";
+        }
+        dat.close();
+        const auto [lo_i, hi_i] = std::minmax_element(d_i.begin(), d_i.end());
+        const auto [lo_e, hi_e] = std::minmax_element(d_e.begin(), d_e.end());
+        const auto [lo_n, hi_n] = std::minmax_element(d_norm.begin(), d_norm.end());
+        std::cout << "d_i is scaled from " << *lo_i << " to " << *hi_i * 0.9 << endl;
+        std::cout << "d_e is scaled from " << *lo_e << " to " << *hi_e * 0.9 << endl;
+        std::cout << "d_norm from " << *lo_n << " to " << *hi_n << ", red (" << *lo_n << ") white (0) blue (" << *hi_n << ")" << endl;
+#pragma omp parallel for
+        for (int i = 0; i < nt; i++)
+        {
+            triangles_i[i].set_colour(mix_colour(d_i[i], Colourcode, *lo_i, *hi_i * 0.9));
+            triangles_e[i].set_colour(mix_colour(d_e[i], Colourcode, *lo_e, *hi_e * 0.9));
+            triangles_n[i].set_colour(d_norm[i] < 0 ? mix_colour(d_norm[i], Colourcode, *lo_n, -*lo_n) : mix_colour(d_norm[i], Colourcode, -*hi_n, *hi_n));
         }
         std::cout << "Total area: " << area << endl;
         std::cout << "Total volume: " << volume << endl;
         writeColourObj("Hirshfeld_surface_i.obj", triangles_i);
         writeColourObj("Hirshfeld_surface_e.obj", triangles_e);
+        writeColourObj("Hirshfeld_surface_norm.obj", triangles_n);
+        if (!esp.empty())
+        {
+            colour_by_ESP(triangles_i, esp, std::cout);
+            writeColourObj("Hirshfeld_surface_esp.obj", triangles_i);
+        }
+        tp.push_back(get_time()); tp_desc.push_back("dat + obj files");
+        write_timing_to_file(std::cout, tp, tp_desc);
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         return 0;

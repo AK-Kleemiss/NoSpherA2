@@ -1,11 +1,33 @@
 #include "pch.h"
 #include "wfn_class.h"
 #include "properties.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "aux_density_gpu.h"
+#include "spherical_density_gpu.h"
+#endif
 #include "convenience.h"
 #include "spherical_density.h"
 #include "cube.h"
 #include "constants.h"
 #include "GridManager.h"
+#include "isosurface.h"
+#include "SALTED_predictor.h"
+
+std::vector<Thakkar> make_thakkar_interpolators()
+{
+    // atom_models[atom.charge - 1] is the lookup convention (see
+    // promolecular_fragment_densities_at), so index a must hold atomic
+    // number a+1, not a=0 (which would build a bogus atomic-number-0 model
+    // and read Thakkar_ns/np/nd/nf out of bounds for every real element).
+    std::vector<Thakkar> atom_models;
+    atom_models.reserve(92);
+    for (int a = 0; a < 92; a++)
+    {
+        atom_models.emplace_back(a + 1);
+        atom_models[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
+    }
+    return atom_models;
+}
 
 void print_time(_time_point &start, _time_point &end, std::ostream &file) {
     if (get_sec(start, end) < 60)
@@ -156,13 +178,59 @@ void Calc_Spherical_Dens(
     using namespace std;
     _time_point start = get_time();
 
-    vector<Thakkar> atom_models;
-    for (int a = 0; a < 92; a++) {
-        atom_models.emplace_back(a);
-        atom_models[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
-    }
+    const vector<Thakkar> atom_models = make_thakkar_interpolators();
     const double radius_bohr = constants::ang2bohr(radius);
     const vector<atom> wavy_atoms = wavy.get_atoms();
+
+#ifdef NOSPHERA2_USE_GPU
+    //Only the elements present travel to the device; wrap sums periodic images with atomics and stays on the host
+    if (!wrap && aux_density_gpu_enabled())
+    {
+        const int ncen = wavy.get_ncen();
+        vector<double> ax(ncen), ay(ncen), az(ncen);
+        vector<int> at_tab(ncen), tab_of_z(92, -1), tab_off{ 0 };
+        vector<double> r_tab, rho_tab;
+        for (int a = 0; a < ncen; a++)
+        {
+            const int z = wavy.get_atom_charge(a) - 1;
+            if (tab_of_z[z] < 0)
+            {
+                tab_of_z[z] = (int)tab_off.size() - 1;
+                const vec &r = atom_models[z].get_radial_dist(), &rho = atom_models[z].get_radial_density_table();
+                r_tab.insert(r_tab.end(), r.begin(), r.end());
+                rho_tab.insert(rho_tab.end(), rho.begin(), rho.end());
+                tab_off.push_back((int)r_tab.size());
+            }
+            at_tab[a] = tab_of_z[z];
+            const d3 pos = wavy.get_atom_pos(a);
+            ax[a] = pos[0], ay[a] = pos[1], az[a] = pos[2];
+        }
+        const i3 n = CubeSpher.get_sizes();
+        double origin[3], vectors[9];
+        for (int i = 0; i < 3; i++)
+        {
+            origin[i] = CubeSpher.get_origin(i);
+            for (int j = 0; j < 3; j++)
+                vectors[3 * i + j] = CubeSpher.get_vector(i, j);
+        }
+        vector<double> out((size_t)n[0] * n[1] * n[2]);
+        if (spherical_density_gpu_eval(n[0], n[1], n[2], origin, vectors, ncen, ax.data(), ay.data(), az.data(), at_tab.data(),
+                                       (int)tab_off.size() - 1, tab_off.data(), r_tab.data(), rho_tab.data(),
+                                       atom_models[0].get_lincr(), atom_models[0].get_start(), radius_bohr, out.data()))
+        {
+            if (!constants::hide_gpu_notes)
+                file << "GPU in use: spherical density grid" << endl;
+            const double *v = out.data();
+            for (int x = 0; x < n[0]; x++)
+                for (int y = 0; y < n[1]; y++)
+                    for (int z = 0; z < n[2]; z++)
+                        CubeSpher.set_value(x, y, z, *v++);
+            _time_point end = get_time();
+            print_time(start, end, file);
+            return;
+        }
+    }
+#endif
 
     evaluate_cube_in_radius(
         CubeSpher,
@@ -396,6 +464,20 @@ void Calc_Rho(
     print_time(start, end, file);
 };
 
+void Calc_Cube(
+    cube &Cube,
+    const WFN &wavy,
+    const std::function<double(const d3 &)> &f,
+    double radius,
+    std::ostream &file,
+    bool wrap)
+{
+    _time_point start = get_time();
+    evaluate_cube_in_radius(Cube, wrap, wavy.get_atoms(), constants::ang2bohr(radius), f);
+    _time_point end = get_time();
+    print_time(start, end, file);
+};
+
 void Calc_Eli(
     cube &CubeEli,
     const WFN &wavy,
@@ -562,14 +644,8 @@ void Calc_Prop(
 
     rho_contrib.evaluate_on_grid(
         [&](const d3 &pos_grid, const i3 &, const i3 &mapped_idx) {
-            if (!is_within_radius(pos_grid, atoms, radius_bohr)) {
-                // RDG visualizations use 101.0 as an explicit mask value outside
-                // the calculation radius. Other properties retain their zero
-                // background.
-                if (Cubes[cube_type::RDG].get_loaded())
-                    Cubes[cube_type::RDG].set_value(mapped_idx[0], mapped_idx[1], mapped_idx[2], 101.0);
+            if (!is_within_radius(pos_grid, atoms, radius_bohr))
                 return 0.0;
-            }
 
             const PropValues values = compute_prop_values(Cubes, wavy, pos_grid);
             accumulate_prop_values(Cubes, mapped_idx, values);
@@ -577,15 +653,20 @@ void Calc_Prop(
         },
         wrap);
 
-#pragma omp parallel for schedule(dynamic)
-    for (int x = 0; x < Cubes[cube_type::Rho].get_size(0); x++)
-        for (int y = 0; y < Cubes[cube_type::Rho].get_size(1); y++)
-            for (int z = 0; z < Cubes[cube_type::Rho].get_size(2); z++)
-                Cubes[cube_type::Rho].set_value(
-                    x,
-                    y,
-                    z,
-                    Cubes[cube_type::Rho].get_value(x, y, z) + rho_contrib.get_value(x, y, z));
+    // Calc_Rho already filled Rho; only the RDG run replaces it by sign(lambda2)*rho.
+    // RDG visualizations use 101.0 as an explicit mask value outside the calculation
+    // radius; with wrap every point is visited once per periodic image, so the mask
+    // is applied after the loop where rho stayed exactly zero.
+    if (Cubes[cube_type::RDG].get_loaded())
+    {
+        Cubes[cube_type::Rho] = rho_contrib;
+        cube &rdg = Cubes[cube_type::RDG];
+        for (int x = 0; x < rdg.get_size(0); x++)
+            for (int y = 0; y < rdg.get_size(1); y++)
+                for (int z = 0; z < rdg.get_size(2); z++)
+                    if (rho_contrib.get_value(x, y, z) == 0.0)
+                        rdg.set_value(x, y, z, 101.0);
+    }
 
     if (!test)
     {
@@ -605,21 +686,7 @@ void Calc_ESP(
     using namespace std;
     _time_point start = get_time();
 
-    vec2 d2;
-    d2.resize(wavy.get_ncen());
-    for (int i = 0; i < wavy.get_ncen(); i++)
-    {
-        d2[i].resize(wavy.get_ncen(), 0.0);
-        for (int j = 0; j < wavy.get_ncen(); j++)
-        {
-            if (i == j)
-            {
-                d2[i][j] = 0;
-                continue;
-            }
-            d2[i][j] = pow(wavy.get_atom_coordinate(i, 0) - wavy.get_atom_coordinate(j, 0), 2) + pow(wavy.get_atom_coordinate(i, 1) - wavy.get_atom_coordinate(j, 1), 2) + pow(wavy.get_atom_coordinate(i, 2) - wavy.get_atom_coordinate(j, 2), 2);
-        }
-    }
+    const WFN::ESP_pairs pairs = wavy.build_ESP_pairs();
     const double radius_bohr = constants::ang2bohr(radius);
     const vector<atom> atoms = wavy.get_atoms();
 
@@ -629,7 +696,7 @@ void Calc_ESP(
         atoms,
         radius_bohr,
         [&](const d3 &pos) {
-            return wavy.computeESP(pos, d2);
+            return wavy.computeESP(pos, pairs);
         });
 
     if (!no_date)
@@ -1145,22 +1212,6 @@ struct PromolecularAtom {
     int fragment = 0;
 };
 
-std::vector<Thakkar> make_thakkar_interpolators()
-{
-    // atom_models[atom.charge - 1] is the lookup convention (see
-    // promolecular_fragment_densities_at), so index a must hold atomic
-    // number a+1, not a=0 (which would build a bogus atomic-number-0 model
-    // and read Thakkar_ns/np/nd/nf out of bounds for every real element).
-    std::vector<Thakkar> atom_models;
-    atom_models.reserve(92);
-    for (int a = 0; a < 92; a++)
-    {
-        atom_models.emplace_back(a + 1);
-        atom_models[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
-    }
-    return atom_models;
-}
-
 double cube_value_clamped(const cube &source, int x, int y, int z)
 {
     x = std::clamp(x, 0, source.get_size(0) - 1);
@@ -1320,6 +1371,7 @@ std::string tcl_quote_path(const std::filesystem::path &path)
 void write_promolecular_nci_vmd(
     const pathvec &xyz_files,
     const std::filesystem::path &output_base,
+    const properties_options &opts,
     std::ostream &log)
 {
     const std::filesystem::path signed_rho_path = output_base.string() + "_signed_rho.cube";
@@ -1363,7 +1415,7 @@ void write_promolecular_nci_vmd(
         << "mol modcolor 0 $nci Volume 0\n"
         << "mol modmaterial 0 $nci Opaque\n"
         << "mol colupdate 0 $nci on\n"
-        << "mol scaleminmax $nci 0 -2.0 2.0\n"
+        << "mol scaleminmax $nci 0 " << -opts.promol_nci_colour_max << " " << opts.promol_nci_colour_max << "\n"
         << "color scale method BGR\n"
         << "color scale midpoint 0.5\n"
         << "\n"
@@ -1456,7 +1508,8 @@ void write_promolecular_nci_plot_script(
 void promolecular_nci_analysis(
     const pathvec &xyz_files,
     const properties_options &opts,
-    std::ostream &log)
+    std::ostream &log,
+    const std::filesystem::path &cif)
 {
     using namespace std;
 
@@ -1484,7 +1537,16 @@ void promolecular_nci_analysis(
     }
 
     properties_options local_opts = opts;
-    readxyzMinMax_fromWFN(combined, local_opts, true);
+    // grid: a box around the fragments, or the unit cell when a cif is given (Olex2's xgrid spans the cell)
+    vec2 cell_matrix(3, vec(3, 0.0));
+    if (cif.empty())
+    {
+        readxyzMinMax_fromWFN(combined, local_opts);
+        for (int i = 0; i < 3; i++)
+            cell_matrix[i][i] = (local_opts.MinMax[i + 3] - local_opts.MinMax[i]) / local_opts.NbSteps[i];
+    }
+    else
+        readxyzMinMax_fromCIF(cif, local_opts, cell_matrix);
     err_checkf(local_opts.NbSteps[0] > 1 && local_opts.NbSteps[1] > 1 && local_opts.NbSteps[2] > 1,
         "Promolecular NCI grid is too small; decrease -resolution or increase -radius.", log);
 
@@ -1501,13 +1563,15 @@ void promolecular_nci_analysis(
 
     for (int i = 0; i < 3; i++)
     {
-        const double step = (local_opts.MinMax[i + 3] - local_opts.MinMax[i]) / local_opts.NbSteps[i];
         rho_cube.set_origin(i, local_opts.MinMax[i]);
         signed_rho_cube.set_origin(i, local_opts.MinMax[i]);
         rdg_cube.set_origin(i, local_opts.MinMax[i]);
-        rho_cube.set_vector(i, i, step);
-        signed_rho_cube.set_vector(i, i, step);
-        rdg_cube.set_vector(i, i, step);
+        for (int j = 0; j < 3; j++)
+        {
+            rho_cube.set_vector(i, j, cell_matrix[i][j]);
+            signed_rho_cube.set_vector(i, j, cell_matrix[i][j]);
+            rdg_cube.set_vector(i, j, cell_matrix[i][j]);
+        }
     }
     rho_cube.calc_dv();
     signed_rho_cube.calc_dv();
@@ -1625,7 +1689,7 @@ void promolecular_nci_analysis(
     rdg_cube.set_path(output_base.string() + "_rdg.cube");
     signed_rho_cube.write_file(true);
     rdg_cube.write_file(true);
-    write_promolecular_nci_vmd(xyz_files, output_base, log);
+    write_promolecular_nci_vmd(xyz_files, output_base, opts, log);
     write_promolecular_nci_plot_script(output_base, opts, log);
 
     log << "Wrote " << signed_rho_cube.get_path() << endl;
@@ -1647,6 +1711,14 @@ void properties_calculation(options &opt)
 
     err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
     WFN wavy(opt.wfn);
+    //Without MOs (xyz input) rho and the ESP come from the SALTED prediction
+    std::unique_ptr<ML_density> ml;
+    if (opt.SALTED && wavy.get_nmo() == 0) {
+        log2 << "No orbitals in " << opt.wfn << ", rho and ESP from the SALTED model " << opt.salted_model_dir << endl;
+        ml = std::make_unique<ML_density>(wavy, opt);
+    }
+    auto ml_rho = [&](const d3& p) { return ml->rho(p); };
+    auto ml_esp = [&](const d3& p) { return ml->esp(p); };
     if (opt.debug)
         log2 << "Starting calculation of properties" << endl;
     if (opt.properties.all_mos)
@@ -1665,11 +1737,16 @@ void properties_calculation(options &opt)
         for (int a = 0; a < wavy.get_ncen(); a++)
             log2 << "Atom " << a << " at " << wavy.get_atom_coordinate(a, 0) << " " << wavy.get_atom_coordinate(a, 1) << " " << wavy.get_atom_coordinate(a, 2) << endl;
     }
+    if (opt.properties.esp_isosurface > 0 && opt.properties.radius < 2.5)
+    {
+        log2 << "Resetting Radius to at least 2.5 for the isosurface!" << endl;
+        opt.properties.radius = 2.5;
+    }
     if (opt.cif != "")
         readxyzMinMax_fromCIF(opt.cif, opt.properties, cell_matrix);
     else
     {
-        readxyzMinMax_fromWFN(wavy, opt.properties, true);
+        readxyzMinMax_fromWFN(wavy, opt.properties);
         for (int i = 0; i < 3; i++)
             cell_matrix[i][i] = constants::ang2bohr(opt.properties.resolution);
     }
@@ -1796,7 +1873,8 @@ void properties_calculation(options &opt)
 
     log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
-    Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
+    if (ml) Calc_Cube(cubes[cube_type::Rho], wavy, ml_rho, opt.properties.radius, log2, opt.cif != "");
+    else Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
 
     if (opt.properties.integral_accuracy != -1) {
         log2 << "Refining grid files to integral accuracy of " << opt.properties.integral_accuracy << " ..." << flush;
@@ -2040,10 +2118,28 @@ void properties_calculation(options &opt)
         WFN temp = wavy;
         temp.delete_unoccupied_MOs();
         temp.delete_Qs();
-        Calc_ESP(cubes[cube_type::ESP], temp, opt.properties.radius, opt.no_date, log2);
+        if (ml) Calc_Cube(cubes[cube_type::ESP], wavy, ml_esp, opt.properties.radius, log2);
+        else Calc_ESP(cubes[cube_type::ESP], temp, opt.properties.radius, opt.no_date, log2);
         log2 << "Writing cube to Disk..." << flush;
         cubes[cube_type::ESP].write_file(true);
         log2 << "  done!" << endl;
+    }
+    if (opt.properties.esp_isosurface > 0)
+    {
+        log2 << std::defaultfloat << std::setprecision(4) << "Colouring the rho = " << opt.properties.esp_isosurface << " au isosurface by the ESP..." << endl;
+        cube box;
+        if (opt.cif != "")
+        { // the cell grid clips the molecule, so take rho on its own box
+            properties_options box_opts = opt.properties;
+            box = box_cube(wavy, box_opts);
+            if (ml) Calc_Cube(box, wavy, ml_rho, box_opts.radius, log2, false);
+            else Calc_Rho(box, wavy, box_opts.radius, log2, false);
+        }
+        std::vector<Triangle> triangles = marchingCubes(opt.cif != "" ? box : cubes[cube_type::Rho], opt.properties.esp_isosurface);
+        log2 << "Found " << triangles.size() << " triangles" << endl;
+        if (ml) colour_by_ESP(triangles, surface_ESP(triangles, ml_esp), log2);
+        else colour_by_ESP(triangles, wavy, log2);
+        writeColourObj((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp.obj", triangles);
     }
     // return output tostd::cout
     std::cout.rdbuf(_coutbuf);
@@ -2069,9 +2165,9 @@ void do_combine_mo(options &opt)
     }
     std::cout << "In total we have " << wavy3.get_ncen() << " atoms" << endl;
 
-    readxyzMinMax_fromWFN(wavy1, opt.properties, true);
+    readxyzMinMax_fromWFN(wavy1, opt.properties);
     properties_options prop2 = opt.properties;
-    readxyzMinMax_fromWFN(wavy2, prop2, true);
+    readxyzMinMax_fromWFN(wavy2, prop2);
 
     std::cout << "Read input\nCalculating for MOs ";
     for (int v1 = 0; v1 < opt.cmo1.size(); v1++)
@@ -2299,7 +2395,7 @@ void dipole_moments(options &opt, std::ostream &log2)
 
     if (opt.debug)
         log2 << opt.cif << " " << opt.properties.resolution << " " << opt.properties.radius << endl;
-    readxyzMinMax_fromWFN(wavy, opt.properties, true);
+    readxyzMinMax_fromWFN(wavy, opt.properties);
     if (opt.debug)
     {
         log2 << "Resolution: " << opt.properties.resolution << endl;
@@ -2441,7 +2537,7 @@ void polarizabilities(options &opt, std::ostream &log2)
 
     if (opt.debug)
         log2 << opt.properties.resolution << " " << opt.properties.radius << endl;
-    readxyzMinMax_fromWFN(wavy[0], opt.properties, true);
+    readxyzMinMax_fromWFN(wavy[0], opt.properties);
     if (opt.debug)
     {
         log2 << "Resolution: " << opt.properties.resolution << endl;

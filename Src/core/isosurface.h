@@ -53,6 +53,18 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
 bool writeObj(const std::filesystem::path& filename, const std::vector<Triangle>& triangles);
 bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>& triangles);
 bool writeMTL(const std::string& mtlFilename, std::vector<Triangle>& triangles);
+RGB mix_colour(double val, const std::array<std::array<int, 3>, 3>& Colourcode, double low_lim, double high_lim);
 void get_colour(Triangle& t, const cube& volumeData, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim);
 void get_colour(Triangle& t, double(*func)(const d3&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim);
 double calc_d_i(const d3& p_t, const WFN& wavy);
+double calc_d_norm_term(const d3& p_t, const WFN& wavy);
+//Hirshfeld surface of mol inside env (weight 0.5 of the spherical-atom densities); raises opts.radius to 2.5 A
+// orthogonal empty grid on the box of wfn's atoms + opts.radius, as opts' MinMax/NbSteps
+cube box_cube(WFN& wfn, properties_options& opts);
+std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& opts, std::ostream& log);
+//ESP at every triangle centre, red (negative) - white - blue (positive) over a symmetric range
+vec surface_ESP(const std::vector<Triangle>& triangles, const WFN& wavy);
+//ESP at the face centres from any point evaluator, e.g. ML_density::esp
+vec surface_ESP(const std::vector<Triangle>& triangles, const std::function<double(const d3&)>& esp_at);
+void colour_by_ESP(std::vector<Triangle>& triangles, const WFN& wavy, std::ostream& log);
+void colour_by_ESP(std::vector<Triangle>& triangles, const vec& esp, std::ostream& log);

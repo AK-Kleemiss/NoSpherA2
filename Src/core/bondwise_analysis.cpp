@@ -2611,7 +2611,7 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     properties_options prop_opt = opt.properties;
     WFN l_w = wavy;
     l_w.delete_unoccupied_MOs();
-    readxyzMinMax_fromWFN(wavy, prop_opt, true);
+    readxyzMinMax_fromWFN(wavy, prop_opt);
 
     cube rho(prop_opt.NbSteps, l_w.get_ncen(), true);
     cube eli_cube(prop_opt.NbSteps, l_w.get_ncen(), true);
@@ -3028,7 +3028,7 @@ void run_QTAIM_ELI_mask(
         wavy.delete_unoccupied_MOs();
 
         properties_options prop_opt = opt.properties;
-        readxyzMinMax_fromWFN(wavy, prop_opt, true);
+        readxyzMinMax_fromWFN(wavy, prop_opt);
 
         log << "Calculating density and ELI grid ("
             << prop_opt.NbSteps[0] << " x " << prop_opt.NbSteps[1] << " x " << prop_opt.NbSteps[2]

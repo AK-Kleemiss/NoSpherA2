@@ -96,6 +96,8 @@ struct properties_options
 	bool all_mos = false;
 	//Fukui functions f+/f-/f0 and the dual descriptor, frozen-orbital approximation
 	bool fukui = false;
+	//rho isosurface value (au) coloured by the ESP and written as obj; 0 = off
+	double esp_isosurface = 0.0;
 	double resolution = 0.1;
 	double radius = 2.0;
 	double integral_accuracy = -1;
@@ -103,6 +105,7 @@ struct properties_options
 	double promol_nci_rcut2 = 0.75;
 	double promol_nci_rho_abs_max = 0.5;
 	double promol_nci_rdg_max = 1.0;
+	double promol_nci_colour_max = 0.015; // VMD/Olex2 colour range on sign(l2)rho in a.u., symmetric
 	//The _values.dat writer schedules grid points dynamically, so row order (not the values) varies between runs; forces single-threaded for golden files
 	bool promol_nci_single_threaded = false;
 	std::array<int, 3> NbSteps = { 0, 0, 0 };
@@ -110,7 +113,7 @@ struct properties_options
 	ivec MO_numbers;
 	int hirsh_number = 0;
 	bool calc() const {
-		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || MO_numbers.size() > 0;
+		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0;
 	}
 	size_t n_grid_points() const {
 		size_t result = static_cast<size_t>(NbSteps[0]) * NbSteps[1] * NbSteps[2];
@@ -500,8 +503,7 @@ private:
 
 void readxyzMinMax_fromWFN(
 	const WFN& wavy,
-	properties_options& opts,
-	bool no_bohr = false);
+	properties_options& opts);
 
 void readxyzMinMax_fromCIF(
 	std::filesystem::path cif,
@@ -942,7 +944,7 @@ struct options
     //Owned by the caller; the scattering-factor grid is built in it instead of a local, so
     //a second table for the same geometry reuses the points and weights
     GridManager* grid_cache = nullptr;
-    //-no_gpu_density keeps the fitted density of the Gordon-Kim repulsion grid on the CPU
+    //-no_gpu_density keeps the fitted density of the Gordon-Kim repulsion grid and the spherical-atom grids on the CPU
     bool gpu_density = true;
     //-gpu_blas offers large dense GEMMs in nos_math to the device
     bool gpu_blas = false;

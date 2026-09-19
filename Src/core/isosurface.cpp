@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "cube.h"
 #include "isosurface.h"
+#include "properties.h"
 
 // --------------------------------------------------------------------------
 // 1) Minimal Edge Table
@@ -387,12 +388,25 @@ double calc_d_i(const d3& p_t, const WFN& wavy) {
     return d_i;
 }
 
-void get_colour(Triangle& t, double(*func)(const d3&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
+double calc_d_norm_term(const d3& p_t, const WFN& wavy) {
+    // (d - r_vdW) / r_vdW of the nearest atom; d_norm is this term for the molecule plus the one for the environment
+    double d_i = 1E100;
+    int nearest = 0;
+    for (int i = 0; i < wavy.get_ncen(); i++) {
+        const d3 p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
+        const double d = array_length(p_a);
+        if (d < d_i) {
+            d_i = d;
+            nearest = i;
+        }
+    }
+    const double r = constants::ang2bohr(constants::vdW_radii[wavy.get_atom_charge(nearest)]);
+    return (d_i - r) / r;
+}
+
+RGB mix_colour(double val, const std::array<std::array<int, 3>, 3>& Colourcode, double low_lim, double high_lim) {
     const double mid_point = (low_lim + high_lim) / 2.0;
-    //const double range = high_lim - low_lim;
     RGB colour;
-    const d3 p = t.calc_center();
-    double val = func(p, wavy);
     if (val < low_lim) {
         colour = Colourcode[0];
     }
@@ -421,8 +435,84 @@ void get_colour(Triangle& t, double(*func)(const d3&, const WFN&), const WFN& wa
             colour[i] = 255;
         else if (colour[i] < 0)
             colour[i] = 0;
-    t.set_colour(colour);
+    return colour;
 };
+
+void get_colour(Triangle& t, double(*func)(const d3&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
+    t.set_colour(mix_colour(func(t.calc_center(), wavy), Colourcode, low_lim, high_lim));
+};
+
+cube box_cube(WFN& wfn, properties_options& opts)
+{
+    readxyzMinMax_fromWFN(wfn, opts);
+    cube grid(opts.NbSteps, wfn.get_ncen(), true);
+    grid.give_parent_wfn(wfn);
+    for (int i = 0; i < 3; i++) {
+        grid.set_origin(i, opts.MinMax[i]);
+        grid.set_vector(i, i, (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i]);
+    }
+    return grid;
+}
+
+std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& opts, std::ostream& log)
+{
+    if (opts.radius < 2.5) {
+        log << "Resetting Radius to at least 2.5!" << std::endl;
+        opts.radius = 2.5;
+    }
+    cube grid_mol = box_cube(mol, opts);
+    cube grid_env(opts.NbSteps, env.get_ncen(), true);
+    grid_env.give_parent_wfn(env);
+    for (int i = 0; i < 3; i++) {
+        grid_env.set_origin(i, opts.MinMax[i]);
+        grid_env.set_vector(i, i, grid_mol.get_vector(i, i));
+    }
+    Calc_Spherical_Dens(grid_mol, mol, opts.radius, log, false);
+    Calc_Spherical_Dens(grid_env, env, opts.radius, log, false);
+    cube total = grid_mol + grid_env;
+    total.give_parent_wfn(mol);
+    cube weight = grid_mol / total;
+    weight.give_parent_wfn(mol);
+    _time_point start = get_time();
+    std::vector<Triangle> triangles = marchingCubes(weight, 0.5);
+    log << "Found " << triangles.size() << " triangles on the " << weight.get_size(0) << "x" << weight.get_size(1) << "x" << weight.get_size(2)
+        << " grid in " << get_msec(start, get_time()) << " ms" << std::endl;
+    return triangles;
+}
+
+vec surface_ESP(const std::vector<Triangle>& triangles, const WFN& wavy)
+{
+    WFN temp = wavy;
+    temp.delete_unoccupied_MOs();
+    temp.delete_Qs();
+    const WFN::ESP_pairs pairs = temp.build_ESP_pairs();
+    return surface_ESP(triangles, [&](const d3& p) { return temp.computeESP(p, pairs); });
+}
+
+vec surface_ESP(const std::vector<Triangle>& triangles, const std::function<double(const d3&)>& esp_at)
+{
+    vec esp(triangles.size());
+#pragma omp parallel for
+    for (int i = 0; i < (int)triangles.size(); i++)
+        esp[i] = esp_at(triangles[i].calc_center());
+    return esp;
+}
+
+void colour_by_ESP(std::vector<Triangle>& triangles, const WFN& wavy, std::ostream& log)
+{
+    if (!triangles.empty())
+        colour_by_ESP(triangles, surface_ESP(triangles, wavy), log);
+}
+
+void colour_by_ESP(std::vector<Triangle>& triangles, const vec& esp, std::ostream& log)
+{
+    const auto [lo, hi] = std::minmax_element(esp.begin(), esp.end());
+    const double lim = std::max(std::fabs(*lo), std::fabs(*hi));
+    log << std::defaultfloat << std::setprecision(4) << "ESP on the surface from " << *lo << " to " << *hi << " au, coloured red (-" << lim << ") white (0) blue (+" << lim << ")" << std::endl;
+    const std::array<std::array<int, 3>, 3> Colourcode{ { {255, 0, 0}, {255, 255, 255}, {0, 0, 255} } };
+    for (int i = 0; i < (int)triangles.size(); i++)
+        triangles[i].set_colour(mix_colour(esp[i], Colourcode, -lim, lim));
+}
 
 // Function to subdivide a cube into smaller cubes
 std::vector<d3> subdivideCube(const d3& p1, const d3& p2, int level) {

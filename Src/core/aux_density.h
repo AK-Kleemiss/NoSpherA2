@@ -96,4 +96,45 @@ namespace aux_density
     {
         return at_deriv<true>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap);
     }
+    //gamma(l+3/2, x) / x^(l+3/2), the lower incomplete gamma without its leading power so the
+    //potential below has no r^-(l+1) to cancel: the series below a+1, the erf recurrence above
+    AUX_HD inline double lower_gamma_scaled(const int l, const double x)
+    {
+        const double a = l + 1.5;
+        if (x < a + 1.0) {
+            double term = 1.0 / a, sum = term;
+            for (int k = 1; k < 500 && term > sum * 1E-17; k++) term *= x / (a + k), sum += term;
+            return exp(-x) * sum;
+        }
+        const double ex = exp(-x);
+        double g = 1.7724538509055160273 * erf(sqrt(x)), xa = sqrt(x), aa = 0.5;
+        for (int i = 0; i <= l; i++) g = aa * g - xa * ex, xa *= x, aa += 1.0;
+        return g / xa;
+    }
+    //Electrostatic potential of the fitted density plus the nuclei at (x, y, z), in Hartree/e like
+    //WFN::computeESP. Each shell n exp(-a r^2) r^l Y(u) has the closed-form potential
+    //4 pi / (2l+1) Y(u) sum_p n_p [ r^(l+2) G(l+3/2, a_p r^2) / 2 + r^l exp(-a_p r^2) / (2 a_p) ]
+    //with G the scaled incomplete gamma above, so no r2_max cutoff: the far field is the multipole tail.
+    AUX_HD inline double esp_at(const double x, const double y, const double z, const int n_at,
+        const double* cx, const double* cy, const double* cz, const int* Z,
+        const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
+        const double* pr_exp, const double* pr_norm, const double* coefs)
+    {
+        double esp = 0.0;
+        for (int a = 0; a < n_at; a++) {
+            const double dx = x - cx[a], dy = y - cy[a], dz = z - cz[a], r2 = dx * dx + dy * dy + dz * dz;
+            const double r = sqrt(r2), ux = dx / r, uy = dy / r, uz = dz / r;
+            esp += Z[a] / r;
+            for (int s = sh_start[a]; s < sh_start[a + 1]; s++) {
+                const int l = sh_l[s];
+                double rl = 1.0;
+                for (int i = 0; i < l; i++) rl *= r;
+                double radial = 0.0;
+                for (int p = pr_start[s]; p < pr_start[s + 1]; p++)
+                    radial += pr_norm[p] * (0.5 * rl * r2 * lower_gamma_scaled(l, pr_exp[p] * r2) + 0.5 * rl * exp(-pr_exp[p] * r2) / pr_exp[p]);
+                esp -= 4.0 * 3.1415926535897932384626433832795028 / (2 * l + 1) * radial * constants::spherical_harmonic(l, ux, uy, uz, coefs + coef_off[s]);
+            }
+        }
+        return esp;
+    }
 }

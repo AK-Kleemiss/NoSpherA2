@@ -124,6 +124,8 @@ struct aux_density_table
     // alpha^(l + 3/2), needed for Fourier-Bessel transform
     vec pr_exp_l32;
     ivec sh_start, sh_atom, sh_l, pr_start, coef_off;
+    // nuclear charges less ECP electrons, for the potential
+    ivec Z;
     // distinct (exponent, l) pairs and the slot of each primitive: the radial Fourier factor depends on nothing else
     vec uniq_exp, uniq_exp_l32;
     ivec uniq_l, pr_uniq;
@@ -136,6 +138,8 @@ struct aux_density_table
     double operator()(const double x, const double y, const double z, const double* coefs) const;
     double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz) const;
     double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double& lap) const;
+    //Electrostatic potential of nuclei and fitted density, see aux_density::esp_at
+    double esp(const double x, const double y, const double z, const double* coefs) const;
 
     // Convenience function for one atom
     cdouble fourier_atom(double kx, double ky, double kz, const double* coefs, int atom_idx) const;

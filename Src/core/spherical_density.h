@@ -171,6 +171,11 @@ public:
         atomic_number = 1;
         charge = 0;
     };
+    //The interpolation table of make_interpolator(), for kernels that replicate get_interpolated_density
+    const vec& get_radial_dist() const { return radial_dist; }
+    const vec& get_radial_density_table() const { return radial_density; }
+    double get_lincr() const { return lincr; }
+    double get_start() const { return start; }
     virtual const double get_radial_density(const double& dist) const
     {
         err_not_impl_SA();

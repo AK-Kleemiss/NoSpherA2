@@ -44,7 +44,8 @@ set(NOSPHERA2_CORE_GPU_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu"
     "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu"
     "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/aux_density_gpu.cu")
+    "${CMAKE_CURRENT_SOURCE_DIR}/aux_density_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/spherical_density_gpu.cu")
 if(NOSPHERA2_USE_CUDA)
     list(APPEND NOSPHERA2_CORE_SOURCES ${NOSPHERA2_CORE_GPU_SOURCES})
 endif()

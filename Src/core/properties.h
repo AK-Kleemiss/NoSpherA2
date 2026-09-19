@@ -97,6 +97,14 @@ void Calc_Rho(
     double radius,
     std::ostream &file,
     bool wrap = true);
+//Any point function on the grid within radius of the atoms of wavy, e.g. rho or the ESP of an ML_density
+void Calc_Cube(
+    cube &Cube,
+    const WFN &wavy,
+    const std::function<double(const d3 &)> &f,
+    double radius,
+    std::ostream &file,
+    bool wrap = true);
 
 void Calc_Eli(
     cube &CubeRho,
@@ -403,7 +411,8 @@ void properties_calculation(options &opt);
 void promolecular_nci_analysis(
     const pathvec& xyz_files,
     const properties_options& opts,
-    std::ostream& log);
+    std::ostream& log,
+    const std::filesystem::path& cif = {}); // cif: grid = the unit cell instead of a box around the fragments
 
 /**
  * Combines the MO (Molecular Orbital) files based on the given options.

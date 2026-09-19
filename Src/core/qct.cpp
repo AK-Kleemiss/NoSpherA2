@@ -500,8 +500,7 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
 
     readxyzMinMax_fromWFN(
         wavy[run.MoleculeFiles[0]],
-        opts,
-        false);
+        opts);
 
     cube persistant_cube_rho(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rho && run.Frames > 1);
     cube persistant_cube_RDG(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rdg && run.Frames > 1);

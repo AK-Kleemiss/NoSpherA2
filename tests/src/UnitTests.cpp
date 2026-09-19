@@ -20,6 +20,7 @@
 #include "core/geometry_aid.h"
 #include "core/crystal_energies.h"
 #include "core/NoSpherA2.h"
+#include "core/isosurface.h"
 #include "core/npy.h"
 #include "core/libCintMain.h"
 #include <occ/qm/hf.h>
@@ -2927,6 +2928,32 @@ namespace NoSpherA2UnitTests
         }
     }
 
+    // The ESP of a fitted density (SALTED or RI) at a point: nuclear Z/r less the shell potentials, one
+    // s Gaussian against the erf closed form and every l against the per-primitive aux_potential
+    TEST(RiInteractionTests, TableEspIsTheNucleusLessTheAuxPotentials)
+    {
+        const double a = 0.9, c = 1.7, R[3] = { 0.8, -0.3, 1.1 };
+        const double r = std::sqrt(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]);
+        {
+            const aux_density_table t = single_aux_shell(a, c, 0);
+            const double q = c * t.shell_population_integral(0);
+            EXPECT_NEAR(t.esp(R[0], R[1], R[2], &c), 1.0 / r - q * std::erf(std::sqrt(a) * r) / r, 1e-12);
+        }
+        for (int l = 1; l <= 4; ++l)
+        {
+            const aux_density_table t = single_aux_shell(a, c, l);
+            vec coefs(2 * l + 1);
+            for (int m = 0; m <= 2 * l; ++m) coefs[m] = 0.3 * m - 0.7;
+            for (double scale : { 0.05, 1.0, 5.0 })
+            {
+                const double Rs[3] = { scale * R[0], scale * R[1], scale * R[2] };
+                double V = 1.0 / (scale * r);
+                for (int m = -l; m <= l; ++m) V -= coefs[m + l] * DensityFitting::aux_potential(a, t.pr_norm[0], l, m, Rs);
+                EXPECT_NEAR(t.esp(Rs[0], Rs[1], Rs[2], coefs.data()), V, 1e-10 * std::abs(V)) << "l " << l << " scale " << scale;
+            }
+        }
+    }
+
     // A partner B whose density is one very tight s Gaussian holding exactly Z_B electrons is neutral and
     // point-like, so the energy cancels in both halves: the analytic aux potential of A at B's nucleus against
     // the libcint two-centre integrals, and A's nuclear repulsion against A's nuclei in B's density. This ties
@@ -3685,13 +3712,13 @@ namespace NoSpherA2UnitTests
             std::istringstream ss(line);
             int A, B, n[3];
             std::string symop;
-            double R, x[6], E[5];
+            double R, x[6], E[6];
             ss >> A >> B >> symop >> n[0] >> n[1] >> n[2] >> R;
             for (int i = 0; i < 6; i++) ss >> x[i];
-            for (int i = 0; i < 5; i++) ss >> E[i];
+            for (int i = 0; i < 6; i++) ss >> E[i];
             ASSERT_FALSE(ss.fail()) << line;
-            EXPECT_NEAR(E[0] + E[1] + E[2] + E[3], E[4], 3e-3) << line;
-            if (symop == "-x,-y,-z+1" && n[2] == 1) found = true, total = E[4];
+            EXPECT_NEAR(E[0] + E[1] + E[2] + E[3] + E[4], E[5], 3e-3) << line;
+            if (symop == "-x,-y,-z+1" && n[2] == 1) found = true, total = E[5];
         }
         in.close();
         EXPECT_EQ(rows, 8);
@@ -3816,6 +3843,113 @@ namespace NoSpherA2UnitTests
             EXPECT_TRUE(std::isfinite(density));
             EXPECT_GT(density, 0.0);
         }
+    }
+
+    //Reference values from the per-point primitive-pair implementation (before 18 Sep 2026) on the 0.2 A cube
+//orca_vpot (ORCA 6.1.1, same input) gives -0.0782518, 0.3776471, 0.3006136, 0.0397176 at these points
+    TEST(EspTests, PairTableMatchesReferenceCube)
+    {
+        const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
+        if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+        WFN wave(input, false);
+        const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+        EXPECT_EQ(pairs.weight.size() + 1, pairs.off.size());
+        const std::array<std::pair<d3, double>, 4> reference = { {
+            { { 1.710101, 11.196696, 1.517632 }, -0.0782518 },  // the negative lobe minimum
+            { { -0.557569, 14.220256, 1.517632 }, 0.377647 },
+            { { -2.825239, 14.976146, 2.651467 }, 0.300611 },
+            { { 2.843936, 16.109981, 3.407357 }, 0.039717 } } };
+        for (const auto& [pos, esp] : reference)
+            EXPECT_NEAR(wave.computeESP(pos, pairs), esp, 1E-5); // the cube header rounds the grid positions to 1E-6 bohr
+    }
+
+    //The surface must sit around the molecule it belongs to: readxyzMinMax_fromWFN used to guess the unit
+    //from the shortest interatomic distance and scaled the grid by 1.89 whenever no bond was shorter
+    //than 2 bohr, so the heavy atoms alone (shortest C-O 1.42 A) are the case that failed (18 Sep 2026)
+    TEST(IsosurfaceTests, HirshfeldSurfaceCentredOnMolecule)
+    {
+        const auto dir = nos_test_repo_root() / "tests" / "isosurface";
+        if (!std::filesystem::exists(dir / "pack.xyz")) GTEST_SKIP() << "Missing " << dir;
+        svec heavy;
+        std::ifstream asu(dir / "asu.xyz");
+        for (std::string line; std::getline(asu, line);)
+            if (heavy.size() < 2 || (!line.empty() && line[0] != 'H')) heavy.push_back(line);
+        heavy[0] = std::to_string(heavy.size() - 2);
+        const auto noH = std::filesystem::temp_directory_path() / "asu_noH.xyz";
+        {
+            std::ofstream out(noH);
+            for (const std::string& line : heavy) out << line << '\n';
+        }
+        WFN mol(noH, false), env(dir / "pack.xyz", false);
+        std::filesystem::remove(noH);
+        EXPECT_EQ(mol.get_ncen(), 23);
+        properties_options opts;
+        opts.resolution = 0.4;
+        std::ostringstream log;
+        std::vector<Triangle> triangles = Hirshfeld_surface(mol, env, opts, log);
+        ASSERT_GT(triangles.size(), 1000);
+        d3 centre{ 0, 0, 0 }, molecule{ 0, 0, 0 };
+        for (const Triangle& t : triangles)
+            for (int k = 0; k < 3; k++) centre[k] += t.calc_center()[k] / triangles.size();
+        for (int a = 0; a < mol.get_ncen(); a++)
+            for (int k = 0; k < 3; k++) molecule[k] += mol.get_atom_coordinate(a, k) / mol.get_ncen();
+        for (int k = 0; k < 3; k++)
+            EXPECT_NEAR(centre[k], molecule[k], 0.5) << "axis " << k;
+        //d_norm: negative where the fragments touch closer than the vdW radii, and a point on an atom's vdW sphere with the environment far away scores about -1 + (d_e - r_e) / r_e
+        double lo = 1E9, hi = -1E9;
+        for (const Triangle& t : triangles)
+        {
+            const double v = calc_d_norm_term(t.calc_center(), mol) + calc_d_norm_term(t.calc_center(), env);
+            lo = std::min(lo, v);
+            hi = std::max(hi, v);
+        }
+        EXPECT_LT(lo, 0.0);
+        EXPECT_GT(hi, 0.0);
+        {
+            std::ofstream out(noH);
+            out << "1\n\nO 0 0 0\n";
+        }
+        WFN one(noH, false);
+        std::filesystem::remove(noH);
+        const double r = constants::ang2bohr(constants::vdW_radii[8]);
+        EXPECT_NEAR(calc_d_norm_term({ 2 * r, 0, 0 }, one), 1.0, 1E-9);
+        EXPECT_NEAR(calc_d_norm_term({ 0, r, 0 }, one), 0.0, 1E-9);
+        EXPECT_NEAR(calc_d_norm_term({ 0, 0, r / 2 }, one), -0.5, 1E-9);
+    }
+
+    //Red at the oxygen, blue over the CH2 groups: the ESP sign is what a chemist expects
+    TEST(IsosurfaceTests, EspColourOfRhoIsosurface)
+    {
+        const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
+        if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+        WFN wave(input, false);
+        properties_options opts;
+        opts.resolution = 0.2;
+        opts.radius = 2.5;
+        readxyzMinMax_fromWFN(wave, opts);
+        cube rho(opts.NbSteps, wave.get_ncen(), true);
+        for (int i = 0; i < 3; i++)
+        {
+            rho.set_origin(i, opts.MinMax[i]);
+            rho.set_vector(i, i, (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i]);
+        }
+        std::ostringstream log;
+        Calc_Rho(rho, wave, opts.radius, log, false);
+        std::vector<Triangle> triangles = marchingCubes(rho, 0.002);
+        ASSERT_GT(triangles.size(), 1000);
+        colour_by_ESP(triangles, wave, log);
+        const d3 O{ wave.get_atom_coordinate(0, 0), wave.get_atom_coordinate(0, 1), wave.get_atom_coordinate(0, 2) };
+        double d_min = 1E9;
+        RGB at_oxygen{ 0, 0, 0 };
+        for (const Triangle& t : triangles)
+        {
+            const d3 c = t.calc_center();
+            const double d = std::hypot(c[0] - O[0], c[1] - O[1], c[2] - O[2]);
+            if (d < d_min) d_min = d, at_oxygen = t.get_colour();
+        }
+        EXPECT_EQ(at_oxygen[0], 255);
+        EXPECT_LT(at_oxygen[2], 128) << "the surface above the oxygen must be red";
+        EXPECT_NE(log.str().find("ESP on the surface from -0.06"), std::string::npos) << log.str();
     }
 
     //Lukas Seifert's derivation: libcint's c2s with ORCA's phase for |m| = 3, 4, 7, 8 over ORCA's angular norm, which drops sqrt((2l-1)(2l-3)) from l = 5 on

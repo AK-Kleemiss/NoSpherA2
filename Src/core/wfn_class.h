@@ -546,10 +546,21 @@ public:
     const double computeMO(const d3& PosGrid, const int& mo) const;
     /** Spherical MO value (not fully implemented). */
     const double compute_MO_spherical(const d3& Pos, const int& MO) const;
+    /** Point-independent part of the ESP primitive-pair sum: density-matrix weighted
+     *  pairs that survive the overlap screen with the (l,r,s) polynomial coefficients of
+     *  every axis, so a grid point only costs the Boys function and the polynomial. */
+    struct ESP_pairs
+    {
+        vec ex_sum, weight;                // weight = prefac * D_ij * (2 for i != j)
+        std::vector<d3> P;                 // pair centre
+        std::vector<std::array<int, 3>> L; // l_i + l_j per axis
+        vec coef;                          // per pair and axis one entry per (l,r,s)
+        std::vector<unsigned char> pc_pow, fn_idx; // l - 2r - 2s and l - 2r - s, parallel to coef
+        ivec off;                          // start of each pair's block in coef, npairs + 1 entries
+    };
+    ESP_pairs build_ESP_pairs() const;
     /** Electrostatic potential including nuclear cores. */
-    const double computeESP(const d3& PosGrid, const vec2& d2) const;
-    /** Electrostatic potential excluding nuclear cores. */
-    const double computeESP_noCore(const d3& PosGrid, const vec2& d2) const;
+    const double computeESP(const d3& PosGrid, const ESP_pairs& pairs) const;
     //----------DM Handling--------------------------------
     /** Build density (and optionally spin density) matrix; loads basis if required. */
     bool build_DM(std::string basis_set_path, bool debug = false);

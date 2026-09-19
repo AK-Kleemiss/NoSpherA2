@@ -278,7 +278,9 @@ std::string help_message =
  "                                    the grid is incompatible or does not fit\n"
  "                                    on the device.\n"
  "  -gpu_density / -no_gpu_density      The fitted density on the Gordon-Kim\n"
- "                                    repulsion grid of -interaction_energy.\n"
+ "                                    repulsion grid of -interaction_energy and\n"
+ "                                    the spherical-atom grids (Hirshfeld\n"
+ "                                    surfaces, -hdef, -hirsh).\n"
  "\n"
  "  Off unless asked:\n"
  "  -gpu_blas                          Offer large dense matrix products to the\n"
@@ -350,6 +352,15 @@ std::string help_message =
  "                                    integrated electron count.\n"
  "  -elf  -eli  -lap  -rdg  -esp       Request ELF, ELI, Laplacian, RDG, or\n"
  "                                    electrostatic-potential properties.\n"
+ "  -esp_isosurface [rho]              Electron-density isosurface [0.002 au]\n"
+ "                                    coloured by the ESP, written as\n"
+ "                                    <wfn>_rho_esp.obj (red negative, blue\n"
+ "                                    positive). Radius is raised to 2.5 A.\n"
+ "                                    -rho, -esp and -esp_isosurface also work\n"
+ "                                    from -xyz <file> with -SALTED <model>:\n"
+ "                                    the density and its analytic potential\n"
+ "                                    come from the ML prediction, no\n"
+ "                                    wavefunction needed.\n"
  "  -def  -HDEF                        Request deformation density or HDEF.\n"
  "  -MO <number|all>                   Generate a molecular-orbital property.\n"
  "  -fukui                             Fukui functions f+/f-/f0 and the dual\n"
@@ -366,7 +377,10 @@ std::string help_message =
  "  -radius <angstrom>  -resolution <angstrom>\n"
  "                                    Grid settings for property calculations.\n"
  "  -hirsh <atom-index>                Hirshfeld analysis for one atom.\n"
- "  -hirshfeld_surface <wfn1> <wfn2>  Hirshfeld-surface analysis.\n"
+ "  -hirshfeld_surface <wfn1> <wfn2>  Hirshfeld-surface analysis: d_i and d_e\n"
+ "                                    coloured surfaces, fingerprint, and the\n"
+ "                                    ESP-coloured surface when wfn1 has MOs\n"
+ "                                    or, for an xyz, with -SALTED <model>.\n"
  "  -rgbi                              Roby-Gould bond-index analysis. With\n"
  "                                    -do_XCW it runs on each refined\n"
  "                                    wavefunction and writes\n"
@@ -376,7 +390,7 @@ std::string help_message =
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
  "  -rgbi-groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
  "                                    for multiple group sets.\n"
- "  -promol_nci <a.xyz> <b.xyz> [c.xyz ...] [rcut1 rcut2 rho_max rdg_max]\n"
+ "  -promol_nci <a.xyz> <b.xyz> [c.xyz ...] [rcut1 rcut2 rho_max rdg_max colour_max]\n"
  "                                    Promolecular NCI/RDG outputs. Defaults:\n"
  "                                    rcut1=0.95 and rcut2=0.75.\n"
  "  -promol_nci_single_thread          Disable NCI parallel processing.\n"
@@ -390,6 +404,13 @@ std::string help_message =
  "  -convert_to_47 <wfn>               Write an NBO File47 (.47).\n"
  "  -fchk <output.fchk>                Write FCHK output (requires -b and -d).\n"
  "  -SALTED <model-dir>                Predict density with a SALTED model.\n"
+ "                                    With -xyz instead of -wfn the prediction\n"
+ "                                    is the structure's density for -rho,\n"
+ "                                    -esp, -esp_isosurface and the Hirshfeld\n"
+ "                                    surface ESP; add\n"
+ "                                    -salted_charge_constraint there, a\n"
+ "                                    fraction of an electron missing shifts\n"
+ "                                    the whole ESP by q/r.\n"
  "  -SALTED_COEFS <model-dir>          Write SALTED_COEFS.npy (requires -wfn).\n"
  "  -salted_charge_constraint          Rescale the l=0 coefficients of every\n"
  "                                    SALTED prediction to the electron count.\n"
@@ -1176,27 +1197,18 @@ bool unsaved_files(std::vector<WFN> &wavy)
 
 void readxyzMinMax_fromWFN(
     const WFN &wavy,
-    properties_options &opts,
-    bool no_bohr)
+    properties_options &opts)
 {
     vec2 PosAtoms;
     PosAtoms.resize(3);
     for (int i = 0; i < 3; i++)
         PosAtoms[i].resize(wavy.get_ncen());
-    bool bohrang = true;
-    if (!no_bohr)
-        bohrang = !check_bohr(wavy, false);
 
     for (int j = 0; j < wavy.get_ncen(); j++)
     {
         PosAtoms[0][j] = wavy.get_atom_coordinate(j, 0);
         PosAtoms[1][j] = wavy.get_atom_coordinate(j, 1);
         PosAtoms[2][j] = wavy.get_atom_coordinate(j, 2);
-        if (!bohrang)
-        {
-            for (int i = 0; i < 3; i++)
-                PosAtoms[i][j] = constants::ang2bohr(PosAtoms[i][j]);
-        }
     }
     opts.MinMax[0] = *std::min_element(PosAtoms[0].begin(), PosAtoms[0].end());
     opts.MinMax[3] = *std::max_element(PosAtoms[0].begin(), PosAtoms[0].end());
@@ -3103,6 +3115,12 @@ bool options::digest_property_options(const std::string &temp, int &i)
         properties.elf = true;
     else if (temp == "-esp")
         properties.esp = true;
+    else if (temp == "-esp_isosurface")
+    {
+        properties.esp_isosurface = 0.002;
+        if (argc > i + 1 && !arguments[i + 1].empty() && arguments[i + 1][0] != '-')
+            properties.esp_isosurface = stod(arguments[i + 1]);
+    }
     else if (temp == "-no_gpu")
         use_gpu = false;
     else if (temp == "-gpu_fp64")
@@ -3251,7 +3269,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
             n_xyz++;
         }
         err_checkf(n_xyz >= 2,
-            "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [frag3.xyz ...] [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max]",
+            "Usage: -promol_nci <frag1.xyz> <frag2.xyz> [frag3.xyz ...] [rcut1=0.95] [rcut2=0.75] [rho_abs_max] [rdg_max] [colour_max=0.015]",
             std::cout);
         i += n_xyz - 2;
 
@@ -3259,10 +3277,11 @@ bool options::digest_property_options(const std::string &temp, int &i)
             &properties.promol_nci_rcut1,
             &properties.promol_nci_rcut2,
             &properties.promol_nci_rho_abs_max,
-            &properties.promol_nci_rdg_max
+            &properties.promol_nci_rdg_max,
+            &properties.promol_nci_colour_max
         };
         int optional_index = 0;
-        while (optional_index < 4 && i + 3 + optional_index < argc)
+        while (optional_index < 5 && i + 3 + optional_index < argc)
         {
             try
             {
