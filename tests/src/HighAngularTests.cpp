@@ -345,11 +345,23 @@ namespace NoSpherA2UnitTests
             EXPECT_NEAR(res.overall_charges[PartitionResults::S_BECKE], electrons, 1e-4 * electrons) << input;
         }
     }
+    //ORCA's molden (orca_2mkl -molden) of the cc-pV5Z CuF2 gbw, cut to the 47 occupied MOs: h and i shells as
+    //pure functions in the gbw order, p shells as x, y, z; until 20 Sep 2026 the molden reader refused anything
+    //beyond g and read p as z, x, y (the gbw order), which put in-plane and out-of-plane p on the same MO here
+    TEST(FormatConsistencyTests, OrcaMoldenWithHAndIShellsMatchesGbw)
+    {
+        const auto root = nos_test_repo_root() / "tests" / "CuF2_i_func" / "71";
+        WFN a(root / "calc.gbw", false), b(root / "calc_occupied.molden", false);
+        a.delete_unoccupied_MOs();
+        EXPECT_EQ(b.get_nmo(), 47);
+        expect_same_density(a, b, 1e-6, "CuF2 i-function gbw vs its molden");
+    }
     //OCC writes fchk in the Gaussian convention, so the reader's pure conventions are checked against the bridge for every l
+    //up to h; from l = 6 libcint's Rys roots fail (nroots 12) inside occ's own HF
     TEST(FormatConsistencyTests, OccFchkMatchesBridge)
     {
         spdlog::set_level(spdlog::level::err);
-        for (int lmax = 1; lmax <= 4; lmax++)
+        for (const int lmax : { 1, 2, 3, 4, 5 })
         {
             const std::vector<occ::core::Atom> atoms{ { 1, 0.0, 0.0, -0.7 }, { 1, 0.0, 0.3, 0.7 } };
             std::vector<occ::gto::Shell> shells;

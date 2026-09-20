@@ -501,7 +501,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         {
             f = fields();
             err_checkf(f.size() >= 2, "Bad shell line in " + where + ": '" + line + "'", file);
-            const size_t shell_type = string("spdfg").find(static_cast<char>(tolower(f[0][0]))) + 1;
+            //spectroscopic letters without j, as ORCA and pyscf write h and i shells
+            const size_t shell_type = string("spdfghiklmn").find(static_cast<char>(tolower(f[0][0]))) + 1;
             err_checkf(f[0].size() == 1 && shell_type > 0, "Unknown shell type in " + where + ": '" + line + "'", file);
             const int number_of_functions = stoi(f[1]);
             err_checkf(number_of_functions > 0, "Shell without primitives in " + where + ": '" + line + "'", file);
@@ -546,7 +547,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
             {
                 const int l = atoms[a].get_basis_set_type(s) - 1;
-                err_checkf(l <= 4, "Molden shells beyond g are not supported", file);
+                //the format defines the cartesian order only up to g; pure shells follow the gbw tables to l = 10
+                err_checkf(l <= 10 && (spherical || l <= 4), "Molden shells beyond g are only supported as spherical harmonics", file);
                 expected_coefs += nfunc(l);
                 current_shell++;
             }
@@ -601,7 +603,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 shell[run][s] = v[1] * prims[basis_run + s].get_coef();
             if (++run < n)
                 continue;
-            if (spherical)
+            //p shells are x, y, z in the file whatever the [5D] flags (the gbw tables would read them as z, x, y)
+            if (spherical && l > 1)
                 push_back_spherical_shell(nmo, l, shell, prims, basis_run, size);
             else
                 push_back_cartesian_shell(nmo, l, shell, prims, basis_run, size, molden_order[l], cart_norm(l).data());
