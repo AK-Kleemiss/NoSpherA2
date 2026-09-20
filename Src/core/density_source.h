@@ -15,6 +15,8 @@ template<class S> concept RelativeModel = requires(const S& s, const d3& p) { { 
 template<class S> concept RelativeModelWithDerivatives = requires(const S& s, const d3& p, d3& g, double& lap) { { s.get_density(p, g, lap) } -> std::convertible_to<double>; };
 template<class S> concept PointDensity = requires(const S& s, const d3& p) { { s.rho(p) } -> std::convertible_to<double>; };
 template<class S> concept PointDensityWithDerivatives = requires(const S& s, const d3& p, d3& g, double& lap) { { s.values(p, g, lap) } -> std::convertible_to<double>; };
+template<class S> concept RelativeModelWithHessian = requires(const S& s, const d3& p, d3& g, double* H) { { s.get_density(p, g, H) } -> std::convertible_to<double>; };
+template<class S> concept PointDensityWithHessian = requires(const S& s, const d3& p, d3& g, double* H) { { s.hessian(p, g, H) } -> std::convertible_to<double>; };
 
 //A spherical (get_radial_density(r)) or EMBIS (get_density of the nucleus-relative position) atom model at a nucleus;
 //holds a reference, so the model outlives it
@@ -25,6 +27,7 @@ template<class A> struct Centred
     double rho(const d3& p) const requires RadialModel<A> { return model.get_radial_density(array_length(p, centre)); }
     double rho(const d3& p) const requires RelativeModel<A> { return model.get_density({ p[0] - centre[0], p[1] - centre[1], p[2] - centre[2] }); }
     double values(const d3& p, d3& grad, double& lap) const requires RelativeModelWithDerivatives<A> { return model.get_density({ p[0] - centre[0], p[1] - centre[1], p[2] - centre[2] }, grad, lap); }
+    double hessian(const d3& p, d3& grad, double* H) const requires RelativeModelWithHessian<A> { return model.get_density({ p[0] - centre[0], p[1] - centre[1], p[2] - centre[2] }, grad, H); }
 };
 
 //rho at p
@@ -127,8 +130,33 @@ inline void calculate_hessian(const WFN& w, const d3& p, double* H)
     d3 g;
     w.computeValues(p, rho, g, H, tau);
 }
-//ponytail: central differences of the gradient, six evaluations; analytic second derivatives when a case needs them
-template<class S> void calculate_hessian(const S& s, const d3& p, double* H)
+template<PointDensityWithHessian S> void calculate_hessian(const S& s, const d3& p, double* H)
+{
+    d3 g;
+    s.hessian(p, g, H);
+}
+//A radial model: H = rho'' u u^T + rho'/r (1 - u u^T) with the radial differences of calculate_density; at the
+//nucleus every direction is radial, H = rho'' 1
+template<RadialModel A> void calculate_hessian(const Centred<A>& s, const d3& p, double* H)
+{
+    const double h = 1E-4;
+    const d3 d{ p[0] - s.centre[0], p[1] - s.centre[1], p[2] - s.centre[2] };
+    const double r = array_length(d), rho = s.model.get_radial_density(r);
+    const double rp = s.model.get_radial_density(r + h), rm = s.model.get_radial_density(std::abs(r - h));
+    const double d1 = (rp - rm) / (2 * h), d2 = (rp + rm - 2 * rho) / (h * h);
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++) {
+            const double delta = i == j ? 1.0 : 0.0;
+            if (r < h) H[3 * i + j] = d2 * delta;
+            else {
+                const double uu = d[i] * d[j] / (r * r);
+                H[3 * i + j] = d2 * uu + d1 / r * (delta - uu);
+            }
+        }
+}
+//ponytail: central differences of the gradient, six evaluations, for a source without an analytic Hessian (none today)
+template<class S> requires (!PointDensityWithHessian<S>)
+void calculate_hessian(const S& s, const d3& p, double* H)
 {
     const double h = 1E-4;
     for (int k = 0; k < 3; k++) {

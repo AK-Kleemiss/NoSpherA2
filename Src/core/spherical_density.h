@@ -336,6 +336,8 @@ public:
     const double get_density(const d3& pos) const;
     // rho with its analytic gradient and Laplacian; at the nucleus (the cusp) both are set to 0
     const double get_density(const d3& pos, d3& grad, double& lap) const;
+    // rho with its analytic gradient and Hessian (row-major 3x3), 0 at the cusp
+    const double get_density(const d3& pos, d3& grad, double* H) const;
 };
 
 class Thakkar_Anion : public Thakkar

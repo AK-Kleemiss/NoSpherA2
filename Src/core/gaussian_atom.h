@@ -37,6 +37,7 @@ public:
     //Potential of this nucleus and its density
     double esp(const d3& p) const { return tab.esp(p[0], p[1], p[2], coefs.data()); }
     double values(const d3& p, d3& g, double& lap) const { return tab(p[0], p[1], p[2], coefs.data(), g[0], g[1], g[2], lap); }
+    double hessian(const d3& p, d3& g, double* H) const { return tab(p[0], p[1], p[2], coefs.data(), g[0], g[1], g[2], H); }
     //Integral of the density, ECP electrons included
     double electrons() const { return calc_atomic_density({ at }, coefs)[0]; }
     //Net charge Z - electrons
@@ -84,6 +85,8 @@ public:
     double eli(const d3& p) const { return tab.eli(p[0], p[1], p[2], coefs.data()); }
     //rho, its gradient and Laplacian from one shell loop
     double values(const d3& p, d3& g, double& lap) const { return tab(p[0], p[1], p[2], coefs.data(), g[0], g[1], g[2], lap); }
+    //rho, its gradient and Hessian (row-major 3x3)
+    double hessian(const d3& p, d3& g, double* H) const { return tab(p[0], p[1], p[2], coefs.data(), g[0], g[1], g[2], H); }
     //Electrons on every atom, ECP electrons included
     vec populations() const { return calc_atomic_density(*aux.get_atoms_ptr(), coefs); }
     double electrons() const;

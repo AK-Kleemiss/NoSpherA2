@@ -138,6 +138,8 @@ struct aux_density_table
     double operator()(const double x, const double y, const double z, const double* coefs) const;
     double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz) const;
     double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double& lap) const;
+    //rho with its gradient and Hessian (row-major 3x3)
+    double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double* H) const;
     //Electrostatic potential of nuclei and fitted density, see aux_density::esp_at
     double esp(const double x, const double y, const double z, const double* coefs) const;
     double lap(const double x, const double y, const double z, const double* coefs) const;

@@ -115,6 +115,24 @@ namespace
         EXPECT_NEAR(lap, lap_fd, 1e-4 * std::abs(lap_fd) + 1e-6) << name;
         EXPECT_NEAR(calculate_laplacian(s, probe), lap, 1e-10 * std::abs(lap)) << name;
         EXPECT_NEAR(calculate_rdg(s, probe), constants::alpha_coef * std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) / std::pow(rho, constants::c_43), 1e-12) << name;
+        //the Hessian: symmetric, its trace the Laplacian, every element against central differences of the analytic
+        //gradient
+        double H[9];
+        calculate_hessian(s, probe, H);
+        EXPECT_NEAR(H[0] + H[4] + H[8], lap, 1e-6 * std::abs(lap) + 1e-9) << name;
+        for (int k = 0; k < 3; k++) {
+            const double h = 1e-4;
+            d3 pp = probe, pm = probe, gp, gm;
+            double l2;
+            pp[k] += h;
+            pm[k] -= h;
+            calculate_density(s, pp, gp, l2);
+            calculate_density(s, pm, gm, l2);
+            for (int j = 0; j < 3; j++) {
+                EXPECT_NEAR(H[3 * k + j], H[3 * j + k], 1e-10 * std::abs(H[3 * k + j]) + 1e-12) << name << " kj " << k << j;
+                EXPECT_NEAR(H[3 * k + j], (gp[j] - gm[j]) / (2 * h), 1e-5 * std::abs(H[3 * k + j]) + 1e-6) << name << " kj " << k << j;
+            }
+        }
 
         const int n = 5;
         const double x[n] = { 0.0, 0.6, -0.3, 1.1, 0.2 }, y[n] = { 0.0, 0.2, 0.4, -0.5, 0.9 }, z[n] = { 0.0, -0.1, 0.7, 0.3, -0.8 };

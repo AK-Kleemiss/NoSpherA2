@@ -730,6 +730,32 @@ const double EMBIS_Atom::get_density(const d3 &pos, d3 &grad, double &lap) const
     return Rho;
 };
 
+// H rho_m = rho_m ((A p)(A p)^T (1/g^2 + 1/g^3) - A / g)
+const double EMBIS_Atom::get_density(const d3 &pos, d3 &grad, double *H) const
+{
+    double Rho = 0.0;
+    grad = { 0.0, 0.0, 0.0 };
+    for (int i = 0; i < 9; i++) H[i] = 0.0;
+    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
+    {
+        const vec &a = alpha[m];
+        const double A[9] = { a[0], a[1], a[2], a[1], a[3], a[4], a[2], a[4], a[5] };
+        const d3 Ap = { A[0] * pos[0] + A[1] * pos[1] + A[2] * pos[2],
+                        A[3] * pos[0] + A[4] * pos[1] + A[5] * pos[2],
+                        A[6] * pos[0] + A[7] * pos[1] + A[8] * pos[2] };
+        const double g = sqrt(Ap[0] * pos[0] + Ap[1] * pos[1] + Ap[2] * pos[2]);
+        const double rho_m = pop[m] * constants::INV_EIGHT_PI * sqrt_det[m] * exp(-g);
+        Rho += rho_m;
+        if (g < 1E-12) continue;
+        const double f = 1.0 / (g * g) + 1.0 / (g * g * g);
+        for (int i = 0; i < 3; i++) {
+            grad[i] -= rho_m * Ap[i] / g;
+            for (int j = 0; j < 3; j++) H[3 * i + j] += rho_m * (Ap[i] * Ap[j] * f - A[3 * i + j] / g);
+        }
+    }
+    return Rho;
+};
+
 bool Thakkar_Anion::available(const int g_atom_number)
 {
     return g_atom_number >= 1 && g_atom_number <= 103 &&

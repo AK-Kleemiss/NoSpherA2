@@ -96,6 +96,85 @@ namespace aux_density
     {
         return at_deriv<true>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap);
     }
+    //Value, gradient and the six upper-triangle second derivatives (xx xy xz yy yz zz), so the harmonic differentiates
+    //itself twice through u(d) = d / r
+    struct hyperdual
+    {
+        double v, g[3], h[6];
+        AUX_HD hyperdual(const double v_ = 0.0) : v(v_), g{ 0.0, 0.0, 0.0 }, h{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 } {}
+    };
+    AUX_HD inline hyperdual operator+(const hyperdual& a, const hyperdual& b)
+    {
+        hyperdual r(a.v + b.v);
+        for (int i = 0; i < 3; i++) r.g[i] = a.g[i] + b.g[i];
+        for (int i = 0; i < 6; i++) r.h[i] = a.h[i] + b.h[i];
+        return r;
+    }
+    AUX_HD inline hyperdual operator-(const hyperdual& a)
+    {
+        hyperdual r(-a.v);
+        for (int i = 0; i < 3; i++) r.g[i] = -a.g[i];
+        for (int i = 0; i < 6; i++) r.h[i] = -a.h[i];
+        return r;
+    }
+    AUX_HD inline hyperdual operator-(const hyperdual& a, const hyperdual& b) { return a + (-b); }
+    AUX_HD inline hyperdual operator*(const hyperdual& a, const hyperdual& b)
+    {
+        hyperdual r(a.v * b.v);
+        for (int i = 0; i < 3; i++) r.g[i] = a.v * b.g[i] + a.g[i] * b.v;
+        for (int i = 0, n = 0; i < 3; i++)
+            for (int j = i; j < 3; j++, n++) r.h[n] = a.v * b.h[n] + a.g[i] * b.g[j] + a.g[j] * b.g[i] + a.h[n] * b.v;
+        return r;
+    }
+    //rho, its gradient and its Hessian (row-major 3x3) at (x, y, z). Each shell is f = g(r) Y(u) with g = r^l R(r^2):
+    //grad f = g' u Y + g grad Y, H f = (g'' u u^T + g'/r (1 - u u^T)) Y + g' (u grad Y^T + grad Y u^T) + g H Y,
+    //where grad Y and H Y with respect to the point come from the hyperdual harmonic seeded with u(d)
+    AUX_HD inline double at_hess(const double x, const double y, const double z, const int n_at,
+        const double* cx, const double* cy, const double* cz, const double* r2_max,
+        const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
+        const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double* H)
+    {
+        double dens = 0.0, grad[3] = { 0.0, 0.0, 0.0 };
+        for (int i = 0; i < 9; i++) H[i] = 0.0;
+        for (int a = 0; a < n_at; a++) {
+            const double d[3] = { x - cx[a], y - cy[a], z - cz[a] }, r2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+            if (r2 > r2_max[a]) continue;
+            const double r = sqrt(r2), u[3] = { d[0] / r, d[1] / r, d[2] / r };
+            hyperdual hu[3];
+            for (int i = 0; i < 3; i++) {
+                hu[i].v = u[i];
+                for (int j = 0; j < 3; j++) hu[i].g[j] = ((i == j ? 1.0 : 0.0) - u[i] * u[j]) / r;
+                for (int j = 0, n = 0; j < 3; j++)
+                    for (int k = j; k < 3; k++, n++)
+                        hu[i].h[n] = (3 * u[i] * u[j] * u[k] - (i == j ? u[k] : 0.0) - (i == k ? u[j] : 0.0) - (j == k ? u[i] : 0.0)) / r2;
+            }
+            for (int s = sh_start[a]; s < sh_start[a + 1]; s++) {
+                const int l = sh_l[s];
+                double R = 0.0, Ra = 0.0, Raa = 0.0, rl = 1.0;
+                for (int p = pr_start[s]; p < pr_start[s + 1]; p++) {
+                    const double e = exp(-pr_exp[p] * r2) * pr_norm[p];
+                    R += e, Ra += pr_exp[p] * e, Raa += pr_exp[p] * pr_exp[p] * e;
+                }
+                for (int i = 0; i < l; i++) rl *= r;
+                const double g = rl * R;
+                if (std::abs(g) < 1E-10) continue;
+                const double g1 = l * rl / r * R - 2.0 * rl * r * Ra;
+                const double g2 = l * (l - 1) * rl / r2 * R - 2.0 * (2 * l + 1) * rl * Ra + 4.0 * rl * r2 * Raa;
+                const hyperdual Y = constants::spherical_harmonic(l, hu[0], hu[1], hu[2], coefs + coef_off[s]);
+                dens += g * Y.v;
+                for (int i = 0; i < 3; i++) grad[i] += g1 * u[i] * Y.v + g * Y.g[i];
+                for (int i = 0, n = 0; i < 3; i++)
+                    for (int j = i; j < 3; j++, n++) {
+                        const double hg = g2 * u[i] * u[j] + g1 / r * ((i == j ? 1.0 : 0.0) - u[i] * u[j]);
+                        const double hf = hg * Y.v + g1 * (u[i] * Y.g[j] + Y.g[i] * u[j]) + g * Y.h[n];
+                        H[3 * i + j] += hf;
+                        if (i != j) H[3 * j + i] += hf;
+                    }
+            }
+        }
+        gx = grad[0], gy = grad[1], gz = grad[2];
+        return dens;
+    }
     //PC07 iso-orbital indicator alpha = tau_P / tau_TF (Perdew and Constantin, Phys. Rev. B 75, 155109 (2007)) with the
     //a, b of r2SCAN-L, from the reduced gradient p = s^2 and the reduced Laplacian q: z = GE4M - F_W is the part of the
     //fourth-order gradient expansion beyond von Weizsaecker, f_ab(z) switches it off where it would go negative
