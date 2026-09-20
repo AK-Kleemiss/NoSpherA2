@@ -825,7 +825,7 @@ void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>> &aux_basis,
         const int off = full.coef_off[full.sh_start[a]];
         const vec sub(coeff.begin() + off, coeff.begin() + off + t.n_coef);
         vec ri_density(gridpoints);
-        calc_density_ML(t, sub, gridpoints,
+        calc_aux_density(t, sub, gridpoints,
             atomic_grids_local[g][GridData::GridIndex::X].data(), atomic_grids_local[g][GridData::GridIndex::Y].data(), atomic_grids_local[g][GridData::GridIndex::Z].data(),
             ri_density.data());
         return ri_density;
@@ -972,12 +972,12 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     vec2 ML_grid(wavy.get_ncen());
     auto grid_data = grid.getGridData();
 
-    //calc_density_ML runs its own OpenMP loop over the points of each atom
+    //calc_aux_density runs its own OpenMP loop over the points of each atom
     const aux_density_table t(wavy_aux.get_atoms());
     for (int a = 0; a < wavy.get_ncen(); a++) {
         const int size = grid.getNumPointsForAtom(a);
         ML_grid[a].resize(size, 0.0);
-        calc_density_ML(t, ri_coefs, size, d1[a].data(), d2[a].data(), d3[a].data(), ML_grid[a].data());
+        calc_aux_density(t, ri_coefs, size, d1[a].data(), d2[a].data(), d3[a].data(), ML_grid[a].data());
 #pragma omp parallel for
         for (int i = 0; i < size; i++)
             ML_grid[a][i] *= grid_data.atomic_grids[a][GridData::GridIndex::WEIGHT][i];

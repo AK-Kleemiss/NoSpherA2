@@ -279,7 +279,7 @@ SALTED training data included, carries the old error.
   `sqrt(4 pi)` of Y_00 is the difference).
 - `RiMultipoleTests.RestraintRowsReproduceTheGridMomentsOfTheAtomicDensity`: closure
   of the whole restraint on one oxygen with the `combo_basis_fit` aux basis. Arbitrary
-  coefficients, the density from `calc_density_ML` integrated on an `AtomGrid` for the
+  coefficients, the density from `calc_aux_density` integrated on an `AtomGrid` for the
   moments up to l = 2, and the restraint rows applied to the same coefficients must give
   those moments back, the targets must land in the matching rows, and `fitted_multipoles`
   must agree. This pins the row placement, the l/m ordering of the coefficients against
@@ -397,7 +397,7 @@ bohr^3/e^2; the fit of K (and of per-term scale factors) against S66x8 is WP3 of
 exchange, `rep = rep_kin + rep_x`; `-repulsion_overlap <K>` with K > 0 still gives K * S. The grid is
 `GridManager` (Becke partition, `no_density_eval`) on a dummy `WFN` that holds the atoms of both
 molecules and their aux exponents through `add_exp`, because `setupPrototypeGrids` sizes the radial
-grids from the primitive list, not from the atoms' basis-set entries. Densities from `calc_density_ML`,
+grids from the primitive list, not from the atoms' basis-set entries. Densities from `calc_aux_density`,
 gradients by central differences for the 1/9 von Weizsaecker term `rep_vw`, which is printed but not
 added: T_vW is subadditive, so the difference is always negative (-10 kcal/mol here) and would turn
 the repulsion into an attraction. `n_A`, `n_B` are the grid electron counts and are printed as the

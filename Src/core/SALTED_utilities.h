@@ -162,8 +162,10 @@ struct aux_density_table
     // Only valid for l = 0.
     double shell_population_integral(int shell) const;
 };
-//rho on np points, OpenMP on the host or on the device when the set is large enough; with gx, gy, gz its gradient too
-void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx = nullptr, double* gy = nullptr, double* gz = nullptr, double* lap = nullptr);
+//The fitted density of an aux_density_table (RI fit or SALTED prediction, the same path) on np points:
+//rho, with the gradient when gx/gy/gz are given, the Laplacian with lap and the row-major 3x3 Hessian
+//with hess (9 per point, needs the gradient arrays); GPU kernel when one is present and enabled, else OpenMP
+void calc_aux_density(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx = nullptr, double* gy = nullptr, double* gz = nullptr, double* lap = nullptr, double* hess = nullptr);
 
 vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs);
 

@@ -110,7 +110,7 @@ namespace {
                 max_diff = 0.0;
                 coefs[l] = 1.0;
 
-                calc_density_ML(t, coefs, grid[0].size(), grid[0].data(), grid[1].data(), grid[2].data(), grid[3].data());
+                calc_aux_density(t, coefs, grid[0].size(), grid[0].data(), grid[1].data(), grid[2].data(), grid[3].data());
 
                 // Empty the vectors sf:A nad sf_N
                 for (int i = 0; i < kpts.size(); i++)
@@ -190,7 +190,7 @@ namespace {
 
 
     //Here only as a reference for simple tests, the actual implementation is in SALTED_utilities.cpp
-    static double calc_density_ML(
+    static double aux_density_reference(
         const double x,
         const double y,
         const double z,
@@ -530,7 +530,7 @@ namespace NoSpherA2UnitTests
     }
 
     // Closure of the whole restraint: for one oxygen with the combo_basis_fit aux basis and arbitrary
-    // coefficients, the density that calc_density_ML evaluates from them is integrated on an atomic
+    // coefficients, the density that calc_aux_density evaluates from them is integrated on an atomic
     // grid to give the moments Q_lm = int rho r^l Y_lm, exactly what calculatePartitionedMultipoles
     // produces for the fit target. The restraint rows applied to the same coefficients must return
     // those moments (times the r_cov^-l row scaling), the targets must land in the matching rows,
@@ -568,7 +568,7 @@ namespace NoSpherA2UnitTests
 
         const aux_density_table t(aux.get_atoms());
         vec f(n_points);
-        calc_density_ML(t, coefs, n_points, gx.data(), gy.data(), gz.data(), f.data());
+        calc_aux_density(t, coefs, n_points, gx.data(), gy.data(), gz.data(), f.data());
 
         for (int p = 0; p < n_points; p++) {
             double d[3] = { gx[p] - pos[0], gy[p] - pos[1], gz[p] - pos[2] };
@@ -1287,7 +1287,7 @@ namespace NoSpherA2UnitTests
     }
 
     // Same partition on both sides: the rows partition_rows_on_grid builds for the oxygen of an O-H pair, applied to
-    // arbitrary coefficients on both atoms, must give the Becke-weighted grid moments of the density calc_density_ML
+    // arbitrary coefficients on both atoms, must give the Becke-weighted grid moments of the density calc_aux_density
     // evaluates from those coefficients, and add_partition_restraint must place them with the sqrt(4pi) / r_cov^-l
     // scaling of the older rows. The hydrogen's functions contribute to the oxygen's rows, which is the point.
     TEST(RiMultipoleTests, PartitionRowsReproduceTheGridMomentsOfTheFittedDensity)
@@ -1322,7 +1322,7 @@ namespace NoSpherA2UnitTests
         vec2 Q(1, vec(n_moments, 0.0));
 
         vec f(n_points);
-        calc_density_ML(t, coefs, n_points, gx.data(), gy.data(), gz.data(), f.data());
+        calc_aux_density(t, coefs, n_points, gx.data(), gy.data(), gz.data(), f.data());
 
         double n_becke = 0.0;
         for (int p = 0; p < n_points; p++) {
@@ -1362,7 +1362,7 @@ namespace NoSpherA2UnitTests
         }
     }
 
-    // The flattened aux basis must give the density calc_density_ML gives atom by atom, on the
+    // The flattened aux basis must give the density calc_aux_density gives atom by atom, on the
     // host and on the device; the point set is sized past the kernel's minimum work so that the
     // GPU branch is the one being tested when a device is present
     TEST(CrystalEnergyTests, FlattenedAuxDensityMatchesTheAtomWalk)
@@ -1379,10 +1379,10 @@ namespace NoSpherA2UnitTests
 #ifdef NOSPHERA2_USE_GPU
         aux_density_gpu_set_enabled(false);
 #endif
-        calc_density_ML(t, c, np, x.data(), y.data(), z.data(), rho.data());
+        calc_aux_density(t, c, np, x.data(), y.data(), z.data(), rho.data());
         double n = 0.0;
         for (int p = 0; p < np; p += 97) {
-            const double ref = calc_density_ML(x[p], y[p], z[p], c, aux.get_atoms());
+            const double ref = aux_density_reference(x[p], y[p], z[p], c, aux.get_atoms());
             EXPECT_NEAR(rho[p], ref, 1e-12 * std::abs(ref) + 1e-14) << p;
             n += std::abs(ref);
         }
@@ -1412,7 +1412,7 @@ namespace NoSpherA2UnitTests
 #ifdef NOSPHERA2_USE_GPU
         aux_density_gpu_set_enabled(false);
 #endif
-        calc_density_ML(t, c, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data());
+        calc_aux_density(t, c, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data());
         double n = 0.0;
         for (int p = 0; p < np; p += 97) {
             EXPECT_NEAR(rho[p], t(x[p], y[p], z[p], c.data()), 1e-12 * std::abs(rho[p]) + 1e-14) << p;
@@ -1456,7 +1456,7 @@ namespace NoSpherA2UnitTests
 #ifdef NOSPHERA2_USE_GPU
         aux_density_gpu_set_enabled(false);
 #endif
-        calc_density_ML(t, c, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data(), lap.data());
+        calc_aux_density(t, c, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data(), lap.data());
         double n = 0.0;
         for (int p = 0; p < np; p += 97) {
             double g[3], d[3], ref = 0.0;
@@ -1482,6 +1482,58 @@ namespace NoSpherA2UnitTests
             EXPECT_NEAR(rho_gpu[p], rho[p], 1e-11 * std::abs(rho[p]) + 1e-14) << p;
             EXPECT_NEAR(gx_gpu[p], gx[p], 1e-11 * std::abs(gx[p]) + 1e-13) << p;
             EXPECT_NEAR(lap_gpu[p], lap[p], 1e-11 * std::abs(lap[p]) + 1e-13) << p;
+        }
+#endif
+    }
+
+    TEST(CrystalEnergyTests, AnalyticAuxHessianMatchesCentralDifferences)
+    {
+        std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+        const WFN aux = generate_aux_wfn(oh_molecule(0.0), basis);
+        vec c(aux_size(aux));
+        for (int i = 0; i < (int)c.size(); i++) c[i] = 0.3 * std::sin(1.0 + i);
+        const aux_density_table t(aux.get_atoms());
+        const int np = 200000;
+        const double h = 1e-5;
+        vec x(np), y(np), z(np), rho(np), gx(np), gy(np), gz(np), lap(np), hess(9 * (size_t)np);
+        for (int p = 0; p < np; p++) x[p] = 6.0 * std::sin(0.37 * p) - 1.0, y[p] = 5.0 * std::cos(0.53 * p), z[p] = 7.0 * std::sin(0.11 * p + 1.0) + 0.5;
+#ifdef NOSPHERA2_USE_GPU
+        aux_density_gpu_set_enabled(false);
+#endif
+        calc_aux_density(t, c, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data(), lap.data(), hess.data());
+        double n = 0.0;
+        for (int p = 0; p < np; p += 97) {
+            const double* H = hess.data() + 9 * (size_t)p;
+            double g[3], l;
+            EXPECT_NEAR(rho[p], t(x[p], y[p], z[p], c.data(), g[0], g[1], g[2], l), 1e-12 * std::abs(rho[p]) + 1e-14) << p;
+            EXPECT_NEAR(gx[p], g[0], 1e-12 * std::abs(g[0]) + 1e-14) << p;
+            EXPECT_NEAR(lap[p], l, 1e-10 * std::abs(l) + 1e-13) << p;
+            EXPECT_NEAR(H[0] + H[4] + H[8], l, 1e-10 * std::abs(l) + 1e-13) << p;
+            for (int k = 0; k < 3; k++) {
+                double xp[3] = { x[p], y[p], z[p] }, xm[3] = { x[p], y[p], z[p] }, gp[3], gm[3];
+                xp[k] += h, xm[k] -= h;
+                t(xp[0], xp[1], xp[2], c.data(), gp[0], gp[1], gp[2]), t(xm[0], xm[1], xm[2], c.data(), gm[0], gm[1], gm[2]);
+                for (int j = 0; j < 3; j++) {
+                    const double ref = (gp[j] - gm[j]) / (2 * h);
+                    EXPECT_NEAR(H[3 * k + j], ref, 1e-6 * std::abs(ref) + 1e-9) << p << " " << k << j;
+                    EXPECT_DOUBLE_EQ(H[3 * k + j], H[3 * j + k]) << "symmetric";
+                    n += std::abs(ref);
+                }
+            }
+        }
+        EXPECT_GT(n, 1e-3);
+#ifdef NOSPHERA2_USE_GPU
+        if (!aux_density_gpu_available()) GTEST_SKIP() << "No GPU device present; the aux density kernel cannot run here";
+        aux_density_gpu_set_enabled(true);
+        vec rho_gpu(np), gx_gpu(np), gy_gpu(np), gz_gpu(np), lap_gpu(np), hess_gpu(9 * (size_t)np);
+        const bool ran = aux_density_gpu_eval(t.n_at, t.cx.data(), t.cy.data(), t.cz.data(), t.r2_max.data(), t.n_sh, t.sh_start.data(), t.sh_l.data(), t.pr_start.data(), t.coef_off.data(), t.n_pr, t.pr_exp.data(), t.pr_norm.data(), t.n_coef, c.data(), np, x.data(), y.data(), z.data(), rho_gpu.data(), gx_gpu.data(), gy_gpu.data(), gz_gpu.data(), lap_gpu.data(), hess_gpu.data());
+        aux_density_gpu_set_enabled(false);
+        ASSERT_TRUE(ran);
+        for (int p = 0; p < np; p++) {
+            EXPECT_NEAR(rho_gpu[p], rho[p], 1e-11 * std::abs(rho[p]) + 1e-14) << p;
+            EXPECT_NEAR(gx_gpu[p], gx[p], 1e-11 * std::abs(gx[p]) + 1e-13) << p;
+            EXPECT_NEAR(lap_gpu[p], lap[p], 1e-11 * std::abs(lap[p]) + 1e-13) << p;
+            for (int k = 0; k < 9; k++) EXPECT_NEAR(hess_gpu[9 * (size_t)p + k], hess[9 * (size_t)p + k], 1e-11 * std::abs(hess[9 * (size_t)p + k]) + 1e-13) << p << " " << k;
         }
 #endif
     }

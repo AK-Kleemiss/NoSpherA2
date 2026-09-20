@@ -1212,7 +1212,7 @@ namespace {
     // Gordon-Kim exchange-repulsion of the fitted densities on a Becke grid over the dimer: gk[0] the Thomas-Fermi kinetic
     // energy, gk[1] 1/9 of the von Weizsaecker gradient correction and gk[2] the Dirac exchange of rhoA + rhoB minus the
     // monomers, gk[3], gk[4] the electron counts of A and B on the grid. Gradients are analytic (aux_density::at_grad) and
-    // asked for only by the GGA functionals, so gk[1] is 0 with Dirac. The densities come from calc_density_ML on the
+    // asked for only by the GGA functionals, so gk[1] is 0 with Dirac. The densities come from calc_aux_density on the
     // flattened aux basis, which is where the OpenMP loop or the GPU kernel sits
     void gordon_kim(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const int x_fun, double* gk)
     {
@@ -1250,8 +1250,8 @@ namespace {
         }
         double* pA[3] = { nullptr, nullptr, nullptr }, * pB[3] = { nullptr, nullptr, nullptr };
         if (x_fun != 0) for (int c = 0; c < 3; c++) pA[c] = gA[c].data(), pB[c] = gB[c].data();
-        calc_density_ML(aux_density_table(aux_A.get_atoms()), coef_A, np, X.data(), Y.data(), Z.data(), rhoA.data(), pA[0], pA[1], pA[2], nl ? lA.data() : nullptr);
-        calc_density_ML(aux_density_table(aux_B.get_atoms()), coef_B, np, X.data(), Y.data(), Z.data(), rhoB.data(), pB[0], pB[1], pB[2], nl ? lB.data() : nullptr);
+        calc_aux_density(aux_density_table(aux_A.get_atoms()), coef_A, np, X.data(), Y.data(), Z.data(), rhoA.data(), pA[0], pA[1], pA[2], nl ? lA.data() : nullptr);
+        calc_aux_density(aux_density_table(aux_B.get_atoms()), coef_B, np, X.data(), Y.data(), Z.data(), rhoB.data(), pB[0], pB[1], pB[2], nl ? lB.data() : nullptr);
         double tf = 0.0, vw = 0.0, x = 0.0, nA = 0.0, nB = 0.0;
 #pragma omp parallel for reduction(+:tf, vw, x, nA, nB)
         for (int p = 0; p < np; p++) {
@@ -1719,7 +1719,7 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
             vec ri_density(natom_points);
             vec atom_coefs(t.n_coef);
             std::copy(coeff.data() + coef_idx, coeff.data() + coef_idx + t.n_coef, atom_coefs.begin());
-            calc_density_ML(t, atom_coefs, natom_points,
+            calc_aux_density(t, atom_coefs, natom_points,
                 atomic_grids[i][GridData::GridIndex::X].data(), atomic_grids[i][GridData::GridIndex::Y].data(), atomic_grids[i][GridData::GridIndex::Z].data(),
                 ri_density.data());
             return ri_density;

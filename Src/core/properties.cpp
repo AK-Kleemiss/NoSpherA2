@@ -14,6 +14,7 @@
 #include "SALTED_predictor.h"
 #include "crystal_energies.h"
 #include "b2c.h"
+#include "density_source.h"
 
 std::vector<Thakkar> make_thakkar_interpolators()
 {
@@ -1199,22 +1200,6 @@ struct PromolecularAtom {
     int fragment = 0;
 };
 
-double cube_value_clamped(const cube &source, int x, int y, int z)
-{
-    x = std::clamp(x, 0, source.get_size(0) - 1);
-    y = std::clamp(y, 0, source.get_size(1) - 1);
-    z = std::clamp(z, 0, source.get_size(2) - 1);
-    return source.get_value(x, y, z);
-}
-
-double cube_axis_step(const cube &source, int axis)
-{
-    double sum = 0.0;
-    for (int i = 0; i < 3; i++)
-        sum += source.get_vector(i, axis) * source.get_vector(i, axis);
-    return std::sqrt(sum);
-}
-
 PromolecularFragmentDensities promolecular_fragment_densities_at(
     const d3 &pos,
     const std::vector<PromolecularAtom> &atoms,
@@ -1233,10 +1218,8 @@ PromolecularFragmentDensities promolecular_fragment_densities_at(
             fragment_sum = 0.0;
             current_fragment = atom.fragment;
         }
-        // Cubic-spline (not linear) table lookup: lambda2_at() differentiates this
-        // field twice via finite differences, and a linear interpolant's curvature
-        // discontinuities at each table node otherwise show up as sign noise in the
-        // (often small) lambda2 that drives NCI coloring.
+        // Table lookup for the mask pass only; lambda2 and the RDG come from the
+        // analytic Thakkar derivatives in promolecular_derivatives_at()
         const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(array_length(pos, atom.pos));
         fragment_sum += contribution;
         result.sum += contribution;
@@ -1265,54 +1248,39 @@ bool is_promolecular_nci_point(
     return fragment_density >= total_density * fragment_sum_cutoff;
 }
 
-double reduced_density_gradient_at(const cube &rho_cube, int x, int y, int z)
+// rho, grad rho and the Hessian of the promolecule at pos, each Thakkar atom's analytic rho', rho''
+// summed through Centred<Thakkar>; replaces the finite-difference stencils on the rho cube, whose
+// error scaled with the grid step and whose edge points were clamped
+double promolecular_derivatives_at(
+    const d3 &pos,
+    const std::vector<PromolecularAtom> &atoms,
+    const std::vector<Thakkar> &atom_models,
+    d3 &grad,
+    double *hessian)
 {
-    const double rho = std::abs(rho_cube.get_value(x, y, z));
-    if (rho <= 1E-20)
-        return 0.0;
-
-    const double hx = cube_axis_step(rho_cube, 0);
-    const double hy = cube_axis_step(rho_cube, 1);
-    const double hz = cube_axis_step(rho_cube, 2);
-
-    const double gx = (cube_value_clamped(rho_cube, x + 1, y, z) - cube_value_clamped(rho_cube, x - 1, y, z)) / (2.0 * hx);
-    const double gy = (cube_value_clamped(rho_cube, x, y + 1, z) - cube_value_clamped(rho_cube, x, y - 1, z)) / (2.0 * hy);
-    const double gz = (cube_value_clamped(rho_cube, x, y, z + 1) - cube_value_clamped(rho_cube, x, y, z - 1)) / (2.0 * hz);
-
-    const double grad_norm = std::sqrt(gx * gx + gy * gy + gz * gz);
-    const double rdg_factor = 2.0 * std::pow(3.0 * constants::PI * constants::PI, 1.0 / 3.0);
-    return grad_norm / (rdg_factor * std::pow(rho, 4.0 / 3.0));
+    double rho = 0.0;
+    grad = { 0.0, 0.0, 0.0 };
+    std::fill(hessian, hessian + 9, 0.0);
+    for (const PromolecularAtom &atom : atoms)
+    {
+        const Centred<Thakkar> source{ atom_models[atom.charge - 1], atom.pos };
+        d3 g;
+        double H[9];
+        rho += calculate_hessian(source, pos, g, H);
+        for (int k = 0; k < 3; k++)
+            grad[k] += g[k];
+        for (int k = 0; k < 9; k++)
+            hessian[k] += H[k];
+    }
+    return rho;
 }
 
-double lambda2_at(const cube &rho_cube, int x, int y, int z)
+double reduced_density_gradient(const double rho, const d3 &grad)
 {
-    const double hx = cube_axis_step(rho_cube, 0);
-    const double hy = cube_axis_step(rho_cube, 1);
-    const double hz = cube_axis_step(rho_cube, 2);
-    const double center = cube_value_clamped(rho_cube, x, y, z);
-
-    double hessian[9]{};
-    hessian[0] = (cube_value_clamped(rho_cube, x + 1, y, z) - 2.0 * center + cube_value_clamped(rho_cube, x - 1, y, z)) / (hx * hx);
-    hessian[4] = (cube_value_clamped(rho_cube, x, y + 1, z) - 2.0 * center + cube_value_clamped(rho_cube, x, y - 1, z)) / (hy * hy);
-    hessian[8] = (cube_value_clamped(rho_cube, x, y, z + 1) - 2.0 * center + cube_value_clamped(rho_cube, x, y, z - 1)) / (hz * hz);
-
-    hessian[1] = hessian[3] =
-        (cube_value_clamped(rho_cube, x + 1, y + 1, z) -
-            cube_value_clamped(rho_cube, x + 1, y - 1, z) -
-            cube_value_clamped(rho_cube, x - 1, y + 1, z) +
-            cube_value_clamped(rho_cube, x - 1, y - 1, z)) / (4.0 * hx * hy);
-    hessian[2] = hessian[6] =
-        (cube_value_clamped(rho_cube, x + 1, y, z + 1) -
-            cube_value_clamped(rho_cube, x + 1, y, z - 1) -
-            cube_value_clamped(rho_cube, x - 1, y, z + 1) +
-            cube_value_clamped(rho_cube, x - 1, y, z - 1)) / (4.0 * hx * hz);
-    hessian[5] = hessian[7] =
-        (cube_value_clamped(rho_cube, x, y + 1, z + 1) -
-            cube_value_clamped(rho_cube, x, y + 1, z - 1) -
-            cube_value_clamped(rho_cube, x, y - 1, z + 1) +
-            cube_value_clamped(rho_cube, x, y - 1, z - 1)) / (4.0 * hy * hz);
-
-    return get_lambda_1(hessian);
+    if (std::abs(rho) <= 1E-20)
+        return 0.0;
+    const double rdg_factor = 2.0 * std::pow(3.0 * constants::PI * constants::PI, 1.0 / 3.0);
+    return array_length(grad) / (rdg_factor * std::pow(std::abs(rho), 4.0 / 3.0));
 }
 
 void add_promolecular_atoms(
@@ -1642,7 +1610,6 @@ void promolecular_nci_analysis(
         {
             for (int z = 0; z < rho_cube.get_size(2); z++)
             {
-                const double rho = rho_cube.get_value(x, y, z);
                 if (std::abs(rdg_cube.get_value(x, y, z) - 101.0) <= 1E-12)
                 {
                     signed_rho_cube.set_value(x, y, z, 0.0);
@@ -1650,9 +1617,12 @@ void promolecular_nci_analysis(
                     continue;
                 }
 
-                const double lambda2 = lambda2_at(rho_cube, x, y, z);
+                d3 grad;
+                double hessian[9];
+                const double rho = promolecular_derivatives_at(rho_cube.get_pos(x, y, z), atoms, atom_models, grad, hessian);
+                const double lambda2 = get_lambda_1(hessian);
                 const double signed_rho = lambda2 < 0.0 ? -rho : rho;
-                const double rdg = sanitize_finite(reduced_density_gradient_at(rho_cube, x, y, z));
+                const double rdg = sanitize_finite(reduced_density_gradient(rho, grad));
 
                 signed_rho_cube.set_value(x, y, z, signed_rho);
                 rdg_cube.set_value(x, y, z, rdg);

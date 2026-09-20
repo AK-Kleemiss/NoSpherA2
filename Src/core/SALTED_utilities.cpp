@@ -598,11 +598,12 @@ double aux_density_table::esp(const double x, const double y, const double z, co
     return aux_density::esp_at(x, y, z, n_at, cx.data(), cy.data(), cz.data(), Z.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs);
 }
 
-void calc_density_ML(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* lap)
+void calc_aux_density(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* lap, double* hess)
 {
     err_checkf((int)coefficients.size() == t.n_coef, "Coefficient count does not match the auxiliary basis", std::cout);
+    err_checkf(hess == nullptr || gx != nullptr, "The Hessian of the fitted density needs the gradient arrays", std::cout);
 #ifdef NOSPHERA2_USE_GPU
-    if (aux_density_gpu_enabled() && aux_density_gpu_eval(t.n_at, t.cx.data(), t.cy.data(), t.cz.data(), t.r2_max.data(), t.n_sh, t.sh_start.data(), t.sh_l.data(), t.pr_start.data(), t.coef_off.data(), t.n_pr, t.pr_exp.data(), t.pr_norm.data(), t.n_coef, coefficients.data(), np, x, y, z, rho, gx, gy, gz, lap)) {
+    if (aux_density_gpu_enabled() && aux_density_gpu_eval(t.n_at, t.cx.data(), t.cy.data(), t.cz.data(), t.r2_max.data(), t.n_sh, t.sh_start.data(), t.sh_l.data(), t.pr_start.data(), t.coef_off.data(), t.n_pr, t.pr_exp.data(), t.pr_norm.data(), t.n_coef, coefficients.data(), np, x, y, z, rho, gx, gy, gz, lap, hess)) {
         static std::atomic<bool> announced{ false };
         if (!announced.exchange(true) && !constants::hide_gpu_notes)
             std::cout << "GPU in use: fitted density on the grid" << std::endl;
@@ -612,6 +613,15 @@ void calc_density_ML(const aux_density_table& t, const vec& coefficients, const 
     if (gx == nullptr) {
 #pragma omp parallel for
         for (int p = 0; p < np; p++) rho[p] = t(x[p], y[p], z[p], coefficients.data());
+        return;
+    }
+    if (hess != nullptr) {
+#pragma omp parallel for
+        for (int p = 0; p < np; p++) {
+            double* H = hess + 9 * (size_t)p;
+            rho[p] = t(x[p], y[p], z[p], coefficients.data(), gx[p], gy[p], gz[p], H);
+            if (lap != nullptr) lap[p] = H[0] + H[4] + H[8];
+        }
         return;
     }
     if (lap == nullptr) {

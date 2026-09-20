@@ -185,6 +185,17 @@ TEST(DensitySourceTests, CentredRadialModelsMatchTheirRadialDensity)
     const Centred<Thakkar> cO{ O, centre };
     EXPECT_DOUBLE_EQ(calculate_density(cO, probe), O.get_radial_density(array_length(probe, centre)));
     check_source(cO, "Centred<Thakkar>");
+    //the one-evaluation form hands back rho and the gradient with the Hessian (what promolecular NCI sums)
+    {
+        d3 g1, g2;
+        double lap1, H1[9], H2[9];
+        const double rho1 = calculate_hessian(cO, probe, g1, H1);
+        EXPECT_DOUBLE_EQ(rho1, calculate_density(cO, probe, g2, lap1));
+        calculate_hessian(cO, probe, H2);
+        for (int k = 0; k < 3; k++) EXPECT_DOUBLE_EQ(g1[k], g2[k]);
+        for (int k = 0; k < 9; k++) EXPECT_DOUBLE_EQ(H1[k], H2[k]);
+        EXPECT_NEAR(H1[0] + H1[4] + H1[8], lap1, 1e-10 * std::abs(lap1));
+    }
     //at the nucleus the gradient vanishes; the Slater cusp has no Laplacian, the 3 rho" of the r < h branch is finite
     d3 g;
     double lap;

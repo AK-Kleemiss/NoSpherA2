@@ -23,7 +23,7 @@ namespace aux_density
     //rho at (x, y, z). Atoms carry their centre, the squared distance beyond which their most
     //diffuse primitive is below 1e-20 and their shell range; shells carry l, the primitive range
     //and the offset of their 2l+1 coefficients; primitives the exponent and the normalised
-    //contraction coefficient. The 1e-10 radial cutoff is the one calc_density_ML always had.
+    //contraction coefficient. The 1e-10 radial cutoff is the one calc_aux_density always had.
     AUX_HD inline double at(const double x, const double y, const double z, const int n_at,
         const double* cx, const double* cy, const double* cz, const double* r2_max,
         const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,

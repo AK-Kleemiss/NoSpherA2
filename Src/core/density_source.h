@@ -146,15 +146,16 @@ template<PointDensityWithHessian S> void calculate_hessian(const S& s, const d3&
     d3 g;
     s.hessian(p, g, H);
 }
-//A radial model: H = rho'' u u^T + rho'/r (1 - u u^T); at the nucleus every direction is radial, H = rho'' 1
-template<RadialModel A> void calculate_hessian(const Centred<A>& s, const d3& p, double* H)
+//A radial model, one evaluation of rho', rho'': grad = rho' u, H = rho'' u u^T + rho'/r (1 - u u^T); at the nucleus
+//every direction is radial, grad = 0 and H = rho'' 1
+template<RadialModel A> double calculate_hessian(const Centred<A>& s, const d3& p, d3& grad, double* H)
 {
     const double h = 1E-4;
     const d3 d{ p[0] - s.centre[0], p[1] - s.centre[1], p[2] - s.centre[2] };
     double d1, d2;
-    const double r = array_length(d);
-    radial_derivatives(s.model, r, d1, d2);
-    for (int i = 0; i < 3; i++)
+    const double r = array_length(d), rho = radial_derivatives(s.model, r, d1, d2);
+    for (int i = 0; i < 3; i++) {
+        grad[i] = r < h ? 0.0 : d1 * d[i] / r;
         for (int j = 0; j < 3; j++) {
             const double delta = i == j ? 1.0 : 0.0;
             if (r < h) H[3 * i + j] = d2 * delta;
@@ -163,6 +164,13 @@ template<RadialModel A> void calculate_hessian(const Centred<A>& s, const d3& p,
                 H[3 * i + j] = d2 * uu + d1 / r * (delta - uu);
             }
         }
+    }
+    return rho;
+}
+template<RadialModel A> void calculate_hessian(const Centred<A>& s, const d3& p, double* H)
+{
+    d3 grad;
+    calculate_hessian(s, p, grad, H);
 }
 //ponytail: central differences of the gradient, six evaluations, for a source without an analytic Hessian (none today)
 template<class S> requires (!PointDensityWithHessian<S>)
