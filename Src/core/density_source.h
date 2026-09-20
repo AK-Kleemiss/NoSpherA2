@@ -12,6 +12,7 @@
 
 template<class S> concept RadialModel = requires(const S& s, const double r) { { s.get_radial_density(r) } -> std::convertible_to<double>; };
 template<class S> concept RelativeModel = requires(const S& s, const d3& p) { { s.get_density(p) } -> std::convertible_to<double>; };
+template<class S> concept RelativeModelWithDerivatives = requires(const S& s, const d3& p, d3& g, double& lap) { { s.get_density(p, g, lap) } -> std::convertible_to<double>; };
 template<class S> concept PointDensity = requires(const S& s, const d3& p) { { s.rho(p) } -> std::convertible_to<double>; };
 template<class S> concept PointDensityWithDerivatives = requires(const S& s, const d3& p, d3& g, double& lap) { { s.values(p, g, lap) } -> std::convertible_to<double>; };
 
@@ -23,6 +24,7 @@ template<class A> struct Centred
     d3 centre;
     double rho(const d3& p) const requires RadialModel<A> { return model.get_radial_density(array_length(p, centre)); }
     double rho(const d3& p) const requires RelativeModel<A> { return model.get_density({ p[0] - centre[0], p[1] - centre[1], p[2] - centre[2] }); }
+    double values(const d3& p, d3& grad, double& lap) const requires RelativeModelWithDerivatives<A> { return model.get_density({ p[0] - centre[0], p[1] - centre[1], p[2] - centre[2] }, grad, lap); }
 };
 
 //rho at p
@@ -38,7 +40,7 @@ inline double calculate_density(const WFN& w, const d3& p, d3& grad, double& lap
     return rho;
 }
 template<PointDensityWithDerivatives S> double calculate_density(const S& s, const d3& p, d3& grad, double& lap) { return s.values(p, grad, lap); }
-//ponytail: central differences for a model that only has rho (the EMBIS atom); analytic derivatives when a case needs them
+//ponytail: central differences for a source that only has rho; analytic derivatives when a case needs them
 template<PointDensity S> requires (!PointDensityWithDerivatives<S>)
 double calculate_density(const S& s, const d3& p, d3& grad, double& lap)
 {

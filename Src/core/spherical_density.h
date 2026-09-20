@@ -334,6 +334,8 @@ public:
     EMBIS_Atom(const int g_atom_number, const vec2& alpha, const vec& pop);
     EMBIS_Atom();
     const double get_density(const d3& pos) const;
+    // rho with its analytic gradient and Laplacian; at the nucleus (the cusp) both are set to 0
+    const double get_density(const d3& pos, d3& grad, double& lap) const;
 };
 
 class Thakkar_Anion : public Thakkar

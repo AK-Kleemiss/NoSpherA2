@@ -214,6 +214,15 @@ TEST(DensitySourceTests, CentredEmbisMatchesGetDensity)
     EXPECT_NEAR(calculate_laplacian(ce, probe), calculate_laplacian(cm, probe), 1e-5 * std::abs(calculate_laplacian(cm, probe)));
     EXPECT_NEAR(calculate_rdg(ce, probe), calculate_rdg(cm, probe), 1e-6 * calculate_rdg(cm, probe));
     EXPECT_NEAR(calculate_eli(ce, probe), calculate_eli(cm, probe), 1e-5 * calculate_eli(cm, probe));
+    //the analytic derivatives with off-diagonal alpha (check_source holds them against central differences), and
+    //the cusp at the nucleus reports 0
+    const EMBIS_Atom skew(8, { { 1.5, 0.3, 0.1, 1.0, 0.2, 2.0 }, { 0.4, -0.1, 0.05, 0.6, 0.1, 0.5 } }, pop);
+    check_source(Centred<EMBIS_Atom>{ skew, centre }, "Centred<EMBIS_Atom> off-diagonal");
+    d3 g;
+    double lap;
+    EXPECT_GT(calculate_density(ce, centre, g, lap), 0.0);
+    EXPECT_EQ(g, (d3{ 0.0, 0.0, 0.0 }));
+    EXPECT_EQ(lap, 0.0);
 }
 
 //TFVC, MBIS and EMBIS partition the fitted density itself on the grid: the populations of every scheme sum to the
