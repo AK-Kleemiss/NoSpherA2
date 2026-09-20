@@ -31,10 +31,28 @@
     </ClCompile>
     <ClCompile Include="..\..\tests\src\main.cpp" />
     <ClCompile Include="..\..\tests\src\TscStreamTests.cpp" />
-    <ClCompile Include="..\..\tests\src\UnitTests.cpp">
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
-    </ClCompile>
     <ClCompile Include="..\..\tests\src\IntegrationTests.cpp" />
+    <ClCompile Include="..\..\tests\src\AtomSymmetryTests.cpp" />
+    <ClCompile Include="..\..\tests\src\BasisConstantsTests.cpp" />
+    <ClCompile Include="..\..\tests\src\BondwiseTests.cpp" />
+    <ClCompile Include="..\..\tests\src\CellMathTests.cpp" />
+    <ClCompile Include="..\..\tests\src\ConvenienceTests.cpp" />
+    <ClCompile Include="..\..\tests\src\CubeTests.cpp" />
+    <ClCompile Include="..\..\tests\src\FieldSurfaceTests.cpp" />
+    <ClCompile Include="..\..\tests\src\GridTests.cpp" />
+    <ClCompile Include="..\..\tests\src\HighAngularTests.cpp" />
+    <ClCompile Include="..\..\tests\src\LibcintDispatchTests.cpp" />
+    <ClCompile Include="..\..\tests\src\MathFunctionTests.cpp" />
+    <ClCompile Include="..\..\tests\src\PropertiesTests.cpp" />
+    <ClCompile Include="..\..\tests\src\RiEnergyTests.cpp" />
+    <ClCompile Include="..\..\tests\src\SaltedFchkTests.cpp" />
+    <ClCompile Include="..\..\tests\src\ScatteringFactorTests.cpp" />
+    <ClCompile Include="..\..\tests\src\StoredEriTests.cpp" />
+    <ClCompile Include="..\..\tests\src\StringUtilTests.cpp" />
+    <ClCompile Include="..\..\tests\src\TscIoTests.cpp" />
+    <ClCompile Include="..\..\tests\src\WfnOpsTests.cpp" />
+    <ClCompile Include="..\..\tests\src\WfnReadTests.cpp" />
+    <ClCompile Include="..\..\tests\src\XcwTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\tests\src\pch.h" />

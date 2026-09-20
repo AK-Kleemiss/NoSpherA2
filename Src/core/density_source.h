@@ -11,6 +11,7 @@
 #include <functional>
 
 template<class S> concept RadialModel = requires(const S& s, const double r) { { s.get_radial_density(r) } -> std::convertible_to<double>; };
+template<class S> concept RadialModelWithDerivatives = requires(const S& s, const double r, double& d1, double& d2) { { s.get_radial_density(r, d1, d2) } -> std::convertible_to<double>; };
 template<class S> concept RelativeModel = requires(const S& s, const d3& p) { { s.get_density(p) } -> std::convertible_to<double>; };
 template<class S> concept RelativeModelWithDerivatives = requires(const S& s, const d3& p, d3& g, double& lap) { { s.get_density(p, g, lap) } -> std::convertible_to<double>; };
 template<class S> concept PointDensity = requires(const S& s, const d3& p) { { s.rho(p) } -> std::convertible_to<double>; };
@@ -59,14 +60,24 @@ double calculate_density(const S& s, const d3& p, d3& grad, double& lap)
     }
     return rho;
 }
-//A radial model needs one difference: lap = rho'' + 2 rho' / r, the model is even in r
+//rho(r), rho', rho'' of a radial model: analytic where the model has them, otherwise one central difference
+//(the model is even in r)
+template<RadialModelWithDerivatives A> double radial_derivatives(const A& m, const double r, double& d1, double& d2) { return m.get_radial_density(r, d1, d2); }
+template<RadialModel A> requires (!RadialModelWithDerivatives<A>)
+double radial_derivatives(const A& m, const double r, double& d1, double& d2)
+{
+    const double h = 1E-4, rho = m.get_radial_density(r);
+    const double rp = m.get_radial_density(r + h), rm = m.get_radial_density(std::abs(r - h));
+    d1 = (rp - rm) / (2 * h), d2 = (rp + rm - 2 * rho) / (h * h);
+    return rho;
+}
+//A radial model: lap = rho'' + 2 rho' / r
 template<RadialModel A> double calculate_density(const Centred<A>& s, const d3& p, d3& grad, double& lap)
 {
     const double h = 1E-4;
     const d3 d{ p[0] - s.centre[0], p[1] - s.centre[1], p[2] - s.centre[2] };
-    const double r = array_length(d), rho = s.model.get_radial_density(r);
-    const double rp = s.model.get_radial_density(r + h), rm = s.model.get_radial_density(std::abs(r - h));
-    const double d1 = (rp - rm) / (2 * h), d2 = (rp + rm - 2 * rho) / (h * h);
+    double d1, d2;
+    const double r = array_length(d), rho = radial_derivatives(s.model, r, d1, d2);
     if (r < h) {
         grad = { 0.0, 0.0, 0.0 };
         lap = 3 * d2;
@@ -135,15 +146,14 @@ template<PointDensityWithHessian S> void calculate_hessian(const S& s, const d3&
     d3 g;
     s.hessian(p, g, H);
 }
-//A radial model: H = rho'' u u^T + rho'/r (1 - u u^T) with the radial differences of calculate_density; at the
-//nucleus every direction is radial, H = rho'' 1
+//A radial model: H = rho'' u u^T + rho'/r (1 - u u^T); at the nucleus every direction is radial, H = rho'' 1
 template<RadialModel A> void calculate_hessian(const Centred<A>& s, const d3& p, double* H)
 {
     const double h = 1E-4;
     const d3 d{ p[0] - s.centre[0], p[1] - s.centre[1], p[2] - s.centre[2] };
-    const double r = array_length(d), rho = s.model.get_radial_density(r);
-    const double rp = s.model.get_radial_density(r + h), rm = s.model.get_radial_density(std::abs(r - h));
-    const double d1 = (rp - rm) / (2 * h), d2 = (rp + rm - 2 * rho) / (h * h);
+    double d1, d2;
+    const double r = array_length(d);
+    radial_derivatives(s.model, r, d1, d2);
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++) {
             const double delta = i == j ? 1.0 : 0.0;

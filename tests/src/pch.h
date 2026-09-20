@@ -59,4 +59,13 @@ inline std::filesystem::path nos_test_expected_cwd()
     return nos_test_find_repo_root() / "tests" / "src";
 }
 
+// error_check ends the process with exit(-1). Windows reports the full value back
+// through GetExitCodeProcess, while POSIX wait() only carries the low 8 bits, so the
+// same exit is observed as 0xFFFFFFFF on one and 255 on the other.
+#ifdef _WIN32
+constexpr unsigned ERROR_CHECK_EXIT_CODE = static_cast<unsigned>(-1);
+#else
+constexpr unsigned ERROR_CHECK_EXIT_CODE = 255u;
+#endif
+
 #endif //PCH_H

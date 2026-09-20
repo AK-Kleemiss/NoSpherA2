@@ -18,6 +18,8 @@ namespace aux_density
     AUX_HD inline dual operator-(const dual& a, const dual& b) { return dual(a.v - b.v, a.x - b.x, a.y - b.y, a.z - b.z); }
     AUX_HD inline dual operator-(const dual& a) { return dual(-a.v, -a.x, -a.y, -a.z); }
     AUX_HD inline dual operator*(const dual& a, const dual& b) { return dual(a.v * b.v, a.v * b.x + a.x * b.v, a.v * b.y + a.y * b.v, a.v * b.z + a.z * b.v); }
+    //A point closer than this to a nucleus is treated as on it (at_deriv, at_hess)
+    constexpr double NUCLEUS_R = 1E-7, NUCLEUS_R2 = NUCLEUS_R * NUCLEUS_R;
     //rho at (x, y, z). Atoms carry their centre, the squared distance beyond which their most
     //diffuse primitive is below 1e-20 and their shell range; shells carry l, the primitive range
     //and the offset of their 2l+1 coefficients; primitives the exponent and the normalised
@@ -56,8 +58,11 @@ namespace aux_density
         double dens = 0.0;
         gx = gy = gz = lap = 0.0;
         for (int a = 0; a < n_at; a++) {
-            const double dx = x - cx[a], dy = y - cy[a], dz = z - cz[a], r2 = dx * dx + dy * dy + dz * dz;
+            double dx = x - cx[a], dy = y - cy[a], dz = z - cz[a], r2 = dx * dx + dy * dy + dz * dz;
             if (r2 > r2_max[a]) continue;
+            //ponytail: u = d / r is undefined on the nucleus; every shell is smooth there, so a 1e-7 bohr nudge is exact
+            //to 1e-7 in the gradient and keeps the 1/r terms below the roundoff of a double
+            if (r2 < NUCLEUS_R2) dx = NUCLEUS_R, r2 = NUCLEUS_R2;
             const double r = sqrt(r2), ux = dx / r, uy = dy / r, uz = dz / r;
             for (int s = sh_start[a]; s < sh_start[a + 1]; s++) {
                 const int l = sh_l[s];
@@ -137,8 +142,9 @@ namespace aux_density
         double dens = 0.0, grad[3] = { 0.0, 0.0, 0.0 };
         for (int i = 0; i < 9; i++) H[i] = 0.0;
         for (int a = 0; a < n_at; a++) {
-            const double d[3] = { x - cx[a], y - cy[a], z - cz[a] }, r2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+            double d[3] = { x - cx[a], y - cy[a], z - cz[a] }, r2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
             if (r2 > r2_max[a]) continue;
+            if (r2 < NUCLEUS_R2) d[0] = NUCLEUS_R, r2 = NUCLEUS_R2;  //see at_deriv
             const double r = sqrt(r2), u[3] = { d[0] / r, d[1] / r, d[2] / r };
             hyperdual hu[3];
             for (int i = 0; i < 3; i++) {

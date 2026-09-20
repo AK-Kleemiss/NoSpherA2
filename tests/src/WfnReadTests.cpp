@@ -18,12 +18,6 @@
 
 namespace
 {
-#ifdef _WIN32
-    constexpr unsigned ERROR_CHECK_EXIT_CODE = static_cast<unsigned>(-1);
-#else
-    constexpr unsigned ERROR_CHECK_EXIT_CODE = 255u;
-#endif
-
     static std::filesystem::path tmp_path(const std::string& name)
     {
         return std::filesystem::temp_directory_path() / ("nosphera2_wfnread_" + name);

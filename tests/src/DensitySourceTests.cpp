@@ -11,14 +11,6 @@
 
 vec2 sigma_to_alpha(const std::pair<vec, vec>& sigma);
 
-//err_checkf exits with -1
-constexpr unsigned ERROR_CHECK_EXIT_CODE =
-#ifdef _WIN32
-    static_cast<unsigned>(-1);
-#else
-    255u;
-#endif
-
 //density_source.h: one calculate_density / calculate_laplacian / calculate_rdg / calculate_eli for every density
 //NoSpherA2 knows. Each source must agree with the point function it wraps, the derivatives with central
 //differences of rho, and the batch with the point call; a Gaussian_Molecule must partition itself.
@@ -193,12 +185,22 @@ TEST(DensitySourceTests, CentredRadialModelsMatchTheirRadialDensity)
     const Centred<Thakkar> cO{ O, centre };
     EXPECT_DOUBLE_EQ(calculate_density(cO, probe), O.get_radial_density(array_length(probe, centre)));
     check_source(cO, "Centred<Thakkar>");
-    //at the nucleus the gradient vanishes and the Laplacian is 3 rho''
+    //at the nucleus the gradient vanishes; the Slater cusp has no Laplacian, the 3 rho" of the r < h branch is finite
     d3 g;
     double lap;
     calculate_density(cO, centre, g, lap);
     for (int k = 0; k < 3; k++) EXPECT_EQ(g[k], 0.0);
-    EXPECT_LT(lap, 0.0);
+    EXPECT_TRUE(std::isfinite(lap));
+    //the analytic Slater-orbital derivatives against central differences of the tabulated density, over the shells
+    for (const double rr : { 0.05, 0.3, 1.0, 2.5 }) {
+        const double h = 1e-5;
+        double d1, d2;
+        const double rho = O.get_radial_density(rr, d1, d2);
+        EXPECT_DOUBLE_EQ(rho, O.get_radial_density(rr));
+        const double rp = O.get_radial_density(rr + h), rm = O.get_radial_density(rr - h);
+        EXPECT_NEAR(d1, (rp - rm) / (2 * h), 1e-6 * std::abs(d1)) << rr;
+        EXPECT_NEAR(d2, (rp + rm - 2 * rho) / (h * h), 1e-4 * std::abs(d2)) << rr;
+    }
 
     const MBIS_Atom m(8, { 0.2, 0.5 }, { 2.0, 6.0 });
     const Centred<MBIS_Atom> cm{ m, centre };

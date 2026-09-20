@@ -17,13 +17,6 @@
 
 namespace
 {
-    constexpr unsigned ERROR_CHECK_EXIT_CODE =
-#ifdef _WIN32
-        static_cast<unsigned>(-1);
-#else
-        255u;
-#endif
-
     std::filesystem::path tmp_path(const std::string& name)
     {
         return std::filesystem::temp_directory_path() / ("nosphera2_saltedfchk_" + name);

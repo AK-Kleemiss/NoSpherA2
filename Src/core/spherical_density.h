@@ -249,6 +249,9 @@ protected:
         const int lower_m,
         const int upper_m,
         double* Orb) const override;
+    //calc_orbs with the first and second radial derivatives of every orbital
+    void calc_orbs_deriv(int& nr_ex, int& nr_coef, const double& dist, const int& offset, const int* n_vector,
+        const int lower_m, const int upper_m, double* Orb, double* dOrb, double* ddOrb) const;
     void calc_custom_orbs(int& nr_ex,
         int& nr_coef,
         const double& dist,
@@ -274,6 +277,8 @@ public:
     Thakkar(const int g_atom_number, const int ECP_mode = 1);
     Thakkar();
     const double get_radial_density(const double& dist) const override;
+    //rho with its analytic first and second radial derivatives
+    const double get_radial_density(const double& dist, double& d1, double& d2) const;
     const double get_radial_custom_density(
         const double& dist,
         const int& max_s,
@@ -318,6 +323,8 @@ public:
     MBIS_Atom(const int g_atom_number, const vec& sig, const vec& pop);
     MBIS_Atom();
     const double get_radial_density(const double& dist) const;
+    //rho with its analytic first and second radial derivatives
+    const double get_radial_density(const double& dist, double& d1, double& d2) const;
     void make_interpolator(const double& incr, const double& min_dist);
     double get_interpolated_density(const double& dist) const;
 };

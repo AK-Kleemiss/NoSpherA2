@@ -167,6 +167,59 @@ void Thakkar::calc_orbs(
     }
 }
 
+//ponytail: plain summation, the Kahan compensation of calc_orbs is for the density tail where the derivatives are not used
+void Thakkar::calc_orbs_deriv(int& nr_ex, int& nr_coef, const double& dist, const int& offset, const int* n_vector,
+    const int lower_m, const int upper_m, double* Orb, double* dOrb, double* ddOrb) const
+{
+    for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++) {
+        for (int m = lower_m; m < upper_m; m++) {
+            if (occ[offset + m] == 0) continue;
+            const double zz = z[nr_ex], exponent = -zz * dist;
+            if (exponent > -46.5) {
+                //r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative
+                const int nn = n[nr_ex];
+                const double e = c[nr_coef] * exp(exponent);
+                const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
+                const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
+                const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
+                Orb[m] += e * p1;
+                dOrb[m] += e * ((nn - 1) * p2 - zz * p1);
+                ddOrb[m] += e * ((nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1);
+            }
+            nr_coef++;
+        }
+        nr_ex++;
+    }
+}
+
+const double Thakkar::get_radial_density(const double& dist, double& d1, double& d2) const
+{
+    if (atomic_number == 1) {
+        const double rho = 6.0835 * exp(-2.3 * dist) / constants::FOUR_PI;
+        d1 = -2.3 * rho;
+        d2 = 2.3 * 2.3 * rho;
+        return rho;
+    }
+    d1 = d2 = 0.0;
+    if (_first_ex == 200000000) return -20;
+    int nr_coef = _prev_coef, nr_ex = _first_ex;
+    double Orb[19] = {}, dOrb[19] = {}, ddOrb[19] = {};
+    calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, ns, 0, 7, Orb, dOrb, ddOrb);
+    calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, np, 7, 13, Orb, dOrb, ddOrb);
+    calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, nd, 13, 17, Orb, dOrb, ddOrb);
+    calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, nf, 17, 19, Orb, dOrb, ddOrb);
+    double Rho = 0.0;
+    for (int m = 0; m < 19; m++) {
+        if (occ[_offset + m] == 0) continue;
+        Rho += occ[_offset + m] * Orb[m] * Orb[m];
+        d1 += occ[_offset + m] * 2 * Orb[m] * dOrb[m];
+        d2 += occ[_offset + m] * 2 * (dOrb[m] * dOrb[m] + Orb[m] * ddOrb[m]);
+    }
+    d1 /= constants::FOUR_PI;
+    d2 /= constants::FOUR_PI;
+    return Rho / constants::FOUR_PI;
+}
+
 void Thakkar::calc_custom_orbs(
     int &nr_ex,
     int &nr_coef,
@@ -641,6 +694,19 @@ const double MBIS_Atom::get_radial_density(const double &dist) const
     }
     return Rho;
 };
+
+const double MBIS_Atom::get_radial_density(const double& dist, double& d1, double& d2) const
+{
+    double Rho = 0.0;
+    d1 = d2 = 0.0;
+    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++) {
+        const double sigval = 1.0 / sig[m], rho_m = pop[m] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-dist * sigval);
+        Rho += rho_m;
+        d1 -= rho_m * sigval;
+        d2 += rho_m * sigval * sigval;
+    }
+    return Rho;
+}
 
 void MBIS_Atom::make_interpolator(const double &incr, const double &min_dist) {
     lincr = log(incr);
